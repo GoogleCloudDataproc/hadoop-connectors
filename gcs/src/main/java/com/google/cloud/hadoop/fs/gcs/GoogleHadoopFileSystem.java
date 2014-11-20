@@ -184,6 +184,11 @@ public class GoogleHadoopFileSystem
   public String getHadoopScheme() {
     return GoogleCloudStorageFileSystem.SCHEME;
   }
+  
+  @Override
+  public String getScheme() {
+    return GoogleCloudStorageFileSystem.SCHEME;
+  }
 
   @Override
   public Path getFileSystemRoot() {
