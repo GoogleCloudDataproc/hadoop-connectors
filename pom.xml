@@ -75,7 +75,7 @@
     <bigdataoss.gcs.version>1.4.1-SNAPSHOT</bigdataoss.gcs.version>
     <bigdataoss.gcsio.version>1.4.1-SNAPSHOT</bigdataoss.gcsio.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <google.api.version>1.19.0</google.api.version>
+    <google.api.version>1.20.0</google.api.version>
     <google.guava.version>18.0</google.guava.version>
     <build.java.source.version>7</build.java.source.version>
     <build.java.target.version>7</build.java.target.version>
@@ -200,7 +200,7 @@
       <dependency>
         <groupId>com.google.apis</groupId>
         <artifactId>google-api-services-storage</artifactId>
-        <version>v1-rev16-${google.api.version}</version>
+        <version>v1-rev35-${google.api.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.oauth-client</groupId>
@@ -215,7 +215,7 @@
       <dependency>
         <groupId>com.google.apis</groupId>
         <artifactId>google-api-services-bigquery</artifactId>
-        <version>v2-rev171-${google.api.version}</version>
+        <version>v2-rev213-${google.api.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.code.gson</groupId>
