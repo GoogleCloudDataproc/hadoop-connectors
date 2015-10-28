@@ -1,0 +1,16 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Known text files
+.gitattributes text
+.gitignore text
+LICENSE text
+*.java text
+*.xml text
+*.md text
+*.properties text
+*.sh text
+*.txt text
+
+# Known binary files
+*.jar binary
