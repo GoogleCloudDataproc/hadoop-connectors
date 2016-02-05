@@ -53,6 +53,9 @@ public class DynamicFileListRecordReader<K, V>
   // The estimated number of records we will read in total.
   private long estimatedNumRecords;
 
+  // maximum number of attempts to wait for next file
+  private int maxAttempts;
+
   // The interval we will poll listStatus/globStatus inside nextKeyValue() if we don't already
   // have a file ready for reading.
   private int pollIntervalMs;
@@ -125,6 +128,10 @@ public class DynamicFileListRecordReader<K, V>
     pollIntervalMs = context.getConfiguration().getInt(
         BigQueryConfiguration.DYNAMIC_FILE_LIST_RECORD_READER_POLL_INTERVAL_MS_KEY,
         BigQueryConfiguration.DYNAMIC_FILE_LIST_RECORD_READER_POLL_INTERVAL_MS_DEFAULT);
+    // max number of attempts to wait for next file
+    maxAttempts = context.getConfiguration().getInt(
+        BigQueryConfiguration.DYNAMIC_FILE_LIST_RECORD_READER_MAX_ATTEMPT_KEY,
+        BigQueryConfiguration.DYNAMIC_FILE_LIST_RECORD_READER_MAX_ATTEMPT_DEFAULT);
 
     fileSystem = inputDirectoryAndPattern.getFileSystem(context.getConfiguration());
 
@@ -159,8 +166,10 @@ public class DynamicFileListRecordReader<K, V>
     }
 
     boolean needRefresh = !isNextFileReady() && shouldExpectMoreFiles();
-    while (needRefresh) {
+    int numAttempt = 0;
+    while (needRefresh && numAttempt < maxAttempts) {
       logger.atFine().log("No files available, but more are expected; refreshing...");
+      LOG.debug(String.format("Current attempt: %s", numAttempt));
       refreshFileList();
       needRefresh = !isNextFileReady() && shouldExpectMoreFiles();
       if (needRefresh) {
@@ -171,7 +180,13 @@ public class DynamicFileListRecordReader<K, V>
         } catch (InterruptedException ie) {
           logger.atWarning().withCause(ie).log("Interrupted while sleeping.");
         }
+        numAttempt++;
       }
+    }
+
+    if (numAttempt == maxAttempts) {
+        throw new IllegalStateException(String.format("Couldn't obtain any files after %s retries. This could happen ",
+                maxAttempts));
     }
 
     if (isNextFileReady()) {
