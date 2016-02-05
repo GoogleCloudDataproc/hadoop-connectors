@@ -77,6 +77,11 @@ public class BigQueryConfiguration {
       "mapred.bq.dynamic.file.list.record.reader.poll.interval";
   public static final int DYNAMIC_FILE_LIST_RECORD_READER_POLL_INTERVAL_MS_DEFAULT = 10000;
 
+  public static final String DYNAMIC_FILE_LIST_RECORD_READER_MAX_ATTEMPT_KEY =
+      "mapred.bq.dynamic.file.list.record.reader.max.attempts";
+  public static final int DYNAMIC_FILE_LIST_RECORD_READER_MAX_ATTEMPT_DEFAULT = 15;
+
+
   /** A list of all necessary Configuration keys for input connector. */
   public static final List<String> MANDATORY_CONFIG_PROPERTIES_INPUT = ImmutableList.of(
       PROJECT_ID_KEY, INPUT_PROJECT_ID_KEY, INPUT_DATASET_ID_KEY, INPUT_TABLE_ID_KEY);
