@@ -1298,8 +1298,15 @@ public class GoogleCloudStorageImpl
         String.format("resourceId.getObjectName() must equal object.getName(): '%s' vs '%s'",
             resourceId.getObjectName(), object.getName()));
 
-    Map<String, byte[]> decodedMetadata =
-        object.getMetadata() == null ? null : decodeMetadata(object.getMetadata());
+    // return the object's checksums as part of its metadata. we explicitly do not return these
+    // as a {@link org.apache.hadoop.fs.FileChecksum} because the normal DistCp implementation
+    // fails if you try to copy between filesystems with different checksum types
+    Map<String, String> encodedMetadata =
+        object.getMetadata() == null ? Maps.<String, String>newHashMap() : object.getMetadata();
+    encodedMetadata.put("md5hash", object.getMd5Hash());
+    encodedMetadata.put("crc32c", object.getCrc32c());
+
+    Map<String, byte[]> decodedMetadata = decodeMetadata(encodedMetadata);
 
     // GCS API does not make available location and storage class at object level at present
     // (it is same for all objects in a bucket). Further, we do not use the values for objects.
