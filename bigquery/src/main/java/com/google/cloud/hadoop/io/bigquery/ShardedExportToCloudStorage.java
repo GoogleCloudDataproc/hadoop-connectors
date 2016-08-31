@@ -1,16 +1,17 @@
 package com.google.cloud.hadoop.io.bigquery;
 
 import com.google.api.services.bigquery.model.Table;
-import com.google.api.services.bigquery.model.TableReference;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * A BigQueryExport that makes use of BigQuery's multiple export path feature and
@@ -48,18 +49,14 @@ public class ShardedExportToCloudStorage extends AbstractExportToCloudStorage {
   // while only populating actual data into one of the two shards.
   public static final int MIN_SHARDS_FOR_SHARDED_EXPORT = 2;
 
-  protected final Table tableMetadata;
-
   public ShardedExportToCloudStorage(
       Configuration configuration,
       String gcsPath,
       ExportFileFormat fileFormat,
       BigQueryHelper bigQueryHelper,
       String projectId,
-      TableReference tableToExport) throws IOException {
+      Table tableToExport) throws IOException {
     super(configuration, gcsPath, fileFormat, bigQueryHelper, projectId, tableToExport);
-    // Fetch some metadata about the table we plan to export.
-    tableMetadata = bigQueryHelper.getTable(tableToExport);
   }
 
   @Override
@@ -69,7 +66,7 @@ public class ShardedExportToCloudStorage extends AbstractExportToCloudStorage {
 
   @Override
   public List<InputSplit> getSplits(JobContext context) throws IOException {
-    long numTableRows = tableMetadata.getNumRows().longValue();
+    long numTableRows = tableToExport.getNumRows().longValue();
     List<String> paths = getExportPaths();
     int pathCount = paths.size();
 
@@ -86,8 +83,8 @@ public class ShardedExportToCloudStorage extends AbstractExportToCloudStorage {
   public List<String> getExportPaths() throws IOException {
     List<String> paths = new ArrayList<>();
 
-    long numTableRows = tableMetadata.getNumRows().longValue();
-    long numTableBytes = tableMetadata.getNumBytes();
+    long numTableRows = tableToExport.getNumRows().longValue();
+    long numTableBytes = tableToExport.getNumBytes();
 
     int numShards = computeNumShards(numTableBytes);
     LOG.info("Computed '{}' shards for sharded BigQuery export.", numShards);
@@ -98,7 +95,7 @@ public class ShardedExportToCloudStorage extends AbstractExportToCloudStorage {
     }
 
     LOG.info("Table '{}' to be exported has {} rows and {} bytes",
-        BigQueryStrings.toString(tableToExport), numTableRows, numTableBytes);
+        BigQueryStrings.toString(tableToExport.getTableReference()), numTableRows, numTableBytes);
 
     return paths;
   }

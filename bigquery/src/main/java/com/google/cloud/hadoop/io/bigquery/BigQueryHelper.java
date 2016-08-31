@@ -138,19 +138,6 @@ public class BigQueryHelper {
   }
 
   /**
-   * Gets the schema of this table.
-   *
-   * @param tableRef The BigQuery table reference.
-   * @return value or null for none
-   * @throws IOException
-   */
-  public TableSchema getTableSchema(TableReference tableRef)
-      throws IOException {
-    Table table = getTable(tableRef);
-    return table.getSchema();
-  }
-
-  /**
    * Creates a new JobReference with a unique jobId generated from {@code jobIdPrefix} plus a
    * randomly generated UUID String.
    */
