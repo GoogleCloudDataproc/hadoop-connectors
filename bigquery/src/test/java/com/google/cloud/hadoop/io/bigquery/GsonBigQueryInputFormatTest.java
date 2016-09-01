@@ -22,7 +22,6 @@ import com.google.api.services.bigquery.model.TableReference;
 import com.google.cloud.hadoop.fs.gcs.InMemoryGoogleHadoopFileSystem;
 import com.google.cloud.hadoop.testing.CredentialConfigurationUtil;
 import com.google.common.collect.ImmutableList;
-import com.google.gson.JsonObject;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;

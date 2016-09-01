@@ -1,20 +1,17 @@
 package com.google.cloud.hadoop.io.bigquery;
 
-import com.google.api.client.repackaged.com.google.common.annotations.VisibleForTesting;
 import com.google.api.services.bigquery.model.Table;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-
+import java.io.IOException;
+import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.InputFormat;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
-
-import java.io.IOException;
-import java.util.List;
-
-import javax.annotation.Nullable;
 
 /**
  * This class represents the logical "export" of BigQuery federated data source stored in

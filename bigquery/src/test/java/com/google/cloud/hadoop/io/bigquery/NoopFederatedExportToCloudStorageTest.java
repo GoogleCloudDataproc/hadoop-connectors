@@ -6,7 +6,8 @@ import static org.junit.Assert.assertEquals;
 import com.google.api.services.bigquery.model.ExternalDataConfiguration;
 import com.google.api.services.bigquery.model.Table;
 import com.google.common.collect.ImmutableList;
-
+import java.io.IOException;
+import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
@@ -21,10 +22,10 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
 
-import java.io.IOException;
-import java.util.List;
-
+@RunWith(JUnit4.class)
 public class NoopFederatedExportToCloudStorageTest {
 
   @Rule

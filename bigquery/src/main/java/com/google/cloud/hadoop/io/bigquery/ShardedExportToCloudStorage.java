@@ -1,17 +1,15 @@
 package com.google.cloud.hadoop.io.bigquery;
 
 import com.google.api.services.bigquery.model.Table;
-
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * A BigQueryExport that makes use of BigQuery's multiple export path feature and
