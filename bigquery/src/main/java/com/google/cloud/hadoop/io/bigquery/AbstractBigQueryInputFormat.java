@@ -44,6 +44,9 @@ public abstract class AbstractBigQueryInputFormat<K, V>
    */
   public static final String INPUT_FORMAT_CLASS_KEY = "mapreduce.inputformat.class";
 
+  /**
+   * The keyword for the type of BigQueryTable store externally.
+   */
   public static final String EXTERNAL_TABLE_TYPE = "EXTERNAL";
 
   // Used by UnshardedExportToCloudStorage
@@ -190,12 +193,7 @@ public abstract class AbstractBigQueryInputFormat<K, V>
         .setTableId(tableName);
     Table table = bigQueryHelper.getTable(exportTableReference);
 
-    boolean enableShardedExport = isShardedExportEnabled(configuration);
-    boolean deleteTableOnExit = configuration.getBoolean(
-        BigQueryConfiguration.DELETE_INTERMEDIATE_TABLE_KEY,
-        BigQueryConfiguration.DELETE_INTERMEDIATE_TABLE_DEFAULT);
     String query = configuration.get(BigQueryConfiguration.INPUT_QUERY_KEY);
-
 
     if (EXTERNAL_TABLE_TYPE.equals(table.getType())) {
       if (Strings.isNullOrEmpty(query)) {
@@ -208,6 +206,11 @@ public abstract class AbstractBigQueryInputFormat<K, V>
         LOG.info("Ignoring use of federated data source, because a query was specified.");
       }
     }
+
+    boolean enableShardedExport = isShardedExportEnabled(configuration);
+    boolean deleteTableOnExit = configuration.getBoolean(
+        BigQueryConfiguration.DELETE_INTERMEDIATE_TABLE_KEY,
+        BigQueryConfiguration.DELETE_INTERMEDIATE_TABLE_DEFAULT);
 
     LOG.debug(
         "isShardedExportEnabled = %s, deleteTableOnExit = %s, tableReference = %s, query = %s",
