@@ -527,6 +527,8 @@ public class GoogleCloudStorageReadChannel
       if (skipBuffer == null) {
         skipBuffer = new byte[SKIP_BUFFER_SIZE];
       }
+      // perform lazy seek before reading
+      performLazySeek();
       while (seekDistance > 0) {
         int bytesRead = readChannel.read(
             ByteBuffer.wrap(skipBuffer, 0, (int) Math.min(skipBuffer.length, seekDistance)));
