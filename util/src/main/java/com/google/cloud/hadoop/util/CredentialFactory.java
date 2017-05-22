@@ -94,9 +94,15 @@ public class CredentialFactory {
           .setServiceAccountScopes(credential.getServiceAccountScopes())
           .setTokenServerEncodedUrl(credential.getTokenServerEncodedUrl())
           .setTransport(credential.getTransport())
+          .setClientAuthentication(credential.getClientAuthentication())
           .setJsonFactory(credential.getJsonFactory())
           .setClock(credential.getClock());
-      return new GoogleCredentialWithRetry(builder);
+      GoogleCredentialWithRetry withRetry = new GoogleCredentialWithRetry(builder);
+      // Setting a refresh token requires validation even if it is null.
+      if(credential.getRefreshToken() != null) {
+        withRetry.setRefreshToken(credential.getRefreshToken());
+      }
+      return withRetry;
     }
 
     public GoogleCredentialWithRetry(Builder builder) {
