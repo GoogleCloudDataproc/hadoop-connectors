@@ -381,6 +381,6 @@ public class CredentialFactory {
       String clientId, String clientSecret, String filePath, List<String> scopes)
       throws IOException, GeneralSecurityException {
     return getCredentialFromFileCredentialStoreForInstalledApp(
-        clientId, clientSecret, filePath, scopes);
+        clientId, clientSecret, filePath, scopes, getStaticHttpTransport());
   }
 }
