@@ -2,8 +2,11 @@
   1. Wire HTTP transport settings into Credential logic.
 
   2. Fixed an issue where JSON auth files containing user auth e.g.
-     Application default credentials does not work with
+     application_default_credentials.json does not work with
      google.cloud.auth.service.account.json.keyfile
+
+  3. Honor GOOGLE_APPLICATION_DEFAULT_CREDENTIALS environment variable. For
+     Google Application Default Credentials (but not other defaults).
 
 1.6.1 - 2017-04-14
 
