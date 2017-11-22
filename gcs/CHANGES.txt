@@ -1,5 +1,7 @@
-1.6.2 - 2017-XX-XX
+1.6.2 - 2017-11-21
+
   1. Wire HTTP transport settings into Credential logic.
+
 
 1.6.1 - 2017-04-14
 
