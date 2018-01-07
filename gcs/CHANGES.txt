@@ -20,6 +20,11 @@
        fs.gs.requester.pays.project.id (no default value)
        fs.gs.requester.pays.buckets (no default value)
 
+  6. Add support for specifying marker files pattern that should be copied
+     last during folder rename operation. Pattern is configured with property:
+
+       fs.gs.marker.file.pattern
+
 
 1.6.3 - 2018-01-25
 
