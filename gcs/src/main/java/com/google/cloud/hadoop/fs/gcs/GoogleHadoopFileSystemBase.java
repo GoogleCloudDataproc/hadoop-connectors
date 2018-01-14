@@ -38,6 +38,7 @@ import static com.google.common.flogger.LazyArgs.lazy;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.FileInfo;
@@ -52,6 +53,7 @@ import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.AccessTokenProviderClassFromConfigFactory;
+import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.CredentialFactory;
 import com.google.cloud.hadoop.util.CredentialFromAccessTokenProviderClassFactory;
 import com.google.cloud.hadoop.util.HadoopCredentialConfiguration;
@@ -263,6 +265,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   /** The fixed reported permission of all files. */
   private FsPermission reportedPermissions;
+
+  private ApiErrorExtractor ERROR_EXTRACTOR = new ApiErrorExtractor();
 
   /** Map of counter values */
   protected final ImmutableMap<Counter, AtomicLong> counters = createCounterMap();
@@ -879,7 +883,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    *
    * @param src Source path.
    * @param dst Destination path.
-   * @return true if rename succeeds.
+   * @return true if successful, or false if the old name does not exist
+   * or if the new name already belongs to the namespace.
    * @throws FileNotFoundException if src does not exist.
    * @throws IOException if an error occurs.
    */
@@ -906,7 +911,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     try {
       getGcsFs().rename(srcPath, dstPath);
     } catch (IOException e) {
-      // Occasionally log exceptions that have a cause at info level,
+      if (shouldThrowDuringRename(e)) {
+        throw e;
+      } else {
+        // Occasionally log exceptions that have a cause at info level,
       // because they could surface real issues and help with troubleshooting
       (logger.atFine().isEnabled() || e.getCause() == null
               ? logger.atFine()
@@ -914,6 +922,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
           .withCause(e)
           .log("rename(src: %s, dst: %s): false [failed]", src, dst);
       return false;
+      }
     }
 
     long duration = System.nanoTime() - startTime;
@@ -921,6 +930,18 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     increment(Counter.RENAME_TIME, duration);
     logger.atFiner().log("rename(src: %s, dst: %s): true", src, dst);
     return true;
+  }
+
+  @VisibleForTesting
+  protected boolean shouldThrowDuringRename(IOException e) {
+    // should resourceNotReady be rethrown?
+    // should accessDeniedNonRecoverable be checked explicitly?
+    GoogleJsonError error = ERROR_EXTRACTOR.unwrapJsonError(e);
+    if (error == null) {
+      return false;
+    }
+    return ERROR_EXTRACTOR.accessDenied(error) ||
+          ERROR_EXTRACTOR.isInternalServerError(error);
   }
 
   /**

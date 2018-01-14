@@ -45,6 +45,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
+import static org.junit.Assert.*;
+
 /** Unit-tests for ApiErrorExtractor class. */
 @RunWith(JUnit4.class)
 public class ApiErrorExtractorTest {
@@ -273,6 +275,37 @@ public class ApiErrorExtractorTest {
             /* httpStatus=*/ 42, /* reason=*/ null, /* message=*/ null, "Top Level HTTP Message");
     assertThat(errorExtractor.getErrorMessage(nullJsonErrorWithMessage))
         .isEqualTo("Top Level HTTP Message");
+  }
+
+  @Test
+  public void testUnwrapJsonError() throws IOException {
+    GoogleJsonResponseException withJsonError = googleJsonResponseException(
+          42, "Detail Reason", "Detail message", "Top Level HTTP Message");
+
+    GoogleJsonError originalError = errorExtractor.unwrapJsonError(withJsonError);
+    assertNotNull(originalError);
+    assertEquals(originalError.getCode(), 42);
+    assertEquals(originalError.getMessage(), "Top Level HTTP Message");
+
+    IOException wrappedException = new IOException(withJsonError.getDetails().toString());
+    GoogleJsonError wrappedError = errorExtractor.unwrapJsonError(wrappedException);
+    assertNotNull(wrappedError);
+    assertEquals(wrappedError.getCode(), 42);
+    assertEquals(wrappedError.getMessage(), "Top Level HTTP Message");
+
+    IOException nestedException = new IOException(new IOException(withJsonError.getDetails().toString()));
+    GoogleJsonError nestedError = errorExtractor.unwrapJsonError(nestedException);
+    assertNotNull(nestedError);
+    assertEquals(nestedError.getCode(), 42);
+    assertEquals(nestedError.getMessage(), "Top Level HTTP Message");
+
+    IOException multiException = new IOException();
+    multiException.addSuppressed(new IOException());
+    multiException.addSuppressed(new IOException(new IOException(withJsonError.getDetails().toString())));
+    GoogleJsonError multiError = errorExtractor.unwrapJsonError(multiException);
+    assertNotNull(multiError);
+    assertEquals(multiError.getCode(), 42);
+    assertEquals(multiError.getMessage(), "Top Level HTTP Message");
   }
 
   @Test

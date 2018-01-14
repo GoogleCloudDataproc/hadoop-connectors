@@ -73,6 +73,8 @@ public class ApiErrorExtractor {
   // as an unknown key.
   private static final String DEBUG_INFO_FIELD = "debugInfo";
 
+  public static final JsonFactory JSON_FACTORY = new JacksonFactory();
+
   /** @deprecated use {@link #INSTANCE} instead */
   @Deprecated
   public ApiErrorExtractor() {}
@@ -101,6 +103,18 @@ public class ApiErrorExtractor {
    */
   public boolean unauthorized(IOException e) {
     return recursiveCheckForCode(e, HttpStatusCodes.STATUS_CODE_UNAUTHORIZED);
+  }
+
+  /**
+   * Determines if the given error indicates 'access denied'.
+   *
+   * <p> Warning: this method only checks for access denied status code,
+   * however this may include potentially recoverable reason codes such as
+   * rate limiting. For alternative, see
+   * {@link #accessDeniedNonRecoverable(GoogleJsonError)}.
+   */
+  public boolean accessDenied(GoogleJsonError e) {
+    return e.getCode() == HttpStatusCodes.STATUS_CODE_FORBIDDEN;
   }
 
   /**
@@ -149,6 +163,13 @@ public class ApiErrorExtractor {
       return getHttpStatusCode(jsonException) / 100 == 5;
     }
     return false;
+  }
+
+  /**
+   * Determines if the error is an internal server error.
+   */
+  public boolean isInternalServerError(GoogleJsonError e) {
+    return e.getCode() / 100 == 5;
   }
 
   /**
@@ -470,4 +491,46 @@ public class ApiErrorExtractor {
     }
     return null;
   }
+
+  // sometimes GoogleJsonResponseException is rewrapped to plain IOException making it impossible to decode
+  @Nullable
+  public GoogleJsonError unwrapJsonError(Throwable t) {
+    // verify rewrapped exceptions
+    Throwable cause = t;
+    while (cause != null) {
+      if (cause instanceof GoogleJsonResponseException) {
+        return ((GoogleJsonResponseException) cause).getDetails();
+      } else if (cause instanceof IOException) {
+        GoogleJsonError decoded = tryParseJsonError(cause);
+        if (decoded != null) {
+          return decoded;
+        }
+        for (Throwable suppressed : cause.getSuppressed()) {
+          decoded = unwrapJsonError(suppressed);
+          if (decoded != null) {
+            return decoded;
+          }
+        }
+      }
+      cause = cause.getCause();
+    }
+    return null;
+  }
+
+  @Nullable
+  private GoogleJsonError tryParseJsonError(Throwable t) {
+    if (t.getMessage() == null) {
+      return null;
+    }
+    try {
+      GoogleJsonError decoded = JSON_FACTORY.fromString(t.getMessage(), GoogleJsonError.class);
+      if (decoded != null && decoded.getCode() != 0) {
+        return decoded;
+      }
+    } catch (IOException|IllegalArgumentException e) {
+      // ignore
+    }
+    return null;
+  }
+
 }
