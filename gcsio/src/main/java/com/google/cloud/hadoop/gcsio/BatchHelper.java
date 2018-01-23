@@ -70,6 +70,10 @@ public class BatchHelper {
       long maxRequestsPerBatch) {
     this.pendingBatchEntries = new LinkedList<>();
     this.batch = gcs.batch(requestInitializer);
+    // If generic batch endpoint is used, force use of API-specific batch endpoint
+    if (this.batch.getBatchUrl().getRawPath().endsWith("batch")) {
+      this.batch.getBatchUrl().appendRawPath("/" + Storage.DEFAULT_SERVICE_PATH);
+    }
     this.maxRequestsPerBatch = maxRequestsPerBatch;
   }
 
