@@ -5,6 +5,9 @@
 
   1. Use new GCS batch requests endpoint.
 
+  6. Disable GCS Metadata Cache by default (e.g. set default value of
+     `fs.gs.metadata.cache.enable` property to `false`).
+
 
 1.6.2 - 2017-11-21
 
