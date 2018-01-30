@@ -14,7 +14,6 @@
 
 package com.google.cloud.hadoop.gcsio.integration;
 
-
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.CacheSupplementedGoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
@@ -72,8 +71,11 @@ public class GoogleCloudStorageIntegrationTest extends GoogleCloudStorageTest {
       Optional<GoogleCloudStorageOptions.Builder> optionalBuilder) throws IOException {
     Credential credential = GoogleCloudStorageTestHelper.getCredential();
 
-    GoogleCloudStorageOptions.Builder builder = optionalBuilder.or(
-        GoogleCloudStorageTestHelper.getStandardOptionBuilder());
+    GoogleCloudStorageOptions.Builder builder =
+        optionalBuilder
+            .or(GoogleCloudStorageTestHelper.getStandardOptionBuilder())
+            .setMaxRequestsPerBatch(100)
+            .setMaxListItemsPerCall(1000);
 
     return new ThrottledGoogleCloudStorage(
         // Allow 2 create or delete bucket operation every second. This will hit rate limits,
