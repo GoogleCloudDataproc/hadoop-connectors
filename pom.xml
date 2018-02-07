@@ -70,18 +70,24 @@
   </distributionManagement>
 
   <properties>
+    <build.java.source.version>7</build.java.source.version>
+    <build.java.target.version>7</build.java.target.version>
+    <build.java.testSource.version>8</build.java.testSource.version>
+    <build.java.testTarget.version>8</build.java.testTarget.version>
+
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+    <gpg.skip>true</gpg.skip>
+
     <bigdataoss.util.version>1.6.4-SNAPSHOT</bigdataoss.util.version>
     <bigdataoss.gcsio.version>1.6.4-SNAPSHOT</bigdataoss.gcsio.version>
     <bigdataoss.util-hadoop.one.version>1.6.4-SNAPSHOT-hadoop1</bigdataoss.util-hadoop.one.version>
     <bigdataoss.util-hadoop.two.version>1.6.4-SNAPSHOT-hadoop2</bigdataoss.util-hadoop.two.version>
     <bigdataoss.gcs.hadoop.one.version>1.6.4-SNAPSHOT-hadoop1</bigdataoss.gcs.hadoop.one.version>
     <bigdataoss.gcs.hadoop.two.version>1.6.4-SNAPSHOT-hadoop2</bigdataoss.gcs.hadoop.two.version>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
     <google.api.version>1.20.0</google.api.version>
     <google.guava.version>18.0</google.guava.version>
-    <build.java.source.version>7</build.java.source.version>
-    <build.java.target.version>7</build.java.target.version>
-    <gpg.skip>true</gpg.skip>
     <hadoop.one.version>1.2.1</hadoop.one.version>
     <hadoop.two.version>2.8.2</hadoop.two.version>
     <slf4j.version>1.7.5</slf4j.version>
@@ -452,6 +458,8 @@
         <configuration>
           <source>${build.java.source.version}</source>
           <target>${build.java.target.version}</target>
+          <testSource>${build.java.testSource.version}</testSource>
+          <testTarget>${build.java.testTarget.version}</testTarget>
         </configuration>
       </plugin>
       <plugin>
