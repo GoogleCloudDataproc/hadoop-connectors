@@ -307,7 +307,7 @@ public class GoogleCloudStorageImpl
     Preconditions.checkArgument(
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
 
-    /**
+    /*
      * When performing mutations in GCS, even when we aren't concerned with parallel writers,
      * we need to protect ourselves from what appear to be out-of-order writes to the writer. These
      * most commonly manifest themselves as a sequence of:
