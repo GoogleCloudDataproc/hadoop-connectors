@@ -1,5 +1,27 @@
 1.6.4 - 2018-03-XX
 
+  1. Fixed an issue where JSON auth files containing user auth e.g.
+     application_default_credentials.json does not work with
+     google.cloud.auth.service.account.json.keyfile
+
+  2. Honor GOOGLE_APPLICATION_DEFAULT_CREDENTIALS environment variable. For
+     Google Application Default Credentials (but not other defaults).
+
+  3. Make fs.gs.project.id optional. It is still required for listing buckets,
+     creating buckets, and entire BigQuery connector.
+
+  4. Update all dependencies to latest versions.
+
+  5. Disable GCS Metadata Cache by default (e.g. set default value of
+     `fs.gs.metadata.cache.enable` property to `false`).
+
+  6. Support GCS Requester Pays feature that could be configured with new
+     properties:
+
+       fs.gs.requester.pays.mode (default=DISABLED)
+       fs.gs.requester.pays.project.id (no default value)
+       fs.gs.requester.pays.buckets (no default value)
+
 
 1.6.3 - 2018-01-25
 

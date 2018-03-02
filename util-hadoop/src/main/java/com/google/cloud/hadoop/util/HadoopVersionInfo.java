@@ -18,7 +18,6 @@ package com.google.cloud.hadoop.util;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
-
 import org.apache.hadoop.util.VersionInfo;
 
 /** Provides information regarding the currently loaded Hadoop version. */
