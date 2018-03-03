@@ -112,6 +112,7 @@
     <google.api-storage.version>v1-rev35-${google.api.version}</google.api-storage.version>
     <google.findbugs.version>2.0.3</google.findbugs.version>
     <google.guava.version>18.0</google.guava.version>
+    <google.auto-value.version>1.5.3</google.auto-value.version>
     <google.truth.version>0.39</google.truth.version>
     <hadoop.one.version>1.2.1</hadoop.one.version>
     <hadoop.two.version>2.7.2</hadoop.two.version>
@@ -272,6 +273,12 @@
         <artifactId>guava-testlib</artifactId>
         <scope>test</scope>
         <version>${google.guava.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.auto.value</groupId>
+        <artifactId>auto-value</artifactId>
+        <version>${google.auto-value.version}</version>
+        <scope>provided</scope>
       </dependency>
       <dependency>
         <groupId>joda-time</groupId>
