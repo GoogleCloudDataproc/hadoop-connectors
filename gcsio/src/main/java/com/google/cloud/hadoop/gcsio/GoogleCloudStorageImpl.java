@@ -40,6 +40,7 @@ import com.google.api.services.storage.model.ComposeRequest;
 import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
+import com.google.cloud.hadoop.util.BackOffFactory;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
@@ -136,20 +137,6 @@ public class GoogleCloudStorageImpl
           }
         }
   };
-
-  /**
-   * A factory for producing BackOff objects.
-   */
-  public static interface BackOffFactory {
-    public static final BackOffFactory DEFAULT = new BackOffFactory() {
-      @Override
-      public BackOff newBackOff() {
-        return new ExponentialBackOff();
-      }
-    };
-
-    BackOff newBackOff();
-  }
 
   // GCS access instance.
   private Storage gcs;

@@ -18,6 +18,7 @@ import com.google.api.client.googleapis.media.MediaHttpUploader;
 import com.google.api.client.googleapis.services.AbstractGoogleClientRequest;
 import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.InputStreamContent;
+import com.google.api.client.util.Sleeper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
@@ -141,6 +142,12 @@ public abstract class AbstractGoogleAsyncWriteChannel
 
   // When enabled, we get higher throughput for writing small files.
   private boolean directUploadEnabled = false;
+
+  // BackOff objects are per-request, use this to make new ones.
+  private BackOffFactory backOffFactory = BackOffFactory.DEFAULT;
+
+  // Sleeper used for waiting between retries.
+  private Sleeper sleeper = Sleeper.DEFAULT;
 
   /**
    * Construct a new channel using the given ExecutorService to run background uploads.
@@ -355,7 +362,10 @@ public abstract class AbstractGoogleAsyncWriteChannel
     public S call() throws Exception {
       Exception exception = null;
       try {
-        return uploadObject.execute();
+        return ResilientOperation.retry(
+            ResilientOperation.getGoogleRequestCallable(uploadObject),
+            new RetryBoundedBackOff(3, backOffFactory.newBackOff()),
+            RetryDeterminer.DEFAULT, IOException.class, sleeper);
       } catch (IOException ioe) {
         exception = ioe;
         S response = createResponseFromException(ioe);
