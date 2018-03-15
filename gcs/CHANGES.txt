@@ -10,12 +10,10 @@
   3. Make fs.gs.project.id optional. It is still required for listing buckets,
      creating buckets, and entire BigQuery connector.
 
-  4. Update all dependencies to latest versions.
-
-  5. Disable GCS Metadata Cache by default (e.g. set default value of
+  4. Disable GCS Metadata Cache by default (e.g. set default value of
      `fs.gs.metadata.cache.enable` property to `false`).
 
-  6. Support GCS Requester Pays feature that could be configured with new
+  5. Support GCS Requester Pays feature that could be configured with new
      properties:
 
        fs.gs.requester.pays.mode (default=DISABLED)
