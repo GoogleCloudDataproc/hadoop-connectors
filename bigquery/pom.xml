@@ -184,6 +184,14 @@
                   </includes>
                 </artifactSet>
                 <minimizeJar>true</minimizeJar>
+                <filters>
+                    <filter>
+                       <artifact>*:*</artifact>
+                       <excludes>
+                         <exclude>**/testing/**</exclude>
+                       </excludes>
+                    </filter>
+                </filters>
                 <relocations>
                   <relocation>
                     <pattern>com</pattern>
