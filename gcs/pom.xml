@@ -251,6 +251,23 @@
                   </includes>
                 </artifactSet>
                 <minimizeJar>true</minimizeJar>
+                <filters>
+                  <filter>
+                    <artifact>com.google.cloud.bigdataoss:util-hadoop</artifact>
+                    <includes>
+                      <include>**</include>
+                    </includes>
+                    <excludes>
+                      <exclude>com/google/cloud/hadoop/util/HadoopToStringUtil.class</exclude>
+                    </excludes>
+                  </filter>
+                  <filter>
+                    <artifact>*:*</artifact>
+                    <excludes>
+                      <exclude>**/testing/**</exclude>
+                    </excludes>
+                  </filter>
+                </filters>
                 <relocations>
                   <relocation>
                     <pattern>com</pattern>
