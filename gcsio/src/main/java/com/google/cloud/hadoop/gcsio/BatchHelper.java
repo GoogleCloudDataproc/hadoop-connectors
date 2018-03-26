@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import com.google.api.client.googleapis.batch.BatchRequest;
 import com.google.api.client.googleapis.batch.json.JsonBatchCallback;
+import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.StorageRequest;
@@ -115,6 +116,7 @@ public class BatchHelper {
           head.enqueue();
         }
 
+        batch.setBatchUrl(new GenericUrl("https://www.googleapis.com/batch/storage/v1"));
         batch.execute();
       } finally {
         flushing = false;
