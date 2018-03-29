@@ -1,5 +1,11 @@
 1.6.5 - 2018-XX-XX
 
+  1. Add support for using Cloud Storage Rewrite requests for copy operation:
+
+       fs.gs.copy.with.rewrite.enable (default: false)
+
+     This allows to copy files between different locations and storage classes.
+
 
 1.6.4 - 2018-03-19
 
