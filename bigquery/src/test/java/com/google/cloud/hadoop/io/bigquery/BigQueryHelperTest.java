@@ -193,7 +193,7 @@ public class BigQueryHelperTest {
     Job job = jobCaptor.getValue();
     assertThat(job.getConfiguration().getLoad().getSourceUris()).contains("test-import-path");
     assertThat(job.getConfiguration().getLoad().getDestinationTable()).isEqualTo(tableRef);
-    assertThat(job.getJobReference().getLocation()).isEqualTo("test_location");
+    assertThat(job.getJobReference().get("location")).isEqualTo("test_location");
 
     // Verify correct calls to BigQuery.Jobs.Get are made.
     verify(mockBigqueryJobsGet, times(1)).execute();
@@ -236,7 +236,7 @@ public class BigQueryHelperTest {
     assertThat(job.getConfiguration().getExtract().getDestinationUris().get(0))
         .isEqualTo("test-export-path");
     assertThat(job.getConfiguration().getExtract().getSourceTable()).isEqualTo(tableRef);
-    assertThat(job.getJobReference().getLocation()).isEqualTo("test_location");
+    assertThat(job.getJobReference().get("location")).isEqualTo("test_location");
 
     // Verify correct calls to BigQuery.Jobs.Get are made.
     verify(mockBigqueryJobsGet, times(1)).execute();

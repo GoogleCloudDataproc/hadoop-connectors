@@ -293,7 +293,7 @@ public class BigQueryHelper {
     Preconditions.checkArgument(fullJobId.length() <= BIGQUERY_JOB_ID_MAX_LENGTH,
         "fullJobId '%s' has length '%s'; must be less than or equal to %s",
         fullJobId, fullJobId.length(), BIGQUERY_JOB_ID_MAX_LENGTH);
-    return new JobReference().setProjectId(projectId).setJobId(fullJobId).setLocation(location);
+    return new JobReference().setProjectId(projectId).setJobId(fullJobId).set("location", location);
   }
 
   /**
