@@ -293,7 +293,7 @@ public class DynamicFileListRecordReader<K, V>
    *     files we plan to read.
    */
   private boolean shouldExpectMoreFiles() {
-    if (endFileNumber == -1 || knownFileSet.size() <= endFileNumber) {
+    if ((endFileNumber == -1 && recordsRead < estimatedNumRecords) || knownFileSet.size() <= endFileNumber) {
       return true;
     }
     return false;
