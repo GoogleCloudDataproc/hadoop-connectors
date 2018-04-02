@@ -36,7 +36,6 @@ import javax.net.ssl.SSLException;
  */
 public class ApiErrorExtractor {
   // TODO(user): Move this into HttpStatusCodes.java.
-  public static final int STATUS_CODE_BAD_REQUEST = 400;
   public static final int STATUS_CODE_CONFLICT = 409;
   public static final int STATUS_CODE_PRECONDITION_FAILED = 412;
   public static final int STATUS_CODE_RANGE_NOT_SATISFIABLE = 416;
