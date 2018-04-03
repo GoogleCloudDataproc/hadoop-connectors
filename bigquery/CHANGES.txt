@@ -4,7 +4,9 @@
 
   2. Always require at least 2 partitions for sharded exports.
 
-  3. POM updates for GCS connector 1.6.5.
+  3. Update all dependencies to latest versions.
+
+  4. POM updates for GCS connector 1.6.5.
 
 
 0.10.5 - 2018-03-19

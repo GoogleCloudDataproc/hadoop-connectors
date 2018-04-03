@@ -6,6 +6,8 @@
 
      This allows to copy files between different locations and storage classes.
 
+  2. Update all dependencies to latest versions.
+
 
 1.6.4 - 2018-03-19
 

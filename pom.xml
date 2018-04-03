@@ -110,12 +110,12 @@
     <google.api.version>1.20.0</google.api.version>
     <google.api-bigquery.version>v2-rev319-${google.api.version}</google.api-bigquery.version>
     <google.api-storage.version>v1-rev35-${google.api.version}</google.api-storage.version>
-    <google.auto-value.version>1.5.4</google.auto-value.version>
+    <google.auto-value.version>1.6</google.auto-value.version>
     <google.findbugs.version>3.0.2</google.findbugs.version>
     <google.guava.version>18.0</google.guava.version>
-    <google.truth.version>0.39</google.truth.version>
+    <google.truth.version>0.40</google.truth.version>
     <hadoop.one.version>1.2.1</hadoop.one.version>
-    <hadoop.two.version>2.7.2</hadoop.two.version>
+    <hadoop.two.version>2.8.3</hadoop.two.version>
     <hamcrest.version>1.3</hamcrest.version>
     <joda-time.version>2.1</joda-time.version>
     <junit.version>4.13-SNAPSHOT</junit.version>
@@ -276,9 +276,8 @@
       </dependency>
       <dependency>
         <groupId>com.google.auto.value</groupId>
-        <artifactId>auto-value</artifactId>
+        <artifactId>auto-value-annotations</artifactId>
         <version>${google.auto-value.version}</version>
-        <scope>provided</scope>
       </dependency>
       <dependency>
         <groupId>joda-time</groupId>
@@ -484,6 +483,13 @@
           <target>${build.java.target.version}</target>
           <testSource>${build.java.testSource.version}</testSource>
           <testTarget>${build.java.testTarget.version}</testTarget>
+          <annotationProcessorPaths>
+            <path>
+              <groupId>com.google.auto.value</groupId>
+              <artifactId>auto-value</artifactId>
+              <version>${google.auto-value.version}</version>
+            </path>
+          </annotationProcessorPaths>
         </configuration>
       </plugin>
       <plugin>
