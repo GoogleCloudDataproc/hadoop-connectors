@@ -20,13 +20,11 @@ import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonError.ErrorInfo;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.HttpStatusCodes;
-
 import java.io.IOError;
 import java.io.IOException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.List;
-
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLException;
 
@@ -35,6 +33,9 @@ import javax.net.ssl.SSLException;
  * for testing how API errors are handled.
  */
 public class ApiErrorExtractor {
+
+  public static final ApiErrorExtractor INSTANCE = new ApiErrorExtractor();
+
   // TODO(user): Move this into HttpStatusCodes.java.
   public static final int STATUS_CODE_CONFLICT = 409;
   public static final int STATUS_CODE_PRECONDITION_FAILED = 412;
@@ -60,6 +61,10 @@ public class ApiErrorExtractor {
 
   // HTTP 413 with message "Value for field 'foo' is too large".
   public static final String FIELD_SIZE_TOO_LARGE = "fieldSizeTooLarge";
+
+  /** @deprecated use {@link #INSTANCE} instead */
+  @Deprecated
+  public ApiErrorExtractor() {}
 
   // Public methods here are in alphabetical order.
 
