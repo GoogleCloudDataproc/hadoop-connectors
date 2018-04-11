@@ -8,6 +8,10 @@
 
   2. Update all dependencies to latest versions.
 
+  3. Make max requests per batch value configurable with property:
+
+       fs.gs.max.requests.per.batch (default: 1000)
+
 
 1.6.4 - 2018-03-19
 
