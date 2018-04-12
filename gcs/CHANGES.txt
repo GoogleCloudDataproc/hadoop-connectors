@@ -8,9 +8,11 @@
 
   2. Update all dependencies to latest versions.
 
-  3. Make max requests per batch value configurable with property:
+  3. Decrease default value for max requests per batch from 1,000 to 30.
 
-       fs.gs.max.requests.per.batch (default: 1000)
+  4. Make max requests per batch value configurable with property:
+
+       fs.gs.max.requests.per.batch (default: 30)
 
 
 1.6.4 - 2018-03-19
