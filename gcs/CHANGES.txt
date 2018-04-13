@@ -1,3 +1,6 @@
+1.6.6 - 2018-XX-XX
+
+
 1.6.5 - 2018-04-12
 
   1. Add support for using Cloud Storage Rewrite requests for copy operation:
