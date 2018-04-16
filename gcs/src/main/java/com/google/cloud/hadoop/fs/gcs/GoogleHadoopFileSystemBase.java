@@ -110,11 +110,11 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   // -----------------------------------------------------------------
   // Configuration settings.
-  //-----------------------------------------------------------------
+  // -----------------------------------------------------------------
 
   /**
    * Key for the permissions that we report a file or directory to have. Can either be octal or
-   * symbolic mode accepted by {@link FsPermission#FromString(String)}
+   * symbolic mode accepted by {@link FsPermission#FsPermission(String)}
    */
   public static final String PERMISSIONS_TO_REPORT_KEY = "fs.gs.reported.permissions";
 
@@ -1207,7 +1207,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     long duration = System.nanoTime() - startTime;
     increment(Counter.CREATE);
     increment(Counter.CREATE_TIME, duration);
-    return new FSDataOutputStream(out);
+    return new FSDataOutputStream(out, null);
   }
 
   /**
