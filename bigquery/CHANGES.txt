@@ -2,6 +2,8 @@
 
   1. POM updates for GCS connector 1.6.6.
 
+  2. Change Maven project structure to be better compatible with IDEs.
+
 
 0.10.6 - 2018-04-12
 
