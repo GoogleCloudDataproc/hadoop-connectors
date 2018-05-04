@@ -4,6 +4,8 @@
 
   2. Change Maven project structure to be better compatible with IDEs.
 
+  3. Support Hadoop 3.
+
 
 0.10.6 - 2018-04-12
 
