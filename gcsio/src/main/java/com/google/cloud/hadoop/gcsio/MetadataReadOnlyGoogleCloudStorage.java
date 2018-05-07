@@ -290,8 +290,7 @@ public class MetadataReadOnlyGoogleCloudStorage
     LOG.debug("getItemInfo({})", resourceId);
     CacheEntry entry = resourceCache.getCacheEntry(resourceId);
     if (entry == null) {
-      // TODO(user): Move the createItemInfoForNotFound method into GoogleCloudStorageItemInfo.
-      return GoogleCloudStorageImpl.createItemInfoForNotFound(resourceId);
+      return GoogleCloudStorageItemInfo.createNotFound(resourceId);
     } else {
       GoogleCloudStorageItemInfo info = entry.getItemInfo();
       Preconditions.checkState(
