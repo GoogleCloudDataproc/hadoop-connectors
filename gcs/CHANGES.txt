@@ -1,12 +1,10 @@
-1.6.6 - 2018-XX-XX
+1.6.6 - 2018-05-08
 
-  1. Hadoop 3 build compatibility.
+  1. Support Hadoop 3.
 
   2. Change Maven project structure to be better compatible with IDEs.
 
-  3. Support Hadoop 3.
-
-  4. Fix thread leaks that were occurring when YARN log aggregation uploaded
+  3. Fix thread leaks that were occurring when YARN log aggregation uploaded
      logs to GCS.
 
 
