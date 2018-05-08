@@ -4,6 +4,8 @@
 
   2. Remove Hadoop3 support.
 
+  3. Deprecate BigQueryOutputFormat in favor of IndirectBigQueryOutputFormat.
+
 
 0.10.7 - 2018-05-08
 
