@@ -40,7 +40,10 @@ import org.slf4j.LoggerFactory;
  * This instance will supplement fake GoogleCloudStorageItemInfos for pure implicit directories
  * if there is no metadata entry for the directory object itself. This means that some directory
  * objects will list info that is inconsistent with an actual listing.
+ *
+ * @deprecated because list conistency already implemented in GCS this class should be removed
  */
+@Deprecated
 public class MetadataReadOnlyGoogleCloudStorage
     implements GoogleCloudStorage {
   // Logger.

@@ -401,11 +401,9 @@ public class ApiErrorExtractor {
    */
   protected GoogleJsonError getDetails(IOException e) {
     if (e instanceof GoogleJsonResponseException) {
-      GoogleJsonResponseException ex = (GoogleJsonResponseException) e;
-      return ex.getDetails();
-    } else {
-      return null;
+      return ((GoogleJsonResponseException) e).getDetails();
     }
+    return null;
   }
 
   /**
@@ -417,11 +415,7 @@ public class ApiErrorExtractor {
       return null;
     }
     List<ErrorInfo> errors = details.getErrors();
-    if (errors.isEmpty()) {
-      return null;
-    } else {
-      return errors.get(0);
-    }
+    return errors.isEmpty() ? null : errors.get(0);
   }
 
   /**
