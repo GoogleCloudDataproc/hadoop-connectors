@@ -2,6 +2,8 @@
 
   1. Remove Hadoop3 support.
 
+  2. Add interface through which user can directly provide the access token.
+
 
 1.6.6 - 2018-05-08
 

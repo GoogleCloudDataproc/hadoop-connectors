@@ -6,6 +6,8 @@
 
   3. Deprecate BigQueryOutputFormat in favor of IndirectBigQueryOutputFormat.
 
+  4. Add interface through which user can directly provide the access token.
+
 
 0.10.7 - 2018-05-08
 
