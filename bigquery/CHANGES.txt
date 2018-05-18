@@ -2,6 +2,8 @@
 
   1. POM updates for GCS connector 1.6.7.
 
+  2. Remove Hadoop3 support.
+
 
 0.10.7 - 2018-05-08
 
