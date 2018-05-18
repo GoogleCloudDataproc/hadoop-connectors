@@ -4,6 +4,8 @@
 
   2. Add interface through which user can directly provide the access token.
 
+  3. Update Hadoop dependencies to 2.8.4 version.
+
 
 1.6.6 - 2018-05-08
 
