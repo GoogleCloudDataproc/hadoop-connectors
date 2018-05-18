@@ -26,6 +26,8 @@
     <relativePath>../pom.xml</relativePath>
   </parent>
 
+  <name>util-hadoop-${hadoop.identifier}</name>
+
   <artifactId>util-hadoop</artifactId>
   <version>1.6.7-SNAPSHOT-${hadoop.identifier}</version>
 
