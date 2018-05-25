@@ -222,7 +222,7 @@ public class GsonRecordReaderTest {
   /**
    * Helper method to write buffer to GHFS.
    *
-   * @param ghfs the GoogleHadoopGlobalRootedFileSystem to write to.
+   * @param ghfs the GoogleHadoopFileSystem to write to.
    * @param hadoopPath the path of the file to write to.
    * @param buffer the buffer to write to the file.
    * @throws IOException on IO Error.
