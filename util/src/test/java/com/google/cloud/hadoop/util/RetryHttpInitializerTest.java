@@ -181,6 +181,11 @@ public class RetryHttpInitializerTest {
   }
 
   @Test
+  public void testErrorCodeGone() throws IOException, InterruptedException {
+    testRetriesForErrorCode(410);
+  }
+
+  @Test
   public void testErrorCodeRateLimitExceeded() throws IOException, InterruptedException {
     testRetriesForErrorCode(429);
   }
