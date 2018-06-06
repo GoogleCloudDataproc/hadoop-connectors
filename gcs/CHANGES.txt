@@ -6,6 +6,14 @@
 
   3. Update Hadoop dependencies to 2.8.4 version.
 
+  4. Add more retries and error handling in GoogleCloudStorageReadChannel,
+     to make it more resilient to network errors; also add a property to allow users
+     to specify number of retries on low level GCS HTTP requests in case of server
+     errors and I/O errors.
+
+  5. Add properties to allow users to specify connect timeout and read timeout on
+     low level GCS HTTP requests.
+
 
 1.6.6 - 2018-05-08
 
