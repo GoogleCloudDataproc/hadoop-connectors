@@ -1,4 +1,4 @@
-1.6.7 - 2018-XX-XX
+1.6.7 - 2018-06-12
 
   1. Remove Hadoop3 support.
 
