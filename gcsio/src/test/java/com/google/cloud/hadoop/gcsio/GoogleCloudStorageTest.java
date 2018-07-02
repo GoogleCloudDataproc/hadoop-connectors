@@ -92,6 +92,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.GZIPOutputStream;
 import javax.net.ssl.SSLException;
 import org.junit.After;
@@ -1565,6 +1566,80 @@ public class GoogleCloudStorageTest {
     assertThat(bytesRead2).isEqualTo(2);
     assertThat(actualData1).isEqualTo(new byte[] {0x01});
     assertThat(actualData2).isEqualTo(new byte[] {0x05, 0x08});
+  }
+
+  /**
+   * Test in-place backward seek does not trigger a re-read if it isn't used
+   */
+  @Test
+  public void testUnusedBackwardSeekIgnored() throws Exception {
+    setUpBasicMockBehaviorForOpeningReadChannel();
+
+    byte[] testData = { 0x01, 0x02, 0x03, 0x05, 0x08 };
+    ByteArrayInputStream bais = new ByteArrayInputStream(testData);
+    final AtomicInteger executeMediaCount = new AtomicInteger();
+    when(mockStorageObjectsGet.executeMedia())
+        .thenAnswer(new Answer<HttpResponse>() {
+          @Override
+          public HttpResponse answer(InvocationOnMock invocation) throws Throwable {
+            // Answer to re-create the underlying InputStream and track invocation count.
+            executeMediaCount.incrementAndGet();
+            return createFakeResponse(testData.length, new ByteArrayInputStream(testData));
+          }
+        });
+    GoogleCloudStorageReadChannel readChannel =
+        (GoogleCloudStorageReadChannel) gcs.open(
+            new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+            new GoogleCloudStorageReadOptions.Builder()
+                .setFastFailOnNotFound(false)
+                .setSupportContentEncoding(false)
+                .setInplaceSeekLimit(2)
+                .build());
+
+    byte[] actualData1 = new byte[1];
+    int bytesRead1 = readChannel.read(ByteBuffer.wrap(actualData1));
+
+    verify(mockStorage).objects();
+    verify(mockStorageObjects).get(eq(BUCKET_NAME), eq(OBJECT_NAME));
+    verify(mockClientRequestHelper).getRequestHeaders(any(Storage.Objects.Get.class));
+    verify(mockHeaders).setRange(eq("bytes=0-"));
+    verify(mockStorageObjectsGet, times(1)).executeMedia();
+
+    assertThat(readChannel.position()).isEqualTo(1);
+
+    // Position back to 0, but don't read anything. Verify position returned to caller.
+    readChannel.position(0);
+    assertThat(readChannel.position()).isEqualTo(0);
+    assertThat(executeMediaCount.get()).isEqualTo(1);
+
+    // Re-position forward before the next read. No new executeMedia calls.
+    readChannel.position(3);
+    assertThat(readChannel.position()).isEqualTo(3);
+    assertThat(executeMediaCount.get()).isEqualTo(1);
+
+    byte[] actualData2 = new byte[2];
+    int bytesRead2 = readChannel.read(ByteBuffer.wrap(actualData2));
+    verify(mockStorageObjectsGet, times(1)).executeMedia();
+    assertThat(executeMediaCount.get()).isEqualTo(1);
+
+    // Position back to 0, and read. Should lead to another executeMedia call.
+    readChannel.position(0);
+    byte[] actualData3 = new byte[2];
+    int bytesRead3 = readChannel.read(ByteBuffer.wrap(actualData3));
+    assertThat(readChannel.position()).isEqualTo(2);
+    assertThat(executeMediaCount.get()).isEqualTo(2);
+    verify(mockStorage, times(2)).objects();
+    verify(mockStorageObjects, times(2)).get(eq(BUCKET_NAME), eq(OBJECT_NAME));
+    verify(mockClientRequestHelper, times(2)).getRequestHeaders(any(Storage.Objects.Get.class));
+    verify(mockHeaders, times(2)).setRange(eq("bytes=0-"));
+    verify(mockStorageObjectsGet, times(2)).executeMedia();
+
+    assertThat(bytesRead1).isEqualTo(1);
+    assertThat(bytesRead2).isEqualTo(2);
+    assertThat(bytesRead3).isEqualTo(2);
+    assertThat(actualData1).isEqualTo(new byte[] {0x01});
+    assertThat(actualData2).isEqualTo(new byte[] {0x05, 0x08});
+    assertThat(actualData3).isEqualTo(new byte[] {0x01, 0x02});
   }
 
   /**
