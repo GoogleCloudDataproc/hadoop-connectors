@@ -31,6 +31,7 @@ import com.google.cloud.hadoop.util.RetryBoundedBackOff;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.EOFException;
@@ -74,6 +75,7 @@ public class GoogleCloudStorageReadChannel
 
   // Size of buffer to allocate for skipping bytes in-place when performing in-place seeks.
   @VisibleForTesting
+  // TODO: Make this configurable.
   static final int SKIP_BUFFER_SIZE = 8192;
 
   // Used to separate elements of a Content-Range
@@ -97,6 +99,7 @@ public class GoogleCloudStorageReadChannel
 
   // Current read position in the channel.
   private long currentPosition = -1;
+  private long lastKnownChannelPosition = -1;
 
   // When a caller calls position(long) to set stream position, we record the target position
   // and defer the actual seek operation until the caller tries to read from the channel.
@@ -381,6 +384,7 @@ public class GoogleCloudStorageReadChannel
         }
         totalBytesRead += numBytesRead;
         currentPosition += numBytesRead;
+        lastKnownChannelPosition = currentPosition;
 
         if (retriesAttempted != 0) {
           LOG.info("Success after {} retries on reading '{}'",
@@ -499,11 +503,13 @@ public class GoogleCloudStorageReadChannel
   protected void closeReadChannel() {
     if (readChannel != null) {
       try {
+        LOG.debug("GHFS.closeReadChannel");
         readChannel.close();
       } catch (Exception e) {
         LOG.debug("Got an exception on readChannel.close(); ignoring it.", e);
       } finally {
         readChannel = null;
+        lastKnownChannelPosition = -1;
       }
     }
   }
@@ -535,6 +541,8 @@ public class GoogleCloudStorageReadChannel
   public long position()
       throws IOException {
     throwIfNotOpen();
+    LOG.debug("GHFS.position. channelPosition={}, lastKnownPosition={}", currentPosition,
+        lastKnownChannelPosition);
     return currentPosition;
   }
 
@@ -550,13 +558,16 @@ public class GoogleCloudStorageReadChannel
   public SeekableByteChannel position(long newPosition) throws IOException {
     throwIfNotOpen();
 
+    LOG.debug("GHFS.re-position: current={}, lastKnow={}, new={}", currentPosition,
+        lastKnownChannelPosition, newPosition);
+
     // If the position has not changed, avoid the expensive operation.
     if (newPosition == currentPosition) {
       return this;
     }
 
     validatePosition(newPosition);
-    long seekDistance = newPosition - currentPosition;
+    long seekDistance = newPosition - lastKnownChannelPosition;
     if (readChannel != null
         && seekDistance > 0
         && seekDistance <= readOptions.getInplaceSeekLimit()) {
@@ -578,6 +589,7 @@ public class GoogleCloudStorageReadChannel
             break;
           }
           seekDistance -= bytesRead;
+          lastKnownChannelPosition += bytesRead;
         } catch (IOException e) {
           LOG.info("Got an I/O exception on readChannel.read(). A lazy-seek will be pending.");
           closeReadChannelAndSetLazySeekPending();
@@ -585,14 +597,32 @@ public class GoogleCloudStorageReadChannel
         }
       }
     } else {
-      // Close the read channel. If anything tries to read on it, it's an error and should fail.
-      closeReadChannelAndSetLazySeekPending();
+      if (seekDistance > readOptions.getInplaceSeekLimit()) {
+        // Close the read channel. If anything tries to read on it, it's an error and should fail.
+        // Seek beyond the in place seek limit. Re-open channel when data is actually read.
+        closeReadChannelAndSetLazySeekPending();
+      } else {
+        // Potential backward seek (PositionedReadable/FSInputStream always reset the position
+        // to the value before a readFully invocation).
+        // Don't close the channel just yet.
+        setLazySeekPendingWithoutChannelClose();
+      }
     }
     currentPosition = newPosition;
     return this;
   }
 
+  private void setLazySeekPendingWithoutChannelClose() {
+    LOG.debug("GHFS.setLazySeekPendingWithoutChannelClose. currentPosition={}, lastKnownPosition={}",
+        currentPosition, lastKnownChannelPosition);
+    lazySeekPending = true;
+  }
+
   private void closeReadChannelAndSetLazySeekPending() {
+    LOG.debug(
+        "Closing ReadChannel and setting lazy seek pending. CurrentPosition={}, " +
+            "lastKnownPosition={}",
+        currentPosition, lastKnownChannelPosition);
     closeReadChannel();
     lazySeekPending = true;
   }
@@ -663,11 +693,17 @@ public class GoogleCloudStorageReadChannel
       return;
     }
 
-    // Close the underlying channel if it is open.
-    closeReadChannel();
 
-    InputStream objectContentStream = openStreamAndSetMetadata(currentPosition);
-    readChannel = Channels.newChannel(objectContentStream);
+    // Perform the seek if readChannel has been closed, or if the stream is actually ahead of the seek position.
+    if (currentPosition < lastKnownChannelPosition || readChannel == null) {
+      LOG.debug(
+          "Re-opening read channel. currentPosition={}, lastKnownPosition={}, readChannelIsNull={}",
+          currentPosition, lastKnownChannelPosition, readChannel == null);
+      closeReadChannel();
+      InputStream objectContentStream = openStreamAndSetMetadata(currentPosition);
+      readChannel = Channels.newChannel(objectContentStream);
+    }
+
     lazySeekPending = false;
   }
 
