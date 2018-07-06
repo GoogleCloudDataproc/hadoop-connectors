@@ -40,8 +40,10 @@ import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.collect.Range;
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -51,6 +53,7 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.time.Duration;
+import java.util.Map.Entry;
 import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,6 +89,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
   @VisibleForTesting static final Cache<String, Boolean> randomAccessObjects =
       CacheBuilder.newBuilder().maximumSize(1_000).expireAfterAccess(Duration.ofHours(1)).build();
+
+  private static final BlockCache blockCache = new BlockCache();
 
   // GCS access instance.
   private final Storage gcs;
@@ -719,10 +724,32 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     }
 
     if (readChannel == null) {
-      InputStream objectContentStream = openStream(limit);
+      InputStream objectContentStream = getCachedBlockInputStream();
+      if (objectContentStream == null) {
+        objectContentStream = openStream(limit);
+        if (objectContentStream == null) {
+          objectContentStream = getCachedBlockInputStream();
+        }
+      }
       readChannel = Channels.newChannel(objectContentStream);
       readChannelPosition = currentPosition;
     }
+  }
+
+  private InputStream getCachedBlockInputStream() {
+    Entry<Range<Long>, byte[]> block = blockCache.get(resourceIdString, currentPosition);
+    if (block == null) {
+      return null;
+    }
+    Range<Long> blockRange = block.getKey();
+    byte[] blockData = block.getValue();
+    LOG.debug(
+        "Retrieved cached block of {} size from {} to {} position for '{}'",
+        blockData.length, blockRange.lowerEndpoint(), blockRange.upperEndpoint(), resourceIdString);
+    return new ByteArrayInputStream(
+        blockData,
+        (int) (currentPosition - blockRange.lowerEndpoint()),
+        (int) (blockRange.upperEndpoint() - currentPosition) + 1);
   }
 
   /**
@@ -802,13 +829,20 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
     // Set the range on the existing request headers that may have been initialized with things
     // like user-agent already. If the file is gzip encoded, request the entire file.
+    long rangeStart = 0;
     String rangeHeader = "bytes=0-";
     if (fileEncoding != FileEncoding.GZIPPED) {
+      rangeStart = currentPosition;
       setReadChannelEnd(limit, bufferSize);
       // limit bufferSize to the end of the readChannel
-      bufferSize = (int) Math.min(readChannelEnd - currentPosition, bufferSize);
+      bufferSize = (int) Math.min(readChannelEnd - rangeStart, bufferSize);
 
-      rangeHeader = "bytes=" + currentPosition + "-";
+      if (randomAccess && bufferSize < readOptions.getBufferSize()) {
+        rangeStart = Math.max(0, readChannelEnd - readOptions.getBufferSize());
+        bufferSize = (int) (readChannelEnd - rangeStart);
+      }
+
+      rangeHeader = "bytes=" + rangeStart + "-";
       if (randomAccess) {
         rangeHeader += readChannelEnd - 1;
       }
@@ -850,6 +884,26 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       // to the desired position. If it is not, we only requested the bytes we haven't read.
       if (fileEncoding == FileEncoding.GZIPPED) {
         content.skip(currentPosition);
+      } else if (randomAccess && readChannelEnd - rangeStart <= readOptions.getBufferSize()) {
+        if (blockCache
+            .get(resourceIdString, rangeStart, readChannelEnd - 1)
+            .asMapOfRanges()
+            .isEmpty()) {
+          LOG.debug(
+              "Caching {} bytes from {} to {} position for '{}'",
+              bufferSize, rangeStart, readChannelEnd, resourceIdString);
+          byte[] blockData = new byte[bufferSize];
+          try (DataInputStream contentData = new DataInputStream(content)) {
+            contentData.readFully(blockData);
+          }
+          blockCache.put(resourceIdString, rangeStart, readChannelEnd - 1, blockData);
+          return null;
+        } else {
+          LOG.debug(
+              "Failed to cache {} bytes from {} to {} position - caching conflict for '{}'",
+              bufferSize, rangeStart, readChannelEnd, resourceIdString);
+          content.skip(currentPosition - rangeStart);
+        }
       }
     } catch (IOException e) {
       try {
