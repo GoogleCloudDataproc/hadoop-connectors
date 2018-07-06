@@ -2,6 +2,20 @@
 
   1. Fix `PerformanceCachingGoogleCloudStorage`.
 
+  2. Always send only 1 GCS metadata request per `GoogleCloudStorageReadChannel`
+     object lifecycle.
+
+  3. Do not open GCS read channel when calling
+     `GoogleCloudStorageReadChannel.size()` method.
+
+  4. Always fail fast when creating `GoogleCloudStorageReadChannel` instance for
+     not existing GCS object.
+
+  5. Add support for sending range request when reading GCS objects.
+
+  6. Do not close GCS read channel when calling
+     `GoogleCloudStorageReadChannel.position(long)` method.
+
 
 1.9.0 - 2018-06-15
 
