@@ -14,58 +14,56 @@
 
 package com.google.cloud.hadoop.gcsio.testing;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadChannel;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
-import com.google.common.base.Preconditions;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
 /**
- * A SeekableByteChannel based on GoogleCloudStorageReadChannel that supports reading
- * from in-memory byte stream.
+ * A SeekableByteChannel based on GoogleCloudStorageReadChannel that supports reading from in-memory
+ * byte stream.
  */
-public class InMemoryObjectReadChannel
-    extends GoogleCloudStorageReadChannel {
+public class InMemoryObjectReadChannel extends GoogleCloudStorageReadChannel {
 
   // All reads return data from this byte array. Set at construction time.
   private final byte[] channelContents;
 
-  /**
-   * Creates a new instance of InMemoryObjectReadChannel.
-   */
-  public InMemoryObjectReadChannel(byte[] channelContents)
-      throws IOException {
+  /** Creates a new instance of InMemoryObjectReadChannel. */
+  public InMemoryObjectReadChannel(byte[] channelContents) throws IOException {
     this(channelContents, GoogleCloudStorageReadOptions.DEFAULT);
   }
 
   /**
-   * Creates a new instance of InMemoryObjectReadChannel with {@code readOptions} plumbed into
-   * the base class.
+   * Creates a new instance of InMemoryObjectReadChannel with {@code readOptions} plumbed into the
+   * base class.
    */
   public InMemoryObjectReadChannel(
-      byte[] channelContents, GoogleCloudStorageReadOptions readOptions)
-      throws IOException {
+      byte[] channelContents, GoogleCloudStorageReadOptions readOptions) throws IOException {
     super(readOptions);
-    Preconditions.checkArgument(channelContents != null);
-    this.channelContents = channelContents;
+    this.channelContents = checkNotNull(channelContents, "channelContents could not be null");
+    // fileEncoding and size should be initialized in constructor, the same as with super-class
+    setFileEncoding(FileEncoding.OTHER);
+    setSize(channelContents.length);
   }
 
+  /** No-op, because file encoding and size are set in constructor. */
+  @Override
+  protected void initFileEncodingAndSize() {}
+
   /**
-   * Opens the underlying byte array stream, sets its position to currentPosition and sets size
-   * to size of the byte array.
+   * Opens the underlying byte array stream, sets its position to currentPosition and sets size to
+   * size of the byte array.
    *
-   * @param newPosition position to seek into the new stream.
+   * @param limit ignored.
    * @throws IOException on IO error
    */
   @Override
-  protected InputStream openStreamAndSetMetadata(long newPosition)
-      throws IOException {
-    validatePosition(newPosition);
-    setSize(channelContents.length);
+  protected InputStream openStream(long limit) throws IOException {
     InputStream inputStream = new ByteArrayInputStream(channelContents);
-    inputStream.skip(newPosition);
+    inputStream.skip(currentPosition);
     return inputStream;
   }
 }
