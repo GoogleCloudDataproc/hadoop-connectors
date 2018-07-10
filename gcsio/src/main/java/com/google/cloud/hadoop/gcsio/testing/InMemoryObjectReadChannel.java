@@ -29,29 +29,29 @@ import java.io.InputStream;
 public class InMemoryObjectReadChannel extends GoogleCloudStorageReadChannel {
 
   // All reads return data from this byte array. Set at construction time.
-  private final byte[] channelContents;
+  private final byte[] channelContent;
 
   /** Creates a new instance of InMemoryObjectReadChannel. */
-  public InMemoryObjectReadChannel(byte[] channelContents) throws IOException {
-    this(channelContents, GoogleCloudStorageReadOptions.DEFAULT);
+  public InMemoryObjectReadChannel(byte[] channelContent) throws IOException {
+    this(channelContent, GoogleCloudStorageReadOptions.DEFAULT);
   }
 
   /**
    * Creates a new instance of InMemoryObjectReadChannel with {@code readOptions} plumbed into the
    * base class.
    */
-  public InMemoryObjectReadChannel(
-      byte[] channelContents, GoogleCloudStorageReadOptions readOptions) throws IOException {
+  public InMemoryObjectReadChannel(byte[] channelContent, GoogleCloudStorageReadOptions readOptions)
+      throws IOException {
     super(readOptions);
-    this.channelContents = checkNotNull(channelContents, "channelContents could not be null");
-    // fileEncoding and size should be initialized in constructor, the same as with super-class
-    setFileEncoding(FileEncoding.OTHER);
-    setSize(channelContents.length);
+    this.channelContent = checkNotNull(channelContent, "channelContents could not be null");
+    // gzipEncoded and size should be initialized in constructor, the same as with super-class
+    // gzipEncoded is false by default.
+    setSize(channelContent.length);
   }
 
-  /** No-op, because file encoding and size are set in constructor. */
+  /** No-op, because encoding and size are set in constructor. */
   @Override
-  protected void initFileEncodingAndSize() {}
+  protected void initEncodingAndSize() {}
 
   /**
    * Opens the underlying byte array stream, sets its position to currentPosition and sets size to
@@ -62,7 +62,7 @@ public class InMemoryObjectReadChannel extends GoogleCloudStorageReadChannel {
    */
   @Override
   protected InputStream openStream(long limit) throws IOException {
-    InputStream inputStream = new ByteArrayInputStream(channelContents);
+    InputStream inputStream = new ByteArrayInputStream(channelContent);
     inputStream.skip(currentPosition);
     return inputStream;
   }

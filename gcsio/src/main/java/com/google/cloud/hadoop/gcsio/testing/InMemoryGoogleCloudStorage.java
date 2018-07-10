@@ -186,8 +186,7 @@ public class InMemoryGoogleCloudStorage
 
   @Override
   public SeekableByteChannel open(
-      StorageResourceId resourceId, GoogleCloudStorageReadOptions readOptions)
-      throws IOException {
+      StorageResourceId resourceId, GoogleCloudStorageReadOptions readOptions) throws IOException {
     if (!getItemInfo(resourceId).exists()) {
       throw GoogleCloudStorageExceptions.getFileNotFoundException(
           resourceId.getBucketName(), resourceId.getObjectName());

@@ -21,6 +21,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.nullToEmpty;
 
+import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.util.BackOff;
 import com.google.api.client.util.BackOffUtils;
@@ -32,6 +33,7 @@ import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.ResilientOperation;
+import com.google.cloud.hadoop.util.ResilientOperation.CheckedCallable;
 import com.google.cloud.hadoop.util.RetryBoundedBackOff;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.common.annotations.VisibleForTesting;
@@ -40,6 +42,7 @@ import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.io.ByteStreams;
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.EOFException;
@@ -73,18 +76,19 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   // Logger.
   private static final Logger LOG = LoggerFactory.getLogger(GoogleCloudStorageReadChannel.class);
 
-  /** Supported GCS file encodings */
-  @VisibleForTesting
-  protected static enum FileEncoding {
-    UNINITIALIZED,
-    GZIPPED,
-    OTHER
-  }
-
   // Size of buffer to allocate for skipping bytes in-place when performing in-place seeks.
-  @VisibleForTesting static final int SKIP_BUFFER_SIZE = 8192;
+  @VisibleForTesting static final int SKIP_BUFFER_SIZE_BYTES = 8192;
 
-  @VisibleForTesting static final Cache<String, Boolean> randomAccessObjects =
+  // TODO(b/110832992): Make it configurable.
+  private static final int MIN_RANGE_REQUEST_SIZE_BYTES = 512;
+
+  // TODO(b/110832992): Make it configurable.
+  private static final int FOOTER_RANGE_SIZE_BYTES = 64 * 1024;
+  private static final String FOOTER_RANGE_HEADER = "bytes=-" + FOOTER_RANGE_SIZE_BYTES;
+
+  // TODO(b/110832992): Make it configurable.
+  @VisibleForTesting
+  static final Cache<String, Boolean> randomAccessObjects =
       CacheBuilder.newBuilder().maximumSize(1_000).expireAfterAccess(Duration.ofHours(1)).build();
 
   // GCS access instance.
@@ -99,34 +103,35 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   // GCS resource/object path, used for logging.
   private final String resourceIdString;
 
-  // Read channel.
-  @VisibleForTesting ReadableByteChannel readChannel;
+  // GCS object content channel.
+  @VisibleForTesting ReadableByteChannel contentChannel;
 
-  // Whether to use range requests instead of streaming requests
+  // Whether to use bounded range requests or streaming requests.
+  // TODO(b/110832992): wire property to control this.
   private boolean randomAccess;
 
   // True if this channel is open, false otherwise.
-  private boolean channelIsOpen;
+  private boolean channelIsOpen = true;
 
-  // Current read position in the readChannel.
+  // Current position in this channel, it could be different from contentChannelPosition if
+  // position(long) method calls were made without calls to read(ByteBuffer) method.
+  @VisibleForTesting protected long currentPosition = 0;
+
+  // Current read position in the contentChannel.
   //
   // When a caller calls position(long) to set stream position, we record the target position
   // and defer the actual seek operation until the caller tries to read from the channel.
   // This allows us to avoid an unnecessary seek to position 0 that would take place on creation
   // of this instance in cases where caller intends to start reading at some other offset.
-  // If readChannelPosition is not the same as currentPosition, it indicates that a target position
-  // has been set but the actual seek operation is still pending.
-  private long readChannelPosition = -1;
-
-  // Current position in this channel, it could be different from `readChannelPosition`
-  // if several `position` method calls were made without clalls to `read` method.
-  @VisibleForTesting protected long currentPosition;
+  // If contentChannelPosition is not the same as currentPosition, it indicates that a target
+  // position has been set but the actual seek operation is still pending.
+  @VisibleForTesting long contentChannelPosition = -1;
 
   // Size of the object being read.
   private long size = -1;
 
-  // Size of the readChannel.
-  private long readChannelEnd = -1;
+  // Size of the contentChannel.
+  private long contentChannelEnd = -1;
 
   // Maximum number of automatic retries when reading from the underlying channel without making
   // progress; each time at least one byte is successfully read, the counter of attempted retries
@@ -164,12 +169,10 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   // in-place seeks.
   private byte[] skipBuffer = null;
 
-  // For files that have Content-Encoding: gzip set in the file metadata, the size of the response
-  // from GCS is the size of the compressed file. However, the HTTP client wraps the content
-  // in a GZIPInputStream, so the number of bytes that can be read from the stream may be greater
-  // than the size of the response. In this case, we allow the position in the stream to be
-  // greater than the size of the response during the validation of the position.
-  private FileEncoding fileEncoding = FileEncoding.UNINITIALIZED;
+  // Whether object content is gzip-encoded.
+  private boolean gzipEncoded = false;
+
+  private byte[] footerContent;
 
   /**
    * Constructs an instance of GoogleCloudStorageReadChannel.
@@ -223,22 +226,22 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     this.objectName = objectName;
     this.errorExtractor = errorExtractor;
     this.readOptions = readOptions;
-    this.channelIsOpen = true;
-    this.currentPosition = 0;
     this.resourceIdString = StorageResourceId.createReadableString(bucketName, objectName);
-    if (!readOptions.getSupportContentEncoding()) {
-      // If we don't need to support nonstandard content-encodings, we'll just proceed assuming
-      // the content-encoding is the standard/safe FileEncoding.OTHER.
-      this.fileEncoding = FileEncoding.OTHER;
-    }
-    initFileEncodingAndSize();
-    // access `randomAccessObjects` cache after `initFileEncodingAndSize()` method call,
+
+    // initEncodingAndSize();
+    initEncodingAndSizeAndGetFooter();
+    // Access `randomAccessObjects` cache after `initFileEncodingAndSize()` method call,
     // because it could throw an exception - in this case we don't want to "refresh"
-    // access time to this object in `randomAccessObjects` LRU cache
+    // access time to this object in `randomAccessObjects` LRU cache.
     this.randomAccess = randomAccessObjects.getIfPresent(resourceIdString) != null;
+    checkEncodingAndAccess();
+
+    String encoding = gzipEncoded ? "gzip" : "other";
+    int prefetchedFooterSize = this.footerContent == null ? 0 : this.footerContent.length;
     LOG.debug(
-        "Created and initialized new channel (encoding={}, size={}, randomAccess={}) for '{}'",
-        fileEncoding, size, randomAccess, resourceIdString);
+        "Created and initialized new channel"
+            + " (encoding={}, size={}, randomAccess={}, prefetchedFooterSize={}) for '{}'",
+        encoding, size, randomAccess, prefetchedFooterSize, resourceIdString);
   }
 
   /**
@@ -277,9 +280,9 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   }
 
   /**
-   * Sets the backoff for determining sleep duration between retries.
+   * Sets the back-off for determining sleep duration between retries.
    *
-   * @param backOff May be null to force the next usage to auto-initialize with default settings.
+   * @param backOff {@link BackOff} to use for retries, could not be null.
    */
   @VisibleForTesting
   void setBackOff(BackOff backOff) {
@@ -287,27 +290,21 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   }
 
   /**
-   * Sets the backoff for determining sleep duration between read retries.
+   * Sets the back-off for determining sleep duration between read retries.
    *
-   * @param backOff May be null to force the next usage to auto-initialize with default settings.
+   * @param backOff {@link BackOff} to use for read retries, could not be null.
    */
   void setReadBackOff(BackOff backOff) {
     this.readBackOff = Suppliers.ofInstance(checkNotNull(backOff, "backOff could not be null"));
   }
 
-  /**
-   * Gets the backoff used for determining sleep duration between retries. May be null if it was
-   * never lazily initialized.
-   */
+  /** Gets the back-off used for determining sleep duration between retries. */
   @VisibleForTesting
   BackOff getBackOff() {
     return backOff.get();
   }
 
-  /**
-   * Gets the backoff used for determining sleep duration between read retries. May be null if it
-   * was never lazily initialized.
-   */
+  /** Gets the back-off used for determining sleep duration between read retries. */
   @VisibleForTesting
   BackOff getReadBackOff() {
     return readBackOff.get();
@@ -327,7 +324,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   }
 
   /**
-   * Sets the number of times to automatically retry by re-opening the underlying readChannel
+   * Sets the number of times to automatically retry by re-opening the underlying contentChannel
    * whenever an exception occurs while reading from it. The count of attempted retries is reset
    * whenever at least one byte is successfully read, so this number of retries refers to retries
    * made without achieving any forward progress.
@@ -349,6 +346,10 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   public int read(ByteBuffer buffer) throws IOException {
     throwIfNotOpen();
 
+    checkState(
+        size >= 0,
+        "size should be initialized already, but was %s for '%s'", size, resourceIdString);
+
     // Don't try to read if the buffer has no space.
     if (buffer.remaining() == 0) {
       return 0;
@@ -358,7 +359,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         "Reading {} bytes at {} position from '{}'",
         buffer.remaining(), currentPosition, resourceIdString);
 
-    if (fileEncoding != FileEncoding.GZIPPED && currentPosition == size) {
+    // Do not perform any further reads if we already read everything from this channel.
+    if (currentPosition == size) {
       return -1;
     }
 
@@ -369,34 +371,39 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     // in the first read. Therefore, loop till we either read the required number of
     // bytes or we reach end-of-stream.
     do {
-      performLazySeek(buffer.remaining());
-      checkState(
-          readChannelPosition == currentPosition,
-          "readChannelPosition (%s) should be equal to currentPosition (%s) after lazy seek",
-          readChannelPosition, currentPosition);
-
       int remainingBeforeRead = buffer.remaining();
+      performLazySeek(remainingBeforeRead);
+      checkState(
+          contentChannelPosition == currentPosition,
+          "contentChannelPosition (%s) should be equal to currentPosition (%s) after lazy seek",
+          contentChannelPosition, currentPosition);
+
       try {
-        int numBytesRead = readChannel.read(buffer);
+        int numBytesRead = contentChannel.read(buffer);
         checkIOPrecondition(numBytesRead != 0, "Read 0 bytes without blocking");
         if (numBytesRead < 0) {
+          // Because we don't know decompressed object size for gzip-encoded objects,
+          // assume that this is an object end.
+          if (gzipEncoded) {
+            size = currentPosition;
+            contentChannelEnd = currentPosition;
+          }
           // Check that we didn't get a premature End of Stream signal by checking the number of
           // bytes read against the stream size. Unfortunately we don't have information about the
           // actual size of the data stream when stream compression is used, so we can only ignore
           // this case here.
           checkIOPrecondition(
-              fileEncoding == FileEncoding.GZIPPED
-                  || currentPosition == readChannelEnd
-                  || currentPosition == size,
+              currentPosition == contentChannelEnd || currentPosition == size,
               String.format(
                   "Received end of stream result before all the file data has been received; "
                       + "totalBytesRead: %d, currentPosition: %d,"
-                      + " readChannelEnd %d, size: %d, object: '%s'",
-                  totalBytesRead, currentPosition, readChannelEnd, size, resourceIdString));
-          // reached an end of the readChannel in randomAccess mode,
-          // need to close it so new readChannel will be opened on next iteration
-          if (readChannelEnd != size && currentPosition == readChannelEnd) {
-            closeReadChannel();
+                      + " contentChannelEnd %d, size: %d, object: '%s'",
+                  totalBytesRead, currentPosition, contentChannelEnd, size, resourceIdString));
+
+          // If we have reached an end of a contentChannel but not an end of an object
+          // then close contentChannel and continue reading an object if necessary.
+          if (contentChannelEnd != size && currentPosition == contentChannelEnd) {
+            closeContentChannel();
           } else {
             break;
           }
@@ -405,14 +412,19 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         if (numBytesRead > 0) {
           totalBytesRead += numBytesRead;
           currentPosition += numBytesRead;
-          readChannelPosition += numBytesRead;
+          contentChannelPosition += numBytesRead;
+          checkState(
+              contentChannelPosition == currentPosition,
+              "contentChannelPosition (%s) should be equal to currentPosition (%s)"
+                  + " after successful read",
+              contentChannelPosition, currentPosition);
         }
 
         if (retriesAttempted != 0) {
           LOG.info("Success after {} retries on reading '{}'", retriesAttempted, resourceIdString);
         }
-        // The count of retriesAttempted is per low-level readChannel.read call; each time we make
-        // progress we reset the retry counter.
+        // The count of retriesAttempted is per low-level contentChannel.read call;
+        // each time we make progress we reset the retry counter.
         retriesAttempted = 0;
       } catch (IOException ioe) {
         // TODO(user): Refactor any reusable logic for retries into a separate RetryHelper class.
@@ -420,11 +432,11 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
           LOG.error(
               "Already attempted max of {} retries while reading '{}'; throwing exception.",
               maxRetries, resourceIdString);
-          closeReadChannel();
+          closeContentChannel();
           throw ioe;
         } else {
           if (retriesAttempted == 0) {
-            // If this is the first of a series of retries, we also want to reset the backOff
+            // If this is the first of a series of retries, we also want to reset the readBackOff
             // to have fresh initial values.
             readBackOff.get().reset();
           }
@@ -440,7 +452,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
                   "BackOff returned false; maximum total elapsed time exhausted."
                       + " Giving up after {} retries for '{}'",
                   retriesAttempted, resourceIdString);
-              closeReadChannel();
+              closeContentChannel();
               throw ioe;
             }
           } catch (InterruptedException ie) {
@@ -448,7 +460,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
                 "Interrupted while sleeping before retry. Giving up after {} retries for '{}'",
                 retriesAttempted, resourceIdString);
             ioe.addSuppressed(ie);
-            closeReadChannel();
+            closeContentChannel();
             throw ioe;
           }
           LOG.info(
@@ -464,11 +476,11 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
             currentPosition += partialRead;
           }
 
-          // Close the channel
-          closeReadChannel();
+          // Close the contentChannel.
+          closeContentChannel();
         }
       } catch (RuntimeException r) {
-        closeReadChannel();
+        closeContentChannel();
         throw r;
       }
     } while (buffer.remaining() > 0);
@@ -482,7 +494,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       // read against the stream size. Unfortunately we don't have information about the actual size
       // of the data stream when stream compression is used, so we can only ignore this case here.
       checkIOPrecondition(
-          fileEncoding == FileEncoding.GZIPPED || currentPosition == size,
+          currentPosition == size,
           String.format(
               "Failed to read any data before all the file data has been received;"
                   + " currentPosition: %d, size: %d, object '%s'",
@@ -524,18 +536,19 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
    * possible, and the SSLSocketImpl was already responsible for performing local cleanup at the
    * time the exception was raised.
    */
-  protected void closeReadChannel() {
-    if (readChannel != null) {
-      LOG.debug("Closing internal readChannel for '{}'", resourceIdString);
+  protected void closeContentChannel() {
+    if (contentChannel != null) {
+      LOG.debug("Closing internal contentChannel for '{}'", resourceIdString);
       try {
-        readChannel.close();
+        contentChannel.close();
       } catch (Exception e) {
         LOG.debug(
-            "Got an exception on readChannel.close() for '{}'; ignoring it.", resourceIdString, e);
+            "Got an exception on contentChannel.close() for '{}'; ignoring it.",
+            resourceIdString, e);
       } finally {
-        readChannel = null;
-        readChannelPosition = -1;
-        readChannelEnd = -1;
+        contentChannel = null;
+        contentChannelPosition = -1;
+        contentChannelEnd = -1;
       }
     }
   }
@@ -553,7 +566,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     }
     LOG.debug("Closing channel for '{}'", resourceIdString);
     channelIsOpen = false;
-    closeReadChannel();
+    closeContentChannel();
   }
 
   /**
@@ -570,6 +583,10 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   /**
    * Sets this channel's position.
    *
+   * <p>This method will throw an exception if {@code newPosition} is greater than object size,
+   * which contradicts {@link SeekableByteChannel#position(long) SeekableByteChannel} contract.
+   * TODO(user): decide if this needs to be fixed.
+   *
    * @param newPosition the new position, counting the number of bytes from the beginning.
    * @return this channel instance
    * @throws java.io.FileNotFoundException if the underlying object does not exist.
@@ -578,21 +595,14 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   @Override
   public SeekableByteChannel position(long newPosition) throws IOException {
     throwIfNotOpen();
+
     if (newPosition == currentPosition) {
       return this;
     }
+
     validatePosition(newPosition);
 
-    // seek backwards is a sign of non-sequential IO, switch to random access.
-    if (!randomAccess && newPosition < currentPosition) {
-      LOG.debug(
-          "Detected backward seek from {} to {} position, switching to random IO for '{}'",
-          currentPosition, newPosition, resourceIdString);
-      setRandomAccess();
-    } else if (!randomAccess && size - newPosition <= 8) {
-      LOG.debug(
-          "Detected footer seek from {} to {} position (size={}), switching to random IO for '{}'",
-          currentPosition, newPosition, size, resourceIdString);
+    if (!gzipEncoded && !randomAccess && isRandomAccessReadPattern(newPosition)) {
       setRandomAccess();
     } else {
       LOG.debug(
@@ -603,40 +613,55 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     return this;
   }
 
+  private boolean isRandomAccessReadPattern(long newPosition) {
+    checkState(
+        !gzipEncoded && !randomAccess,
+        "shouldn't try to detect random access read pattern for '%s'", resourceIdString);
+    if (newPosition < currentPosition) {
+      LOG.debug(
+          "Detected backward seek from {} to {} position, switching to random IO for '{}'",
+          currentPosition, newPosition, resourceIdString);
+      return true;
+    }
+    return false;
+  }
+
   private void setRandomAccess() {
     randomAccess = true;
+    checkEncodingAndAccess();
     randomAccessObjects.put(resourceIdString, Boolean.TRUE);
   }
 
   private void skipInPlace(long seekDistance) {
     if (skipBuffer == null) {
-      skipBuffer = new byte[SKIP_BUFFER_SIZE];
+      skipBuffer = new byte[SKIP_BUFFER_SIZE_BYTES];
     }
-    while (seekDistance > 0 && readChannel != null) {
+    while (seekDistance > 0 && contentChannel != null) {
       try {
         int bufferSize = (int) Math.min(skipBuffer.length, seekDistance);
-        int bytesRead = readChannel.read(ByteBuffer.wrap(skipBuffer, 0, bufferSize));
+        int bytesRead = contentChannel.read(ByteBuffer.wrap(skipBuffer, 0, bufferSize));
         if (bytesRead < 0) {
           // Shouldn't happen since we called validatePosition prior to this loop.
           LOG.info(
               "Somehow read {} bytes trying to skip {} bytes to seek to position {}, size: {}",
               bytesRead, seekDistance, currentPosition, size);
-          closeReadChannel();
+          closeContentChannel();
+        } else {
+          seekDistance -= bytesRead;
+          contentChannelPosition += bytesRead;
         }
-        seekDistance -= bytesRead;
-        readChannelPosition += bytesRead;
       } catch (IOException e) {
         LOG.info(
-            "Got an I/O exception on readChannel.read() for '{}'. A lazy-seek will be pending.",
+            "Got an IO exception on contentChannel.read(), a lazy-seek will be pending for '{}'",
             resourceIdString, e);
-        closeReadChannel();
+        closeContentChannel();
       }
     }
     checkState(
-        readChannelPosition == -1 || readChannelPosition == currentPosition,
-        "readChannelPosition (%s) should be '-1' or same as currentPosition (%s)"
-            + " after in-place skip",
-        readChannelPosition, currentPosition);
+        contentChannel == null || contentChannelPosition == currentPosition,
+        "contentChannelPosition (%s) should be equal to currentPosition (%s)"
+            + " after successful in-place skip",
+        contentChannelPosition, currentPosition);
   }
 
   /**
@@ -652,20 +677,20 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   }
 
   /** Sets size of this channel to the given value. */
+  @VisibleForTesting
   protected void setSize(long size) {
     this.size = size;
   }
 
-  /** Sets file encoding of this channel to the given value. */
-  @VisibleForTesting
-  protected void setFileEncoding(FileEncoding fileEncoding) {
-    this.fileEncoding = fileEncoding;
+  private void checkEncodingAndAccess() {
+    checkState(
+        !(gzipEncoded && randomAccess),
+        "gzipEncoded and randomAccess should not be true at the same time for '%s'",
+        resourceIdString);
   }
 
   /** Validates that the given position is valid for this channel. */
   protected void validatePosition(long position) throws IOException {
-    checkState(size >= 0, "size should be initialized before validatePosition call");
-    // Validate: position >= 0
     if (position < 0) {
       throw new EOFException(
           String.format(
@@ -673,12 +698,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
               position, resourceIdString));
     }
 
-    // Validate: position < size
-    // If a file is gzip encoded, the size of the response may be less than the number of bytes
-    // that can be read. In this case, the new position may be a valid offset, and we proceed.
-    // If not, the size of the response is the number of bytes that can be read and we throw
-    // an exception for an invalid seek.
-    if (fileEncoding != FileEncoding.GZIPPED && position >= size) {
+    if (position >= size) {
       throw new EOFException(
           String.format(
               "Invalid seek offset: position value (%d) must be between 0 and %d for '%s'",
@@ -696,49 +716,65 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
    */
   @VisibleForTesting
   void performLazySeek(long limit) throws IOException {
+    throwIfNotOpen();
+
     // Return quickly if there is no pending seek operation, i.e. position didn't change.
-    if (currentPosition == readChannelPosition && readChannel != null && readChannel.isOpen()) {
+    if (currentPosition == contentChannelPosition && contentChannel != null) {
       return;
     }
 
     LOG.debug(
         "Performing lazySeek from {} to {} position with {} limit for '{}'",
-        readChannelPosition, currentPosition, limit, resourceIdString);
+        contentChannelPosition, currentPosition, limit, resourceIdString);
 
-    long seekDistance = currentPosition - readChannelPosition;
-    if (readChannel != null
+    long seekDistance = currentPosition - contentChannelPosition;
+    if (contentChannel != null
         && seekDistance > 0
         && seekDistance <= readOptions.getInplaceSeekLimit()
-        && (readChannelEnd <= 0 || currentPosition < readChannelEnd)) {
+        && currentPosition < contentChannelEnd) {
       LOG.debug(
           "Seeking forward {} bytes (inplaceSeekLimit: {}) in-place to position {} for '{}'",
           seekDistance, readOptions.getInplaceSeekLimit(), currentPosition, resourceIdString);
       skipInPlace(seekDistance);
     } else {
-      closeReadChannel();
+      closeContentChannel();
     }
 
-    if (readChannel == null) {
-      InputStream objectContentStream = openStream(limit);
-      readChannel = Channels.newChannel(objectContentStream);
-      readChannelPosition = currentPosition;
+    if (contentChannel == null) {
+      openContentChannel(limit);
     }
   }
 
+  private void openContentChannel(long limit) throws IOException {
+    checkState(contentChannel == null, "contentChannel should be null, before opening new");
+    InputStream objectContentStream;
+    if (footerContent != null && currentPosition >= size - footerContent.length) {
+      int offset = (int) (currentPosition - (size - footerContent.length));
+      int length = footerContent.length - offset;
+      objectContentStream = new ByteArrayInputStream(footerContent, offset, length);
+      LOG.debug(
+          "Opened stream (prefetched footer) from {} position and {} limit for '{}'",
+          currentPosition, limit, resourceIdString);
+    } else {
+      objectContentStream = openStream(limit);
+    }
+    contentChannel = Channels.newChannel(objectContentStream);
+    contentChannelPosition = currentPosition;
+  }
+
   /**
-   * Initializes {@link #fileEncoding} and {@link #size} from object's GCS metadata.
+   * Initializes {@link #gzipEncoded} and {@link #size} from object's GCS metadata.
    *
    * @throws IOException on IO error.
    */
   @VisibleForTesting
-  protected void initFileEncodingAndSize() throws IOException {
-    if (fileEncoding == FileEncoding.UNINITIALIZED || size < 0) {
-      StorageObject metadata = getMetadata();
-      if (fileEncoding == FileEncoding.UNINITIALIZED) {
-        fileEncoding = getEncoding(metadata);
-      }
-      size = metadata.getSize().longValue();
-    }
+  protected void initEncodingAndSize() throws IOException {
+    checkState(
+        size < 0,
+        "size should be not initialized yet, but was %s for '%s'", size, resourceIdString);
+    StorageObject metadata = getMetadata();
+    gzipEncoded = nullToEmpty(metadata.getContentEncoding()).contains("gzip");
+    size = gzipEncoded ? Long.MAX_VALUE : metadata.getSize().longValue();
   }
 
   /**
@@ -767,15 +803,51 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   }
 
   /**
-   * Returns the FileEncoding of a file given its metadata. Currently supports GZIPPED and OTHER.
+   * Retrieve the object's metadata from GCS.
    *
-   * @param metadata the object's metadata.
-   * @return FileEncoding.GZIPPED if the response from GCS will have gzip encoding or
-   *     FileEncoding.OTHER otherwise.
+   * @throws IOException on IO error.
    */
-  protected static FileEncoding getEncoding(StorageObject metadata) {
-    String encoding = metadata.getContentEncoding();
-    return nullToEmpty(encoding).contains("gzip") ? FileEncoding.GZIPPED : FileEncoding.OTHER;
+  protected void initEncodingAndSizeAndGetFooter() throws IOException {
+    Storage.Objects.Get getObject = createRequest();
+    getObject.getRequestHeaders().setAcceptEncoding("gzip");
+    getObject.getRequestHeaders().setRange(FOOTER_RANGE_HEADER);
+    backOff.get().reset();
+    try {
+      HttpResponse response =
+          ResilientOperation.retry(
+              new CheckedCallable<HttpResponse, IOException>() {
+                @Override
+                public HttpResponse call() throws IOException {
+                  return getObject.executeMedia();
+                }
+              },
+              new RetryBoundedBackOff(maxRetries, backOff.get()),
+              RetryDeterminer.SOCKET_ERRORS,
+              IOException.class,
+              sleeper);
+      HttpHeaders responseHeaders = response.getHeaders();
+      gzipEncoded = nullToEmpty(responseHeaders.getContentEncoding()).contains("gzip");
+      if (gzipEncoded) {
+        size = Long.MAX_VALUE;
+        return;
+      }
+      String range = responseHeaders.getContentRange();
+      size = Long.parseLong(range.substring(range.lastIndexOf('/') + 1));
+      if (size > 0) {
+        int contentSize = responseHeaders.getContentLength().intValue();
+        try (InputStream footer = new BufferedInputStream(response.getContent(), contentSize)) {
+          footerContent = ByteStreams.toByteArray(footer);
+        }
+        checkState(footerContent.length == contentSize);
+      }
+    } catch (IOException e) {
+      if (errorExtractor.itemNotFound(e)) {
+        throw GoogleCloudStorageExceptions.getFileNotFoundException(bucketName, objectName);
+      }
+      throw new IOException("Error reading " + resourceIdString, e);
+    } catch (InterruptedException e) { // From the sleep
+      throw new IOException("Thread interrupt received.", e);
+    }
   }
 
   /**
@@ -792,33 +864,68 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   protected InputStream openStream(long limit) throws IOException {
     checkArgument(limit > 0, "limit should be greater than 0, but was %s", limit);
 
+    checkState(
+        contentChannel == null && contentChannelEnd < 0,
+        "contentChannel and contentChannelEnd should be not initialized yet for '%s'",
+        resourceIdString);
+
     if (size == 0) {
       return new ByteArrayInputStream(new byte[0]);
     }
 
     Storage.Objects.Get getObject = createRequest();
 
+    // Set the headers on the existing request headers that may have
+    // been initialized with things like user-agent already.
+    HttpHeaders requestHeaders = clientRequestHelper.getRequestHeaders(getObject);
+
+    // Disable GCS decompressive transcoding.
+    requestHeaders.setAcceptEncoding("gzip");
+
     int bufferSize = readOptions.getBufferSize();
 
-    // Set the range on the existing request headers that may have been initialized with things
-    // like user-agent already. If the file is gzip encoded, request the entire file.
-    String rangeHeader = "bytes=0-";
-    if (fileEncoding != FileEncoding.GZIPPED) {
-      setReadChannelEnd(limit, bufferSize);
-      // limit bufferSize to the end of the readChannel
-      bufferSize = (int) Math.min(readChannelEnd - currentPosition, bufferSize);
+    // Do not set range for gzip-encoded files - it's not supported.
+    if (!gzipEncoded) {
+      String rangeHeader = "bytes=" + currentPosition + "-";
 
-      rangeHeader = "bytes=" + currentPosition + "-";
       if (randomAccess) {
-        rangeHeader += readChannelEnd - 1;
+        long rangeSize = Math.max(bufferSize, limit);
+        // When bufferSize is 0 and limit passed by client is very small,
+        // we still don't want to send too small range request to GCS.
+        rangeSize = Math.max(rangeSize, MIN_RANGE_REQUEST_SIZE_BYTES);
+        // limit rangeSize to the object end
+        rangeSize = Math.min(rangeSize, size - currentPosition);
+        long rangeEndInclusive = currentPosition + rangeSize - 1;
+        rangeHeader += rangeEndInclusive;
+
+        // set contentChannelEnd to range end
+        contentChannelEnd = currentPosition + rangeSize;
       }
+
+      requestHeaders.setRange(rangeHeader);
     }
 
-    clientRequestHelper.getRequestHeaders(getObject).setRange(rangeHeader);
+    if (contentChannelEnd < 0) {
+      checkState(
+          !randomAccess,
+          "contentChannelEnd should be initialized already if randomAccess is true for '%s'",
+          resourceIdString);
+
+      // we are reading object till the end
+      contentChannelEnd = size;
+    }
+
+    // limit buffer size to the object end
+    bufferSize = (int) Math.min(bufferSize, contentChannelEnd - currentPosition);
+
+    checkState(
+        contentChannelEnd >= 0,
+        "contentChannelEnd should be initialized already for '%s'", resourceIdString);
 
     HttpResponse response;
     try {
       response = getObject.executeMedia();
+      // TODO(user): validate response range header against expected/request range
     } catch (IOException e) {
       if (errorExtractor.itemNotFound(e)) {
         throw GoogleCloudStorageExceptions.getFileNotFoundException(bucketName, objectName);
@@ -831,51 +938,32 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       throw new IOException(msg, e);
     }
 
-    InputStream content = null;
     try {
-      content = response.getContent();
+      InputStream contentStream = response.getContent();
 
       if (bufferSize > 0) {
         LOG.debug(
             "Opened stream from {} position with {} range, {} limit and {} bytes buffer for '{}'",
-            currentPosition, rangeHeader, limit, bufferSize, resourceIdString);
-        content = new BufferedInputStream(content, bufferSize);
+            currentPosition, requestHeaders.getRange(), limit, bufferSize, resourceIdString);
+        contentStream = new BufferedInputStream(contentStream, bufferSize);
       } else {
         LOG.debug(
             "Opened stream from {} position with {} range and {} limit for '{}'",
-            currentPosition, rangeHeader, limit, resourceIdString);
+            currentPosition, requestHeaders.getRange(), limit, resourceIdString);
       }
 
-      // If the file is gzip encoded, we requested the entire file and need to seek in the content
-      // to the desired position. If it is not, we only requested the bytes we haven't read.
-      if (fileEncoding == FileEncoding.GZIPPED) {
-        content.skip(currentPosition);
+      if (gzipEncoded) {
+        contentStream.skip(currentPosition);
       }
+
+      return contentStream;
     } catch (IOException e) {
       try {
-        if (content != null) {
-          content.close();
-        }
-      } catch (IOException closeException) { // ignore error on close
-        LOG.debug(
-            "Caught exception on close after IOException thrown for '{}'",
-            resourceIdString, closeException);
+        response.disconnect();
+      } catch (IOException closeException) {
         e.addSuppressed(closeException);
       }
       throw e;
-    }
-    return content;
-  }
-
-  private void setReadChannelEnd(long limit, int bufferSize) {
-    if (fileEncoding != FileEncoding.GZIPPED) {
-      if (randomAccess) {
-        readChannelEnd = currentPosition + Math.max(limit, bufferSize);
-        // if readChannelEnd exceeds size, set it to size
-        readChannelEnd = Math.min(readChannelEnd, size);
-      } else {
-        readChannelEnd = size;
-      }
     }
   }
 
