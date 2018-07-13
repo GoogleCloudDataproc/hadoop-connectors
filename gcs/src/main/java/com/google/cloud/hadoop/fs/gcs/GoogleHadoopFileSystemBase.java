@@ -1667,7 +1667,7 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
   }
 
   /** Helper method to get the UGI short user name */
-  private String getUgiUserName() throws IOException {
+  private static String getUgiUserName() throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     return ugi.getShortUserName();
   }
