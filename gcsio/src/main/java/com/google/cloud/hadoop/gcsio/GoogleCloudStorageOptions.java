@@ -45,6 +45,9 @@ public class GoogleCloudStorageOptions {
   /** Default setting for maximum number of requests per GCS batch. */
   public static final long MAX_REQUESTS_PER_BATCH_DEFAULT = 30;
 
+  /** Default setting for number of threads to execute GCS batch requests. */
+  public static final int BATCH_THREADS_DEFAULT = 0;
+
   /** Default setting for maximum number of GCS HTTP request retires. */
   public static final int MAX_HTTP_REQUEST_RETRIES = 10;
 
@@ -87,6 +90,8 @@ public class GoogleCloudStorageOptions {
     // maximum of 1000 requests per batch; it should not generally be necessary to modify this value
     // manually, except possibly for testing purposes.
     private long maxRequestsPerBatch = MAX_REQUESTS_PER_BATCH_DEFAULT;
+
+    private int batchThreads = BATCH_THREADS_DEFAULT;
 
     private int maxHttpRequestRetries = MAX_HTTP_REQUEST_RETRIES;
 
@@ -136,6 +141,11 @@ public class GoogleCloudStorageOptions {
 
     public Builder setMaxRequestsPerBatch(long maxRequestsPerBatch) {
       this.maxRequestsPerBatch = maxRequestsPerBatch;
+      return this;
+    }
+
+    public Builder setBatchThreads(int batchThreads) {
+      this.batchThreads = batchThreads;
       return this;
     }
 
@@ -212,6 +222,7 @@ public class GoogleCloudStorageOptions {
   private final AsyncWriteChannelOptions writeChannelOptions;
   private final long maxListItemsPerCall;
   private final long maxRequestsPerBatch;
+  private final int batchThreads;
   private final int maxHttpRequestRetries;
   private final int httpRequestConnectTimeout;
   private final int httpRequestReadTimeout;
@@ -229,6 +240,7 @@ public class GoogleCloudStorageOptions {
     this.writeChannelOptions = builder.getWriteChannelOptionsBuilder().build();
     this.maxListItemsPerCall = builder.maxListItemsPerCall;
     this.maxRequestsPerBatch = builder.maxRequestsPerBatch;
+    this.batchThreads = builder.batchThreads;
     this.maxHttpRequestRetries = builder.maxHttpRequestRetries;
     this.httpRequestConnectTimeout = builder.httpRequestConnectTimeout;
     this.httpRequestReadTimeout = builder.httpRequestReadTimeout;
@@ -308,6 +320,10 @@ public class GoogleCloudStorageOptions {
 
   public long getMaxRequestsPerBatch() {
     return maxRequestsPerBatch;
+  }
+
+  public int getBatchThreads() {
+    return batchThreads;
   }
 
   public int getMaxHttpRequestRetries() {

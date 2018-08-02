@@ -699,6 +699,10 @@ public class GoogleCloudStorageImpl
   public void deleteObjects(List<StorageResourceId> fullObjectNames) throws IOException {
     LOG.debug("deleteObjects({})", fullObjectNames);
 
+    if (fullObjectNames.isEmpty()) {
+      return;
+    }
+
     // Validate that all the elements represent StorageObjects.
     for (StorageResourceId fullObjectName : fullObjectNames) {
       Preconditions.checkArgument(
@@ -711,7 +715,11 @@ public class GoogleCloudStorageImpl
     final Set<IOException> innerExceptions = newConcurrentHashSet();
     BatchHelper batchHelper =
         batchFactory.newBatchHelper(
-            httpRequestInitializer, gcs, storageOptions.getMaxRequestsPerBatch());
+            httpRequestInitializer,
+            gcs,
+            storageOptions.getMaxRequestsPerBatch(),
+            fullObjectNames.size(),
+            storageOptions.getBatchThreads());
 
     for (StorageResourceId fullObjectName : fullObjectNames) {
       queueSingleObjectDelete(fullObjectName, innerExceptions, batchHelper, 1);
@@ -897,6 +905,10 @@ public class GoogleCloudStorageImpl
       throws IOException {
     validateCopyArguments(srcBucketName, srcObjectNames, dstBucketName, dstObjectNames, this);
 
+    if (srcObjectNames.isEmpty()) {
+      return;
+    }
+
     // Gather FileNotFoundExceptions for individual objects,
     // but only throw a single combined exception at the end.
     Set<IOException> innerExceptions = newConcurrentHashSet();
@@ -904,7 +916,11 @@ public class GoogleCloudStorageImpl
     // Perform the copy operations.
     BatchHelper batchHelper =
         batchFactory.newBatchHelper(
-            httpRequestInitializer, gcs, storageOptions.getMaxRequestsPerBatch());
+            httpRequestInitializer,
+            gcs,
+            storageOptions.getMaxRequestsPerBatch(),
+            srcObjectNames.size(),
+            storageOptions.getBatchThreads());
 
     for (int i = 0; i < srcObjectNames.size(); i++) {
       if (storageOptions.isCopyWithRewriteEnabled()) {
@@ -1562,12 +1578,19 @@ public class GoogleCloudStorageImpl
       throws IOException {
     LOG.debug("getItemInfos({})", resourceIds);
 
+    if (resourceIds.isEmpty()) {
+      return new ArrayList<>();
+    }
+
     final Map<StorageResourceId, GoogleCloudStorageItemInfo> itemInfos = new ConcurrentHashMap<>();
     final Set<IOException> innerExceptions = newConcurrentHashSet();
-    BatchHelper batchHelper = batchFactory.newBatchHelper(
-        httpRequestInitializer,
-        gcs,
-        storageOptions.getMaxRequestsPerBatch());
+    BatchHelper batchHelper =
+        batchFactory.newBatchHelper(
+            httpRequestInitializer,
+            gcs,
+            storageOptions.getMaxRequestsPerBatch(),
+            resourceIds.size(),
+            storageOptions.getBatchThreads());
 
     // For each resourceId, we'll either directly add ROOT_INFO, enqueue a Bucket fetch request, or
     // enqueue a StorageObject fetch request.
@@ -1658,13 +1681,20 @@ public class GoogleCloudStorageImpl
       throws IOException {
     LOG.debug("updateItems({})", itemInfoList);
 
+    if (itemInfoList.isEmpty()) {
+      return new ArrayList<>();
+    }
+
     final Map<StorageResourceId, GoogleCloudStorageItemInfo> resultItemInfos =
         new ConcurrentHashMap<>();
     final Set<IOException> innerExceptions = newConcurrentHashSet();
-    BatchHelper batchHelper = batchFactory.newBatchHelper(
-        httpRequestInitializer,
-        gcs,
-        storageOptions.getMaxRequestsPerBatch());
+    BatchHelper batchHelper =
+        batchFactory.newBatchHelper(
+            httpRequestInitializer,
+            gcs,
+            storageOptions.getMaxRequestsPerBatch(),
+            itemInfoList.size(),
+            storageOptions.getBatchThreads());
 
     for (UpdatableItemInfo itemInfo : itemInfoList) {
       Preconditions.checkArgument(!itemInfo.getStorageResourceId().isBucket()

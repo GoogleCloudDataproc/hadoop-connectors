@@ -1,5 +1,14 @@
 1.6.8 - 2018-XX-XX
 
+  1. Support parallel execution of GCS batch requests.
+
+     Number of threads to execute batch requests configurable via property:
+
+       fs.gs.batch.threads (default: 0)
+
+     If `fs.gs.batch.threads` value is set to 0 then batch requests will be
+     executed sequentially by caller thread.
+
 
 1.6.7 - 2018-06-12
 

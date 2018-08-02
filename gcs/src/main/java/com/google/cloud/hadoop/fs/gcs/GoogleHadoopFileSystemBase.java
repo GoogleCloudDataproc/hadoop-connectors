@@ -25,6 +25,7 @@ import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.PathCodec;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
@@ -490,6 +491,13 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
 
   /** Default value for {@link GoogleHadoopFileSystemBase#GCS_MAX_REQUESTS_PER_BATCH}. */
   public static final long GCS_MAX_REQUESTS_PER_BATCH_DEFAULT = 30;
+
+  /** Configuration key for a number of threads to execute batch requests. */
+  public static final String GCS_BATCH_THREADS = "fs.gs.batch.threads";
+
+  /** Default value for {@link #GCS_BATCH_THREADS}. */
+  public static final int GCS_BATCH_THREADS_DEFAULT =
+      GoogleCloudStorageOptions.BATCH_THREADS_DEFAULT;
 
   /**
    * Configuration key for the max number of retries for failed HTTP request to GCS. Note that the
@@ -2357,6 +2365,11 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
     LOG.debug("{} = {}", GCS_MAX_REQUESTS_PER_BATCH, maxRequestsPerBatch);
 
     optionsBuilder.getCloudStorageOptionsBuilder().setMaxRequestsPerBatch(maxRequestsPerBatch);
+
+    int batchThreads = config.getInt(GCS_BATCH_THREADS, GCS_BATCH_THREADS_DEFAULT);
+    LOG.debug("{} = {}", GCS_BATCH_THREADS, batchThreads);
+
+    optionsBuilder.getCloudStorageOptionsBuilder().setBatchThreads(batchThreads);
 
     int maxHttpRequestRetries = config.getInt(GCS_HTTP_MAX_RETRY_KEY, GCS_HTTP_MAX_RETRY_DEFAULT);
     LOG.debug("{} = {}", GCS_HTTP_MAX_RETRY_KEY, maxHttpRequestRetries);
