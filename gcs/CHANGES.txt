@@ -9,6 +9,9 @@
      If `fs.gs.batch.threads` value is set to 0 then batch requests will be
      executed sequentially by caller thread.
 
+  2. Do not send batch request when performing operations (rename, delete, copy)
+     on 1 object.
+
 
 1.6.7 - 2018-06-12
 
