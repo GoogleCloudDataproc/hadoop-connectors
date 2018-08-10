@@ -1,4 +1,4 @@
-1.6.8 - 2018-XX-XX
+1.6.8 - 2018-08-10
 
   1. Support parallel execution of GCS batch requests.
 
