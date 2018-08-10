@@ -480,6 +480,20 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
   /** Default value for {@link GoogleHadoopFileSystemBase#GCS_ENABLE_COPY_WITH_REWRITE_KEY}. */
   public static final boolean GCS_ENABLE_COPY_WITH_REWRITE_DEFAULT = false;
 
+  /** Configuration key for a max number of GCS RPCs in batch request for copy operations. */
+  public static final String GCS_COPY_MAX_REQUESTS_PER_BATCH = "fs.gs.copy.max.requests.per.batch";
+
+  /** Default value for {@link #GCS_COPY_MAX_REQUESTS_PER_BATCH}. */
+  public static final long GCS_COPY_MAX_REQUESTS_PER_BATCH_DEFAULT =
+      GoogleCloudStorageOptions.COPY_MAX_REQUESTS_PER_BATCH_DEFAULT;
+
+  /** Configuration key for a number of threads to execute batch requests for copy operations. */
+  public static final String GCS_COPY_BATCH_THREADS = "fs.gs.copy.batch.threads";
+
+  /** Default value for {@link #GCS_COPY_BATCH_THREADS}. */
+  public static final int GCS_COPY_BATCH_THREADS_DEFAULT =
+      GoogleCloudStorageOptions.COPY_BATCH_THREADS_DEFAULT;
+
   /** Configuration key for number of items to return per call to the list* GCS RPCs. */
   public static final String GCS_MAX_LIST_ITEMS_PER_CALL = "fs.gs.list.max.items.per.call";
 
@@ -2335,8 +2349,18 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
     boolean enableCopyWithRewrite =
         config.getBoolean(GCS_ENABLE_COPY_WITH_REWRITE_KEY, GCS_ENABLE_COPY_WITH_REWRITE_DEFAULT);
     LOG.debug("{} = {}", GCS_ENABLE_COPY_WITH_REWRITE_KEY, enableCopyWithRewrite);
-
     optionsBuilder.getCloudStorageOptionsBuilder().setCopyWithRewriteEnabled(enableCopyWithRewrite);
+
+    long copyMaxRequestsPerBatch =
+        config.getLong(GCS_COPY_MAX_REQUESTS_PER_BATCH, GCS_COPY_MAX_REQUESTS_PER_BATCH_DEFAULT);
+    LOG.debug("{} = {}", GCS_COPY_MAX_REQUESTS_PER_BATCH, copyMaxRequestsPerBatch);
+    optionsBuilder
+        .getCloudStorageOptionsBuilder()
+        .setCopyMaxRequestsPerBatch(copyMaxRequestsPerBatch);
+
+    int copyBatchThreads = config.getInt(GCS_COPY_BATCH_THREADS, GCS_COPY_BATCH_THREADS_DEFAULT);
+    LOG.debug("{} = {}", GCS_COPY_BATCH_THREADS, copyBatchThreads);
+    optionsBuilder.getCloudStorageOptionsBuilder().setCopyBatchThreads(copyBatchThreads);
 
     String transportTypeString = config.get(GCS_HTTP_TRANSPORT_KEY, GCS_HTTP_TRANSPORT_DEFAULT);
     LOG.debug("{} = {}", GCS_HTTP_TRANSPORT_KEY, transportTypeString);

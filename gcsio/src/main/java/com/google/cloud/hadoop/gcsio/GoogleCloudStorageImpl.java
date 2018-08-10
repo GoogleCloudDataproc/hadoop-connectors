@@ -918,9 +918,9 @@ public class GoogleCloudStorageImpl
         batchFactory.newBatchHelper(
             httpRequestInitializer,
             gcs,
-            storageOptions.getMaxRequestsPerBatch(),
+            storageOptions.getCopyMaxRequestsPerBatch(),
             srcObjectNames.size(),
-            storageOptions.getBatchThreads());
+            storageOptions.getCopyBatchThreads());
 
     for (int i = 0; i < srcObjectNames.size(); i++) {
       if (storageOptions.isCopyWithRewriteEnabled()) {

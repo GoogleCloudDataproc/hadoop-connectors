@@ -72,6 +72,12 @@ public class GoogleCloudStorageOptions {
   /** Default setting for whether or not to use rewrite request for copy operation. */
   public static final boolean COPY_WITH_REWRITE_DEFAULT = false;
 
+  /** Default setting for maximum number of requests per GCS batch for copy operations. */
+  public static final long COPY_MAX_REQUESTS_PER_BATCH_DEFAULT = MAX_REQUESTS_PER_BATCH_DEFAULT;
+
+  /** Default setting for number of threads to execute GCS batch requests for copy operations. */
+  public static final int COPY_BATCH_THREADS_DEFAULT = BATCH_THREADS_DEFAULT;
+
   /** Mutable builder for the GoogleCloudStorageOptions class. */
   public static class Builder {
     private boolean autoRepairImplicitDirectoriesEnabled = AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT;
@@ -90,7 +96,6 @@ public class GoogleCloudStorageOptions {
     // maximum of 1000 requests per batch; it should not generally be necessary to modify this value
     // manually, except possibly for testing purposes.
     private long maxRequestsPerBatch = MAX_REQUESTS_PER_BATCH_DEFAULT;
-
     private int batchThreads = BATCH_THREADS_DEFAULT;
 
     private int maxHttpRequestRetries = MAX_HTTP_REQUEST_RETRIES;
@@ -105,6 +110,8 @@ public class GoogleCloudStorageOptions {
     private RequesterPaysOptions requesterPaysOptions = DEFAULT_REQUESTER_PAYS_OPTIONS;
 
     private boolean copyWithRewriteEnabled = COPY_WITH_REWRITE_DEFAULT;
+    private long copyMaxRequestsPerBatch = COPY_MAX_REQUESTS_PER_BATCH_DEFAULT;
+    private int copyBatchThreads = COPY_BATCH_THREADS_DEFAULT;
 
     public Builder setAutoRepairImplicitDirectoriesEnabled(
         boolean autoRepairImplicitDirectoriesEnabled) {
@@ -203,6 +210,16 @@ public class GoogleCloudStorageOptions {
       return this;
     }
 
+    public Builder setCopyMaxRequestsPerBatch(long copyMaxRequestsPerBatch) {
+      this.copyMaxRequestsPerBatch = copyMaxRequestsPerBatch;
+      return this;
+    }
+
+    public Builder setCopyBatchThreads(int copyBatchThreads) {
+      this.copyBatchThreads = copyBatchThreads;
+      return this;
+    }
+
     public GoogleCloudStorageOptions build() {
       return new GoogleCloudStorageOptions(this);
     }
@@ -230,6 +247,8 @@ public class GoogleCloudStorageOptions {
   private final int maxWaitMillisForEmptyObjectCreation;
   private final RequesterPaysOptions requesterPaysOptions;
   private final boolean copyWithRewriteEnabled;
+  private final long copyMaxRequestsPerBatch;
+  private final int copyBatchThreads;
 
   protected GoogleCloudStorageOptions(Builder builder) {
     this.autoRepairImplicitDirectoriesEnabled = builder.autoRepairImplicitDirectoriesEnabled;
@@ -251,6 +270,8 @@ public class GoogleCloudStorageOptions {
     this.requesterPaysOptions =
         checkNotNull(builder.requesterPaysOptions, "requesterPaysOptions could not be null");
     this.copyWithRewriteEnabled = builder.copyWithRewriteEnabled;
+    this.copyMaxRequestsPerBatch = builder.copyMaxRequestsPerBatch;
+    this.copyBatchThreads = builder.copyBatchThreads;
   }
 
   public GoogleCloudStorageOptions(
@@ -352,6 +373,14 @@ public class GoogleCloudStorageOptions {
 
   public boolean isCopyWithRewriteEnabled() {
     return copyWithRewriteEnabled;
+  }
+
+  public long getCopyMaxRequestsPerBatch() {
+    return copyMaxRequestsPerBatch;
+  }
+
+  public int getCopyBatchThreads() {
+    return copyBatchThreads;
   }
 
   public void throwIfNotValid() {

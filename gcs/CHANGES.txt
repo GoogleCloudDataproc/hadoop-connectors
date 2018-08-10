@@ -12,6 +12,15 @@
   2. Do not send batch request when performing operations (rename, delete, copy)
      on 1 object.
 
+  3. Add configuration properties to control batching of copy operations
+     separately from other operations:
+
+       fs.gs.copy.max.requests.per.batch (default: 30)
+       fs.gs.copy.batch.threads (default: 0)
+
+  4. Fix `RejectedExecutionException` during parallel execution of GCS batch
+     requests.
+
 
 1.6.7 - 2018-06-12
 
