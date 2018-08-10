@@ -17,6 +17,7 @@ package com.google.cloud.hadoop.testing;
 import com.google.cloud.hadoop.util.EntriesCredentialConfiguration;
 import com.google.cloud.hadoop.util.EntriesCredentialConfiguration.Entries;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -57,6 +58,11 @@ public class EntriesCredentialConfigurationUtil {
     public void setBoolean(String key, boolean value) {
       Boolean b = Boolean.valueOf(value);
       map.put(key, b);
+    }
+
+    @Override
+    public String getPassword(String key) throws IOException {
+      return get(key);
     }
   }
 }

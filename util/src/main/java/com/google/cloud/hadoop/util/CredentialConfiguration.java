@@ -31,6 +31,10 @@ public class CredentialConfiguration {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   private boolean serviceAccountEnabled = true;
+  private String saPrivateKeyId = null;
+  private String saPrivateKey = null;
+  private String saClientEmail = null;
+  private String saClientId = null;
   private String serviceAccountEmail = null;
   private String serviceAccountKeyFile = null;
   private String serviceAccountJsonKeyFile = null;
@@ -47,10 +51,10 @@ public class CredentialConfiguration {
    * Get the credential as configured.
    *
    * The following is the order in which properties are applied to create the Credential:
-   * 1. If service accounts are not disabled and no service account key file is set, use the
-   *    metadata service.
-   * 2. If service accounts are not disabled and a service-account email and keyfile are provided,
-   *    use service account authentication with the given keyfile and email.
+   * 1. If service accounts are not disabled and no service account key file or sa parameters are
+   *    set, use the metadata service.
+   * 2. If service accounts are not disabled and a service-account email and keyfile, or service account
+   *     parameters are provided, use service account authentication with the given parameters.
    * 3. If service accounts are disabled and client id, client secret and OAuth credential file
    *    is provided, use the Installed App authentication flow.
    * 4. If service accounts are disabled and null credentials are enabled for unit testing, return
@@ -73,7 +77,26 @@ public class CredentialConfiguration {
         return credentialFactory.getCredentialFromMetadataServiceAccount();
       }
 
-      if (!isNullOrEmpty(serviceAccountJsonKeyFile)) {
+      if (!isNullOrEmpty(saPrivateKeyId)) {
+        // TODO: Test with a hadoop credentials (jceks) file. getPassword is being used.
+        logger.atFine().log("Attempting to get credentials from Configuration");
+        Preconditions.checkState(
+            !isNullOrEmpty(saPrivateKey),
+            "privateKeyId must be set if using credentials configured directly in configuration");
+        Preconditions.checkState(
+            !isNullOrEmpty(saClientEmail),
+            "clientEmail must be set if using credentials configured directly in configuration");
+        Preconditions.checkArgument(
+            isNullOrEmpty(serviceAccountKeyFile),
+            "A P12 key file may not be specified at the same time as credentials via configuration.");
+        Preconditions.checkArgument(
+            isNullOrEmpty(serviceAccountJsonKeyFile),
+            "A JSON key file may not be specified at the same time as credentials via configuration.");
+        return credentialFactory.getCredentialsFromSAParameters(
+            saPrivateKeyId, saPrivateKey, saClientEmail, scopes, getTransport());
+      }
+
+      if (isNullOrEmpty(serviceAccountJsonKeyFile)) {
         logger.atFine().log("Using JSON keyfile %s", serviceAccountJsonKeyFile);
         Preconditions.checkArgument(
             isNullOrEmpty(serviceAccountKeyFile),
@@ -125,6 +148,7 @@ public class CredentialConfiguration {
   public boolean shouldUseMetadataService() {
     return isNullOrEmpty(serviceAccountKeyFile)
         && isNullOrEmpty(serviceAccountJsonKeyFile)
+        && isNullOrEmpty(saPrivateKey)
         && !shouldUseApplicationDefaultCredentials();
   }
 
@@ -146,6 +170,30 @@ public class CredentialConfiguration {
 
   public boolean isServiceAccountEnabled() {
     return serviceAccountEnabled;
+  }
+
+  public String getSaPrivateKeyId() {
+    return saPrivateKeyId;
+  }
+
+  public void setSaPrivateKeyId(String saPrivateKeyId) {
+    this.saPrivateKeyId = saPrivateKeyId;
+  }
+
+  public String getSaPrivateKey() {
+    return saPrivateKey;
+  }
+
+  public void setSaPrivateKey(String saPrivateKey) {
+    this.saPrivateKey = saPrivateKey;
+  }
+
+  public String getSaClientEmail() {
+    return saClientEmail;
+  }
+
+  public void setSaClientEmail(String saClientEmail) {
+    this.saClientEmail = saClientEmail;
   }
 
   public void setEnableServiceAccounts(boolean enableServiceAccounts) {
@@ -217,6 +265,13 @@ public class CredentialConfiguration {
   public String toString() {
     return "CredentialConfiguration{"
         + ("serviceAccountEnabled: " + isServiceAccountEnabled() + '\n')
+        + ("saPrivateKeyId: "
+            + (isNullOrEmpty(getSaPrivateKeyId()) ? "Not Provided" : "Provided, but not displayed")
+            + '\n')
+        + ("saPrivateKey: "
+            + (isNullOrEmpty(getSaPrivateKey()) ? "Not Provided" : "Provided, but not displayed")
+            + '\n')
+        + ("saClientEmail: " + getSaClientEmail() + '\n')
         + ("serviceAccountEmail: " + getServiceAccountEmail() + '\n')
         + ("serviceAccountKeyfile: " + getServiceAccountKeyFile() + '\n')
         + ("clientId: " + getClientId() + '\n')

@@ -115,6 +115,18 @@ public class CredentialConfigurationTest {
   }
 
   @Test
+  public void configurationSAUsedWhenConfigured() throws IOException, GeneralSecurityException {
+    configuration.setSaClientEmail("foo@example.com");
+    configuration.setSaPrivateKeyId("privateKeyId");
+    configuration.setSaPrivateKey("privateKey");
+
+    configuration.getCredential(TEST_SCOPES);
+    verify(mockCredentialFactory, times(1))
+        .getCredentialsFromSAParameters(
+            "privateKeyId", "privateKey", "foo@example.com", TEST_SCOPES, mockTransport);
+  }
+
+  @Test
   public void installedAppWorkflowUsedWhenConfigurred()
       throws IOException, GeneralSecurityException  {
     configuration.setEnableServiceAccounts(false);

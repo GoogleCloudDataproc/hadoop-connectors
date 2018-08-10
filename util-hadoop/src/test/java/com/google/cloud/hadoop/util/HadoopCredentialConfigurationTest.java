@@ -17,6 +17,7 @@ package com.google.cloud.hadoop.util;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.google.common.collect.ImmutableList;
+import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.Test;
@@ -35,7 +36,7 @@ public class HadoopCredentialConfigurationTest {
   }
 
   @Test
-  public void componentsCanOverrideBaseConfiguration() {
+  public void componentsCanOverrideBaseConfiguration() throws IOException {
     Configuration configuration = new Configuration();
     // Overall, use service accounts
     configuration.set(HadoopCredentialConfiguration.BASE_KEY_PREFIX +
@@ -63,9 +64,21 @@ public class HadoopCredentialConfigurationTest {
   }
 
   @Test
-  public void setConfiugrationSetsValuesAsExpected() {
+  public void setConfiugrationSetsValuesAsExpected() throws IOException {
     Configuration conf = new Configuration();
 
+    setConfigurationKey(
+        conf,
+        HadoopCredentialConfiguration.SA_CLIENT_EMAIL_SUFFIX,
+        "anEmail");
+    setConfigurationKey(
+        conf,
+        HadoopCredentialConfiguration.SA_PRIVATE_KEY_ID_SUFFIX,
+        "aPrivateKeyId");
+    setConfigurationKey(
+        conf,
+        HadoopCredentialConfiguration.SA_PRIVATE_KEY_SUFFIX,
+        "aPrivateKey");
     setConfigurationKey(
         conf,
         HadoopCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX,
@@ -104,6 +117,9 @@ public class HadoopCredentialConfigurationTest {
         .withConfiguration(conf)
         .build();
 
+    assertThat(credentialConfiguration.getSaClientEmail()).isEqualTo("anEmail");
+    assertThat(credentialConfiguration.getSaPrivateKeyId()).isEqualTo("aPrivateKeyId");
+    assertThat(credentialConfiguration.getSaPrivateKey()).isEqualTo("aPrivateKey");
     assertThat(credentialConfiguration.getServiceAccountEmail()).isEqualTo("anEmail");
     assertThat(credentialConfiguration.getServiceAccountKeyFile()).isEqualTo("aKeyFile");
     assertThat(credentialConfiguration.getServiceAccountJsonKeyFile()).isEqualTo("aJsonFile");
@@ -141,6 +157,27 @@ public class HadoopCredentialConfigurationTest {
         conf,
         HadoopCredentialConfiguration.JSON_KEYFILE_SUFFIX);
     assertThat(writtenValue).isEqualTo("aJsonFile");
+
+    credentialConfiguration.setSaClientEmail("anEmail");
+    conf = credentialConfiguration.getConf();
+    writtenValue = getConfigurationKey(
+        conf,
+        HadoopCredentialConfiguration.SA_CLIENT_EMAIL_SUFFIX);
+    assertThat(writtenValue).isEqualTo("anEmail");
+
+    credentialConfiguration.setSaPrivateKeyId("aPrivateKeyId");
+    conf = credentialConfiguration.getConf();
+    writtenValue = getConfigurationKey(
+        conf,
+        HadoopCredentialConfiguration.SA_PRIVATE_KEY_ID_SUFFIX);
+    assertThat(writtenValue).isEqualTo("aPrivateKeyId");
+
+    credentialConfiguration.setSaPrivateKey("aPrivateKey");
+    conf = credentialConfiguration.getConf();
+    writtenValue = getConfigurationKey(
+        conf,
+        HadoopCredentialConfiguration.SA_PRIVATE_KEY_SUFFIX);
+    assertThat(writtenValue).isEqualTo("aPrivateKey");
 
     credentialConfiguration.setClientSecret("clientSecret");
     conf = credentialConfiguration.getConf();
