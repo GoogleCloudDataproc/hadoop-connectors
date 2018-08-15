@@ -150,6 +150,40 @@ public class BigQueryOutputConfiguration {
   }
 
   /**
+   * A helper function to set the required output keys in the given configuration.
+   *
+   * <p>This method will set the output table schema as auto-detected.
+   *
+   * @param conf the configuration to set the keys on.
+   * @param qualifiedOutputTableId the qualified id of the output table in the form: <code>(Optional
+   *     ProjectId):[DatasetId].[TableId]</code>. If the project id is missing, the default project
+   *     id is attempted {@link BigQueryConfiguration#PROJECT_ID_KEY}.
+   * @param outputGcsPath the path in GCS to stage data in. Example: 'gs://bucket/job'.
+   * @param outputFileFormat the formatting of the data being written by the output format class.
+   * @param outputFormatClass the file output format that will write files to GCS.
+   * @throws IOException
+   */
+  @SuppressWarnings("rawtypes")
+  public static void configureWithAutoSchema(
+      Configuration conf,
+      String qualifiedOutputTableId,
+      String outputGcsPath,
+      BigQueryFileFormat outputFileFormat,
+      Class<? extends FileOutputFormat> outputFormatClass)
+      throws IOException {
+    TableReference outputTable = BigQueryStrings.parseTableReference(qualifiedOutputTableId);
+    configure(
+        conf,
+        outputTable.getProjectId(),
+        outputTable.getDatasetId(),
+        outputTable.getTableId(),
+        /* outputTableSchemaJson= */ null,
+        outputGcsPath,
+        outputFileFormat,
+        outputFormatClass);
+  }
+
+  /**
    * Helper function that validates the output configuration. Ensures the project id, dataset id,
    * and table id exist in the configuration. This also ensures that if a schema is provided, that
    * it is properly formatted.
