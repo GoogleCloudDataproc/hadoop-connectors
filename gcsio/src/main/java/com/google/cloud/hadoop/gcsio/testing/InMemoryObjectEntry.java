@@ -118,13 +118,13 @@ public class InMemoryObjectEntry {
           info = new GoogleCloudStorageItemInfo(
               info.getResourceId(),
               info.getCreationTime(),
-              completedContents.length,
-              null,
-              null,
+              /* size= */ completedContents.length,
+              /* location= */ null,
+              /* storageClass= */ null,
               info.getContentType(),
               info.getMetadata(),
-              info.getContentGeneration(),
-              0L,
+              /* contentGeneration= */ 1,
+              /* metaGeneration= */ 1,
               new VerificationAttributes(
                   md5.asBytes(),
                   Ints.toByteArray(crc32c.asInt())));
@@ -144,13 +144,13 @@ public class InMemoryObjectEntry {
     info = new GoogleCloudStorageItemInfo(
         new StorageResourceId(bucketName, objectName),
         createTimeMillis,
-        0,
-        null,
-        null,
+        /* size= */ 0,
+        /* location= */ null,
+        /* storageClass= */ null,
         contentType,
         ImmutableMap.copyOf(metadata),
-        createTimeMillis,
-        0L);
+        /* contentGeneration= */ 0,
+        /* metaGeneration= */ 0);
   }
 
   /**
@@ -207,12 +207,12 @@ public class InMemoryObjectEntry {
             new StorageResourceId(bucketName, objectName),
             System.currentTimeMillis(),
             info.getSize(),
-            null,
-            null,
+            /* location= */ null,
+            /* storageClass= */ null,
             info.getContentType(),
             info.getMetadata(),
             info.getContentGeneration(),
-            0L);
+            info.getMetaGeneration());
     return copy;
   }
 
@@ -288,12 +288,12 @@ public class InMemoryObjectEntry {
     info = new GoogleCloudStorageItemInfo(
         info.getResourceId(),
         info.getCreationTime(),
-        completedContents.length,
-        null,
-        null,
+        /* size= */ completedContents.length,
+        /* location= */ null,
+        /* storageClass= */ null,
         info.getContentType(),
         mergedMetadata,
-        0L,
-        0L);
+        info.getContentGeneration(),
+        info.getMetaGeneration() + 1);
   }
 }
