@@ -90,8 +90,10 @@ public class BigQueryUtils {
     // While job is incomplete continue to poll.
     while (notDone) {
       BackOff operationBackOff = new ExponentialBackOff.Builder().build();
-      Get get = bigquery.jobs().get(projectId, jobReference.getJobId());
-      
+      Get get = bigquery.jobs()
+          .get(projectId, jobReference.getJobId())
+          .set("location", jobReference.get("location"));
+
       Job pollJob = ResilientOperation.retry(
           ResilientOperation.getGoogleRequestCallable(get),
           operationBackOff,
