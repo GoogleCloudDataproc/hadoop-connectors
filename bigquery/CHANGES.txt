@@ -2,6 +2,10 @@
 
   1. POM updates for GCS connector 1.6.9.
 
+  2. Poll BQ jobs in their correct locations.
+
+  3. Update all dependencies to latest versions.
+
 
 0.10.9 - 2018-08-10
 

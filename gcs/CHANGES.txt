@@ -8,6 +8,8 @@
        fs.gs.max.requests.per.batch (default: 25 -> 15)
        fs.gs.batch.threads (default: 25 -> 15)
 
+  2. Update all dependencies to latest versions.
+
 
 1.6.8 - 2018-08-10
 
