@@ -60,7 +60,7 @@ public class HadoopCredentialConfiguration
     @Override
     public String getPassword(String key) throws IOException {
       char[] val = config.getPassword(key);
-      return val == null ? null : String.valueOf(config.getPassword(key));
+      return val == null ? null : String.valueOf(val);
     }
   }
 

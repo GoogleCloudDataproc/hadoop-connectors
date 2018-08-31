@@ -34,7 +34,6 @@ public class CredentialConfiguration {
   private String saPrivateKeyId = null;
   private String saPrivateKey = null;
   private String saClientEmail = null;
-  private String saClientId = null;
   private String serviceAccountEmail = null;
   private String serviceAccountKeyFile = null;
   private String serviceAccountJsonKeyFile = null;
