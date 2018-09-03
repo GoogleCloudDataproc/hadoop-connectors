@@ -40,6 +40,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.GenerationReadConsistency;
 import com.google.cloud.hadoop.gcsio.PathCodec;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PageState;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.AccessTokenProviderClassFromConfigFactory;
 import com.google.cloud.hadoop.util.CredentialFactory;
@@ -71,16 +72,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.ContentSummary;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileAlreadyExistsException;
-import org.apache.hadoop.fs.FileChecksum;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.GlobPattern;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -1109,7 +1101,17 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
 
       // Get everything matching the non-glob prefix.
       logger.atFine().log("Listing everything with prefix '%s'", prefixUri);
-      List<FileInfo> fileInfos = gcsfs.listAllFileInfoForPrefix(prefixUri);
+      PageState pageState = new PageState(true);
+      List<FileInfo> fileInfos = new ArrayList();
+      GlobFilter globFilter = new GlobFilter(pathString, filter);
+      do {
+        List<FileInfo> fileInfoPart = gcsfs.listAllFileInfoForPrefix(prefixUri, pageState);
+        for (FileInfo fileInfo : fileInfoPart) {
+          if (globFilter.accept(getHadoopPath(fileInfo.getPath()))) fileInfos.add(fileInfo);
+        }
+      } while (pageState.getNextPageToken() != null);
+      fileInfos.sort(gcsfs.FILE_INFO_PATH_COMPARATOR);
+
       if (fileInfos.isEmpty()) {
         // Let the superclass define the proper logic for finding no matches.
         return super.globStatus(fixedPath, filter);
@@ -1117,10 +1119,7 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
 
       Collection<FileStatus> fileStatuses = toFileStatusesWithImplicitDirectories(fileInfos);
 
-      // Perform the core globbing logic in the helper filesystem.
-      FileSystem helperFileSystem =
-          InMemoryGlobberFileSystem.createInstance(getConf(), getWorkingDirectory(), fileStatuses);
-      FileStatus[] returnList = helperFileSystem.globStatus(fixedPath, filter);
+      FileStatus[] returnList = fileStatuses.toArray(new FileStatus[0]);
 
       // If the return list contains directories, we should repair them if they're 'implicit'.
       if (enableAutoRepairImplicitDirectories) {

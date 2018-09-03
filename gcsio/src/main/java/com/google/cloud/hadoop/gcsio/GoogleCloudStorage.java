@@ -16,10 +16,15 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import com.google.api.services.storage.model.StorageObject;
+
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Interface for exposing the Google Cloud Storage API behavior in a way more amenable to writing
@@ -273,9 +278,16 @@ public interface GoogleCloudStorage {
       long maxResults)
       throws IOException;
 
+
   /**
    * Same name-matching semantics as {@link #listObjectNames} except this method
-   * retrieves the full GoogleCloudStorageFileInfo for each item as well.
+   * retrieves the full GoogleCloudStorageFileInfo for each item as well. In addition
+   * pagination is optionally supported to control the data flow from server.
+   *
+   * IMPORTANT: The PageState contains the paged output that will not survive across pages, the
+   * caller is expected to call pageState.clear() to clear up before the call to fetch
+   * the next page.
+   *
    * <p>
    * Generally the info is already available from
    * the same "list()" calls, so the only additional cost is dispatching an extra batch request to
@@ -289,12 +301,44 @@ public interface GoogleCloudStorage {
    * @param bucketName bucket name
    * @param objectNamePrefix object name prefix or null if all objects in the bucket are desired
    * @param delimiter delimiter to use (typically "/"), otherwise null
-   * @return list of object info
+   * @param maxResults maximum number of results to return,
+   *        unlimited if negative or zero
+   * @param pageState the page state during pagination; null if no pagination is desired
+   * @return list of object info per page
    * @throws IOException on IO error
    */
   List<GoogleCloudStorageItemInfo> listObjectInfo(
-      final String bucketName, String objectNamePrefix, String delimiter)
-      throws IOException;
+          final String bucketName, String objectNamePrefix, String delimiter, long maxResults, PageState pageState)
+          throws IOException;
+
+  /**
+   * The same semanticsas {@link #listObjectInfo} with unlimited maximum total number
+   * of items returned, and pagination disabled
+   * @param bucketName bucket name
+   * @param objectNamePrefix object name prefix or null if all objects in the bucket are desired
+   * @param delimiter delimiter to use (typically "/"), otherwise null
+   * @return list of object info per page: NOTE that the list will be reused in the next page round
+   * so its elements have to be processed by the caller before make the next page call.
+   * @throws IOException on IO error
+   */
+
+  List<GoogleCloudStorageItemInfo> listObjectInfo(
+          final String bucketName, String objectNamePrefix, String delimiter)
+          throws IOException;
+
+  /**
+   * The same semanticsas {@link #listObjectInfo} with unlimited maximum total number
+   * of items returned
+   * @param bucketName bucket name
+   * @param objectNamePrefix object name prefix or null if all objects in the bucket are desired
+   * @param delimiter delimiter to use (typically "/"), otherwise null
+   * @param pageState the page state during pagination; null if no pagination is desired
+   * @return list of object info per page
+   * @throws IOException on IO error
+   */
+  List<GoogleCloudStorageItemInfo> listObjectInfo(
+          final String bucketName, String objectNamePrefix, String delimiter, PageState pageState)
+          throws IOException;
 
   /**
    * Same name-matching semantics as {@link #listObjectNames} except this method
@@ -391,4 +435,74 @@ public interface GoogleCloudStorage {
   GoogleCloudStorageItemInfo composeObjects(
       List<StorageResourceId> sources, StorageResourceId destination, CreateObjectOptions options)
       throws IOException;
+
+  // Holder of pagination states if pagination is enabled;
+  // Holder of initial and final states that have empty and full contents respectively
+  class PageState {
+    //
+    private boolean pagination;
+    private long fetchedSize = 0;
+    private String nextPageToken = null;
+    // prefixes holds prefixes
+    private Set<String> prefixes = new LinkedHashSet<>();
+    // listObjects holds processed objects per-page:
+    private List<StorageObject> listedObjects = new ArrayList<>();
+
+    public PageState(boolean pagination) {
+      this.pagination = pagination;
+    }
+
+    /**
+     * sets up the states for next page processing
+     * @param pt next page token passed from GCS
+     */
+    public void setNext(String pt) {
+      fetchedSize += listedObjects.size();
+      nextPageToken = pt;
+    }
+
+    public void clear() {
+      listedObjects.clear();
+    }
+
+    public long getFetchedSize() {
+      return fetchedSize;
+    }
+
+    public String getNextPageToken() {
+      return nextPageToken;
+    }
+
+    public Set<String> getPrefixes() {
+      return prefixes;
+    }
+
+    public List<StorageObject> getListedObjects() {
+      return listedObjects;
+    }
+
+    public boolean isPagination() {
+      return pagination;
+    }
+
+    public void disablePagination() {
+      pagination = false;
+      nextPageToken = null;
+    }
+
+    /**
+     * To adjust the tracked accumulated size. Since it no longer reflects
+     * the size of the output lists per page contained here, we clear up them
+     * for sake of safty and early error out.
+     *
+     * Consider call of this method a bit risky: currently only for testing purpose
+     * @param adjustment The size to be adjusted from the {@link #fetchedSize}
+     */
+    public void adjustSize(long adjustment) {
+      if (adjustment != 0) {
+        fetchedSize -= adjustment;
+        clear();
+      }
+    }
+  }
 }

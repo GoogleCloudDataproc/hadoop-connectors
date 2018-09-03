@@ -1138,6 +1138,34 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   /**
+   * See {@link GoogleCloudStorage#listObjectInfo(String, String, String)}
+   * for details about expected behavior.
+   */
+  @Override
+  public List<GoogleCloudStorageItemInfo> listObjectInfo(
+      final String bucketName, String objectNamePrefix, String delimiter)
+      throws IOException {
+    return listObjectInfo(bucketName, objectNamePrefix, delimiter, MAX_RESULTS_UNLIMITED);
+  }
+
+  @Override
+  public List<GoogleCloudStorageItemInfo> listObjectInfo(
+          final String bucketName, String objectNamePrefix, String delimiter, PageState pageState)
+          throws IOException {
+    return listObjectInfo(bucketName, objectNamePrefix, delimiter,
+            GoogleCloudStorage.MAX_RESULTS_UNLIMITED, pageState);
+  }
+
+  @Override
+  public List<GoogleCloudStorageItemInfo> listObjectInfo(
+          final String bucketName, String objectNamePrefix, String delimiter,
+          long maxResults)
+          throws IOException {
+    return listObjectInfo(bucketName, objectNamePrefix, delimiter,
+            maxResults, null);
+  }
+
+  /**
    * See {@link GoogleCloudStorage#listBucketInfo()} for details about expected behavior.
    */
   @Override
@@ -1197,8 +1225,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    *     listedObjects}
    * @param maxResults maximum number of results to return (total of both {@code listedObjects} and
    *     {@code listedPrefixes}), unlimited if negative or zero
-   * @param listedObjects output parameter into which retrieved StorageObjects will be added
-   * @param listedPrefixes output parameter into which retrieved prefixes will be added
+   * @param pageState if pagination enabled, holds stateful info across pages
    */
   private void listStorageObjectsAndPrefixes(
       String bucketName,
@@ -1206,20 +1233,35 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       String delimiter,
       boolean includeTrailingDelimiter,
       long maxResults,
-      List<StorageObject> listedObjects,
-      List<String> listedPrefixes)
+      PageState pageState)
       throws IOException {
     logger.atFine().log(
         "listStorageObjectsAndPrefixes(%s, %s, %s, %s, %s)",
         bucketName, objectNamePrefix, delimiter, includeTrailingDelimiter, maxResults);
-
+    checkArgument(pageState != null, "pageState must not be null");
+    String pageToken = pageState.getNextPageToken();
+    long fetchedSize = pageState.getFetchedSize();
+    // Two output lists: prefixes is of global life;
+    // listedObjects is only of page scope
+    Set<String> prefixes = pageState.getPrefixes();
+    List<StorageObject> listedObjects = pageState.getListedObjects();
+    final boolean pagination = pageState.isPagination();
     checkArgument(!Strings.isNullOrEmpty(bucketName), "bucketName must not be null or empty");
     checkArgument(
         listedObjects != null && listedObjects.isEmpty(),
         "Must provide a non-null empty container for listedObjects.");
-    checkArgument(
-        listedPrefixes != null && listedPrefixes.isEmpty(),
-        "Must provide a non-null empty container for listedPrefixes.");
+    checkArgument(pagination || (listedObjects.isEmpty()
+                    && prefixes.isEmpty() && pageToken == null && fetchedSize == 0),
+            "Pagination is disabled with a bad state");
+    checkArgument((fetchedSize == 0 && pageToken == null && prefixes.isEmpty()) ||
+                    (pageToken != null && fetchedSize > 0),
+            "Page state is in bad state");
+
+    if (pagination && getMaxRemainingResults(maxResults, prefixes.size() + fetchedSize) <= 0)
+    {
+      pageState.setNext(null);
+      return;
+    }
 
     Storage.Objects.List listObject = configureRequest(gcs.objects().list(bucketName), bucketName);
 
@@ -1242,12 +1284,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       listObject.setPrefix(objectNamePrefix);
     }
 
-    // Loop till we fetch all items.
-    String pageToken = null;
-
     // Deduplicate prefixes and items, because if 'includeTrailingDelimiter' set to true
     // then returned items will contain "prefix objects" too.
-    Set<String> prefixes = new LinkedHashSet<>();
     do {
       if (pageToken != null) {
         logger.atFine().log("listStorageObjectsAndPrefixes: next page %s", pageToken);
@@ -1272,7 +1310,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       List<String> pagePrefixes = items.getPrefixes();
       if (pagePrefixes != null) {
         logger.atFine().log("listed %s prefixes", pagePrefixes.size());
-        long maxRemainingResults = getMaxRemainingResults(maxResults, prefixes, listedObjects);
+        long maxRemainingResults = getMaxRemainingResults(maxResults, (long) prefixes.size()
+                + fetchedSize);
         // Do not cast 'maxRemainingResults' to int here, it could overflow
         long maxPrefixes = Math.min(maxRemainingResults, (long) pagePrefixes.size());
         prefixes.addAll(pagePrefixes.subList(0, (int) maxPrefixes));
@@ -1296,9 +1335,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
         // Determine if the caller sent a directory name as a prefix.
         boolean objectPrefixEndsWithDelimiter =
-            !Strings.isNullOrEmpty(objectNamePrefix) && objectNamePrefix.endsWith(PATH_DELIMITER);
+                !Strings.isNullOrEmpty(objectNamePrefix) && objectNamePrefix.endsWith(PATH_DELIMITER);
 
-        long maxRemainingResults = getMaxRemainingResults(maxResults, prefixes, listedObjects);
+        long maxRemainingResults = getMaxRemainingResults(maxResults,
+                fetchedSize + (long) prefixes.size());
         for (StorageObject object : objects) {
           String objectName = object.getName();
           if (!objectPrefixEndsWithDelimiter || !objectName.equals(objectNamePrefix)) {
@@ -1313,20 +1353,20 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           }
         }
       }
-
       pageToken = items.getNextPageToken();
-    } while (pageToken != null && getMaxRemainingResults(maxResults, prefixes, listedObjects) > 0);
-
-    listedPrefixes.addAll(prefixes);
+    } while (!pagination && pageToken != null && getMaxRemainingResults(maxResults,
+            (long) prefixes.size() + listedObjects.size()) > 0);
+    if (pagination) {
+      pageState.setNext(pageToken);
+    }
   }
 
   private static long getMaxRemainingResults(
-      long maxResults, Set<String> prefixes, List<StorageObject> objects) {
+      long maxResults, long fetchedSize) {
     if (maxResults <= 0) {
       return Long.MAX_VALUE;
     }
-    long numResults = (long) prefixes.size() + objects.size();
-    return maxResults - numResults;
+    return maxResults - fetchedSize;
   }
 
   /**
@@ -1353,36 +1393,24 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         "listObjectNames(%s, %s, %s, %s)", bucketName, objectNamePrefix, delimiter, maxResults);
 
     // Helper will handle going through pages of list results and accumulating them.
-    List<StorageObject> listedObjects = new ArrayList<>();
-    List<String> listedPrefixes = new ArrayList<>();
+    PageState pageState = new PageState(false); // disable pagination for now
     listStorageObjectsAndPrefixes(
         bucketName,
         objectNamePrefix,
         delimiter,
         /* includeTrailingDelimiter= */ false,
         maxResults,
-        listedObjects,
-        listedPrefixes);
+        pageState);
 
     // Just use the prefix list as a starting point, and extract all the names from the
     // StorageObjects, adding them to the list.
     // TODO(user): Maybe de-dupe if it's possible for GCS to return duplicates.
-    List<String> objectNames = listedPrefixes;
-    for (StorageObject obj : listedObjects) {
+    List<String> objectNames = new ArrayList<>(pageState.getPrefixes().size());
+    objectNames.addAll(pageState.getPrefixes());;
+    for (StorageObject obj : pageState.getListedObjects()) {
       objectNames.add(obj.getName());
     }
     return objectNames;
-  }
-
-  /**
-   * See {@link GoogleCloudStorage#listObjectInfo(String, String, String)}
-   * for details about expected behavior.
-   */
-  @Override
-  public List<GoogleCloudStorageItemInfo> listObjectInfo(
-      final String bucketName, String objectNamePrefix, String delimiter)
-      throws IOException {
-    return listObjectInfo(bucketName, objectNamePrefix, delimiter, MAX_RESULTS_UNLIMITED);
   }
 
   /**
@@ -1391,67 +1419,71 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    */
   @Override
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
-      final String bucketName, String objectNamePrefix, String delimiter, long maxResults)
+      final String bucketName, String objectNamePrefix, String delimiter,
+      long maxResults, PageState pageState)
       throws IOException {
     logger.atFine().log(
         "listObjectInfo(%s, %s, %s, %s)", bucketName, objectNamePrefix, delimiter, maxResults);
 
+    if (pageState == null) pageState = new PageState(false);
     // Helper will handle going through pages of list results and accumulating them.
-    List<StorageObject> listedObjects = new ArrayList<>();
-    List<String> listedPrefixes = new ArrayList<>();
     listStorageObjectsAndPrefixes(
         bucketName,
         objectNamePrefix,
         delimiter,
         /* includeTrailingDelimiter= */ true,
         maxResults,
-        listedObjects,
-        listedPrefixes);
+        pageState);
 
     // For the listedObjects, we simply parse each item into a GoogleCloudStorageItemInfo without
     // further work.
+    List<StorageObject> listedObjects = pageState.getListedObjects();
     List<GoogleCloudStorageItemInfo> objectInfos = new ArrayList<>(listedObjects.size());
     for (StorageObject obj : listedObjects) {
       objectInfos.add(
           createItemInfoForStorageObject(new StorageResourceId(bucketName, obj.getName()), obj));
     }
+    pageState.clear();
 
-    if (listedPrefixes.isEmpty()) {
-      return objectInfos;
-    }
-
-    // Handle prefixes without prefix objects.
-    if (storageOptions.isAutoRepairImplicitDirectoriesEnabled()) {
-      logger.atInfo().log("Repairing batch of %s missing directories.", listedPrefixes.size());
-      logger.atFine().log("Directories to repair: %s", listedPrefixes);
-
-      List<StorageResourceId> prefixIds = new ArrayList<>(listedPrefixes.size());
-      for (String prefix : listedPrefixes) {
-        prefixIds.add(new StorageResourceId(bucketName, prefix));
+    if (pageState.getNextPageToken() == null) {
+      Set<String> listedPrefixes = pageState.getPrefixes();
+      if (listedPrefixes.isEmpty()) {
+        return objectInfos;
       }
 
-      try {
-        createEmptyObjects(prefixIds);
-      } catch (IOException ioe) {
-        // Don't totally fail the listObjectInfo call, since auto-repair is best-effort anyways.
-        logger.atSevere().withCause(ioe).log("Failed to repair some missing directories.");
-      }
+      // Handle prefixes without prefix objects.
+      if (storageOptions.isAutoRepairImplicitDirectoriesEnabled()) {
+        logger.atInfo().log("Repairing batch of %s missing directories.", listedPrefixes.size());
+        logger.atFine().log("Directories to repair: %s", listedPrefixes);
 
-      List<GoogleCloudStorageItemInfo> repairedInfos = getItemInfos(prefixIds);
-      objectInfos.addAll(
-          inferOrFilterNotRepairedInfos(
-              repairedInfos, storageOptions.isInferImplicitDirectoriesEnabled()));
-    } else if (storageOptions.isInferImplicitDirectoriesEnabled()) {
-      for (String prefix : listedPrefixes) {
-        objectInfos.add(
-            GoogleCloudStorageItemInfo.createInferredDirectory(
-                new StorageResourceId(bucketName, prefix)));
+        List<StorageResourceId> prefixIds = new ArrayList<>(listedPrefixes.size());
+        for (String prefix : listedPrefixes) {
+          prefixIds.add(new StorageResourceId(bucketName, prefix));
+        }
+
+        try {
+          createEmptyObjects(prefixIds);
+        } catch (IOException ioe) {
+          // Don't totally fail the listObjectInfo call, since auto-repair is best-effort anyways.
+          logger.atSevere().withCause(ioe).log("Failed to repair some missing directories.");
+        }
+
+        List<GoogleCloudStorageItemInfo> repairedInfos = getItemInfos(prefixIds);
+        objectInfos.addAll(
+            inferOrFilterNotRepairedInfos(
+                repairedInfos, storageOptions.isInferImplicitDirectoriesEnabled()));
+      } else if (storageOptions.isInferImplicitDirectoriesEnabled()) {
+        for (String prefix : listedPrefixes) {
+          objectInfos.add(
+              GoogleCloudStorageItemInfo.createInferredDirectory(
+                  new StorageResourceId(bucketName, prefix)));
+        }
+      } else {
+        logger.atInfo().log(
+            "Directory repair and inferred directories are disabled, "
+                + "giving up on retrieving missing directories: %s",
+            listedPrefixes);
       }
-    } else {
-      logger.atInfo().log(
-          "Directory repair and inferred directories are disabled, "
-              + "giving up on retrieving missing directories: %s",
-          listedPrefixes);
     }
 
     return objectInfos;

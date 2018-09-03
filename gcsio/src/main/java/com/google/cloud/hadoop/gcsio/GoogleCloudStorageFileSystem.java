@@ -23,6 +23,7 @@ import static java.util.stream.Collectors.toCollection;
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.util.Clock;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.TimestampUpdatePredicate;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PageState;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
@@ -104,8 +105,7 @@ public class GoogleCloudStorageFileSystem {
       };
 
   // Comparator used for sorting a collection of FileInfo items based on path comparison.
-  @VisibleForTesting
-  static final Comparator<FileInfo> FILE_INFO_PATH_COMPARATOR =
+  static public final Comparator<FileInfo> FILE_INFO_PATH_COMPARATOR =
       new Comparator<FileInfo>() {
         @Override
         public int compare(FileInfo file1, FileInfo file2) {
@@ -358,7 +358,7 @@ public class GoogleCloudStorageFileSystem {
     if (fileInfo.isDirectory()) {
       itemsToDelete =
           recursive
-              ? listAllFileInfoForPrefix(fileInfo.getPath())
+              ? listAllFileInfoForPrefix(fileInfo.getPath(), null)
               : listFileInfo(fileInfo.getPath(), /* enableAutoRepair= */ false);
       if (!itemsToDelete.isEmpty() && !recursive) {
         throw new DirectoryNotEmptyException("Cannot delete a non-empty directory.");
@@ -804,7 +804,7 @@ public class GoogleCloudStorageFileSystem {
 
     // List of individual paths to rename;
     // we will try to carry out the copies in this list's order.
-    List<FileInfo> srcItemInfos = listAllFileInfoForPrefix(srcInfo.getPath());
+    List<FileInfo> srcItemInfos = listAllFileInfoForPrefix(srcInfo.getPath(), null);
 
     // Create the destination directory.
     dst = FileInfo.convertToDirectoryPath(pathCodec, dst);
@@ -1039,7 +1039,7 @@ public class GoogleCloudStorageFileSystem {
    *
    * @param prefix the prefix to use to list all matching objects.
    */
-  public List<FileInfo> listAllFileInfoForPrefix(URI prefix)
+  public List<FileInfo> listAllFileInfoForPrefix(URI prefix, PageState pageState)
       throws IOException {
     logger.atFine().log("listAllFileInfoForPrefix(%s)", prefix);
     Preconditions.checkNotNull(prefix, "prefix could not be null");
@@ -1050,9 +1050,8 @@ public class GoogleCloudStorageFileSystem {
     // Use 'null' for delimiter to get full 'recursive' listing.
     List<GoogleCloudStorageItemInfo> itemInfos =
         gcs.listObjectInfo(
-            prefixId.getBucketName(), prefixId.getObjectName(), /* delimiter= */ null);
+            prefixId.getBucketName(), prefixId.getObjectName(), /* delimiter= */ null, pageState);
     List<FileInfo> fileInfos = FileInfo.fromItemInfos(pathCodec, itemInfos);
-    fileInfos.sort(FILE_INFO_PATH_COMPARATOR);
     return fileInfos;
   }
 

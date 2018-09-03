@@ -40,6 +40,7 @@ import java.nio.file.FileAlreadyExistsException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -55,6 +56,12 @@ public class InMemoryGoogleCloudStorage
   private final Map<String, InMemoryBucketEntry> bucketLookup = new HashMap<>();
   private final GoogleCloudStorageOptions storageOptions;
   private final Clock clock;
+  // The next fields are for mocked pagination behavoir
+  private final String NextPageToken = "IN-MEMORY-PAGE-END";
+  // A unlimited page size will effectively disable pagination
+  private long pageSize = GoogleCloudStorage.MAX_RESULTS_UNLIMITED;
+  private Iterator<String> it = null;
+  private long totalSize = 0;
 
   public InMemoryGoogleCloudStorage() {
     storageOptions = GoogleCloudStorageOptions.newBuilder().setAppName("in-memory").build();
@@ -69,6 +76,10 @@ public class InMemoryGoogleCloudStorage
   public InMemoryGoogleCloudStorage(GoogleCloudStorageOptions storageOptions, Clock clock) {
     this.storageOptions = storageOptions;
     this.clock = clock;
+  }
+
+  public void setPageSize(long size) {
+    pageSize = size;
   }
 
   @Override
@@ -412,12 +423,37 @@ public class InMemoryGoogleCloudStorage
       final String bucketName, String objectNamePrefix, String delimiter,
       long maxResults)
       throws IOException {
-    // Since we're just in memory, we can do the naive implementation of just listing names and
-    // then calling getItemInfo for each.
-    List<String> listedNames = listObjectNames(bucketName, objectNamePrefix,
-        delimiter, GoogleCloudStorage.MAX_RESULTS_UNLIMITED);
+    return listObjectInfo(bucketName, objectNamePrefix, delimiter, maxResults, null);
+  }
+
+  @Override
+  public synchronized List<GoogleCloudStorageItemInfo> listObjectInfo(
+      final String bucketName, String objectNamePrefix, String delimiter,
+      PageState pageState)
+      throws IOException {
+    return listObjectInfo(bucketName, objectNamePrefix, delimiter,
+      GoogleCloudStorage.MAX_RESULTS_UNLIMITED, pageState);
+  }
+
+  @Override
+  public synchronized List<GoogleCloudStorageItemInfo> listObjectInfo(
+      final String bucketName, String objectNamePrefix, String delimiter,
+      long maxResults, PageState pageState)
+      throws IOException {
+    // Disable pagination for unlimited page size
+    if (pageState != null && pageSize <= 0) pageState.disablePagination();
     List<GoogleCloudStorageItemInfo> listedInfo = new ArrayList<>();
-    for (String objectName : listedNames) {
+    boolean pagination =(pageState != null && pageState.isPagination());
+    boolean contPage = (pagination && pageState.getNextPageToken() != null);
+    if (!contPage) {
+      // Since we're just in memory, we can do the naive implementation of just listing names and
+      // then calling getItemInfo for each.
+      List<String> listedNames = listObjectNames(bucketName, objectNamePrefix,
+              delimiter, GoogleCloudStorage.MAX_RESULTS_UNLIMITED);
+      it = listedNames.iterator();
+    }
+    for (; it.hasNext(); ) {
+      String objectName = it.next();
       GoogleCloudStorageItemInfo itemInfo =
           getItemInfo(new StorageResourceId(bucketName, objectName));
       if (itemInfo.exists()) {
@@ -440,10 +476,26 @@ public class InMemoryGoogleCloudStorage
         listedInfo.add(
             GoogleCloudStorageItemInfo.createInferredDirectory(itemInfo.getResourceId()));
       }
-      if (maxResults > 0 && listedInfo.size() >= maxResults) {
+      if (maxResults > 0 && listedInfo.size() + totalSize>= maxResults) {
+        it = null;
+        totalSize = 0;
+        if (contPage) {
+          // disrupt paging
+          pageState.setNext(null);
+        }
+        break;
+      } else if (pagination && listedInfo.size() >= pageSize) {
+        // set up next page
+        pageState.setNext(NextPageToken);
         break;
       }
     }
+    if (pagination && it != null && !it.hasNext()) {
+      totalSize = 0;
+      pageState.setNext(null);
+    }
+    if (pagination && pageState.getNextPageToken() != null)
+      totalSize += listedInfo.size();
     return listedInfo;
   }
 

@@ -228,9 +228,24 @@ public class ThrottledGoogleCloudStorage implements GoogleCloudStorage {
   public List<GoogleCloudStorageItemInfo> listObjectInfo(String bucketName,
       String objectNamePrefix, String delimiter, long maxResults)
       throws IOException {
+    return listObjectInfo(bucketName, objectNamePrefix, delimiter, maxResults, null);
+  }
+
+  @Override
+  public List<GoogleCloudStorageItemInfo> listObjectInfo(String bucketName,
+      String objectNamePrefix, String delimiter, PageState pageState)
+      throws IOException {
+    return listObjectInfo(bucketName, objectNamePrefix, delimiter,
+             GoogleCloudStorage.MAX_RESULTS_UNLIMITED, pageState );
+  }
+
+  @Override
+  public List<GoogleCloudStorageItemInfo> listObjectInfo(String bucketName,
+      String objectNamePrefix, String delimiter, long maxResults, PageState pageState)
+      throws IOException {
     throttle(StorageOperation.LIST_OBJECTS);
     return wrappedGcs.listObjectInfo(
-        bucketName, objectNamePrefix, delimiter, maxResults);
+        bucketName, objectNamePrefix, delimiter, maxResults, pageState);
   }
 
   @Override

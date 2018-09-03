@@ -122,18 +122,38 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
         bucketName, objectNamePrefix, delimiter, GoogleCloudStorage.MAX_RESULTS_UNLIMITED);
   }
 
+  @Override
+  public List<GoogleCloudStorageItemInfo> listObjectInfo(
+      String bucketName, String objectNamePrefix, String delimiter, long maxResults) throws IOException {
+
+    return this.listObjectInfo(
+        bucketName, objectNamePrefix, delimiter, maxResults, null);
+  }
+
+  @Override
+  public List<GoogleCloudStorageItemInfo> listObjectInfo(
+      String bucketName, String objectNamePrefix, String delimiter, PageState pageState) throws IOException {
+
+    return this.listObjectInfo(
+        bucketName, objectNamePrefix, delimiter, GoogleCloudStorage.MAX_RESULTS_UNLIMITED, pageState);
+  }
+
   /** This function may return cached copies of GoogleCloudStorageItemInfo. */
   @Override
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
-      String bucketName, String objectNamePrefix, String delimiter, long maxResults)
+      String bucketName, String objectNamePrefix, String delimiter,
+      long maxResults, PageState pageState)
       throws IOException {
     List<GoogleCloudStorageItemInfo> result;
+
+    // For now pagination is not supported for this storage
+    if (pageState != null) pageState.disablePagination();
 
     if (options.isListCachingEnabled()) {
       result = cache.getList(bucketName, objectNamePrefix);
 
       if (result == null) {
-        result = super.listObjectInfo(bucketName, objectNamePrefix, null);
+        result = super.listObjectInfo(bucketName, objectNamePrefix, null, pageState);
         cache.putList(bucketName, objectNamePrefix, result);
       }
 
@@ -144,7 +164,7 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
         result = result.subList(0, (int) maxResults);
       }
     } else {
-      result = super.listObjectInfo(bucketName, objectNamePrefix, delimiter, maxResults);
+      result = super.listObjectInfo(bucketName, objectNamePrefix, delimiter, maxResults, pageState);
       for (GoogleCloudStorageItemInfo item : result) {
         cache.putItem(item);
       }
