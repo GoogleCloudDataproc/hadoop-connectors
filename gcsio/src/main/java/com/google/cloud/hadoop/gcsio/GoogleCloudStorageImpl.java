@@ -1138,34 +1138,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   /**
-   * See {@link GoogleCloudStorage#listObjectInfo(String, String, String)}
-   * for details about expected behavior.
-   */
-  @Override
-  public List<GoogleCloudStorageItemInfo> listObjectInfo(
-      final String bucketName, String objectNamePrefix, String delimiter)
-      throws IOException {
-    return listObjectInfo(bucketName, objectNamePrefix, delimiter, MAX_RESULTS_UNLIMITED);
-  }
-
-  @Override
-  public List<GoogleCloudStorageItemInfo> listObjectInfo(
-          final String bucketName, String objectNamePrefix, String delimiter, PageState pageState)
-          throws IOException {
-    return listObjectInfo(bucketName, objectNamePrefix, delimiter,
-            GoogleCloudStorage.MAX_RESULTS_UNLIMITED, pageState);
-  }
-
-  @Override
-  public List<GoogleCloudStorageItemInfo> listObjectInfo(
-          final String bucketName, String objectNamePrefix, String delimiter,
-          long maxResults)
-          throws IOException {
-    return listObjectInfo(bucketName, objectNamePrefix, delimiter,
-            maxResults, null);
-  }
-
-  /**
    * See {@link GoogleCloudStorage#listBucketInfo()} for details about expected behavior.
    */
   @Override
@@ -1414,7 +1386,43 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   /**
-   * See {@link GoogleCloudStorage#listObjectInfo(String, String, String, long)} for details about
+   * See {@link GoogleCloudStorage#listObjectInfo(String, String, String)}
+   * for details about expected behavior.
+   */
+  @Override
+  public List<GoogleCloudStorageItemInfo> listObjectInfo(
+          final String bucketName, String objectNamePrefix, String delimiter)
+          throws IOException {
+    return listObjectInfo(bucketName, objectNamePrefix, delimiter, MAX_RESULTS_UNLIMITED);
+  }
+
+  /**
+   * See {@link GoogleCloudStorage#listObjectInfo(String, String, String, PageState)}
+   * for details about expected behavior.
+   */
+  @Override
+  public List<GoogleCloudStorageItemInfo> listObjectInfo(
+          final String bucketName, String objectNamePrefix, String delimiter, PageState pageState)
+          throws IOException {
+    return listObjectInfo(bucketName, objectNamePrefix, delimiter,
+            GoogleCloudStorage.MAX_RESULTS_UNLIMITED, pageState);
+  }
+
+  /**
+   * See {@link GoogleCloudStorage#listObjectInfo(String, String, String, long)}
+   * for details about expected behavior.
+   */
+  @Override
+  public List<GoogleCloudStorageItemInfo> listObjectInfo(
+          final String bucketName, String objectNamePrefix, String delimiter,
+          long maxResults)
+          throws IOException {
+    return listObjectInfo(bucketName, objectNamePrefix, delimiter,
+            maxResults, null);
+  }
+
+  /**
+   * See {@link GoogleCloudStorage#listObjectInfo(String, String, String, long, PageState)} for details about
    * expected behavior.
    */
   @Override

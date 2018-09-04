@@ -312,7 +312,7 @@ public interface GoogleCloudStorage {
           throws IOException;
 
   /**
-   * The same semanticsas {@link #listObjectInfo} with unlimited maximum total number
+   * The same semantics as {@link #listObjectInfo} with unlimited maximum total number
    * of items returned, and pagination disabled
    * @param bucketName bucket name
    * @param objectNamePrefix object name prefix or null if all objects in the bucket are desired
@@ -437,15 +437,19 @@ public interface GoogleCloudStorage {
       throws IOException;
 
   // Holder of pagination states if pagination is enabled;
-  // Holder of initial and final states that have empty and full contents respectively
   class PageState {
     //
     private boolean pagination;
     private long fetchedSize = 0;
     private String nextPageToken = null;
-    // prefixes holds prefixes
+    /**
+     * prefixes holds prefixes across pages
+      */
     private Set<String> prefixes = new LinkedHashSet<>();
-    // listObjects holds processed objects per-page:
+    /** listObjects holds processed objects per-page.
+     * The final processor of all pages is responsible to
+     * call {@link #clear()} to reset this list before fetch the next page.
+     */
     private List<StorageObject> listedObjects = new ArrayList<>();
 
     public PageState(boolean pagination) {

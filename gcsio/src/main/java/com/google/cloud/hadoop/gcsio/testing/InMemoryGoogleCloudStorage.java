@@ -56,7 +56,7 @@ public class InMemoryGoogleCloudStorage
   private final Map<String, InMemoryBucketEntry> bucketLookup = new HashMap<>();
   private final GoogleCloudStorageOptions storageOptions;
   private final Clock clock;
-  // The next fields are for mocked pagination behavoir
+  // The next fields are for mocked pagination behavior
   private final String NextPageToken = "IN-MEMORY-PAGE-END";
   // A unlimited page size will effectively disable pagination
   private long pageSize = GoogleCloudStorage.MAX_RESULTS_UNLIMITED;
@@ -451,6 +451,7 @@ public class InMemoryGoogleCloudStorage
       List<String> listedNames = listObjectNames(bucketName, objectNamePrefix,
               delimiter, GoogleCloudStorage.MAX_RESULTS_UNLIMITED);
       it = listedNames.iterator();
+      totalSize = 0;
     }
     for (; it.hasNext(); ) {
       String objectName = it.next();
