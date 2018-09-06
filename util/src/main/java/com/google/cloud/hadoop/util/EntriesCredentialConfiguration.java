@@ -155,9 +155,7 @@ public class EntriesCredentialConfiguration extends CredentialConfiguration {
      */
     protected abstract T beginBuild();
 
-    /**
-     * Return the fully-assembled concrete object for which this is a builder.
-     */
+    /** Return the fully-assembled concrete object for which this is a builder. */
     public T build() throws IOException {
       T concreteCredentialConfiguration = beginBuild();
       if (configuration != null) {
@@ -230,13 +228,16 @@ public class EntriesCredentialConfiguration extends CredentialConfiguration {
     for (String prefix : prefixes) {
       configuration.setBoolean(prefix + ENABLE_SERVICE_ACCOUNTS_SUFFIX, isServiceAccountEnabled());
       if (getServiceAccountClientEmail() != null) {
-        configuration.set(prefix + SERVICE_ACCOUNT_CLIENT_EMAIL_SUFFIX, getServiceAccountClientEmail());
+        configuration.set(
+            prefix + SERVICE_ACCOUNT_CLIENT_EMAIL_SUFFIX, getServiceAccountClientEmail());
       }
       if (getServiceAccountPrivateKeyId() != null) {
-        configuration.set(prefix + SERVICE_ACCOUNT_PRIVATE_KEY_ID_SUFFIX, getServiceAccountPrivateKeyId());
+        configuration.set(
+            prefix + SERVICE_ACCOUNT_PRIVATE_KEY_ID_SUFFIX, getServiceAccountPrivateKeyId());
       }
       if (getServiceAccountPrivateKey() != null) {
-        configuration.set(prefix + SERVICE_ACCOUNT_PRIVATE_KEY_SUFFIX, getServiceAccountPrivateKey());
+        configuration.set(
+            prefix + SERVICE_ACCOUNT_PRIVATE_KEY_SUFFIX, getServiceAccountPrivateKey());
       }
       if (getServiceAccountEmail() != null) {
         configuration.set(prefix + SERVICE_ACCOUNT_EMAIL_SUFFIX, getServiceAccountEmail());
