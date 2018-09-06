@@ -294,9 +294,8 @@ public class CredentialFactory {
       List<String> scopes,
       HttpTransport transport)
       throws IOException {
-    logger.atFine().log("getServiceAccountCredentialFromHadoopConfiguration({})", clientEmail);
-    if (clientEmail == null || privateKeyPem == null
-        || privateKeyId == null) {
+    logger.atFine().log("getServiceAccountCredentialFromHadoopConfiguration(%s)", clientEmail);
+    if (clientEmail == null || privateKeyPem == null || privateKeyId == null) {
       throw new IOException("Error reading service account credential from stream, "
           + "expecting, 'client_email', 'private_key' and 'private_key_id'.");
     }

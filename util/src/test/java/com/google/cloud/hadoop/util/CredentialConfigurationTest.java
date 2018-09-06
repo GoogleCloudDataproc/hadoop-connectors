@@ -116,9 +116,9 @@ public class CredentialConfigurationTest {
 
   @Test
   public void configurationSAUsedWhenConfigured() throws IOException, GeneralSecurityException {
-    configuration.setSaClientEmail("foo@example.com");
-    configuration.setSaPrivateKeyId("privateKeyId");
-    configuration.setSaPrivateKey("privateKey");
+    configuration.setServiceAccountClientEmail("foo@example.com");
+    configuration.setServiceAccountPrivateKeyId("privateKeyId");
+    configuration.setServiceAccountPrivateKey("privateKey");
 
     configuration.getCredential(TEST_SCOPES);
     verify(mockCredentialFactory, times(1))

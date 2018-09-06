@@ -62,11 +62,14 @@ public class EntriesCredentialConfiguration extends CredentialConfiguration {
    */
   public static final String ENABLE_SERVICE_ACCOUNTS_SUFFIX = ".auth.service.account.enable";
 
-  // TODO Document the parameters. Additional documentation in gs-defaults.xml, toString
-  public static final String SA_PRIVATE_KEY_ID_SUFFIX = ".auth.service.account.private.key.id";
-  public static final String SA_PRIVATE_KEY_SUFFIX = ".auth.service.account.private.key";
-  // Not ideal to duplicate email, but keeps the parameter names for this set of configuration consistent
-  public static final String SA_CLIENT_EMAIL_SUFFIX = ".auth.service.account.client.email";
+  public static final String SERVICE_ACCOUNT_PRIVATE_KEY_ID_SUFFIX =
+      ".auth.service.account.private.key.id";
+  public static final String SERVICE_ACCOUNT_PRIVATE_KEY_SUFFIX =
+      ".auth.service.account.private.key";
+  // Not ideal to duplicate email, but keeps the parameter names for this set of configuration
+  // consistent
+  public static final String SERVICE_ACCOUNT_CLIENT_EMAIL_SUFFIX =
+      ".auth.service.account.client.email";
 
   /**
    * Key suffix used to control which email address is associated with the service account.
@@ -226,14 +229,14 @@ public class EntriesCredentialConfiguration extends CredentialConfiguration {
   public void getConfigurationInto(Entries configuration) {
     for (String prefix : prefixes) {
       configuration.setBoolean(prefix + ENABLE_SERVICE_ACCOUNTS_SUFFIX, isServiceAccountEnabled());
-      if (getSaClientEmail() != null) {
-        configuration.set(prefix + SA_CLIENT_EMAIL_SUFFIX, getSaClientEmail());
+      if (getServiceAccountClientEmail() != null) {
+        configuration.set(prefix + SERVICE_ACCOUNT_CLIENT_EMAIL_SUFFIX, getServiceAccountClientEmail());
       }
-      if (getSaPrivateKeyId() != null) {
-        configuration.set(prefix + SA_PRIVATE_KEY_ID_SUFFIX, getSaPrivateKeyId());
+      if (getServiceAccountPrivateKeyId() != null) {
+        configuration.set(prefix + SERVICE_ACCOUNT_PRIVATE_KEY_ID_SUFFIX, getServiceAccountPrivateKeyId());
       }
-      if (getSaPrivateKey() != null) {
-        configuration.set(prefix + SA_PRIVATE_KEY_SUFFIX, getSaPrivateKey());
+      if (getServiceAccountPrivateKey() != null) {
+        configuration.set(prefix + SERVICE_ACCOUNT_PRIVATE_KEY_SUFFIX, getServiceAccountPrivateKey());
       }
       if (getServiceAccountEmail() != null) {
         configuration.set(prefix + SERVICE_ACCOUNT_EMAIL_SUFFIX, getServiceAccountEmail());
@@ -276,21 +279,23 @@ public class EntriesCredentialConfiguration extends CredentialConfiguration {
         setEnableServiceAccounts(enableServiceAccounts.get());
       }
 
-      // Parameters for SA directly in Configuration
-      String saPrivateKeyId = entries.getPassword(prefix + SA_PRIVATE_KEY_ID_SUFFIX);
-      if (saPrivateKeyId != null) {
-        setSaPrivateKeyId(saPrivateKeyId);
+      // Parameters for ServiceAccount directly in Configuration
+      String serviceAccountPrivateKeyId =
+          entries.getPassword(prefix + SERVICE_ACCOUNT_PRIVATE_KEY_ID_SUFFIX);
+      if (serviceAccountPrivateKeyId != null) {
+        setServiceAccountPrivateKeyId(serviceAccountPrivateKeyId);
       }
 
-      String saPrivateKey = entries.getPassword(prefix + SA_PRIVATE_KEY_SUFFIX);
-      if (saPrivateKey != null) {
-        saPrivateKey = saPrivateKey.replace("\\n", System.lineSeparator());
-        setSaPrivateKey(saPrivateKey);
+      String serviceAccountPrivateKey =
+          entries.getPassword(prefix + SERVICE_ACCOUNT_PRIVATE_KEY_SUFFIX);
+      if (serviceAccountPrivateKey != null) {
+        setServiceAccountPrivateKey(serviceAccountPrivateKey);
       }
 
-      String saClientEmail = entries.getPassword(prefix + SA_CLIENT_EMAIL_SUFFIX);
-      if (saClientEmail != null) {
-        setSaClientEmail(saClientEmail);
+      String serviceAccountClientEmail =
+          entries.getPassword(prefix + SERVICE_ACCOUNT_CLIENT_EMAIL_SUFFIX);
+      if (serviceAccountClientEmail != null) {
+        setServiceAccountClientEmail(serviceAccountClientEmail);
       }
 
       // Parameters for file based credentials

@@ -68,17 +68,11 @@ public class HadoopCredentialConfigurationTest {
     Configuration conf = new Configuration();
 
     setConfigurationKey(
-        conf,
-        HadoopCredentialConfiguration.SA_CLIENT_EMAIL_SUFFIX,
-        "anEmail");
+        conf, HadoopCredentialConfiguration.SERVICE_ACCOUNT_CLIENT_EMAIL_SUFFIX, "anEmail");
     setConfigurationKey(
-        conf,
-        HadoopCredentialConfiguration.SA_PRIVATE_KEY_ID_SUFFIX,
-        "aPrivateKeyId");
+        conf, HadoopCredentialConfiguration.SERVICE_ACCOUNT_PRIVATE_KEY_ID_SUFFIX, "aPrivateKeyId");
     setConfigurationKey(
-        conf,
-        HadoopCredentialConfiguration.SA_PRIVATE_KEY_SUFFIX,
-        "aPrivateKey");
+        conf, HadoopCredentialConfiguration.SERVICE_ACCOUNT_PRIVATE_KEY_SUFFIX, "aPrivateKey");
     setConfigurationKey(
         conf,
         HadoopCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX,
@@ -117,9 +111,9 @@ public class HadoopCredentialConfigurationTest {
         .withConfiguration(conf)
         .build();
 
-    assertThat(credentialConfiguration.getSaClientEmail()).isEqualTo("anEmail");
-    assertThat(credentialConfiguration.getSaPrivateKeyId()).isEqualTo("aPrivateKeyId");
-    assertThat(credentialConfiguration.getSaPrivateKey()).isEqualTo("aPrivateKey");
+    assertThat(credentialConfiguration.getServiceAccountClientEmail()).isEqualTo("anEmail");
+    assertThat(credentialConfiguration.getServiceAccountPrivateKeyId()).isEqualTo("aPrivateKeyId");
+    assertThat(credentialConfiguration.getServiceAccountPrivateKey()).isEqualTo("aPrivateKey");
     assertThat(credentialConfiguration.getServiceAccountEmail()).isEqualTo("anEmail");
     assertThat(credentialConfiguration.getServiceAccountKeyFile()).isEqualTo("aKeyFile");
     assertThat(credentialConfiguration.getServiceAccountJsonKeyFile()).isEqualTo("aJsonFile");
@@ -158,25 +152,25 @@ public class HadoopCredentialConfigurationTest {
         HadoopCredentialConfiguration.JSON_KEYFILE_SUFFIX);
     assertThat(writtenValue).isEqualTo("aJsonFile");
 
-    credentialConfiguration.setSaClientEmail("anEmail");
+    credentialConfiguration.setServiceAccountClientEmail("anEmail");
     conf = credentialConfiguration.getConf();
     writtenValue = getConfigurationKey(
         conf,
-        HadoopCredentialConfiguration.SA_CLIENT_EMAIL_SUFFIX);
+        HadoopCredentialConfiguration.SERVICE_ACCOUNT_CLIENT_EMAIL_SUFFIX);
     assertThat(writtenValue).isEqualTo("anEmail");
 
-    credentialConfiguration.setSaPrivateKeyId("aPrivateKeyId");
+    credentialConfiguration.setServiceAccountPrivateKeyId("aPrivateKeyId");
     conf = credentialConfiguration.getConf();
     writtenValue = getConfigurationKey(
         conf,
-        HadoopCredentialConfiguration.SA_PRIVATE_KEY_ID_SUFFIX);
+        HadoopCredentialConfiguration.SERVICE_ACCOUNT_PRIVATE_KEY_ID_SUFFIX);
     assertThat(writtenValue).isEqualTo("aPrivateKeyId");
 
-    credentialConfiguration.setSaPrivateKey("aPrivateKey");
+    credentialConfiguration.setServiceAccountPrivateKey("aPrivateKey");
     conf = credentialConfiguration.getConf();
     writtenValue = getConfigurationKey(
         conf,
-        HadoopCredentialConfiguration.SA_PRIVATE_KEY_SUFFIX);
+        HadoopCredentialConfiguration.SERVICE_ACCOUNT_PRIVATE_KEY_SUFFIX);
     assertThat(writtenValue).isEqualTo("aPrivateKey");
 
     credentialConfiguration.setClientSecret("clientSecret");

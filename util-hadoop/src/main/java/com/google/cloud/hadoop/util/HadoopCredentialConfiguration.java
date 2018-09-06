@@ -16,6 +16,7 @@ package com.google.cloud.hadoop.util;
 
 import java.io.IOException;
 import java.util.List;
+import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 
 /**
@@ -30,7 +31,7 @@ import org.apache.hadoop.conf.Configuration;
  * credentials.
  */
 public class HadoopCredentialConfiguration
-    extends EntriesCredentialConfiguration {
+    extends EntriesCredentialConfiguration implements Configurable {
 
   /**
    * An adapter to use our Configuration object as the config object
@@ -104,5 +105,20 @@ public class HadoopCredentialConfiguration
     Configuration configuration = new Configuration();
     getConfigurationInto(new ConfigurationEntriesAdapter(configuration));
     return configuration;
+  }
+
+  /**
+   * Load configuration values from the provided Configuration source. For any key that does not
+   * have a corresponding value in the Configuration, no changes will be made to the state of this
+   * object.
+   */
+  @Override
+  @Deprecated
+  public void setConf(Configuration entries) {
+    try {
+      setConfiguration(new ConfigurationEntriesAdapter(entries));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 }
