@@ -22,8 +22,8 @@ import static java.util.stream.Collectors.toCollection;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.util.Clock;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.TimestampUpdatePredicate;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PageState;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.TimestampUpdatePredicate;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
@@ -105,7 +105,7 @@ public class GoogleCloudStorageFileSystem {
       };
 
   // Comparator used for sorting a collection of FileInfo items based on path comparison.
-  static public final Comparator<FileInfo> FILE_INFO_PATH_COMPARATOR =
+  public static final Comparator<FileInfo> FILE_INFO_PATH_COMPARATOR =
       new Comparator<FileInfo>() {
         @Override
         public int compare(FileInfo file1, FileInfo file2) {
@@ -1031,11 +1031,11 @@ public class GoogleCloudStorageFileSystem {
   }
 
   /**
-   * Equivalent to a recursive listing of {@code prefix}, except that {@code prefix} doesn't
-   * have to represent an actual object but can just be a partial prefix string, and there
-   * is no auto-repair of implicit directories since we can't detect implicit directories
-   * without listing by 'delimiter'. The 'authority' component of the {@code prefix} *must*
-   * be the complete authority, however; we can only list prefixes of *objects*, not buckets.
+   * Equivalent to a recursive listing of {@code prefix}, except that {@code prefix} doesn't have to
+   * represent an actual object but can just be a partial prefix string, and there is no auto-repair
+   * of implicit directories since we can't detect implicit directories without listing by
+   * 'delimiter'. The 'authority' component of the {@code prefix} *must* be the complete authority,
+   * however; we can only list prefixes of *objects*, not buckets.
    *
    * @param prefix the prefix to use to list all matching objects.
    */

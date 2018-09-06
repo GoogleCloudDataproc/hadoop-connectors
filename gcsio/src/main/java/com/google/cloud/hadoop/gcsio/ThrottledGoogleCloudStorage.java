@@ -15,7 +15,6 @@
 package com.google.cloud.hadoop.gcsio;
 
 import com.google.common.util.concurrent.RateLimiter;
-
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
@@ -232,16 +231,24 @@ public class ThrottledGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public List<GoogleCloudStorageItemInfo> listObjectInfo(String bucketName,
-      String objectNamePrefix, String delimiter, PageState pageState)
+  public List<GoogleCloudStorageItemInfo> listObjectInfo(
+      String bucketName, String objectNamePrefix, String delimiter, PageState pageState)
       throws IOException {
-    return listObjectInfo(bucketName, objectNamePrefix, delimiter,
-             GoogleCloudStorage.MAX_RESULTS_UNLIMITED, pageState );
+    return listObjectInfo(
+        bucketName,
+        objectNamePrefix,
+        delimiter,
+        GoogleCloudStorage.MAX_RESULTS_UNLIMITED,
+        pageState);
   }
 
   @Override
-  public List<GoogleCloudStorageItemInfo> listObjectInfo(String bucketName,
-      String objectNamePrefix, String delimiter, long maxResults, PageState pageState)
+  public List<GoogleCloudStorageItemInfo> listObjectInfo(
+      String bucketName,
+      String objectNamePrefix,
+      String delimiter,
+      long maxResults,
+      PageState pageState)
       throws IOException {
     throttle(StorageOperation.LIST_OBJECTS);
     return wrappedGcs.listObjectInfo(

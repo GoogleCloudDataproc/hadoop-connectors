@@ -124,25 +124,33 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
 
   @Override
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
-      String bucketName, String objectNamePrefix, String delimiter, long maxResults) throws IOException {
+      String bucketName, String objectNamePrefix, String delimiter, long maxResults)
+      throws IOException {
 
-    return this.listObjectInfo(
-        bucketName, objectNamePrefix, delimiter, maxResults, null);
+    return this.listObjectInfo(bucketName, objectNamePrefix, delimiter, maxResults, null);
   }
 
   @Override
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
-      String bucketName, String objectNamePrefix, String delimiter, PageState pageState) throws IOException {
+      String bucketName, String objectNamePrefix, String delimiter, PageState pageState)
+      throws IOException {
 
     return this.listObjectInfo(
-        bucketName, objectNamePrefix, delimiter, GoogleCloudStorage.MAX_RESULTS_UNLIMITED, pageState);
+        bucketName,
+        objectNamePrefix,
+        delimiter,
+        GoogleCloudStorage.MAX_RESULTS_UNLIMITED,
+        pageState);
   }
 
   /** This function may return cached copies of GoogleCloudStorageItemInfo. */
   @Override
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
-      String bucketName, String objectNamePrefix, String delimiter,
-      long maxResults, PageState pageState)
+      String bucketName,
+      String objectNamePrefix,
+      String delimiter,
+      long maxResults,
+      PageState pageState)
       throws IOException {
     List<GoogleCloudStorageItemInfo> result;
 

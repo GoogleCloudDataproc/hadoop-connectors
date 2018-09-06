@@ -72,7 +72,6 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -1222,15 +1221,19 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     checkArgument(
         listedObjects != null && listedObjects.isEmpty(),
         "Must provide a non-null empty container for listedObjects.");
-    checkArgument(pagination || (listedObjects.isEmpty()
-                    && prefixes.isEmpty() && pageToken == null && fetchedSize == 0),
-            "Pagination is disabled with a bad state");
-    checkArgument((fetchedSize == 0 && pageToken == null && prefixes.isEmpty()) ||
-                    (pageToken != null && fetchedSize > 0),
-            "Page state is in bad state");
+    checkArgument(
+        pagination
+            || (listedObjects.isEmpty()
+                && prefixes.isEmpty()
+                && pageToken == null
+                && fetchedSize == 0),
+        "Pagination is disabled with a bad state");
+    checkArgument(
+        (fetchedSize == 0 && pageToken == null && prefixes.isEmpty())
+            || (pageToken != null && fetchedSize > 0),
+        "Page state is in bad state");
 
-    if (pagination && getMaxRemainingResults(maxResults, prefixes.size() + fetchedSize) <= 0)
-    {
+    if (pagination && getMaxRemainingResults(maxResults, prefixes.size() + fetchedSize) <= 0) {
       pageState.setNext(null);
       return;
     }
@@ -1282,8 +1285,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       List<String> pagePrefixes = items.getPrefixes();
       if (pagePrefixes != null) {
         logger.atFine().log("listed %s prefixes", pagePrefixes.size());
-        long maxRemainingResults = getMaxRemainingResults(maxResults, (long) prefixes.size()
-                + fetchedSize);
+        long maxRemainingResults =
+            getMaxRemainingResults(maxResults, (long) prefixes.size() + fetchedSize);
         // Do not cast 'maxRemainingResults' to int here, it could overflow
         long maxPrefixes = Math.min(maxRemainingResults, (long) pagePrefixes.size());
         prefixes.addAll(pagePrefixes.subList(0, (int) maxPrefixes));
@@ -1307,10 +1310,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
         // Determine if the caller sent a directory name as a prefix.
         boolean objectPrefixEndsWithDelimiter =
-                !Strings.isNullOrEmpty(objectNamePrefix) && objectNamePrefix.endsWith(PATH_DELIMITER);
+            !Strings.isNullOrEmpty(objectNamePrefix) && objectNamePrefix.endsWith(PATH_DELIMITER);
 
-        long maxRemainingResults = getMaxRemainingResults(maxResults,
-                fetchedSize + (long) prefixes.size());
+        long maxRemainingResults =
+            getMaxRemainingResults(maxResults, fetchedSize + (long) prefixes.size());
         for (StorageObject object : objects) {
           String objectName = object.getName();
           if (!objectPrefixEndsWithDelimiter || !objectName.equals(objectNamePrefix)) {
@@ -1326,15 +1329,15 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         }
       }
       pageToken = items.getNextPageToken();
-    } while (!pagination && pageToken != null && getMaxRemainingResults(maxResults,
-            (long) prefixes.size() + listedObjects.size()) > 0);
+    } while (!pagination
+        && pageToken != null
+        && getMaxRemainingResults(maxResults, (long) prefixes.size() + listedObjects.size()) > 0);
     if (pagination) {
       pageState.setNext(pageToken);
     }
   }
 
-  private static long getMaxRemainingResults(
-      long maxResults, long fetchedSize) {
+  private static long getMaxRemainingResults(long maxResults, long fetchedSize) {
     if (maxResults <= 0) {
       return Long.MAX_VALUE;
     }
@@ -1378,7 +1381,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // StorageObjects, adding them to the list.
     // TODO(user): Maybe de-dupe if it's possible for GCS to return duplicates.
     List<String> objectNames = new ArrayList<>(pageState.getPrefixes().size());
-    objectNames.addAll(pageState.getPrefixes());;
+    objectNames.addAll(pageState.getPrefixes());
+    ;
     for (StorageObject obj : pageState.getListedObjects()) {
       objectNames.add(obj.getName());
     }
@@ -1386,49 +1390,53 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   /**
-   * See {@link GoogleCloudStorage#listObjectInfo(String, String, String)}
-   * for details about expected behavior.
-   */
-  @Override
-  public List<GoogleCloudStorageItemInfo> listObjectInfo(
-          final String bucketName, String objectNamePrefix, String delimiter)
-          throws IOException {
-    return listObjectInfo(bucketName, objectNamePrefix, delimiter, MAX_RESULTS_UNLIMITED);
-  }
-
-  /**
-   * See {@link GoogleCloudStorage#listObjectInfo(String, String, String, PageState)}
-   * for details about expected behavior.
-   */
-  @Override
-  public List<GoogleCloudStorageItemInfo> listObjectInfo(
-          final String bucketName, String objectNamePrefix, String delimiter, PageState pageState)
-          throws IOException {
-    return listObjectInfo(bucketName, objectNamePrefix, delimiter,
-            GoogleCloudStorage.MAX_RESULTS_UNLIMITED, pageState);
-  }
-
-  /**
-   * See {@link GoogleCloudStorage#listObjectInfo(String, String, String, long)}
-   * for details about expected behavior.
-   */
-  @Override
-  public List<GoogleCloudStorageItemInfo> listObjectInfo(
-          final String bucketName, String objectNamePrefix, String delimiter,
-          long maxResults)
-          throws IOException {
-    return listObjectInfo(bucketName, objectNamePrefix, delimiter,
-            maxResults, null);
-  }
-
-  /**
-   * See {@link GoogleCloudStorage#listObjectInfo(String, String, String, long, PageState)} for details about
+   * See {@link GoogleCloudStorage#listObjectInfo(String, String, String)} for details about
    * expected behavior.
    */
   @Override
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
-      final String bucketName, String objectNamePrefix, String delimiter,
-      long maxResults, PageState pageState)
+      final String bucketName, String objectNamePrefix, String delimiter) throws IOException {
+    return listObjectInfo(bucketName, objectNamePrefix, delimiter, MAX_RESULTS_UNLIMITED);
+  }
+
+  /**
+   * See {@link GoogleCloudStorage#listObjectInfo(String, String, String, PageState)} for details
+   * about expected behavior.
+   */
+  @Override
+  public List<GoogleCloudStorageItemInfo> listObjectInfo(
+      final String bucketName, String objectNamePrefix, String delimiter, PageState pageState)
+      throws IOException {
+    return listObjectInfo(
+        bucketName,
+        objectNamePrefix,
+        delimiter,
+        GoogleCloudStorage.MAX_RESULTS_UNLIMITED,
+        pageState);
+  }
+
+  /**
+   * See {@link GoogleCloudStorage#listObjectInfo(String, String, String, long)} for details about
+   * expected behavior.
+   */
+  @Override
+  public List<GoogleCloudStorageItemInfo> listObjectInfo(
+      final String bucketName, String objectNamePrefix, String delimiter, long maxResults)
+      throws IOException {
+    return listObjectInfo(bucketName, objectNamePrefix, delimiter, maxResults, null);
+  }
+
+  /**
+   * See {@link GoogleCloudStorage#listObjectInfo(String, String, String, long, PageState)} for
+   * details about expected behavior.
+   */
+  @Override
+  public List<GoogleCloudStorageItemInfo> listObjectInfo(
+      final String bucketName,
+      String objectNamePrefix,
+      String delimiter,
+      long maxResults,
+      PageState pageState)
       throws IOException {
     logger.atFine().log(
         "listObjectInfo(%s, %s, %s, %s)", bucketName, objectNamePrefix, delimiter, maxResults);

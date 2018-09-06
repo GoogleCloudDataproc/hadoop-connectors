@@ -331,7 +331,7 @@ public class GoogleCloudStorageTest {
   public void testCreateObjectNormalOperation()
       throws Exception {
     // Prepare the mock return values before invoking the method being tested.
-     when(mockStorage.objects()).thenReturn(mockStorageObjects);
+    when(mockStorage.objects()).thenReturn(mockStorageObjects);
 
     // Setup the argument captor so we can get back the data that we write.
     final ArgumentCaptor<AbstractInputStreamContent> inputStreamCaptor =

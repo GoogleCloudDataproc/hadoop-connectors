@@ -428,28 +428,35 @@ public class InMemoryGoogleCloudStorage
 
   @Override
   public synchronized List<GoogleCloudStorageItemInfo> listObjectInfo(
-      final String bucketName, String objectNamePrefix, String delimiter,
-      PageState pageState)
+      final String bucketName, String objectNamePrefix, String delimiter, PageState pageState)
       throws IOException {
-    return listObjectInfo(bucketName, objectNamePrefix, delimiter,
-      GoogleCloudStorage.MAX_RESULTS_UNLIMITED, pageState);
+    return listObjectInfo(
+        bucketName,
+        objectNamePrefix,
+        delimiter,
+        GoogleCloudStorage.MAX_RESULTS_UNLIMITED,
+        pageState);
   }
 
   @Override
   public synchronized List<GoogleCloudStorageItemInfo> listObjectInfo(
-      final String bucketName, String objectNamePrefix, String delimiter,
-      long maxResults, PageState pageState)
+      final String bucketName,
+      String objectNamePrefix,
+      String delimiter,
+      long maxResults,
+      PageState pageState)
       throws IOException {
     // Disable pagination for unlimited page size
     if (pageState != null && pageSize <= 0) pageState.disablePagination();
     List<GoogleCloudStorageItemInfo> listedInfo = new ArrayList<>();
-    boolean pagination =(pageState != null && pageState.isPagination());
+    boolean pagination = (pageState != null && pageState.isPagination());
     boolean contPage = (pagination && pageState.getNextPageToken() != null);
     if (!contPage) {
       // Since we're just in memory, we can do the naive implementation of just listing names and
       // then calling getItemInfo for each.
-      List<String> listedNames = listObjectNames(bucketName, objectNamePrefix,
-              delimiter, GoogleCloudStorage.MAX_RESULTS_UNLIMITED);
+      List<String> listedNames =
+          listObjectNames(
+              bucketName, objectNamePrefix, delimiter, GoogleCloudStorage.MAX_RESULTS_UNLIMITED);
       it = listedNames.iterator();
       totalSize = 0;
     }
@@ -477,7 +484,7 @@ public class InMemoryGoogleCloudStorage
         listedInfo.add(
             GoogleCloudStorageItemInfo.createInferredDirectory(itemInfo.getResourceId()));
       }
-      if (maxResults > 0 && listedInfo.size() + totalSize>= maxResults) {
+      if (maxResults > 0 && listedInfo.size() + totalSize >= maxResults) {
         it = null;
         totalSize = 0;
         if (contPage) {
@@ -495,8 +502,7 @@ public class InMemoryGoogleCloudStorage
       totalSize = 0;
       pageState.setNext(null);
     }
-    if (pagination && pageState.getNextPageToken() != null)
-      totalSize += listedInfo.size();
+    if (pagination && pageState.getNextPageToken() != null) totalSize += listedInfo.size();
     return listedInfo;
   }
 

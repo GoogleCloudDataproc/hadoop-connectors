@@ -17,7 +17,6 @@ package com.google.cloud.hadoop.gcsio;
 import com.google.api.client.util.Clock;
 import com.google.common.base.Function;
 import com.google.common.collect.Lists;
-
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
@@ -233,32 +232,42 @@ public class LaggedGoogleCloudStorage implements GoogleCloudStorage  {
 
   @Override
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
-          String bucketName, String objectNamePrefix, String delimiter,
-          long maxResults)
-          throws IOException {
-    return listObjectInfo(bucketName, objectNamePrefix, delimiter,
-            maxResults, null);
+      String bucketName, String objectNamePrefix, String delimiter, long maxResults)
+      throws IOException {
+    return listObjectInfo(bucketName, objectNamePrefix, delimiter, maxResults, null);
   }
 
   @Override
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
-          final String bucketName, String objectNamePrefix, String delimiter, PageState pageState)
-          throws IOException {
-    return listObjectInfo(bucketName, objectNamePrefix, delimiter,
-            GoogleCloudStorage.MAX_RESULTS_UNLIMITED, pageState);
+      final String bucketName, String objectNamePrefix, String delimiter, PageState pageState)
+      throws IOException {
+    return listObjectInfo(
+        bucketName,
+        objectNamePrefix,
+        delimiter,
+        GoogleCloudStorage.MAX_RESULTS_UNLIMITED,
+        pageState);
   }
 
   @Override
-  public List<GoogleCloudStorageItemInfo> listObjectInfo(String bucketName,
-      String objectNamePrefix, String delimiter, long maxResults, PageState pageState)
+  public List<GoogleCloudStorageItemInfo> listObjectInfo(
+      String bucketName,
+      String objectNamePrefix,
+      String delimiter,
+      long maxResults,
+      PageState pageState)
       throws IOException {
     // We don't know how many items will be trimmed by listVisibilityCalculator,
     // so we can't limit the number of items returned by our delegate.
     if (pageState == null) pageState = new PageState(false);
     long prevSize = pageState.getFetchedSize();
     List<GoogleCloudStorageItemInfo> delegatedObjects =
-        delegate.listObjectInfo(bucketName, objectNamePrefix, delimiter,
-            GoogleCloudStorage.MAX_RESULTS_UNLIMITED, pageState);
+        delegate.listObjectInfo(
+            bucketName,
+            objectNamePrefix,
+            delimiter,
+            GoogleCloudStorage.MAX_RESULTS_UNLIMITED,
+            pageState);
 
     List<GoogleCloudStorageItemInfo> result = new ArrayList<>();
 

@@ -181,8 +181,12 @@ public class PerformanceCachingGoogleCloudStorageTest {
 
     // Verify the delegate call.
     verify(gcsDelegate)
-        .listObjectInfo(eq(BUCKET_A), eq(PREFIX_A), eq(null), eq(MAX_RESULTS_UNLIMITED),
-        Matchers.<PageState>eq(null));
+        .listObjectInfo(
+            eq(BUCKET_A),
+            eq(PREFIX_A),
+            eq(null),
+            eq(MAX_RESULTS_UNLIMITED),
+            Matchers.<PageState>eq(null));
     assertThat(result).containsExactlyElementsIn(expected);
     // Verify the state of the cache.
     assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expected);
@@ -211,8 +215,13 @@ public class PerformanceCachingGoogleCloudStorageTest {
     assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expectedAllCachedItems);
 
     verify(gcsDelegate).listBucketInfo();
-    verify(gcsDelegate).listObjectInfo(eq(BUCKET_A), eq(null), eq(null),
-           eq(MAX_RESULTS_UNLIMITED), Matchers.<PageState>eq(null));
+    verify(gcsDelegate)
+        .listObjectInfo(
+            eq(BUCKET_A),
+            eq(null),
+            eq(null),
+            eq(MAX_RESULTS_UNLIMITED),
+            Matchers.<PageState>eq(null));
   }
 
   @Test
@@ -229,8 +238,12 @@ public class PerformanceCachingGoogleCloudStorageTest {
 
     // Verify the delegate call.
     verify(gcsDelegate)
-        .listObjectInfo(eq(BUCKET_A), eq(PREFIX_A), eq(null), eq(MAX_RESULTS_UNLIMITED),
-                        Matchers.<PageState>eq(null));
+        .listObjectInfo(
+            eq(BUCKET_A),
+            eq(PREFIX_A),
+            eq(null),
+            eq(MAX_RESULTS_UNLIMITED),
+            Matchers.<PageState>eq(null));
 
     // Verify the result.
     assertThat(result).containsExactlyElementsIn(expectedResult);
@@ -256,8 +269,12 @@ public class PerformanceCachingGoogleCloudStorageTest {
 
     // Verify the delegate call.
     verify(gcsDelegate)
-        .listObjectInfo(eq(BUCKET_A), eq(prefixADir), eq(null),
-                eq(MAX_RESULTS_UNLIMITED), Matchers.<GoogleCloudStorage.PageState>eq(null));
+        .listObjectInfo(
+            eq(BUCKET_A),
+            eq(prefixADir),
+            eq(null),
+            eq(MAX_RESULTS_UNLIMITED),
+            Matchers.<GoogleCloudStorage.PageState>eq(null));
 
     // Verify the result.
     assertThat(result).containsExactlyElementsIn(expectedResult);
@@ -274,9 +291,12 @@ public class PerformanceCachingGoogleCloudStorageTest {
 
     // Verify the delegate call.
     verify(gcsDelegate)
-        .listObjectInfo(eq(BUCKET_B), Matchers.<String>eq(null), Matchers.<String>eq(null),
-                eq(GoogleCloudStorage.MAX_RESULTS_UNLIMITED),
-                Matchers.<GoogleCloudStorage.PageState>eq(null));
+        .listObjectInfo(
+            eq(BUCKET_B),
+            Matchers.<String>eq(null),
+            Matchers.<String>eq(null),
+            eq(GoogleCloudStorage.MAX_RESULTS_UNLIMITED),
+            Matchers.<GoogleCloudStorage.PageState>eq(null));
     assertThat(result).containsExactlyElementsIn(expected);
     // Verify the state of the cache.
     assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expected);
@@ -294,9 +314,12 @@ public class PerformanceCachingGoogleCloudStorageTest {
 
     // Verify the delegate call once.
     verify(gcsDelegate)
-        .listObjectInfo(eq(BUCKET_A), Matchers.<String>eq(null), Matchers.<String>eq(null),
-                eq(GoogleCloudStorage.MAX_RESULTS_UNLIMITED),
-                Matchers.<GoogleCloudStorage.PageState>eq(null));
+        .listObjectInfo(
+            eq(BUCKET_A),
+            Matchers.<String>eq(null),
+            Matchers.<String>eq(null),
+            eq(GoogleCloudStorage.MAX_RESULTS_UNLIMITED),
+            Matchers.<GoogleCloudStorage.PageState>eq(null));
     assertThat(result).containsExactlyElementsIn(expected);
     // Verify the state of the cache.
     assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expected);
