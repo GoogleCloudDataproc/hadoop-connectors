@@ -296,8 +296,9 @@ public class CredentialFactory {
       throws IOException {
     logger.atFine().log("getServiceAccountCredentialFromHadoopConfiguration(%s)", clientEmail);
     if (clientEmail == null || privateKeyPem == null || privateKeyId == null) {
-      throw new IOException("Error reading service account credential from stream, "
-          + "expecting, 'client_email', 'private_key' and 'private_key_id'.");
+      throw new IOException(
+          "Error reading service account credential from stream, "
+              + "expecting, 'client_email', 'private_key' and 'private_key_id'.");
     }
     PrivateKey privateKey = privateKeyFromPkcs8(privateKeyPem);
     GoogleCredential.Builder builder =
@@ -458,6 +459,5 @@ public class CredentialFactory {
     } catch (NoSuchAlgorithmException | InvalidKeySpecException exception) {
       throw new IOException("Unexpected expcetion reading PKCS data", exception);
     }
-
   }
 }
