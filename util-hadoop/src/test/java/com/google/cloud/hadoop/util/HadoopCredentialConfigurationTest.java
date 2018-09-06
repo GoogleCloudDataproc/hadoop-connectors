@@ -154,23 +154,22 @@ public class HadoopCredentialConfigurationTest {
 
     credentialConfiguration.setServiceAccountClientEmail("anEmail");
     conf = credentialConfiguration.getConf();
-    writtenValue = getConfigurationKey(
-        conf,
-        HadoopCredentialConfiguration.SERVICE_ACCOUNT_CLIENT_EMAIL_SUFFIX);
+    writtenValue =
+        getConfigurationKey(
+            conf, HadoopCredentialConfiguration.SERVICE_ACCOUNT_CLIENT_EMAIL_SUFFIX);
     assertThat(writtenValue).isEqualTo("anEmail");
 
     credentialConfiguration.setServiceAccountPrivateKeyId("aPrivateKeyId");
     conf = credentialConfiguration.getConf();
-    writtenValue = getConfigurationKey(
-        conf,
-        HadoopCredentialConfiguration.SERVICE_ACCOUNT_PRIVATE_KEY_ID_SUFFIX);
+    writtenValue =
+        getConfigurationKey(
+            conf, HadoopCredentialConfiguration.SERVICE_ACCOUNT_PRIVATE_KEY_ID_SUFFIX);
     assertThat(writtenValue).isEqualTo("aPrivateKeyId");
 
     credentialConfiguration.setServiceAccountPrivateKey("aPrivateKey");
     conf = credentialConfiguration.getConf();
-    writtenValue = getConfigurationKey(
-        conf,
-        HadoopCredentialConfiguration.SERVICE_ACCOUNT_PRIVATE_KEY_SUFFIX);
+    writtenValue =
+        getConfigurationKey(conf, HadoopCredentialConfiguration.SERVICE_ACCOUNT_PRIVATE_KEY_SUFFIX);
     assertThat(writtenValue).isEqualTo("aPrivateKey");
 
     credentialConfiguration.setClientSecret("clientSecret");
