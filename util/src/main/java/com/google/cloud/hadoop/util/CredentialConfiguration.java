@@ -105,7 +105,7 @@ public class CredentialConfiguration {
             getTransport());
       }
 
-      if (isNullOrEmpty(serviceAccountJsonKeyFile)) {
+      if (!isNullOrEmpty(serviceAccountJsonKeyFile)) {
         logger.atFine().log("Using JSON keyfile %s", serviceAccountJsonKeyFile);
         Preconditions.checkArgument(
             isNullOrEmpty(serviceAccountKeyFile),
@@ -287,6 +287,7 @@ public class CredentialConfiguration {
         + ("serviceAccountClientEmail: " + getServiceAccountClientEmail() + '\n')
         + ("serviceAccountEmail: " + getServiceAccountEmail() + '\n')
         + ("serviceAccountKeyfile: " + getServiceAccountKeyFile() + '\n')
+        + ("serviceAccountJsonKeyFile: " + getServiceAccountJsonKeyFile() + '\n')
         + ("clientId: " + getClientId() + '\n')
         + ("clientSecret: "
             + (isNullOrEmpty(getClientSecret()) ? "Not provided" : "Provided, but not displayed")
