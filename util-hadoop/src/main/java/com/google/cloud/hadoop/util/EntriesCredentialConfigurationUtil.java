@@ -16,7 +16,6 @@ package com.google.cloud.hadoop.testing;
 
 import com.google.cloud.hadoop.util.EntriesCredentialConfiguration;
 import com.google.cloud.hadoop.util.EntriesCredentialConfiguration.Entries;
-
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
