@@ -1382,7 +1382,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // TODO(user): Maybe de-dupe if it's possible for GCS to return duplicates.
     List<String> objectNames = new ArrayList<>(pageState.getPrefixes().size());
     objectNames.addAll(pageState.getPrefixes());
-    ;
     for (StorageObject obj : pageState.getListedObjects()) {
       objectNames.add(obj.getName());
     }
