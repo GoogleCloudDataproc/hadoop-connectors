@@ -358,7 +358,7 @@ public class GoogleCloudStorageFileSystem {
     if (fileInfo.isDirectory()) {
       itemsToDelete =
           recursive
-              ? listAllFileInfoForPrefix(fileInfo.getPath(), null)
+              ? listAllFileInfoForPrefix(fileInfo.getPath())
               : listFileInfo(fileInfo.getPath(), /* enableAutoRepair= */ false);
       if (!itemsToDelete.isEmpty() && !recursive) {
         throw new DirectoryNotEmptyException("Cannot delete a non-empty directory.");
@@ -804,7 +804,7 @@ public class GoogleCloudStorageFileSystem {
 
     // List of individual paths to rename;
     // we will try to carry out the copies in this list's order.
-    List<FileInfo> srcItemInfos = listAllFileInfoForPrefix(srcInfo.getPath(), null);
+    List<FileInfo> srcItemInfos = listAllFileInfoForPrefix(srcInfo.getPath());
 
     // Create the destination directory.
     dst = FileInfo.convertToDirectoryPath(pathCodec, dst);
@@ -1038,6 +1038,21 @@ public class GoogleCloudStorageFileSystem {
    * however; we can only list prefixes of *objects*, not buckets.
    *
    * @param prefix the prefix to use to list all matching objects.
+   */
+  public List<FileInfo> listAllFileInfoForPrefix(URI prefix)
+      throws IOException {
+    return listAllFileInfoForPrefix(prefix, null);
+  }
+
+  /**
+   * Equivalent to a recursive listing of {@code prefix}, except that {@code prefix} doesn't have to
+   * represent an actual object but can just be a partial prefix string, and there is no auto-repair
+   * of implicit directories since we can't detect implicit directories without listing by
+   * 'delimiter'. The 'authority' component of the {@code prefix} *must* be the complete authority,
+   * however; we can only list prefixes of *objects*, not buckets.
+   *
+   * @param prefix the prefix to use to list all matching objects.
+   * @param pageState the page state maintained across paginations
    */
   public List<FileInfo> listAllFileInfoForPrefix(URI prefix, PageState pageState)
       throws IOException {
