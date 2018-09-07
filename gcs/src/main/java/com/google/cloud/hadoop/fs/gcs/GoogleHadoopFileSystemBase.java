@@ -1109,8 +1109,7 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
         List<FileInfo> fileInfoPart = gcsfs.listAllFileInfoForPrefix(prefixUri, pageState);
         for (FileInfo fileInfo : fileInfoPart) {
           path = getHadoopPath(fileInfo.getPath());
-          if (pattern.matches(path.getName()) &&
-          filter.accept(path)) fileInfos.add(fileInfo);
+          if (pattern.matches(path.getName()) && filter.accept(path)) fileInfos.add(fileInfo);
         }
       } while (pageState.getNextPageToken() != null);
       fileInfos.sort(gcsfs.FILE_INFO_PATH_COMPARATOR);

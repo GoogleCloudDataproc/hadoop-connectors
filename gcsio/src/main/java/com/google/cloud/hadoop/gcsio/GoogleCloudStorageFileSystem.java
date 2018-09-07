@@ -1039,8 +1039,7 @@ public class GoogleCloudStorageFileSystem {
    *
    * @param prefix the prefix to use to list all matching objects.
    */
-  public List<FileInfo> listAllFileInfoForPrefix(URI prefix)
-      throws IOException {
+  public List<FileInfo> listAllFileInfoForPrefix(URI prefix) throws IOException {
     return listAllFileInfoForPrefix(prefix, null);
   }
 
