@@ -1103,11 +1103,14 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
       logger.atFine().log("Listing everything with prefix '%s'", prefixUri);
       PageState pageState = new PageState(true);
       List<FileInfo> fileInfos = new ArrayList();
-      GlobFilter globFilter = new GlobFilter(pathString, filter);
+      GlobPattern pattern = new GlobPattern(pathString);
+      Path path;
       do {
         List<FileInfo> fileInfoPart = gcsfs.listAllFileInfoForPrefix(prefixUri, pageState);
         for (FileInfo fileInfo : fileInfoPart) {
-          if (globFilter.accept(getHadoopPath(fileInfo.getPath()))) fileInfos.add(fileInfo);
+          path = getHadoopPath(fileInfo.getPath());
+          if (pattern.matches(path.getName()) &&
+          filter.accept(path)) fileInfos.add(fileInfo);
         }
       } while (pageState.getNextPageToken() != null);
       fileInfos.sort(gcsfs.FILE_INFO_PATH_COMPARATOR);
