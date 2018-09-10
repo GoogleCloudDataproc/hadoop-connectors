@@ -14,6 +14,8 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 import com.google.api.client.util.Clock;
 import com.google.common.base.Function;
 import com.google.common.collect.Lists;
@@ -234,7 +236,23 @@ public class LaggedGoogleCloudStorage implements GoogleCloudStorage  {
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
       String bucketName, String objectNamePrefix, String delimiter, long maxResults)
       throws IOException {
-    return listObjectInfo(bucketName, objectNamePrefix, delimiter, maxResults, null);
+    // We don't know how many items will be trimmed by listVisibilityCalculator,
+    // so we can't limit the number of items returned by our delegate.
+    List<GoogleCloudStorageItemInfo> delegatedObjects =
+        delegate.listObjectInfo(
+            bucketName, objectNamePrefix, delimiter, GoogleCloudStorage.MAX_RESULTS_UNLIMITED);
+
+    List<GoogleCloudStorageItemInfo> result = new ArrayList<>();
+
+    for (GoogleCloudStorageItemInfo info : delegatedObjects) {
+      if (listVisibilityCalculator.isObjectVisible(clock, info)) {
+        result.add(info);
+        if (maxResults > 0 && result.size() >= maxResults) {
+          break;
+        }
+      }
+    }
+    return result;
   }
 
   @Override
@@ -259,7 +277,7 @@ public class LaggedGoogleCloudStorage implements GoogleCloudStorage  {
       throws IOException {
     // We don't know how many items will be trimmed by listVisibilityCalculator,
     // so we can't limit the number of items returned by our delegate.
-    if (pageState == null) pageState = new PageState(false);
+    checkArgument(pageState != null, "pageState must not be null");
     long prevSize = pageState.getFetchedSize();
     List<GoogleCloudStorageItemInfo> delegatedObjects =
         delegate.listObjectInfo(

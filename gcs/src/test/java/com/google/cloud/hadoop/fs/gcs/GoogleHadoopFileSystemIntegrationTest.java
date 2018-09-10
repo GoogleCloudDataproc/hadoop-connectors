@@ -519,7 +519,7 @@ public class GoogleHadoopFileSystemIntegrationTest
     createFile(fakeGhFs, new Path("/directory1/subdirectory1/file2"), data);
     createFile(fakeGhFs, new Path("/directory1/subdirectory2/file1"), data);
     createFile(fakeGhFs, new Path("/directory1/subdirectory2/file2"), data);
-    GoogleCloudStorage.PageState pageState = new GoogleCloudStorage.PageState(true);
+    GoogleCloudStorage.PageState pageState = new GoogleCloudStorage.PageState();
     String bucket = fakeGhFs.getRootBucketName();
     URI prefix = new Path("gs://" + bucket + "/directory1").toUri();
     int pageCount = 0;

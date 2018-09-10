@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.StorageObject;
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
@@ -437,9 +438,9 @@ public interface GoogleCloudStorage {
   // Holder of pagination states if pagination is enabled;
   class PageState {
     //
-    private boolean pagination;
     private long fetchedSize = 0;
     private String nextPageToken = null;
+    private Storage.Objects.List listObject = null;
     /** prefixes holds prefixes across pages */
     private Set<String> prefixes = new LinkedHashSet<>();
     /**
@@ -447,10 +448,6 @@ public interface GoogleCloudStorage {
      * to call {@link #clear()} to reset this list before fetch the next page.
      */
     private List<StorageObject> listedObjects = new ArrayList<>();
-
-    public PageState(boolean pagination) {
-      this.pagination = pagination;
-    }
 
     /**
      * sets up the states for next page processing
@@ -482,13 +479,12 @@ public interface GoogleCloudStorage {
       return listedObjects;
     }
 
-    public boolean isPagination() {
-      return pagination;
+    public void setListObject(Storage.Objects.List listObject) {
+      this.listObject = listObject;
     }
 
-    public void disablePagination() {
-      pagination = false;
-      nextPageToken = null;
+    public Storage.Objects.List getListObject() {
+      return listObject;
     }
 
     /**

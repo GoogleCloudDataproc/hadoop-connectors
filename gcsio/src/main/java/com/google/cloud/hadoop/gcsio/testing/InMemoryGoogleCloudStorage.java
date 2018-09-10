@@ -423,7 +423,40 @@ public class InMemoryGoogleCloudStorage
       final String bucketName, String objectNamePrefix, String delimiter,
       long maxResults)
       throws IOException {
-    return listObjectInfo(bucketName, objectNamePrefix, delimiter, maxResults, null);
+    // Since we're just in memory, we can do the naive implementation of just listing names and
+    // then calling getItemInfo for each.
+    List<String> listedNames =
+        listObjectNames(
+            bucketName, objectNamePrefix, delimiter, GoogleCloudStorage.MAX_RESULTS_UNLIMITED);
+    List<GoogleCloudStorageItemInfo> listedInfo = new ArrayList<>();
+    for (String objectName : listedNames) {
+      GoogleCloudStorageItemInfo itemInfo =
+          getItemInfo(new StorageResourceId(bucketName, objectName));
+      if (itemInfo.exists()) {
+        listedInfo.add(itemInfo);
+      } else if (itemInfo.getResourceId().isStorageObject()
+          && storageOptions.isAutoRepairImplicitDirectoriesEnabled()) {
+        create(itemInfo.getResourceId()).close();
+        GoogleCloudStorageItemInfo newInfo = getItemInfo(itemInfo.getResourceId());
+        if (newInfo.exists()) {
+          listedInfo.add(newInfo);
+        } else if (storageOptions.isInferImplicitDirectoriesEnabled()) {
+          // If we fail to do the repair, but inferImplicit is enabled,
+          // then we silently add the implicit (as opposed to silently
+          // ignoring the failure, which is what we used to do).
+          listedInfo.add(
+              GoogleCloudStorageItemInfo.createInferredDirectory(itemInfo.getResourceId()));
+        }
+      } else if (itemInfo.getResourceId().isStorageObject()
+          && storageOptions.isInferImplicitDirectoriesEnabled()) {
+        listedInfo.add(
+            GoogleCloudStorageItemInfo.createInferredDirectory(itemInfo.getResourceId()));
+      }
+      if (maxResults > 0 && listedInfo.size() >= maxResults) {
+        break;
+      }
+    }
+    return listedInfo;
   }
 
   @Override
@@ -447,10 +480,12 @@ public class InMemoryGoogleCloudStorage
       PageState pageState)
       throws IOException {
     // Disable pagination for unlimited page size
-    if (pageState != null && pageSize <= 0) pageState.disablePagination();
+    if (pageState == null || pageSize <= 0) {
+      if (pageState != null) pageState.setNext(null);
+      return listObjectInfo(bucketName, objectNamePrefix, delimiter, maxResults);
+    }
     List<GoogleCloudStorageItemInfo> listedInfo = new ArrayList<>();
-    boolean pagination = (pageState != null && pageState.isPagination());
-    boolean contPage = (pagination && pageState.getNextPageToken() != null);
+    boolean contPage = (pageState.getNextPageToken() != null);
     if (!contPage) {
       // Since we're just in memory, we can do the naive implementation of just listing names and
       // then calling getItemInfo for each.
@@ -492,17 +527,17 @@ public class InMemoryGoogleCloudStorage
           pageState.setNext(null);
         }
         break;
-      } else if (pagination && listedInfo.size() >= pageSize) {
+      } else if (listedInfo.size() >= pageSize) {
         // set up next page
         pageState.setNext(NextPageToken);
         break;
       }
     }
-    if (pagination && it != null && !it.hasNext()) {
+    if (it != null && !it.hasNext()) {
       totalSize = 0;
       pageState.setNext(null);
     }
-    if (pagination && pageState.getNextPageToken() != null) totalSize += listedInfo.size();
+    if (pageState.getNextPageToken() != null) totalSize += listedInfo.size();
     return listedInfo;
   }
 

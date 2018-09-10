@@ -1101,7 +1101,7 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
 
       // Get everything matching the non-glob prefix.
       logger.atFine().log("Listing everything with prefix '%s'", prefixUri);
-      PageState pageState = new PageState(true);
+      PageState pageState = new PageState();
       List<FileInfo> fileInfos = new ArrayList();
       GlobPattern pattern = new GlobPattern(pathString);
       Path path;

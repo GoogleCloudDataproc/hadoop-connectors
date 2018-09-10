@@ -126,8 +126,29 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
       String bucketName, String objectNamePrefix, String delimiter, long maxResults)
       throws IOException {
+    List<GoogleCloudStorageItemInfo> result;
 
-    return this.listObjectInfo(bucketName, objectNamePrefix, delimiter, maxResults, null);
+    if (options.isListCachingEnabled()) {
+      result = cache.getList(bucketName, objectNamePrefix);
+
+      if (result == null) {
+        result = super.listObjectInfo(bucketName, objectNamePrefix, null);
+        cache.putList(bucketName, objectNamePrefix, result);
+      }
+
+      filter(result, bucketName, objectNamePrefix, delimiter);
+
+      if (maxResults > 0 && result.size() > maxResults) {
+        result = result.subList(0, (int) maxResults);
+      }
+    } else {
+      result = super.listObjectInfo(bucketName, objectNamePrefix, delimiter, maxResults);
+      for (GoogleCloudStorageItemInfo item : result) {
+        cache.putItem(item);
+      }
+    }
+
+    return result;
   }
 
   @Override
@@ -155,30 +176,7 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
     List<GoogleCloudStorageItemInfo> result;
 
     // For now pagination is not supported for this storage
-    if (pageState != null) pageState.disablePagination();
-
-    if (options.isListCachingEnabled()) {
-      result = cache.getList(bucketName, objectNamePrefix);
-
-      if (result == null) {
-        result = super.listObjectInfo(bucketName, objectNamePrefix, null, pageState);
-        cache.putList(bucketName, objectNamePrefix, result);
-      }
-
-      filter(result, bucketName, objectNamePrefix, delimiter);
-
-
-      if (maxResults > 0 && result.size() > maxResults) {
-        result = result.subList(0, (int) maxResults);
-      }
-    } else {
-      result = super.listObjectInfo(bucketName, objectNamePrefix, delimiter, maxResults, pageState);
-      for (GoogleCloudStorageItemInfo item : result) {
-        cache.putItem(item);
-      }
-    }
-
-    return result;
+    return listObjectInfo(bucketName, objectNamePrefix, delimiter, maxResults);
   }
 
   /**
