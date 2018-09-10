@@ -1290,11 +1290,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         "Page state is in bad state");
 
     if (getMaxRemainingResults(maxResults, prefixes.size() + fetchedSize) <= 0) {
+      // size limitation reached: discontinue any further fetch attempts
       pageState.setNext(null);
       return;
     }
 
     if (listObject == null) {
+      // This is the initial call so we need to set up the request
       listObject = configureRequest(gcs.objects().list(bucketName), bucketName);
       configureFetchrequest(
           listObject, delimiter, includeTrailingDelimiter, maxResults, objectNamePrefix);
@@ -1523,8 +1525,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         listedObjects,
         listedPrefixes);
 
-    List<GoogleCloudStorageItemInfo> objectInfos = processItemInfoList1(bucketName, listedObjects);
-    processItemInfoList2(bucketName, listedPrefixes, objectInfos);
+    List<GoogleCloudStorageItemInfo> objectInfos = processItemInfo(bucketName, listedObjects);
+    processItemInfoFinal(bucketName, listedPrefixes, objectInfos);
     return objectInfos;
   }
 
@@ -1555,18 +1557,26 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // For the listedObjects, we simply parse each item into a GoogleCloudStorageItemInfo without
     // further work.
     List<StorageObject> listedObjects = pageState.getListedObjects();
-    List<GoogleCloudStorageItemInfo> objectInfos = processItemInfoList1(bucketName, listedObjects);
+    List<GoogleCloudStorageItemInfo> objectInfos = processItemInfo(bucketName, listedObjects);
     if (pageState.getNextPageToken() == null) {
+      // All pages have been processed for StorageObjects; now process left-over prefixes
       Set<String> prefixes = pageState.getPrefixes();
       List<String> listedPrefixes = new ArrayList<>(prefixes.size());
       listedPrefixes.addAll(prefixes);
-      processItemInfoList2(bucketName, listedPrefixes, objectInfos);
+      processItemInfoFinal(bucketName, listedPrefixes, objectInfos);
     }
     pageState.clear();
     return objectInfos;
   }
 
-  public List<GoogleCloudStorageItemInfo> processItemInfoList1(
+  /**
+   * Helper to process object info either per fetched page or after all pages are fetched
+   *
+   * @param bucketName bucket name
+   * @param listedObjects Accumulated StorageObject list to be processed
+   * @return
+   */
+  public List<GoogleCloudStorageItemInfo> processItemInfo(
       String bucketName, List<StorageObject> listedObjects) {
     // For the listedObjects, we simply parse each item into a GoogleCloudStorageItemInfo without
     // further work.
@@ -1578,7 +1588,17 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     return objectInfos;
   }
 
-  public void processItemInfoList2(
+  /**
+   * Helper to process prefixes that have not been added in the StorageObjects after all pages have
+   * been processed either in a single call to {@link this#processItemInfo} for all-page processing
+   * or many calls to {@link this#processItemInfo} for paged processing
+   *
+   * @param bucketName bucket name
+   * @param listedPrefixes the prefixes to be processed
+   * @param objectInfos In/Out The object item info list to be accumulated on
+   * @throws IOException
+   */
+  public void processItemInfoFinal(
       String bucketName, List<String> listedPrefixes, List<GoogleCloudStorageItemInfo> objectInfos)
       throws IOException {
     if (listedPrefixes.isEmpty()) {
