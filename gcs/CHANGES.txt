@@ -1,5 +1,13 @@
 1.6.10 - 2018-XX-XX
 
+  1. Add an option to specify max bytes rewritten per rewrite request when
+     `fs.gs.copy.with.rewrite.enable` is set to `true`:
+
+       fs.gs.rewrite.max.bytes.per.call (default: 536870912)
+
+     Even though GCS does not require this parameter for rewrite requests,
+     rewrite requests are flaky without it.
+
 
 1.6.9 - 2018-09-04
 

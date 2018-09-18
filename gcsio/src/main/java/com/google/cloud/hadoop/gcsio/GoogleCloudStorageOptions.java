@@ -72,6 +72,9 @@ public class GoogleCloudStorageOptions {
   /** Default setting for whether or not to use rewrite request for copy operation. */
   public static final boolean COPY_WITH_REWRITE_DEFAULT = false;
 
+  /** Default setting for max number of bytes rewritten per rewrite request/call. */
+  public static final long MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT = 512 * 1024 * 1024L;
+
   /** Default setting for maximum number of requests per GCS batch for copy operations. */
   public static final long COPY_MAX_REQUESTS_PER_BATCH_DEFAULT = MAX_REQUESTS_PER_BATCH_DEFAULT;
 
@@ -110,6 +113,7 @@ public class GoogleCloudStorageOptions {
     private RequesterPaysOptions requesterPaysOptions = DEFAULT_REQUESTER_PAYS_OPTIONS;
 
     private boolean copyWithRewriteEnabled = COPY_WITH_REWRITE_DEFAULT;
+    private long maxBytesRewrittenPerCall = MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT;
     private long copyMaxRequestsPerBatch = COPY_MAX_REQUESTS_PER_BATCH_DEFAULT;
     private int copyBatchThreads = COPY_BATCH_THREADS_DEFAULT;
 
@@ -210,6 +214,11 @@ public class GoogleCloudStorageOptions {
       return this;
     }
 
+    public Builder setMaxBytesRewrittenPerCall(long maxBytesRewrittenPerCall) {
+      this.maxBytesRewrittenPerCall = maxBytesRewrittenPerCall;
+      return this;
+    }
+
     public Builder setCopyMaxRequestsPerBatch(long copyMaxRequestsPerBatch) {
       this.copyMaxRequestsPerBatch = copyMaxRequestsPerBatch;
       return this;
@@ -247,6 +256,7 @@ public class GoogleCloudStorageOptions {
   private final int maxWaitMillisForEmptyObjectCreation;
   private final RequesterPaysOptions requesterPaysOptions;
   private final boolean copyWithRewriteEnabled;
+  private final long maxBytesRewrittenPerCall;
   private final long copyMaxRequestsPerBatch;
   private final int copyBatchThreads;
 
@@ -270,6 +280,7 @@ public class GoogleCloudStorageOptions {
     this.requesterPaysOptions =
         checkNotNull(builder.requesterPaysOptions, "requesterPaysOptions could not be null");
     this.copyWithRewriteEnabled = builder.copyWithRewriteEnabled;
+    this.maxBytesRewrittenPerCall = builder.maxBytesRewrittenPerCall;
     this.copyMaxRequestsPerBatch = builder.copyMaxRequestsPerBatch;
     this.copyBatchThreads = builder.copyBatchThreads;
   }
@@ -375,6 +386,10 @@ public class GoogleCloudStorageOptions {
     return copyWithRewriteEnabled;
   }
 
+  public long getMaxBytesRewrittenPerCall() {
+    return maxBytesRewrittenPerCall;
+  }
+
   public long getCopyMaxRequestsPerBatch() {
     return copyMaxRequestsPerBatch;
   }
@@ -385,5 +400,9 @@ public class GoogleCloudStorageOptions {
 
   public void throwIfNotValid() {
     checkArgument(!isNullOrEmpty(appName), "appName must not be null or empty");
+    checkArgument(
+        maxBytesRewrittenPerCall <= 0 || maxBytesRewrittenPerCall % (1024 * 1024) == 0,
+        "maxBytesRewrittenPerCall must be an integral multiple of 1 MiB (1048576), but was: %s",
+        maxBytesRewrittenPerCall);
   }
 }

@@ -480,6 +480,12 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
   /** Default value for {@link GoogleHadoopFileSystemBase#GCS_ENABLE_COPY_WITH_REWRITE_KEY}. */
   public static final boolean GCS_ENABLE_COPY_WITH_REWRITE_DEFAULT = true;
 
+  /** Configuration key for number of bytes rewritten per rewrite request/call. */
+  public static final String GCS_REWRITE_MAX_BYTES_PER_CALL = "fs.gs.rewrite.max.bytes.per.call";
+
+  /** Default value for {@link #GCS_REWRITE_MAX_BYTES_PER_CALL}. */
+  public static final long GCS_REWRITE_MAX_BYTES_PER_CALL_DEFAULT = 512 * 1024 * 1024L;
+
   /** Configuration key for a max number of GCS RPCs in batch request for copy operations. */
   public static final String GCS_COPY_MAX_REQUESTS_PER_BATCH = "fs.gs.copy.max.requests.per.batch";
 
@@ -2347,6 +2353,11 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
         config.getBoolean(GCS_ENABLE_COPY_WITH_REWRITE_KEY, GCS_ENABLE_COPY_WITH_REWRITE_DEFAULT);
     LOG.debug("{} = {}", GCS_ENABLE_COPY_WITH_REWRITE_KEY, enableCopyWithRewrite);
     optionsBuilder.getCloudStorageOptionsBuilder().setCopyWithRewriteEnabled(enableCopyWithRewrite);
+
+    long maxBytesRewrittenPerCall =
+        config.getLong(GCS_REWRITE_MAX_BYTES_PER_CALL, GCS_REWRITE_MAX_BYTES_PER_CALL_DEFAULT);
+    LOG.debug("{} = {}", GCS_REWRITE_MAX_BYTES_PER_CALL, maxBytesRewrittenPerCall);
+    optionsBuilder.getCloudStorageOptionsBuilder().setMaxBytesRewrittenPerCall(maxBytesRewrittenPerCall);
 
     long copyMaxRequestsPerBatch =
         config.getLong(GCS_COPY_MAX_REQUESTS_PER_BATCH, GCS_COPY_MAX_REQUESTS_PER_BATCH_DEFAULT);
