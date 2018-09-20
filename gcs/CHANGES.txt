@@ -1,3 +1,6 @@
+1.6.10 - 2018-XX-XX
+
+
 1.6.9 - 2018-09-04
 
   1. Change default values for GCS batch/directory operations properties to
