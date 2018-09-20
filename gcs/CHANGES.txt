@@ -1,4 +1,4 @@
-1.6.10 - 2018-XX-XX
+1.6.10 - 2018-09-20
 
   1. Add an option to specify max bytes rewritten per rewrite request when
      `fs.gs.copy.with.rewrite.enable` is set to `true`:
