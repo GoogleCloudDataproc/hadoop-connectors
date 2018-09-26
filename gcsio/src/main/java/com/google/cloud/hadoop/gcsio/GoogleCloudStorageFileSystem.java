@@ -22,7 +22,7 @@ import static java.util.stream.Collectors.toCollection;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.util.Clock;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PageState;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.TimestampUpdatePredicate;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
@@ -105,7 +105,8 @@ public class GoogleCloudStorageFileSystem {
       };
 
   // Comparator used for sorting a collection of FileInfo items based on path comparison.
-  public static final Comparator<FileInfo> FILE_INFO_PATH_COMPARATOR =
+  @VisibleForTesting
+  static final Comparator<FileInfo> FILE_INFO_PATH_COMPARATOR =
       new Comparator<FileInfo>() {
         @Override
         public int compare(FileInfo file1, FileInfo file2) {
@@ -1034,13 +1035,17 @@ public class GoogleCloudStorageFileSystem {
    * Equivalent to a recursive listing of {@code prefix}, except that {@code prefix} doesn't have to
    * represent an actual object but can just be a partial prefix string, and there is no auto-repair
    * of implicit directories since we can't detect implicit directories without listing by
-   * 'delimiter'. The 'authority' component of the {@code prefix} *must* be the complete authority,
-   * however; we can only list prefixes of *objects*, not buckets.
+   * 'delimiter'. The 'authority' component of the {@code prefix} <b>must</b> be the complete
+   * authority, however; we can only list prefixes of <b>objects</b>, not buckets.
    *
    * @param prefix the prefix to use to list all matching objects.
    */
   public List<FileInfo> listAllFileInfoForPrefix(URI prefix) throws IOException {
-    return listAllFileInfoForPrefix(prefix, null);
+    StorageResourceId prefixId = getPrefixId(prefix);
+    List<GoogleCloudStorageItemInfo> itemInfos =
+        gcs.listObjectInfo(
+            prefixId.getBucketName(), prefixId.getObjectName(), /* delimiter= */ null);
+    return FileInfo.fromItemInfos(pathCodec, itemInfos);
   }
 
   /**
@@ -1051,25 +1056,27 @@ public class GoogleCloudStorageFileSystem {
    * however; we can only list prefixes of *objects*, not buckets.
    *
    * @param prefix the prefix to use to list all matching objects.
-   * @param pageState the page state maintained across paginations
+   * @param pageToken the page state maintained across paginations
    */
-  public List<FileInfo> listAllFileInfoForPrefix(URI prefix, PageState pageState)
+  public ListPage<FileInfo> listAllFileInfoForPrefixPage(URI prefix, String pageToken)
       throws IOException {
+    StorageResourceId prefixId = getPrefixId(prefix);
+    ListPage<GoogleCloudStorageItemInfo> itemInfosPage =
+        gcs.listObjectInfoPage(
+            prefixId.getBucketName(), prefixId.getObjectName(), /* delimiter= */ null, pageToken);
+    List<FileInfo> fileInfosPage = FileInfo.fromItemInfos(pathCodec, itemInfosPage.getItems());
+    return new ListPage<>(fileInfosPage, itemInfosPage.getNextPageToken());
+  }
+
+  private StorageResourceId getPrefixId(URI prefix) {
     logger.atFine().log("listAllFileInfoForPrefix(%s)", prefix);
     Preconditions.checkNotNull(prefix, "prefix could not be null");
 
     StorageResourceId prefixId = pathCodec.validatePathAndGetId(prefix, true);
     Preconditions.checkArgument(
         !prefixId.isRoot(), "prefix must not be global root, got '%s'", prefix);
-    // Use 'null' for delimiter to get full 'recursive' listing.
-    List<GoogleCloudStorageItemInfo> itemInfos =
-        pageState == null
-            ? gcs.listObjectInfo(
-                prefixId.getBucketName(), prefixId.getObjectName(), /* delimiter= */ null)
-            : gcs.listObjectInfo(
-                prefixId.getBucketName(), prefixId.getObjectName(), null, pageState);
-    List<FileInfo> fileInfos = FileInfo.fromItemInfos(pathCodec, itemInfos);
-    return fileInfos;
+
+    return prefixId;
   }
 
   /**
