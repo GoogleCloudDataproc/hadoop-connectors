@@ -18,7 +18,11 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.assertThrows;
 
-import com.google.cloud.hadoop.gcsio.*;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.MethodOutcome;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -29,7 +33,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.*;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Before;
@@ -492,108 +499,9 @@ public class GoogleHadoopFileSystemIntegrationTest
   }
 
   public void createFile(Path filePath, byte[] data) throws IOException {
-    createFile(ghfs, filePath, data);
-  }
-
-  public void createFile(FileSystem fs, Path filePath, byte[] data) throws IOException {
-    try (FSDataOutputStream output = fs.create(filePath)) {
+    try (FSDataOutputStream output = ghfs.create(filePath)) {
       output.write(data);
     }
-  }
-
-  @Test
-  public void testPaginationOnPagedStorage() throws IOException {
-    InMemoryGoogleHadoopFileSystem fakeGhFs = new InMemoryGoogleHadoopFileSystem();
-    ((InMemoryGoogleCloudStorage) fakeGhFs.getGcsFs().getGcs()).setPageSize(2);
-    Path testRoot = new Path("/directory1/");
-    fakeGhFs.mkdirs(testRoot);
-    fakeGhFs.mkdirs(new Path("/directory1/subdirectory1"));
-    fakeGhFs.mkdirs(new Path("/directory1/subdirectory2"));
-
-    byte[] data = new byte[10];
-    for (int i = 0; i < data.length; i++) {
-      data[i] = (byte) i;
-    }
-
-    createFile(fakeGhFs, new Path("/directory1/subdirectory1/file1"), data);
-    createFile(fakeGhFs, new Path("/directory1/subdirectory1/file2"), data);
-    createFile(fakeGhFs, new Path("/directory1/subdirectory2/file1"), data);
-    createFile(fakeGhFs, new Path("/directory1/subdirectory2/file2"), data);
-    GoogleCloudStorage.PageState pageState = new GoogleCloudStorage.PageState();
-    String bucket = fakeGhFs.getRootBucketName();
-    URI prefix = new Path("gs://" + bucket + "/directory1").toUri();
-    int pageCount = 0;
-    do {
-      FileInfo[] fileInfoPart =
-          fakeGhFs.getGcsFs().listAllFileInfoForPrefix(prefix, pageState).toArray(new FileInfo[0]);
-      if (pageState.getNextPageToken() != null) assertThat(fileInfoPart).hasLength(2);
-      else assertThat(fileInfoPart).hasLength(1);
-      pageCount++;
-    } while (pageState.getNextPageToken() != null);
-    assertThat(pageCount).isEqualTo(4);
-    fakeGhFs.delete(testRoot, true);
-  }
-
-  @Test
-  public void testGlobStatusOnPagedStorage() throws IOException {
-    InMemoryGoogleHadoopFileSystem fakeGhFs = new InMemoryGoogleHadoopFileSystem();
-    ((InMemoryGoogleCloudStorage) fakeGhFs.getGcsFs().getGcs()).setPageSize(2);
-    Path testRoot = new Path("/directory1/");
-    fakeGhFs.mkdirs(testRoot);
-    fakeGhFs.mkdirs(new Path("/directory1/subdirectory1"));
-    fakeGhFs.mkdirs(new Path("/directory1/subdirectory2"));
-
-    byte[] data = new byte[10];
-    for (int i = 0; i < data.length; i++) {
-      data[i] = (byte) i;
-    }
-
-    createFile(fakeGhFs, new Path("/directory1/subdirectory1/file1"), data);
-    createFile(fakeGhFs, new Path("/directory1/subdirectory1/file2"), data);
-    createFile(fakeGhFs, new Path("/directory1/subdirectory2/file1"), data);
-    createFile(fakeGhFs, new Path("/directory1/subdirectory2/file2"), data);
-
-    FileStatus[] rootDirectories = fakeGhFs.globStatus(new Path("/d*"));
-    assertThat(rootDirectories).hasLength(1);
-    assertThat(rootDirectories[0].getPath().getName()).isEqualTo("directory1");
-
-    FileStatus[] subDirectories = fakeGhFs.globStatus(new Path("/directory1/s*"));
-    assertThat(subDirectories).hasLength(2);
-
-    FileStatus[] subDirectory1Files = fakeGhFs.globStatus(new Path("/directory1/subdirectory1/*"));
-    assertThat(subDirectory1Files).hasLength(2);
-    assertThat(subDirectory1Files[0].getPath().getName()).isEqualTo("file1");
-    assertThat(subDirectory1Files[1].getPath().getName()).isEqualTo("file2");
-
-    FileStatus[] subDirectory2Files = fakeGhFs.globStatus(new Path("/directory1/subdirectory2/f*"));
-    assertThat(subDirectory2Files).hasLength(2);
-    assertThat(subDirectory2Files[0].getPath().getName()).isEqualTo("file1");
-    assertThat(subDirectory2Files[1].getPath().getName()).isEqualTo("file2");
-
-    FileStatus[] subDirectory2Files2 =
-        fakeGhFs.globStatus(new Path("/directory1/subdirectory2/file?"));
-    assertThat(subDirectory2Files2).hasLength(2);
-    assertThat(subDirectory2Files2[0].getPath().getName()).isEqualTo("file1");
-    assertThat(subDirectory2Files2[1].getPath().getName()).isEqualTo("file2");
-
-    FileStatus[] subDirectory2Files3 =
-        fakeGhFs.globStatus(new Path("/directory1/subdirectory2/file[0-9]"));
-    assertThat(subDirectory2Files3).hasLength(2);
-    assertThat(subDirectory2Files3[0].getPath().getName()).isEqualTo("file1");
-    assertThat(subDirectory2Files3[1].getPath().getName()).isEqualTo("file2");
-
-    FileStatus[] subDirectory2Files4 =
-        fakeGhFs.globStatus(new Path("/directory1/subdirectory2/file[^1]"));
-    assertThat(subDirectory2Files4).hasLength(1);
-    assertThat(subDirectory2Files4[0].getPath().getName()).isEqualTo("file2");
-
-    FileStatus[] subDirectory2Files5 =
-        fakeGhFs.globStatus(new Path("/directory1/subdirectory2/file{1,2}"));
-    assertThat(subDirectory2Files5).hasLength(2);
-    assertThat(subDirectory2Files5[0].getPath().getName()).isEqualTo("file1");
-    assertThat(subDirectory2Files5[1].getPath().getName()).isEqualTo("file2");
-
-    fakeGhFs.delete(testRoot, true);
   }
 
   @Test
