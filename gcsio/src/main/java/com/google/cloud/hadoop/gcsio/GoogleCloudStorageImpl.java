@@ -1210,10 +1210,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       List<String> listedPrefixes)
       throws IOException {
     logger.atFine().log(
-        "listStorageObjectsAndPrefixes(%s, %s, %s, %s)",
-        bucketName, objectNamePrefix, delimiter, maxResults);
+        "listStorageObjectsAndPrefixes(%s, %s, %s, %s, %d)",
+        bucketName, objectNamePrefix, delimiter, includeTrailingDelimiter, maxResults);
 
-    checkArgument(!Strings.isNullOrEmpty(bucketName), "bucketName must not be null or empty");
     checkArgument(
         listedObjects != null && listedObjects.isEmpty(),
         "Must provide a non-null empty container for listedObjects.");
@@ -1221,189 +1220,115 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         listedPrefixes != null && listedPrefixes.isEmpty(),
         "Must provide a non-null empty container for listedPrefixes.");
 
-    Storage.Objects.List listObject = configureRequest(gcs.objects().list(bucketName), bucketName);
+    Storage.Objects.List listObject =
+        createListRequest(
+            bucketName, objectNamePrefix, delimiter, includeTrailingDelimiter, maxResults);
 
-    configureFetchrequest(
-        listObject, delimiter, includeTrailingDelimiter, maxResults, objectNamePrefix);
-
-    // Loop till we fetch all items.
     String pageToken = null;
-
-    // Deduplicate prefixes and items, because if 'includeTrailingDelimiter' set to true
-    // then returned items will contain "prefix objects" too.
-    Set<String> prefixes = new LinkedHashSet<>();
     do {
-      pageToken =
-          listStorageObjectsAndPrefixesInternal(
-              bucketName,
-              objectNamePrefix,
-              delimiter,
-              maxResults,
-              listedObjects,
-              prefixes,
-              listObject,
-              pageToken);
-    } while (pageToken != null
-        && getMaxRemainingResults(maxResults, (long) prefixes.size() + listedObjects.size()) > 0);
-
-    listedPrefixes.addAll(prefixes);
-  }
-
-  /**
-   * Helper for both listObjectNames and listObjectInfo that executes the actual API calls to get
-   * paginated lists, accumulating the StorageObjects and String prefixes into the params {@code
-   * listedObjects} and {@code listedPrefixes}.
-   *
-   * @param bucketName bucket name
-   * @param objectNamePrefix object name prefix or null if all objects in the bucket are desired
-   * @param delimiter delimiter to use (typically "/"), otherwise null
-   * @param includeTrailingDelimiter whether to include prefix objects into the {@code
-   *     listedObjects}
-   * @param maxResults maximum number of results to return (total of both {@code listedObjects} and
-   *     {@code listedPrefixes}), unlimited if negative or zero
-   * @param pageState if pagination enabled, holds stateful info across pages
-   */
-  private void listStorageObjectsAndPrefixes(
-      String bucketName,
-      String objectNamePrefix,
-      String delimiter,
-      boolean includeTrailingDelimiter,
-      long maxResults,
-      PageState pageState)
-      throws IOException {
-    logger.atFine().log(
-        "listStorageObjectsAndPrefixes(%s, %s, %s, %s, %s)",
-        bucketName, objectNamePrefix, delimiter, includeTrailingDelimiter, maxResults);
-    String pageToken = pageState.getNextPageToken();
-    long fetchedSize = pageState.getFetchedSize();
-    // Two output lists: prefixes is of global life;
-    // listedObjects is only of page scope
-    Set<String> prefixes = pageState.getPrefixes();
-    List<StorageObject> listedObjects = pageState.getListedObjects();
-    Storage.Objects.List listObject = pageState.getListObject();
-    checkArgument(!Strings.isNullOrEmpty(bucketName), "bucketName must not be null or empty");
-    checkArgument(
-        listedObjects.isEmpty() && prefixes.isEmpty(), "Pagination is disabled with a bad state");
-    checkArgument(
-        (fetchedSize == 0 && pageToken == null && listObject == null && prefixes.isEmpty())
-            || (pageToken != null && fetchedSize > 0 && listObject != null),
-        "Page state is in bad state");
-
-    if (getMaxRemainingResults(maxResults, prefixes.size() + fetchedSize) <= 0) {
-      // size limitation reached: discontinue any further fetch attempts
-      pageState.setNext(null);
-      return;
-    }
-
-    if (listObject == null) {
-      // This is the initial call so we need to set up the request
-      listObject = configureRequest(gcs.objects().list(bucketName), bucketName);
-      configureFetchrequest(
-          listObject, delimiter, includeTrailingDelimiter, maxResults, objectNamePrefix);
-      pageState.setListObject(listObject);
-    }
-
-    // Deduplicate prefixes and items, because if 'includeTrailingDelimiter' set to true
-    // then returned items will contain "prefix objects" too.
-    pageToken =
-        listStorageObjectsAndPrefixesInternal(
-            bucketName,
-            objectNamePrefix,
-            delimiter,
-            maxResults,
-            listedObjects,
-            prefixes,
-            listObject,
-            pageToken);
-    pageState.setNext(pageToken);
-  }
-
-  private String listStorageObjectsAndPrefixesInternal(
-      String bucketName,
-      String objectNamePrefix,
-      String delimiter,
-      long maxResults,
-      List<StorageObject> listedObjects,
-      Set<String> listedPrefixes,
-      Storage.Objects.List listObject,
-      String pageToken)
-      throws IOException {
-
       if (pageToken != null) {
         logger.atFine().log("listStorageObjectsAndPrefixes: next page %s", pageToken);
         listObject.setPageToken(pageToken);
       }
+      pageToken =
+          listStorageObjectsAndPrefixesPage(listObject, maxResults, listedObjects, listedPrefixes);
+    } while (pageToken != null);
+  }
 
-      Objects items;
-      try {
-        items = listObject.execute();
-      } catch (IOException e) {
-        if (errorExtractor.itemNotFound(e)) {
-          logger.atFine().log(
-              "listStorageObjectsAndPrefixes(%s, %s, %s, %s): item not found",
-              bucketName, objectNamePrefix, delimiter, maxResults);
+  private String listStorageObjectsAndPrefixesPage(
+      Storage.Objects.List listObject,
+      long maxResults,
+      List<StorageObject> listedObjects,
+      List<String> listedPrefixes)
+      throws IOException {
+    logger.atFine().log("listStorageObjectsAndPrefixesPage(%s, %d)", listObject, maxResults);
+
+    checkNotNull(listedObjects, "Must provide a non-null container for listedObjects.");
+    checkNotNull(listedPrefixes, "Must provide a non-null container for listedPrefixes.");
+
+    // Deduplicate prefixes and items, because if 'includeTrailingDelimiter' set to true
+    // then returned items will contain "prefix objects" too.
+    Set<String> prefixes = new LinkedHashSet<>(listedPrefixes);
+
+    Objects items;
+    try {
+      items = listObject.execute();
+    } catch (IOException e) {
+      if (errorExtractor.itemNotFound(e)) {
+        logger.atFine().log(
+            "listStorageObjectsAndPrefixesPage(%s, %d): item not found", listObject, maxResults);
         return null;
-        } else {
-          throw wrapException(e, "Error listing", bucketName, objectNamePrefix);
-        }
       }
+      throw wrapException(e, "Error listing", listObject.getBucket(), listObject.getPrefix());
+    }
 
-      // Add prefixes (if any).
-      List<String> pagePrefixes = items.getPrefixes();
-      if (pagePrefixes != null) {
-        logger.atFine().log("listed %s prefixes", pagePrefixes.size());
-      long maxRemainingResults =
-          getMaxRemainingResults(maxResults, (long) listedPrefixes.size() + listedObjects.size());
-        // Do not cast 'maxRemainingResults' to int here, it could overflow
-        long maxPrefixes = Math.min(maxRemainingResults, (long) pagePrefixes.size());
-      listedPrefixes.addAll(pagePrefixes.subList(0, (int) maxPrefixes));
-      }
+    // Add prefixes (if any).
+    List<String> pagePrefixes = items.getPrefixes();
+    if (pagePrefixes != null) {
+      logger.atFine().log("listed %s prefixes", pagePrefixes.size());
+      long maxRemainingResults = getMaxRemainingResults(maxResults, prefixes, listedObjects);
+      // Do not cast 'maxRemainingResults' to int here, it could overflow
+      long maxPrefixes = Math.min(maxRemainingResults, (long) pagePrefixes.size());
+      prefixes.addAll(pagePrefixes.subList(0, (int) maxPrefixes));
+    }
 
-      // Add object names (if any).
-      List<StorageObject> objects = items.getItems();
-      if (objects != null) {
-        logger.atFine().log("listed %s objects", objects.size());
+    // Add object names (if any).
+    List<StorageObject> objects = items.getItems();
+    if (objects != null) {
+      logger.atFine().log("listed %s objects", objects.size());
 
-        // Although GCS does not implement a file system, it treats objects that end
-        // in delimiter as different from other objects when listing objects.
-        //
-        // If caller sends foo/ as the prefix, foo/ is returned as an object name.
-        // That is inconsistent with listing items in a directory.
-        // Not sure if that is a bug in GCS or the intended behavior.
-        //
-        // In this case, we do not want foo/ in the returned list because we want to
-        // keep the behavior more like a file system without calling it as such.
-        // Therefore, we filter out such entry.
+      // Although GCS does not implement a file system, it treats objects that end
+      // in delimiter as different from other objects when listing objects.
+      //
+      // If caller sends foo/ as the prefix, foo/ is returned as an object name.
+      // That is inconsistent with listing items in a directory.
+      // Not sure if that is a bug in GCS or the intended behavior.
+      //
+      // In this case, we do not want foo/ in the returned list because we want to
+      // keep the behavior more like a file system without calling it as such.
+      // Therefore, we filter out such entry.
 
-        // Determine if the caller sent a directory name as a prefix.
-        boolean objectPrefixEndsWithDelimiter =
-            !Strings.isNullOrEmpty(objectNamePrefix) && objectNamePrefix.endsWith(PATH_DELIMITER);
+      // Determine if the caller sent a directory name as a prefix.
+      String objectNamePrefix = listObject.getPrefix();
+      boolean objectPrefixEndsWithDelimiter =
+          !Strings.isNullOrEmpty(objectNamePrefix) && objectNamePrefix.endsWith(PATH_DELIMITER);
 
-      long maxRemainingResults =
-          getMaxRemainingResults(maxResults, (long) listedPrefixes.size() + listedObjects.size());
-        for (StorageObject object : objects) {
-          String objectName = object.getName();
-          if (!objectPrefixEndsWithDelimiter || !objectName.equals(objectNamePrefix)) {
-          if (listedPrefixes.remove(objectName)) {
-              listedObjects.add(object);
-            } else if (maxRemainingResults > 0) {
-              listedObjects.add(object);
-              maxRemainingResults--;
-            }
-            // Do not break here, because we want to be sure
-            // that we replaced all prefixes with prefix objects
+      long maxRemainingResults = getMaxRemainingResults(maxResults, prefixes, listedObjects);
+      for (StorageObject object : objects) {
+        String objectName = object.getName();
+        if (!objectPrefixEndsWithDelimiter || !objectName.equals(objectNamePrefix)) {
+          if (prefixes.remove(objectName)) {
+            listedObjects.add(object);
+          } else if (maxRemainingResults > 0) {
+            listedObjects.add(object);
+            maxRemainingResults--;
           }
+          // Do not break here, because we want to be sure
+          // that we replaced all prefixes with prefix objects
         }
       }
+    }
+
+    listedPrefixes.clear();
+    listedPrefixes.addAll(prefixes);
+
     return items.getNextPageToken();
   }
 
-  private void configureFetchrequest(
-      Storage.Objects.List listObject,
+  private Storage.Objects.List createListRequest(
+      String bucketName,
+      String objectNamePrefix,
       String delimiter,
       boolean includeTrailingDelimiter,
-      long maxResults,
-      String objectNamePrefix) {
+      long maxResults)
+      throws IOException {
+    logger.atFine().log(
+        "createListRequest(%s, %s, %s, %s, %d)",
+        bucketName, objectNamePrefix, delimiter, includeTrailingDelimiter, maxResults);
+    checkArgument(!Strings.isNullOrEmpty(bucketName), "bucketName must not be null or empty");
+
+    Storage.Objects.List listObject = configureRequest(gcs.objects().list(bucketName), bucketName);
+
     // Set delimiter if supplied.
     if (delimiter != null) {
       listObject.setDelimiter(delimiter);
@@ -1422,13 +1347,17 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     if (!Strings.isNullOrEmpty(objectNamePrefix)) {
       listObject.setPrefix(objectNamePrefix);
     }
+
+    return listObject;
   }
 
-  private static long getMaxRemainingResults(long maxResults, long fetchedSize) {
+  private static long getMaxRemainingResults(
+      long maxResults, Set<String> prefixes, List<StorageObject> objects) {
     if (maxResults <= 0) {
       return Long.MAX_VALUE;
     }
-    return maxResults - fetchedSize;
+    long numResults = (long) prefixes.size() + objects.size();
+    return maxResults - numResults;
   }
 
   /**
@@ -1482,24 +1411,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    */
   @Override
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
-      final String bucketName, String objectNamePrefix, String delimiter) throws IOException {
+      String bucketName, String objectNamePrefix, String delimiter) throws IOException {
     return listObjectInfo(bucketName, objectNamePrefix, delimiter, MAX_RESULTS_UNLIMITED);
-  }
-
-  /**
-   * See {@link GoogleCloudStorage#listObjectInfo(String, String, String, PageState)} for details
-   * about expected behavior.
-   */
-  @Override
-  public List<GoogleCloudStorageItemInfo> listObjectInfo(
-      final String bucketName, String objectNamePrefix, String delimiter, PageState pageState)
-      throws IOException {
-    return listObjectInfo(
-        bucketName,
-        objectNamePrefix,
-        delimiter,
-        GoogleCloudStorage.MAX_RESULTS_UNLIMITED,
-        pageState);
   }
 
   /**
@@ -1508,7 +1421,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    */
   @Override
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
-      final String bucketName, String objectNamePrefix, String delimiter, long maxResults)
+      String bucketName, String objectNamePrefix, String delimiter, long maxResults)
       throws IOException {
     logger.atFine().log(
         "listObjectInfo(%s, %s, %s, %s)", bucketName, objectNamePrefix, delimiter, maxResults);
@@ -1525,59 +1438,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         listedObjects,
         listedPrefixes);
 
-    List<GoogleCloudStorageItemInfo> objectInfos = processItemInfo(bucketName, listedObjects);
-    processItemInfoFinal(bucketName, listedPrefixes, objectInfos);
-    return objectInfos;
-  }
-
-  /**
-   * See {@link GoogleCloudStorage#listObjectInfo(String, String, String, long, PageState)} for
-   * details about expected behavior.
-   */
-  @Override
-  public List<GoogleCloudStorageItemInfo> listObjectInfo(
-      final String bucketName,
-      String objectNamePrefix,
-      String delimiter,
-      long maxResults,
-      PageState pageState)
-      throws IOException {
-    logger.atFine().log(
-        "listObjectInfo(%s, %s, %s, %s)", bucketName, objectNamePrefix, delimiter, maxResults);
-    checkArgument(pageState != null, "pageState must not be null");
-    // Helper will handle going through pages of list results and accumulating them.
-    listStorageObjectsAndPrefixes(
-        bucketName,
-        objectNamePrefix,
-        delimiter,
-        /* includeTrailingDelimiter= */ true,
-        maxResults,
-        pageState);
-
-    // For the listedObjects, we simply parse each item into a GoogleCloudStorageItemInfo without
-    // further work.
-    List<StorageObject> listedObjects = pageState.getListedObjects();
-    List<GoogleCloudStorageItemInfo> objectInfos = processItemInfo(bucketName, listedObjects);
-    if (pageState.getNextPageToken() == null) {
-      // All pages have been processed for StorageObjects; now process left-over prefixes
-      Set<String> prefixes = pageState.getPrefixes();
-      List<String> listedPrefixes = new ArrayList<>(prefixes.size());
-      listedPrefixes.addAll(prefixes);
-      processItemInfoFinal(bucketName, listedPrefixes, objectInfos);
-    }
-    pageState.clear();
-    return objectInfos;
-  }
-
-  /**
-   * Helper to process object info either per fetched page or after all pages are fetched
-   *
-   * @param bucketName bucket name
-   * @param listedObjects Accumulated StorageObject list to be processed
-   * @return
-   */
-  public List<GoogleCloudStorageItemInfo> processItemInfo(
-      String bucketName, List<StorageObject> listedObjects) {
     // For the listedObjects, we simply parse each item into a GoogleCloudStorageItemInfo without
     // further work.
     List<GoogleCloudStorageItemInfo> objectInfos = new ArrayList<>(listedObjects.size());
@@ -1585,33 +1445,67 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       objectInfos.add(
           createItemInfoForStorageObject(new StorageResourceId(bucketName, obj.getName()), obj));
     }
+
+    if (listedPrefixes.isEmpty()) {
+      return objectInfos;
+    }
+
+    handlePrefixes(bucketName, listedPrefixes, objectInfos);
+
     return objectInfos;
   }
 
-  /**
-   * Helper to process prefixes that have not been added in the StorageObjects after all pages have
-   * been processed either in a single call to {@link this#processItemInfo} for all-page processing
-   * or many calls to {@link this#processItemInfo} for paged processing
-   *
-   * @param bucketName bucket name
-   * @param listedPrefixes the prefixes to be processed
-   * @param objectInfos In/Out The object item info list to be accumulated on
-   * @throws IOException
-   */
-  public void processItemInfoFinal(
-      String bucketName, List<String> listedPrefixes, List<GoogleCloudStorageItemInfo> objectInfos)
+  @Override
+  public ListPage<GoogleCloudStorageItemInfo> listObjectInfoPage(
+      String bucketName, String objectNamePrefix, String delimiter, String pageToken)
       throws IOException {
-    if (listedPrefixes.isEmpty()) {
-      return;
+    logger.atFine().log(
+        "listObjectInfoPage(%s, %s, %s, %s)", bucketName, objectNamePrefix, delimiter, pageToken);
+
+    Storage.Objects.List listObject =
+        createListRequest(
+            bucketName,
+            objectNamePrefix,
+            delimiter,
+            /* includeTrailingDelimiter= */ true,
+            MAX_RESULTS_UNLIMITED);
+    if (pageToken != null) {
+      logger.atFine().log("listObjectInfoPage: next page %s", pageToken);
+      listObject.setPageToken(pageToken);
     }
 
-    // Handle prefixes without prefix objects.
-    if (storageOptions.isAutoRepairImplicitDirectoriesEnabled()) {
-      logger.atInfo().log("Repairing batch of %s missing directories.", listedPrefixes.size());
-      logger.atFine().log("Directories to repair: %s", listedPrefixes);
+    // Helper will handle going through pages of list results and accumulating them.
+    List<StorageObject> listedObjects = new ArrayList<>();
+    List<String> listedPrefixes = new ArrayList<>();
+    String nextPageToken =
+        listStorageObjectsAndPrefixesPage(
+            listObject, MAX_RESULTS_UNLIMITED, listedObjects, listedPrefixes);
 
-      List<StorageResourceId> prefixIds = new ArrayList<>(listedPrefixes.size());
-      for (String prefix : listedPrefixes) {
+    // For the listedObjects, we simply parse each item into a GoogleCloudStorageItemInfo without
+    // further work.
+    List<GoogleCloudStorageItemInfo> objectInfos = new ArrayList<>(listedObjects.size());
+    for (StorageObject obj : listedObjects) {
+      objectInfos.add(
+          createItemInfoForStorageObject(new StorageResourceId(bucketName, obj.getName()), obj));
+    }
+
+    if (!listedPrefixes.isEmpty()) {
+      handlePrefixes(bucketName, listedPrefixes, objectInfos);
+    }
+
+    return new ListPage<>(objectInfos, nextPageToken);
+  }
+
+  /** Handle prefixes without prefix objects. */
+  private void handlePrefixes(
+      String bucketName, List<String> prefixes, List<GoogleCloudStorageItemInfo> objectInfos)
+      throws IOException {
+    if (storageOptions.isAutoRepairImplicitDirectoriesEnabled()) {
+      logger.atInfo().log("Repairing batch of %s missing directories.", prefixes.size());
+      logger.atFine().log("Directories to repair: %s", prefixes);
+
+      List<StorageResourceId> prefixIds = new ArrayList<>(prefixes.size());
+      for (String prefix : prefixes) {
         prefixIds.add(new StorageResourceId(bucketName, prefix));
       }
 
@@ -1627,7 +1521,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           inferOrFilterNotRepairedInfos(
               repairedInfos, storageOptions.isInferImplicitDirectoriesEnabled()));
     } else if (storageOptions.isInferImplicitDirectoriesEnabled()) {
-      for (String prefix : listedPrefixes) {
+      for (String prefix : prefixes) {
         objectInfos.add(
             GoogleCloudStorageItemInfo.createInferredDirectory(
                 new StorageResourceId(bucketName, prefix)));
@@ -1636,7 +1530,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       logger.atInfo().log(
           "Directory repair and inferred directories are disabled, "
               + "giving up on retrieving missing directories: %s",
-          listedPrefixes);
+          prefixes);
     }
   }
 
