@@ -13,367 +13,498 @@
  */
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.api.client.util.Strings.isNullOrEmpty;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.inferOrFilterNotRepairedInfos;
-import static com.google.common.base.Strings.nullToEmpty;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.MAX_RESULTS_UNLIMITED;
+import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.flogger.GoogleLogger;
+import com.google.api.client.util.Clock;
+import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
+import com.google.common.base.Ticker;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.hash.HashCode;
+import com.google.common.hash.Hashing;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
-import javax.annotation.Nullable;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
+import org.mockito.Matchers;
+import org.mockito.MockitoAnnotations;
 
-/**
- * This class adds a caching layer around a GoogleCloudStorage instance, caching calls that create,
- * update, remove, and query for GoogleCloudStorageItemInfo. Those cached copies are returned when
- * requesting data through {@link GoogleCloudStorage#getItemInfo(StorageResourceId)} and {@link
- * GoogleCloudStorage#getItemInfo(StorageResourceId)}. This provides faster access to recently
- * queried data in the scope of this instance. Because the data is cached, modifications made
- * outside of this instance may not be immediately reflected.
- */
-public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudStorage {
+@RunWith(JUnit4.class)
+public class PerformanceCachingGoogleCloudStorageTest {
 
-  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+  private static final HashCode EMPTY_OBJECT_MD5 = Hashing.md5().hashBytes(new byte[0]);
+  private static final HashCode EMPTY_OBJECT_CRC32C = Hashing.crc32c().hashBytes(new byte[0]);
 
-  /** Cache to hold item info and manage invalidation. */
-  private final PrefixMappedItemCache cache;
+  // Sample empty metadata.
+  private static final ImmutableMap<String, byte[]> TEST_METADATA =
+      ImmutableMap.of("test_key", new byte[] {2});
 
-  /** Options that configure delegate storage. */
-  private final GoogleCloudStorageOptions delegateOptions;
+  private static final CreateBucketOptions CREATE_BUCKET_OPTIONS =
+      new CreateBucketOptions("test_location", "test_storage_class");
 
-  /** Options that configure this cache. */
-  private final PerformanceCachingGoogleCloudStorageOptions options;
+  private static final CreateObjectOptions CREATE_OBJECT_OPTIONS =
+      new CreateObjectOptions(true, "test_content_type", TEST_METADATA, true);
+
+  // Sample bucket names.
+  private static final String BUCKET_A = "alpha";
+  private static final String BUCKET_B = "alph";
+
+  // Sample object names.
+  private static final String PREFIX_A = "bar";
+  private static final String PREFIX_AA = "bar/apple";
+  private static final String PREFIX_ABA = "bar/berry/foo";
+  private static final String PREFIX_B = "baz";
+
+  /* Sample bucket item info. */
+  private static final GoogleCloudStorageItemInfo ITEM_A = createBucketItemInfo(BUCKET_A);
+  private static final GoogleCloudStorageItemInfo ITEM_B = createBucketItemInfo(BUCKET_B);
+
+  /* Sample item info. */
+  private static final GoogleCloudStorageItemInfo ITEM_A_A =
+      createObjectItemInfo(BUCKET_A, PREFIX_A);
+  private static final GoogleCloudStorageItemInfo ITEM_A_AA =
+      createObjectItemInfo(BUCKET_A, PREFIX_AA);
+  private static final GoogleCloudStorageItemInfo ITEM_A_ABA =
+      createObjectItemInfo(BUCKET_A, PREFIX_ABA);
+  private static final GoogleCloudStorageItemInfo ITEM_A_B =
+      createObjectItemInfo(BUCKET_A, PREFIX_B);
+  private static final GoogleCloudStorageItemInfo ITEM_B_A =
+      createObjectItemInfo(BUCKET_B, PREFIX_A);
+  private static final GoogleCloudStorageItemInfo ITEM_B_B =
+      createObjectItemInfo(BUCKET_B, PREFIX_B);
+
+  /** Clock implementation for testing the GCS delegate. */
+  private TestClock clock;
+  /** {@link PerformanceCachingGoogleCloudStorage} instance being tested. */
+  private PerformanceCachingGoogleCloudStorage gcs;
+  /** Cache implementation to back the GCS instance being tested. */
+  private PrefixMappedItemCache cache;
+  /** GoogleCloudStorage implementation to back the GCS instance being tested. */
+  private GoogleCloudStorage gcsDelegate;
+
+  @Before
+  public void setUp() throws IOException {
+    // Setup mocks.
+    MockitoAnnotations.initMocks(this);
+
+    // Create the cache configuration.
+    PrefixMappedItemCache.Config cacheConfig = new PrefixMappedItemCache.Config();
+    cacheConfig.setMaxEntryAgeMillis(10);
+    cacheConfig.setTicker(new TestTicker());
+    cache = new PrefixMappedItemCache(cacheConfig);
+
+    // Create the cache configuration.
+    PerformanceCachingGoogleCloudStorageOptions options =
+        PerformanceCachingGoogleCloudStorageOptions.builder().setListCachingEnabled(true).build();
+
+    // Setup the delegate
+    clock = new TestClock();
+    GoogleCloudStorage gcsImpl =
+        new InMemoryGoogleCloudStorage(GoogleCloudStorageOptions.newBuilder().build(), clock);
+    gcsDelegate = spy(gcsImpl);
+
+    gcs = new PerformanceCachingGoogleCloudStorage(gcsDelegate, options, cache);
+
+    // Prepare the delegate.
+    gcsDelegate.create(BUCKET_A, CREATE_BUCKET_OPTIONS);
+    gcsDelegate.create(BUCKET_B, CREATE_BUCKET_OPTIONS);
+    gcsDelegate.createEmptyObject(ITEM_A_A.getResourceId(), CREATE_OBJECT_OPTIONS);
+    gcsDelegate.createEmptyObject(ITEM_A_AA.getResourceId(), CREATE_OBJECT_OPTIONS);
+    gcsDelegate.createEmptyObject(ITEM_A_ABA.getResourceId(), CREATE_OBJECT_OPTIONS);
+    gcsDelegate.createEmptyObject(ITEM_A_B.getResourceId(), CREATE_OBJECT_OPTIONS);
+    gcsDelegate.createEmptyObject(ITEM_B_A.getResourceId(), CREATE_OBJECT_OPTIONS);
+    gcsDelegate.createEmptyObject(ITEM_B_B.getResourceId(), CREATE_OBJECT_OPTIONS);
+  }
+
+  @Test
+  public void testDeleteBuckets() throws IOException {
+    List<String> buckets = Lists.newArrayList(BUCKET_A);
+
+    // Prepare the cache.
+    cache.putItem(ITEM_A_A); // Deleted.
+    cache.putItem(ITEM_B_A); // Not deleted.
+
+    gcs.deleteBuckets(buckets);
+
+    // Verify the delegate call.
+    verify(gcsDelegate).deleteBuckets(eq(buckets));
+    // Verify the state of the cache.
+    assertThat(cache.getAllItemsRaw()).containsExactly(ITEM_B_A);
+  }
+
+  @Test
+  public void testDeleteObjects() throws IOException {
+    List<StorageResourceId> ids =
+        Lists.newArrayList(ITEM_A_A.getResourceId(), ITEM_B_A.getResourceId());
+
+    // Prepare the cache.
+    cache.putItem(ITEM_A_A); // Deleted.
+    cache.putItem(ITEM_B_A); // Deleted.
+    cache.putItem(ITEM_B_B); // Not deleted.
+
+    gcs.deleteObjects(ids);
+
+    // Verify the delegate call.
+    verify(gcsDelegate).deleteObjects(eq(ids));
+    // Verify the state of the cache.
+    assertThat(cache.getAllItemsRaw()).containsExactly(ITEM_B_B);
+  }
+
+  @Test
+  public void testListBucketInfo() throws IOException {
+    List<GoogleCloudStorageItemInfo> expected = Lists.newArrayList(ITEM_A, ITEM_B);
+
+    List<GoogleCloudStorageItemInfo> result = gcs.listBucketInfo();
+
+    // Verify the delegate call.
+    verify(gcsDelegate).listBucketInfo();
+    assertThat(result).containsExactlyElementsIn(expected);
+    // Verify the state of the cache.
+    assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expected);
+  }
+
+  @Test
+  public void testListObjectInfo() throws IOException {
+    List<GoogleCloudStorageItemInfo> expected = Lists.newArrayList(ITEM_A_A, ITEM_A_AA, ITEM_A_ABA);
+
+    List<GoogleCloudStorageItemInfo> result =
+        gcs.listObjectInfo(BUCKET_A, PREFIX_A, null, MAX_RESULTS_UNLIMITED);
+
+    // Verify the delegate call.
+    verify(gcsDelegate)
+        .listObjectInfo(eq(BUCKET_A), eq(PREFIX_A), eq(null), eq(MAX_RESULTS_UNLIMITED));
+    assertThat(result).containsExactlyElementsIn(expected);
+    // Verify the state of the cache.
+    assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expected);
+  }
+
+  @Test
+  public void testListBucketInfoAndObjectInfo() throws IOException {
+    List<GoogleCloudStorageItemInfo> expectedBuckets = ImmutableList.of(ITEM_A, ITEM_B);
+    List<GoogleCloudStorageItemInfo> expectedObjectsInBucketA =
+        ImmutableList.of(ITEM_A_A, ITEM_A_AA, ITEM_A_ABA, ITEM_A_B);
+    Iterable<GoogleCloudStorageItemInfo> expectedAllCachedItems =
+        Iterables.concat(expectedBuckets, expectedObjectsInBucketA);
+
+    List<GoogleCloudStorageItemInfo> objects1 =
+        gcs.listObjectInfo(BUCKET_A, /* objectNamePrefix= */ null, /* delimiter= */ null);
+    assertThat(objects1).containsExactlyElementsIn(expectedObjectsInBucketA);
+    assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expectedObjectsInBucketA);
+
+    List<GoogleCloudStorageItemInfo> buckets = gcs.listBucketInfo();
+    assertThat(buckets).containsExactlyElementsIn(expectedBuckets);
+    assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expectedAllCachedItems);
+
+    List<GoogleCloudStorageItemInfo> objects2 =
+        gcs.listObjectInfo(BUCKET_A, /* objectNamePrefix= */ null, /* delimiter= */ null);
+    assertThat(objects2).containsExactlyElementsIn(expectedObjectsInBucketA);
+    assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expectedAllCachedItems);
+
+    verify(gcsDelegate).listBucketInfo();
+    verify(gcsDelegate).listObjectInfo(eq(BUCKET_A), eq(null), eq(null), eq(MAX_RESULTS_UNLIMITED));
+  }
+
+  @Test
+  public void testListObjectInfo_delimiter() throws IOException {
+    GoogleCloudStorageItemInfo itemAAPrefix =
+        createObjectItemInfo(BUCKET_A, PREFIX_A + "/", CreateObjectOptions.DEFAULT);
+
+    List<GoogleCloudStorageItemInfo> expectedResult = Lists.newArrayList(ITEM_A_A, itemAAPrefix);
+    List<GoogleCloudStorageItemInfo> expectedCached =
+        Lists.newArrayList(ITEM_A_A, itemAAPrefix, ITEM_A_AA, ITEM_A_ABA);
+
+    List<GoogleCloudStorageItemInfo> result =
+        gcs.listObjectInfo(BUCKET_A, PREFIX_A, "/", MAX_RESULTS_UNLIMITED);
+
+    // Verify the delegate call.
+    verify(gcsDelegate)
+        .listObjectInfo(eq(BUCKET_A), eq(PREFIX_A), eq(null), eq(MAX_RESULTS_UNLIMITED));
+
+    // Verify the result.
+    assertThat(result).containsExactlyElementsIn(expectedResult);
+
+    // Verify the state of the cache.
+    assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expectedCached);
+  }
+
+  @Test
+  public void testListObjectInfo_prefixDir_delimiter() throws IOException {
+    String prefixADir = PREFIX_A + "/";
+
+    String prefixABADir = PREFIX_ABA.substring(0, PREFIX_ABA.lastIndexOf('/') + 1);
+    GoogleCloudStorageItemInfo itemABAPrefix =
+        createObjectItemInfo(BUCKET_A, prefixABADir, CreateObjectOptions.DEFAULT);
+
+    List<GoogleCloudStorageItemInfo> expectedResult = Lists.newArrayList(ITEM_A_AA, itemABAPrefix);
+    List<GoogleCloudStorageItemInfo> expectedCached =
+        Lists.newArrayList(ITEM_A_AA, itemABAPrefix, ITEM_A_ABA);
+
+    List<GoogleCloudStorageItemInfo> result =
+        gcs.listObjectInfo(BUCKET_A, prefixADir, "/", MAX_RESULTS_UNLIMITED);
+
+    // Verify the delegate call.
+    verify(gcsDelegate)
+        .listObjectInfo(eq(BUCKET_A), eq(prefixADir), eq(null), eq(MAX_RESULTS_UNLIMITED));
+
+    // Verify the result.
+    assertThat(result).containsExactlyElementsIn(expectedResult);
+
+    // Verify the state of the cache.
+    assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expectedCached);
+  }
+
+  @Test
+  public void testListObjectInfoAlt() throws IOException {
+    List<GoogleCloudStorageItemInfo> expected = Lists.newArrayList(ITEM_B_A, ITEM_B_B);
+
+    List<GoogleCloudStorageItemInfo> result = gcs.listObjectInfo(BUCKET_B, null, null);
+
+    // Verify the delegate call.
+    verify(gcsDelegate)
+        .listObjectInfo(eq(BUCKET_B), Matchers.<String>eq(null), Matchers.<String>eq(null));
+    assertThat(result).containsExactlyElementsIn(expected);
+    // Verify the state of the cache.
+    assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expected);
+  }
+
+  @Test
+  public void testListObjectInfoCached() throws IOException {
+    List<GoogleCloudStorageItemInfo> expected =
+        Lists.newArrayList(ITEM_A_A, ITEM_A_AA, ITEM_A_ABA, ITEM_A_B);
+
+    // First call to get the values in cache.
+    gcs.listObjectInfo(BUCKET_A, null, null);
+    // Second call to ensure the values are being served from cache.
+    List<GoogleCloudStorageItemInfo> result = gcs.listObjectInfo(BUCKET_A, null, null);
+
+    // Verify the delegate call once.
+    verify(gcsDelegate)
+        .listObjectInfo(eq(BUCKET_A), Matchers.<String>eq(null), Matchers.<String>eq(null));
+    assertThat(result).containsExactlyElementsIn(expected);
+    // Verify the state of the cache.
+    assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expected);
+  }
+
+  @Test
+  public void testGetItemInfo() throws IOException {
+    // Prepare the cache.
+    cache.putItem(ITEM_A_A);
+
+    GoogleCloudStorageItemInfo result = gcs.getItemInfo(ITEM_A_A.getResourceId());
+
+    // Verify the cached item was returned.
+    assertThat(result).isEqualTo(ITEM_A_A);
+    // Verify the state of the cache.
+    assertThat(cache.getAllItemsRaw()).containsExactly(ITEM_A_A);
+  }
+
+  @Test
+  public void testGetItemInfoMissing() throws IOException {
+    GoogleCloudStorageItemInfo result = gcs.getItemInfo(ITEM_A_A.getResourceId());
+
+    // Verify the delegate call.
+    verify(gcsDelegate).getItemInfo(eq(ITEM_A_A.getResourceId()));
+    assertThat(result).isEqualTo(ITEM_A_A);
+    // Verify the cache was updated.
+    assertThat(cache.getItem(ITEM_A_A.getResourceId())).isEqualTo(ITEM_A_A);
+  }
+
+  @Test
+  public void testGetItemInfosAllCached() throws IOException {
+    List<StorageResourceId> requestedIds =
+        Lists.newArrayList(ITEM_A_A.getResourceId(), ITEM_A_B.getResourceId());
+    List<GoogleCloudStorageItemInfo> expected = Lists.newArrayList(ITEM_A_A, ITEM_A_B);
+
+    // Prepare the cache.
+    cache.putItem(ITEM_A_A);
+    cache.putItem(ITEM_A_B);
+
+    List<GoogleCloudStorageItemInfo> result = gcs.getItemInfos(requestedIds);
+
+    // Verify the result is exactly what the delegate returns in order.
+    assertThat(result).containsExactlyElementsIn(expected).inOrder();
+    // Verify the state of the cache.
+    assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expected);
+  }
+
+  @Test
+  public void testGetItemInfosSomeCached() throws IOException {
+    List<StorageResourceId> requestedIds =
+        Lists.newArrayList(
+            ITEM_A_A.getResourceId(), // Not cached
+            ITEM_A_B.getResourceId(), // Cached
+            ITEM_B_A.getResourceId(), // Not cached
+            ITEM_B_B.getResourceId()); // Cached
+    List<StorageResourceId> uncachedIds =
+        Lists.newArrayList(ITEM_A_A.getResourceId(), ITEM_B_A.getResourceId());
+    List<GoogleCloudStorageItemInfo> expected =
+        Lists.newArrayList(ITEM_A_A, ITEM_A_B, ITEM_B_A, ITEM_B_B);
+
+    // Prepare the cache.
+    cache.putItem(ITEM_A_B);
+    cache.putItem(ITEM_B_B);
+
+    List<GoogleCloudStorageItemInfo> result = gcs.getItemInfos(requestedIds);
+
+    // Verify the delegate call.
+    verify(gcsDelegate).getItemInfos(eq(uncachedIds));
+    // Verify the result and its ordering.
+    assertThat(result).containsExactlyElementsIn(expected).inOrder();
+    // Verify the state of the cache.
+    assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expected);
+  }
+
+  @Test
+  public void testGetItemInfosNoneCached() throws IOException {
+    List<StorageResourceId> requestedIds =
+        Lists.newArrayList(ITEM_A_A.getResourceId(), ITEM_A_B.getResourceId());
+    List<GoogleCloudStorageItemInfo> expected = Lists.newArrayList(ITEM_A_A, ITEM_A_B);
+
+    List<GoogleCloudStorageItemInfo> result = gcs.getItemInfos(requestedIds);
+
+    // Verify the delegate call.
+    verify(gcsDelegate).getItemInfos(eq(requestedIds));
+    // Verify the result and its ordering.
+    assertThat(result).containsExactlyElementsIn(expected).inOrder();
+    // Verify the state of the cache.
+    assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expected);
+  }
+
+  @Test
+  public void testUpdateItems() throws IOException {
+    List<UpdatableItemInfo> updateItems =
+        Lists.newArrayList(new UpdatableItemInfo(ITEM_A_A.getResourceId(), TEST_METADATA));
+    GoogleCloudStorageItemInfo itemAAUpdated =
+        updateObjectItemInfo(ITEM_A_A, ITEM_A_A.getMetaGeneration() + 1);
+
+    List<GoogleCloudStorageItemInfo> result = gcs.updateItems(updateItems);
+
+    // Verify the delegate call.
+    verify(gcsDelegate).updateItems(eq(updateItems));
+    assertThat(result).containsExactly(itemAAUpdated);
+    // Verify the state of the cache.
+    assertThat(cache.getAllItemsRaw()).containsExactly(itemAAUpdated);
+  }
+
+  @Test
+  public void testClose() {
+    // Prepare the cache.
+    cache.putItem(ITEM_A_A);
+
+    gcs.close();
+
+    // Verify the delegate call was made.
+    verify(gcsDelegate).close();
+    // Verify the state of the cache.
+    assertThat(cache.getAllItemsRaw()).isEmpty();
+  }
+
+  @Test
+  public void testComposeObjects() throws IOException {
+    List<StorageResourceId> ids =
+        Lists.newArrayList(ITEM_A_A.getResourceId(), ITEM_A_B.getResourceId());
+
+    GoogleCloudStorageItemInfo result =
+        gcs.composeObjects(ids, ITEM_A_AA.getResourceId(), CREATE_OBJECT_OPTIONS);
+
+    // Verify the delegate call.
+    verify(gcsDelegate)
+        .composeObjects(eq(ids), eq(ITEM_A_AA.getResourceId()), eq(CREATE_OBJECT_OPTIONS));
+    assertThat(result).isEqualTo(ITEM_A_AA);
+    // Verify the state of the cache.
+    assertThat(cache.getAllItemsRaw()).containsExactly(ITEM_A_AA);
+  }
 
   /**
-   * Creates a wrapper around a GoogleCloudStorage instance, caching calls that create, update,
-   * remove, and query for GoogleCloudStorageItemInfo. Those cached copies are returned when
-   * requesting data through {@link GoogleCloudStorage#getItemInfo(StorageResourceId)} and {@link
-   * GoogleCloudStorage#getItemInfo(StorageResourceId)}. This provides faster access to recently
-   * queried data in the scope of this instance. Because the data is cached, modifications made
-   * outside of this instance may not be immediately reflected.
+   * Helper to generate GoogleCloudStorageItemInfo for a bucket entry.
    *
-   * @param delegate the {@link GoogleCloudStorage} instance to wrap and delegate calls to.
-   * @param options the options to configure this cache with.
+   * @param bucketName the name of the bucket.
+   * @return the generated item.
    */
-  public PerformanceCachingGoogleCloudStorage(
-      GoogleCloudStorage delegate, PerformanceCachingGoogleCloudStorageOptions options) {
-    this(delegate, options, createCache(options));
-  }
-
-  @VisibleForTesting
-  PerformanceCachingGoogleCloudStorage(
-      GoogleCloudStorage delegate,
-      PerformanceCachingGoogleCloudStorageOptions options,
-      PrefixMappedItemCache cache) {
-    super(delegate);
-    this.delegateOptions = delegate.getOptions();
-    this.options = options;
-    this.cache = cache;
-  }
-
-  private static PrefixMappedItemCache createCache(
-      PerformanceCachingGoogleCloudStorageOptions options) {
-    PrefixMappedItemCache.Config config = new PrefixMappedItemCache.Config();
-    config.setMaxEntryAgeMillis(options.getMaxEntryAgeMillis());
-    return new PrefixMappedItemCache(config);
-  }
-
-  @Override
-  public void deleteBuckets(List<String> bucketNames) throws IOException {
-    super.deleteBuckets(bucketNames);
-
-    // Remove objects that reside in deleted buckets.
-    for (String bucket : bucketNames) {
-      cache.invalidateBucket(bucket);
-    }
-  }
-
-  @Override
-  public void deleteObjects(List<StorageResourceId> fullObjectNames) throws IOException {
-    super.deleteObjects(fullObjectNames);
-
-    // Remove the deleted objects from cache.
-    for (StorageResourceId id : fullObjectNames) {
-      cache.removeItem(id);
-    }
-  }
-
-  @Override
-  public List<GoogleCloudStorageItemInfo> listBucketInfo() throws IOException {
-    List<GoogleCloudStorageItemInfo> result = super.listBucketInfo();
-
-    // Add the results to the cache.
-    for (GoogleCloudStorageItemInfo item : result) {
-      cache.putItem(item);
-    }
-
-    return result;
-  }
-
-  /** This function may return cached copies of GoogleCloudStorageItemInfo. */
-  @Override
-  public List<GoogleCloudStorageItemInfo> listObjectInfo(
-      String bucketName, String objectNamePrefix, String delimiter) throws IOException {
-    return this.listObjectInfo(
-        bucketName, objectNamePrefix, delimiter, GoogleCloudStorage.MAX_RESULTS_UNLIMITED);
-  }
-
-  /** This function may return cached copies of GoogleCloudStorageItemInfo. */
-  @Override
-  public List<GoogleCloudStorageItemInfo> listObjectInfo(
-      String bucketName, String objectNamePrefix, String delimiter, long maxResults)
-      throws IOException {
-    List<GoogleCloudStorageItemInfo> result;
-
-    if (options.isListCachingEnabled()) {
-      result = cache.getList(bucketName, objectNamePrefix);
-
-      if (result == null) {
-        result = super.listObjectInfo(bucketName, objectNamePrefix, null);
-        cache.putList(bucketName, objectNamePrefix, result);
-      }
-
-      filter(result, bucketName, objectNamePrefix, delimiter);
-
-      if (maxResults > 0 && result.size() > maxResults) {
-        result = result.subList(0, (int) maxResults);
-      }
-    } else {
-      result = super.listObjectInfo(bucketName, objectNamePrefix, delimiter, maxResults);
-      for (GoogleCloudStorageItemInfo item : result) {
-        cache.putItem(item);
-      }
-    }
-
-    return result;
-  }
-
-  @Override
-  public ListPage<GoogleCloudStorageItemInfo> listObjectInfoPage(
-      String bucketName, String objectNamePrefix, String delimiter, String pageToken)
-      throws IOException {
-    if (options.isListCachingEnabled()) {
-      return new ListPage<>(listObjectInfo(bucketName, objectNamePrefix, delimiter), null);
-    }
-
-    ListPage<GoogleCloudStorageItemInfo> result =
-        super.listObjectInfoPage(bucketName, objectNamePrefix, delimiter, pageToken);
-    for (GoogleCloudStorageItemInfo item : result.getItems()) {
-      cache.putItem(item);
-    }
-    return result;
+  public static GoogleCloudStorageItemInfo createBucketItemInfo(String bucketName) {
+    return new GoogleCloudStorageItemInfo(
+        new StorageResourceId(bucketName),
+        /* creationTime= */ 0,
+        /* size= */ 0,
+        CREATE_BUCKET_OPTIONS.getLocation(),
+        CREATE_BUCKET_OPTIONS.getStorageClass());
   }
 
   /**
-   * Matches Google Cloud Storage's delimiter filtering.
+   * Helper to generate a GoogleCloudStorageItemInfo for an object entry.
    *
-   * @param items the mutable list of items to filter. Items matching the filter conditions will be
-   *     removed from this list.
-   * @param bucketName the bucket name to filter for.
-   * @param prefix the object name prefix to filter for.
-   * @param delimiter the delimiter to filter on.
+   * @param bucketName the name of the bucket for the generated item.
+   * @param objectName the object name of the generated item.
+   * @return the generated item.
    */
-  private void filter(
-      List<GoogleCloudStorageItemInfo> items,
-      String bucketName,
-      @Nullable String prefix,
-      @Nullable String delimiter)
-      throws IOException {
-    prefix = nullToEmpty(prefix);
+  public static GoogleCloudStorageItemInfo createObjectItemInfo(
+      String bucketName, String objectName) {
+    return createObjectItemInfo(bucketName, objectName, CREATE_OBJECT_OPTIONS);
+  }
 
-    // if delimiter is not specified we don't need to filter-out subdirectories
-    if (isNullOrEmpty(delimiter)) {
-      // if prefix is not specified it means that we are listing all objects in the bucket
-      // and we need to exclude bucket from the result
-      if (prefix.isEmpty()) {
-        Iterator<GoogleCloudStorageItemInfo> itr = items.iterator();
-        while (itr.hasNext()) {
-          GoogleCloudStorageItemInfo item = itr.next();
-          if (item.isBucket()) {
-            itr.remove();
-            break;
-          }
-        }
-      }
-      return;
-    }
+  /**
+   * Helper to generate a GoogleCloudStorageItemInfo for an object entry.
+   *
+   * @param bucketName the name of the bucket for the generated item.
+   * @param objectName the object name of the generated item.
+   * @param createObjectOptions the {@link CreateObjectOptions} to use to generate item.
+   * @return the generated item.
+   */
+  public static GoogleCloudStorageItemInfo createObjectItemInfo(
+      String bucketName, String objectName, CreateObjectOptions createObjectOptions) {
+    return new GoogleCloudStorageItemInfo(
+        new StorageResourceId(bucketName, objectName),
+        /* creationTime= */ 0,
+        /* size= */ 0,
+        /* location= */ null,
+        /* storageClass= */ null,
+        createObjectOptions.getContentType(),
+        /* contentEncoding= */ null,
+        createObjectOptions.getMetadata(),
+        /* contentGeneration= */ 1,
+        /* metaGeneration= */ 1,
+        new VerificationAttributes(EMPTY_OBJECT_MD5.asBytes(), EMPTY_OBJECT_CRC32C.asBytes()));
+  }
 
-    HashSet<String> dirs = new HashSet<>();
-    Iterator<GoogleCloudStorageItemInfo> itr = items.iterator();
-    while (itr.hasNext()) {
-      GoogleCloudStorageItemInfo item = itr.next();
-      String objectName = item.getObjectName();
+  private static GoogleCloudStorageItemInfo updateObjectItemInfo(
+      GoogleCloudStorageItemInfo object, long metaGeneration) {
+    return new GoogleCloudStorageItemInfo(
+        object.getResourceId(),
+        object.getCreationTime(),
+        object.getSize(),
+        object.getLocation(),
+        object.getStorageClass(),
+        object.getContentType(),
+        object.getContentEncoding(),
+        object.getMetadata(),
+        object.getContentGeneration(),
+        metaGeneration,
+        object.getVerificationAttributes());
+  }
 
-      // 1. Remove if bucket (means that listing objects in bucket):
-      //    do not return bucket itself (prefix dir) to avoid infinite recursion
-      // 2. Remove if doesn't start with the prefix.
-      // 3. Remove prefix object if it ends with delimiter:
-      //    do not return prefix dir to avoid infinite recursion.
-      if (item.isBucket()
-          || !objectName.startsWith(prefix)
-          || (prefix.endsWith(delimiter) && objectName.equals(prefix))) {
-        itr.remove();
-      } else {
-        // Retain if missing the delimiter after the prefix.
-        int firstIndex = objectName.indexOf(delimiter, prefix.length());
-        if (firstIndex != -1) {
-          // Remove if the first occurrence of the delimiter after the prefix isn't the last.
-          // Remove if the last occurrence of the delimiter isn't the end of the string.
-          int lastIndex = objectName.lastIndexOf(delimiter);
-          if (firstIndex != lastIndex || lastIndex != objectName.length() - 1) {
-            itr.remove();
-            dirs.add(objectName.substring(0, firstIndex + 1));
-          }
-        }
-      }
-    }
+  /** Ticker with a manual time value used for testing the cache. */
+  private static class TestTicker extends Ticker {
 
-    // Remove non-implicit directories (i.e. have corresponding directory objects)
-    for (GoogleCloudStorageItemInfo item : items) {
-      dirs.remove(item.getObjectName());
-    }
-
-    if (dirs.isEmpty()) {
-      return;
-    }
-
-    List<StorageResourceId> dirIds = new ArrayList<>(dirs.size());
-    for (String dir : dirs) {
-      dirIds.add(new StorageResourceId(bucketName, dir));
-    }
-
-    boolean inferImplicitDirectories = delegateOptions.isInferImplicitDirectoriesEnabled();
-    if (delegateOptions.isAutoRepairImplicitDirectoriesEnabled()) {
-      try {
-        createEmptyObjects(dirIds);
-      } catch (IOException ioe) {
-        // Don't totally fail the listObjectInfo call, since auto-repair is best-effort anyways.
-        logger.atSevere().withCause(ioe).log("Failed to repair some missing directories.");
-      }
-      // cache repaired dirs
-      List<GoogleCloudStorageItemInfo> repairedDirInfos = getItemInfos(dirIds);
-      items.addAll(inferOrFilterNotRepairedInfos(repairedDirInfos, inferImplicitDirectories));
-    } else if (inferImplicitDirectories) {
-      for (StorageResourceId dirId : dirIds) {
-        items.add(GoogleCloudStorageItemInfo.createInferredDirectory(dirId));
-      }
+    @Override
+    public long read() {
+      return 0L;
     }
   }
 
-  /** This function may return cached copies of GoogleCloudStorageItemInfo. */
-  @Override
-  public GoogleCloudStorageItemInfo getItemInfo(StorageResourceId resourceId) throws IOException {
-    // Get the item from cache.
-    GoogleCloudStorageItemInfo item = cache.getItem(resourceId);
+  /** Clock with a manual time value used for testing the GCS delegate. */
+  private static class TestClock implements Clock {
 
-    // If it wasn't in the cache, list all the objects in the parent directory and cache them
-    // and then retrieve it from the cache.
-    long dirMetadataPrefetchLimit = options.getDirMetadataPrefetchLimit();
-    if (item == null && resourceId.isStorageObject() && dirMetadataPrefetchLimit != 0) {
-      String bucketName = resourceId.getBucketName();
-      String objectName = resourceId.getObjectName();
-      int lastSlashIndex = objectName.lastIndexOf(PATH_DELIMITER);
-      String directoryName =
-          lastSlashIndex >= 0 ? objectName.substring(0, lastSlashIndex + 1) : null;
-      List<GoogleCloudStorageItemInfo> cachedInDirectory =
-          cache.listItems(bucketName, directoryName);
-      filter(cachedInDirectory, bucketName, directoryName, PATH_DELIMITER);
-      // If there are a lot of items cached in directory, do not prefetch with list requests,
-      // because metadata in this directory already prefetched
-      if (dirMetadataPrefetchLimit == GoogleCloudStorage.MAX_RESULTS_UNLIMITED
-          || cachedInDirectory.size() < dirMetadataPrefetchLimit) {
-        listObjectInfo(bucketName, directoryName, PATH_DELIMITER, dirMetadataPrefetchLimit);
-        item = cache.getItem(resourceId);
-      }
+    @Override
+    public long currentTimeMillis() {
+      return 0L;
     }
-
-    // If it wasn't in the cache and wasn't cached in directory list request
-    // then request and cache it directly.
-    if (item == null) {
-      item = super.getItemInfo(resourceId);
-      cache.putItem(item);
-    }
-
-    return item;
-  }
-
-  /** This function may return cached copies of GoogleCloudStorageItemInfo. */
-  @Override
-  public List<GoogleCloudStorageItemInfo> getItemInfos(List<StorageResourceId> resourceIds)
-      throws IOException {
-    List<GoogleCloudStorageItemInfo> result = new ArrayList<>(resourceIds.size());
-    List<StorageResourceId> request = new ArrayList<>(resourceIds.size());
-
-    // Populate the result list with items in the cache, and the request list with resources that
-    // still need to be resolved. Null items are added to the result list to preserve ordering.
-    for (StorageResourceId resourceId : resourceIds) {
-      GoogleCloudStorageItemInfo item = cache.getItem(resourceId);
-      if (item == null) {
-        request.add(resourceId);
-      }
-      result.add(item);
-    }
-
-    // Resolve all the resources which were not cached, cache them, and add them to the result list.
-    // Null entries in the result list are replaced by the fresh entries from the underlying
-    // GoogleCloudStorage.
-    if (!request.isEmpty()) {
-      List<GoogleCloudStorageItemInfo> response = super.getItemInfos(request);
-      Iterator<GoogleCloudStorageItemInfo> responseIterator = response.iterator();
-
-      // Iterate through the result set, replacing the null entries added previously with entries
-      // from the response.
-      for (int i = 0; i < result.size() && responseIterator.hasNext(); i++) {
-        if (result.get(i) == null) {
-          GoogleCloudStorageItemInfo item = responseIterator.next();
-          cache.putItem(item);
-          result.set(i, item);
-        }
-      }
-    }
-
-    return result;
-  }
-
-  @Override
-  public List<GoogleCloudStorageItemInfo> updateItems(List<UpdatableItemInfo> itemInfoList)
-      throws IOException {
-    List<GoogleCloudStorageItemInfo> result = super.updateItems(itemInfoList);
-
-    // Update the cache with the returned items. This overwrites the originals as the
-    // StorageResourceIds of the items do not change in an update.
-    for (GoogleCloudStorageItemInfo item : result) {
-      cache.putItem(item);
-    }
-
-    return result;
-  }
-
-  @Override
-  public void close() {
-    super.close();
-
-    // Respect close and empty the cache.
-    cache.invalidateAll();
-  }
-
-  @Override
-  public GoogleCloudStorageItemInfo composeObjects(
-      List<StorageResourceId> sources, StorageResourceId destination, CreateObjectOptions options)
-      throws IOException {
-    GoogleCloudStorageItemInfo item = super.composeObjects(sources, destination, options);
-
-    // Cache the composed object.
-    cache.putItem(item);
-
-    return item;
-  }
-
-  @VisibleForTesting
-  public void invalidateCache() {
-    cache.invalidateAll();
   }
 }
