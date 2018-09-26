@@ -32,7 +32,7 @@ import static com.google.common.flogger.LazyArgs.lazy;
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.FileInfo;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PageState;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
@@ -65,6 +65,7 @@ import java.nio.file.DirectoryNotEmptyException;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
@@ -72,7 +73,16 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.*;
+import org.apache.hadoop.fs.ContentSummary;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.FileChecksum;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.GlobPattern;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -1101,34 +1111,53 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
 
       // Get everything matching the non-glob prefix.
       logger.atFine().log("Listing everything with prefix '%s'", prefixUri);
-      PageState pageState = new PageState();
-      List<FileInfo> fileInfos = new ArrayList();
-      GlobPattern pattern = new GlobPattern(pathString);
-      Path path;
+      List<FileStatus> matchedStatuses = null;
+      String pageToken = null;
       do {
-        List<FileInfo> fileInfoPart = gcsfs.listAllFileInfoForPrefix(prefixUri, pageState);
-        for (FileInfo fileInfo : fileInfoPart) {
-          path = getHadoopPath(fileInfo.getPath());
-          if (pattern.matches(path.getName()) && filter.accept(path)) fileInfos.add(fileInfo);
-        }
-      } while (pageState.getNextPageToken() != null);
-      fileInfos.sort(gcsfs.FILE_INFO_PATH_COMPARATOR);
+        ListPage<FileInfo> infoPage = gcsfs.listAllFileInfoForPrefixPage(prefixUri, pageToken);
 
-      if (fileInfos.isEmpty()) {
-        // Let the superclass define the proper logic for finding no matches.
-        return super.globStatus(fixedPath, filter);
+        // TODO: Are implicit directories really always needed for globbing?
+        //  Shouldn't be they inferred only when fs.gs.implicit.dir.infer.enable is true?
+        Collection<FileStatus> statusPage =
+            toFileStatusesWithImplicitDirectories(infoPage.getItems());
+
+        // TODO: refactor to use GlobPattern and PathFilter directly without helper FS
+        FileSystem helperFileSystem =
+            InMemoryGlobberFileSystem.createInstance(getConf(), getWorkingDirectory(), statusPage);
+        FileStatus[] matchedStatusPage = helperFileSystem.globStatus(fixedPath, filter);
+        if (matchedStatusPage != null) {
+          Collections.addAll(
+              (matchedStatuses == null ? matchedStatuses = new ArrayList<>() : matchedStatuses),
+              matchedStatusPage);
+        }
+
+        pageToken = infoPage.getNextPageToken();
+      } while (pageToken != null);
+
+      if (matchedStatuses == null) {
+        return null;
       }
 
-      Collection<FileStatus> fileStatuses = toFileStatusesWithImplicitDirectories(fileInfos);
+      Collections.sort(matchedStatuses);
 
-      FileStatus[] returnList = fileStatuses.toArray(new FileStatus[0]);
+      // Remove duplicate file infos that could appear
+      // because of pagination and implicit directories
+      for (int i = 0; i < matchedStatuses.size() - 1; i++) {
+        FileStatus curr = matchedStatuses.get(i);
+        FileStatus next = matchedStatuses.get(i + 1);
+        if (curr.compareTo(next) == 0) {
+          matchedStatuses.remove(isImplicitDirectory(curr) ? i : i + 1);
+          i--;
+        }
+      }
+
+      FileStatus[] returnList = matchedStatuses.toArray(new FileStatus[0]);
 
       // If the return list contains directories, we should repair them if they're 'implicit'.
       if (enableAutoRepairImplicitDirectories) {
         List<URI> toRepair = new ArrayList<>();
         for (FileStatus status : returnList) {
-          // Modification time of 0 indicates implicit directory.
-          if (status.isDir() && status.getModificationTime() == 0) {
+          if (isImplicitDirectory(status)) {
             toRepair.add(getGcsPath(status.getPath()));
           }
         }
@@ -1139,6 +1168,7 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
           gcsfs.repairDirs(toRepair);
         }
       }
+
       return returnList;
     } else {
       FileStatus[] ret = super.globStatus(fixedPath, filter);
@@ -1154,6 +1184,11 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
       }
       return ret;
     }
+  }
+
+  private static boolean isImplicitDirectory(FileStatus curr) {
+    // Modification time of 0 indicates implicit directory.
+    return curr.isDir() && curr.getModificationTime() == 0;
   }
 
   /** Helper method that converts {@link FileInfo} collection to {@link FileStatus} collection. */
