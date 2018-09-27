@@ -197,7 +197,6 @@ public class GoogleCloudStorageFileSystem {
                 .setDaemon(true)
                 .build());
     // allowCoreThreadTimeOut needs to be enabled for cases where the encapsulating class does not
-    // reliably call close().  See https://goto.google.com/dataproc-design-gcsfs-thread-leak-fix.
     service.allowCoreThreadTimeOut(true);
     return service;
   }
@@ -387,7 +386,7 @@ public class GoogleCloudStorageFileSystem {
   /** Deletes all items in the given path list followed by all bucket items. */
   private void deleteInternal(List<FileInfo> itemsToDelete, List<FileInfo> bucketsToDelete)
       throws IOException {
-    // TODO(dhuo): We might need to separate out children into separate batches from parents to
+    // TODO(user): We might need to separate out children into separate batches from parents to
     // avoid deleting a parent before somehow failing to delete a child.
 
     // Delete children before their parents.
@@ -1013,7 +1012,7 @@ public class GoogleCloudStorageFileSystem {
       return pathInfo;
     }
 
-    // TODO(dhuo): Refactor the method name and signature to make this less hacky; the logic of
+    // TODO(user): Refactor the method name and signature to make this less hacky; the logic of
     // piggybacking on auto-repair within listObjectInfo is sound because listing with prefixes
     // is a natural prerequisite for verifying that an implicit directory indeed exists. We just
     // need to make it more clear that the method is actually "list and maybe repair".
@@ -1166,7 +1165,7 @@ public class GoogleCloudStorageFileSystem {
     // therefore we allow object name to be empty.
     StorageResourceId resourceId = pathCodec.validatePathAndGetId(path, true);
     GoogleCloudStorageItemInfo itemInfo = gcs.getItemInfo(resourceId);
-    // TODO(dhuo): Here and below, just request foo and foo/ simultaneously in the same batch
+    // TODO(user): Here and below, just request foo and foo/ simultaneously in the same batch
     // request and choose the relevant one.
     if (!itemInfo.exists() && !FileInfo.isDirectory(itemInfo)) {
       // If the given file does not exist, see if a directory of
@@ -1237,7 +1236,7 @@ public class GoogleCloudStorageFileSystem {
     // StorageResourceId to the index of itemInfos the new item will replace.
     // NB: HashMap here is required; if we wish to use TreeMap we must implement Comparable in
     // StorageResourceId.
-    // TODO(dhuo): Use HashMultimap if it ever becomes possible for the input to list the same
+    // TODO(user): Use HashMultimap if it ever becomes possible for the input to list the same
     // URI multiple times and actually expects the returned list to list those duplicate values
     // the same multiple times.
     Map<StorageResourceId, Integer> convertedIdsToIndex = new HashMap<>();
