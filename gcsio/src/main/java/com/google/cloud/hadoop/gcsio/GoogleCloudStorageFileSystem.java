@@ -197,6 +197,7 @@ public class GoogleCloudStorageFileSystem {
                 .setDaemon(true)
                 .build());
     // allowCoreThreadTimeOut needs to be enabled for cases where the encapsulating class does not
+    // reliably call close().  See https://goto.google.com/dataproc-design-gcsfs-thread-leak-fix.
     service.allowCoreThreadTimeOut(true);
     return service;
   }
@@ -386,7 +387,7 @@ public class GoogleCloudStorageFileSystem {
   /** Deletes all items in the given path list followed by all bucket items. */
   private void deleteInternal(List<FileInfo> itemsToDelete, List<FileInfo> bucketsToDelete)
       throws IOException {
-    // TODO(user): We might need to separate out children into separate batches from parents to
+    // TODO(dhuo): We might need to separate out children into separate batches from parents to
     // avoid deleting a parent before somehow failing to delete a child.
 
     // Delete children before their parents.
@@ -1012,7 +1013,7 @@ public class GoogleCloudStorageFileSystem {
       return pathInfo;
     }
 
-    // TODO(user): Refactor the method name and signature to make this less hacky; the logic of
+    // TODO(dhuo): Refactor the method name and signature to make this less hacky; the logic of
     // piggybacking on auto-repair within listObjectInfo is sound because listing with prefixes
     // is a natural prerequisite for verifying that an implicit directory indeed exists. We just
     // need to make it more clear that the method is actually "list and maybe repair".
@@ -1041,35 +1042,36 @@ public class GoogleCloudStorageFileSystem {
    * @param prefix the prefix to use to list all matching objects.
    */
   public List<FileInfo> listAllFileInfoForPrefix(URI prefix) throws IOException {
+    logger.atFine().log("listAllFileInfoForPrefixPage(%s)", prefix);
     StorageResourceId prefixId = getPrefixId(prefix);
     List<GoogleCloudStorageItemInfo> itemInfos =
         gcs.listObjectInfo(
             prefixId.getBucketName(), prefixId.getObjectName(), /* delimiter= */ null);
-    return FileInfo.fromItemInfos(pathCodec, itemInfos);
+    List<FileInfo> fileInfos = FileInfo.fromItemInfos(pathCodec, itemInfos);
+    fileInfos.sort(FILE_INFO_PATH_COMPARATOR);
+    return fileInfos;
   }
 
   /**
-   * Equivalent to a recursive listing of {@code prefix}, except that {@code prefix} doesn't have to
-   * represent an actual object but can just be a partial prefix string, and there is no auto-repair
-   * of implicit directories since we can't detect implicit directories without listing by
-   * 'delimiter'. The 'authority' component of the {@code prefix} *must* be the complete authority,
-   * however; we can only list prefixes of *objects*, not buckets.
+   * Equivalent to {@link #listAllFileInfoForPrefix} but returns {@link FileInfo}s listed by single
+   * request (1 page).
    *
    * @param prefix the prefix to use to list all matching objects.
-   * @param pageToken the page state maintained across paginations
+   * @param pageToken the page token to list
    */
   public ListPage<FileInfo> listAllFileInfoForPrefixPage(URI prefix, String pageToken)
       throws IOException {
+    logger.atFine().log("listAllFileInfoForPrefixPage(%s, %s)", prefix, pageToken);
     StorageResourceId prefixId = getPrefixId(prefix);
     ListPage<GoogleCloudStorageItemInfo> itemInfosPage =
         gcs.listObjectInfoPage(
             prefixId.getBucketName(), prefixId.getObjectName(), /* delimiter= */ null, pageToken);
     List<FileInfo> fileInfosPage = FileInfo.fromItemInfos(pathCodec, itemInfosPage.getItems());
+    fileInfosPage.sort(FILE_INFO_PATH_COMPARATOR);
     return new ListPage<>(fileInfosPage, itemInfosPage.getNextPageToken());
   }
 
   private StorageResourceId getPrefixId(URI prefix) {
-    logger.atFine().log("listAllFileInfoForPrefix(%s)", prefix);
     Preconditions.checkNotNull(prefix, "prefix could not be null");
 
     StorageResourceId prefixId = pathCodec.validatePathAndGetId(prefix, true);
@@ -1164,7 +1166,7 @@ public class GoogleCloudStorageFileSystem {
     // therefore we allow object name to be empty.
     StorageResourceId resourceId = pathCodec.validatePathAndGetId(path, true);
     GoogleCloudStorageItemInfo itemInfo = gcs.getItemInfo(resourceId);
-    // TODO(user): Here and below, just request foo and foo/ simultaneously in the same batch
+    // TODO(dhuo): Here and below, just request foo and foo/ simultaneously in the same batch
     // request and choose the relevant one.
     if (!itemInfo.exists() && !FileInfo.isDirectory(itemInfo)) {
       // If the given file does not exist, see if a directory of
@@ -1235,7 +1237,7 @@ public class GoogleCloudStorageFileSystem {
     // StorageResourceId to the index of itemInfos the new item will replace.
     // NB: HashMap here is required; if we wish to use TreeMap we must implement Comparable in
     // StorageResourceId.
-    // TODO(user): Use HashMultimap if it ever becomes possible for the input to list the same
+    // TODO(dhuo): Use HashMultimap if it ever becomes possible for the input to list the same
     // URI multiple times and actually expects the returned list to list those duplicate values
     // the same multiple times.
     Map<StorageResourceId, Integer> convertedIdsToIndex = new HashMap<>();
