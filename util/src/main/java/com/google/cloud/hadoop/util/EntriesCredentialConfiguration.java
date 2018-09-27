@@ -78,6 +78,11 @@ public class EntriesCredentialConfiguration extends CredentialConfiguration {
    */
   public static final String JSON_KEYFILE_SUFFIX = ".auth.service.account.json.keyfile";
   /**
+   * Hadoop credential provider path. Typically clients will configure the secret keys in the provider
+   */
+  public static final String CREDENTIAL_PROVIDER_PATH = ".auth.hadoop.credential.provider.path";
+
+  /**
    * For OAuth-based Installed App authentication, the key suffix specifying the client ID for
    * the credentials.
    */
@@ -243,6 +248,9 @@ public class EntriesCredentialConfiguration extends CredentialConfiguration {
       if (getOAuthCredentialFile() != null) {
         configuration.set(prefix + OAUTH_CLIENT_FILE_SUFFIX, getOAuthCredentialFile());
       }
+      if (getCredentialProviderPath() != null) {
+        configuration.set(prefix + CREDENTIAL_PROVIDER_PATH, getCredentialProviderPath());
+      }
       configuration.setBoolean(prefix + ENABLE_NULL_CREDENTIAL_SUFFIX, isNullCredentialEnabled());
     }
     // Transport configuration does not use prefixes
@@ -291,6 +299,11 @@ public class EntriesCredentialConfiguration extends CredentialConfiguration {
       String serviceAccountJsonKeyFile = entries.get(prefix + JSON_KEYFILE_SUFFIX);
       if (serviceAccountJsonKeyFile != null) {
         setServiceAccountJsonKeyFile(serviceAccountJsonKeyFile);
+      }
+
+      String hadoopCredentialProviderPath = entries.get(prefix + CREDENTIAL_PROVIDER_PATH);
+      if (hadoopCredentialProviderPath != null) {
+        setCredentialProviderPath(hadoopCredentialProviderPath);
       }
 
       String clientId = entries.get(prefix + CLIENT_ID_SUFFIX);

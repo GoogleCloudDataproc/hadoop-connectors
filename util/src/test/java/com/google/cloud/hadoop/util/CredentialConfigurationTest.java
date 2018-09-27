@@ -25,6 +25,7 @@ import com.google.api.client.http.HttpTransport;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import org.apache.hadoop.security.alias.CredentialProvider;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -112,6 +113,16 @@ public class CredentialConfigurationTest {
 
     verify(mockCredentialFactory, times(1))
         .getCredentialFromJsonKeyFile("jsonExampleKeyFile", TEST_SCOPES, mockTransport);
+  }
+
+  @Test
+  public void hadoopCredentialProviderPathWhenConfigured() throws IOException, GeneralSecurityException {
+    configuration.setCredentialProviderPath("localjceks://file/home/random_user/aws.jceks");
+    configuration.getCredential(TEST_SCOPES);
+
+    verify(mockCredentialFactory, times(1))
+            .getCredentialFromCredentialProvider("localjceks://file/home/random_user/aws.jceks",
+                    TEST_SCOPES, mockTransport);
   }
 
   @Test

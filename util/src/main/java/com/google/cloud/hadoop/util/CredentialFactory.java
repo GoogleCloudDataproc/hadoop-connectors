@@ -49,11 +49,18 @@ import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.alias.CredentialProvider;
+import org.apache.hadoop.security.alias.CredentialProviderFactory;
+
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
@@ -61,6 +68,7 @@ import java.security.PrivateKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.List;
+import java.util.ServiceLoader;
 
 /** Miscellaneous helper methods for getting a {@code Credential} from various sources. */
 public class CredentialFactory {
@@ -71,6 +79,8 @@ public class CredentialFactory {
   private static final String TOKEN_SERVER_URL_DEFAULT = "https://oauth2.googleapis.com/token";
   private static final String TOKEN_SERVER_URL =
       MoreObjects.firstNonNull(System.getenv(TOKEN_SERVER_URL_ENV_VAR), TOKEN_SERVER_URL_DEFAULT);
+  private static final ServiceLoader<CredentialProviderFactory> serviceLoader =
+          ServiceLoader.load(CredentialProviderFactory.class);
 
   /**
    * Simple HttpRequestInitializer that retries requests that result in 5XX response codes and IO
@@ -284,6 +294,77 @@ public class CredentialFactory {
     try (FileInputStream fis = new FileInputStream(serviceAccountJsonKeyFile)) {
       return GoogleCredentialWithRetry.fromGoogleCredential(
           GoogleCredential.fromStream(fis, transport, JSON_FACTORY).createScoped(scopes));
+    }
+  }
+
+  /**
+   *
+   * @param credentialProviderPath
+   * @return Correct Credential provider on basis of path configured
+   * @throws IOException
+   */
+  private CredentialProvider getHadoopCredentialProvider(String credentialProviderPath) throws IOException {
+    CredentialProvider result = null;
+    try {
+      URI uri = new URI(credentialProviderPath);
+      boolean found = false;
+      for(CredentialProviderFactory factory: serviceLoader) {
+        CredentialProvider kp = factory.createProvider(uri, new Configuration());
+        if (kp != null) {
+          result = kp;
+          found = true;
+        }
+      }
+      if (!found) {
+        throw new IOException("No CredentialProviderFactory for " + uri + " in " +
+                credentialProviderPath);
+      }
+    } catch (URISyntaxException error) {
+      throw new IOException("Bad configuration of " + credentialProviderPath, error);
+    }
+
+    return result;
+  }
+
+  /**
+   * Initializes OAuth2 credential from a Hadoop credential Provider path.
+   * More details around Hadoop credential provider
+   * <a href="https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/CredentialProviderAPI.html">
+   * Hadoop Credential </a>
+   *
+   * @param credentialProviderPath Credential provider.
+   * @param scopes List of well-formed desired scopes to use with the credential.
+   * @param transport The HttpTransport used for authorization
+   */
+  public Credential getCredentialFromCredentialProvider(
+          String credentialProviderPath,
+          List<String> scopes,
+          HttpTransport transport)
+          throws IOException {
+    logger.atFine().log("Get credential provider from credential path %s", credentialProviderPath);
+    CredentialProvider credentialProvider = getHadoopCredentialProvider(credentialProviderPath);
+
+    // Obtain all the aliases (secret keys) defined in the credential provider
+    List<String> secretAliases = credentialProvider.getAliases();
+
+
+    String separator = "";
+
+    // Construct a JSON like string over all secret keys
+    StringBuilder bld = new StringBuilder();
+    bld.append("{");
+    for (String alias : secretAliases) {
+      String key = alias;
+      String val = String.valueOf(credentialProvider.getCredentialEntry(alias).getCredential());
+      bld.append(separator + "\"" + key + "\"" + ":" + "\"" + val + "\"");
+      separator = ",";
+    }
+    bld.append("}");
+
+    // Create a byte array stream on top of JSON string to obtain the Google credential
+    try (ByteArrayInputStream byteArrInputStream = new ByteArrayInputStream(bld.toString().getBytes())) {
+      return GoogleCredentialWithRetry.fromGoogleCredential(
+              GoogleCredential.fromStream(byteArrInputStream, transport, JSON_FACTORY).createScoped(scopes));
     }
   }
 

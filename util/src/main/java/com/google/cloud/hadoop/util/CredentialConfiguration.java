@@ -43,6 +43,9 @@ public class CredentialConfiguration {
   // The following parameter is used for ServiceAccount Json KeyFiles
   private String serviceAccountJsonKeyFile = null;
 
+  // The following parameter is used for Hadoop-credential provider Path
+  private String credentialProviderPath = null;
+
   // The following 3 parameters are used for client authentication
   private String clientId = null;
   private String clientSecret = null;
@@ -138,6 +141,23 @@ public class CredentialConfiguration {
             serviceAccountEmail, serviceAccountKeyFile, scopes, getTransport());
       }
 
+      if (!isNullOrEmpty(credentialProviderPath)) {
+        Preconditions.checkArgument(
+                isNullOrEmpty(serviceAccountKeyFile),
+                "A P12 key file may not be specified at the same time as a credential provider path.");
+        Preconditions.checkArgument(
+                isNullOrEmpty(serviceAccountJsonKeyFile),
+                "A JSON key file may not be specified at the same time as a credential provider path.");
+        Preconditions.checkArgument(
+                isNullOrEmpty(serviceAccountEmail),
+                "Service account email may not be specified at the same time as a credential provider path.");
+
+        // If credential to be obtained from Hadoop credential provider path
+        logger.atFine().log("Obtaining hadoop credential from the path");
+        return credentialFactory.getCredentialFromCredentialProvider(credentialProviderPath,
+                scopes, getTransport());
+      }
+
       if (shouldUseApplicationDefaultCredentials()) {
         logger.atFine().log("Getting Application Default Credentials");
         return credentialFactory.getApplicationDefaultCredentials(scopes, getTransport());
@@ -166,6 +186,7 @@ public class CredentialConfiguration {
     return isNullOrEmpty(serviceAccountKeyFile)
         && isNullOrEmpty(serviceAccountJsonKeyFile)
         && isNullOrEmpty(serviceAccountPrivateKey)
+        && isNullOrEmpty(credentialProviderPath)
         && !shouldUseApplicationDefaultCredentials();
   }
 
@@ -264,6 +285,12 @@ public class CredentialConfiguration {
   public void setProxyAddress(String proxyAddress) {
     this.proxyAddress = proxyAddress;
   }
+
+  public void setCredentialProviderPath(String credentialProviderPath) {
+    this.credentialProviderPath = credentialProviderPath;
+  }
+
+  public String getCredentialProviderPath() { return credentialProviderPath; }
 
   @VisibleForTesting
   void setCredentialFactory(CredentialFactory factory) {
