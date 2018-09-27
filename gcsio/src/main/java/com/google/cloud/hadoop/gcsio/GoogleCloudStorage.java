@@ -368,10 +368,6 @@ public interface GoogleCloudStorage {
   /**
    * Waits for the given bucket to be empty.
    *
-   * MOE:begin_intracomment_strip
-   * TODO(dhuo): Remove this method from public interface once overall index consistency issues
-   * are abstracted out in a better way.
-   * MOE:end_intracomment_strip
    *
    * Note:
    * GCS only supports eventual consistency of object lists.
