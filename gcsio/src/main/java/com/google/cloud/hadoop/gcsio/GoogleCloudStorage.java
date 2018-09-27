@@ -315,14 +315,15 @@ public interface GoogleCloudStorage {
       throws IOException;
 
   /**
-   * The same semanticsas {@link #listObjectInfo} with unlimited maximum total number of items
-   * returned
+   * The same semantics as {@link #listObjectInfo}, but returns only result of single list request
+   * (1 page).
    *
    * @param bucketName bucket name
    * @param objectNamePrefix object name prefix or null if all objects in the bucket are desired
    * @param delimiter delimiter to use (typically "/"), otherwise null
-   * @param pageToken the page state during pagination; null if no pagination is desired
-   * @return list of object info per page
+   * @param pageToken the page token
+   * @return {@link ListPage} object with listed {@link GoogleCloudStorageItemInfo}s and next page
+   *     token if any
    * @throws IOException on IO error
    */
   ListPage<GoogleCloudStorageItemInfo> listObjectInfoPage(
@@ -367,6 +368,10 @@ public interface GoogleCloudStorage {
   /**
    * Waits for the given bucket to be empty.
    *
+   * MOE:begin_intracomment_strip
+   * TODO(dhuo): Remove this method from public interface once overall index consistency issues
+   * are abstracted out in a better way.
+   * MOE:end_intracomment_strip
    *
    * Note:
    * GCS only supports eventual consistency of object lists.
