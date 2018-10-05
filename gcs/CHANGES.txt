@@ -21,7 +21,6 @@
 
   3. Update Apache HttpClient to the latest version.
 
-
 1.9.7 - 2018-09-20
 
   1. Add an option to provide credentials directly in Hadoop Configuration,
