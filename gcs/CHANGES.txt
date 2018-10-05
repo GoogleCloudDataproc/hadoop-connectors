@@ -1,4 +1,7 @@
-1.9.8 - 2018-XX-XX
+1.9.9 - 2018-XX-XX
+
+
+1.9.8 - 2018-10-03
 
   1. Expose `FileChecksum` in `GoogleHadoopFileSystem` via property:
 
@@ -16,6 +19,7 @@
         fs.gs.proxy.username (default: null)
         fs.gs.proxy.password (default: null)
 
+  3. Update Apache HttpClient to the latest version.
 
 1.9.7 - 2018-09-20
 
