@@ -380,6 +380,24 @@ public class GoogleHadoopFileSystemConfiguration {
           EntriesCredentialConfiguration.PROXY_ADDRESS_DEFAULT);
 
   /**
+   * Configuration key for setting a proxy username for the connector to use to authenticate with
+   * proxy used to connect to GCS.
+   */
+  public static final GoogleHadoopFileSystemConfigurationProperty<String> GCS_PROXY_USERNAME =
+      new GoogleHadoopFileSystemConfigurationProperty<>(
+          EntriesCredentialConfiguration.PROXY_USERNAME_KEY,
+          EntriesCredentialConfiguration.PROXY_USERNAME_DEFAULT);
+
+  /**
+   * Configuration key for setting a proxy password for the connector to use to authenticate with
+   * proxy used to connect to GCS.
+   */
+  public static final GoogleHadoopFileSystemConfigurationProperty<String> GCS_PROXY_PASSWORD =
+      new GoogleHadoopFileSystemConfigurationProperty<>(
+          EntriesCredentialConfiguration.PROXY_PASSWORD_KEY,
+          EntriesCredentialConfiguration.PROXY_PASSWORD_DEFAULT);
+
+  /**
    * Configuration key for the name of HttpTransport class to use for connecting to GCS. Must be the
    * name of an HttpTransportFactory.HttpTransportType (APACHE or JAVA_NET).
    */
@@ -500,12 +518,12 @@ public class GoogleHadoopFileSystemConfiguration {
             .setEnableBucketDelete(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))
             .setShouldIncludeInTimestampUpdatesPredicate(
                 ParentTimestampUpdateIncludePredicate.create(config))
-            .setMarkerFilePattern(GCS_MARKER_FILE_PATTERN.get(config::get))
+            .setMarkerFilePattern(GCS_MARKER_FILE_PATTERN.get(config, config::get))
             .setIsPerformanceCacheEnabled(
                 GCS_PERFORMANCE_CACHE_ENABLE.get(config, config::getBoolean))
             .setImmutablePerformanceCachingOptions(getPerformanceCachingOptions(config));
 
-    String projectId = GCS_PROJECT_ID.get(config::get);
+    String projectId = GCS_PROJECT_ID.get(config, config::get);
     gcsFsOptionsBuilder
         .getCloudStorageOptionsBuilder()
         .setAutoRepairImplicitDirectoriesEnabled(
@@ -519,7 +537,9 @@ public class GoogleHadoopFileSystemConfiguration {
         .setCopyMaxRequestsPerBatch(GCS_COPY_MAX_REQUESTS_PER_BATCH.get(config, config::getLong))
         .setCopyBatchThreads(GCS_COPY_BATCH_THREADS.get(config, config::getInt))
         .setTransportType(GCS_HTTP_TRANSPORT.get(config, config::getEnum))
-        .setProxyAddress(GCS_PROXY_ADDRESS.get(config::get))
+        .setProxyAddress(GCS_PROXY_ADDRESS.get(config, config::get))
+        .setProxyUsername(GCS_PROXY_USERNAME.get(config, config::get))
+        .setProxyPassword(GCS_PROXY_PASSWORD.get(config, config::get))
         .setProjectId(projectId)
         .setMaxListItemsPerCall(GCS_MAX_LIST_ITEMS_PER_CALL.get(config, config::getLong))
         .setMaxRequestsPerBatch(GCS_MAX_REQUESTS_PER_BATCH.get(config, config::getLong))
@@ -550,8 +570,8 @@ public class GoogleHadoopFileSystemConfiguration {
   }
 
   private static String getApplicationName(Configuration config) {
-    String applicationName =
-        GoogleHadoopFileSystem.GHFS_ID + nullToEmpty(GCS_APPLICATION_NAME_SUFFIX.get(config::get));
+    String appNameSuffix = nullToEmpty(GCS_APPLICATION_NAME_SUFFIX.get(config, config::get));
+    String applicationName = GoogleHadoopFileSystem.GHFS_ID + appNameSuffix;
     logger.atFine().log("Setting GCS application name to %s", applicationName);
     return applicationName;
   }
@@ -579,11 +599,11 @@ public class GoogleHadoopFileSystemConfiguration {
 
   private static RequesterPaysOptions getRequesterPaysOptions(
       Configuration config, String projectId) {
-    String requesterPaysProjectId = GCS_REQUESTER_PAYS_PROJECT_ID.get(config::get);
+    String requesterPaysProjectId = GCS_REQUESTER_PAYS_PROJECT_ID.get(config, config::get);
     return RequesterPaysOptions.builder()
         .setMode(GCS_REQUESTER_PAYS_MODE.get(config, config::getEnum))
         .setProjectId(requesterPaysProjectId == null ? projectId : requesterPaysProjectId)
-        .setBuckets(GCS_REQUESTER_PAYS_BUCKETS.get(config::getStringCollection))
+        .setBuckets(GCS_REQUESTER_PAYS_BUCKETS.getStringCollection(config))
         .build();
   }
 }
