@@ -519,13 +519,9 @@ public class GoogleHadoopFileSystemConfiguration {
               "fs.gs.inputstream.min.range.request.size",
               GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE);
 
-  /**
-   * Override configuration file path.
-   */
-  public static final GoogleHadoopFileSystemConfigurationProperty<Integer>
-          GCS_CONFIG_OVERRIDE_FILE =
-          new GoogleHadoopFileSystemConfigurationProperty<>(
-                  "fs.gs.config.override.file", null);
+  /** Override configuration file path. This file must have be a valid Hadoop configuration file. */
+  public static final GoogleHadoopFileSystemConfigurationProperty<String> GCS_CONFIG_OVERRIDE_FILE =
+      new GoogleHadoopFileSystemConfigurationProperty<>("fs.gs.config.override.file", null);
 
   @VisibleForTesting
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
