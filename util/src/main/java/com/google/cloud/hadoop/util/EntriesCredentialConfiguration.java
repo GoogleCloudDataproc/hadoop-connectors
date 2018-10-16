@@ -303,7 +303,8 @@ public class EntriesCredentialConfiguration extends CredentialConfiguration {
       if (serviceAccountPrivateKeyId != null) {
         setServiceAccountPrivateKeyId(serviceAccountPrivateKeyId);
       }
-      String serviceAccountPrivateKey = entries.getPassword(prefix + SERVICE_ACCOUNT_PRIVATE_KEY_SUFFIX);
+      String serviceAccountPrivateKey =
+          entries.getPassword(prefix + SERVICE_ACCOUNT_PRIVATE_KEY_SUFFIX);
       if (serviceAccountPrivateKey != null) {
         setServiceAccountPrivateKey(serviceAccountPrivateKey);
       }
