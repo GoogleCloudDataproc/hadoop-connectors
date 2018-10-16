@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 Google Inc. All Rights Reserved.
+ * Copyright 2018 Google Inc. All Rights Reserved.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -17,10 +17,9 @@ package com.google.cloud.hadoop.util;
 import org.apache.hadoop.conf.Configuration;
 
 /**
- * A generic adapter to use a Hadoop Configuration object as the config object
- * for our superclass.
+ * A generic adapter to use a Hadoop Configuration object as the config object for our superclass.
  */
-public  abstract class ConfigurationEntriesAdapterGeneric
+public abstract class ConfigurationEntriesAdapterGeneric
     implements EntriesCredentialConfiguration.Entries {
   protected Configuration config;
 
