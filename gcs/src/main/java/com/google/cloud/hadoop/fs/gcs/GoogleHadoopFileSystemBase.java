@@ -1513,6 +1513,16 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
     logger.atFine().log("GHFS.configure");
     logger.atFine().log("GHFS_ID = %s", GHFS_ID);
 
+    // if overrides file configured, update properties from override file into Configuration object
+    if(config.get(GoogleHadoopFileSystemConfiguration.GCS_CONFIG_OVERRIDE_FILE.getKey()) != null) {
+      File overrideFileObject = Paths.get(config.get(GoogleHadoopFileSystemConfiguration.GCS_CONFIG_OVERRIDE_FILE.getKey())).toFile();
+      if(overrideFileObject.exists()) {
+        config.addResource(FileUtils.openInputStream(overrideFileObject));
+      } else {
+        logger.atWarning().log("Override configuration path specified not present, path "+overrideFileObject.getAbsolutePath());
+      }
+    }
+
     if (gcsfs == null) {
       copyDeprecatedConfigurationOptions(config);
 
@@ -1528,16 +1538,6 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
 
       enableFlatGlob = GCS_FLAT_GLOB_ENABLE.get(config, config::getBoolean);
       checksumType = GCS_FILE_CHECKSUM_TYPE.get(config, config::getEnum);
-
-      // if overrides file configured, update properties from override file into Configuration object
-      if(config.get(GoogleHadoopFileSystemConfiguration.GCS_CONFIG_OVERRIDE_FILE.getKey()) != null) {
-        File overrideFileObject = Paths.get(config.get(GoogleHadoopFileSystemConfiguration.GCS_CONFIG_OVERRIDE_FILE.getKey())).toFile();
-        if(overrideFileObject.exists()) {
-          config.addResource(FileUtils.openInputStream(overrideFileObject));
-        } else {
-          logger.atWarning().log("Override configuration path specified not present, path "+overrideFileObject.getAbsolutePath());
-        }
-      }
 
       GoogleCloudStorageFileSystemOptions.Builder optionsBuilder =
           GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config);
