@@ -6,6 +6,12 @@
 
        fs.gs.glob.concurent.enable (default: false)
 
+  2. Add an option to provide path configuration override file. Connector overrides
+     configurations with values provided in this file. File format should be xml and
+     follows same schema of hadoop configuration files.
+
+       fs.gs.config.override.file (default: null)
+
 1.9.8 - 2018-10-03
 
   1. Expose `FileChecksum` in `GoogleHadoopFileSystem` via property:
