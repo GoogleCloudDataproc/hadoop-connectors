@@ -60,8 +60,12 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.flogger.GoogleLogger;
-
-import java.io.*;
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.net.URI;
 import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.Paths;
@@ -1553,15 +1557,7 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
     logger.atFine().log("GHFS.configure");
     logger.atFine().log("GHFS_ID = %s", GHFS_ID);
 
-    // if overrides file configured, update properties from override file into Configuration object
-    if(config.get(GoogleHadoopFileSystemConfiguration.GCS_CONFIG_OVERRIDE_FILE.getKey()) != null) {
-      File overrideFileObject = Paths.get(config.get(GoogleHadoopFileSystemConfiguration.GCS_CONFIG_OVERRIDE_FILE.getKey())).toFile();
-      if(overrideFileObject.exists()) {
-        config.addResource(FileUtils.openInputStream(overrideFileObject));
-      } else {
-        logger.atWarning().log("Override configuration path specified not present, path "+overrideFileObject.getAbsolutePath());
-      }
-    }
+    overrideConfigFromFile(config);
 
     if (gcsfs == null) {
       copyDeprecatedConfigurationOptions(config);
@@ -1637,6 +1633,25 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
     setConf(config);
 
     logger.atFine().log("GHFS.configure: done");
+  }
+
+  /**
+   * If overrides file configured, update properties from override file into {@link Configuration}
+   * object
+   */
+  private void overrideConfigFromFile(Configuration config) throws IOException {
+    String configFilePath =
+        GoogleHadoopFileSystemConfiguration.GCS_CONFIG_OVERRIDE_FILE.get(config, config::get);
+    if (configFilePath != null) {
+      File configFile = Paths.get(configFilePath).toFile();
+      if (configFile.exists()) {
+        config.addResource(FileUtils.openInputStream(configFile));
+      } else {
+        logger.atWarning().log(
+            "Override configuration path specified not present, path %s",
+            configFile.getAbsolutePath());
+      }
+    }
   }
 
   /**
