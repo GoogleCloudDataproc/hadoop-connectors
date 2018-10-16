@@ -60,13 +60,11 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.flogger.GoogleLogger;
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.OutputStream;
+
+import java.io.*;
 import java.net.URI;
 import java.nio.file.DirectoryNotEmptyException;
+import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -84,6 +82,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -1570,6 +1569,16 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
       enableFlatGlob = GCS_FLAT_GLOB_ENABLE.get(config, config::getBoolean);
       enableConcurrentGlob = GCS_CONCURRENT_GLOB_ENABLE.get(config, config::getBoolean);
       checksumType = GCS_FILE_CHECKSUM_TYPE.get(config, config::getEnum);
+
+      // if overrides file configured, update properties from override file into Configuration object
+      if(config.get(GoogleHadoopFileSystemConfiguration.GCS_CONFIG_OVERRIDE_FILE.getKey()) != null) {
+        File overrideFileObject = Paths.get(config.get(GoogleHadoopFileSystemConfiguration.GCS_CONFIG_OVERRIDE_FILE.getKey())).toFile();
+        if(overrideFileObject.exists()) {
+          config.addResource(FileUtils.openInputStream(overrideFileObject));
+        } else {
+          logger.atWarning().log("Override configuration path specified not present, path "+overrideFileObject.getAbsolutePath());
+        }
+      }
 
       GoogleCloudStorageFileSystemOptions.Builder optionsBuilder =
           GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config);
