@@ -16,10 +16,10 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONCURRENT_GLOB_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CREATE_SYSTEM_BUCKET;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_FLAT_GLOB_ENABLE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONCURRENT_GLOB_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_TYPE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_PARENT_TIMESTAMP_UPDATE_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_PARENT_TIMESTAMP_UPDATE_EXCLUDES;
@@ -1203,7 +1203,8 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
     return globInternal(fixedPath, filter, pathPattern);
   }
 
-  private FileStatus[] concurrentGlobInternal(Path fixedPath, PathFilter filter, Path pathPattern) throws IOException {
+  private FileStatus[] concurrentGlobInternal(Path fixedPath, PathFilter filter, Path pathPattern)
+      throws IOException {
     ExecutorService executorService = Executors.newFixedThreadPool(2);
     Callable<FileStatus[]> flatGlobTask = () -> flatGlobInternal(fixedPath, filter);
     Callable<FileStatus[]> nonFlatGlobTask = () -> globInternal(fixedPath, filter, pathPattern);
@@ -1240,7 +1241,7 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
       // TODO: Are implicit directories really always needed for globbing?
       //  Probably they should be inferred only when fs.gs.implicit.dir.infer.enable is true.
       Collection<FileStatus> statusPage =
-              toFileStatusesWithImplicitDirectories(infoPage.getItems());
+          toFileStatusesWithImplicitDirectories(infoPage.getItems());
 
       // TODO: refactor to use GlobPattern and PathFilter directly without helper FS
       FileSystem helperFileSystem =
@@ -1249,7 +1250,7 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
       if (matchedStatusPage != null) {
         Collections.addAll(
             (matchedStatuses == null ? matchedStatuses = new ArrayList<>() : matchedStatuses),
-                matchedStatusPage);
+            matchedStatusPage);
       }
 
       pageToken = infoPage.getNextPageToken();
@@ -1287,8 +1288,7 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
       }
       if (!toRepair.isEmpty()) {
         logger.atWarning().log(
-            "Discovered %s implicit directories to repair within return values.",
-            toRepair.size());
+            "Discovered %s implicit directories to repair within return values.", toRepair.size());
         gcsfs.repairDirs(toRepair);
       }
     }
@@ -1296,7 +1296,8 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
     return returnList;
   }
 
-  private FileStatus[] globInternal(Path fixedPath, PathFilter filter, Path pathPattern) throws IOException {
+  private FileStatus[] globInternal(Path fixedPath, PathFilter filter, Path pathPattern)
+      throws IOException {
     FileStatus[] ret = super.globStatus(fixedPath, filter);
     if (ret == null) {
       if (enableAutoRepairImplicitDirectories) {
