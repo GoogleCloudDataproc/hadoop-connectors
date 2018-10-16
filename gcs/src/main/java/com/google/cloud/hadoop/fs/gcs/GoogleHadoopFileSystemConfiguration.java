@@ -299,11 +299,12 @@ public class GoogleHadoopFileSystemConfiguration {
       new GoogleHadoopFileSystemConfigurationProperty<>("fs.gs.glob.flatlist.enable", true);
 
   /**
-   * Configuration key for enabling the use of flat and regular glob search algorithms in two parallel
-   * threads. After the first one returns result, another one will be interrupted.
+   * Configuration key for enabling the use of flat and regular glob search algorithms in two
+   * parallel threads. After the first one returns result, another one will be interrupted.
    */
-  public static final GoogleHadoopFileSystemConfigurationProperty<Boolean> GCS_CONCURRENT_GLOB_ENABLE =
-      new GoogleHadoopFileSystemConfigurationProperty<>("fs.gs.glob.concurent.enable", false);
+  public static final GoogleHadoopFileSystemConfigurationProperty<Boolean>
+      GCS_CONCURRENT_GLOB_ENABLE =
+          new GoogleHadoopFileSystemConfigurationProperty<>("fs.gs.glob.concurent.enable", false);
 
   /**
    * Configuration key for enabling the use of marker files during file creation. When running
