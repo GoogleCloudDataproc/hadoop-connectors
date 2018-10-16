@@ -17,9 +17,9 @@ package com.google.cloud.hadoop.util;
 import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 
-public class ConfigurationEntriesAdapter extends ConfigurationEntriesAdapterGeneric {
+abstract class ConfigurationEntriesAdapterSpecific extends ConfigurationEntriesAdapterGeneric {
 
-  public ConfigurationEntriesAdapter(Configuration config) {
+  public ConfigurationEntriesAdapterSpecific(Configuration config) {
     super(config);
   }
 

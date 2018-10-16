@@ -32,6 +32,16 @@ import org.apache.hadoop.conf.Configuration;
 public class HadoopCredentialConfiguration
     extends EntriesCredentialConfiguration implements Configurable {
 
+  /** An adapter to use our Configuration object as the config object for our superclass.
+   *  Exists here for backward compatibility
+   */
+  public static class ConfigurationEntriesAdapter
+      extends ConfigurationEntriesAdapterSpecific {
+    public ConfigurationEntriesAdapter(Configuration config) {
+      super(config);
+    }
+  }
+
   /**
    * Create a Builder with a withConfiguration method that
    * takes our Configuration.
