@@ -89,6 +89,19 @@ public final class CredentialFromAccessTokenProviderClassFactory {
    * provider, return null.
    */
   public static Credential credential(
+    AccessTokenProvider accessTokenProvider,
+    Collection<String> scopes)
+    throws IOException, GeneralSecurityException {
+    return getCredentialFromAccessTokenProvider(accessTokenProvider, scopes);
+  }
+
+  /**
+   * Generate the credential.
+   *
+   * <p>If the {@link AccessTokenProviderClassFromConfigFactory} generates no Class for the
+   * provider, return null.
+   */
+  public static Credential credential(
       AccessTokenProviderClassFromConfigFactory providerClassFactory,
       Configuration config,
       Collection<String> scopes)
