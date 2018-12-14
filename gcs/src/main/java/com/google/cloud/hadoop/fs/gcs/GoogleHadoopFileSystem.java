@@ -78,7 +78,7 @@ public class GoogleHadoopFileSystem extends GoogleHadoopFileSystemBase {
     if (rootBucket != null) {
       // Validate root bucket name
       pathCodec.getPath(rootBucket, null, true);
-    } else if (systemBucket != null) {
+    } else if (systemBucket != null && !systemBucket.isEmpty()) {
       logger.atWarning().log(
           "GHFS.configureBuckets: Warning. No GCS bucket provided. "
               + "Falling back on deprecated fs.gs.system.bucket.");

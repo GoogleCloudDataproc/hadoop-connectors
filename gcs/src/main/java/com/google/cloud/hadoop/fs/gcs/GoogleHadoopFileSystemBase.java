@@ -1657,7 +1657,7 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
     logger.atFine().log("GHFS.configureBuckets: %s, %s", systemBucketName, createSystemBucket);
 
     systemBucket = systemBucketName;
-    if (systemBucket != null) {
+    if (systemBucket != null && !systemBucket.isEmpty()) {
       logger.atFine().log("GHFS.configureBuckets: Warning fs.gs.system.bucket is deprecated.");
       // Ensure that system bucket exists. It really must be a bucket, not a GCS path.
       URI systemBucketPath =
