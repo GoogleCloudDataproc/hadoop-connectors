@@ -140,12 +140,11 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
       throws URISyntaxException, IOException;
 
   @Test
-  public abstract void testConfigureBucketsWithRootBucketButNoSystemBucket()
-      throws IOException;
+  public abstract void testConfigureBucketsWithRootBucketButNoSystemBucket() throws IOException;
 
   @Test
   public abstract void testConfigureBucketsWithNeitherRootBucketNorSystemBucket()
-        throws IOException;
+      throws IOException;
 
   // -----------------------------------------------------------------------------------------
   // Tests that aren't supported by all configurations of GHFS.
