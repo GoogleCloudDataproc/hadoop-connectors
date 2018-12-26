@@ -78,6 +78,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.DirectoryNotEmptyException;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
@@ -663,7 +664,13 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   private void initializeDelegationTokenSupport(Configuration config, URI path) throws IOException {
     // Load delegation token binding, if support is configured
     GCSDelegationTokens dts = new GCSDelegationTokens();
-    dts.bindToFileSystem(path, this);
+    URI uri;
+    try {
+      uri = new URI(getScheme() + "://" + path.getAuthority());
+    } catch (URISyntaxException e) {
+      throw new RuntimeException(e);
+    }
+    dts.bindToFileSystem(uri, this);
     try {
       dts.init(config);
       delegationTokens = dts;
