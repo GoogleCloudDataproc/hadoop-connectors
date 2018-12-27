@@ -111,6 +111,32 @@ public class ResilientOperationTest {
     verifySleeper(sleeper, 2);
   }
 
+  @Test
+  public void testCallRetriesAndFailsWithServerErrors() throws Exception {
+    MockSleeper sleeper = new MockSleeper();
+    ArrayList<IOException> exceptions = new ArrayList<>();
+    exceptions.add(new RetryDeterminerTest().makeHttpException(500));
+    exceptions.add(new RetryDeterminerTest().makeHttpException(500));
+    exceptions.add(new IOException("FakeException"));
+    CallableTester<IOException> callTester = new CallableTester<>(exceptions);
+    BackOff backoff = new RetryBoundedBackOff(5, new BackOffTester());
+
+    IOException thrown =
+        assertThrows(
+            IOException.class,
+            () ->
+                ResilientOperation.retry(
+                    callTester,
+                    backoff,
+                    RetryDeterminer.SERVER_ERRORS,
+                    IOException.class,
+                    sleeper));
+    assertThat(thrown).hasMessageThat().contains("FakeException");
+
+    assertThat(callTester.timesCalled()).isEqualTo(3);
+    verifySleeper(sleeper, 2);
+  }
+
   public void verifySleeper(MockSleeper sleeper, int retry) {
     assertThat(retry).isEqualTo(sleeper.getCount());
     if (retry == 0) {
