@@ -292,7 +292,7 @@ public class GCSDelegationTokens {
    * @throws IOException failure to validate/read data encoded in identifier.
    * @throws IllegalArgumentException if the token isn't an GCP session token
    */
-  public AbstractGCPTokenIdentifier extractIdentifier(
+  public static AbstractGCPTokenIdentifier extractIdentifier(
       final Token<? extends AbstractGCPTokenIdentifier> token)
       throws IOException {
     Preconditions.checkArgument(token != null, "null token");
@@ -311,8 +311,7 @@ public class GCSDelegationTokens {
       }
     }
     if (identifier == null) {
-      throw new DelegationTokenIOException("Failed to unmarshall token for "
-          + getUri());
+      throw new DelegationTokenIOException("Failed to unmarshall token " + token.toString());
     }
     identifier.validate();
     return identifier;
