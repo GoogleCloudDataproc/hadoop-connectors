@@ -91,7 +91,7 @@ public class GCSDelegationTokens {
           (AbstractDelegationTokenBinding) bindingClass.newInstance();
       binding.bindToFileSystem(getUri(), fileSystem);
       tokenBinding = binding;
-      logger.atInfo().log("Filesystem %s is using delegation tokens of kind %s",
+      logger.atFine().log("Filesystem %s is using delegation tokens of kind %s",
           getUri(), tokenBinding.getKind().toString());
 
       service = binding.getService();
@@ -129,7 +129,7 @@ public class GCSDelegationTokens {
       throws IOException {
     Preconditions.checkState(!isBoundToDT(),
         "Already Bound to a delegation token");
-    logger.atInfo().log("No delegation tokens present: using direct authentication");
+    logger.atFine().log("No delegation tokens present: using direct authentication");
     accessTokenProvider = tokenBinding.deployUnbonded();
     return accessTokenProvider;
   }
