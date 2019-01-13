@@ -61,17 +61,8 @@ public abstract class AbstractGCPTokenIdentifier extends DelegationTokenIdentifi
     super(kind);
   }
 
-  protected AbstractGCPTokenIdentifier(Text kind, String renewer, String realUser) {
-    this(kind, new Text(), new Text(renewer), new Text(realUser));
-  }
-
-  protected AbstractGCPTokenIdentifier(Text kind, Text owner, Text renewer, Text realUser) {
+  protected AbstractGCPTokenIdentifier(Text kind, Text owner, Text renewer, Text realUser, URI uri, String origin) {
     super(kind, owner, renewer, realUser);
-  }
-
-  protected AbstractGCPTokenIdentifier(Text kind, URI uri, Text owner, String origin) {
-    super(kind);
-    this.setOwner(owner);
     this.uri = uri;
     this.origin = origin;
   }

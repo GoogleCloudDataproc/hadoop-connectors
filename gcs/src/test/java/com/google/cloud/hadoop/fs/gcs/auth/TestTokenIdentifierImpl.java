@@ -32,7 +32,7 @@ public class TestTokenIdentifierImpl extends AbstractGCPTokenIdentifier {
   }
 
   public TestTokenIdentifierImpl(URI uri, Text owner, String origin) {
-    super(KIND, uri, owner, origin);
+    super(KIND, owner, owner, owner, uri, origin);
   }
 }
 
