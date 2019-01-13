@@ -134,13 +134,12 @@ public abstract class AbstractGCPTokenIdentifier extends DelegationTokenIdentifi
 
   @Override
   public String toString() {
-    final StringBuilder sb = new StringBuilder("GCPTokenIdentifier{");
+    final StringBuilder sb = new StringBuilder("GCPTokenIdentifier: ");
     sb.append(getKind());
     sb.append("; uri=").append(uri);
     sb.append("; timestamp=").append(created);
     sb.append("; uuid=").append(uuid);
     sb.append("; ").append(origin);
-    sb.append('}');
     return sb.toString();
   }
 
