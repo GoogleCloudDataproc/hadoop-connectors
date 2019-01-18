@@ -42,6 +42,7 @@ public class GoogleCloudStorageWriteChannel
   private final String objectName;
   private final ObjectWriteConditions writeConditions;
   private final Map<String, String> metadata;
+  private String kmsKeyName;
 
   private GoogleCloudStorageItemInfo completedItemInfo = null;
 
@@ -65,13 +66,17 @@ public class GoogleCloudStorageWriteChannel
       AsyncWriteChannelOptions options,
       ObjectWriteConditions writeConditions,
       Map<String, String> objectMetadata) {
-    super(threadPool, options);
-    this.setClientRequestHelper(requestHelper);
-    this.gcs = gcs;
-    this.bucketName = bucketName;
-    this.objectName = objectName;
-    this.writeConditions = writeConditions;
-    this.metadata = objectMetadata;
+    this(
+        threadPool,
+        gcs,
+        requestHelper,
+        bucketName,
+        objectName,
+        options,
+        writeConditions,
+        objectMetadata,
+        null,
+        null);
   }
 
   /**
@@ -104,8 +109,46 @@ public class GoogleCloudStorageWriteChannel
         objectName,
         options,
         writeConditions,
-        objectMetadata);
-    setContentType(contentType);
+        objectMetadata,
+        contentType,
+        null);
+  }
+
+  /**
+   * Constructs an instance of GoogleCloudStorageWriteChannel.
+   *
+   * @param threadPool thread pool to use for running the upload operation
+   * @param gcs storage object instance
+   * @param requestHelper a ClientRequestHelper to set extra headers
+   * @param bucketName name of the bucket to create object in
+   * @param objectName name of the object to create
+   * @param writeConditions conditions on which write should be allowed to continue
+   * @param objectMetadata metadata to apply to the newly created object
+   * @param contentType content type
+   * @param kmsKeyName Name of Cloud KMS key to use to encrypt the newly created object
+   */
+  public GoogleCloudStorageWriteChannel(
+      ExecutorService threadPool,
+      Storage gcs,
+      ClientRequestHelper<StorageObject> requestHelper,
+      String bucketName,
+      String objectName,
+      AsyncWriteChannelOptions options,
+      ObjectWriteConditions writeConditions,
+      Map<String, String> objectMetadata,
+      String contentType,
+      String kmsKeyName) {
+    super(threadPool, options);
+    this.setClientRequestHelper(requestHelper);
+    this.gcs = gcs;
+    this.bucketName = bucketName;
+    this.objectName = objectName;
+    this.writeConditions = writeConditions;
+    this.metadata = objectMetadata;
+    if (contentType != null) {
+      setContentType(contentType);
+    }
+    this.kmsKeyName = kmsKeyName;
   }
 
   @Override
@@ -124,6 +167,9 @@ public class GoogleCloudStorageWriteChannel
         new LoggingMediaHttpUploaderProgressListener(this.objectName, MIN_LOGGING_INTERVAL_MS));
     }
     insert.setName(objectName);
+    if (kmsKeyName != null) {
+      insert.setKmsKeyName(kmsKeyName);
+    }
     return insert;
   }
 
