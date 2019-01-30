@@ -63,6 +63,7 @@ import com.google.common.base.Strings;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.flogger.GoogleLogger;
@@ -91,6 +92,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+
 import org.apache.commons.codec.binary.Hex;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
@@ -199,6 +202,9 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
 
   /** Identifies this version of the GoogleHadoopFileSystemBase library. */
   public static final String GHFS_ID;
+
+  /** The maximum number of objects that can be composed in one operation. */
+  public static final int MAX_COMPOSE_OBJECTS = 32;
 
   static {
     VERSION =
@@ -817,6 +823,37 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
     increment(Counter.APPEND);
     increment(Counter.APPEND_TIME, duration);
     throw new IOException("The append operation is not supported.");
+  }
+
+  /**
+   * Concat existing files together.
+   * @param trg the path to the target destination.
+   * @param psrcs the paths to the sources to use for the concatenation.
+   * @throws IOException IO failure
+   */
+  @Override
+  public void concat(final Path trg, final Path [] psrcs) throws IOException {
+    logger.atFine().log("GHFS.concat: %s, %d sources", trg, psrcs.length);
+
+    Preconditions.checkArgument(psrcs.length > 0, "must be at least one source");
+
+    URI trgPath = getGcsPath(trg);
+    List<URI> srcPaths = Arrays.stream(psrcs).map(this::getGcsPath).collect(Collectors.toList());
+
+    Preconditions.checkArgument(!srcPaths.contains(trgPath), "target must not be contained in sources");
+
+    List<List<URI>> partitions = Lists.partition(srcPaths, MAX_COMPOSE_OBJECTS - 1);
+    logger.atFine().log("GHFS.concat: %s, %d partitions", trg, partitions.size());
+    for (List<URI> partition : partitions) {
+      // We need to include the target in the list of sources to compose since
+      // the GCSFS compose operation will overwrite the target, whereas the Hadoop
+      // concat operation appends to the target.
+      List<URI> sources = Lists.newArrayList(trgPath);
+      sources.addAll(partition);
+      logger.atFine().log("GHFS.concat: %s, calling compose", trg);
+      getGcsFs().compose(sources, trgPath, CreateFileOptions.DEFAULT_CONTENT_TYPE);
+    }
+    logger.atFine().log("GHFS.concat: %s done", trg);
   }
 
   /**
