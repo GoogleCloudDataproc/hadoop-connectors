@@ -16,12 +16,14 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.CreateFileOptions.EMPTY_ATTRIBUTES;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.toCollection;
 
@@ -37,6 +39,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.common.collect.Streams;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.MoreExecutors;
@@ -44,10 +47,12 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.FileAlreadyExistsException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -57,6 +62,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -398,6 +404,14 @@ public class GoogleCloudStorageFileSystem {
       bucketsToDelete.add(fileInfo);
     } else {
       itemsToDelete.add(fileInfo);
+    }
+
+    if (options.enableCooperativeLocking() && recursive && fileInfo.isDirectory()) {
+      List<String> logRecords =
+          Streams.concat(itemsToDelete.stream(), bucketsToDelete.stream())
+              .map(i -> i.getItemInfo().getResourceId().toString())
+              .collect(toImmutableList());
+      logOperation(path.getAuthority(), "delete", logRecords);
     }
 
     deleteInternal(itemsToDelete, bucketsToDelete);
@@ -791,6 +805,17 @@ public class GoogleCloudStorageFileSystem {
       } else {
         srcToDstItemNames.put(srcItemInfo, dstItemName);
       }
+    }
+
+    if (options.enableCooperativeLocking()
+        && srcInfo.getItemInfo().getBucketName().equals(dst.getAuthority())) {
+      List<String> logRecords =
+          Streams.concat(
+                  srcToDstItemNames.entrySet().stream(),
+                  srcToDstMarkerItemNames.entrySet().stream())
+              .map(e -> e.getKey().getItemInfo().getResourceId() + " -> " + e.getValue())
+              .collect(toImmutableList());
+      logOperation(dst.getAuthority(), "rename", logRecords);
     }
 
     // First, copy all items except marker items
@@ -1572,5 +1597,21 @@ public class GoogleCloudStorageFileSystem {
     return index < 0
         ? pathCodec.getPath(resourceId.getBucketName(), null, true)
         : pathCodec.getPath(resourceId.getBucketName(), objectName.substring(0, index + 1), false);
+  }
+
+  private static final CreateFileOptions LOG_FILE_OPTIONS =
+      new CreateFileOptions(/* overwriteExisting= */ false, "application/text", EMPTY_ATTRIBUTES);
+
+  private void logOperation(String bucket, String operation, List<String> records)
+      throws IOException {
+    String logFile =
+        String.format("_lock/%s_%s_%s.log", Instant.now(), operation, UUID.randomUUID());
+    URI logPath = pathCodec.getPath(bucket, logFile, /* allowEmptyObjectName= */ false);
+    try (WritableByteChannel channel = create(logPath, LOG_FILE_OPTIONS)) {
+      for (String record : records) {
+        channel.write(ByteBuffer.wrap(record.getBytes(UTF_8)));
+        channel.write(ByteBuffer.wrap(new byte[] {'\n'}));
+      }
+    }
   }
 }
