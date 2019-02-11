@@ -1,6 +1,6 @@
 package com.google.cloud.hadoop.fs.gcs.contract;
 
-import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.AbstractContractConcatTest;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
@@ -13,7 +13,7 @@ import static org.apache.hadoop.fs.contract.ContractTestUtils.dataset;
 public abstract class AbstractGoogleContractConcatTest extends AbstractContractConcatTest {
   @Test
   public void testConcatMultiple() throws Throwable {
-    int numFiles = GoogleHadoopFileSystemBase.MAX_COMPOSE_OBJECTS * 3 / 2;
+    int numFiles = GoogleCloudStorage.MAX_COMPOSE_OBJECTS * 3 / 2;
     Path testPath = path("test");
 
     byte[][] blocks = new byte[numFiles][0];

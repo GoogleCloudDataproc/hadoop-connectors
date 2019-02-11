@@ -39,6 +39,7 @@ import static com.google.common.flogger.LazyArgs.lazy;
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.FileInfo;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
@@ -202,9 +203,6 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
 
   /** Identifies this version of the GoogleHadoopFileSystemBase library. */
   public static final String GHFS_ID;
-
-  /** The maximum number of objects that can be composed in one operation. */
-  public static final int MAX_COMPOSE_OBJECTS = 32;
 
   static {
     VERSION =
@@ -842,7 +840,7 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
 
     Preconditions.checkArgument(!srcPaths.contains(trgPath), "target must not be contained in sources");
 
-    List<List<URI>> partitions = Lists.partition(srcPaths, MAX_COMPOSE_OBJECTS - 1);
+    List<List<URI>> partitions = Lists.partition(srcPaths, GoogleCloudStorage.MAX_COMPOSE_OBJECTS - 1);
     logger.atFine().log("GHFS.concat: %s, %d partitions", trg, partitions.size());
     for (List<URI> partition : partitions) {
       // We need to include the target in the list of sources to compose since

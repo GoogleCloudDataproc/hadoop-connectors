@@ -547,7 +547,8 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
       final StorageResourceId destination,
       CreateObjectOptions options)
       throws IOException {
-    Preconditions.checkArgument(sources.size() <= 32, "Cannot compose more than 32 sources");
+    Preconditions.checkArgument(sources.size() <= MAX_COMPOSE_OBJECTS,
+        "Cannot compose more than %s sources", MAX_COMPOSE_OBJECTS);
     ByteArrayOutputStream tempOutput = new ByteArrayOutputStream();
     for (StorageResourceId sourceId : sources) {
       // TODO(user): If we change to also set generationIds for source objects in the base
