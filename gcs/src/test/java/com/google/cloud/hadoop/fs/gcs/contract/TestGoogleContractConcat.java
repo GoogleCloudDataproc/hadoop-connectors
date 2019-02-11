@@ -2,12 +2,11 @@ package com.google.cloud.hadoop.fs.gcs.contract;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 import org.junit.AfterClass;
 import org.junit.Before;
-
-import java.util.concurrent.atomic.AtomicReference;
 
 /** GCS contract tests covering file concat. */
 public class TestGoogleContractConcat extends AbstractGoogleContractConcatTest {

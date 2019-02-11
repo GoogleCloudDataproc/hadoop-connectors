@@ -31,9 +31,11 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.PATH_CODEC;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.emptyToNull;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.flogger.LazyArgs.lazy;
 
 import com.google.api.client.auth.oauth2.Credential;
@@ -93,8 +95,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
-
 import org.apache.commons.codec.binary.Hex;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
@@ -824,34 +824,36 @@ public abstract class GoogleHadoopFileSystemBase extends GoogleHadoopFileSystemB
   }
 
   /**
-   * Concat existing files together.
+   * Concat existing files into one file.
+   *
    * @param trg the path to the target destination.
    * @param psrcs the paths to the sources to use for the concatenation.
    * @throws IOException IO failure
    */
   @Override
-  public void concat(final Path trg, final Path [] psrcs) throws IOException {
-    logger.atFine().log("GHFS.concat: %s, %d sources", trg, psrcs.length);
+  public void concat(Path trg, Path[] psrcs) throws IOException {
+    logger.atFine().log("GHFS.concat: %s, %s", trg, lazy(() -> Arrays.toString(psrcs)));
 
-    Preconditions.checkArgument(psrcs.length > 0, "must be at least one source");
+    checkArgument(psrcs.length > 0, "psrcs must have at least one source");
 
     URI trgPath = getGcsPath(trg);
-    List<URI> srcPaths = Arrays.stream(psrcs).map(this::getGcsPath).collect(Collectors.toList());
+    List<URI> srcPaths = Arrays.stream(psrcs).map(this::getGcsPath).collect(toImmutableList());
 
-    Preconditions.checkArgument(!srcPaths.contains(trgPath), "target must not be contained in sources");
+    checkArgument(!srcPaths.contains(trgPath), "target must not be contained in sources");
 
-    List<List<URI>> partitions = Lists.partition(srcPaths, GoogleCloudStorage.MAX_COMPOSE_OBJECTS - 1);
+    List<List<URI>> partitions =
+        Lists.partition(srcPaths, GoogleCloudStorage.MAX_COMPOSE_OBJECTS - 1);
     logger.atFine().log("GHFS.concat: %s, %d partitions", trg, partitions.size());
     for (List<URI> partition : partitions) {
       // We need to include the target in the list of sources to compose since
-      // the GCSFS compose operation will overwrite the target, whereas the Hadoop
+      // the GCS FS compose operation will overwrite the target, whereas the Hadoop
       // concat operation appends to the target.
       List<URI> sources = Lists.newArrayList(trgPath);
       sources.addAll(partition);
-      logger.atFine().log("GHFS.concat: %s, calling compose", trg);
+      logger.atFine().log("GHFS.concat compose: %s, %s", trgPath, sources);
       getGcsFs().compose(sources, trgPath, CreateFileOptions.DEFAULT_CONTENT_TYPE);
     }
-    logger.atFine().log("GHFS.concat: %s done", trg);
+    logger.atFine().log("GHFS.concat:=> ");
   }
 
   /**
