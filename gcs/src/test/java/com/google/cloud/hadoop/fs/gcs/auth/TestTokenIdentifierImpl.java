@@ -31,8 +31,9 @@ public class TestTokenIdentifierImpl extends DelegationTokenIdentifier {
     super(KIND);
   }
 
-  public TestTokenIdentifierImpl(URI uri, Text owner, String origin) {
-    super(KIND, owner, owner, owner, uri, origin);
+  public TestTokenIdentifierImpl(Text owner, Text renewer, Text realUser, Text service) {
+    super(KIND, owner, renewer, realUser, service);
   }
+
 }
 
