@@ -21,12 +21,10 @@ import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 
 import java.io.IOException;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 
 import static java.util.Objects.requireNonNull;
@@ -41,26 +39,13 @@ public abstract class AbstractDelegationTokenBinding {
   protected SecretManager<AbstractGCPTokenIdentifier> secretManager =
       new TokenSecretManager();
 
-  /**
-   * URI of the filesystem.
-   * Valid after {@link #bindToFileSystem(URI, GoogleHadoopFileSystemBase)}.
-   */
-  private URI canonicalUri;
-
   private Text service;
 
   /**
    * The owning filesystem.
-   * Valid after {@link #bindToFileSystem(URI, GoogleHadoopFileSystemBase)}.
+   * Valid after {@link #bindToFileSystem(GoogleHadoopFileSystemBase, Text)}.
    */
   private GoogleHadoopFileSystemBase fileSystem;
-
-  /**
-   * Owner of the filesystem.
-   * Valid after {@link #bindToFileSystem(URI, GoogleHadoopFileSystemBase)}.
-   */
-  private UserGroupInformation owner;
-
 
   protected AbstractDelegationTokenBinding(Text kind) {
     this.kind = kind;
@@ -68,14 +53,6 @@ public abstract class AbstractDelegationTokenBinding {
 
   public Text getKind() {
     return kind;
-  }
-
-  /**
-   * Get the canonical URI of the filesystem, which is what is used to identify the tokens.
-   * @return the URI.
-   */
-  public URI getCanonicalUri() {
-    return canonicalUri;
   }
 
   /**
@@ -88,19 +65,6 @@ public abstract class AbstractDelegationTokenBinding {
   public Text getService() {
     return service;
   }
-
-  /**
-   * Return the name of the owner to be used in tokens.
-   * This may be that of the UGI owner, or it could be related to
-   * the GCS login.
-   *
-   * @return a text name of the owner.
-   */
-  public Text getOwnerText() {
-    UserGroupInformation owner = getFileSystem().getOwner();
-    return new Text(owner != null ? owner.getUserName() : "");
-  }
-
 
   /**
    * Perform any actions when deploying unbonded, and return a list
@@ -132,20 +96,16 @@ public abstract class AbstractDelegationTokenBinding {
    * is not live for actual use and will not yet have interacted with
    * GCS services.
    *
-   * @param uri the canonical URI of the FS.
    * @param fs owning FS.
+   * @param service name of the service (i.e. bucket name) for the FS.
    *
    * @throws IOException failure.
    */
-  public void bindToFileSystem(final URI uri,
-                               final GoogleHadoopFileSystemBase fs)
+  public void bindToFileSystem(final GoogleHadoopFileSystemBase fs,
+                               final Text service)
       throws IOException {
-    Preconditions.checkState((canonicalUri == null),
-                             "bindToFileSystem called twice");
-    this.canonicalUri = requireNonNull(uri);
     this.fileSystem = requireNonNull(fs);
-    this.service = new Text(uri.toString());
-    this.owner = fs.getOwner();
+    this.service = requireNonNull(service);
   }
 
 
@@ -245,7 +205,7 @@ public abstract class AbstractDelegationTokenBinding {
    */
   protected class TokenSecretManager extends SecretManager<AbstractGCPTokenIdentifier> {
 
-    private final byte[] pwd = "not-a-pass".getBytes(StandardCharsets.UTF_8);
+    private final byte[] pwd = "not-a-password".getBytes(StandardCharsets.UTF_8);
 
     @Override
     protected byte[] createPassword(AbstractGCPTokenIdentifier identifier) {

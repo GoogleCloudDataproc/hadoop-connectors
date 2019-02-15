@@ -27,7 +27,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 
 import java.io.IOException;
-import java.net.URI;
 
 
 import static java.util.Objects.requireNonNull;
@@ -41,8 +40,6 @@ public class GCSDelegationTokens {
 
   private static final String E_ALREADY_DEPLOYED =
       "GCP Delegation tokens has already been bound/deployed";
-
-  private URI uri;
 
   private GoogleHadoopFileSystemBase fileSystem;
 
@@ -89,27 +86,18 @@ public class GCSDelegationTokens {
       Class bindingClass = Class.forName(tokenBindingImpl);
       AbstractDelegationTokenBinding binding =
           (AbstractDelegationTokenBinding) bindingClass.newInstance();
-      binding.bindToFileSystem(getUri(), fileSystem);
+      binding.bindToFileSystem(fileSystem, getService());
       tokenBinding = binding;
       logger.atFine().log("Filesystem %s is using delegation tokens of kind %s",
-          getUri(), tokenBinding.getKind().toString());
-
-      service = binding.getService();
-
+          getService(), tokenBinding.getKind().toString());
       bindToAnyDelegationToken();
     } catch (Exception e) {
-      logger.atSevere().log("Failed to load configured delegation token binding %s",
-                tokenBindingImpl,
-                e);
+      throw new RuntimeException(e);
     }
   }
 
   public Text getService() {
     return service;
-  }
-
-  public URI getUri() {
-    return uri;
   }
 
   public AccessTokenProvider getAccessTokenProvider() {
@@ -190,7 +178,7 @@ public class GCSDelegationTokens {
   }
 
   /**
-   * Find a token for the FS user and canonical filesystem URI.
+   * Find a token for the FS user and service name.
    * @return the token, or null if one cannot be found.
    * @throws IOException on a failure to unmarshall the token.
    */
@@ -215,9 +203,9 @@ public class GCSDelegationTokens {
    * @throws IOException failure.
    */
   public void bindToFileSystem(
-      final URI uri,
-      final GoogleHadoopFileSystemBase fs) throws IOException {
-    this.uri = requireNonNull(uri);
+      final GoogleHadoopFileSystemBase fs,
+      final Text service) throws IOException {
+    this.service = requireNonNull(service);
     this.fileSystem = requireNonNull(fs);
   }
 
@@ -341,7 +329,7 @@ public class GCSDelegationTokens {
         // throws the failure up.
         return (Token<AbstractGCPTokenIdentifier>) token;
       } else {
-        // there's a token for this URI, but its not the right DT kind
+        // there's a token for this service, but its not the right DT kind
         throw DelegationTokenIOException.tokenMismatch(service, kind, tokenKind);
       }
     }
@@ -371,13 +359,13 @@ public class GCSDelegationTokens {
   /**
    * Look for any GCP token for the given FS service.
    * @param credentials credentials to scan.
-   * @param uri the URI of the FS to look for
+   * @param service the service of the FS to look for
    * @return the token or null if none was found
    */
   public static Token<AbstractGCPTokenIdentifier> lookupGCPDelegationToken(
       final Credentials credentials,
-      final URI uri) throws DelegationTokenIOException {
-    return lookupToken(credentials, new Text(uri.toString()));
+      final Text service) throws DelegationTokenIOException {
+    return lookupToken(credentials, service);
   }
 
 }

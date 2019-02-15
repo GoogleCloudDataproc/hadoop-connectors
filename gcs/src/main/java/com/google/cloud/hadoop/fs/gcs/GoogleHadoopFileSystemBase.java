@@ -116,6 +116,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
@@ -662,15 +663,11 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * @throws IOException
    */
   private void initializeDelegationTokenSupport(Configuration config, URI path) throws IOException {
+    logger.atFine().log("GHFS.initializeDelegationTokenSupport");
     // Load delegation token binding, if support is configured
     GCSDelegationTokens dts = new GCSDelegationTokens();
-    URI uri;
-    try {
-      uri = new URI(getScheme() + "://" + path.getAuthority());
-    } catch (URISyntaxException e) {
-      throw new RuntimeException(e);
-    }
-    dts.bindToFileSystem(uri, this);
+    Text service = new Text(getScheme() + "://" + path.getAuthority());
+    dts.bindToFileSystem(this, service);
     try {
       dts.init(config);
       delegationTokens = dts;

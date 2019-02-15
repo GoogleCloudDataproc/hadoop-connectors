@@ -23,7 +23,6 @@ import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.net.URI;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -35,8 +34,8 @@ public abstract class AbstractGCPTokenIdentifier extends DelegationTokenIdentifi
    */
   protected static final int MAX_TEXT_LENGTH = 32768;
 
-  /** Canonical URI of the bucket. */
-  private URI uri;
+  /** Service associated with the token */
+  private Text service;
 
   /**
    * Timestamp of creation.
@@ -61,14 +60,10 @@ public abstract class AbstractGCPTokenIdentifier extends DelegationTokenIdentifi
     super(kind);
   }
 
-  protected AbstractGCPTokenIdentifier(Text kind, Text owner, Text renewer, Text realUser, URI uri, String origin) {
+  protected AbstractGCPTokenIdentifier(Text kind, Text owner, Text renewer, Text realUser, Text service, String origin) {
     super(kind, owner, renewer, realUser);
-    this.uri = uri;
+    this.service = service;
     this.origin = origin;
-  }
-
-  public URI getUri() {
-    return uri;
   }
 
   public String getOrigin() {
@@ -92,7 +87,7 @@ public abstract class AbstractGCPTokenIdentifier extends DelegationTokenIdentifi
   @Override
   public void write(final DataOutput out) throws IOException {
     super.write(out);
-    Text.writeString(out, uri.toString());
+    Text.writeString(out, service.toString());
     Text.writeString(out, origin);
     Text.writeString(out, uuid);
     out.writeLong(created);
@@ -115,7 +110,6 @@ public abstract class AbstractGCPTokenIdentifier extends DelegationTokenIdentifi
   public void readFields(final DataInput in)
       throws DelegationTokenIOException, IOException {
     super.readFields(in);
-    uri = URI.create(Text.readString(in, MAX_TEXT_LENGTH));
     origin = Text.readString(in, MAX_TEXT_LENGTH);
     uuid = Text.readString(in, MAX_TEXT_LENGTH);
     created = in.readLong();
@@ -127,8 +121,8 @@ public abstract class AbstractGCPTokenIdentifier extends DelegationTokenIdentifi
    * @throws IOException on failure.
    */
   public void validate() throws IOException {
-    if (uri == null) {
-      throw new DelegationTokenIOException("No URI in " + this);
+    if (service == null) {
+      throw new DelegationTokenIOException("No service in " + this);
     }
   }
 
@@ -136,7 +130,6 @@ public abstract class AbstractGCPTokenIdentifier extends DelegationTokenIdentifi
   public String toString() {
     final StringBuilder sb = new StringBuilder("GCPTokenIdentifier: ");
     sb.append(getKind());
-    sb.append("; uri=").append(uri);
     sb.append("; timestamp=").append(created);
     sb.append("; uuid=").append(uuid);
     sb.append("; ").append(origin);
@@ -160,12 +153,12 @@ public abstract class AbstractGCPTokenIdentifier extends DelegationTokenIdentifi
       return false;
     }
     final AbstractGCPTokenIdentifier that = (AbstractGCPTokenIdentifier) o;
-    return Objects.equals(uuid, that.uuid) && Objects.equals(uri, that.uri);
+    return Objects.equals(uuid, that.uuid) && Objects.equals(service, that.service);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(super.hashCode(), uri);
+    return Objects.hash(super.hashCode(), service);
   }
 
   /**
