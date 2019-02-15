@@ -65,12 +65,6 @@ public class GCSDelegationTokens {
    */
   private Token<DelegationTokenIdentifier> boundDT = null;
 
-  /**
-   * The DT decoded when this instance is created by bonding
-   * to an existing DT.
-   */
-  private DelegationTokenIdentifier decodedIdentifier = null;
-
 
   public GCSDelegationTokens() throws IOException {
     user = UserGroupInformation.getCurrentUser();
@@ -131,7 +125,6 @@ public class GCSDelegationTokens {
    * If successful:
    * <ol>
    *   <li>{@link #boundDT} is set to the retrieved token.</li>
-   *   <li>{@link #decodedIdentifier} is set to the extracted identifier.</li>
    *   <li>{@link #accessTokenProvider} is set to the credential
    *   provider(s) returned by the token binding.</li>
    * </ol>
@@ -157,25 +150,6 @@ public class GCSDelegationTokens {
           + " created by Delegation Token Binding "
           + tokenBinding.getKind());
     }
-  }
-
-  /**
-   * This is a test-only back door which resets the state and binds to
-   * a token again.
-   * This allows an instance of this class to be bonded to a DT after being
-   * started, so avoids the need to have the token in the current user
-   * credentials. It is package scoped so as to only be usable in tests
-   * in the same package.
-   *
-   * Yes, this is ugly, but there is no obvious/easy way to test token
-   * binding without Kerberos getting involved.
-   * @param token token to decode and bind to.
-   * @throws IOException selection/extraction/validation failure.
-   */
-  void resetTokenBindingToDT(final Token<AbstractGCPTokenIdentifier> token)
-      throws IOException{
-    accessTokenProvider = null;
-    bindToDelegationToken(token);
   }
 
   /**
@@ -217,7 +191,6 @@ public class GCSDelegationTokens {
    * to the values.
    * <ol>
    *   <li>{@link #boundDT} is set to {@code token}.</li>
-   *   <li>{@link #decodedIdentifier} is set to the extracted identifier.</li>
    *   <li>{@link #accessTokenProvider} is set to the credential
    *   provider(s) returned by the token binding.</li>
    * </ol>
@@ -232,7 +205,6 @@ public class GCSDelegationTokens {
     boundDT = token;
     DelegationTokenIdentifier dti = extractIdentifier(token);
     logger.atInfo().log("Using delegation token %s", dti);
-    decodedIdentifier = dti;
     // extract the credential providers.
     accessTokenProvider = tokenBinding.bindToTokenIdentifier(dti);
   }

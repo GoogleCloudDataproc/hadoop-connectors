@@ -18,7 +18,6 @@ package com.google.cloud.hadoop.fs.gcs.auth;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
-import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.SecretManager;
@@ -103,8 +102,7 @@ public abstract class AbstractDelegationTokenBinding {
    * @throws IOException failure.
    */
   public void bindToFileSystem(final GoogleHadoopFileSystemBase fs,
-                               final Text service)
-      throws IOException {
+                               final Text service) {
     this.fileSystem = requireNonNull(fs);
     this.service = requireNonNull(service);
   }

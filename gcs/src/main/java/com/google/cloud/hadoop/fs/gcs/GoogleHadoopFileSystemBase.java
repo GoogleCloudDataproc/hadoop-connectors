@@ -240,8 +240,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   /** The URI the File System is passed in initialize. */
   protected URI initUri;
 
-  protected UserGroupInformation owner;
-
   /** Delegation token support **/
   protected GCSDelegationTokens delegationTokens = null;
 
@@ -491,10 +489,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     this.pathCodec = gcsFs.getPathCodec();
   }
 
-  public UserGroupInformation getOwner() {
-    return owner;
-  }
-
   /**
    * Returns an unqualified path without any leading slash, relative to the filesystem root,
    * which serves as the home directory of the current user; see {@code getHomeDirectory} for
@@ -636,8 +630,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       // statistics object.
       statistics = new Statistics(getScheme());
     }
-
-    owner = UserGroupInformation.getCurrentUser();
 
     // Set this configuration as the default config for this instance; configure()
     // will perform some file-system-specific adjustments, but the original should
