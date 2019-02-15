@@ -25,6 +25,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier;
 
 import java.io.IOException;
 
@@ -62,13 +63,13 @@ public class GCSDelegationTokens {
   /**
    * Active Delegation token.
    */
-  private Token<AbstractGCPTokenIdentifier> boundDT = null;
+  private Token<DelegationTokenIdentifier> boundDT = null;
 
   /**
    * The DT decoded when this instance is created by bonding
    * to an existing DT.
    */
-  private AbstractGCPTokenIdentifier decodedIdentifier = null;
+  private DelegationTokenIdentifier decodedIdentifier = null;
 
 
   public GCSDelegationTokens() throws IOException {
@@ -145,7 +146,7 @@ public class GCSDelegationTokens {
    */
   public void bindToAnyDelegationToken() throws IOException {
     Preconditions.checkState(accessTokenProvider == null, E_ALREADY_DEPLOYED);
-    Token<AbstractGCPTokenIdentifier> token = selectTokenFromFSOwner();
+    Token<DelegationTokenIdentifier> token = selectTokenFromFSOwner();
     if (token != null) {
       bindToDelegationToken(token);
     } else {
@@ -182,7 +183,7 @@ public class GCSDelegationTokens {
    * @return the token, or null if one cannot be found.
    * @throws IOException on a failure to unmarshall the token.
    */
-  public Token<AbstractGCPTokenIdentifier> selectTokenFromFSOwner()
+  public Token<DelegationTokenIdentifier> selectTokenFromFSOwner()
       throws IOException {
     return lookupToken(user.getCredentials(),
         service,
@@ -224,12 +225,12 @@ public class GCSDelegationTokens {
    * @throws IOException selection/extraction/validation failure.
    */
   public void bindToDelegationToken(
-      final Token<AbstractGCPTokenIdentifier> token)
+      final Token<DelegationTokenIdentifier> token)
       throws IOException {
     Preconditions.checkState((accessTokenProvider == null),
                              E_ALREADY_DEPLOYED);
     boundDT = token;
-    AbstractGCPTokenIdentifier dti = extractIdentifier(token);
+    DelegationTokenIdentifier dti = extractIdentifier(token);
     logger.atInfo().log("Using delegation token %s", dti);
     decodedIdentifier = dti;
     // extract the credential providers.
@@ -248,7 +249,7 @@ public class GCSDelegationTokens {
    * Get any bound DT.
    * @return a delegation token if this instance was bound to it.
    */
-  public Token<AbstractGCPTokenIdentifier> getBoundDT() {
+  public Token<DelegationTokenIdentifier> getBoundDT() {
     return boundDT;
   }
 
@@ -258,7 +259,7 @@ public class GCSDelegationTokens {
    * @throws IOException if one cannot be created
    */
   @SuppressWarnings("OptionalGetWithoutIsPresent")
-  public Token<AbstractGCPTokenIdentifier> getBoundOrNewDT(String renewer)
+  public Token<DelegationTokenIdentifier> getBoundOrNewDT(String renewer)
       throws IOException {
     logger.atFine().log("Delegation token requested");
     if (isBoundToDT()) {
@@ -280,11 +281,11 @@ public class GCSDelegationTokens {
    * @throws IOException failure to validate/read data encoded in identifier.
    * @throws IllegalArgumentException if the token isn't an GCP session token
    */
-  public static AbstractGCPTokenIdentifier extractIdentifier(
-      final Token<? extends AbstractGCPTokenIdentifier> token)
+  public static DelegationTokenIdentifier extractIdentifier(
+      final Token<? extends DelegationTokenIdentifier> token)
       throws IOException {
     Preconditions.checkArgument(token != null, "null token");
-    AbstractGCPTokenIdentifier identifier;
+    DelegationTokenIdentifier identifier;
     // harden up decode beyond what Token does itself
     try {
       identifier = token.decodeIdentifier();
@@ -301,7 +302,6 @@ public class GCSDelegationTokens {
     if (identifier == null) {
       throw new DelegationTokenIOException("Failed to unmarshall token " + token.toString());
     }
-    identifier.validate();
     return identifier;
   }
 
@@ -314,7 +314,7 @@ public class GCSDelegationTokens {
    * @return the token or null if no suitable token was found
    * @throws DelegationTokenIOException wrong token kind found
    */
-  public static Token<AbstractGCPTokenIdentifier> lookupToken(
+  public static Token<DelegationTokenIdentifier> lookupToken(
       final Credentials credentials,
       final Text service,
       final Text kind)
@@ -325,11 +325,11 @@ public class GCSDelegationTokens {
       Text tokenKind = token.getKind();
       logger.atFine().log("Found token of kind %s", tokenKind);
       if (kind.equals(tokenKind)) {
-        // the Oauth implementation catches and logs here; this one
+        // The OAuth implementation catches and logs here; this one
         // throws the failure up.
-        return (Token<AbstractGCPTokenIdentifier>) token;
+        return (Token<DelegationTokenIdentifier>) token;
       } else {
-        // there's a token for this service, but its not the right DT kind
+        // There's a token for this service, but it's not the right DT kind
         throw DelegationTokenIOException.tokenMismatch(service, kind, tokenKind);
       }
     }
@@ -345,13 +345,13 @@ public class GCSDelegationTokens {
    * @return any token found or null if none was
    * @throws ClassCastException if the token is of a wrong type.
    */
-  public static Token<AbstractGCPTokenIdentifier> lookupToken(
+  public static Token<DelegationTokenIdentifier> lookupToken(
       final Credentials credentials,
       final Text service) {
-    Token<AbstractGCPTokenIdentifier> result = null;
+    Token<DelegationTokenIdentifier> result = null;
     Token<?> token = credentials.getToken(service);
     if (token != null) {
-      result = (Token<AbstractGCPTokenIdentifier>) token;
+      result = (Token<DelegationTokenIdentifier>) token;
     }
     return result;
   }
@@ -362,7 +362,7 @@ public class GCSDelegationTokens {
    * @param service the service of the FS to look for
    * @return the token or null if none was found
    */
-  public static Token<AbstractGCPTokenIdentifier> lookupGCPDelegationToken(
+  public static Token<DelegationTokenIdentifier> lookupGCPDelegationToken(
       final Credentials credentials,
       final Text service) throws DelegationTokenIOException {
     return lookupToken(credentials, service);

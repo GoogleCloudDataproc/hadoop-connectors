@@ -16,7 +16,6 @@
  */
 package com.google.cloud.hadoop.fs.gcs;
 
-import com.google.cloud.hadoop.fs.gcs.auth.AbstractGCPTokenIdentifier;
 import com.google.cloud.hadoop.fs.gcs.auth.GCSDelegationTokens;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
 import com.google.cloud.hadoop.fs.gcs.auth.TestTokenIdentifierImpl;
@@ -25,6 +24,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -61,7 +61,7 @@ public class GoogleHadoopFileSystemDelegationTokensTest {
       assertNotNull("Failed to decode token identifier", decoded);
       assertTrue("Unexpected delegation token identifier type", (decoded instanceof TestTokenIdentifierImpl));
 
-      AbstractGCPTokenIdentifier identifier = (AbstractGCPTokenIdentifier) decoded;
+      DelegationTokenIdentifier identifier = (DelegationTokenIdentifier) decoded;
       assertEquals("Unexpected delegation token identifier kind", expectedKind, identifier.getKind());
       assertEquals("Unexpected delegation token URI", initUri, identifier.getUri());
     } catch (IOException e) {

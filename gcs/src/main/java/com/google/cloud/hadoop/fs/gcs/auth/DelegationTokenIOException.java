@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.fs.gcs.auth;
 
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier;
 
 import java.io.IOException;
 
@@ -39,7 +40,7 @@ public class DelegationTokenIOException extends IOException {
 
 
   public static DelegationTokenIOException wrongTokenType(Class expectedClass,
-                                                          AbstractGCPTokenIdentifier identifier) {
+                                                          DelegationTokenIdentifier identifier) {
     return new DelegationTokenIOException(TOKEN_WRONG_TYPE +
                                           "; expected a token identifier of type " +
                                           expectedClass +

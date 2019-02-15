@@ -17,13 +17,13 @@
 package com.google.cloud.hadoop.fs.gcs.auth;
 
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier;
 
-import java.net.URI;
 
 /**
  * A test delegation token identifier implementation
  */
-public class TestTokenIdentifierImpl extends AbstractGCPTokenIdentifier {
+public class TestTokenIdentifierImpl extends DelegationTokenIdentifier {
 
   public static final Text KIND = new Text("GCPDelegationToken/Test");
 

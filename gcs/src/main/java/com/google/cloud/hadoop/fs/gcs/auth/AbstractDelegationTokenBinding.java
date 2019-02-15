@@ -23,6 +23,7 @@ import com.google.common.flogger.GoogleLogger;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -36,7 +37,7 @@ public abstract class AbstractDelegationTokenBinding {
 
   private final Text kind;
 
-  protected SecretManager<AbstractGCPTokenIdentifier> secretManager =
+  protected SecretManager<DelegationTokenIdentifier> secretManager =
       new TokenSecretManager();
 
   private Text service;
@@ -82,7 +83,7 @@ public abstract class AbstractDelegationTokenBinding {
    * authenticating this client with GCP services.
    * @throws IOException any failure.
    */
-  public abstract AccessTokenProvider bindToTokenIdentifier(AbstractGCPTokenIdentifier retrievedIdentifier)
+  public abstract AccessTokenProvider bindToTokenIdentifier(DelegationTokenIdentifier retrievedIdentifier)
       throws IOException;
 
   /**
@@ -118,18 +119,18 @@ public abstract class AbstractDelegationTokenBinding {
    *
    * @throws IOException if one cannot be created
    */
-  public Token<AbstractGCPTokenIdentifier> createDelegationToken(String renewer)
+  public Token<DelegationTokenIdentifier> createDelegationToken(String renewer)
       throws IOException {
     Text renewerText = new Text();
     if (renewer != null) {
       renewerText.set(renewer);
     }
 
-    AbstractGCPTokenIdentifier tokenIdentifier =
+    DelegationTokenIdentifier tokenIdentifier =
         requireNonNull(createTokenIdentifier(renewerText),
                        "Token identifier");
 
-    Token<AbstractGCPTokenIdentifier> token =
+    Token<DelegationTokenIdentifier> token =
         new Token<>(tokenIdentifier, secretManager);
     token.setKind(getKind());
     token.setService(service);
@@ -152,7 +153,7 @@ public abstract class AbstractDelegationTokenBinding {
    *
    * @throws IOException failure creating the token data.
    */
-  public abstract AbstractGCPTokenIdentifier createTokenIdentifier(Text renewer)
+  public abstract DelegationTokenIdentifier createTokenIdentifier(Text renewer)
       throws IOException;
 
 
@@ -170,16 +171,16 @@ public abstract class AbstractDelegationTokenBinding {
    *
    * @throws IOException failure creating the token data.
    */
-  public abstract AbstractGCPTokenIdentifier createTokenIdentifier()
+  public abstract DelegationTokenIdentifier createTokenIdentifier()
       throws IOException;
 
 
   /**
-   * Create a new subclass of {@link AbstractGCPTokenIdentifier}.
+   * Create a new subclass of {@link DelegationTokenIdentifier}.
    * This is used in the secret manager.
    * @return an empty identifier.
    */
-  public abstract AbstractGCPTokenIdentifier createEmptyIdentifier();
+  public abstract DelegationTokenIdentifier createEmptyIdentifier();
 
 
   /**
@@ -190,8 +191,8 @@ public abstract class AbstractDelegationTokenBinding {
    * @param expectedClass class of the expected token identifier.
    * @throws DelegationTokenIOException If the wrong class was found.
    */
-  protected <T extends AbstractGCPTokenIdentifier> T convertTokenIdentifier(
-      final AbstractGCPTokenIdentifier identifier,
+  protected <T extends DelegationTokenIdentifier> T convertTokenIdentifier(
+      final DelegationTokenIdentifier identifier,
       final Class<T> expectedClass) throws DelegationTokenIOException {
     if (!identifier.getClass().equals(expectedClass)) {
       throw DelegationTokenIOException.wrongTokenType(expectedClass, identifier);
@@ -203,22 +204,22 @@ public abstract class AbstractDelegationTokenBinding {
    * The secret manager always uses the same secret; the
    * factory for new identifiers is that of the token manager.
    */
-  protected class TokenSecretManager extends SecretManager<AbstractGCPTokenIdentifier> {
+  protected class TokenSecretManager extends SecretManager<DelegationTokenIdentifier> {
 
     private final byte[] pwd = "not-a-password".getBytes(StandardCharsets.UTF_8);
 
     @Override
-    protected byte[] createPassword(AbstractGCPTokenIdentifier identifier) {
+    protected byte[] createPassword(DelegationTokenIdentifier identifier) {
       return pwd;
     }
 
     @Override
-    public byte[] retrievePassword(AbstractGCPTokenIdentifier identifier) throws InvalidToken {
+    public byte[] retrievePassword(DelegationTokenIdentifier identifier) throws InvalidToken {
       return pwd;
     }
 
     @Override
-    public AbstractGCPTokenIdentifier createIdentifier() {
+    public DelegationTokenIdentifier createIdentifier() {
       return AbstractDelegationTokenBinding.this.createEmptyIdentifier();
     }
   }
