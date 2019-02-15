@@ -76,7 +76,7 @@ public abstract class AbstractDelegationTokenBinding {
 
   /**
    * Bind to the token identifier, returning the credential providers to use
-   * for the owner to talk to S3, DDB and related GCP Services.
+   * for the owner to talk to GCP services.
    * @param retrievedIdentifier the unmarshalled data
    * @return non-empty list of GCP credential providers to use for
    * authenticating this client with GCP services.

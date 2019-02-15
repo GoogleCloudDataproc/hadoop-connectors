@@ -265,8 +265,7 @@ public class GCSDelegationTokens {
       Throwable cause = e.getCause();
       if (cause != null) {
         // its a wrapping around class instantiation.
-        throw new DelegationTokenIOException("Decoding GCS token " + cause,
-                                             cause);
+        throw new DelegationTokenIOException("Decoding GCS token " + cause, cause);
       } else {
         throw e;
       }
@@ -306,7 +305,7 @@ public class GCSDelegationTokens {
       }
     }
     // A token for the service was not found
-    logger.atFine().log("No token for %s found", service);
+    logger.atFine().log("No token found for %s", service);
     return null;
   }
 

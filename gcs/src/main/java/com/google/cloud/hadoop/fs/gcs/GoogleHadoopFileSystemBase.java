@@ -1491,7 +1491,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public String getCanonicalServiceName() {
     String service = null;
-    logger.atFine().log("GHFS.getCanonicalServiceName:");
     if (delegationTokens != null) {
       service = delegationTokens.getService().toString();
     }

@@ -83,10 +83,7 @@ public final class CredentialFromAccessTokenProviderClassFactory {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   /**
-   * Generate the credential.
-   *
-   * <p>If the {@link AccessTokenProviderClassFromConfigFactory} generates no Class for the
-   * provider, return null.
+   * Generate the credential from the {@link AccessTokenProvider}.
    */
   public static Credential credential(
     AccessTokenProvider accessTokenProvider,
