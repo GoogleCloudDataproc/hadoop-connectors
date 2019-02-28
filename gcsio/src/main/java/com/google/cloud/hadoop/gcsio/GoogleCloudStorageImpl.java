@@ -460,6 +460,24 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
   }
 
+  public void updateMetadata(GoogleCloudStorageItemInfo itemInfo, Map<String, byte[]> metadata)
+      throws IOException {
+    StorageResourceId resourceId = itemInfo.getResourceId();
+    Preconditions.checkArgument(
+        resourceId.isStorageObject(), "Expected full StorageObject ID, got %s", resourceId);
+
+    StorageObject storageObject = new StorageObject().setMetadata(encodeMetadata(metadata));
+
+    Storage.Objects.Patch patchObject =
+        configureRequest(
+                gcs.objects()
+                    .patch(resourceId.getBucketName(), resourceId.getObjectName(), storageObject),
+                resourceId.getBucketName())
+            .setIfMetagenerationMatch(itemInfo.getMetaGeneration());
+
+    patchObject.execute();
+  }
+
   /**
    * See {@link GoogleCloudStorage#createEmptyObject(StorageResourceId)} for details about
    * expected behavior.

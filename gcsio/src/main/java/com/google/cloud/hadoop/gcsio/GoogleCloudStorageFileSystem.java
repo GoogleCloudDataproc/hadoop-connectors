@@ -106,6 +106,7 @@ public class GoogleCloudStorageFileSystem {
 
   // GCS access instance.
   private GoogleCloudStorage gcs;
+  private final GcsAtomicOperations gcsAtomic;
 
   private final PathCodec pathCodec;
 
@@ -166,6 +167,7 @@ public class GoogleCloudStorageFileSystem {
 
     this.options = options;
     this.gcs = new GoogleCloudStorageImpl(options.getCloudStorageOptions(), credential);
+    this.gcsAtomic = new GcsAtomicOperations(gcs);
     this.pathCodec = options.getPathCodec();
 
     if (options.isPerformanceCacheEnabled()) {
@@ -178,9 +180,11 @@ public class GoogleCloudStorageFileSystem {
    * GoogleCloudStorage {@code gcs}.
    */
   public GoogleCloudStorageFileSystem(GoogleCloudStorage gcs) throws IOException {
-    this(gcs, GoogleCloudStorageFileSystemOptions.newBuilder()
-        .setImmutableCloudStorageOptions(gcs.getOptions())
-        .build());
+    this(
+        gcs,
+        GoogleCloudStorageFileSystemOptions.newBuilder()
+            .setImmutableCloudStorageOptions(gcs.getOptions())
+            .build());
   }
 
   /**
@@ -190,6 +194,7 @@ public class GoogleCloudStorageFileSystem {
   public GoogleCloudStorageFileSystem(
       GoogleCloudStorage gcs, GoogleCloudStorageFileSystemOptions options) throws IOException {
     this.gcs = gcs;
+    this.gcsAtomic = new GcsAtomicOperations(gcs);
     this.options = options;
     this.pathCodec = options.getPathCodec();
   }
@@ -406,15 +411,42 @@ public class GoogleCloudStorageFileSystem {
       itemsToDelete.add(fileInfo);
     }
 
-    if (options.enableCooperativeLocking() && recursive && fileInfo.isDirectory()) {
-      List<String> logRecords =
-          Streams.concat(itemsToDelete.stream(), bucketsToDelete.stream())
-              .map(i -> i.getItemInfo().getResourceId().toString())
-              .collect(toImmutableList());
-      logOperation(path.getAuthority(), "delete", logRecords);
-    }
+    if (options.enableCooperativeLocking() && fileInfo.isDirectory()) {
+      String clientId = UUID.randomUUID().toString();
+      StorageResourceId resourceId = pathCodec.validatePathAndGetId(fileInfo.getPath(), true);
+      do {
+        try {
+          if (gcsAtomic.lockPaths(clientId, resourceId)) {
+            break;
+          }
+        } catch (Exception e) {
+          logger.atWarning().withCause(e).log(
+              "Failed to lock (client=%s, res=%s), retrying.", clientId, resourceId);
+        }
+      } while (true);
+      try {
+        List<String> logRecords =
+            Streams.concat(itemsToDelete.stream(), bucketsToDelete.stream())
+                .map(i -> i.getItemInfo().getResourceId().toString())
+                .collect(toImmutableList());
+        logOperation(path.getAuthority(), "delete", logRecords);
 
-    deleteInternal(itemsToDelete, bucketsToDelete);
+        deleteInternal(itemsToDelete, bucketsToDelete);
+      } finally {
+        do {
+          try {
+            if (gcsAtomic.unlockPaths(clientId, resourceId)) {
+              break;
+            }
+          } catch (Exception e) {
+            logger.atWarning().withCause(e).log(
+                "Failed to unlock (client=%s, res=%s), retrying.", clientId, resourceId);
+          }
+        } while (true);
+      }
+    } else {
+      deleteInternal(itemsToDelete, bucketsToDelete);
+    }
 
     repairImplicitDirectory(parentInfoFuture);
 
@@ -745,7 +777,37 @@ public class GoogleCloudStorageFileSystem {
    * copied and not the content of any file.
    */
   private void renameInternal(FileInfo srcInfo, URI dst) throws IOException {
-    if (srcInfo.isDirectory()) {
+    if (srcInfo.isDirectory() && options.enableCooperativeLocking()) {
+      String clientId = UUID.randomUUID().toString();
+      StorageResourceId srcResourceId = pathCodec.validatePathAndGetId(srcInfo.getPath(), true);
+      StorageResourceId dstResourceId = pathCodec.validatePathAndGetId(dst, true);
+      do {
+        try {
+          if (gcsAtomic.lockPaths(clientId, srcResourceId, dstResourceId)) {
+            break;
+          }
+        } catch (Exception e) {
+          logger.atWarning().withCause(e).log(
+              "Failed to lock (client=%s, src=%s, dst=%s), retrying.",
+              clientId, srcResourceId, dstResourceId);
+        }
+      } while (true);
+      try {
+        renameDirectoryInternal(srcInfo, dst);
+      } finally {
+        do {
+          try {
+            if (gcsAtomic.unlockPaths(clientId, srcResourceId, dstResourceId)) {
+              break;
+            }
+          } catch (Exception e) {
+            logger.atWarning().withCause(e).log(
+                "Failed to unlock (client=%s, src=%s, dst=%s), retrying.",
+                clientId, srcResourceId, dstResourceId);
+          }
+        } while (true);
+      }
+    } else if (srcInfo.isDirectory()) {
       renameDirectoryInternal(srcInfo, dst);
     } else {
       URI src = srcInfo.getPath();
