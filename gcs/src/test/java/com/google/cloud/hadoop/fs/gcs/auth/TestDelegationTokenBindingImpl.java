@@ -17,6 +17,8 @@
 package com.google.cloud.hadoop.fs.gcs.auth;
 
 import com.google.cloud.hadoop.util.AccessTokenProvider;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 
@@ -37,22 +39,33 @@ public class TestDelegationTokenBindingImpl extends AbstractDelegationTokenBindi
   }
 
   @Override
-  public AccessTokenProvider bindToTokenIdentifier(AbstractGCPTokenIdentifier retrievedIdentifier) throws IOException {
+  public AccessTokenProvider bindToTokenIdentifier(DelegationTokenIdentifier retrievedIdentifier) throws IOException {
     return deployUnbonded();
   }
 
   @Override
-  public AbstractGCPTokenIdentifier createTokenIdentifier(Text renewer) throws IOException {
-    return new TestTokenIdentifierImpl(getFileSystem().getUri(), new Text("owner_name"), "Test");
+  public DelegationTokenIdentifier createTokenIdentifier(Text renewer) throws IOException {
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    String user = ugi.getUserName();
+    Text owner = new Text(user);
+    Text realUser = null;
+    if (ugi.getRealUser() != null) {
+        realUser = new Text(ugi.getRealUser().getUserName());
+    }
+    return new TestTokenIdentifierImpl(
+        owner,
+        renewer,
+        realUser,
+        getService());
   }
 
   @Override
-  public AbstractGCPTokenIdentifier createTokenIdentifier() throws IOException {
+  public DelegationTokenIdentifier createTokenIdentifier() throws IOException {
     return createEmptyIdentifier();
   }
 
   @Override
-  public AbstractGCPTokenIdentifier createEmptyIdentifier() {
+  public DelegationTokenIdentifier createEmptyIdentifier() {
     return new TestTokenIdentifierImpl();
   }
 

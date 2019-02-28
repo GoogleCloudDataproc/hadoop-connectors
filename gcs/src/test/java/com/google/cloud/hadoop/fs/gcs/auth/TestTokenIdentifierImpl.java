@@ -32,7 +32,7 @@ public class TestTokenIdentifierImpl extends DelegationTokenIdentifier {
   }
 
   public TestTokenIdentifierImpl(Text owner, Text renewer, Text realUser, Text service) {
-    super(KIND, owner, renewer, realUser, service);
+    super(KIND, owner, renewer, realUser);
   }
 
 }
