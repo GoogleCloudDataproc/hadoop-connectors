@@ -19,10 +19,7 @@ package com.google.cloud.hadoop.fs.gcs.auth;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier;
 
-
-/**
- * A test delegation token identifier implementation
- */
+/** A test delegation token identifier implementation */
 public class TestTokenIdentifierImpl extends DelegationTokenIdentifier {
 
   public static final Text KIND = new Text("GCPDelegationToken/Test");
@@ -34,6 +31,4 @@ public class TestTokenIdentifierImpl extends DelegationTokenIdentifier {
   public TestTokenIdentifierImpl(Text owner, Text renewer, Text realUser, Text service) {
     super(KIND, owner, renewer, realUser);
   }
-
 }
-

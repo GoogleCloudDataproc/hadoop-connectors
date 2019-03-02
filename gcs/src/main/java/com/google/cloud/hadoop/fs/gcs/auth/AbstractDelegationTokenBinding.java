@@ -16,19 +16,17 @@
  */
 package com.google.cloud.hadoop.fs.gcs.auth;
 
+import static java.util.Objects.requireNonNull;
+
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.common.flogger.GoogleLogger;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier;
-
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-
-import static java.util.Objects.requireNonNull;
-
 
 public abstract class AbstractDelegationTokenBinding {
 
@@ -36,14 +34,12 @@ public abstract class AbstractDelegationTokenBinding {
 
   private final Text kind;
 
-  protected SecretManager<DelegationTokenIdentifier> secretManager =
-      new TokenSecretManager();
+  protected SecretManager<DelegationTokenIdentifier> secretManager = new TokenSecretManager();
 
   private Text service;
 
   /**
-   * The owning filesystem.
-   * Valid after {@link #bindToFileSystem(GoogleHadoopFileSystemBase, Text)}.
+   * The owning filesystem. Valid after {@link #bindToFileSystem(GoogleHadoopFileSystemBase, Text)}.
    */
   private GoogleHadoopFileSystemBase fileSystem;
 
@@ -55,9 +51,7 @@ public abstract class AbstractDelegationTokenBinding {
     return kind;
   }
 
-  /**
-   * @return The bound file system
-   */
+  /** @return The bound file system */
   public GoogleHadoopFileSystemBase getFileSystem() {
     return fileSystem;
   }
@@ -67,132 +61,107 @@ public abstract class AbstractDelegationTokenBinding {
   }
 
   /**
-   * Perform any actions when deploying unbonded, and return a list
-   * of credential providers.
+   * Perform any actions when deploying unbonded, and return a list of credential providers.
+   *
    * @throws IOException any failure.
    */
   public abstract AccessTokenProvider deployUnbonded() throws IOException;
 
-
   /**
-   * Bind to the token identifier, returning the credential providers to use
-   * for the owner to talk to GCP services.
+   * Bind to the token identifier, returning the credential providers to use for the owner to talk
+   * to GCP services.
+   *
    * @param retrievedIdentifier the unmarshalled data
-   * @return non-empty list of GCP credential providers to use for
-   * authenticating this client with GCP services.
+   * @return non-empty list of GCP credential providers to use for authenticating this client with
+   *     GCP services.
    * @throws IOException any failure.
    */
-  public abstract AccessTokenProvider bindToTokenIdentifier(DelegationTokenIdentifier retrievedIdentifier)
-      throws IOException;
+  public abstract AccessTokenProvider bindToTokenIdentifier(
+      DelegationTokenIdentifier retrievedIdentifier) throws IOException;
 
   /**
-   * Bind to the filesystem.
-   * Subclasses can use this to perform their own binding operations -
-   * but they must always call their superclass implementation.
-   * This <i>Must</i> be called before calling {@code init()}.
+   * Bind to the filesystem. Subclasses can use this to perform their own binding operations - but
+   * they must always call their superclass implementation. This <i>Must</i> be called before
+   * calling {@code init()}.
    *
-   * <b>Important:</b>
-   * This binding will happen during FileSystem.initialize(); the FS
-   * is not live for actual use and will not yet have interacted with
-   * GCS services.
+   * <p><b>Important:</b> This binding will happen during FileSystem.initialize(); the FS is not
+   * live for actual use and will not yet have interacted with GCS services.
    *
    * @param fs owning FS.
    * @param service name of the service (i.e. bucket name) for the FS.
-   *
    * @throws IOException failure.
    */
-  public void bindToFileSystem(final GoogleHadoopFileSystemBase fs,
-                               final Text service) {
+  public void bindToFileSystem(final GoogleHadoopFileSystemBase fs, final Text service) {
     this.fileSystem = requireNonNull(fs);
     this.service = requireNonNull(service);
   }
 
-
   /**
-   * Create a delegation token for the user.
-   * This will only be called if a new DT is needed, that is: the
-   * filesystem has been deployed unbound.
+   * Create a delegation token for the user. This will only be called if a new DT is needed, that
+   * is: the filesystem has been deployed unbound.
    *
    * @return the token
-   *
    * @throws IOException if one cannot be created
    */
-  public Token<DelegationTokenIdentifier> createDelegationToken(String renewer)
-      throws IOException {
+  public Token<DelegationTokenIdentifier> createDelegationToken(String renewer) throws IOException {
     Text renewerText = new Text();
     if (renewer != null) {
       renewerText.set(renewer);
     }
 
     DelegationTokenIdentifier tokenIdentifier =
-        requireNonNull(createTokenIdentifier(renewerText),
-                       "Token identifier");
+        requireNonNull(createTokenIdentifier(renewerText), "Token identifier");
 
-    Token<DelegationTokenIdentifier> token =
-        new Token<>(tokenIdentifier, secretManager);
+    Token<DelegationTokenIdentifier> token = new Token<>(tokenIdentifier, secretManager);
     token.setKind(getKind());
     token.setService(service);
-    logger.atFine().log("Created token %s with token identifier %s",
-        token, tokenIdentifier);
+    logger.atFine().log("Created token %s with token identifier %s", token, tokenIdentifier);
     return token;
   }
 
   /**
-   * Create a token identifier with all the information needed
-   * to be included in a delegation token.
-   * This is where session credentials need to be extracted, etc.
-   * This will only be called if a new DT is needed, that is: the
-   * filesystem has been deployed unbound.
+   * Create a token identifier with all the information needed to be included in a delegation token.
+   * This is where session credentials need to be extracted, etc. This will only be called if a new
+   * DT is needed, that is: the filesystem has been deployed unbound.
    *
-   * If {@link #createDelegationToken}
-   * is overridden, this method can be replaced with a stub.
+   * <p>If {@link #createDelegationToken} is overridden, this method can be replaced with a stub.
    *
    * @return the token data to include in the token identifier.
-   *
    * @throws IOException failure creating the token data.
    */
-  public abstract DelegationTokenIdentifier createTokenIdentifier(Text renewer)
-      throws IOException;
-
+  public abstract DelegationTokenIdentifier createTokenIdentifier(Text renewer) throws IOException;
 
   /**
-   * Create a token identifier with all the information needed
-   * to be included in a delegation token.
-   * This is where session credentials need to be extracted, etc.
-   * This will only be called if a new DT is needed, that is: the
-   * filesystem has been deployed unbound.
+   * Create a token identifier with all the information needed to be included in a delegation token.
+   * This is where session credentials need to be extracted, etc. This will only be called if a new
+   * DT is needed, that is: the filesystem has been deployed unbound.
    *
-   * If {@link #createDelegationToken}
-   * is overridden, this method can be replaced with a stub.
+   * <p>If {@link #createDelegationToken} is overridden, this method can be replaced with a stub.
    *
    * @return the token data to include in the token identifier.
-   *
    * @throws IOException failure creating the token data.
    */
-  public abstract DelegationTokenIdentifier createTokenIdentifier()
-      throws IOException;
-
+  public abstract DelegationTokenIdentifier createTokenIdentifier() throws IOException;
 
   /**
-   * Create a new "empty" token identifier.
-   * It is used by the "dummy" SecretManager, which requires a token identifier
-   * (even one that's not real) to satisfy the contract.
+   * Create a new "empty" token identifier. It is used by the "dummy" SecretManager, which requires
+   * a token identifier (even one that's not real) to satisfy the contract.
+   *
    * @return an empty identifier.
    */
   public abstract DelegationTokenIdentifier createEmptyIdentifier();
 
-
   /**
-   * Verify that a token identifier is of a specific class.
-   * This will reject subclasses (i.e. it is stricter than
-   * {@code instanceof}, then cast it to that type.
+   * Verify that a token identifier is of a specific class. This will reject subclasses (i.e. it is
+   * stricter than {@code instanceof}, then cast it to that type.
+   *
    * @param identifier identifier to validate
    * @param expectedClass class of the expected token identifier.
    * @throws DelegationTokenIOException If the wrong class was found.
    */
   protected <T extends DelegationTokenIdentifier> T convertTokenIdentifier(
-      final DelegationTokenIdentifier identifier,
-      final Class<T> expectedClass) throws DelegationTokenIOException {
+      final DelegationTokenIdentifier identifier, final Class<T> expectedClass)
+      throws DelegationTokenIOException {
     if (!identifier.getClass().equals(expectedClass)) {
       throw DelegationTokenIOException.wrongTokenType(expectedClass, identifier);
     }
@@ -200,8 +169,8 @@ public abstract class AbstractDelegationTokenBinding {
   }
 
   /**
-   * The secret manager always uses the same secret; the
-   * factory for new identifiers is that of the token manager.
+   * The secret manager always uses the same secret; the factory for new identifiers is that of the
+   * token manager.
    */
   protected class TokenSecretManager extends SecretManager<DelegationTokenIdentifier> {
 
@@ -222,5 +191,4 @@ public abstract class AbstractDelegationTokenBinding {
       return AbstractDelegationTokenBinding.this.createEmptyIdentifier();
     }
   }
-
 }

@@ -17,16 +17,13 @@
 package com.google.cloud.hadoop.fs.gcs.auth;
 
 import com.google.cloud.hadoop.util.AccessTokenProvider;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier;
+import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier;
 
-import java.io.IOException;
-
-/**
- * A test delegation token binding implementation
- */
+/** A test delegation token binding implementation */
 public class TestDelegationTokenBindingImpl extends AbstractDelegationTokenBinding {
 
   public TestDelegationTokenBindingImpl() {
@@ -39,7 +36,8 @@ public class TestDelegationTokenBindingImpl extends AbstractDelegationTokenBindi
   }
 
   @Override
-  public AccessTokenProvider bindToTokenIdentifier(DelegationTokenIdentifier retrievedIdentifier) throws IOException {
+  public AccessTokenProvider bindToTokenIdentifier(DelegationTokenIdentifier retrievedIdentifier)
+      throws IOException {
     return deployUnbonded();
   }
 
@@ -50,13 +48,9 @@ public class TestDelegationTokenBindingImpl extends AbstractDelegationTokenBindi
     Text owner = new Text(user);
     Text realUser = null;
     if (ugi.getRealUser() != null) {
-        realUser = new Text(ugi.getRealUser().getUserName());
+      realUser = new Text(ugi.getRealUser().getUserName());
     }
-    return new TestTokenIdentifierImpl(
-        owner,
-        renewer,
-        realUser,
-        getService());
+    return new TestTokenIdentifierImpl(owner, renewer, realUser, getService());
   }
 
   @Override
@@ -77,8 +71,8 @@ public class TestDelegationTokenBindingImpl extends AbstractDelegationTokenBindi
 
     @Override
     public AccessToken getAccessToken() {
-      return new AccessToken(config.get(TOKEN_CONFIG_PROPERTY_NAME),
-          System.currentTimeMillis() + 60000);
+      return new AccessToken(
+          config.get(TOKEN_CONFIG_PROPERTY_NAME), System.currentTimeMillis() + 60000);
     }
 
     @Override

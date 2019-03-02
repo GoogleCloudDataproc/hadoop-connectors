@@ -16,21 +16,19 @@
  */
 package com.google.cloud.hadoop.fs.gcs.auth;
 
+import static java.util.Objects.requireNonNull;
+
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
+import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier;
-
-import java.io.IOException;
-
-
-import static java.util.Objects.requireNonNull;
 
 public class GCSDelegationTokens {
 
@@ -45,37 +43,29 @@ public class GCSDelegationTokens {
   private GoogleHadoopFileSystemBase fileSystem;
 
   /**
-   * User who owns this FS; fixed at instantiation time, so that
-   * in calls to getDelegationToken() and similar, this user is the one whose
-   * credentials are involved.
+   * User who owns this FS; fixed at instantiation time, so that in calls to getDelegationToken()
+   * and similar, this user is the one whose credentials are involved.
    */
   private final UserGroupInformation user;
 
   private Text service;
 
-  /**
-   * Dynamically loaded token binding; lifecycle matches this object.
-   */
+  /** Dynamically loaded token binding; lifecycle matches this object. */
   private AbstractDelegationTokenBinding tokenBinding;
 
   private AccessTokenProvider accessTokenProvider = null;
 
-  /**
-   * Active Delegation token.
-   */
+  /** Active Delegation token. */
   private Token<DelegationTokenIdentifier> boundDT = null;
-
 
   public GCSDelegationTokens() throws IOException {
     user = UserGroupInformation.getCurrentUser();
   }
 
   public void init(final Configuration conf) {
-    String tokenBindingImpl =
-        conf.get(CONFIG_DELEGATION_TOKEN_BINDING_CLASS);
+    String tokenBindingImpl = conf.get(CONFIG_DELEGATION_TOKEN_BINDING_CLASS);
 
-    Preconditions.checkState((tokenBindingImpl != null),
-        "Delegation Tokens not configured");
+    Preconditions.checkState((tokenBindingImpl != null), "Delegation Tokens not configured");
 
     try {
       Class bindingClass = Class.forName(tokenBindingImpl);
@@ -83,7 +73,8 @@ public class GCSDelegationTokens {
           (AbstractDelegationTokenBinding) bindingClass.newInstance();
       binding.bindToFileSystem(fileSystem, getService());
       tokenBinding = binding;
-      logger.atFine().log("Filesystem %s is using delegation tokens of kind %s",
+      logger.atFine().log(
+          "Filesystem %s is using delegation tokens of kind %s",
           getService(), tokenBinding.getKind().toString());
       bindToAnyDelegationToken();
     } catch (Exception e) {
@@ -100,40 +91,35 @@ public class GCSDelegationTokens {
   }
 
   /**
-   * Perform the unbonded deployment operations.
-   * Create the GCP credential provider chain to use
-   * when talking to GCP when there is no delegation token to work with.
-   * authenticating this client with GCP services, and saves it
-   * to {@link #accessTokenProvider}
+   * Perform the unbonded deployment operations. Create the GCP credential provider chain to use
+   * when talking to GCP when there is no delegation token to work with. authenticating this client
+   * with GCP services, and saves it to {@link #accessTokenProvider}
    *
    * @throws IOException any failure.
    */
-  public AccessTokenProvider deployUnbonded()
-      throws IOException {
-    Preconditions.checkState(!isBoundToDT(),
-        "Already Bound to a delegation token");
+  public AccessTokenProvider deployUnbonded() throws IOException {
+    Preconditions.checkState(!isBoundToDT(), "Already Bound to a delegation token");
     logger.atFine().log("No delegation tokens present: using direct authentication");
     accessTokenProvider = tokenBinding.deployUnbonded();
     return accessTokenProvider;
   }
 
   /**
-   * Attempt to bind to any existing DT, including unmarshalling its contents
-   * and creating the GCP credential provider used to authenticate
-   * the client.
+   * Attempt to bind to any existing DT, including unmarshalling its contents and creating the GCP
+   * credential provider used to authenticate the client.
    *
-   * If successful:
+   * <p>If successful:
+   *
    * <ol>
-   *   <li>{@link #boundDT} is set to the retrieved token.</li>
-   *   <li>{@link #accessTokenProvider} is set to the credential
-   *   provider(s) returned by the token binding.</li>
+   *   <li>{@link #boundDT} is set to the retrieved token.
+   *   <li>{@link #accessTokenProvider} is set to the credential provider(s) returned by the token
+   *       binding.
    * </ol>
-   * If unsuccessful, {@link #deployUnbonded()} is called for the
-   * unbonded codepath instead, which will set
-   * {@link #accessTokenProvider} to its value.
    *
-   * This means after this call (and only after) the token operations
-   * can be invoked.
+   * If unsuccessful, {@link #deployUnbonded()} is called for the unbonded codepath instead, which
+   * will set {@link #accessTokenProvider} to its value.
+   *
+   * <p>This means after this call (and only after) the token operations can be invoked.
    *
    * @throws IOException selection/extraction/validation failure.
    */
@@ -146,62 +132,56 @@ public class GCSDelegationTokens {
       deployUnbonded();
     }
     if (accessTokenProvider == null) {
-      throw new DelegationTokenIOException("No AccessTokenProvider"
-          + " created by Delegation Token Binding "
-          + tokenBinding.getKind());
+      throw new DelegationTokenIOException(
+          "No AccessTokenProvider"
+              + " created by Delegation Token Binding "
+              + tokenBinding.getKind());
     }
   }
 
   /**
    * Find a token for the FS user and service name.
+   *
    * @return the token, or null if one cannot be found.
    * @throws IOException on a failure to unmarshall the token.
    */
-  public Token<DelegationTokenIdentifier> selectTokenFromFSOwner()
-      throws IOException {
-    return lookupToken(user.getCredentials(),
-        service,
-        tokenBinding.getKind());
+  public Token<DelegationTokenIdentifier> selectTokenFromFSOwner() throws IOException {
+    return lookupToken(user.getCredentials(), service, tokenBinding.getKind());
   }
 
   /**
-   * Bind to the filesystem.
-   * Subclasses can use this to perform their own binding operations -
-   * but they must always call their superclass implementation.
-   * This <i>Must</i> be called before calling {@code init()}.
+   * Bind to the filesystem. Subclasses can use this to perform their own binding operations - but
+   * they must always call their superclass implementation. This <i>Must</i> be called before
+   * calling {@code init()}.
    *
-   * <b>Important:</b>
-   * This binding will happen during FileSystem.initialize(); the FS
-   * is not live for actual use and will not yet have interacted with
-   * GCS services.
+   * <p><b>Important:</b> This binding will happen during FileSystem.initialize(); the FS is not
+   * live for actual use and will not yet have interacted with GCS services.
+   *
    * @param fs owning FS.
    * @throws IOException failure.
    */
-  public void bindToFileSystem(
-      final GoogleHadoopFileSystemBase fs,
-      final Text service) throws IOException {
+  public void bindToFileSystem(final GoogleHadoopFileSystemBase fs, final Text service)
+      throws IOException {
     this.service = requireNonNull(service);
     this.fileSystem = requireNonNull(fs);
   }
 
-
   /**
-   * Bind to a delegation token retrieved for this filesystem.
-   * Extract the secrets from the token and set internal fields
-   * to the values.
+   * Bind to a delegation token retrieved for this filesystem. Extract the secrets from the token
+   * and set internal fields to the values.
+   *
    * <ol>
-   *   <li>{@link #boundDT} is set to {@code token}.</li>
-   *   <li>{@link #accessTokenProvider} is set to the credential
-   *   provider(s) returned by the token binding.</li>
+   *   <li>{@link #boundDT} is set to {@code token}.
+   *   <li>{@link #accessTokenProvider} is set to the credential provider(s) returned by the token
+   *       binding.
    * </ol>
+   *
    * @param token token to decode and bind to.
    * @throws IOException selection/extraction/validation failure.
    */
-  public void bindToDelegationToken(
-      final Token<DelegationTokenIdentifier> token)
+  public void bindToDelegationToken(final Token<DelegationTokenIdentifier> token)
       throws IOException {
-    Preconditions.checkState((accessTokenProvider == null),
-                             E_ALREADY_DEPLOYED);
+    Preconditions.checkState((accessTokenProvider == null), E_ALREADY_DEPLOYED);
     boundDT = token;
     DelegationTokenIdentifier dti = extractIdentifier(token);
     logger.atInfo().log("Using delegation token %s", dti);
@@ -211,6 +191,7 @@ public class GCSDelegationTokens {
 
   /**
    * Predicate: is there a bound DT?
+   *
    * @return true if there's a value in {@link #boundDT}.
    */
   public boolean isBoundToDT() {
@@ -219,6 +200,7 @@ public class GCSDelegationTokens {
 
   /**
    * Get any bound DT.
+   *
    * @return a delegation token if this instance was bound to it.
    */
   public Token<DelegationTokenIdentifier> getBoundDT() {
@@ -227,12 +209,12 @@ public class GCSDelegationTokens {
 
   /**
    * Get any bound DT or create a new one.
+   *
    * @return a delegation token.
    * @throws IOException if one cannot be created
    */
   @SuppressWarnings("OptionalGetWithoutIsPresent")
-  public Token<DelegationTokenIdentifier> getBoundOrNewDT(String renewer)
-      throws IOException {
+  public Token<DelegationTokenIdentifier> getBoundOrNewDT(String renewer) throws IOException {
     logger.atFine().log("Delegation token requested");
     if (isBoundToDT()) {
       // the FS was created on startup with a token, so return it.
@@ -248,14 +230,14 @@ public class GCSDelegationTokens {
 
   /**
    * From a token, get the session token identifier.
+   *
    * @param token token to process
    * @return the session token identifier
    * @throws IOException failure to validate/read data encoded in identifier.
    * @throws IllegalArgumentException if the token isn't an GCP session token
    */
   public static DelegationTokenIdentifier extractIdentifier(
-      final Token<? extends DelegationTokenIdentifier> token)
-      throws IOException {
+      final Token<? extends DelegationTokenIdentifier> token) throws IOException {
     Preconditions.checkArgument(token != null, "null token");
     DelegationTokenIdentifier identifier;
     // harden up decode beyond what Token does itself
@@ -277,8 +259,8 @@ public class GCSDelegationTokens {
   }
 
   /**
-   * Look up a token from the credentials, verify it is of the correct
-   * kind.
+   * Look up a token from the credentials, verify it is of the correct kind.
+   *
    * @param credentials credentials to look up.
    * @param service service name
    * @param kind token kind to look for
@@ -286,9 +268,7 @@ public class GCSDelegationTokens {
    * @throws DelegationTokenIOException wrong token kind found
    */
   public static Token<DelegationTokenIdentifier> lookupToken(
-      final Credentials credentials,
-      final Text service,
-      final Text kind)
+      final Credentials credentials, final Text service, final Text kind)
       throws DelegationTokenIOException {
     logger.atFine().log("Looking for token for service %s in credentials", service);
     Token<?> token = credentials.getToken(service);
@@ -311,14 +291,14 @@ public class GCSDelegationTokens {
 
   /**
    * Look up any token from the service; cast it to one of ours.
+   *
    * @param credentials credentials
    * @param service service to look up
    * @return any token found or null if none was
    * @throws ClassCastException if the token is of a wrong type.
    */
   public static Token<DelegationTokenIdentifier> lookupToken(
-      final Credentials credentials,
-      final Text service) {
+      final Credentials credentials, final Text service) {
     Token<DelegationTokenIdentifier> result = null;
     Token<?> token = credentials.getToken(service);
     if (token != null) {
@@ -329,14 +309,13 @@ public class GCSDelegationTokens {
 
   /**
    * Look for any GCP token for the given FS service.
+   *
    * @param credentials credentials to scan.
    * @param service the service of the FS to look for
    * @return the token or null if none was found
    */
   public static Token<DelegationTokenIdentifier> lookupGCPDelegationToken(
-      final Credentials credentials,
-      final Text service) throws DelegationTokenIOException {
+      final Credentials credentials, final Text service) throws DelegationTokenIOException {
     return lookupToken(credentials, service);
   }
-
 }

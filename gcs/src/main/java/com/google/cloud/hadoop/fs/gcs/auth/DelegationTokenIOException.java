@@ -16,51 +16,51 @@
  */
 package com.google.cloud.hadoop.fs.gcs.auth;
 
+import java.io.IOException;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier;
 
-import java.io.IOException;
-
 /**
- * General IOException for Delegation Token issues.
- * Includes recommended error strings, which can be used in tests when
- * looking for specific errors.
+ * General IOException for Delegation Token issues. Includes recommended error strings, which can be
+ * used in tests when looking for specific errors.
  */
 public class DelegationTokenIOException extends IOException {
 
   /**
-   * Version number for serialization.
-   * See more info at: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/io/Serializable.html
+   * Version number for serialization. See more info at:
+   * https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/io/Serializable.html
    */
   private static final long serialVersionUID = 5431764092856006083L;
 
   /** Error: delegation token/token identifier class isn't the right one. */
   static final String TOKEN_WRONG_TYPE = "Delegation token type is incorrect";
 
-  /**
-   * The far end is expecting a different token kind than that which the client created.
-   */
+  /** The far end is expecting a different token kind than that which the client created. */
   static final String TOKEN_MISMATCH = "Token mismatch";
 
-
-  public static DelegationTokenIOException wrongTokenType(Class expectedClass,
-                                                          DelegationTokenIdentifier identifier) {
-    return new DelegationTokenIOException(TOKEN_WRONG_TYPE +
-                                          "; expected a token identifier of type " +
-                                          expectedClass +
-                                          " but got " +
-                                          identifier.getClass() +
-                                          " and kind " + identifier.getKind());
+  public static DelegationTokenIOException wrongTokenType(
+      Class expectedClass, DelegationTokenIdentifier identifier) {
+    return new DelegationTokenIOException(
+        TOKEN_WRONG_TYPE
+            + "; expected a token identifier of type "
+            + expectedClass
+            + " but got "
+            + identifier.getClass()
+            + " and kind "
+            + identifier.getKind());
   }
 
-  public static DelegationTokenIOException tokenMismatch(Text service,
-                                                         Text expectedKind,
-                                                         Text actualKind) {
+  public static DelegationTokenIOException tokenMismatch(
+      Text service, Text expectedKind, Text actualKind) {
     return new DelegationTokenIOException(
-        DelegationTokenIOException.TOKEN_MISMATCH + ": expected token"
-            + " for " + service
-            + " of type " + expectedKind
-            + " but got a token of type " + actualKind);
+        DelegationTokenIOException.TOKEN_MISMATCH
+            + ": expected token"
+            + " for "
+            + service
+            + " of type "
+            + expectedKind
+            + " but got a token of type "
+            + actualKind);
   }
 
   public DelegationTokenIOException(final String message) {
@@ -70,5 +70,4 @@ public class DelegationTokenIOException extends IOException {
   public DelegationTokenIOException(final String message, final Throwable cause) {
     super(message, cause);
   }
-
 }

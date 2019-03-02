@@ -16,6 +16,7 @@
  */
 package com.google.cloud.hadoop.fs.gcs.auth;
 
+import java.net.URI;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.io.Text;
@@ -24,23 +25,16 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.DtFetcher;
 import org.apache.hadoop.security.token.Token;
 
-import java.net.URI;
-
 /**
- * A DT fetcher for GCS.
- * This is a copy-and-paste of
- * {@code org.apache.hadoop.hdfs.HdfsDtFetcher}.
+ * A DT fetcher for GCS. This is a copy-and-paste of {@code org.apache.hadoop.hdfs.HdfsDtFetcher}.
  */
 public class GCSDtFetcher implements DtFetcher {
 
   private static final String SERVICE_NAME = "gs";
 
-  private static final String FETCH_FAILED =
-      "Filesystem not generating Delegation Tokens";
+  private static final String FETCH_FAILED = "Filesystem not generating Delegation Tokens";
 
-  /**
-   * Returns the service name for GCS, which is also a valid URL prefix.
-   */
+  /** Returns the service name for GCS, which is also a valid URL prefix. */
   public Text getServiceName() {
     return new Text(SERVICE_NAME);
   }
@@ -50,17 +44,16 @@ public class GCSDtFetcher implements DtFetcher {
   }
 
   /**
-   *  Returns Token object via FileSystem, null if bad argument.
-   *  @param conf - a Configuration object used with FileSystem.get()
-   *  @param creds - a Credentials object to which token(s) will be added
-   *  @param renewer  - the renewer to send with the token request
-   *  @param url  - the URL to which the request is sent
-   *  @return a Token, or null if fetch fails.
+   * Returns Token object via FileSystem, null if bad argument.
+   *
+   * @param conf - a Configuration object used with FileSystem.get()
+   * @param creds - a Credentials object to which token(s) will be added
+   * @param renewer - the renewer to send with the token request
+   * @param url - the URL to which the request is sent
+   * @return a Token, or null if fetch fails.
    */
-  public Token<?> addDelegationTokens(Configuration conf,
-                                      Credentials creds,
-                                      String renewer,
-                                      String url) throws Exception {
+  public Token<?> addDelegationTokens(
+      Configuration conf, Credentials creds, String renewer, String url) throws Exception {
     if (!url.startsWith(SERVICE_NAME)) {
       url = SERVICE_NAME + "://" + url;
     }
@@ -73,4 +66,3 @@ public class GCSDtFetcher implements DtFetcher {
     return token;
   }
 }
-

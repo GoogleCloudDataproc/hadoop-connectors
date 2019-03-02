@@ -16,9 +16,16 @@
  */
 package com.google.cloud.hadoop.fs.gcs;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import com.google.cloud.hadoop.fs.gcs.auth.GCSDelegationTokens;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
 import com.google.cloud.hadoop.fs.gcs.auth.TestTokenIdentifierImpl;
+import java.io.IOException;
+import java.net.URI;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
@@ -27,20 +34,9 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier;
 import org.junit.Test;
 
-import java.io.IOException;
-import java.net.URI;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-
 public class GoogleHadoopFileSystemDelegationTokensTest {
 
-  /**
-   * Verifies that a configured delegation token binding is correctly loaded and employed
-   */
+  /** Verifies that a configured delegation token binding is correctly loaded and employed */
   @Test
   public void testDelegationTokenBinding() {
     final URI initUri = (new Path("gs://" + "test/")).toUri();
@@ -59,10 +55,13 @@ public class GoogleHadoopFileSystemDelegationTokensTest {
       // Validate the associated identifier
       TokenIdentifier decoded = dt.decodeIdentifier();
       assertNotNull("Failed to decode token identifier", decoded);
-      assertTrue("Unexpected delegation token identifier type", (decoded instanceof TestTokenIdentifierImpl));
+      assertTrue(
+          "Unexpected delegation token identifier type",
+          (decoded instanceof TestTokenIdentifierImpl));
 
       DelegationTokenIdentifier identifier = (DelegationTokenIdentifier) decoded;
-      assertEquals("Unexpected delegation token identifier kind", expectedKind, identifier.getKind());
+      assertEquals(
+          "Unexpected delegation token identifier kind", expectedKind, identifier.getKind());
     } catch (IOException e) {
       fail(e.getMessage());
     }
@@ -76,13 +75,13 @@ public class GoogleHadoopFileSystemDelegationTokensTest {
     config.setLong(GoogleHadoopFileSystemBase.BLOCK_SIZE_KEY, 1024);
 
     // Token binding config
-    config.set(GCSDelegationTokens.CONFIG_DELEGATION_TOKEN_BINDING_CLASS,
-               TestDelegationTokenBindingImpl.class.getName());
-    config.set(TestDelegationTokenBindingImpl.TestAccessTokenProviderImpl.TOKEN_CONFIG_PROPERTY_NAME,
-               "qWDAWFA3WWFAWFAWFAW3FAWF3AWF3WFAF33GR5G5"); // Bogus auth token
+    config.set(
+        GCSDelegationTokens.CONFIG_DELEGATION_TOKEN_BINDING_CLASS,
+        TestDelegationTokenBindingImpl.class.getName());
+    config.set(
+        TestDelegationTokenBindingImpl.TestAccessTokenProviderImpl.TOKEN_CONFIG_PROPERTY_NAME,
+        "qWDAWFA3WWFAWFAWFAW3FAWF3AWF3WFAF33GR5G5"); // Bogus auth token
 
     return config;
   }
-
-
 }
