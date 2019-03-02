@@ -28,6 +28,10 @@ import java.io.IOException;
  */
 public class DelegationTokenIOException extends IOException {
 
+  /**
+   * Version number for serialization.
+   * See more info at: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/io/Serializable.html
+   */
   private static final long serialVersionUID = 5431764092856006083L;
 
   /** Error: delegation token/token identifier class isn't the right one. */

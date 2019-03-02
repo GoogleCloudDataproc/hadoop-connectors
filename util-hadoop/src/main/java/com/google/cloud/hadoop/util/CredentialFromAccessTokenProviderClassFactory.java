@@ -95,7 +95,7 @@ public final class CredentialFromAccessTokenProviderClassFactory {
   /**
    * Generate the credential.
    *
-   * <p>If the {@link AccessTokenProviderClassFromConfigFactory} generates no Class for the
+   * If the {@link AccessTokenProviderClassFromConfigFactory} generates no Class for the
    * provider, return null.
    */
   public static Credential credential(
@@ -118,7 +118,7 @@ public final class CredentialFromAccessTokenProviderClassFactory {
     return null;
   }
 
-  /** Creates ad {@link Credential} based on information from the access token provider. */
+  /** Creates a {@link Credential} based on information from the access token provider. */
   private static Credential getCredentialFromAccessTokenProvider(
       AccessTokenProvider accessTokenProvider, Collection<String> scopes)
       throws IOException, GeneralSecurityException {

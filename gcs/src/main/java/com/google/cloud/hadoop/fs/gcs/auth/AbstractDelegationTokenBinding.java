@@ -174,8 +174,9 @@ public abstract class AbstractDelegationTokenBinding {
 
 
   /**
-   * Create a new subclass of {@link DelegationTokenIdentifier}.
-   * This is used in the secret manager.
+   * Create a new "empty" token identifier.
+   * It is used by the "dummy" SecretManager, which requires a token identifier
+   * (even one that's not real) to satisfy the contract.
    * @return an empty identifier.
    */
   public abstract DelegationTokenIdentifier createEmptyIdentifier();
