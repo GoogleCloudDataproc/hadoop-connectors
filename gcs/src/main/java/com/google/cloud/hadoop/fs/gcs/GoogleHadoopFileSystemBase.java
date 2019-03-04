@@ -1609,7 +1609,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * access token provided by this provider; Otherwise obtain credential through {@link
    * HadoopCredentialConfiguration#getCredential(List)}.
    */
-  private static Credential getCredential(
+  private Credential getCredential(
       AccessTokenProviderClassFromConfigFactory providerClassFactory, Configuration config)
       throws IOException, GeneralSecurityException {
     Credential credential = null;
@@ -1631,17 +1631,18 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       credential =
           CredentialFromAccessTokenProviderClassFactory.credential(
               providerClassFactory, config, CredentialFactory.GCS_SCOPES);
-    }
 
-    if (credential == null) {
-      // Finally, if no credentials have been acquired at this point, employ
-      // the default mechanism.
-      credential =
-          HadoopCredentialConfiguration.newBuilder()
-              .withConfiguration(config)
-              .withOverridePrefix(AUTHENTICATION_PREFIX)
-              .build()
-              .getCredential(CredentialFactory.GCS_SCOPES);
+      if (credential == null) {
+        // Finally, if no credentials have been acquired at this point, employ
+        // the default mechanism.
+        credential =
+            HadoopCredentialConfiguration.newBuilder()
+                .withConfiguration(config)
+                .withOverridePrefix(AUTHENTICATION_PREFIX)
+                .build()
+                .getCredential(CredentialFactory.GCS_SCOPES);
+      }
+
     }
 
     return credential;
@@ -1726,7 +1727,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     }
   }
 
-  private static GoogleCloudStorageFileSystem createGcsFs(Configuration config) throws IOException {
+  private GoogleCloudStorageFileSystem createGcsFs(Configuration config) throws IOException {
     Credential credential;
     try {
       credential =
