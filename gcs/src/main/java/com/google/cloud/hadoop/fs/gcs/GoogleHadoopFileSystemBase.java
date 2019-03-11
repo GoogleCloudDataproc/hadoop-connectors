@@ -1642,7 +1642,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 .build()
                 .getCredential(CredentialFactory.GCS_SCOPES);
       }
-
     }
 
     return credential;
