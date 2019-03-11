@@ -40,7 +40,7 @@ import static com.google.common.flogger.LazyArgs.lazy;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.api.client.auth.oauth2.Credential;
-import com.google.cloud.hadoop.fs.gcs.auth.GCSDelegationTokens;
+import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
@@ -240,7 +240,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   protected URI initUri;
 
   /** Delegation token support */
-  protected GCSDelegationTokens delegationTokens = null;
+  protected GcsDelegationTokens delegationTokens = null;
 
   /**
    * The retrieved configuration value for {@link
@@ -654,7 +654,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   private void initializeDelegationTokenSupport(Configuration config, URI path) throws IOException {
     logger.atFine().log("GHFS.initializeDelegationTokenSupport");
     // Load delegation token binding, if support is configured
-    GCSDelegationTokens dts = new GCSDelegationTokens();
+    GcsDelegationTokens dts = new GcsDelegationTokens();
     Text service = new Text(getScheme() + "://" + path.getAuthority());
     dts.bindToFileSystem(this, service);
     try {

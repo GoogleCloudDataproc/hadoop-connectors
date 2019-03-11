@@ -30,7 +30,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier;
 
-public class GCSDelegationTokens {
+public class GcsDelegationTokens {
 
   public static final String CONFIG_DELEGATION_TOKEN_BINDING_CLASS =
       "fs.gs.delegation.token.binding";
@@ -58,7 +58,7 @@ public class GCSDelegationTokens {
   /** Active Delegation token. */
   private Token<DelegationTokenIdentifier> boundDT = null;
 
-  public GCSDelegationTokens() throws IOException {
+  public GcsDelegationTokens() throws IOException {
     user = UserGroupInformation.getCurrentUser();
   }
 

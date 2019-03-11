@@ -28,7 +28,7 @@ import org.apache.hadoop.security.token.Token;
 /**
  * A DT fetcher for GCS. This is a copy-and-paste of {@code org.apache.hadoop.hdfs.HdfsDtFetcher}.
  */
-public class GCSDtFetcher implements DtFetcher {
+public class GcsDtFetcher implements DtFetcher {
 
   private static final String SERVICE_NAME = "gs";
 

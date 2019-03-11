@@ -21,7 +21,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import com.google.cloud.hadoop.fs.gcs.auth.GCSDelegationTokens;
+import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
 import com.google.cloud.hadoop.fs.gcs.auth.TestTokenIdentifierImpl;
 import java.io.IOException;
@@ -76,7 +76,7 @@ public class GoogleHadoopFileSystemDelegationTokensTest {
 
     // Token binding config
     config.set(
-        GCSDelegationTokens.CONFIG_DELEGATION_TOKEN_BINDING_CLASS,
+        GcsDelegationTokens.CONFIG_DELEGATION_TOKEN_BINDING_CLASS,
         TestDelegationTokenBindingImpl.class.getName());
     config.set(
         TestDelegationTokenBindingImpl.TestAccessTokenProviderImpl.TOKEN_CONFIG_PROPERTY_NAME,
