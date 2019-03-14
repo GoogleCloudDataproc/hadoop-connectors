@@ -23,6 +23,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.toCollection;
@@ -419,6 +420,9 @@ public class GoogleCloudStorageFileSystem {
           if (gcsAtomic.lockPaths(clientId, resourceId)) {
             break;
           }
+          logger.atInfo().atMostEvery(30, TimeUnit.SECONDS).log(
+              "Failed to acquire lock to delete %s. Re-trying after sleep.", resourceId);
+          sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
           logger.atWarning().withCause(e).log(
               "Failed to lock (client=%s, res=%s), retrying.", clientId, resourceId);
@@ -786,6 +790,10 @@ public class GoogleCloudStorageFileSystem {
           if (gcsAtomic.lockPaths(clientId, srcResourceId, dstResourceId)) {
             break;
           }
+          logger.atInfo().atMostEvery(30, TimeUnit.SECONDS).log(
+              "Failed to acquire lock to rename %s to %s. Re-trying after sleep.",
+              srcResourceId, dstResourceId);
+          sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
           logger.atWarning().withCause(e).log(
               "Failed to lock (client=%s, src=%s, dst=%s), retrying.",
