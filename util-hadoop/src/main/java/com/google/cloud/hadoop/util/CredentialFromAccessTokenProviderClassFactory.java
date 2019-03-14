@@ -82,6 +82,13 @@ public final class CredentialFromAccessTokenProviderClassFactory {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
+  /** Generate the credential from the {@link AccessTokenProvider}. */
+  public static Credential credential(
+      AccessTokenProvider accessTokenProvider, Collection<String> scopes)
+      throws IOException, GeneralSecurityException {
+    return getCredentialFromAccessTokenProvider(accessTokenProvider, scopes);
+  }
+
   /**
    * Generate the credential.
    *
