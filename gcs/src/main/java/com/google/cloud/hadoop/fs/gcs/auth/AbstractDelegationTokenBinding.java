@@ -28,6 +28,7 @@ import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier;
 
+/** Binds file system with service and access token provider */
 public abstract class AbstractDelegationTokenBinding {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();

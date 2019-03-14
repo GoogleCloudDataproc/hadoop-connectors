@@ -16,11 +16,12 @@
  */
 package com.google.cloud.hadoop.fs.gcs.auth;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
-import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
@@ -30,15 +31,13 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier;
 
+/** Manages delegation tokens for files system */
 public class GcsDelegationTokens {
-
-  public static final String CONFIG_DELEGATION_TOKEN_BINDING_CLASS =
-      "fs.gs.delegation.token.binding";
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  private static final String E_ALREADY_DEPLOYED =
-      "GCP Delegation tokens has already been bound/deployed";
+  public static final String CONFIG_DELEGATION_TOKEN_BINDING_CLASS =
+      "fs.gs.delegation.token.binding";
 
   private GoogleHadoopFileSystemBase fileSystem;
 
@@ -65,7 +64,7 @@ public class GcsDelegationTokens {
   public void init(final Configuration conf) {
     String tokenBindingImpl = conf.get(CONFIG_DELEGATION_TOKEN_BINDING_CLASS);
 
-    Preconditions.checkState((tokenBindingImpl != null), "Delegation Tokens not configured");
+    checkState(tokenBindingImpl != null, "Delegation Tokens are not configured");
 
     try {
       Class bindingClass = Class.forName(tokenBindingImpl);
@@ -75,7 +74,7 @@ public class GcsDelegationTokens {
       tokenBinding = binding;
       logger.atFine().log(
           "Filesystem %s is using delegation tokens of kind %s",
-          getService(), tokenBinding.getKind().toString());
+          getService(), tokenBinding.getKind());
       bindToAnyDelegationToken();
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -98,7 +97,7 @@ public class GcsDelegationTokens {
    * @throws IOException any failure.
    */
   public AccessTokenProvider deployUnbonded() throws IOException {
-    Preconditions.checkState(!isBoundToDT(), "Already Bound to a delegation token");
+    checkState(!isBoundToDT(), "Already Bound to a delegation token");
     logger.atFine().log("No delegation tokens present: using direct authentication");
     accessTokenProvider = tokenBinding.deployUnbonded();
     return accessTokenProvider;
@@ -124,8 +123,8 @@ public class GcsDelegationTokens {
    * @throws IOException selection/extraction/validation failure.
    */
   public void bindToAnyDelegationToken() throws IOException {
-    Preconditions.checkState(accessTokenProvider == null, E_ALREADY_DEPLOYED);
-    Token<DelegationTokenIdentifier> token = selectTokenFromFSOwner();
+    validateAccessTokenProvider();
+    Token<DelegationTokenIdentifier> token = selectTokenFromFsOwner();
     if (token != null) {
       bindToDelegationToken(token);
     } else {
@@ -133,9 +132,7 @@ public class GcsDelegationTokens {
     }
     if (accessTokenProvider == null) {
       throw new DelegationTokenIOException(
-          "No AccessTokenProvider"
-              + " created by Delegation Token Binding "
-              + tokenBinding.getKind());
+          "No AccessTokenProvider created by Delegation Token Binding " + tokenBinding.getKind());
     }
   }
 
@@ -145,7 +142,7 @@ public class GcsDelegationTokens {
    * @return the token, or null if one cannot be found.
    * @throws IOException on a failure to unmarshall the token.
    */
-  public Token<DelegationTokenIdentifier> selectTokenFromFSOwner() throws IOException {
+  public Token<DelegationTokenIdentifier> selectTokenFromFsOwner() throws IOException {
     return lookupToken(user.getCredentials(), service, tokenBinding.getKind());
   }
 
@@ -181,7 +178,7 @@ public class GcsDelegationTokens {
    */
   public void bindToDelegationToken(final Token<DelegationTokenIdentifier> token)
       throws IOException {
-    Preconditions.checkState((accessTokenProvider == null), E_ALREADY_DEPLOYED);
+    validateAccessTokenProvider();
     boundDT = token;
     DelegationTokenIdentifier dti = extractIdentifier(token);
     logger.atInfo().log("Using delegation token %s", dti);
@@ -238,7 +235,7 @@ public class GcsDelegationTokens {
    */
   public static DelegationTokenIdentifier extractIdentifier(
       final Token<? extends DelegationTokenIdentifier> token) throws IOException {
-    Preconditions.checkArgument(token != null, "null token");
+    checkArgument(token != null, "null token");
     DelegationTokenIdentifier identifier;
     // harden up decode beyond what Token does itself
     try {
@@ -267,55 +264,28 @@ public class GcsDelegationTokens {
    * @return the token or null if no suitable token was found
    * @throws DelegationTokenIOException wrong token kind found
    */
-  public static Token<DelegationTokenIdentifier> lookupToken(
-      final Credentials credentials, final Text service, final Text kind)
-      throws DelegationTokenIOException {
+  private static Token<DelegationTokenIdentifier> lookupToken(
+      Credentials credentials, Text service, Text kind) throws DelegationTokenIOException {
     logger.atFine().log("Looking for token for service %s in credentials", service);
     Token<?> token = credentials.getToken(service);
     if (token != null) {
       Text tokenKind = token.getKind();
       logger.atFine().log("Found token of kind %s", tokenKind);
       if (kind.equals(tokenKind)) {
-        // The OAuth implementation catches and logs here; this one
-        // throws the failure up.
+        // The OAuth implementation catches and logs here; this one throws the failure up.
         return (Token<DelegationTokenIdentifier>) token;
-      } else {
-        // There's a token for this service, but it's not the right DT kind
-        throw DelegationTokenIOException.tokenMismatch(service, kind, tokenKind);
       }
+
+      // There's a token for this service, but it's not the right DT kind
+      throw DelegationTokenIOException.tokenMismatch(service, kind, tokenKind);
     }
     // A token for the service was not found
     logger.atFine().log("No token found for %s", service);
     return null;
   }
 
-  /**
-   * Look up any token from the service; cast it to one of ours.
-   *
-   * @param credentials credentials
-   * @param service service to look up
-   * @return any token found or null if none was
-   * @throws ClassCastException if the token is of a wrong type.
-   */
-  public static Token<DelegationTokenIdentifier> lookupToken(
-      final Credentials credentials, final Text service) {
-    Token<DelegationTokenIdentifier> result = null;
-    Token<?> token = credentials.getToken(service);
-    if (token != null) {
-      result = (Token<DelegationTokenIdentifier>) token;
-    }
-    return result;
-  }
-
-  /**
-   * Look for any GCP token for the given FS service.
-   *
-   * @param credentials credentials to scan.
-   * @param service the service of the FS to look for
-   * @return the token or null if none was found
-   */
-  public static Token<DelegationTokenIdentifier> lookupGCPDelegationToken(
-      final Credentials credentials, final Text service) throws DelegationTokenIOException {
-    return lookupToken(credentials, service);
+  private void validateAccessTokenProvider() {
+    checkState(
+        accessTokenProvider == null, "GCP Delegation tokens has already been bound/deployed");
   }
 }
