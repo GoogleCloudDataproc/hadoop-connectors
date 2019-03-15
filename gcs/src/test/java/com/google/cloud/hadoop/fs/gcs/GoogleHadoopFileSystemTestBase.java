@@ -19,15 +19,16 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.assertThrows;
 
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.TimestampUpdatePredicate;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.testing.TestingAccessTokenProvider;
 import com.google.common.base.Joiner;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.Writer;
 import java.net.URI;
@@ -90,12 +91,10 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     config.set(GoogleHadoopFileSystemConfiguration.GCS_SYSTEM_BUCKET.getKey(), systemBucketName);
     config.setBoolean(GoogleHadoopFileSystemConfiguration.GCS_CREATE_SYSTEM_BUCKET.getKey(), true);
     config.setBoolean(
-        GoogleHadoopFileSystemConfiguration.GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.getKey(), true);
-    config.setBoolean(
         GoogleHadoopFileSystemConfiguration.GCS_INFER_IMPLICIT_DIRECTORIES_ENABLE.getKey(), false);
     // Allow buckets to be deleted in test cleanup:
     config.setBoolean(GoogleHadoopFileSystemConfiguration.GCE_BUCKET_DELETE_ENABLE.getKey(), true);
-    // Disable concurrent globbing because it's unpredictable in auto repairing parent directory
+    // Disable concurrent globbing
     config.setBoolean(
         GoogleHadoopFileSystemConfiguration.GCS_CONCURRENT_GLOB_ENABLE.getKey(), false);
     return config;
@@ -192,11 +191,10 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
   }
 
   /**
-   * Makes listStatus and globStatus perform repairs by first creating an object directly without
-   * creating its parent directory object.
+   * Test implicit directories.
    */
   @Test
-  public void testRepairImplicitDirectory() throws IOException, URISyntaxException {
+  public void testImplicitDirectory() throws IOException {
     String bucketName = sharedBucketName1;
     GoogleHadoopFileSystemBase myghfs = (GoogleHadoopFileSystemBase) ghfs;
     GoogleCloudStorageFileSystem gcsfs = myghfs.getGcsFs();
@@ -215,90 +213,74 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
 
     boolean inferredDirExists =
         gcsfs.getOptions().getCloudStorageOptions().isInferImplicitDirectoriesEnabled();
-    boolean inferredOrRepairedDirExists =
-        gcsfs.getOptions().getCloudStorageOptions().isInferImplicitDirectoriesEnabled()
-            || gcsfs.getOptions().getCloudStorageOptions().isAutoRepairImplicitDirectoriesEnabled();
 
     assertDirectory(gcsfs, leafUri, /* exists= */ true);
     assertDirectory(gcsfs, subdirUri, inferredDirExists);
     assertDirectory(gcsfs, parentUri, inferredDirExists);
-
-    if (inferredOrRepairedDirExists) {
-      myghfs.listStatus(parentPath);
-    } else {
-      assertThrows(FileNotFoundException.class, () -> myghfs.listStatus(parentPath));
-    }
-
-    assertDirectory(gcsfs, leafUri, /* exists= */ true);
-    assertDirectory(gcsfs, subdirUri, inferredOrRepairedDirExists);
-    assertDirectory(gcsfs, parentUri, inferredOrRepairedDirExists);
 
     ghfsHelper.clearBucket(bucketName);
+  }
 
-    // Reset for globStatus.
-    gcsfs.mkdir(leafUri);
+  /**
+   * Test directory repair at deletion
+   * @throws IOException
+   */
+  @Test
+  public void testRepairDirectory() throws IOException {
+    String bucketName = sharedBucketName1;
+    GoogleHadoopFileSystemBase myghfs = (GoogleHadoopFileSystemBase) ghfs;
+    GoogleCloudStorageFileSystem gcsfs = myghfs.getGcsFs();
+    GoogleCloudStorage gcs = gcsfs.getGcs();
+    URI seedUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path dirPath = ghfsHelper.castAsHadoopPath(seedUri);
+    URI dirUri = myghfs.getGcsPath(dirPath);
 
-    assertDirectory(gcsfs, leafUri, /* exists= */ true);
-    assertDirectory(gcsfs, subdirUri, inferredDirExists);
-    assertDirectory(gcsfs, parentUri, inferredDirExists);
+    // A subdir path that looks like gs://<bucket>/<generated-tempdir>/foo-subdir where
+    // neither the subdir nor gs://<bucket>/<generated-tempdir> exist yet.
+    Path emptyObject = new Path(dirPath, "empty-object");
+    URI objUri = myghfs.getGcsPath(emptyObject);
+    StorageResourceId resource = gcsfs.getPathCodec().validatePathAndGetId(objUri, false);
+    gcs.createEmptyObject(resource);
 
-    myghfs.globStatus(parentPath);
+    boolean inferImplicitDirectories =
+        gcsfs.getOptions().getCloudStorageOptions().isInferImplicitDirectoriesEnabled();
 
-    // Globbing the single directory only repairs that top-level directory; it is *not* the same
-    // as listStatus.
-    assertDirectory(gcsfs, leafUri, /* exists= */ true);
-    assertDirectory(gcsfs, subdirUri, inferredDirExists);
-    assertDirectory(gcsfs, parentUri, inferredOrRepairedDirExists);
-
-    ghfsHelper.clearBucket(bucketName);
-
-    // Reset for globStatus(path/*)
-    gcsfs.mkdir(leafUri);
-
-    assertDirectory(gcsfs, leafUri, /* exists= */ true);
-    assertDirectory(gcsfs, subdirUri, inferredDirExists);
-    assertDirectory(gcsfs, parentUri, inferredDirExists);
-
-    // When globbing children, the parent will only be repaired if flat-globbing is not enabled.
-    Path globChildrenPath = new Path(parentPath.toString() + "/*");
-    myghfs.globStatus(globChildrenPath);
-    boolean expectParentRepair =
-        !(myghfs.enableFlatGlob && myghfs.couldUseFlatGlob(globChildrenPath));
-
-    // This will internally call listStatus, so will have the same behavior of repairing both
-    // levels of subdirectories.
-    assertDirectory(gcsfs, leafUri, /* exists= */ true);
-
-    assertDirectory(gcsfs, subdirUri, inferredOrRepairedDirExists);
-
-    if (expectParentRepair || inferredDirExists) {
-      assertWithMessage("Expected to exist: %s", parentUri).that(gcsfs.exists(parentUri)).isTrue();
+    if (inferImplicitDirectories) {
+      assertWithMessage("Expected to exist: %s", dirUri)
+          .that(gcsfs.exists(dirUri))
+          .isTrue();
     } else {
-      assertWithMessage("Expected not to exist due to flat globbing: %s", parentUri)
-          .that(gcsfs.exists(parentUri))
+      assertWithMessage("Expected to !exist: %s", dirUri)
+          .that(gcsfs.exists(dirUri))
           .isFalse();
     }
-
+    gcsfs.delete(objUri, false);
+    // Implicit directory created after deletion of the sole object in the directory
+    assertWithMessage("Expected to exist: %s", dirUri)
+        .that(gcsfs.exists(dirUri))
+        .isTrue();
     ghfsHelper.clearBucket(bucketName);
 
-    // Reset for globStatus(path*)
-    gcsfs.mkdir(leafUri);
-
-    assertDirectory(gcsfs, leafUri, /* exists= */ true);
-    assertDirectory(gcsfs, subdirUri, inferredDirExists);
-    assertDirectory(gcsfs, parentUri, inferredDirExists);
-
-    // Globbing with a wildcard in the parentUri itself also only repairs one level, but for
-    // a different reason than globbing with no wildcard. Globbing with no wildcard requires
-    // catching 'null' in globStatus, whereas having the wildcard causes the repair to happen
-    // when listing parentOf(parentUri).
-    myghfs.globStatus(new Path(parentPath.toString() + "*"));
-
-    assertDirectory(gcsfs, leafUri, /* exists= */ true);
-    assertDirectory(gcsfs, subdirUri, inferredDirExists);
-    assertDirectory(gcsfs, parentUri, inferredOrRepairedDirExists);
-
-    ghfsHelper.clearBucket(bucketName);
+    // test implicit dir repair after a subdir vs. an object has been deleted (recursively)
+    if (inferImplicitDirectories) {
+      // only if directory inferring is enabled, the directory without the implicit
+      // directory entry can be deleted without the FileNotFoundException
+      Path subDir = new Path(dirPath, "subdir");
+      emptyObject = new Path(subDir, "empty-object");
+      objUri = myghfs.getGcsPath(emptyObject);
+      resource = gcsfs.getPathCodec().validatePathAndGetId(objUri, false);
+      gcs.createEmptyObject(resource);
+      URI subdirUri = myghfs.getGcsPath(subDir);
+      assertWithMessage("Expected to exist: %s", dirUri)
+          .that(gcsfs.exists(dirUri) && gcsfs.exists(subdirUri))
+          .isTrue();
+      gcsfs.delete(subdirUri, true);
+      // Implicit directory created after deletion of the sole object in the directory
+      assertWithMessage("Expected to exist: %s", dirUri)
+          .that(gcsfs.exists(dirUri))
+          .isTrue();
+      ghfsHelper.clearBucket(bucketName);
+    }
   }
 
   private static void assertDirectory(GoogleCloudStorageFileSystem gcsfs, URI path, boolean exists)

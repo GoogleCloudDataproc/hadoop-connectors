@@ -265,16 +265,6 @@ public class GoogleHadoopFileSystemConfiguration {
       GCS_LAZY_INITIALIZATION_ENABLE =
           new GoogleHadoopFileSystemConfigurationProperty<>("fs.gs.lazy.init.enable", false);
 
-  /**
-   * Configuration key for enabling automatic repair of implicit directories whenever detected
-   * inside listStatus and globStatus calls, or other methods which may indirectly call listStatus
-   * and/or globStatus.
-   */
-  public static final GoogleHadoopFileSystemConfigurationProperty<Boolean>
-      GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE =
-          new GoogleHadoopFileSystemConfigurationProperty<>(
-              "fs.gs.implicit.dir.repair.enable", true);
-
   /** Configuration key for changing the path codec from legacy to 'uri path encoding'. */
   public static final GoogleHadoopFileSystemConfigurationProperty<String> PATH_CODEC =
       new GoogleHadoopFileSystemConfigurationProperty<>(
@@ -283,9 +273,7 @@ public class GoogleHadoopFileSystemConfiguration {
   /**
    * Configuration key for enabling automatic inference of implicit directories. If set, we create
    * and return in-memory directory objects on the fly when no backing object exists, but we know
-   * there are files with the same prefix. The ENABLE_REPAIR flag takes precedence over this flag:
-   * if both are set, the repair is attempted, and only if it fails does the setting of this flag
-   * kick in.
+   * there are files with the same prefix.
    */
   public static final GoogleHadoopFileSystemConfigurationProperty<Boolean>
       GCS_INFER_IMPLICIT_DIRECTORIES_ENABLE =
@@ -541,8 +529,6 @@ public class GoogleHadoopFileSystemConfiguration {
     String projectId = GCS_PROJECT_ID.get(config, config::get);
     gcsFsOptionsBuilder
         .getCloudStorageOptionsBuilder()
-        .setAutoRepairImplicitDirectoriesEnabled(
-            GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.get(config, config::getBoolean))
         .setInferImplicitDirectoriesEnabled(
             GCS_INFER_IMPLICIT_DIRECTORIES_ENABLE.get(config, config::getBoolean))
         .setMarkerFileCreationEnabled(

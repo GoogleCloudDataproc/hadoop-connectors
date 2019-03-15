@@ -224,11 +224,8 @@ public class GoogleHadoopFileSystemIntegrationTest
     GoogleCloudStorageFileSystemOptions options = optionsBuilder.build();
     GoogleCloudStorageOptions gcsOptions = options.getCloudStorageOptions();
 
-    assertThat(gcsOptions.isAutoRepairImplicitDirectoriesEnabled()).isTrue();
     assertThat(gcsOptions.isInferImplicitDirectoriesEnabled()).isFalse();
 
-    config.setBoolean(
-        GoogleHadoopFileSystemConfiguration.GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.getKey(), false);
     config.setBoolean(
         GoogleHadoopFileSystemConfiguration.GCS_INFER_IMPLICIT_DIRECTORIES_ENABLE.getKey(), true);
 
@@ -236,7 +233,6 @@ public class GoogleHadoopFileSystemIntegrationTest
     options = optionsBuilder.build();
 
     gcsOptions = options.getCloudStorageOptions();
-    assertThat(gcsOptions.isAutoRepairImplicitDirectoriesEnabled()).isFalse();
     assertThat(gcsOptions.isInferImplicitDirectoriesEnabled()).isTrue();
   }
 

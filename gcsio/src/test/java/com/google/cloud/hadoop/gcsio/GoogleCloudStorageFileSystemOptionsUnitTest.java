@@ -83,8 +83,7 @@ public class GoogleCloudStorageFileSystemOptionsUnitTest
 
         // We don't test with a file-backed cache, because it creates
         // its cache files on disk, which requires
-        // that parent directories be created, so the test fails when
-        // autoRepair=false and we expect there not to be any
+        // that parent directories be created, and we expect there not to be any
         // intermediate directories.
     });
   }
@@ -100,8 +99,7 @@ public class GoogleCloudStorageFileSystemOptionsUnitTest
    */
   @Override
   public GoogleCloudStorageFileSystem
-      createGcsfsWithAutoRepairWithInferDirectories(
-      boolean autoRepairEnabled, boolean inferDirectories)
+      createGcsfsWithInferDirectories(boolean inferDirectories)
       throws IOException {
     // Use the GcsOptions builder from the GcsFsOptions builder
     // so that we can get to the GcsOptions from the GcsFsOptions
@@ -114,7 +112,6 @@ public class GoogleCloudStorageFileSystemOptionsUnitTest
     GoogleCloudStorageOptions.Builder gcsOptionsBuilder =
         fsOptionsBuilder.getCloudStorageOptionsBuilder();
     GoogleCloudStorageOptions gcsOptions = gcsOptionsBuilder
-        .setAutoRepairImplicitDirectoriesEnabled(autoRepairEnabled)
         .setInferImplicitDirectoriesEnabled(inferDirectories)
         .build();
     GoogleCloudStorage gcs = this.gcsCreator.createGcs(gcsOptions);

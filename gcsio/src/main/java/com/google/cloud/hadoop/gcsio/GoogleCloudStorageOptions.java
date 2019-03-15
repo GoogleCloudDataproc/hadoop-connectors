@@ -27,9 +27,6 @@ import javax.annotation.Nullable;
 @AutoValue
 public abstract class GoogleCloudStorageOptions {
 
-  /** Default setting for enabling auto-repair of implicit directories. */
-  public static final boolean AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT = true;
-
   /** Default setting for enabling inferring of implicit directories. */
   public static final boolean INFER_IMPLICIT_DIRECTORIES_DEFAULT = true;
 
@@ -86,7 +83,6 @@ public abstract class GoogleCloudStorageOptions {
 
   public static Builder newBuilder() {
     return new AutoValue_GoogleCloudStorageOptions.Builder()
-        .setAutoRepairImplicitDirectoriesEnabled(AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT)
         .setInferImplicitDirectoriesEnabled(INFER_IMPLICIT_DIRECTORIES_DEFAULT)
         .setCreateMarkerObjects(CREATE_EMPTY_MARKER_OBJECT_DEFAULT)
         .setMaxWaitMillisForEmptyObjectCreation(MAX_WAIT_MILLIS_FOR_EMPTY_OBJECT_CREATION)
@@ -111,8 +107,6 @@ public abstract class GoogleCloudStorageOptions {
 
   @Nullable
   public abstract String getAppName();
-
-  public abstract boolean isAutoRepairImplicitDirectoriesEnabled();
 
   public abstract boolean isInferImplicitDirectoriesEnabled();
 
@@ -170,8 +164,6 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setProjectId(String projectId);
 
     public abstract Builder setAppName(String appName);
-
-    public abstract Builder setAutoRepairImplicitDirectoriesEnabled(boolean autoRepair);
 
     public abstract Builder setInferImplicitDirectoriesEnabled(boolean inferImplicitDirectories);
 

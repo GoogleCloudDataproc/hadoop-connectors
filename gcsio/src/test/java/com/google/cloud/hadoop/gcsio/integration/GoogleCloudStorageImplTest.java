@@ -81,7 +81,6 @@ public class GoogleCloudStorageImplTest {
     GoogleCloudStorageOptions.Builder builder =
         GoogleCloudStorageTestHelper.getStandardOptionBuilder();
 
-    builder.setAutoRepairImplicitDirectoriesEnabled(false);
     builder.setInferImplicitDirectoriesEnabled(true);
 
     return makeStorage(builder.build());

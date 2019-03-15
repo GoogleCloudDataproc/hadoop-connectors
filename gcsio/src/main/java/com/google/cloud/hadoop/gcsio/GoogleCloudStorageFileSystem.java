@@ -362,7 +362,7 @@ public class GoogleCloudStorageFileSystem {
       itemsToDelete =
           recursive
               ? listAllFileInfoForPrefix(fileInfo.getPath())
-              : listFileInfo(fileInfo.getPath(), /* enableAutoRepair= */ false);
+              : listFileInfo(fileInfo.getPath());
       if (!itemsToDelete.isEmpty() && !recursive) {
         throw new DirectoryNotEmptyException("Cannot delete a non-empty directory.");
       }
@@ -383,6 +383,9 @@ public class GoogleCloudStorageFileSystem {
       // Any path that was deleted, we should update the parent except for parents we also deleted
       tryUpdateTimestampsForParentDirectories(itemsToDeleteNames, itemsToDeleteNames);
     }
+
+    URI parent = getParentPath(path);
+    repairPossibleImplicitDirectory(parent);
   }
 
   /** Deletes all items in the given path list followed by all bucket items. */
@@ -444,19 +447,12 @@ public class GoogleCloudStorageFileSystem {
    * and doesn't create their parent dirs if their parent dirs don't already exist. Use with
    * caution.
    */
-  public void repairDirs(List<URI> exactDirPaths)
+  private void repairDir(StorageResourceId resourceId)
       throws IOException{
-    logger.atFine().log("repairDirs(%s)", exactDirPaths);
-    List<StorageResourceId> dirsToCreate = new ArrayList<>();
-    for (URI dirUri : exactDirPaths) {
-      StorageResourceId resourceId = pathCodec.validatePathAndGetId(dirUri, true);
-      if (resourceId.isStorageObject()) {
-        resourceId = FileInfo.convertToDirectoryPath(resourceId);
-        dirsToCreate.add(resourceId);
-      }
-    }
-
-    if (dirsToCreate.isEmpty()) {
+    logger.atFine().log("repairDir(%s)", resourceId.getObjectName());
+    if (resourceId.isStorageObject()) {
+      resourceId = FileInfo.convertToDirectoryPath(resourceId);
+    } else {
       return;
     }
 
@@ -466,9 +462,9 @@ public class GoogleCloudStorageFileSystem {
      * of "creating" directories, instead it drops markers to help GCSFS and GHFS find directories
      * that already "existed" and 3) it's extra RPCs on top of the list and create empty object RPCs
      */
-    gcs.createEmptyObjects(dirsToCreate);
+    gcs.createEmptyObject(resourceId);
 
-    logger.atInfo().log("Successfully repaired %s directories.", dirsToCreate.size());
+    logger.atInfo().log("Successfully repaired 1 directory.");
   }
 
   /**
@@ -942,7 +938,7 @@ public class GoogleCloudStorageFileSystem {
    *
    * @return true if a repair was successfully made, false if a repair was unnecessary or failed.
    */
-  public boolean repairPossibleImplicitDirectory(URI path) throws IOException {
+  private void repairPossibleImplicitDirectory(URI path) throws IOException {
     logger.atFine().log("repairPossibleImplicitDirectory(%s)", path);
     Preconditions.checkNotNull(path);
     StorageResourceId resourceId = pathCodec.validatePathAndGetId(path, true);
@@ -950,31 +946,27 @@ public class GoogleCloudStorageFileSystem {
 
     // Implicit directories are only applicable for non-trivial object names.
     if (dirId.isRoot() || dirId.isBucket() || PATH_DELIMITER.equals(dirId.getObjectName())) {
-      return gcs.getItemInfo(dirId).exists();
+      return;
     }
 
-    // TODO(user): Refactor the method name and signature to make this less hacky; the logic of
-    // piggybacking on auto-repair within listObjectInfo is sound because listing with prefixes
-    // is a natural prerequisite for verifying that an implicit directory indeed exists. We just
-    // need to make it more clear that the method is actually "list and maybe repair".
-    try {
-      gcs.listObjectInfo(
-          dirId.getBucketName(), FileInfo.convertToFilePath(dirId.getObjectName()), PATH_DELIMITER);
-    } catch (IOException e) {
-      logger.atWarning().withCause(e).log(
-          "Got exception trying to listObjectNames for '%s'",
-          FileInfo.convertToFilePath(dirId.toString()));
-      // It's possible our repair succeeded anyway.
+    GoogleCloudStorageItemInfo pathInfo = gcs.getItemInfo(dirId);
+    if (!pathInfo.exists()) {
+      try {
+        repairDir(dirId);
+      } catch (IOException e) {
+        logger.atWarning().withCause(e).log(
+            "Got exception trying to repairDir for '%s'",
+            FileInfo.convertToFilePath(dirId.toString()));
+        // It's possible our repair succeeded anyway.
+      }
     }
 
-    return gcs.getItemInfo(dirId).exists();
+    return;
   }
 
   /**
    * Equivalent to a recursive listing of {@code prefix}, except that {@code prefix} doesn't have to
-   * represent an actual object but can just be a partial prefix string, and there is no auto-repair
-   * of implicit directories since we can't detect implicit directories without listing by
-   * 'delimiter'. The 'authority' component of the {@code prefix} <b>must</b> be the complete
+   * represent an actual object but can just be a partial prefix string. The 'authority' component of the {@code prefix} <b>must</b> be the complete
    * authority, however; we can only list prefixes of <b>objects</b>, not buckets.
    *
    * @param prefix the prefix to use to list all matching objects.
@@ -1030,14 +1022,13 @@ public class GoogleCloudStorageFileSystem {
    * names of children and no other attributes.
    *
    * @param path Given path.
-   * @param enableAutoRepair if true, attempt to repair implicit directories when detected.
    * @return Information about a file or children of a directory.
    * @throws FileNotFoundException if the given path does not exist.
    * @throws IOException
    */
-  public List<FileInfo> listFileInfo(URI path, boolean enableAutoRepair)
+  public List<FileInfo> listFileInfo(URI path)
       throws IOException {
-    logger.atFine().log("listFileInfo(%s, %s)", path, enableAutoRepair);
+    logger.atFine().log("listFileInfo(%s)", path);
     Preconditions.checkNotNull(path);
 
     StorageResourceId pathId = pathCodec.validatePathAndGetId(path, true);
@@ -1068,14 +1059,6 @@ public class GoogleCloudStorageFileSystem {
                 : gcs.listObjectInfo(dirId.getBucketName(), dirId.getObjectName(), PATH_DELIMITER);
         if (!dirInfo.exists() && dirItemInfos.isEmpty()) {
           throw new FileNotFoundException("Item not found: " + path);
-        }
-
-        if (!dirInfo.exists() && enableAutoRepair) {
-          try {
-            gcs.createEmptyObject(dirId);
-          } catch (IOException e) {
-            logger.atWarning().withCause(e).log("Failed to repair implicit directory '%s'", dirId);
-          }
         }
 
         List<FileInfo> fileInfos = FileInfo.fromItemInfos(pathCodec, dirItemInfos);
