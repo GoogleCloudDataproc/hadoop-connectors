@@ -62,9 +62,9 @@ public class GcsAtomicOperations {
 
   public boolean lockPaths(String clientId, StorageResourceId... resources) throws IOException {
     long startMs = System.currentTimeMillis();
-    logger.atInfo().log("lockPaths(%s, %s)", clientId, lazy(() -> Arrays.toString(resources)));
+    logger.atFine().log("lockPaths(%s, %s)", clientId, lazy(() -> Arrays.toString(resources)));
     boolean result = modifyLock(this::addLockRecords, clientId, resources);
-    logger.atInfo().log(
+    logger.atFine().log(
         "[%dms] lockPaths(%s, %s): %s",
         System.currentTimeMillis() - startMs,
         clientId,
@@ -75,9 +75,9 @@ public class GcsAtomicOperations {
 
   public boolean unlockPaths(String clientId, StorageResourceId... resources) throws IOException {
     long startMs = System.currentTimeMillis();
-    logger.atInfo().log("unlockPaths(%s, %s)", clientId, lazy(() -> Arrays.toString(resources)));
+    logger.atFine().log("unlockPaths(%s, %s)", clientId, lazy(() -> Arrays.toString(resources)));
     boolean result = modifyLock(this::removeLockRecords, clientId, resources);
-    logger.atInfo().log(
+    logger.atFine().log(
         "[%dms] unlockPaths(%s, %s): %s",
         System.currentTimeMillis() - startMs,
         clientId,
@@ -132,7 +132,8 @@ public class GcsAtomicOperations {
 
       if (lockRecords.size() > MAX_LOCKS_COUNT) {
         logger.atInfo().atMostEvery(5, SECONDS).log(
-            "Skipping lock entries update in %s file. Retrying later.", lockId);
+            "Skipping lock entries update in %s file: too many (%d) locked resources. Re-trying.",
+            lockRecords.size(), lockId);
         sleepUninterruptibly(backOff.nextBackOffMillis(), MILLISECONDS);
         continue;
       }
@@ -146,7 +147,8 @@ public class GcsAtomicOperations {
       } catch (IOException e) {
         // continue after sleep if update failed due to file generation mismatch
         if (e.getMessage().contains("conditionNotMet")) {
-          logger.atInfo().log("Failed to update entries in %s file. Re-trying.", lockId);
+          logger.atInfo().atMostEvery(5, SECONDS).log(
+              "Failed to update entries in %s file. Re-trying.", lockId);
           sleepUninterruptibly(backOff.nextBackOffMillis(), MILLISECONDS);
           continue;
         }
@@ -154,7 +156,7 @@ public class GcsAtomicOperations {
         throw e;
       }
 
-      logger.atInfo().log(
+      logger.atFine().log(
           "updated lock file in %dms for %s client and %s resources",
           System.currentTimeMillis() - startMs, clientId, lazy(() -> Arrays.toString(resources)));
       return true;
