@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.CreateFileOptions.EMPTY_ATTRIBUTES;
+import static com.google.cloud.hadoop.gcsio.GcsAtomicOperations.LOCK_DIRECTORY;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -54,6 +55,8 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.FileAlreadyExistsException;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -104,6 +107,12 @@ public class GoogleCloudStorageFileSystem {
                   .or(CharMatcher.inRange('a', 'z'))
                   .or(CharMatcher.anyOf("_.-")))
           .precomputed();
+
+  private static final CreateFileOptions LOG_FILE_OPTIONS =
+      new CreateFileOptions(/* overwriteExisting= */ false, "application/text", EMPTY_ATTRIBUTES);
+
+  private static DateTimeFormatter LOCK_FILE_DATE_TIME_FORMAT =
+      DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss.SSSXXX").withZone(ZoneId.of("UTC"));
 
   // GCS access instance.
   private GoogleCloudStorage gcs;
@@ -1669,13 +1678,11 @@ public class GoogleCloudStorageFileSystem {
         : pathCodec.getPath(resourceId.getBucketName(), objectName.substring(0, index + 1), false);
   }
 
-  private static final CreateFileOptions LOG_FILE_OPTIONS =
-      new CreateFileOptions(/* overwriteExisting= */ false, "application/text", EMPTY_ATTRIBUTES);
-
   private void logOperation(String bucket, String operation, List<String> records)
       throws IOException {
+    String date = LOCK_FILE_DATE_TIME_FORMAT.format(Instant.now());
     String logFile =
-        String.format("_lock/%s_%s_%s.log", Instant.now(), operation, UUID.randomUUID());
+        String.format(LOCK_DIRECTORY + "%s_%s_%s.log", date, operation, UUID.randomUUID());
     URI logPath = pathCodec.getPath(bucket, logFile, /* allowEmptyObjectName= */ false);
     try (WritableByteChannel channel = create(logPath, LOG_FILE_OPTIONS)) {
       for (String record : records) {

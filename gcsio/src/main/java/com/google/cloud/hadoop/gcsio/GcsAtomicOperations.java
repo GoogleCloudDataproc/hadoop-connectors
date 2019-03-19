@@ -45,8 +45,10 @@ public class GcsAtomicOperations {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
+  public static final String LOCK_DIRECTORY = "_lock/";
+
   private static final Gson GSON = new Gson();
-  private static final String LOCK_PATH = "_lock/all.lock";
+  private static final String LOCK_PATH = LOCK_DIRECTORY + "all.lock";
   private static final String LOCK_METADATA_KEY = "lock";
   private static final int MAX_LOCKS_COUNT = 20;
 
