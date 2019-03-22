@@ -32,42 +32,28 @@ public class DelegationTokenIOException extends IOException {
    */
   private static final long serialVersionUID = 5431764092856006083L;
 
-  /** Error: delegation token/token identifier class isn't the right one. */
-  static final String TOKEN_WRONG_TYPE = "Delegation token type is incorrect";
-
-  /** The far end is expecting a different token kind than that which the client created. */
-  static final String TOKEN_MISMATCH = "Token mismatch";
-
   public static DelegationTokenIOException wrongTokenType(
       Class expectedClass, DelegationTokenIdentifier identifier) {
     return new DelegationTokenIOException(
-        TOKEN_WRONG_TYPE
-            + "; expected a token identifier of type "
-            + expectedClass
-            + " but got "
-            + identifier.getClass()
-            + " and kind "
-            + identifier.getKind());
+        String.format(
+            "Delegation token type is incorrect;"
+                + " expected a token identifier of type %s but got %s and kind %s",
+            expectedClass, identifier.getClass(), identifier.getKind()));
   }
 
   public static DelegationTokenIOException tokenMismatch(
       Text service, Text expectedKind, Text actualKind) {
     return new DelegationTokenIOException(
-        DelegationTokenIOException.TOKEN_MISMATCH
-            + ": expected token"
-            + " for "
-            + service
-            + " of type "
-            + expectedKind
-            + " but got a token of type "
-            + actualKind);
+        String.format(
+            "Token mismatch: expected token for %s of type %s but got a token of type %s",
+            service, expectedKind, actualKind));
   }
 
-  public DelegationTokenIOException(final String message) {
+  public DelegationTokenIOException(String message) {
     super(message);
   }
 
-  public DelegationTokenIOException(final String message, final Throwable cause) {
+  public DelegationTokenIOException(String message, final Throwable cause) {
     super(message, cause);
   }
 }

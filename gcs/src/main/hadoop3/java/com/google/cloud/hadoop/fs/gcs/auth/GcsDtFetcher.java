@@ -16,6 +16,8 @@
  */
 package com.google.cloud.hadoop.fs.gcs.auth;
 
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.SCHEME;
+
 import java.net.URI;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -30,13 +32,9 @@ import org.apache.hadoop.security.token.Token;
  */
 public class GcsDtFetcher implements DtFetcher {
 
-  private static final String SERVICE_NAME = "gs";
-
-  private static final String FETCH_FAILED = "Filesystem not generating Delegation Tokens";
-
   /** Returns the service name for GCS, which is also a valid URL prefix. */
   public Text getServiceName() {
-    return new Text(SERVICE_NAME);
+    return new Text(SCHEME);
   }
 
   public boolean isTokenRequired() {
@@ -54,13 +52,13 @@ public class GcsDtFetcher implements DtFetcher {
    */
   public Token<?> addDelegationTokens(
       Configuration conf, Credentials creds, String renewer, String url) throws Exception {
-    if (!url.startsWith(SERVICE_NAME)) {
-      url = SERVICE_NAME + "://" + url;
+    if (!url.startsWith(SCHEME)) {
+      url = SCHEME + "://" + url;
     }
     FileSystem fs = FileSystem.get(URI.create(url), conf);
     Token<?> token = fs.getDelegationToken(renewer);
     if (token == null) {
-      throw new DelegationTokenIOException(FETCH_FAILED + ": " + url);
+      throw new DelegationTokenIOException("Filesystem not generating Delegation Tokens: " + url);
     }
     creds.addToken(token.getService(), token);
     return token;

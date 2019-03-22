@@ -61,7 +61,7 @@ public class GcsDelegationTokens {
     user = UserGroupInformation.getCurrentUser();
   }
 
-  public void init(final Configuration conf) {
+  public void init(Configuration conf) {
     String tokenBindingImpl = conf.get(CONFIG_DELEGATION_TOKEN_BINDING_CLASS);
 
     checkState(tokenBindingImpl != null, "Delegation Tokens are not configured");
@@ -157,8 +157,7 @@ public class GcsDelegationTokens {
    * @param fs owning FS.
    * @throws IOException failure.
    */
-  public void bindToFileSystem(final GoogleHadoopFileSystemBase fs, final Text service)
-      throws IOException {
+  public void bindToFileSystem(GoogleHadoopFileSystemBase fs, Text service) throws IOException {
     this.service = requireNonNull(service);
     this.fileSystem = requireNonNull(fs);
   }
@@ -176,8 +175,7 @@ public class GcsDelegationTokens {
    * @param token token to decode and bind to.
    * @throws IOException selection/extraction/validation failure.
    */
-  public void bindToDelegationToken(final Token<DelegationTokenIdentifier> token)
-      throws IOException {
+  public void bindToDelegationToken(Token<DelegationTokenIdentifier> token) throws IOException {
     validateAccessTokenProvider();
     boundDT = token;
     DelegationTokenIdentifier dti = extractIdentifier(token);
@@ -217,12 +215,12 @@ public class GcsDelegationTokens {
       // the FS was created on startup with a token, so return it.
       logger.atFine().log("Returning current token");
       return getBoundDT();
-    } else {
-      // not bound to a token, so create a new one.
-      // issued DTs are not cached so that long-lived filesystems can
-      // reliably issue session/role tokens.
-      return tokenBinding.createDelegationToken(renewer);
     }
+
+    // not bound to a token, so create a new one.
+    // issued DTs are not cached so that long-lived filesystems can
+    // reliably issue session/role tokens.
+    return tokenBinding.createDelegationToken(renewer);
   }
 
   /**
@@ -245,12 +243,11 @@ public class GcsDelegationTokens {
       if (cause != null) {
         // its a wrapping around class instantiation.
         throw new DelegationTokenIOException("Decoding GCS token " + cause, cause);
-      } else {
-        throw e;
       }
+      throw e;
     }
     if (identifier == null) {
-      throw new DelegationTokenIOException("Failed to unmarshall token " + token.toString());
+      throw new DelegationTokenIOException("Failed to unmarshall token " + token);
     }
     return identifier;
   }

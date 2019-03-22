@@ -92,7 +92,7 @@ public abstract class AbstractDelegationTokenBinding {
    * @param service name of the service (i.e. bucket name) for the FS.
    * @throws IOException failure.
    */
-  public void bindToFileSystem(final GoogleHadoopFileSystemBase fs, final Text service) {
+  public void bindToFileSystem(GoogleHadoopFileSystemBase fs, Text service) {
     this.fileSystem = requireNonNull(fs);
     this.service = requireNonNull(service);
   }
@@ -161,7 +161,7 @@ public abstract class AbstractDelegationTokenBinding {
    * @throws DelegationTokenIOException If the wrong class was found.
    */
   protected <T extends DelegationTokenIdentifier> T convertTokenIdentifier(
-      final DelegationTokenIdentifier identifier, final Class<T> expectedClass)
+      DelegationTokenIdentifier identifier, Class<T> expectedClass)
       throws DelegationTokenIOException {
     if (!identifier.getClass().equals(expectedClass)) {
       throw DelegationTokenIOException.wrongTokenType(expectedClass, identifier);
