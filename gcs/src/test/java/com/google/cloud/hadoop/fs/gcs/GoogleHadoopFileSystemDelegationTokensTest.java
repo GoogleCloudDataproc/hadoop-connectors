@@ -16,12 +16,12 @@
  */
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
 import com.google.cloud.hadoop.fs.gcs.auth.TestTokenIdentifierImpl;
 import java.io.IOException;
@@ -76,8 +76,7 @@ public class GoogleHadoopFileSystemDelegationTokensTest {
 
     // Token binding config
     config.set(
-        GcsDelegationTokens.CONFIG_DELEGATION_TOKEN_BINDING_CLASS,
-        TestDelegationTokenBindingImpl.class.getName());
+        DELEGATION_TOKEN_BINDING_CLASS.getKey(), TestDelegationTokenBindingImpl.class.getName());
     config.set(
         TestDelegationTokenBindingImpl.TestAccessTokenProviderImpl.TOKEN_CONFIG_PROPERTY_NAME,
         "qWDAWFA3WWFAWFAWFAW3FAWF3AWF3WFAF33GR5G5"); // Bogus auth token

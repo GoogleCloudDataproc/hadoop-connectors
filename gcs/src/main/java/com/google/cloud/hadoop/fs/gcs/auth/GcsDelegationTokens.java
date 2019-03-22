@@ -16,6 +16,7 @@
  */
 package com.google.cloud.hadoop.fs.gcs.auth;
 
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
@@ -35,9 +36,6 @@ import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier
 public class GcsDelegationTokens {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-
-  public static final String CONFIG_DELEGATION_TOKEN_BINDING_CLASS =
-      "fs.gs.delegation.token.binding";
 
   private GoogleHadoopFileSystemBase fileSystem;
 
@@ -62,7 +60,7 @@ public class GcsDelegationTokens {
   }
 
   public void init(Configuration conf) {
-    String tokenBindingImpl = conf.get(CONFIG_DELEGATION_TOKEN_BINDING_CLASS);
+    String tokenBindingImpl = conf.get(DELEGATION_TOKEN_BINDING_CLASS.getKey());
 
     checkState(tokenBindingImpl != null, "Delegation Tokens are not configured");
 
