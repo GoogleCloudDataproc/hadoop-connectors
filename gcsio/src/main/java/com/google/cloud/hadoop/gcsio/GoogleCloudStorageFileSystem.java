@@ -39,6 +39,7 @@ import com.google.common.base.CharMatcher;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Streams;
@@ -108,14 +109,20 @@ public class GoogleCloudStorageFileSystem {
                   .or(CharMatcher.anyOf("_.-")))
           .precomputed();
 
-  private static final CreateFileOptions LOG_FILE_OPTIONS =
+  private static final Set<String> VALID_OPERATIONS = ImmutableSet.of("delete", "rename");
+  private static final String OPERATION_LOG_FILE_FORMAT = "%s_%s_%s.log";
+  private static final String OPERATION_LOCK_FILE_FORMAT = "%s_%s_%s.lock";
+  private static final CreateFileOptions CREATE_FILE_OPTIONS =
       new CreateFileOptions(/* overwriteExisting= */ false, "application/text", EMPTY_ATTRIBUTES);
+  private static final CreateFileOptions UPDATE_FILE_OPTIONS =
+      new CreateFileOptions(/* overwriteExisting= */ true, "application/text", EMPTY_ATTRIBUTES);
 
   private static DateTimeFormatter LOCK_FILE_DATE_TIME_FORMAT =
       DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss.SSSXXX").withZone(ZoneId.of("UTC"));
 
   // GCS access instance.
   private GoogleCloudStorage gcs;
+
   private final GcsAtomicOperations gcsAtomic;
 
   private final PathCodec pathCodec;
@@ -207,6 +214,10 @@ public class GoogleCloudStorageFileSystem {
     this.gcsAtomic = new GcsAtomicOperations(gcs);
     this.options = options;
     this.pathCodec = options.getPathCodec();
+  }
+
+  public GcsAtomicOperations getGcsAtomic() {
+    return gcsAtomic;
   }
 
   @VisibleForTesting
@@ -422,11 +433,11 @@ public class GoogleCloudStorageFileSystem {
     }
 
     if (options.enableCooperativeLocking() && fileInfo.isDirectory()) {
-      String clientId = UUID.randomUUID().toString();
+      String operationId = UUID.randomUUID().toString();
       StorageResourceId resourceId = pathCodec.validatePathAndGetId(fileInfo.getPath(), true);
       do {
         try {
-          if (gcsAtomic.lockPaths(clientId, resourceId)) {
+          if (gcsAtomic.lockPaths(operationId, resourceId)) {
             break;
           }
           logger.atInfo().atMostEvery(30, TimeUnit.SECONDS).log(
@@ -434,29 +445,52 @@ public class GoogleCloudStorageFileSystem {
           sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
           logger.atWarning().withCause(e).log(
-              "Failed to lock (client=%s, res=%s), retrying.", clientId, resourceId);
+              "Failed to lock (operation=%s, res=%s), retrying.", operationId, resourceId);
         }
       } while (true);
-      try {
-        List<String> logRecords =
-            Streams.concat(itemsToDelete.stream(), bucketsToDelete.stream())
-                .map(i -> i.getItemInfo().getResourceId().toString())
-                .collect(toImmutableList());
-        logOperation(path.getAuthority(), "delete", logRecords);
 
-        deleteInternal(itemsToDelete, bucketsToDelete);
-      } finally {
-        do {
-          try {
-            if (gcsAtomic.unlockPaths(clientId, resourceId)) {
-              break;
-            }
-          } catch (Exception e) {
-            logger.atWarning().withCause(e).log(
-                "Failed to unlock (client=%s, res=%s), retrying.", clientId, resourceId);
+      Instant operationInstant = Instant.now();
+      List<String> lockRecords =
+          ImmutableList.of(
+              String.valueOf(operationInstant.getEpochSecond()), resourceId.toString());
+      URI lockFile =
+          writeOperationFile(
+              path.getAuthority(),
+              OPERATION_LOCK_FILE_FORMAT,
+              CREATE_FILE_OPTIONS,
+              "delete",
+              operationId,
+              operationInstant,
+              lockRecords);
+      List<String> logRecords =
+          Streams.concat(itemsToDelete.stream(), bucketsToDelete.stream())
+              .map(i -> i.getItemInfo().getResourceId().toString())
+              .collect(toImmutableList());
+      URI logFile =
+          writeOperationFile(
+              path.getAuthority(),
+              OPERATION_LOG_FILE_FORMAT,
+              CREATE_FILE_OPTIONS,
+              "delete",
+              operationId,
+              operationInstant,
+              logRecords);
+
+      deleteInternal(itemsToDelete, bucketsToDelete);
+
+      delete(lockFile, /* recursive= */ false);
+      delete(logFile, /* recursive= */ false);
+
+      do {
+        try {
+          if (gcsAtomic.unlockPaths(operationId, resourceId)) {
+            break;
           }
-        } while (true);
-      }
+        } catch (Exception e) {
+          logger.atWarning().withCause(e).log(
+              "Failed to unlock (client=%s, res=%s), retrying.", operationId, resourceId);
+        }
+      } while (true);
     } else {
       deleteInternal(itemsToDelete, bucketsToDelete);
     }
@@ -791,12 +825,12 @@ public class GoogleCloudStorageFileSystem {
    */
   private void renameInternal(FileInfo srcInfo, URI dst) throws IOException {
     if (srcInfo.isDirectory() && options.enableCooperativeLocking()) {
-      String clientId = UUID.randomUUID().toString();
+      String operationId = UUID.randomUUID().toString();
       StorageResourceId srcResourceId = pathCodec.validatePathAndGetId(srcInfo.getPath(), true);
       StorageResourceId dstResourceId = pathCodec.validatePathAndGetId(dst, true);
       do {
         try {
-          if (gcsAtomic.lockPaths(clientId, srcResourceId, dstResourceId)) {
+          if (gcsAtomic.lockPaths(operationId, srcResourceId, dstResourceId)) {
             break;
           }
           logger.atInfo().atMostEvery(30, TimeUnit.SECONDS).log(
@@ -806,26 +840,26 @@ public class GoogleCloudStorageFileSystem {
         } catch (Exception e) {
           logger.atWarning().withCause(e).log(
               "Failed to lock (client=%s, src=%s, dst=%s), retrying.",
-              clientId, srcResourceId, dstResourceId);
+              operationId, srcResourceId, dstResourceId);
         }
       } while (true);
       try {
-        renameDirectoryInternal(srcInfo, dst);
+        renameDirectoryInternal(srcInfo, dst, operationId);
       } finally {
         do {
           try {
-            if (gcsAtomic.unlockPaths(clientId, srcResourceId, dstResourceId)) {
+            if (gcsAtomic.unlockPaths(operationId, srcResourceId, dstResourceId)) {
               break;
             }
           } catch (Exception e) {
             logger.atWarning().withCause(e).log(
                 "Failed to unlock (client=%s, src=%s, dst=%s), retrying.",
-                clientId, srcResourceId, dstResourceId);
+                operationId, srcResourceId, dstResourceId);
           }
         } while (true);
       }
     } else if (srcInfo.isDirectory()) {
-      renameDirectoryInternal(srcInfo, dst);
+      renameDirectoryInternal(srcInfo, dst, /* operationId= */ null);
     } else {
       URI src = srcInfo.getPath();
       StorageResourceId srcResourceId = pathCodec.validatePathAndGetId(src, true);
@@ -855,7 +889,8 @@ public class GoogleCloudStorageFileSystem {
    *
    * @see #renameInternal
    */
-  private void renameDirectoryInternal(FileInfo srcInfo, URI dst) throws IOException {
+  private void renameDirectoryInternal(FileInfo srcInfo, URI dst, String operationId)
+      throws IOException {
     checkArgument(srcInfo.isDirectory(), "'%s' should be a directory", srcInfo);
 
     Pattern markerFilePattern = options.getMarkerFilePattern();
@@ -886,21 +921,65 @@ public class GoogleCloudStorageFileSystem {
       }
     }
 
+    URI lockFile = null;
+    URI logFile = null;
+    Instant operationInstant = Instant.now();
     if (options.enableCooperativeLocking()
         && srcInfo.getItemInfo().getBucketName().equals(dst.getAuthority())) {
+      List<String> lockRecords =
+          ImmutableList.of(
+              String.valueOf(operationInstant.getEpochSecond()),
+              srcInfo.getPath().toString(),
+              dst.toString(),
+              "false");
+      lockFile =
+          writeOperationFile(
+              dst.getAuthority(),
+              OPERATION_LOCK_FILE_FORMAT,
+              CREATE_FILE_OPTIONS,
+              "rename",
+              operationId,
+              operationInstant,
+              lockRecords);
       List<String> logRecords =
           Streams.concat(
                   srcToDstItemNames.entrySet().stream(),
                   srcToDstMarkerItemNames.entrySet().stream())
               .map(e -> e.getKey().getItemInfo().getResourceId() + " -> " + e.getValue())
               .collect(toImmutableList());
-      logOperation(dst.getAuthority(), "rename", logRecords);
+      logFile =
+          writeOperationFile(
+              dst.getAuthority(),
+              OPERATION_LOG_FILE_FORMAT,
+              CREATE_FILE_OPTIONS,
+              "rename",
+              operationId,
+              operationInstant,
+              logRecords);
     }
 
     // First, copy all items except marker items
     copyInternal(srcToDstItemNames);
     // Finally, copy marker items (if any) to mark rename operation success
     copyInternal(srcToDstMarkerItemNames);
+
+    if (options.enableCooperativeLocking()
+        && srcInfo.getItemInfo().getBucketName().equals(dst.getAuthority())) {
+      List<String> lockRecords =
+          ImmutableList.of(
+              String.valueOf(operationInstant.getEpochSecond()),
+              srcInfo.getPath().toString(),
+              dst.toString(),
+              "true");
+      writeOperationFile(
+          dst.getAuthority(),
+          OPERATION_LOCK_FILE_FORMAT,
+          UPDATE_FILE_OPTIONS,
+          "rename",
+          operationId,
+          operationInstant,
+          lockRecords);
+    }
 
     // So far, only the destination directories are updated. Only do those now:
     if (!srcToDstItemNames.isEmpty() || !srcToDstMarkerItemNames.isEmpty()) {
@@ -934,6 +1013,12 @@ public class GoogleCloudStorageFileSystem {
           srcItemInfos.stream().map(FileInfo::getPath).collect(toCollection(ArrayList::new));
       // Any path that was deleted, we should update the parent except for parents we also deleted
       tryUpdateTimestampsForParentDirectories(srcItemNames, srcItemNames);
+    }
+
+    if (options.enableCooperativeLocking()
+        && srcInfo.getItemInfo().getBucketName().equals(dst.getAuthority())) {
+      delete(lockFile, /* recursive= */ false);
+      delete(logFile, /* recursive= */ false);
     }
   }
 
@@ -1678,17 +1763,29 @@ public class GoogleCloudStorageFileSystem {
         : pathCodec.getPath(resourceId.getBucketName(), objectName.substring(0, index + 1), false);
   }
 
-  private void logOperation(String bucket, String operation, List<String> records)
+  private URI writeOperationFile(
+      String bucket,
+      String fileNameFormat,
+      CreateFileOptions createFileOptions,
+      String operation,
+      String operationId,
+      Instant operationInstant,
+      List<String> records)
       throws IOException {
-    String date = LOCK_FILE_DATE_TIME_FORMAT.format(Instant.now());
-    String logFile =
-        String.format(LOCK_DIRECTORY + "%s_%s_%s.log", date, operation, UUID.randomUUID());
-    URI logPath = pathCodec.getPath(bucket, logFile, /* allowEmptyObjectName= */ false);
-    try (WritableByteChannel channel = create(logPath, LOG_FILE_OPTIONS)) {
+    checkArgument(
+        VALID_OPERATIONS.contains(operation),
+        "operation must be one of $s, but was '%s'",
+        VALID_OPERATIONS,
+        operation);
+    String date = LOCK_FILE_DATE_TIME_FORMAT.format(operationInstant);
+    String file = String.format(LOCK_DIRECTORY + fileNameFormat, date, operation, operationId);
+    URI path = pathCodec.getPath(bucket, file, /* allowEmptyObjectName= */ false);
+    try (WritableByteChannel channel = create(path, createFileOptions)) {
       for (String record : records) {
         channel.write(ByteBuffer.wrap(record.getBytes(UTF_8)));
         channel.write(ByteBuffer.wrap(new byte[] {'\n'}));
       }
     }
+    return path;
   }
 }

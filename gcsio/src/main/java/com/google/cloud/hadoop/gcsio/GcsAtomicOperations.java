@@ -62,27 +62,28 @@ public class GcsAtomicOperations {
     this.gcs = gcs;
   }
 
-  public boolean lockPaths(String clientId, StorageResourceId... resources) throws IOException {
+  public boolean lockPaths(String operationId, StorageResourceId... resources) throws IOException {
     long startMs = System.currentTimeMillis();
-    logger.atFine().log("lockPaths(%s, %s)", clientId, lazy(() -> Arrays.toString(resources)));
-    boolean result = modifyLock(this::addLockRecords, clientId, resources);
+    logger.atFine().log("lockPaths(%s, %s)", operationId, lazy(() -> Arrays.toString(resources)));
+    boolean result = modifyLock(this::addLockRecords, operationId, resources);
     logger.atFine().log(
         "[%dms] lockPaths(%s, %s): %s",
         System.currentTimeMillis() - startMs,
-        clientId,
+        operationId,
         lazy(() -> Arrays.toString(resources)),
         result);
     return result;
   }
 
-  public boolean unlockPaths(String clientId, StorageResourceId... resources) throws IOException {
+  public boolean unlockPaths(String operationId, StorageResourceId... resources)
+      throws IOException {
     long startMs = System.currentTimeMillis();
-    logger.atFine().log("unlockPaths(%s, %s)", clientId, lazy(() -> Arrays.toString(resources)));
-    boolean result = modifyLock(this::removeLockRecords, clientId, resources);
+    logger.atFine().log("unlockPaths(%s, %s)", operationId, lazy(() -> Arrays.toString(resources)));
+    boolean result = modifyLock(this::removeLockRecords, operationId, resources);
     logger.atFine().log(
         "[%dms] unlockPaths(%s, %s): %s",
         System.currentTimeMillis() - startMs,
-        clientId,
+        operationId,
         lazy(() -> Arrays.toString(resources)),
         result);
     return result;
@@ -90,7 +91,7 @@ public class GcsAtomicOperations {
 
   private boolean modifyLock(
       LockRecordsModificationFunction<Boolean, List<String[]>, String, Set<String>> modificationFn,
-      String clientId,
+      String operationId,
       StorageResourceId... resources)
       throws IOException {
     long startMs = System.currentTimeMillis();
@@ -127,7 +128,7 @@ public class GcsAtomicOperations {
               ? new ArrayList<>()
               : getLockRecords(lockInfo);
 
-      if (!modificationFn.apply(lockRecords, clientId, objects)) {
+      if (!modificationFn.apply(lockRecords, operationId, objects)) {
         sleepUninterruptibly(backOff.nextBackOffMillis(), MILLISECONDS);
         continue;
       }
@@ -160,7 +161,9 @@ public class GcsAtomicOperations {
 
       logger.atFine().log(
           "updated lock file in %dms for %s client and %s resources",
-          System.currentTimeMillis() - startMs, clientId, lazy(() -> Arrays.toString(resources)));
+          System.currentTimeMillis() - startMs,
+          operationId,
+          lazy(() -> Arrays.toString(resources)));
       return true;
     } while (true);
   }
@@ -172,14 +175,14 @@ public class GcsAtomicOperations {
   }
 
   private boolean addLockRecords(
-      List<String[]> lockRecords, String clientId, Set<String> objectsToAdd) {
+      List<String[]> lockRecords, String operationId, Set<String> objectsToAdd) {
     if (lockRecords.stream().anyMatch(r -> objectsToAdd.contains(r[LOCKED_PATH_INDEX]))) {
       return false;
     }
 
     String lockTime = Instant.now().toString();
     for (String object : objectsToAdd) {
-      lockRecords.add(new String[] {clientId, object, lockTime});
+      lockRecords.add(new String[] {operationId, object, lockTime});
     }
 
     lockRecords.sort(Comparator.comparing(r -> r[CLIENT_ID_INDEX]));
@@ -188,17 +191,17 @@ public class GcsAtomicOperations {
   }
 
   private boolean removeLockRecords(
-      List<String[]> lockRecords, String clientId, Set<String> objectsToRemove) {
+      List<String[]> lockRecords, String operationId, Set<String> objectsToRemove) {
     int[] indexesToRemove =
         IntStream.range(0, lockRecords.size())
             .filter(i -> objectsToRemove.contains(lockRecords.get(i)[LOCKED_PATH_INDEX]))
             .peek(
                 i ->
                     checkState(
-                        clientId.equals(lockRecords.get(i)[CLIENT_ID_INDEX]),
+                        operationId.equals(lockRecords.get(i)[CLIENT_ID_INDEX]),
                         "record %s should be locked by client %s",
                         Arrays.asList(lockRecords.get(i)),
-                        clientId))
+                        operationId))
             .toArray();
     checkState(
         indexesToRemove.length == objectsToRemove.size(),
