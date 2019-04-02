@@ -94,9 +94,6 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
         GoogleHadoopFileSystemConfiguration.GCS_INFER_IMPLICIT_DIRECTORIES_ENABLE.getKey(), false);
     // Allow buckets to be deleted in test cleanup:
     config.setBoolean(GoogleHadoopFileSystemConfiguration.GCE_BUCKET_DELETE_ENABLE.getKey(), true);
-    // Disable concurrent globbing
-    config.setBoolean(
-        GoogleHadoopFileSystemConfiguration.GCS_CONCURRENT_GLOB_ENABLE.getKey(), false);
     return config;
   }
 

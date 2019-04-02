@@ -79,9 +79,8 @@ public class GoogleCloudStorageImplTest {
   protected GoogleCloudStorageImpl makeStorageWithInferImplicit()
       throws IOException {
     GoogleCloudStorageOptions.Builder builder =
-        GoogleCloudStorageTestHelper.getStandardOptionBuilder();
-
-    builder.setInferImplicitDirectoriesEnabled(true);
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setInferImplicitDirectoriesEnabled(true);
 
     return makeStorage(builder.build());
   }

@@ -1271,7 +1271,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       return flatGlobInternal(fixedPath, filter);
     }
 
-    return globInternal(fixedPath, filter, pathPattern);
+    return super.globStatus(fixedPath, filter);
   }
 
   /**
@@ -1282,7 +1282,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       throws IOException {
     ExecutorService executorService = Executors.newFixedThreadPool(2, DAEMON_THREAD_FACTORY);
     Callable<FileStatus[]> flatGlobTask = () -> flatGlobInternal(fixedPath, filter);
-    Callable<FileStatus[]> nonFlatGlobTask = () -> globInternal(fixedPath, filter, pathPattern);
+    Callable<FileStatus[]> nonFlatGlobTask = () -> super.globStatus(fixedPath, filter);
 
     try {
       return executorService.invokeAny(Arrays.asList(flatGlobTask, nonFlatGlobTask));
@@ -1354,12 +1354,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     FileStatus[] returnList = filteredStatuses.toArray(new FileStatus[0]);
 
     return returnList;
-  }
-
-  private FileStatus[] globInternal(Path fixedPath, PathFilter filter, Path pathPattern)
-      throws IOException {
-    FileStatus[] ret = super.globStatus(fixedPath, filter);
-    return ret;
   }
 
   private static boolean isImplicitDirectory(FileStatus curr) {
