@@ -646,6 +646,11 @@ public class GoogleCloudStorageTest {
 
     assertWithMessage("Infos not expected to be empty").that(rootInfo).hasSize(2);
 
+    GoogleCloudStorageItemInfo d2Info =
+        rawStorage.getItemInfo(
+            new StorageResourceId(bucketName, "testListObjectInfoWithDirectoryRepair_d2/"));
+    assertThat(d2Info.exists()).isFalse();
+
     List<GoogleCloudStorageItemInfo> d2ItemInfo =
         rawStorage.listObjectInfo(
             bucketName, "testListObjectInfoWithDirectoryRepair_d2/d3/", "/", MAX_RESULTS_UNLIMITED);

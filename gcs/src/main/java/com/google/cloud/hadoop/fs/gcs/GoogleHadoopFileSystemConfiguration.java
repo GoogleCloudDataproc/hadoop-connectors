@@ -265,6 +265,15 @@ public class GoogleHadoopFileSystemConfiguration {
       GCS_LAZY_INITIALIZATION_ENABLE =
           new GoogleHadoopFileSystemConfigurationProperty<>("fs.gs.lazy.init.enable", false);
 
+  /**
+   * Configuration key for enabling automatic repair of implicit directories whenever detected
+   * inside delete calls.
+   */
+  public static final GoogleHadoopFileSystemConfigurationProperty<Boolean>
+      GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE =
+          new GoogleHadoopFileSystemConfigurationProperty<>(
+              "fs.gs.implicit.dir.repair.enable", true);
+
   /** Configuration key for changing the path codec from legacy to 'uri path encoding'. */
   public static final GoogleHadoopFileSystemConfigurationProperty<String> PATH_CODEC =
       new GoogleHadoopFileSystemConfigurationProperty<>(
@@ -529,6 +538,8 @@ public class GoogleHadoopFileSystemConfiguration {
     String projectId = GCS_PROJECT_ID.get(config, config::get);
     gcsFsOptionsBuilder
         .getCloudStorageOptionsBuilder()
+        .setAutoRepairImplicitDirectoriesEnabled(
+            GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.get(config, config::getBoolean))
         .setInferImplicitDirectoriesEnabled(
             GCS_INFER_IMPLICIT_DIRECTORIES_ENABLE.get(config, config::getBoolean))
         .setMarkerFileCreationEnabled(

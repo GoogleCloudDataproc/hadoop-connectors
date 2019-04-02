@@ -384,10 +384,12 @@ public class GoogleCloudStorageFileSystem {
       tryUpdateTimestampsForParentDirectories(itemsToDeleteNames, itemsToDeleteNames);
     }
 
-    // TODO: check asynchronously if parent object exists, so item deletion time will not increase
-    //  for existing directories.
-    URI parent = getParentPath(path);
-    createDirectoryIfDoesNotExist(parent);
+    if (options.getCloudStorageOptions().isAutoRepairImplicitDirectoriesEnabled()) {
+      // TODO: check asynchronously if parent object exists, so item deletion time will not increase
+      //  for items inside existing directories.
+      URI parent = getParentPath(path);
+      createDirectoryIfDoesNotExist(parent);
+    }
   }
 
   /** Deletes all items in the given path list followed by all bucket items. */
@@ -997,8 +999,8 @@ public class GoogleCloudStorageFileSystem {
    * @throws IOException
    */
   public List<FileInfo> listFileInfo(URI path) throws IOException {
+    Preconditions.checkNotNull(path, "path can not be null");
     logger.atFine().log("listFileInfo(%s)", path);
-    Preconditions.checkNotNull(path);
 
     StorageResourceId pathId = pathCodec.validatePathAndGetId(path, true);
     StorageResourceId dirId =
