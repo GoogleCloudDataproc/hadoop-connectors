@@ -447,8 +447,7 @@ public class GoogleCloudStorageFileSystem {
    * and doesn't create their parent dirs if their parent dirs don't already exist. Use with
    * caution.
    */
-  private void repairDir(StorageResourceId resourceId)
-      throws IOException{
+  private void repairDir(StorageResourceId resourceId) throws IOException {
     logger.atFine().log("repairDir(%s)", resourceId.getObjectName());
     if (resourceId.isStorageObject()) {
       resourceId = FileInfo.convertToDirectoryPath(resourceId);
@@ -966,8 +965,9 @@ public class GoogleCloudStorageFileSystem {
 
   /**
    * Equivalent to a recursive listing of {@code prefix}, except that {@code prefix} doesn't have to
-   * represent an actual object but can just be a partial prefix string. The 'authority' component of the {@code prefix} <b>must</b> be the complete
-   * authority, however; we can only list prefixes of <b>objects</b>, not buckets.
+   * represent an actual object but can just be a partial prefix string. The 'authority' component
+   * of the {@code prefix} <b>must</b> be the complete authority, however; we can only list prefixes
+   * of <b>objects</b>, not buckets.
    *
    * @param prefix the prefix to use to list all matching objects.
    */
@@ -1012,13 +1012,11 @@ public class GoogleCloudStorageFileSystem {
   }
 
   /**
-   * If the given path points to a directory then the information about its
-   * children is returned, otherwise information about the given file is returned.
+   * If the given path points to a directory then the information about its children is returned,
+   * otherwise information about the given file is returned.
    *
-   * Note:
-   * This function is expensive to call, especially for a directory with many
-   * children. Use the alternative
-   * {@link GoogleCloudStorageFileSystem#listFileNames(FileInfo)} if you only need
+   * <p>Note: This function is expensive to call, especially for a directory with many children. Use
+   * the alternative {@link GoogleCloudStorageFileSystem#listFileNames(FileInfo)} if you only need
    * names of children and no other attributes.
    *
    * @param path Given path.
@@ -1026,8 +1024,7 @@ public class GoogleCloudStorageFileSystem {
    * @throws FileNotFoundException if the given path does not exist.
    * @throws IOException
    */
-  public List<FileInfo> listFileInfo(URI path)
-      throws IOException {
+  public List<FileInfo> listFileInfo(URI path) throws IOException {
     logger.atFine().log("listFileInfo(%s)", path);
     Preconditions.checkNotNull(path);
 

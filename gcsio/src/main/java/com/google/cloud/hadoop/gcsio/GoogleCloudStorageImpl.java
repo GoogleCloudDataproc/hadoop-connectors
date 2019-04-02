@@ -1490,8 +1490,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       }
     } else {
       logger.atInfo().log(
-          "Inferred directories are disabled, "
-              + "giving up on retrieving missing directories: %s",
+          "Inferred directories are disabled, " + "giving up on retrieving missing directories: %s",
           prefixes);
     }
   }

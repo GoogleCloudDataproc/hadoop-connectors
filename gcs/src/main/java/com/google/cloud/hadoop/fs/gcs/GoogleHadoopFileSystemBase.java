@@ -1007,8 +1007,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     List<FileStatus> status;
 
     try {
-      List<FileInfo> fileInfos =
-          getGcsFs().listFileInfo(gcsPath);
+      List<FileInfo> fileInfos = getGcsFs().listFileInfo(gcsPath);
       status = new ArrayList<>(fileInfos.size());
       String userName = getUgiUserName();
       for (FileInfo fileInfo : fileInfos) {

@@ -3001,8 +3001,7 @@ public class GoogleCloudStorageTest {
   }
 
   private void runTestListObjectInfo(boolean inferImplicit) throws IOException {
-    GoogleCloudStorage gcs =
-        createTestInstanceWithInferImplicit(inferImplicit);
+    GoogleCloudStorage gcs = createTestInstanceWithInferImplicit(inferImplicit);
 
     String objectPrefix = "foo/bar/baz/";
     String delimiter = "/";

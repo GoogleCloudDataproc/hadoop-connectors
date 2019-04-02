@@ -190,9 +190,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     assertThat(ghfs.getCanonicalServiceName()).isNull();
   }
 
-  /**
-   * Test implicit directories.
-   */
+  /** Test implicit directories. */
   @Test
   public void testImplicitDirectory() throws IOException {
     String bucketName = sharedBucketName1;
@@ -223,6 +221,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
 
   /**
    * Test directory repair at deletion
+   *
    * @throws IOException
    */
   @Test
@@ -246,19 +245,13 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
         gcsfs.getOptions().getCloudStorageOptions().isInferImplicitDirectoriesEnabled();
 
     if (inferImplicitDirectories) {
-      assertWithMessage("Expected to exist: %s", dirUri)
-          .that(gcsfs.exists(dirUri))
-          .isTrue();
+      assertWithMessage("Expected to exist: %s", dirUri).that(gcsfs.exists(dirUri)).isTrue();
     } else {
-      assertWithMessage("Expected to !exist: %s", dirUri)
-          .that(gcsfs.exists(dirUri))
-          .isFalse();
+      assertWithMessage("Expected to !exist: %s", dirUri).that(gcsfs.exists(dirUri)).isFalse();
     }
     gcsfs.delete(objUri, false);
     // Implicit directory created after deletion of the sole object in the directory
-    assertWithMessage("Expected to exist: %s", dirUri)
-        .that(gcsfs.exists(dirUri))
-        .isTrue();
+    assertWithMessage("Expected to exist: %s", dirUri).that(gcsfs.exists(dirUri)).isTrue();
     ghfsHelper.clearBucket(bucketName);
 
     // test implicit dir repair after a subdir vs. an object has been deleted (recursively)
@@ -276,9 +269,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
           .isTrue();
       gcsfs.delete(subdirUri, true);
       // Implicit directory created after deletion of the sole object in the directory
-      assertWithMessage("Expected to exist: %s", dirUri)
-          .that(gcsfs.exists(dirUri))
-          .isTrue();
+      assertWithMessage("Expected to exist: %s", dirUri).that(gcsfs.exists(dirUri)).isTrue();
       ghfsHelper.clearBucket(bucketName);
     }
   }

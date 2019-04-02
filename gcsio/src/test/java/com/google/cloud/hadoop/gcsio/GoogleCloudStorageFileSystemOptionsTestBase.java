@@ -81,16 +81,11 @@ public abstract class GoogleCloudStorageFileSystemOptionsTestBase {
     }
   }
 
-  /**
-   * Generate the GCSFS to be used for testing.
-   */
-  public abstract GoogleCloudStorageFileSystem
-    createGcsfsWithInferDirectories(boolean inferDirectories)
-      throws IOException;
+  /** Generate the GCSFS to be used for testing. */
+  public abstract GoogleCloudStorageFileSystem createGcsfsWithInferDirectories(
+      boolean inferDirectories) throws IOException;
 
-  /**
-   * Ensure directory implicit directory is absent.
-   */
+  /** Ensure directory implicit directory is absent. */
   @Test
   public void testImplicitDirectory() throws IOException, URISyntaxException {
     // We need different GCSFS options for our test.
@@ -102,16 +97,11 @@ public abstract class GoogleCloudStorageFileSystemOptionsTestBase {
     // The directory objects should still not exist.
     for (String dir : impliedDirs) {
       FileInfo dirInfo = gcsfs.getFileInfo(new URI(dir));
-      assertWithMessage("Directory " + dir + " should not exist.")
-          .that(dirInfo.exists())
-          .isFalse();
+      assertWithMessage("Directory " + dir + " should not exist.").that(dirInfo.exists()).isFalse();
     }
   }
 
-  /**
-   * With inferred directories,
-   * the directories should appear to be there.
-   */
+  /** With inferred directories, the directories should appear to be there. */
   @Test
   public void testInferredDirectories() throws IOException, URISyntaxException {
     // We need different GCSFS options for our test.
@@ -151,8 +141,7 @@ public abstract class GoogleCloudStorageFileSystemOptionsTestBase {
     }
   }
 
-  private void testImpliedDirs(
-      GoogleCloudStorageFileSystem gcsfs)
+  private void testImpliedDirs(GoogleCloudStorageFileSystem gcsfs)
       throws IOException, URISyntaxException {
     // We created our objects directly in GCS, so the implied directories
     // should not exist.

@@ -71,21 +71,21 @@ public class GoogleCloudStorageFileSystemOptionsUnitTest
   @Parameters
   public static Collection<Object[]> getConstructorArguments()
       throws IOException {
-    return Arrays.asList(new Object[][]{
-        {new InMemoryGcsCreator()},
-        {new ZeroLaggedGcsCreator()},
-        // {new CachedLaggedGcsCreator()},
-        // TODO(user): The above test fails when we run :UnitTests,
-        // but succeeds when we run :UnitTests with a filter set to
-        // this class name, so there must be some kind of interaction
-        // between this test and other tests in :UnitTests.
-        // Need to track this down.
+    return Arrays.asList(
+        new Object[][] {
+          {new InMemoryGcsCreator()}, {new ZeroLaggedGcsCreator()},
+          // {new CachedLaggedGcsCreator()},
+          // TODO(user): The above test fails when we run :UnitTests,
+          // but succeeds when we run :UnitTests with a filter set to
+          // this class name, so there must be some kind of interaction
+          // between this test and other tests in :UnitTests.
+          // Need to track this down.
 
-        // We don't test with a file-backed cache, because it creates
-        // its cache files on disk, which requires
-        // that parent directories be created, and we expect there not to be any
-        // intermediate directories.
-    });
+          // We don't test with a file-backed cache, because it creates
+          // its cache files on disk, which requires
+          // that parent directories be created, and we expect there not to be any
+          // intermediate directories.
+        });
   }
 
   @BeforeClass
@@ -94,12 +94,9 @@ public class GoogleCloudStorageFileSystemOptionsUnitTest
     GoogleCloudStorageFileSystemOptionsTestBase.beforeAllTests();
   }
 
-  /**
-   * Generate the GCSFS to be used for testing.
-   */
+  /** Generate the GCSFS to be used for testing. */
   @Override
-  public GoogleCloudStorageFileSystem
-      createGcsfsWithInferDirectories(boolean inferDirectories)
+  public GoogleCloudStorageFileSystem createGcsfsWithInferDirectories(boolean inferDirectories)
       throws IOException {
     // Use the GcsOptions builder from the GcsFsOptions builder
     // so that we can get to the GcsOptions from the GcsFsOptions
