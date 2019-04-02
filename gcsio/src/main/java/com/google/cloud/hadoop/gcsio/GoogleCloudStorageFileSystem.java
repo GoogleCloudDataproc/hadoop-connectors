@@ -348,6 +348,13 @@ public class GoogleCloudStorageFileSystem {
     checkArgument(!path.equals(GCS_ROOT), "Cannot delete root path (%s)", path);
     logger.atFine().log("delete(%s, %s)", path, recursive);
 
+    Future<FileInfo> parentInfoFuture = null;
+    if (options.getCloudStorageOptions().isAutoRepairImplicitDirectoriesEnabled()) {
+      ExecutorService parentExecutor = Executors.newSingleThreadExecutor(DAEMON_THREAD_FACTORY);
+      parentInfoFuture = parentExecutor.submit(() -> getFileInfo(getParentPath(path)));
+      parentExecutor.shutdown();
+    }
+
     // Throw FileNotFoundException if the path does not exist.
     FileInfo fileInfo = getFileInfo(path);
     if (!fileInfo.exists()) {
@@ -385,10 +392,18 @@ public class GoogleCloudStorageFileSystem {
     }
 
     if (options.getCloudStorageOptions().isAutoRepairImplicitDirectoriesEnabled()) {
-      // TODO: check asynchronously if parent object exists, so item deletion time will not increase
-      //  for items inside existing directories.
-      URI parent = getParentPath(path);
-      createDirectoryIfDoesNotExist(parent);
+      FileInfo parentInfo;
+      try {
+        parentInfo = checkNotNull(parentInfoFuture, "parentInfoFuture should not be null").get();
+      } catch (InterruptedException e) {
+        throw new IOException("Failed to get parent info for: " + path, e);
+      } catch (ExecutionException e) {
+        if (e.getCause() instanceof IOException) {
+          throw (IOException) e.getCause();
+        }
+        throw new IOException("Failed to get parent info for: " + path, e.getCause());
+      }
+      createDirectoryIfDoesNotExist(parentInfo);
     }
   }
 
@@ -906,34 +921,33 @@ public class GoogleCloudStorageFileSystem {
   }
 
   /**
-   * Checks that {@code path} doesn't already exist as a directory object, and if so creates the
-   * directory object explicitly.
+   * Attempts to create the directory object explicitly for provided {@code info} if it doesn't
+   * already exist as a directory object.
    */
-  private void createDirectoryIfDoesNotExist(URI path) throws IOException {
-    Preconditions.checkNotNull(path, "path can not be null");
-    logger.atFine().log("createDirectoryIfDoesNotExist(%s)", path);
-    StorageResourceId dirId =
-        FileInfo.convertToDirectoryPath(
-            pathCodec.validatePathAndGetId(path, /* allowEmptyObjectName= */ true));
+  private void createDirectoryIfDoesNotExist(FileInfo info) {
+    Preconditions.checkNotNull(info, "info can not be null");
+    logger.atFine().log("createDirectoryIfDoesNotExist(%s)", info.getPath());
+    StorageResourceId resourceId = info.getItemInfo().getResourceId();
 
-    // Implicit directories are only applicable for non-trivial object names.
-    if (dirId.isRoot() || dirId.isBucket() || PATH_DELIMITER.equals(dirId.getObjectName())) {
+    if (info.exists()
+        || resourceId.isRoot()
+        || resourceId.isBucket()
+        || PATH_DELIMITER.equals(resourceId.getObjectName())) {
       return;
     }
 
-    GoogleCloudStorageItemInfo pathInfo = gcs.getItemInfo(dirId);
-    if (!pathInfo.exists()) {
-      // Note that in both cases, we do not update parent directory timestamps. The idea is that:
-      // 1) directory repair isn't a user-invoked action
-      // 2) directory repair shouldn't be thought of "creating" directories, instead it drops
-      //    markers to help GCSFS and GHFS find directories that already "existed"
-      // 3) it's extra RPCs on top of the list and create empty object RPCs
-      try {
-        gcs.createEmptyObject(dirId);
-        logger.atInfo().log("Successfully repaired '%s' directory.", dirId);
-      } catch (IOException e) {
-        logger.atWarning().withCause(e).log("Got exception trying to repair '%s' directory", dirId);
-      }
+    checkState(resourceId.isDirectory(), "'%s' should be a directory", resourceId);
+
+    // Note that we do not update parent directory timestamps. The idea is that:
+    // 1) directory repair isn't a user-invoked action
+    // 2) directory repair shouldn't be thought of "creating" directories, instead it drops
+    //    markers to help GCSFS and GHFS find directories that already "existed"
+    // 3) it's extra RPCs on top of the list and create empty object RPCs
+    try {
+      gcs.createEmptyObject(resourceId);
+      logger.atInfo().log("Successfully repaired '%s' directory.", resourceId);
+    } catch (IOException e) {
+      logger.atWarning().withCause(e).log("Failed to repair '%s' directory", resourceId);
     }
   }
 

@@ -243,11 +243,11 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     boolean inferImplicitDirectories =
         gcsfs.getOptions().getCloudStorageOptions().isInferImplicitDirectoriesEnabled();
 
-    if (inferImplicitDirectories) {
-      assertWithMessage("Expected to exist: %s", dirUri).that(gcsfs.exists(dirUri)).isTrue();
-    } else {
-      assertWithMessage("Expected to !exist: %s", dirUri).that(gcsfs.exists(dirUri)).isFalse();
-    }
+    assertWithMessage(
+            "Expected to %s: %s", inferImplicitDirectories ? "exist" : "not exist", dirUri)
+        .that(gcsfs.exists(dirUri))
+        .isEqualTo(inferImplicitDirectories);
+
     gcsfs.delete(objUri, false);
     // Implicit directory created after deletion of the sole object in the directory
     assertWithMessage("Expected to exist: %s", dirUri).that(gcsfs.exists(dirUri)).isTrue();
@@ -263,9 +263,8 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
       resource = gcsfs.getPathCodec().validatePathAndGetId(objUri, false);
       gcs.createEmptyObject(resource);
       URI subdirUri = myghfs.getGcsPath(subDir);
-      assertWithMessage("Expected to exist: %s", dirUri)
-          .that(gcsfs.exists(dirUri) && gcsfs.exists(subdirUri))
-          .isTrue();
+      assertWithMessage("Expected to exist: %s", dirUri).that(gcsfs.exists(dirUri)).isTrue();
+      assertWithMessage("Expected to exist: %s", subdirUri).that(gcsfs.exists(subdirUri)).isTrue();
       gcsfs.delete(subdirUri, true);
       // Implicit directory created after deletion of the sole object in the directory
       assertWithMessage("Expected to exist: %s", dirUri).that(gcsfs.exists(dirUri)).isTrue();
