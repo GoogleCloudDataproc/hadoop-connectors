@@ -1,6 +1,9 @@
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_COOPERATIVE_LOCKING_ENABLE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static java.time.temporal.ChronoUnit.SECONDS;
 
 import com.google.cloud.hadoop.gcsio.GcsAtomicOperations;
@@ -11,9 +14,11 @@ import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -34,16 +39,18 @@ public class AtomicGcsFsck {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  private static final int LOCK_EXPIRATION_SECONDS = 120;
+  private static final int LOCK_EXPIRATION_SECONDS = 0;
 
   public static void main(String[] args) throws Exception {
     String bucket = args[0];
     checkArgument(bucket.startsWith("gs://"), "bucket parameter should have 'gs://' scheme");
 
-    URI bucketUri = URI.create(bucket);
     Configuration conf = new Configuration();
     // Disable cooperative locking to prevent blocking
-    conf.set(GoogleHadoopFileSystemConfiguration.GCS_COOPERATIVE_LOCKING_ENABLE.getKey(), "false");
+    conf.set(GCS_COOPERATIVE_LOCKING_ENABLE.getKey(), "false");
+    conf.set(GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.getKey(), "false");
+
+    URI bucketUri = URI.create(bucket);
     GoogleHadoopFileSystem ghFs = (GoogleHadoopFileSystem) FileSystem.get(bucketUri, conf);
     GoogleCloudStorageFileSystem gcsFs = ghFs.getGcsFs();
     GoogleCloudStorage gcs = gcsFs.getGcs();
@@ -51,17 +58,50 @@ public class AtomicGcsFsck {
 
     Instant operationExpirationTime = Instant.now();
 
-    FileStatus[] operations =
-        ghFs.globStatus(
-            new Path(bucketUri.resolve("/" + GcsAtomicOperations.LOCK_DIRECTORY + "*.lock")),
-            path -> !path.getName().equals("all.lock"));
-    if (operations == null || operations.length == 0) {
+    Map<String, Collection<String>> lockedOperations =
+        gcsAtomic.getLockedOperations(bucketUri.getAuthority());
+    if (lockedOperations.isEmpty()) {
       logger.atInfo().log("No expired operation locks");
       return;
     }
 
     Map<FileStatus, String[]> expiredOperations = new HashMap<>();
-    for (FileStatus operation : operations) {
+    for (Map.Entry<String, Collection<String>> lockedOperation : lockedOperations.entrySet()) {
+      String operationId = lockedOperation.getKey();
+      URI operationPattern =
+          bucketUri.resolve(
+              "/" + GcsAtomicOperations.LOCK_DIRECTORY + "*" + operationId + "*.lock");
+      FileStatus[] operationStatuses = ghFs.globStatus(new Path(operationPattern));
+      checkState(
+          operationStatuses.length < 2,
+          "operation %s should not have more than one lock file",
+          operationId);
+
+      // Lock file not created - nothing to repair
+      if (operationStatuses.length == 0) {
+        logger.atInfo().log(
+            "Operation %s for %s resources doesn't have lock file, unlocking",
+            lockedOperation.getKey(), lockedOperation.getValue());
+        StorageResourceId[] lockedResources =
+            lockedOperation.getValue().stream()
+                .map(r -> StorageResourceId.fromObjectName(bucketUri.resolve("/" + r).toString()))
+                .collect(Collectors.toList())
+                .toArray(new StorageResourceId[0]);
+        do {
+          try {
+            if (gcsAtomic.unlockPaths(lockedOperation.getKey(), lockedResources)) {
+              break;
+            }
+          } catch (Exception e) {
+            logger.atWarning().withCause(e).log(
+                "Failed to unlock (operation=%s, resources=%s), retrying.",
+                operationId, lockedResources);
+          }
+        } while (true);
+        continue;
+      }
+
+      FileStatus operation = operationStatuses[0];
       String[] content;
       try (FSDataInputStream in = ghFs.open(operation.getPath())) {
         content = IOUtils.toString(in).split("\\n");
@@ -83,9 +123,7 @@ public class AtomicGcsFsck {
           FileStatus operation = expiredOperation.getKey();
           String[] operationContent = expiredOperation.getValue();
 
-          String[] fileParts = operation.getPath().toString().split("_");
-          String operationId = fileParts[fileParts.length - 1].split("\\.")[0];
-
+          String operationId = getOperationId(operation);
           try {
             if (operation.getPath().toString().contains("_delete_")) {
               logger.atInfo().log("Repairing FS after %s delete operation.", operation.getPath());
@@ -137,12 +175,6 @@ public class AtomicGcsFsck {
             } else {
               throw new IllegalStateException("Unknown operation type: " + operation.getPath());
             }
-
-            ghFs.delete(operation.getPath(), /* recursive= */ false);
-            ghFs.delete(
-                new Path(operation.getPath().toString().replace(".lock", ".log")),
-                /* recursive= */ false);
-
           } catch (IOException e) {
             throw new RuntimeException("Failed to recover operation: ", e);
           }
@@ -167,5 +199,10 @@ public class AtomicGcsFsck {
             "Operation %s failed to roll forward in %dms", expiredOperation, finish - start);
       }
     }
+  }
+
+  private static String getOperationId(FileStatus operation) {
+    String[] fileParts = operation.getPath().toString().split("_");
+    return fileParts[fileParts.length - 1].split("\\.")[0];
   }
 }

@@ -453,33 +453,28 @@ public class GoogleCloudStorageFileSystem {
       List<String> lockRecords =
           ImmutableList.of(
               String.valueOf(operationInstant.getEpochSecond()), resourceId.toString());
-      URI lockFile =
-          writeOperationFile(
-              path.getAuthority(),
-              OPERATION_LOCK_FILE_FORMAT,
-              CREATE_FILE_OPTIONS,
-              "delete",
-              operationId,
-              operationInstant,
-              lockRecords);
+      writeOperationFile(
+          path.getAuthority(),
+          OPERATION_LOCK_FILE_FORMAT,
+          CREATE_FILE_OPTIONS,
+          "delete",
+          operationId,
+          operationInstant,
+          lockRecords);
       List<String> logRecords =
           Streams.concat(itemsToDelete.stream(), bucketsToDelete.stream())
               .map(i -> i.getItemInfo().getResourceId().toString())
               .collect(toImmutableList());
-      URI logFile =
-          writeOperationFile(
-              path.getAuthority(),
-              OPERATION_LOG_FILE_FORMAT,
-              CREATE_FILE_OPTIONS,
-              "delete",
-              operationId,
-              operationInstant,
-              logRecords);
+      writeOperationFile(
+          path.getAuthority(),
+          OPERATION_LOG_FILE_FORMAT,
+          CREATE_FILE_OPTIONS,
+          "delete",
+          operationId,
+          operationInstant,
+          logRecords);
 
       deleteInternal(itemsToDelete, bucketsToDelete);
-
-      delete(lockFile, /* recursive= */ false);
-      delete(logFile, /* recursive= */ false);
 
       do {
         try {
@@ -921,8 +916,6 @@ public class GoogleCloudStorageFileSystem {
       }
     }
 
-    URI lockFile = null;
-    URI logFile = null;
     Instant operationInstant = Instant.now();
     if (options.enableCooperativeLocking()
         && srcInfo.getItemInfo().getBucketName().equals(dst.getAuthority())) {
@@ -932,30 +925,28 @@ public class GoogleCloudStorageFileSystem {
               srcInfo.getPath().toString(),
               dst.toString(),
               "false");
-      lockFile =
-          writeOperationFile(
-              dst.getAuthority(),
-              OPERATION_LOCK_FILE_FORMAT,
-              CREATE_FILE_OPTIONS,
-              "rename",
-              operationId,
-              operationInstant,
-              lockRecords);
+      writeOperationFile(
+          dst.getAuthority(),
+          OPERATION_LOCK_FILE_FORMAT,
+          CREATE_FILE_OPTIONS,
+          "rename",
+          operationId,
+          operationInstant,
+          lockRecords);
       List<String> logRecords =
           Streams.concat(
                   srcToDstItemNames.entrySet().stream(),
                   srcToDstMarkerItemNames.entrySet().stream())
               .map(e -> e.getKey().getItemInfo().getResourceId() + " -> " + e.getValue())
               .collect(toImmutableList());
-      logFile =
-          writeOperationFile(
-              dst.getAuthority(),
-              OPERATION_LOG_FILE_FORMAT,
-              CREATE_FILE_OPTIONS,
-              "rename",
-              operationId,
-              operationInstant,
-              logRecords);
+      writeOperationFile(
+          dst.getAuthority(),
+          OPERATION_LOG_FILE_FORMAT,
+          CREATE_FILE_OPTIONS,
+          "rename",
+          operationId,
+          operationInstant,
+          logRecords);
     }
 
     // First, copy all items except marker items
@@ -1013,12 +1004,6 @@ public class GoogleCloudStorageFileSystem {
           srcItemInfos.stream().map(FileInfo::getPath).collect(toCollection(ArrayList::new));
       // Any path that was deleted, we should update the parent except for parents we also deleted
       tryUpdateTimestampsForParentDirectories(srcItemNames, srcItemNames);
-    }
-
-    if (options.enableCooperativeLocking()
-        && srcInfo.getItemInfo().getBucketName().equals(dst.getAuthority())) {
-      delete(lockFile, /* recursive= */ false);
-      delete(logFile, /* recursive= */ false);
     }
   }
 

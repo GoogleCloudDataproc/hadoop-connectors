@@ -28,12 +28,15 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.MultimapBuilder;
+import com.google.common.collect.Multimaps;
 import com.google.common.flogger.GoogleLogger;
 import com.google.gson.Gson;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -53,13 +56,35 @@ public class GcsAtomicOperations {
   private static final int MAX_LOCKS_COUNT = 20;
 
   // lock record mapping
-  private static final int CLIENT_ID_INDEX = 0;
+  private static final int OPERATION_ID_INDEX = 0;
   private static final int LOCKED_PATH_INDEX = 1;
 
   private final GoogleCloudStorage gcs;
 
   public GcsAtomicOperations(GoogleCloudStorage gcs) {
     this.gcs = gcs;
+  }
+
+  public Map<String, Collection<String>> getLockedOperations(String bucketName) throws IOException {
+    long startMs = System.currentTimeMillis();
+    logger.atFine().log("getLockedOperations(%s)", bucketName);
+    StorageResourceId lockId = getLockId(bucketName);
+    GoogleCloudStorageItemInfo lockInfo = gcs.getItemInfo(lockId);
+    Map<String, Collection<String>> operations =
+        !lockInfo.exists()
+                || lockInfo.getMetaGeneration() == 0
+                || lockInfo.getMetadata().get(LOCK_METADATA_KEY) == null
+            ? new HashMap<>()
+            : getLockRecords(lockInfo).stream()
+                .collect(
+                    Multimaps.toMultimap(
+                        r -> r[OPERATION_ID_INDEX],
+                        r -> r[LOCKED_PATH_INDEX],
+                        MultimapBuilder.hashKeys().arrayListValues()::build))
+                .asMap();
+    logger.atFine().log(
+        "[%dms] lockPaths(%s): %s", System.currentTimeMillis() - startMs, bucketName, operations);
+    return operations;
   }
 
   public boolean lockPaths(String operationId, StorageResourceId... resources) throws IOException {
@@ -106,7 +131,7 @@ public class GcsAtomicOperations {
     ImmutableSet<String> objects =
         Arrays.stream(resources).map(StorageResourceId::getObjectName).collect(toImmutableSet());
 
-    String lockObject = "gs://" + bucketName + "/" + LOCK_PATH;
+    StorageResourceId lockId = getLockId(bucketName);
 
     ExponentialBackOff backOff =
         new ExponentialBackOff.Builder()
@@ -117,7 +142,6 @@ public class GcsAtomicOperations {
             .build();
 
     do {
-      StorageResourceId lockId = StorageResourceId.fromObjectName(lockObject);
       GoogleCloudStorageItemInfo lockInfo = gcs.getItemInfo(lockId);
       if (!lockInfo.exists()) {
         gcs.createEmptyObject(lockId, new CreateObjectOptions(false));
@@ -168,6 +192,11 @@ public class GcsAtomicOperations {
     } while (true);
   }
 
+  private StorageResourceId getLockId(String bucketName) {
+    String lockObject = "gs://" + bucketName + "/" + LOCK_PATH;
+    return StorageResourceId.fromObjectName(lockObject);
+  }
+
   private List<String[]> getLockRecords(GoogleCloudStorageItemInfo lockInfo) throws IOException {
     String lockContent = new String(lockInfo.getMetadata().get(LOCK_METADATA_KEY), UTF_8);
     String[][] jsonArray = GSON.fromJson(lockContent, String[][].class);
@@ -185,7 +214,7 @@ public class GcsAtomicOperations {
       lockRecords.add(new String[] {operationId, object, lockTime});
     }
 
-    lockRecords.sort(Comparator.comparing(r -> r[CLIENT_ID_INDEX]));
+    lockRecords.sort(Comparator.comparing(r -> r[OPERATION_ID_INDEX]));
 
     return true;
   }
@@ -198,7 +227,7 @@ public class GcsAtomicOperations {
             .peek(
                 i ->
                     checkState(
-                        operationId.equals(lockRecords.get(i)[CLIENT_ID_INDEX]),
+                        operationId.equals(lockRecords.get(i)[OPERATION_ID_INDEX]),
                         "record %s should be locked by client %s",
                         Arrays.asList(lockRecords.get(i)),
                         operationId))

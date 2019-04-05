@@ -533,7 +533,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                 // Make sure to catch Throwable instead of only IOException so that we can
                 // correctly wrap other such throwables and propagate them out cleanly inside
                 // innerExceptions; common sources of non-IOExceptions include Preconditions
-                // checks which get enforced at varous layers in the library stack.
+                // checks which get enforced at various layers in the library stack.
                 innerExceptions.add(
                     new IOException("Error re-fetching after rate-limit error: " + resourceId, t));
               }
