@@ -23,6 +23,10 @@
   9. Log HTTP `429 Too Many Requests` responses from GCS at 1 per 10 seconds
      rate.
 
+  10. Add configuration property to force usage of VPC-SC via restricted.googleapis.com:
+
+       `fs.gs.vpcsc.enable` (default: false)
+
 
 1.9.14 - 2019-02-13
 

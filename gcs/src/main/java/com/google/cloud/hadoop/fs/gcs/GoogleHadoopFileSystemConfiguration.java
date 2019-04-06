@@ -378,6 +378,13 @@ public class GoogleHadoopFileSystemConfiguration {
       new GoogleHadoopFileSystemConfigurationProperty<>("fs.gs.http.read-timeout", 20 * 1000);
 
   /**
+   * Configuration key for enabling VPC-SC override of GCS root URL.
+   */
+  public static final GoogleHadoopFileSystemConfigurationProperty<Boolean> GCS_VPCSC_ENABLE =
+          new GoogleHadoopFileSystemConfigurationProperty<>(
+                  "fs.gs.vpcsc.enable", false);
+
+  /**
    * Configuration key for setting a proxy for the connector to use to connect to GCS. The proxy
    * must be an HTTP proxy of the form "host:port".
    */
@@ -564,6 +571,7 @@ public class GoogleHadoopFileSystemConfiguration {
             GCS_MAX_WAIT_MILLIS_EMPTY_OBJECT_CREATE.get(config, config::getInt))
         .setReadChannelOptions(getReadChannelOptions(config))
         .setWriteChannelOptions(getWriteChannelOptions(config))
+        .setVpcSc(GCS_VPCSC_ENABLE.get(config, config::getBoolean))
         .setRequesterPaysOptions(getRequesterPaysOptions(config, projectId));
 
     return gcsFsOptionsBuilder;

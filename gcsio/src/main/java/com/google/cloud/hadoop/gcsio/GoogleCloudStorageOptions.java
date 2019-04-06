@@ -84,6 +84,9 @@ public abstract class GoogleCloudStorageOptions {
   public static final RequesterPaysOptions REQUESTER_PAYS_OPTIONS_DEFAULT =
       RequesterPaysOptions.DEFAULT;
 
+  /** Default setting for VPC-SC flag. */
+  public static final Boolean VPC_SC_DEFAULT = false;
+
   public static Builder newBuilder() {
     return new AutoValue_GoogleCloudStorageOptions.Builder()
         .setAutoRepairImplicitDirectoriesEnabled(AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT)
@@ -103,6 +106,7 @@ public abstract class GoogleCloudStorageOptions {
         .setCopyBatchThreads(COPY_BATCH_THREADS_DEFAULT)
         .setReadChannelOptions(READ_CHANNEL_OPTIONS_DEFAULT)
         .setWriteChannelOptions(ASYNC_WRITE_CHANNEL_OPTIONS_DEFAULT)
+        .setVpcSc(VPC_SC_DEFAULT)
         .setRequesterPaysOptions(REQUESTER_PAYS_OPTIONS_DEFAULT);
   }
 
@@ -154,6 +158,8 @@ public abstract class GoogleCloudStorageOptions {
   public abstract GoogleCloudStorageReadOptions getReadChannelOptions();
 
   public abstract AsyncWriteChannelOptions getWriteChannelOptions();
+
+  public abstract Boolean getVpcSc();
 
   public abstract RequesterPaysOptions getRequesterPaysOptions();
 
@@ -235,6 +241,8 @@ public abstract class GoogleCloudStorageOptions {
           ? writeChannelOptionsBuilder = AsyncWriteChannelOptions.newBuilder()
           : writeChannelOptionsBuilder;
     }
+
+    public abstract Builder setVpcSc(Boolean vpcsc);
 
     public abstract Builder setRequesterPaysOptions(RequesterPaysOptions requesterPaysOptions);
 

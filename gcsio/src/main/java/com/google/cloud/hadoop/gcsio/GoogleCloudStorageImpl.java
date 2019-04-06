@@ -43,6 +43,7 @@ import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.RewriteResponse;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
+import com.google.cloud.hadoop.util.VpcScHttpRequestInitializer;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
@@ -111,6 +112,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private static final int MAXIMUM_PRECONDITION_FAILURES_IN_DELETE = 4;
 
   private static final String USER_PROJECT_FIELD_NAME = "userProject";
+
+  public static final String STORAGE_HOST_DEFAULT = Storage.DEFAULT_ROOT_URL.replace("https://", "");
+
+  public static final String VPCSC_ROOT_URL = Storage.DEFAULT_ROOT_URL.replace("www", "restricted");
 
   // A function to encode metadata map values
   private static final Function<byte[], String> ENCODE_METADATA_VALUES =
@@ -228,7 +233,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     logger.atFine().log("GCS(%s)", options.getAppName());
     this.storageOptions = options;
 
-    this.httpRequestInitializer = httpRequestInitializer;
+    this.httpRequestInitializer = (options.getVpcSc())
+      ? new VpcScHttpRequestInitializer(STORAGE_HOST_DEFAULT,
+            httpRequestInitializer): httpRequestInitializer;
 
     HttpTransport httpTransport =
         HttpTransportFactory.createHttpTransport(
@@ -241,6 +248,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     this.gcs =
         new Storage.Builder(httpTransport, JSON_FACTORY, httpRequestInitializer)
             .setApplicationName(options.getAppName())
+            .setRootUrl((options.getVpcSc()) ? VPCSC_ROOT_URL : Storage.DEFAULT_ROOT_URL)
             .build();
   }
 

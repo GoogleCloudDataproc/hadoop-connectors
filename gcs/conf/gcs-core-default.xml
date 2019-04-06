@@ -269,7 +269,12 @@
       `fs.gs.requester.pays.mode` property value is set to CUSTOM.
     </description>
   </property>
-
+  <property>
+    <name>fs.gs.vpcsc.enable</name>
+    <description>
+      Optional. Whether or not to override GCS endpoint to restricted.googleapis.com for VPC-SC.
+    </description>
+  </property>
   <property>
     <name>fs.gs.config.override.file</name>
     <description>
