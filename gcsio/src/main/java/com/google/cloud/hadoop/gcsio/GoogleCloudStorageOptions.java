@@ -17,6 +17,7 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
+import com.google.api.services.storage.Storage;
 import com.google.auto.value.AutoValue;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
@@ -84,6 +85,10 @@ public abstract class GoogleCloudStorageOptions {
   public static final RequesterPaysOptions REQUESTER_PAYS_OPTIONS_DEFAULT =
       RequesterPaysOptions.DEFAULT;
 
+  /** Default setting for root URL pays feature. */
+  public static final String ROOT_URL_DEFAULT =
+      Storage.DEFAULT_ROOT_URL;
+
   public static Builder newBuilder() {
     return new AutoValue_GoogleCloudStorageOptions.Builder()
         .setAutoRepairImplicitDirectoriesEnabled(AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT)
@@ -103,6 +108,7 @@ public abstract class GoogleCloudStorageOptions {
         .setCopyBatchThreads(COPY_BATCH_THREADS_DEFAULT)
         .setReadChannelOptions(READ_CHANNEL_OPTIONS_DEFAULT)
         .setWriteChannelOptions(ASYNC_WRITE_CHANNEL_OPTIONS_DEFAULT)
+        .setRootUrl(ROOT_URL_DEFAULT)
         .setRequesterPaysOptions(REQUESTER_PAYS_OPTIONS_DEFAULT);
   }
 
@@ -154,6 +160,8 @@ public abstract class GoogleCloudStorageOptions {
   public abstract GoogleCloudStorageReadOptions getReadChannelOptions();
 
   public abstract AsyncWriteChannelOptions getWriteChannelOptions();
+
+  public abstract String getRootUrl();
 
   public abstract RequesterPaysOptions getRequesterPaysOptions();
 
@@ -235,6 +243,8 @@ public abstract class GoogleCloudStorageOptions {
           ? writeChannelOptionsBuilder = AsyncWriteChannelOptions.newBuilder()
           : writeChannelOptionsBuilder;
     }
+
+    public abstract Builder setRootUrl(String rootUrl);
 
     public abstract Builder setRequesterPaysOptions(RequesterPaysOptions requesterPaysOptions);
 

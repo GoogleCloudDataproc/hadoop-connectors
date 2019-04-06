@@ -23,6 +23,7 @@ import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksum
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.ParentTimestampUpdateIncludePredicate;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.GenerationReadConsistency;
@@ -378,6 +379,15 @@ public class GoogleHadoopFileSystemConfiguration {
       new GoogleHadoopFileSystemConfigurationProperty<>("fs.gs.http.read-timeout", 20 * 1000);
 
   /**
+   * Configuration key for setting GCS root URL. The URL
+   * must be of the form "https://host:port/".
+   */
+  public static final GoogleHadoopFileSystemConfigurationProperty<String> GCS_ROOT_URL =
+          new GoogleHadoopFileSystemConfigurationProperty<>(
+                  "fs.gs.http.rooturl",
+                  GoogleCloudStorageOptions.ROOT_URL_DEFAULT);
+
+  /**
    * Configuration key for setting a proxy for the connector to use to connect to GCS. The proxy
    * must be an HTTP proxy of the form "host:port".
    */
@@ -564,6 +574,7 @@ public class GoogleHadoopFileSystemConfiguration {
             GCS_MAX_WAIT_MILLIS_EMPTY_OBJECT_CREATE.get(config, config::getInt))
         .setReadChannelOptions(getReadChannelOptions(config))
         .setWriteChannelOptions(getWriteChannelOptions(config))
+        .setRootUrl(GCS_ROOT_URL.get(config, config::get))
         .setRequesterPaysOptions(getRequesterPaysOptions(config, projectId));
 
     return gcsFsOptionsBuilder;

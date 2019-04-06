@@ -20,6 +20,10 @@
   8. Repair implicit directories during delete operations instead of list
      operations.
 
+  9. Add configuration property to set GCS root URL:
+
+       fs.gs.http.rooturl (default: https://www.googleapis.com/)
+
 
 1.9.14 - 2019-02-13
 
