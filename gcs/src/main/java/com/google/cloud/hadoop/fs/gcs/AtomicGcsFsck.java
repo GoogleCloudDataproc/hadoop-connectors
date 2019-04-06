@@ -39,7 +39,7 @@ public class AtomicGcsFsck {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  private static final int LOCK_EXPIRATION_SECONDS = 0;
+  private static final int LOCK_EXPIRATION_SECONDS = 120;
 
   public static void main(String[] args) throws Exception {
     String bucket = args[0];
