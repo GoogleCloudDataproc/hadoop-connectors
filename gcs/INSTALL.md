@@ -59,17 +59,17 @@ Once you have the JSON key file, you must add the following property to
   <name>google.cloud.auth.service.account.enable</name>
   <value>/path/to/keyfile</value>
   <description>
-      Whether to use a service account for GCS authorization.
-      If set to `false` then GCE VM metadata service will be used
-      for authorization.
+    Whether to use a service account for GCS authorization.
+    If set to `false` then GCE VM metadata service will be used
+    for authorization.
   </description>
 </property>
 <property>
   <name>google.cloud.auth.service.account.json.keyfile</name>
   <value>/path/to/keyfile</value>
   <description>
-      The JSON key file of the service account used for GCS
-      access when google.cloud.auth.service.account.enable is true.
+    The JSON key file of the service account used for GCS
+    access when google.cloud.auth.service.account.enable is true.
   </description>
 </property>
 ```
