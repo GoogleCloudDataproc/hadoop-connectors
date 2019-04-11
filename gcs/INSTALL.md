@@ -41,8 +41,8 @@ Once you have the JSON key file, you must add the following property to
   <name>fs.gs.project.id</name>
   <value></value>
   <description>
-      Optional. Google Cloud Project ID with access to GCS buckets.
-      Required only for list buckets and create bucket operations.
+    Optional. Google Cloud Project ID with access to GCS buckets.
+    Required only for list buckets and create bucket operations.
   </description>
 </property>
 <property>
