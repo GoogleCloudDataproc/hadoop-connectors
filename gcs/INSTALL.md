@@ -60,8 +60,9 @@ Once you have the JSON key file, you must add the following property to
   <value>/path/to/keyfile</value>
   <description>
     Whether to use a service account for GCS authorization.
-    If set to `false` then GCE VM metadata service will be used
-    for authorization.
+    If set to `false` then GCE VM metadata service will be used for authorization.
+    Note: alternatively you can set `GOOGLE_APPLICATION_CREDENTIALS` environment
+    variable to `/path/to/keyfile.json`.
   </description>
 </property>
 <property>
