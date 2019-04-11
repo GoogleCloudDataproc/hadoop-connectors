@@ -20,10 +20,10 @@ must do one of the following:
 
 ## Add the connector jar to Hadoop's classpath
 
-Placing the connector jar in the appropriate subdirectory of the Hadoop
-installation may be effective to have Hadoop load the jar. However, to be
-certain that the jar is loaded, add
-`HADOOP_CLASSPATH=$HADOOP_CLASSPATH:</path/to/gcs-connector-jar>` to
+Placing the connector jar in the appropriate subdirectory of the Hadoop installation
+(`$HADOOP_COMMON_LIB_JARS_DIR`) may be sufficient to have Hadoop load the jar.
+However, to be certain that the jar is loaded, add
+`HADOOP_CLASSPATH=$HADOOP_CLASSPATH:</path/to/gcs-connector.jar>` to
 `hadoop-env.sh` in the Hadoop configuration directory.
 
 ## Configure Hadoop
