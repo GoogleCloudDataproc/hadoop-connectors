@@ -38,16 +38,6 @@ Once you have the JSON key file, you must add the following property to
 
 ```xml
 <property>
-  <name>fs.gs.impl</name>
-  <value>com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem</value>
-  <description>The FileSystem for "gs://" (GCS) uris.</description>
-</property>
-<property>
-  <name>fs.AbstractFileSystem.gs.impl</name>
-  <value>com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS</value>
-  <description>The AbstractFileSystem for "gs://" (GCS) uris.</description>
-</property>
-<property>
   <name>fs.gs.project.id</name>
   <value></value>
   <description>
