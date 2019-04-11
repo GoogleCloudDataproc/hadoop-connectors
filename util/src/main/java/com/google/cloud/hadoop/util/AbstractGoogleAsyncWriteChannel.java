@@ -17,6 +17,8 @@ package com.google.cloud.hadoop.util;
 import com.google.api.client.googleapis.media.MediaHttpUploader;
 import com.google.api.client.googleapis.services.AbstractGoogleClientRequest;
 import com.google.api.client.http.InputStreamContent;
+import com.google.api.client.util.ExponentialBackOff;
+import com.google.api.client.util.Sleeper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
@@ -271,7 +273,11 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
     public S call() throws Exception {
       Exception exception = null;
       try {
-        return uploadObject.execute();
+        return ResilientOperation.retry(
+            ResilientOperation.getGoogleRequestCallable(uploadObject),
+            new ExponentialBackOff(),
+            RetryDeterminer.SERVER_ERRORS,
+            IOException.class, Sleeper.DEFAULT);
       } catch (IOException ioe) {
         exception = ioe;
         S response = createResponseFromException(ioe);
