@@ -15,9 +15,11 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -33,8 +35,8 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** InputFormat that directly reads data from BigQuery.
- *
+/**
+ * InputFormat that directly reads data from BigQuery.
  */
 @InterfaceStability.Evolving
 public class DirectBigQueryInputFormat extends InputFormat<NullWritable, GenericRecord> {
@@ -56,10 +58,12 @@ public class DirectBigQueryInputFormat extends InputFormat<NullWritable, Generic
       LOG.error("Failed to create BigQuery client", gse);
       throw new IOException("Failed to create BigQuery client", gse);
     }
-    double skewLimit = configuration.getDouble(BigQueryConfiguration.SKEW_LIMIT_KEY, BigQueryConfiguration.SKEW_LIMIT_DEFAULT);
+    double skewLimit = configuration
+        .getDouble(BigQueryConfiguration.SKEW_LIMIT_KEY, BigQueryConfiguration.SKEW_LIMIT_DEFAULT);
     Preconditions.checkArgument(
         skewLimit >= 1.0,
-        BigQueryConfiguration.SKEW_LIMIT_KEY + " is less than 1, than not all records would be read. Exiting");
+        BigQueryConfiguration.SKEW_LIMIT_KEY
+            + " is less than 1, than not all records would be read. Exiting");
     Table table = getTable(configuration, bigQueryHelper);
     ReadSession session = startSession(configuration, table, client);
     long numRows = table.getNumRows().longValue();
@@ -106,8 +110,8 @@ public class DirectBigQueryInputFormat extends InputFormat<NullWritable, Generic
         CreateReadSessionRequest.newBuilder()
             .setTableReference(
                 TableReferenceProto.TableReference.newBuilder()
-                    .setDatasetId(table.getTableReference().getDatasetId())
                     .setProjectId(table.getTableReference().getProjectId())
+                    .setDatasetId(table.getTableReference().getDatasetId())
                     .setTableId(table.getTableReference().getTableId()))
             .setRequestedStreams(getParallelism(configuration))
             .setParent("projects/" + jobProjectId)
@@ -137,21 +141,26 @@ public class DirectBigQueryInputFormat extends InputFormat<NullWritable, Generic
     return BigQueryStorageClient.create();
   }
 
-  /** Helper method to override for testing. */
+  /**
+   * Helper method to override for testing.
+   */
   protected BigQueryHelper getBigQueryHelper(Configuration config)
       throws GeneralSecurityException, IOException {
     BigQueryFactory factory = new BigQueryFactory();
     return factory.getBigQueryHelper(config);
   }
 
-  /** InputSplit containing session metadata. */
+  /**
+   * InputSplit containing session metadata.
+   */
   public static class DirectBigQueryInputSplit extends InputSplit implements Writable {
 
     private String name;
     private String schema;
     private long limit;
 
-    public DirectBigQueryInputSplit() {}
+    public DirectBigQueryInputSplit() {
+    }
 
     public DirectBigQueryInputSplit(String name, String schema, long limit) {
       this.name = name;
@@ -194,6 +203,28 @@ public class DirectBigQueryInputFormat extends InputFormat<NullWritable, Generic
 
     public long getLimit() {
       return limit;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(name, schema, limit);
+    }
+
+    private Object[] vals() {
+      return new Object[]{name, schema, limit};
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof DirectBigQueryInputSplit)) {
+        return false;
+      }
+      return Arrays.equals(vals(), ((DirectBigQueryInputSplit) o).vals());
+    }
+
+    @Override
+    public String toString() {
+      return String.format("(name='%s', schema='%s', limit='%s')", name, schema, limit);
     }
   }
 }

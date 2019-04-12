@@ -63,11 +63,10 @@ public class DirectBigQueryRecordReader extends RecordReader<NullWritable, Gener
   public boolean nextKeyValue() {
     // Finalize reader once we hit limit. We must at that point keep reading until BigQuery stops
     // sending records.
-    if (idx >= limit && !finalized) {
+    if (++idx >= limit && !finalized) {
       client.finalizeStream(stream);
       finalized = true;
     }
-    idx++;
 
     // TODO: unwrap runtime exceptions thrown by responseIterator:
     // RE(InterruptedException) -> InterruptedException
