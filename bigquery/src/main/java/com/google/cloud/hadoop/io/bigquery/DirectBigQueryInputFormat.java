@@ -1,3 +1,16 @@
+/*
+ * Copyright 2019 Google LLC
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software distributed under the
+ * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.google.cloud.hadoop.io.bigquery;
 
 import com.google.api.services.bigquery.model.Table;
@@ -11,7 +24,6 @@ import com.google.cloud.bigquery.storage.v1beta1.Storage.ReadSession;
 import com.google.cloud.bigquery.storage.v1beta1.TableReferenceProto;
 import com.google.cloud.hadoop.util.ConfigurationUtil;
 import com.google.common.base.Preconditions;
-import com.google.common.flogger.FluentLogger;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
@@ -21,7 +33,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -36,12 +47,11 @@ import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 /**
- * InputFormat that directly reads data from BigQuery.
+ * InputFormat that directly reads data from BigQuery using the BigQuery Storage API.
+ * See https://cloud.google.com/bigquery/docs/reference/storage/.
  */
 @InterfaceStability.Evolving
 public class DirectBigQueryInputFormat extends InputFormat<NullWritable, GenericRecord> {
-
-  private static final FluentLogger LOG = FluentLogger.forEnclosingClass();
 
   private static final String STANDARD_TABLE_TYPE = "TABLE";
   private static String DIRECT_PARALLELISM_KEY = MRJobConfig.NUM_MAPS;
@@ -55,15 +65,15 @@ public class DirectBigQueryInputFormat extends InputFormat<NullWritable, Generic
     try {
       bigQueryHelper = getBigQueryHelper(configuration);
     } catch (GeneralSecurityException gse) {
-      LOG.at(Level.SEVERE).log("Failed to create BigQuery client", gse);
       throw new IOException("Failed to create BigQuery client", gse);
     }
     double skewLimit = configuration
         .getDouble(BigQueryConfiguration.SKEW_LIMIT_KEY, BigQueryConfiguration.SKEW_LIMIT_DEFAULT);
     Preconditions.checkArgument(
         skewLimit >= 1.0,
-        BigQueryConfiguration.SKEW_LIMIT_KEY
-            + " is less than 1, than not all records would be read. Exiting");
+        String.format(
+            "%s is less than 1; not all records would be read. Exiting",
+            BigQueryConfiguration.SKEW_LIMIT_KEY));
     Table table = getTable(configuration, bigQueryHelper);
     ReadSession session = startSession(configuration, table, client);
     long numRows = table.getNumRows().longValue();

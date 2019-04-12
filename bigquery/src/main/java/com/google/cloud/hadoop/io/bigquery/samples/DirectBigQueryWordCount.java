@@ -1,3 +1,16 @@
+/*
+ * Copyright 2019 Google LLC
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software distributed under the
+ * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.google.cloud.hadoop.io.bigquery.samples;
 
 import com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration;
@@ -75,7 +88,7 @@ public class DirectBigQueryWordCount {
       System.out.println(
           "Usage: hadoop jar bigquery_wordcount.jar [ProjectId] [QualifiedInputTableId] "
               + "[GcsOutputPath]\n"
-              + "    ProjectId - Project under which to issue the BigQuery operations. Also"
+              + "    ProjectId - Project under which to issue the BigQuery operations. Also "
               + "serves as the default project for table IDs which don't explicitly specify a "
               + "project for the table.\n"
               + "    QualifiedInputTableId - Input table ID of the form "
@@ -90,7 +103,7 @@ public class DirectBigQueryWordCount {
     String inputQualifiedTableId = args[1];
     String outputPath = args[2];
 
-    // Create the job and get it's configuration.
+    // Create the job and get its configuration.
     Job job = new Job(parser.getConfiguration(), "wordcount");
     Configuration conf = job.getConfiguration();
 

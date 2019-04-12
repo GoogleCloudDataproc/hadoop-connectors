@@ -90,7 +90,7 @@
     <google.api-bigquery.version>v2-rev20181221-${google.api.version}</google.api-bigquery.version>
     <google.api-storage.version>v1-rev20181109-${google.api.version}</google.api-storage.version>
     <google.auto-value.version>1.6.3</google.auto-value.version>
-    <google.cloud-bigquery-storage.version>0.79.0-alpha</google.cloud-bigquery-storage.version>
+    <google.cloud-bigquery-storage.version>0.87.0-alpha</google.cloud-bigquery-storage.version>
     <google.flogger.version>0.3.1</google.flogger.version>
     <google.guava.version>27.0.1-jre</google.guava.version>
     <google.truth.version>0.44</google.truth.version>
