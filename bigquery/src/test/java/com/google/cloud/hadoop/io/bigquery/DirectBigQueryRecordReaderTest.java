@@ -53,7 +53,7 @@ public class DirectBigQueryRecordReaderTest {
               .setSerializedBinaryRows(ByteString.copyFrom(new byte[]{2, 6}))) // 3
           .build());
 
-  private DirectBigQueryInputSplit split = new DirectBigQueryInputSplit("session", RAW_SCHEMA, 100);
+  private DirectBigQueryInputSplit split = new DirectBigQueryInputSplit("session", RAW_SCHEMA, 5);
   private static final Stream STREAM = Stream.newBuilder().setName("session").build();
 
   @Mock

@@ -11,6 +11,7 @@ import com.google.cloud.bigquery.storage.v1beta1.Storage.ReadSession;
 import com.google.cloud.bigquery.storage.v1beta1.TableReferenceProto;
 import com.google.cloud.hadoop.util.ConfigurationUtil;
 import com.google.common.base.Preconditions;
+import com.google.common.flogger.FluentLogger;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
@@ -20,6 +21,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -32,8 +34,6 @@ import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * InputFormat that directly reads data from BigQuery.
@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
 @InterfaceStability.Evolving
 public class DirectBigQueryInputFormat extends InputFormat<NullWritable, GenericRecord> {
 
-  private static final Logger LOG = LoggerFactory.getLogger(DirectBigQueryInputFormat.class);
+  private static final FluentLogger LOG = FluentLogger.forEnclosingClass();
 
   private static final String STANDARD_TABLE_TYPE = "TABLE";
   private static String DIRECT_PARALLELISM_KEY = MRJobConfig.NUM_MAPS;
@@ -55,7 +55,7 @@ public class DirectBigQueryInputFormat extends InputFormat<NullWritable, Generic
     try {
       bigQueryHelper = getBigQueryHelper(configuration);
     } catch (GeneralSecurityException gse) {
-      LOG.error("Failed to create BigQuery client", gse);
+      LOG.at(Level.SEVERE).log("Failed to create BigQuery client", gse);
       throw new IOException("Failed to create BigQuery client", gse);
     }
     double skewLimit = configuration

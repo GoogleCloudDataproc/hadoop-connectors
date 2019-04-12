@@ -191,10 +191,22 @@
                     implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
               </transformers>
               <filters>
+                <!--minimizeJar breaks all the dynamic load hacks; add them explicitly-->
+                <filter>
+                  <artifact>io.grpc:*</artifact>
+                  <includes>
+                    <include>**</include>
+                  </includes>
+                </filter>
+                <filter>
+                  <artifact>io.opencensus:*</artifact>
+                  <includes>
+                    <include>**</include>
+                  </includes>
+                </filter>
                 <filter>
                   <artifact>com.google.flogger:flogger-log4j-backend</artifact>
                   <includes>
-                    <!--Avoid cleanup with minimizeJar that breaks Log4j logging-->
                     <include>**</include>
                   </includes>
                 </filter>
@@ -205,11 +217,14 @@
                   </excludes>
                 </filter>
               </filters>
-              <!--artifactSet>
+              <artifactSet>
                 <includes>
                   <include>com.fasterxml.jackson.core:jackson-core</include>
+                  <include>com.google.api</include>
+                  <include>com.google.api.grpc</include>
                   <include>com.google.api-client</include>
                   <include>com.google.apis</include>
+                  <include>com.google.auth</include>
                   <include>com.google.cloud</include>
                   <include>com.google.cloud.bigdataoss:util</include>
                   <include>com.google.cloud.bigdataoss:util-hadoop</include>
@@ -219,15 +234,17 @@
                   <include>com.google.http-client:google-http-client-jackson2</include>
                   <include>com.google.oauth-client:google-oauth-client</include>
                   <include>com.google.oauth-client:google-oauth-client-java6</include>
+                  <include>com.google.protobuf</include>
                   <include>io.grpc</include>
-                  <include>io.netty.intern</include>
+                  <include>io.opencensus</include>
                   <include>org.apache.httpcomponents:httpclient</include>
                   <include>org.apache.httpcomponents:httpcore</include>
-                  < needed by http client and versions conflict
+                  <include>org.threeten</include>
+                  <!-- needed by http client and versions conflict -->
                   <include>commons-codec:commons-codec</include>
                 </includes>
-              </artifactSet-->
-              <!--minimizeJar>true</minimizeJar-->
+              </artifactSet>
+              <minimizeJar>true</minimizeJar>
               <relocations>
                 <relocation>
                   <pattern>com</pattern>
@@ -254,6 +271,10 @@
                   <pattern>io.grpc</pattern>
                   <shadedPattern>com.google.cloud.hadoop.repackaged.bigquery.io.grpc</shadedPattern>
                 </relocation>
+                <relocation>
+                  <pattern>io.opencensus</pattern>
+                  <shadedPattern>com.google.cloud.hadoop.repackaged.bigquery.io.opencensus</shadedPattern>
+                </relocation>
 
                 <relocation>
                   <pattern>org</pattern>
@@ -261,6 +282,10 @@
                   <includes>
                     <include>org.apache.commons.codec.**</include>
                     <include>org.apache.http.**</include>
+                    <include>org.checkerframework.**</include>
+                    <include>org.codehaus.mojo.animal_sniffer.**</include>
+                    <include>org.joda.**</include>
+                    <include>org.threeten.**</include>
                   </includes>
                 </relocation>
                 <relocation>
