@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.CreateFileOptions.DEFAULT_CONTENT_TYPE;
 import static com.google.cloud.hadoop.gcsio.CreateFileOptions.EMPTY_ATTRIBUTES;
 import static com.google.cloud.hadoop.gcsio.GcsAtomicOperations.LOCK_DIRECTORY;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
@@ -47,10 +48,12 @@ import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.DirectoryNotEmptyException;
@@ -74,6 +77,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -915,6 +919,7 @@ public class GoogleCloudStorageFileSystem {
       }
     }
 
+    Future<?> lockUpdateFuture = null;
     Instant operationInstant = Instant.now();
     if (options.enableCooperativeLocking()
         && srcInfo.getItemInfo().getBucketName().equals(dst.getAuthority())) {
@@ -924,14 +929,15 @@ public class GoogleCloudStorageFileSystem {
               srcInfo.getPath().toString(),
               dst.toString(),
               "false");
-      writeOperationFile(
-          dst.getAuthority(),
-          OPERATION_LOCK_FILE_FORMAT,
-          CREATE_FILE_OPTIONS,
-          "rename",
-          operationId,
-          operationInstant,
-          lockRecords);
+      URI operationLockPath =
+          writeOperationFile(
+              dst.getAuthority(),
+              OPERATION_LOCK_FILE_FORMAT,
+              CREATE_FILE_OPTIONS,
+              "rename",
+              operationId,
+              operationInstant,
+              lockRecords);
       List<String> logRecords =
           Streams.concat(
                   srcToDstItemNames.entrySet().stream(),
@@ -946,6 +952,26 @@ public class GoogleCloudStorageFileSystem {
           operationId,
           operationInstant,
           logRecords);
+      // Schedule lock expiration update
+      lockUpdateFuture =
+          scheduleLockUpdate(
+              () -> {
+                // read lock file info
+                for (int i = 0; i < 10; i++) {
+                  try {
+                    renewLock(operationId, operationLockPath);
+                  } catch (IOException e) {
+                    logger.atWarning().withCause(e).log(
+                        "Failed to renew '%s' lock for %s operation, retry #%d",
+                        operationLockPath, operationId, i + 1);
+                  }
+                  sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
+                }
+                logger.atSevere().log(
+                    "Failed to renew '%s' lock for %s operation, exiting",
+                    operationLockPath, operationId);
+                System.exit(1);
+              });
     }
 
     // Create the destination directory.
@@ -1007,6 +1033,33 @@ public class GoogleCloudStorageFileSystem {
       // Any path that was deleted, we should update the parent except for parents we also deleted
       tryUpdateTimestampsForParentDirectories(srcItemNames, srcItemNames);
     }
+
+    if (lockUpdateFuture != null) {
+      lockUpdateFuture.cancel(/* mayInterruptIfRunning= */ false);
+    }
+  }
+
+  private void renewLock(String operationId, URI operationLockPath) throws IOException {
+    StorageResourceId lockId = StorageResourceId.fromObjectName(operationLockPath.toString());
+    GoogleCloudStorageItemInfo lockInfo = gcs.getItemInfo(lockId);
+    checkState(lockInfo.exists(), "lock file for %s operation should exist", operationId);
+
+    List<String> newLockRecords;
+    try (BufferedReader reader =
+        new BufferedReader(Channels.newReader(gcs.open(lockId), UTF_8.name()))) {
+      newLockRecords = reader.lines().collect(toCollection(ArrayList::new));
+    }
+
+    newLockRecords.set(0, String.valueOf(Instant.now().getEpochSecond()));
+    CreateFileOptions updateOptions =
+        new CreateFileOptions(
+            /* overwriteExisting= */ true,
+            DEFAULT_CONTENT_TYPE,
+            EMPTY_ATTRIBUTES,
+            /* checkNoDirectoryConflict= */ false,
+            /* ensureParentDirectoriesExist= */ false,
+            lockInfo.getContentGeneration());
+    writeOperationUri(operationLockPath, updateOptions, newLockRecords);
   }
 
   /** Copies items in given map that maps source items to destination items. */
@@ -1420,14 +1473,6 @@ public class GoogleCloudStorageFileSystem {
             updateTimestampsExecutor = null;
           }
         }
-
-        if (cachedExecutor != null) {
-          try {
-            shutdownExecutor(cachedExecutor, /* waitSeconds= */ 5);
-          } finally {
-            cachedExecutor = null;
-          }
-        }
       }
     }
   }
@@ -1767,12 +1812,24 @@ public class GoogleCloudStorageFileSystem {
     String date = LOCK_FILE_DATE_TIME_FORMAT.format(operationInstant);
     String file = String.format(LOCK_DIRECTORY + fileNameFormat, date, operation, operationId);
     URI path = pathCodec.getPath(bucket, file, /* allowEmptyObjectName= */ false);
+    writeOperationUri(path, createFileOptions, records);
+    return path;
+  }
+
+  private void writeOperationUri(
+      URI path, CreateFileOptions createFileOptions, List<String> records) throws IOException {
     try (WritableByteChannel channel = create(path, createFileOptions)) {
       for (String record : records) {
         channel.write(ByteBuffer.wrap(record.getBytes(UTF_8)));
         channel.write(ByteBuffer.wrap(new byte[] {'\n'}));
       }
     }
-    return path;
+  }
+
+  private ScheduledExecutorService scheduledThreadPool = Executors.newScheduledThreadPool(1);
+
+  private Future<?> scheduleLockUpdate(Runnable updateFn) {
+    return scheduledThreadPool.scheduleAtFixedRate(
+        updateFn, /* initialDelay= */ 1, /* period= */ 1, TimeUnit.MINUTES);
   }
 }
