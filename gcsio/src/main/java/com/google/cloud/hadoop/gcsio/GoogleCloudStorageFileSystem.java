@@ -457,14 +457,15 @@ public class GoogleCloudStorageFileSystem {
       List<String> lockRecords =
           ImmutableList.of(
               String.valueOf(operationInstant.getEpochSecond()), resourceId.toString());
-      writeOperationFile(
-          path.getAuthority(),
-          OPERATION_LOCK_FILE_FORMAT,
-          CREATE_FILE_OPTIONS,
-          "delete",
-          operationId,
-          operationInstant,
-          lockRecords);
+      URI operationLockPath =
+          writeOperationFile(
+              path.getAuthority(),
+              OPERATION_LOCK_FILE_FORMAT,
+              CREATE_FILE_OPTIONS,
+              "delete",
+              operationId,
+              operationInstant,
+              lockRecords);
       List<String> logRecords =
           Streams.concat(itemsToDelete.stream(), bucketsToDelete.stream())
               .map(i -> i.getItemInfo().getResourceId().toString())
@@ -477,6 +478,9 @@ public class GoogleCloudStorageFileSystem {
           operationId,
           operationInstant,
           logRecords);
+      // Schedule lock expiration update
+      Future<?> lockUpdateFuture =
+          scheduleLockUpdate(() -> renewLockOrExit(operationId, operationLockPath));
 
       deleteInternal(itemsToDelete, bucketsToDelete);
 
@@ -490,6 +494,8 @@ public class GoogleCloudStorageFileSystem {
               "Failed to unlock (client=%s, res=%s), retrying.", operationId, resourceId);
         }
       } while (true);
+
+      lockUpdateFuture.cancel(/* mayInterruptIfRunning= */ false);
     } else {
       deleteInternal(itemsToDelete, bucketsToDelete);
     }
@@ -503,6 +509,23 @@ public class GoogleCloudStorageFileSystem {
       // Any path that was deleted, we should update the parent except for parents we also deleted
       tryUpdateTimestampsForParentDirectories(itemsToDeleteNames, itemsToDeleteNames);
     }
+  }
+
+  private void renewLockOrExit(String operationId, URI operationLockPath) {
+    // read lock file info
+    for (int i = 0; i < 10; i++) {
+      try {
+        renewLock(operationId, operationLockPath);
+      } catch (IOException e) {
+        logger.atWarning().withCause(e).log(
+            "Failed to renew '%s' lock for %s operation, retry #%d",
+            operationLockPath, operationId, i + 1);
+      }
+      sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
+    }
+    logger.atSevere().log(
+        "Failed to renew '%s' lock for %s operation, exiting", operationLockPath, operationId);
+    System.exit(1);
   }
 
   /** Deletes all items in the given path list followed by all bucket items. */
@@ -953,25 +976,7 @@ public class GoogleCloudStorageFileSystem {
           operationInstant,
           logRecords);
       // Schedule lock expiration update
-      lockUpdateFuture =
-          scheduleLockUpdate(
-              () -> {
-                // read lock file info
-                for (int i = 0; i < 10; i++) {
-                  try {
-                    renewLock(operationId, operationLockPath);
-                  } catch (IOException e) {
-                    logger.atWarning().withCause(e).log(
-                        "Failed to renew '%s' lock for %s operation, retry #%d",
-                        operationLockPath, operationId, i + 1);
-                  }
-                  sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
-                }
-                logger.atSevere().log(
-                    "Failed to renew '%s' lock for %s operation, exiting",
-                    operationLockPath, operationId);
-                System.exit(1);
-              });
+      lockUpdateFuture = scheduleLockUpdate(() -> renewLockOrExit(operationId, operationLockPath));
     }
 
     // Create the destination directory.
