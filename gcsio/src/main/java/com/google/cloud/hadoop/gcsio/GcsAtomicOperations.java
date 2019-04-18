@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -205,7 +206,20 @@ public class GcsAtomicOperations {
 
   private boolean addLockRecords(
       List<String[]> lockRecords, String operationId, Set<String> objectsToAdd) {
-    if (lockRecords.stream().anyMatch(r -> objectsToAdd.contains(r[LOCKED_PATH_INDEX]))) {
+    // TODO: optimize to match more efficiently
+    if (lockRecords.stream()
+        .anyMatch(
+            r -> {
+              String lockedObject = r[LOCKED_PATH_INDEX];
+              for (String objectToAdd : objectsToAdd) {
+                if (objectToAdd.equals(lockedObject)
+                    || isChildObject(lockedObject, objectToAdd)
+                    || isChildObject(objectToAdd, lockedObject)) {
+                  return true;
+                }
+              }
+              return false;
+            })) {
       return false;
     }
 
@@ -217,6 +231,10 @@ public class GcsAtomicOperations {
     lockRecords.sort(Comparator.comparing(r -> r[OPERATION_ID_INDEX]));
 
     return true;
+  }
+
+  private boolean isChildObject(String parent, String child) {
+    return parent.startsWith(child.endsWith(PATH_DELIMITER) ? child : child + PATH_DELIMITER);
   }
 
   private boolean removeLockRecords(
