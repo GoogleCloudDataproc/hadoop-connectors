@@ -53,8 +53,7 @@ public class DirectBigQueryRecordReader extends RecordReader<NullWritable, Gener
 
   @Override
   public void initialize(InputSplit genericSplit, TaskAttemptContext context) throws IOException {
-    DirectBigQueryInputSplit split =
-        (DirectBigQueryInputSplit) genericSplit;
+    DirectBigQueryInputSplit split = (DirectBigQueryInputSplit) genericSplit;
     schema = parser.parse(checkNotNull(split.getSchema(), "schema"));
 
     stream = Stream.newBuilder().setName(checkNotNull(split.getName(), "name")).build();

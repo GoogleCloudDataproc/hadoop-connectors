@@ -67,8 +67,7 @@ public class DirectBigQueryWordCount {
         throws IOException, InterruptedException {
       // Add up the values to get a total number of occurrences of our word.
       count.set(
-          StreamSupport.stream(counts.spliterator(), false)
-              .mapToLong(LongWritable::get).sum());
+          StreamSupport.stream(counts.spliterator(), false).mapToLong(LongWritable::get).sum());
       context.write(word, count);
     }
   }

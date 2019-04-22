@@ -47,8 +47,8 @@ import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 /**
- * InputFormat that directly reads data from BigQuery using the BigQuery Storage API.
- * See https://cloud.google.com/bigquery/docs/reference/storage/.
+ * InputFormat that directly reads data from BigQuery using the BigQuery Storage API. See
+ * https://cloud.google.com/bigquery/docs/reference/storage/.
  */
 @InterfaceStability.Evolving
 public class DirectBigQueryInputFormat extends InputFormat<NullWritable, GenericRecord> {
@@ -67,8 +67,9 @@ public class DirectBigQueryInputFormat extends InputFormat<NullWritable, Generic
     } catch (GeneralSecurityException gse) {
       throw new IOException("Failed to create BigQuery client", gse);
     }
-    double skewLimit = configuration
-        .getDouble(BigQueryConfiguration.SKEW_LIMIT_KEY, BigQueryConfiguration.SKEW_LIMIT_DEFAULT);
+    double skewLimit =
+        configuration.getDouble(
+            BigQueryConfiguration.SKEW_LIMIT_KEY, BigQueryConfiguration.SKEW_LIMIT_DEFAULT);
     Preconditions.checkArgument(
         skewLimit >= 1.0,
         String.format(
@@ -109,8 +110,8 @@ public class DirectBigQueryInputFormat extends InputFormat<NullWritable, Generic
     // Extract relevant configuration settings.
     String jobProjectId = configuration.get(BigQueryConfiguration.PROJECT_ID_KEY);
     String filter = configuration.get(BigQueryConfiguration.SQL_FILTER_KEY, "");
-    Collection<String> selectedFields = configuration.getStringCollection(
-        BigQueryConfiguration.SELECTED_FIELDS_KEY);
+    Collection<String> selectedFields =
+        configuration.getStringCollection(BigQueryConfiguration.SELECTED_FIELDS_KEY);
 
     Builder readOptions = TableReadOptions.newBuilder().setRowRestriction(filter);
     if (!selectedFields.isEmpty()) {
@@ -151,26 +152,21 @@ public class DirectBigQueryInputFormat extends InputFormat<NullWritable, Generic
     return BigQueryStorageClient.create();
   }
 
-  /**
-   * Helper method to override for testing.
-   */
+  /** Helper method to override for testing. */
   protected BigQueryHelper getBigQueryHelper(Configuration config)
       throws GeneralSecurityException, IOException {
     BigQueryFactory factory = new BigQueryFactory();
     return factory.getBigQueryHelper(config);
   }
 
-  /**
-   * InputSplit containing session metadata.
-   */
+  /** InputSplit containing session metadata. */
   public static class DirectBigQueryInputSplit extends InputSplit implements Writable {
 
     private String name;
     private String schema;
     private long limit;
 
-    public DirectBigQueryInputSplit() {
-    }
+    public DirectBigQueryInputSplit() {}
 
     public DirectBigQueryInputSplit(String name, String schema, long limit) {
       this.name = name;
@@ -221,7 +217,7 @@ public class DirectBigQueryInputFormat extends InputFormat<NullWritable, Generic
     }
 
     private Object[] vals() {
-      return new Object[]{name, schema, limit};
+      return new Object[] {name, schema, limit};
     }
 
     @Override

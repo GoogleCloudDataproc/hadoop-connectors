@@ -53,12 +53,9 @@ import org.mockito.MockitoAnnotations;
 @RunWith(JUnit4.class)
 public class DirectBigQueryInputFormatTest {
 
-  @Mock
-  private BigQueryHelper bqHelper;
-  @Mock
-  private BigQueryStorageClient bqClient;
-  @Mock
-  private TaskAttemptContext taskContext;
+  @Mock private BigQueryHelper bqHelper;
+  @Mock private BigQueryStorageClient bqClient;
+  @Mock private TaskAttemptContext taskContext;
 
   private JobConf config;
   private DirectBigQueryInputFormat input;
@@ -76,14 +73,18 @@ public class DirectBigQueryInputFormatTest {
     MockitoAnnotations.initMocks(this);
 
     // Create table reference.
-    tableRef = new TableReference()
-        .setProjectId(dataProjectId).setDatasetId(datasetId).setTableId(tableId);
+    tableRef =
+        new TableReference()
+            .setProjectId(dataProjectId)
+            .setDatasetId(datasetId)
+            .setTableId(tableId);
 
-    Table table = new Table()
-        .setTableReference(tableRef)
-        .setLocation("test_location")
-        .setNumRows(BigInteger.valueOf(23))
-        .setNumBytes(3L * 128 * 1024 * 1024);
+    Table table =
+        new Table()
+            .setTableReference(tableRef)
+            .setLocation("test_location")
+            .setNumRows(BigInteger.valueOf(23))
+            .setNumBytes(3L * 128 * 1024 * 1024);
 
     when(bqHelper.getTable(any(TableReference.class))).thenReturn(table);
 
@@ -127,15 +128,18 @@ public class DirectBigQueryInputFormatTest {
             .setFormat(DataFormat.AVRO)
             .build();
 
-    ReadSession session = ReadSession.newBuilder()
-        .setAvroSchema(AvroSchema.newBuilder().setSchema("schema").build())
-        .addAllStreams(ImmutableList.of(
-            Stream.newBuilder().setName("stream1").build(),
-            Stream.newBuilder().setName("stream2").build()))
-        .build();
-    ImmutableList<DirectBigQueryInputSplit> expected = ImmutableList.of(
-        new DirectBigQueryInputSplit("stream1", "schema", 14),
-        new DirectBigQueryInputSplit("stream2", "schema", 14));
+    ReadSession session =
+        ReadSession.newBuilder()
+            .setAvroSchema(AvroSchema.newBuilder().setSchema("schema").build())
+            .addAllStreams(
+                ImmutableList.of(
+                    Stream.newBuilder().setName("stream1").build(),
+                    Stream.newBuilder().setName("stream2").build()))
+            .build();
+    ImmutableList<DirectBigQueryInputSplit> expected =
+        ImmutableList.of(
+            new DirectBigQueryInputSplit("stream1", "schema", 14),
+            new DirectBigQueryInputSplit("stream2", "schema", 14));
 
     when(bqClient.createReadSession(any(CreateReadSessionRequest.class))).thenReturn(session);
     try {
@@ -152,8 +156,8 @@ public class DirectBigQueryInputFormatTest {
 
   @Test
   public void createRecordReader() {
-    assertThat(input.createRecordReader(
-        new DirectBigQueryInputSplit("foo", "schema", 7), taskContext))
+    assertThat(
+            input.createRecordReader(new DirectBigQueryInputSplit("foo", "schema", 7), taskContext))
         .isInstanceOf(DirectBigQueryRecordReader.class);
   }
 

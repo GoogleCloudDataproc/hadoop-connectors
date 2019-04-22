@@ -51,36 +51,37 @@ import org.mockito.MockitoAnnotations;
 public class DirectBigQueryRecordReaderTest {
 
   // Corresponds to a single nullable INTEGER
-  private static final String RAW_SCHEMA = "{\"type\": \"record\", \"name\": \"__root__\", \"fields\": [{\"name\": \"f0_\", \"type\": [\"null\", \"long\"]}]}";
+  private static final String RAW_SCHEMA =
+      "{\"type\": \"record\", \"name\": \"__root__\", \"fields\": [{\"name\": \"f0_\", \"type\":"
+          + " [\"null\", \"long\"]}]}";
   private Schema parsedSchema;
 
-  private static final List<ReadRowsResponse> RESPONSES_123 = ImmutableList.of(
-      ReadRowsResponse.newBuilder()
-          .setAvroRows(AvroRows.newBuilder()
-              .setRowCount(2)
-              .setSerializedBinaryRows(ByteString.copyFrom(new byte[]{2, 2, 2, 4}))) // 1, 2
-          .build(),
-      ReadRowsResponse.newBuilder()
-          .setAvroRows(AvroRows.newBuilder()
-              .setRowCount(1)
-              .setSerializedBinaryRows(ByteString.copyFrom(new byte[]{2, 6}))) // 3
-          .build());
+  private static final List<ReadRowsResponse> RESPONSES_123 =
+      ImmutableList.of(
+          ReadRowsResponse.newBuilder()
+              .setAvroRows(
+                  AvroRows.newBuilder()
+                      .setRowCount(2)
+                      .setSerializedBinaryRows(
+                          ByteString.copyFrom(new byte[] {2, 2, 2, 4}))) // 1, 2
+              .build(),
+          ReadRowsResponse.newBuilder()
+              .setAvroRows(
+                  AvroRows.newBuilder()
+                      .setRowCount(1)
+                      .setSerializedBinaryRows(ByteString.copyFrom(new byte[] {2, 6}))) // 3
+              .build());
 
   private DirectBigQueryInputSplit split = new DirectBigQueryInputSplit("session", RAW_SCHEMA, 5);
   private static final Stream STREAM = Stream.newBuilder().setName("session").build();
 
-  @Mock
-  private BigQueryStorageClient bqClient;
+  @Mock private BigQueryStorageClient bqClient;
   // TODO: investigate google-cloud-java test classes to avoid so many mocks.
-  @Mock
-  private ServerStreamingCallable<ReadRowsRequest, ReadRowsResponse> readRows;
-  @Mock
-  private TaskAttemptContext taskContext;
-  @Mock
-  private ServerStream<ReadRowsResponse> rowsStream;
+  @Mock private ServerStreamingCallable<ReadRowsRequest, ReadRowsResponse> readRows;
+  @Mock private TaskAttemptContext taskContext;
+  @Mock private ServerStream<ReadRowsResponse> rowsStream;
 
   private DirectBigQueryRecordReader reader;
-
 
   @Before
   public void setUp() {
@@ -178,7 +179,6 @@ public class DirectBigQueryRecordReaderTest {
     }
     assertThat(reader.nextKeyValue()).isFalse();
   }
-
 
   class TestDirectBigQueryRecordReader extends DirectBigQueryRecordReader {
 
