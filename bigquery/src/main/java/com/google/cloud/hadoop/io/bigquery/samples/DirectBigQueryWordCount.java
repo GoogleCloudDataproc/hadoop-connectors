@@ -43,8 +43,8 @@ public class DirectBigQueryWordCount {
 
   /** The mapper for our WordCount job. */
   public static class Map extends Mapper<NullWritable, GenericRecord, Text, LongWritable> {
-    private Text word = new Text();
-    private LongWritable count = new LongWritable();
+    private final Text word = new Text();
+    private final LongWritable count = new LongWritable();
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {}
@@ -60,7 +60,7 @@ public class DirectBigQueryWordCount {
 
   /** The reducer for our WordCount job. */
   public static class Reduce extends Reducer<Text, LongWritable, Text, LongWritable> {
-    private LongWritable count = new LongWritable();
+    private final LongWritable count = new LongWritable();
 
     @Override
     public void reduce(Text word, Iterable<LongWritable> counts, Context context)

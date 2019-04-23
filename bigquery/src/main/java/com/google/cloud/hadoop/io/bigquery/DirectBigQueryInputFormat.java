@@ -54,8 +54,8 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 public class DirectBigQueryInputFormat extends InputFormat<NullWritable, GenericRecord> {
 
   private static final String STANDARD_TABLE_TYPE = "TABLE";
-  private static String DIRECT_PARALLELISM_KEY = MRJobConfig.NUM_MAPS;
-  private static int DIRECT_PARALLELISM_DEFAULT = 10;
+  private static final String DIRECT_PARALLELISM_KEY = MRJobConfig.NUM_MAPS;
+  private static final int DIRECT_PARALLELISM_DEFAULT = 10;
 
   @Override
   public List<InputSplit> getSplits(JobContext context) throws IOException {
@@ -72,9 +72,8 @@ public class DirectBigQueryInputFormat extends InputFormat<NullWritable, Generic
             BigQueryConfiguration.SKEW_LIMIT_KEY, BigQueryConfiguration.SKEW_LIMIT_DEFAULT);
     Preconditions.checkArgument(
         skewLimit >= 1.0,
-        String.format(
-            "%s is less than 1; not all records would be read. Exiting",
-            BigQueryConfiguration.SKEW_LIMIT_KEY));
+        "%s is less than 1; not all records would be read. Exiting",
+        BigQueryConfiguration.SKEW_LIMIT_KEY);
     Table table = getTable(configuration, bigQueryHelper);
     ReadSession session = startSession(configuration, table, client);
     long numRows = table.getNumRows().longValue();

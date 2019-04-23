@@ -207,6 +207,7 @@
                 <filter>
                   <artifact>com.google.flogger:flogger-log4j-backend</artifact>
                   <includes>
+                    <!--Avoid cleanup with minimizeJar that breaks Log4j logging-->
                     <include>**</include>
                   </includes>
                 </filter>
