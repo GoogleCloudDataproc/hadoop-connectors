@@ -143,7 +143,7 @@ public class DirectBigQueryRecordReader extends RecordReader<NullWritable, Gener
         return !in.isEnd();
       } catch (IOException e) {
         throw new RuntimeException(
-            "Failed to check for more records:\n" + e.getMessage());
+            "Failed to check for more records", e);
       }
     }
 
@@ -153,7 +153,7 @@ public class DirectBigQueryRecordReader extends RecordReader<NullWritable, Gener
         return reader.read(null, in);
       } catch (IOException e) {
         throw new RuntimeException(
-            "Failed to read more records:\n" + e.getMessage());
+            "Failed to read more records", e);
       }
     }
   }
