@@ -474,10 +474,6 @@
         <plugin>
           <artifactId>maven-surefire-plugin</artifactId>
           <version>2.22.0</version>
-          <!--I get weird test failures without this-->
-          <configuration>
-            <useSystemClassLoader>false</useSystemClassLoader>
-          </configuration>
         </plugin>
         <plugin>
           <artifactId>maven-release-plugin</artifactId>
