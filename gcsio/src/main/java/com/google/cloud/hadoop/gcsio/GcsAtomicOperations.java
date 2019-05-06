@@ -159,6 +159,13 @@ public class GcsAtomicOperations {
         continue;
       }
 
+      // Unlocked all objects - delete lock object
+      if (lockRecords.isEmpty()) {
+        ((GoogleCloudStorageImpl) gcs)
+            .deleteObject(lockInfo.getResourceId(), lockInfo.getMetaGeneration());
+        return true;
+      }
+
       if (lockRecords.size() > MAX_LOCKS_COUNT) {
         logger.atInfo().atMostEvery(5, SECONDS).log(
             "Skipping lock entries update in %s file: too many (%d) locked resources. Re-trying.",

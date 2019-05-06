@@ -17,8 +17,8 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GcsAtomicOperations.LOCK_DIRECTORY;
-import static com.google.cloud.hadoop.gcsio.GcsAtomicOperations.LOCK_FILE;
 import static com.google.cloud.hadoop.gcsio.GcsAtomicOperations.LOCK_PATH;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.deleteRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.updateMetadataRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.uploadRequestString;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -112,8 +112,8 @@ public class CooperativeLockingIntegrationTest {
     assertThat(trackingRequestInitializer.getAllRequestStrings())
         .containsAllOf(
             uploadRequestString(bucketName, LOCK_PATH),
-            updateMetadataRequestString(bucketName, LOCK_PATH, /* metaGenerationId= */ 1),
-            updateMetadataRequestString(bucketName, LOCK_PATH, /* metaGenerationId= */ 2));
+            updateMetadataRequestString(bucketName, LOCK_PATH, /* metaGeneration= */ 1),
+            deleteRequestString(bucketName, LOCK_PATH, /* metaGeneration= */ 2));
 
     assertThat(gcsFs.exists(srcDirUri)).isFalse();
     assertThat(gcsFs.exists(srcDirUri.resolve(fileName))).isFalse();
@@ -126,14 +126,12 @@ public class CooperativeLockingIntegrationTest {
             .map(FileInfo::getPath)
             .collect(toList());
 
-    assertThat(lockFiles).hasSize(3);
-    URI lockFile = matchFile(lockFiles, LOCK_FILE).get();
+    assertThat(lockFiles).hasSize(2);
     URI lockFileUri =
         matchFile(lockFiles, String.format(OPERATION_FILENAME_PATTERN, "rename") + "\\.lock").get();
     URI logFileUri =
         matchFile(lockFiles, String.format(OPERATION_FILENAME_PATTERN, "rename") + "\\.log").get();
 
-    assertThat(gcsfsIHelper.readTextFile(bucketName, lockFile.getPath())).isEmpty();
     assertThat(gcsfsIHelper.readTextFile(bucketName, lockFileUri.getPath()))
         .matches("^[0-9]+\n" + srcDirUri + "\n" + dstDirUri + "\n" + "true\n$");
     assertThat(gcsfsIHelper.readTextFile(bucketName, logFileUri.getPath()))
@@ -160,8 +158,8 @@ public class CooperativeLockingIntegrationTest {
     assertThat(trackingRequestInitializer.getAllRequestStrings())
         .containsAllOf(
             uploadRequestString(bucketName, LOCK_PATH),
-            updateMetadataRequestString(bucketName, LOCK_PATH, /* metaGenerationId= */ 1),
-            updateMetadataRequestString(bucketName, LOCK_PATH, /* metaGenerationId= */ 2));
+            updateMetadataRequestString(bucketName, LOCK_PATH, /* metaGeneration= */ 1),
+            deleteRequestString(bucketName, LOCK_PATH, /* metaGeneration= */ 2));
 
     assertThat(gcsFs.exists(dirUri)).isFalse();
     assertThat(gcsFs.exists(dirUri.resolve(fileName))).isFalse();
@@ -172,12 +170,9 @@ public class CooperativeLockingIntegrationTest {
             .map(FileInfo::getPath)
             .collect(toList());
 
-    assertThat(lockFiles).hasSize(3);
-    URI lockFile = matchFile(lockFiles, LOCK_FILE).get();
+    assertThat(lockFiles).hasSize(2);
     URI lockFileUri =
         matchFile(lockFiles, String.format(OPERATION_FILENAME_PATTERN, "delete") + "\\.lock").get();
-
-    assertThat(gcsfsIHelper.readTextFile(bucketName, lockFile.getPath())).isEmpty();
     assertThat(gcsfsIHelper.readTextFile(bucketName, lockFileUri.getPath()))
         .matches("^[0-9]+\n" + dirUri + "\n$");
   }

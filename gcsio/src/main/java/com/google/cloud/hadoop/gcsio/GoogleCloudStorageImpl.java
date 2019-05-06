@@ -667,6 +667,14 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
   }
 
+  void deleteObject(StorageResourceId resourceId, long metaGeneration) throws IOException {
+    String bucketName = resourceId.getBucketName();
+    Storage.Objects.Delete deleteObject =
+        configureRequest(gcs.objects().delete(bucketName, resourceId.getObjectName()), bucketName)
+            .setIfMetagenerationMatch(metaGeneration);
+    deleteObject.execute();
+  }
+
   /** See {@link GoogleCloudStorage#deleteObjects(List)} for details about expected behavior. */
   @Override
   public void deleteObjects(List<StorageResourceId> fullObjectNames) throws IOException {
@@ -2009,7 +2017,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     return compositeInfo;
   }
 
-  private <RequestT extends StorageRequest<?>> RequestT configureRequest(
+  <RequestT extends StorageRequest<?>> RequestT configureRequest(
       RequestT request, String bucketName) {
     setRequesterPaysProject(request, bucketName);
     return request;
