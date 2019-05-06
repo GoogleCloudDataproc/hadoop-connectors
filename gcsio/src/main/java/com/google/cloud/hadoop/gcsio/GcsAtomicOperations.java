@@ -52,7 +52,8 @@ public class GcsAtomicOperations {
   public static final String LOCK_DIRECTORY = "_lock/";
 
   private static final Gson GSON = new Gson();
-  private static final String LOCK_PATH = LOCK_DIRECTORY + "all.lock";
+  static final String LOCK_FILE = "all.lock";
+  static final String LOCK_PATH = LOCK_DIRECTORY + LOCK_FILE;
   private static final String LOCK_METADATA_KEY = "lock";
   private static final int MAX_LOCKS_COUNT = 20;
 
