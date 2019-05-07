@@ -148,7 +148,7 @@ public class CooperativeLockingIntegrationTest {
     String bucketName = gcsfsIHelper.createUniqueBucket("cooperative-delete");
     URI bucketUri = new URI("gs://" + bucketName + "/");
     String fileName = "file";
-    URI dirUri = bucketUri.resolve("rename_" + UUID.randomUUID() + "/");
+    URI dirUri = bucketUri.resolve("delete_" + UUID.randomUUID() + "/");
 
     // create file to rename
     gcsfsIHelper.writeTextFile(bucketName, dirUri.resolve(fileName).getPath(), "file_content");

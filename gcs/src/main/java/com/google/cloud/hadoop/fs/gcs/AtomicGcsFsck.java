@@ -7,6 +7,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static java.time.temporal.ChronoUnit.SECONDS;
 
 import com.google.cloud.hadoop.gcsio.GcsAtomicOperations;
+import com.google.cloud.hadoop.gcsio.GcsAtomicOperations.Operation;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
@@ -14,11 +15,10 @@ import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Instant;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -58,16 +58,15 @@ public class AtomicGcsFsck {
 
     Instant operationExpirationTime = Instant.now();
 
-    Map<String, Collection<String>> lockedOperations =
-        gcsAtomic.getLockedOperations(bucketUri.getAuthority());
+    Set<Operation> lockedOperations = gcsAtomic.getLockedOperations(bucketUri.getAuthority());
     if (lockedOperations.isEmpty()) {
       logger.atInfo().log("No expired operation locks");
       return;
     }
 
     Map<FileStatus, String[]> expiredOperations = new HashMap<>();
-    for (Map.Entry<String, Collection<String>> lockedOperation : lockedOperations.entrySet()) {
-      String operationId = lockedOperation.getKey();
+    for (Operation lockedOperation : lockedOperations) {
+      String operationId = lockedOperation.getOperationId();
       URI operationPattern =
           bucketUri.resolve(
               "/" + GcsAtomicOperations.LOCK_DIRECTORY + "*" + operationId + "*.lock");
@@ -81,15 +80,14 @@ public class AtomicGcsFsck {
       if (operationStatuses.length == 0) {
         logger.atInfo().log(
             "Operation %s for %s resources doesn't have lock file, unlocking",
-            lockedOperation.getKey(), lockedOperation.getValue());
+            lockedOperation.getOperationId(), lockedOperation.getResources());
         StorageResourceId[] lockedResources =
-            lockedOperation.getValue().stream()
+            lockedOperation.getResources().stream()
                 .map(r -> StorageResourceId.fromObjectName(bucketUri.resolve("/" + r).toString()))
-                .collect(Collectors.toList())
-                .toArray(new StorageResourceId[0]);
+                .toArray(StorageResourceId[]::new);
         do {
           try {
-            if (gcsAtomic.unlockPaths(lockedOperation.getKey(), lockedResources)) {
+            if (gcsAtomic.unlockPaths(lockedOperation.getOperationId(), lockedResources)) {
               break;
             }
           } catch (Exception e) {

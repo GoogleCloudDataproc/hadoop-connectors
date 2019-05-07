@@ -28,22 +28,22 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import com.google.api.client.util.ExponentialBackOff;
+import com.google.common.base.MoreObjects;
+import com.google.common.base.MoreObjects.ToStringHelper;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.MultimapBuilder;
-import com.google.common.collect.Multimaps;
 import com.google.common.flogger.GoogleLogger;
 import com.google.gson.Gson;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.IntStream;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 public class GcsAtomicOperations {
 
@@ -52,38 +52,30 @@ public class GcsAtomicOperations {
   public static final String LOCK_DIRECTORY = "_lock/";
 
   private static final Gson GSON = new Gson();
+
   static final String LOCK_FILE = "all.lock";
   static final String LOCK_PATH = LOCK_DIRECTORY + LOCK_FILE;
+
   private static final String LOCK_METADATA_KEY = "lock";
   private static final int MAX_LOCKS_COUNT = 20;
 
-  // lock record mapping
-  private static final int OPERATION_ID_INDEX = 0;
-  private static final int LOCKED_PATH_INDEX = 1;
-
-  private final GoogleCloudStorage gcs;
+  private final GoogleCloudStorageImpl gcs;
 
   public GcsAtomicOperations(GoogleCloudStorage gcs) {
-    this.gcs = gcs;
+    this.gcs = (GoogleCloudStorageImpl) gcs;
   }
 
-  public Map<String, Collection<String>> getLockedOperations(String bucketName) throws IOException {
+  public Set<Operation> getLockedOperations(String bucketName) throws IOException {
     long startMs = System.currentTimeMillis();
     logger.atFine().log("getLockedOperations(%s)", bucketName);
     StorageResourceId lockId = getLockId(bucketName);
     GoogleCloudStorageItemInfo lockInfo = gcs.getItemInfo(lockId);
-    Map<String, Collection<String>> operations =
+    Set<Operation> operations =
         !lockInfo.exists()
                 || lockInfo.getMetaGeneration() == 0
                 || lockInfo.getMetadata().get(LOCK_METADATA_KEY) == null
-            ? new HashMap<>()
-            : getLockRecords(lockInfo).stream()
-                .collect(
-                    Multimaps.toMultimap(
-                        r -> r[OPERATION_ID_INDEX],
-                        r -> r[LOCKED_PATH_INDEX],
-                        MultimapBuilder.hashKeys().arrayListValues()::build))
-                .asMap();
+            ? new HashSet<>()
+            : getLockRecords(lockInfo).getOperations();
     logger.atFine().log(
         "[%dms] lockPaths(%s): %s", System.currentTimeMillis() - startMs, bucketName, operations);
     return operations;
@@ -117,7 +109,7 @@ public class GcsAtomicOperations {
   }
 
   private boolean modifyLock(
-      LockRecordsModificationFunction<Boolean, List<String[]>, String, Set<String>> modificationFn,
+      LockRecordsModificationFunction<Boolean, OperationLocks, String, Set<String>> modificationFn,
       String operationId,
       StorageResourceId... resources)
       throws IOException {
@@ -149,9 +141,9 @@ public class GcsAtomicOperations {
         gcs.createEmptyObject(lockId, new CreateObjectOptions(false));
         lockInfo = gcs.getItemInfo(lockId);
       }
-      List<String[]> lockRecords =
+      OperationLocks lockRecords =
           lockInfo.getMetaGeneration() == 0 || lockInfo.getMetadata().get(LOCK_METADATA_KEY) == null
-              ? new ArrayList<>()
+              ? new OperationLocks()
               : getLockRecords(lockInfo);
 
       if (!modificationFn.apply(lockRecords, operationId, objects)) {
@@ -160,26 +152,25 @@ public class GcsAtomicOperations {
       }
 
       // Unlocked all objects - delete lock object
-      if (lockRecords.isEmpty()) {
-        ((GoogleCloudStorageImpl) gcs)
-            .deleteObject(lockInfo.getResourceId(), lockInfo.getMetaGeneration());
+      if (lockRecords.getOperations().isEmpty()) {
+        gcs.deleteObject(lockInfo.getResourceId(), lockInfo.getMetaGeneration());
         return true;
       }
 
-      if (lockRecords.size() > MAX_LOCKS_COUNT) {
+      if (lockRecords.getOperations().size() > MAX_LOCKS_COUNT) {
         logger.atInfo().atMostEvery(5, SECONDS).log(
             "Skipping lock entries update in %s file: too many (%d) locked resources. Re-trying.",
-            lockRecords.size(), lockId);
+            lockRecords.getOperations().size(), lockId);
         sleepUninterruptibly(backOff.nextBackOffMillis(), MILLISECONDS);
         continue;
       }
 
-      String lockContent = GSON.toJson(lockRecords.toArray(new String[0][0]), String[][].class);
+      String lockContent = GSON.toJson(lockRecords, OperationLocks.class);
       Map<String, byte[]> metadata = new HashMap<>(lockInfo.getMetadata());
       metadata.put(LOCK_METADATA_KEY, lockContent.getBytes(UTF_8));
 
       try {
-        ((GoogleCloudStorageImpl) gcs).updateMetadata(lockInfo, metadata);
+        gcs.updateMetadata(lockInfo, metadata);
       } catch (IOException e) {
         // continue after sleep if update failed due to file generation mismatch
         if (e.getMessage().contains("conditionNotMet")) {
@@ -206,23 +197,28 @@ public class GcsAtomicOperations {
     return StorageResourceId.fromObjectName(lockObject);
   }
 
-  private List<String[]> getLockRecords(GoogleCloudStorageItemInfo lockInfo) throws IOException {
+  private OperationLocks getLockRecords(GoogleCloudStorageItemInfo lockInfo) throws IOException {
     String lockContent = new String(lockInfo.getMetadata().get(LOCK_METADATA_KEY), UTF_8);
-    String[][] jsonArray = GSON.fromJson(lockContent, String[][].class);
-    return new ArrayList<>(Arrays.asList(jsonArray));
+    OperationLocks lockRecords = GSON.fromJson(lockContent, OperationLocks.class);
+    checkState(
+        lockRecords.getFormatVersion() == OperationLocks.FORMAT_VERSION,
+        "Unsupported metadata format: expected %d, but was %d",
+        lockRecords.getFormatVersion(),
+        OperationLocks.FORMAT_VERSION);
+    return lockRecords;
   }
 
   private boolean addLockRecords(
-      List<String[]> lockRecords, String operationId, Set<String> objectsToAdd) {
+      OperationLocks lockRecords, String operationId, Set<String> resourcesToAdd) {
     // TODO: optimize to match more efficiently
-    if (lockRecords.stream()
+    if (lockRecords.getOperations().stream()
+        .flatMap(operation -> operation.getResources().stream())
         .anyMatch(
-            r -> {
-              String lockedObject = r[LOCKED_PATH_INDEX];
-              for (String objectToAdd : objectsToAdd) {
-                if (objectToAdd.equals(lockedObject)
-                    || isChildObject(lockedObject, objectToAdd)
-                    || isChildObject(objectToAdd, lockedObject)) {
+            resource -> {
+              for (String resourceToAdd : resourcesToAdd) {
+                if (resourceToAdd.equals(resource)
+                    || isChildObject(resource, resourceToAdd)
+                    || isChildObject(resourceToAdd, resource)) {
                   return true;
                 }
               }
@@ -231,12 +227,14 @@ public class GcsAtomicOperations {
       return false;
     }
 
-    String lockTime = Instant.now().toString();
-    for (String object : objectsToAdd) {
-      lockRecords.add(new String[] {operationId, object, lockTime});
-    }
-
-    lockRecords.sort(Comparator.comparing(r -> r[OPERATION_ID_INDEX]));
+    long lockEpochMillis = Instant.now().toEpochMilli();
+    lockRecords
+        .getOperations()
+        .add(
+            new Operation()
+                .setOperationId(operationId)
+                .setResources(resourcesToAdd)
+                .setLockEpochMillis(lockEpochMillis));
 
     return true;
   }
@@ -246,33 +244,108 @@ public class GcsAtomicOperations {
   }
 
   private boolean removeLockRecords(
-      List<String[]> lockRecords, String operationId, Set<String> objectsToRemove) {
-    int[] indexesToRemove =
-        IntStream.range(0, lockRecords.size())
-            .filter(i -> objectsToRemove.contains(lockRecords.get(i)[LOCKED_PATH_INDEX]))
-            .peek(
-                i ->
-                    checkState(
-                        operationId.equals(lockRecords.get(i)[OPERATION_ID_INDEX]),
-                        "record %s should be locked by client %s",
-                        Arrays.asList(lockRecords.get(i)),
-                        operationId))
-            .toArray();
+      OperationLocks lockRecords, String operationId, Set<String> resourcesToRemove) {
+    List<Operation> operationLocksToRemove =
+        lockRecords.getOperations().stream()
+            .filter(o -> o.getResources().stream().anyMatch(resourcesToRemove::contains))
+            .collect(Collectors.toList());
     checkState(
-        indexesToRemove.length == objectsToRemove.size(),
-        "%s objects should be locked, but was %s",
-        objectsToRemove.size(),
-        indexesToRemove.length);
-
-    for (int i = indexesToRemove.length - 1; i >= 0; i--) {
-      lockRecords.remove(indexesToRemove[i]);
-    }
-
+        operationLocksToRemove.size() == 1
+            && operationLocksToRemove.get(0).getOperationId().equals(operationId),
+        "All resources %s should belong to %s operation, but was %s",
+        resourcesToRemove.size(),
+        operationLocksToRemove.size());
+    Operation operationToRemove = operationLocksToRemove.get(0);
+    checkState(
+        operationToRemove.getResources().equals(resourcesToRemove),
+        "All of %s resources should be locked by operation, but was locked only %s resources",
+        resourcesToRemove,
+        operationToRemove.getResources());
+    checkState(
+        lockRecords.getOperations().remove(operationToRemove),
+        "operation %s was not removed",
+        operationToRemove);
     return true;
   }
 
   @FunctionalInterface
   private interface LockRecordsModificationFunction<T, T1, T2, T3> {
     T apply(T1 p1, T2 p2, T3 p3);
+  }
+
+  public static class OperationLocks {
+    public static final long FORMAT_VERSION = 1L;
+
+    private long formatVersion = FORMAT_VERSION;
+    private Set<Operation> operations =
+        new TreeSet<>(Comparator.comparing(Operation::getOperationId));
+
+    public long getFormatVersion() {
+      return formatVersion;
+    }
+
+    public void setFormatVersion(long formatVersion) {
+      this.formatVersion = formatVersion;
+    }
+
+    public Set<Operation> getOperations() {
+      return operations;
+    }
+
+    public OperationLocks setOperations(Set<Operation> operations) {
+      this.operations = new TreeSet<>(Comparator.comparing(Operation::getOperationId));
+      this.operations.addAll(operations);
+      return this;
+    }
+
+    @Override
+    public String toString() {
+      return MoreObjects.toStringHelper(this)
+          .add("formatVersion", formatVersion)
+          .add("operations", operations)
+          .toString();
+    }
+  }
+
+  public static class Operation {
+    private String operationId;
+    private long lockEpochMillis;
+    private Set<String> resources = new TreeSet<>();
+
+    public String getOperationId() {
+      return operationId;
+    }
+
+    public Operation setOperationId(String operationId) {
+      this.operationId = operationId;
+      return this;
+    }
+
+    public long getLockEpochMillis() {
+      return lockEpochMillis;
+    }
+
+    public Operation setLockEpochMillis(long lockEpochMillis) {
+      this.lockEpochMillis = lockEpochMillis;
+      return this;
+    }
+
+    public Set<String> getResources() {
+      return resources;
+    }
+
+    public Operation setResources(Set<String> resources) {
+      this.resources = new TreeSet<>(resources);
+      return this;
+    }
+
+    @Override
+    public String toString() {
+      return MoreObjects.toStringHelper(this)
+          .add("operationId", operationId)
+          .add("lockEpochMillis", lockEpochMillis)
+          .add("resources", resources)
+          .toString();
+    }
   }
 }
