@@ -85,17 +85,7 @@ public class AtomicGcsFsck {
             lockedOperation.getResources().stream()
                 .map(r -> StorageResourceId.fromObjectName(bucketUri.resolve("/" + r).toString()))
                 .toArray(StorageResourceId[]::new);
-        do {
-          try {
-            if (gcsAtomic.unlockPaths(lockedOperation.getOperationId(), lockedResources)) {
-              break;
-            }
-          } catch (Exception e) {
-            logger.atWarning().withCause(e).log(
-                "Failed to unlock (operation=%s, resources=%s), retrying.",
-                operationId, lockedResources);
-          }
-        } while (true);
+        gcsAtomic.unlockPaths(lockedOperation.getOperationId(), lockedResources);
         continue;
       }
 
@@ -126,18 +116,8 @@ public class AtomicGcsFsck {
             if (operation.getPath().toString().contains("_delete_")) {
               logger.atInfo().log("Repairing FS after %s delete operation.", operation.getPath());
               ghFs.delete(new Path(operationContent[1]), /* recursive= */ true);
-              do {
-                try {
-                  if (gcsAtomic.unlockPaths(
-                      operationId, StorageResourceId.fromObjectName(operationContent[1]))) {
-                    break;
-                  }
-                } catch (Exception e) {
-                  logger.atWarning().withCause(e).log(
-                      "Failed to unlock (client=%s, res=%s), retrying.",
-                      operationId, operationContent[1]);
-                }
-              } while (true);
+              gcsAtomic.unlockPaths(
+                  operationId, StorageResourceId.fromObjectName(operationContent[1]));
             } else if (operation.getPath().toString().contains("_rename_")) {
               boolean copySucceeded = Boolean.valueOf(operationContent[3]);
               if (copySucceeded) {
@@ -156,20 +136,10 @@ public class AtomicGcsFsck {
                 ghFs.delete(new Path(operationContent[2]), /* recursive= */ true);
                 ghFs.rename(new Path(operationContent[1]), new Path(operationContent[2]));
               }
-              do {
-                try {
-                  if (gcsAtomic.unlockPaths(
-                      operationId,
-                      StorageResourceId.fromObjectName(operationContent[1]),
-                      StorageResourceId.fromObjectName(operationContent[2]))) {
-                    break;
-                  }
-                } catch (Exception e) {
-                  logger.atWarning().withCause(e).log(
-                      "Failed to unlock (client=%s, src=%s, dst=%s), retrying.",
-                      operationId, operationContent[1], operationContent[2]);
-                }
-              } while (true);
+              gcsAtomic.unlockPaths(
+                  operationId,
+                  StorageResourceId.fromObjectName(operationContent[1]),
+                  StorageResourceId.fromObjectName(operationContent[2]));
             } else {
               throw new IllegalStateException("Unknown operation type: " + operation.getPath());
             }

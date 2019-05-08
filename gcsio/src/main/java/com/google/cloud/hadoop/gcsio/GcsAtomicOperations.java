@@ -29,7 +29,6 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.common.base.MoreObjects;
-import com.google.common.base.MoreObjects.ToStringHelper;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import com.google.gson.Gson;
@@ -81,42 +80,33 @@ public class GcsAtomicOperations {
     return operations;
   }
 
-  public boolean lockPaths(String operationId, StorageResourceId... resources) throws IOException {
+  public void lockPaths(String operationId, StorageResourceId... resources) throws IOException {
     long startMs = System.currentTimeMillis();
     logger.atFine().log("lockPaths(%s, %s)", operationId, lazy(() -> Arrays.toString(resources)));
-    boolean result = modifyLock(this::addLockRecords, operationId, resources);
+    modifyLock(this::addLockRecords, operationId, resources);
     logger.atFine().log(
-        "[%dms] lockPaths(%s, %s): %s",
-        System.currentTimeMillis() - startMs,
-        operationId,
-        lazy(() -> Arrays.toString(resources)),
-        result);
-    return result;
+        "[%dms] lockPaths(%s, %s)",
+        System.currentTimeMillis() - startMs, operationId, lazy(() -> Arrays.toString(resources)));
   }
 
-  public boolean unlockPaths(String operationId, StorageResourceId... resources)
-      throws IOException {
+  public void unlockPaths(String operationId, StorageResourceId... resources) throws IOException {
     long startMs = System.currentTimeMillis();
     logger.atFine().log("unlockPaths(%s, %s)", operationId, lazy(() -> Arrays.toString(resources)));
-    boolean result = modifyLock(this::removeLockRecords, operationId, resources);
+    modifyLock(this::removeLockRecords, operationId, resources);
     logger.atFine().log(
-        "[%dms] unlockPaths(%s, %s): %s",
-        System.currentTimeMillis() - startMs,
-        operationId,
-        lazy(() -> Arrays.toString(resources)),
-        result);
-    return result;
+        "[%dms] unlockPaths(%s, %s)",
+        System.currentTimeMillis() - startMs, operationId, lazy(() -> Arrays.toString(resources)));
   }
 
-  private boolean modifyLock(
+  private void modifyLock(
       LockRecordsModificationFunction<Boolean, OperationLocks, String, Set<String>> modificationFn,
       String operationId,
       StorageResourceId... resources)
       throws IOException {
     long startMs = System.currentTimeMillis();
 
-    checkNotNull(resources, "resourcesArray should not be null");
-    checkArgument(resources.length > 0, "resourcesArray should not be empty");
+    checkNotNull(resources, "resources should not be null");
+    checkArgument(resources.length > 0, "resources should not be empty");
     String bucketName = resources[0].getBucketName();
     checkState(
         Arrays.stream(resources).allMatch(r -> r.getBucketName().equals(bucketName)),
@@ -136,59 +126,63 @@ public class GcsAtomicOperations {
             .build();
 
     do {
-      GoogleCloudStorageItemInfo lockInfo = gcs.getItemInfo(lockId);
-      if (!lockInfo.exists()) {
-        gcs.createEmptyObject(lockId, new CreateObjectOptions(false));
-        lockInfo = gcs.getItemInfo(lockId);
-      }
-      OperationLocks lockRecords =
-          lockInfo.getMetaGeneration() == 0 || lockInfo.getMetadata().get(LOCK_METADATA_KEY) == null
-              ? new OperationLocks()
-              : getLockRecords(lockInfo);
-
-      if (!modificationFn.apply(lockRecords, operationId, objects)) {
-        sleepUninterruptibly(backOff.nextBackOffMillis(), MILLISECONDS);
-        continue;
-      }
-
-      // Unlocked all objects - delete lock object
-      if (lockRecords.getOperations().isEmpty()) {
-        gcs.deleteObject(lockInfo.getResourceId(), lockInfo.getMetaGeneration());
-        return true;
-      }
-
-      if (lockRecords.getOperations().size() > MAX_LOCKS_COUNT) {
-        logger.atInfo().atMostEvery(5, SECONDS).log(
-            "Skipping lock entries update in %s file: too many (%d) locked resources. Re-trying.",
-            lockRecords.getOperations().size(), lockId);
-        sleepUninterruptibly(backOff.nextBackOffMillis(), MILLISECONDS);
-        continue;
-      }
-
-      String lockContent = GSON.toJson(lockRecords, OperationLocks.class);
-      Map<String, byte[]> metadata = new HashMap<>(lockInfo.getMetadata());
-      metadata.put(LOCK_METADATA_KEY, lockContent.getBytes(UTF_8));
-
       try {
-        gcs.updateMetadata(lockInfo, metadata);
-      } catch (IOException e) {
-        // continue after sleep if update failed due to file generation mismatch
-        if (e.getMessage().contains("conditionNotMet")) {
-          logger.atInfo().atMostEvery(5, SECONDS).log(
-              "Failed to update entries in %s file. Re-trying.", lockId);
+        GoogleCloudStorageItemInfo lockInfo = gcs.getItemInfo(lockId);
+        if (!lockInfo.exists()) {
+          gcs.createEmptyObject(lockId, new CreateObjectOptions(false));
+          lockInfo = gcs.getItemInfo(lockId);
+        }
+        OperationLocks lockRecords =
+            lockInfo.getMetaGeneration() == 0
+                    || lockInfo.getMetadata().get(LOCK_METADATA_KEY) == null
+                ? new OperationLocks()
+                : getLockRecords(lockInfo);
+
+        if (!modificationFn.apply(lockRecords, operationId, objects)) {
           sleepUninterruptibly(backOff.nextBackOffMillis(), MILLISECONDS);
           continue;
         }
 
-        throw e;
-      }
+        // Unlocked all objects - delete lock object
+        if (lockRecords.getOperations().isEmpty()) {
+          gcs.deleteObject(lockInfo.getResourceId(), lockInfo.getMetaGeneration());
+          break;
+        }
 
-      logger.atFine().log(
-          "updated lock file in %dms for %s client and %s resources",
-          System.currentTimeMillis() - startMs,
-          operationId,
-          lazy(() -> Arrays.toString(resources)));
-      return true;
+        if (lockRecords.getOperations().size() > MAX_LOCKS_COUNT) {
+          logger.atInfo().atMostEvery(5, SECONDS).log(
+              "Skipping lock entries update in %s file: too many (%d) locked resources. Re-trying.",
+              lockRecords.getOperations().size(), lockId);
+          sleepUninterruptibly(backOff.nextBackOffMillis(), MILLISECONDS);
+          continue;
+        }
+
+        String lockContent = GSON.toJson(lockRecords, OperationLocks.class);
+        Map<String, byte[]> metadata = new HashMap<>(lockInfo.getMetadata());
+        metadata.put(LOCK_METADATA_KEY, lockContent.getBytes(UTF_8));
+
+        gcs.updateMetadata(lockInfo, metadata);
+
+        logger.atFine().log(
+            "updated lock file in %dms for %s client and %s resources",
+            System.currentTimeMillis() - startMs,
+            operationId,
+            lazy(() -> Arrays.toString(resources)));
+        break;
+      } catch (IOException e) {
+        // continue after sleep if update failed due to file generation mismatch or other
+        // IOException
+        if (e.getMessage().contains("conditionNotMet")) {
+          logger.atInfo().atMostEvery(5, SECONDS).log(
+              "Failed to update entries (conditionNotMet) in %s file for operation %s. Re-trying.",
+              lockId, operationId);
+        } else {
+          logger.atWarning().withCause(e).log(
+              "Failed to modify lock for %s operation on %s resources, retrying.",
+              operationId, Arrays.toString(resources));
+        }
+        sleepUninterruptibly(backOff.nextBackOffMillis(), MILLISECONDS);
+      }
     } while (true);
   }
 

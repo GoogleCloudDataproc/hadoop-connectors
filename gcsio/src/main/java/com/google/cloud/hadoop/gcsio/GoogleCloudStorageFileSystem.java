@@ -439,63 +439,47 @@ public class GoogleCloudStorageFileSystem {
     if (options.enableCooperativeLocking() && fileInfo.isDirectory()) {
       String operationId = UUID.randomUUID().toString();
       StorageResourceId resourceId = pathCodec.validatePathAndGetId(fileInfo.getPath(), true);
-      do {
+
+      gcsAtomic.lockPaths(operationId, resourceId);
+      Future<?> lockUpdateFuture = Futures.immediateCancelledFuture();
+      try {
+        Instant operationInstant = Instant.now();
+        List<String> lockRecords =
+            ImmutableList.of(
+                String.valueOf(operationInstant.getEpochSecond()), resourceId.toString());
+        URI operationLockPath =
+            writeOperationFile(
+                path.getAuthority(),
+                OPERATION_LOCK_FILE_FORMAT,
+                CREATE_FILE_OPTIONS,
+                "delete",
+                operationId,
+                operationInstant,
+                lockRecords);
+        List<String> logRecords =
+            Streams.concat(itemsToDelete.stream(), bucketsToDelete.stream())
+                .map(i -> i.getItemInfo().getResourceId().toString())
+                .collect(toImmutableList());
+        writeOperationFile(
+            path.getAuthority(),
+            OPERATION_LOG_FILE_FORMAT,
+            CREATE_FILE_OPTIONS,
+            "delete",
+            operationId,
+            operationInstant,
+            logRecords);
+        // Schedule lock expiration update
+        lockUpdateFuture =
+            scheduleLockUpdate(() -> renewLockOrExit(operationId, operationLockPath));
+
+        deleteInternal(itemsToDelete, bucketsToDelete);
+      } finally {
         try {
-          if (gcsAtomic.lockPaths(operationId, resourceId)) {
-            break;
-          }
-          logger.atInfo().atMostEvery(30, TimeUnit.SECONDS).log(
-              "Failed to acquire lock to delete %s. Re-trying after sleep.", resourceId);
-          sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
-        } catch (Exception e) {
-          logger.atWarning().withCause(e).log(
-              "Failed to lock (operation=%s, res=%s), retrying.", operationId, resourceId);
+          gcsAtomic.unlockPaths(operationId, resourceId);
+        } finally {
+          lockUpdateFuture.cancel(/* mayInterruptIfRunning= */ false);
         }
-      } while (true);
-
-      Instant operationInstant = Instant.now();
-      List<String> lockRecords =
-          ImmutableList.of(
-              String.valueOf(operationInstant.getEpochSecond()), resourceId.toString());
-      URI operationLockPath =
-          writeOperationFile(
-              path.getAuthority(),
-              OPERATION_LOCK_FILE_FORMAT,
-              CREATE_FILE_OPTIONS,
-              "delete",
-              operationId,
-              operationInstant,
-              lockRecords);
-      List<String> logRecords =
-          Streams.concat(itemsToDelete.stream(), bucketsToDelete.stream())
-              .map(i -> i.getItemInfo().getResourceId().toString())
-              .collect(toImmutableList());
-      writeOperationFile(
-          path.getAuthority(),
-          OPERATION_LOG_FILE_FORMAT,
-          CREATE_FILE_OPTIONS,
-          "delete",
-          operationId,
-          operationInstant,
-          logRecords);
-      // Schedule lock expiration update
-      Future<?> lockUpdateFuture =
-          scheduleLockUpdate(() -> renewLockOrExit(operationId, operationLockPath));
-
-      deleteInternal(itemsToDelete, bucketsToDelete);
-
-      do {
-        try {
-          if (gcsAtomic.unlockPaths(operationId, resourceId)) {
-            break;
-          }
-        } catch (Exception e) {
-          logger.atWarning().withCause(e).log(
-              "Failed to unlock (client=%s, res=%s), retrying.", operationId, resourceId);
-        }
-      } while (true);
-
-      lockUpdateFuture.cancel(/* mayInterruptIfRunning= */ false);
+      }
     } else {
       deleteInternal(itemsToDelete, bucketsToDelete);
     }
@@ -850,35 +834,11 @@ public class GoogleCloudStorageFileSystem {
       String operationId = UUID.randomUUID().toString();
       StorageResourceId srcResourceId = pathCodec.validatePathAndGetId(srcInfo.getPath(), true);
       StorageResourceId dstResourceId = pathCodec.validatePathAndGetId(dst, true);
-      do {
-        try {
-          if (gcsAtomic.lockPaths(operationId, srcResourceId, dstResourceId)) {
-            break;
-          }
-          logger.atInfo().atMostEvery(30, TimeUnit.SECONDS).log(
-              "Failed to acquire lock to rename %s to %s. Re-trying after sleep.",
-              srcResourceId, dstResourceId);
-          sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
-        } catch (Exception e) {
-          logger.atWarning().withCause(e).log(
-              "Failed to lock (client=%s, src=%s, dst=%s), retrying.",
-              operationId, srcResourceId, dstResourceId);
-        }
-      } while (true);
+      gcsAtomic.lockPaths(operationId, srcResourceId, dstResourceId);
       try {
         renameDirectoryInternal(srcInfo, dst, operationId);
       } finally {
-        do {
-          try {
-            if (gcsAtomic.unlockPaths(operationId, srcResourceId, dstResourceId)) {
-              break;
-            }
-          } catch (Exception e) {
-            logger.atWarning().withCause(e).log(
-                "Failed to unlock (client=%s, src=%s, dst=%s), retrying.",
-                operationId, srcResourceId, dstResourceId);
-          }
-        } while (true);
+        gcsAtomic.unlockPaths(operationId, srcResourceId, dstResourceId);
       }
     } else if (srcInfo.isDirectory()) {
       renameDirectoryInternal(srcInfo, dst, /* operationId= */ null);
