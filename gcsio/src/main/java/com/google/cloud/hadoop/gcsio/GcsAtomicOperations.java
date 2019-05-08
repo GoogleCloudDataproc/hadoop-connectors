@@ -135,7 +135,7 @@ public class GcsAtomicOperations {
         OperationLocks lockRecords =
             lockInfo.getMetaGeneration() == 0
                     || lockInfo.getMetadata().get(LOCK_METADATA_KEY) == null
-                ? new OperationLocks()
+                ? new OperationLocks().setFormatVersion(OperationLocks.FORMAT_VERSION)
                 : getLockRecords(lockInfo);
 
         if (!modificationFn.apply(lockRecords, operationId, objects)) {
@@ -221,14 +221,14 @@ public class GcsAtomicOperations {
       return false;
     }
 
-    long lockEpochMillis = Instant.now().toEpochMilli();
+    long lockEpochSeconds = Instant.now().getEpochSecond();
     lockRecords
         .getOperations()
         .add(
             new Operation()
                 .setOperationId(operationId)
                 .setResources(resourcesToAdd)
-                .setLockEpochMillis(lockEpochMillis));
+                .setLockEpochSeconds(lockEpochSeconds));
 
     return true;
   }
@@ -268,9 +268,9 @@ public class GcsAtomicOperations {
   }
 
   public static class OperationLocks {
-    public static final long FORMAT_VERSION = 1L;
+    public static final long FORMAT_VERSION = 1;
 
-    private long formatVersion = FORMAT_VERSION;
+    private long formatVersion = -1;
     private Set<Operation> operations =
         new TreeSet<>(Comparator.comparing(Operation::getOperationId));
 
@@ -278,8 +278,9 @@ public class GcsAtomicOperations {
       return formatVersion;
     }
 
-    public void setFormatVersion(long formatVersion) {
+    public OperationLocks setFormatVersion(long formatVersion) {
       this.formatVersion = formatVersion;
+      return this;
     }
 
     public Set<Operation> getOperations() {
@@ -303,7 +304,7 @@ public class GcsAtomicOperations {
 
   public static class Operation {
     private String operationId;
-    private long lockEpochMillis;
+    private long lockEpochSeconds;
     private Set<String> resources = new TreeSet<>();
 
     public String getOperationId() {
@@ -315,12 +316,12 @@ public class GcsAtomicOperations {
       return this;
     }
 
-    public long getLockEpochMillis() {
-      return lockEpochMillis;
+    public long getLockEpochSeconds() {
+      return lockEpochSeconds;
     }
 
-    public Operation setLockEpochMillis(long lockEpochMillis) {
-      this.lockEpochMillis = lockEpochMillis;
+    public Operation setLockEpochSeconds(long lockEpochSeconds) {
+      this.lockEpochSeconds = lockEpochSeconds;
       return this;
     }
 
@@ -337,7 +338,7 @@ public class GcsAtomicOperations {
     public String toString() {
       return MoreObjects.toStringHelper(this)
           .add("operationId", operationId)
-          .add("lockEpochMillis", lockEpochMillis)
+          .add("lockEpochSeconds", lockEpochSeconds)
           .add("resources", resources)
           .toString();
     }
