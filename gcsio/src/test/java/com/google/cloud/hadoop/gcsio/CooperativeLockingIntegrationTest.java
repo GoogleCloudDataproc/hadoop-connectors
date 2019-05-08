@@ -27,9 +27,12 @@ import static java.util.stream.Collectors.toList;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.http.HttpRequestInitializer;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.DeleteOperation;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.RenameOperation;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
+import com.google.gson.Gson;
 import java.io.IOException;
 import java.net.URI;
 import java.util.List;
@@ -44,6 +47,8 @@ import org.junit.runners.JUnit4;
 /** Integration tests for GoogleCloudStorageFileSystem class. */
 @RunWith(JUnit4.class)
 public class CooperativeLockingIntegrationTest {
+
+  private static final Gson GSON = new Gson();
 
   private static final String OPERATION_FILENAME_PATTERN =
       "[0-9]{8}T[0-9]{6}\\.[0-9]{3}Z_%s_[a-z0-9\\-]+";
@@ -132,8 +137,14 @@ public class CooperativeLockingIntegrationTest {
     URI logFileUri =
         matchFile(lockFiles, String.format(OPERATION_FILENAME_PATTERN, "rename") + "\\.log").get();
 
-    assertThat(gcsfsIHelper.readTextFile(bucketName, lockFileUri.getPath()))
-        .matches("^[0-9]+\n" + srcDirUri + "\n" + dstDirUri + "\n" + "true\n$");
+    String lockContent = gcsfsIHelper.readTextFile(bucketName, lockFileUri.getPath());
+    assertThat(GSON.fromJson(lockContent, RenameOperation.class).setLockEpochSeconds(0))
+        .isEqualTo(
+            new RenameOperation()
+                .setLockEpochSeconds(0)
+                .setSrcResource(srcDirUri.toString())
+                .setDstResource(dstDirUri.toString())
+                .setCopySucceeded(true));
     assertThat(gcsfsIHelper.readTextFile(bucketName, logFileUri.getPath()))
         .isEqualTo(srcDirUri.resolve(fileName) + " -> " + dstDirUri.resolve(fileName) + "\n");
   }
@@ -173,8 +184,9 @@ public class CooperativeLockingIntegrationTest {
     assertThat(lockFiles).hasSize(2);
     URI lockFileUri =
         matchFile(lockFiles, String.format(OPERATION_FILENAME_PATTERN, "delete") + "\\.lock").get();
-    assertThat(gcsfsIHelper.readTextFile(bucketName, lockFileUri.getPath()))
-        .matches("^[0-9]+\n" + dirUri + "\n$");
+    String lockContent = gcsfsIHelper.readTextFile(bucketName, lockFileUri.getPath());
+    assertThat(GSON.fromJson(lockContent, DeleteOperation.class).setLockEpochSeconds(0))
+        .isEqualTo(new DeleteOperation().setLockEpochSeconds(0).setResource(dirUri.toString()));
   }
 
   private Optional<URI> matchFile(List<URI> files, String pattern) {

@@ -10,8 +10,11 @@ import com.google.cloud.hadoop.gcsio.GcsAtomicOperations;
 import com.google.cloud.hadoop.gcsio.GcsAtomicOperations.Operation;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.DeleteOperation;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.RenameOperation;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.common.flogger.GoogleLogger;
+import com.google.gson.Gson;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Instant;
@@ -41,6 +44,8 @@ public class AtomicGcsFsck {
 
   private static final int LOCK_EXPIRATION_SECONDS = 120;
 
+  private static final Gson GSON = new Gson();
+
   public static void main(String[] args) throws Exception {
     String bucket = args[0];
     checkArgument(bucket.startsWith("gs://"), "bucket parameter should have 'gs://' scheme");
@@ -64,7 +69,7 @@ public class AtomicGcsFsck {
       return;
     }
 
-    Map<FileStatus, String[]> expiredOperations = new HashMap<>();
+    Map<FileStatus, String> expiredOperations = new HashMap<>();
     for (Operation lockedOperation : lockedOperations) {
       String operationId = lockedOperation.getOperationId();
       URI operationPattern =
@@ -90,56 +95,61 @@ public class AtomicGcsFsck {
       }
 
       FileStatus operation = operationStatuses[0];
-      String[] content;
+      String operationContent;
       try (FSDataInputStream in = ghFs.open(operation.getPath())) {
-        content = IOUtils.toString(in).split("\\n");
+        operationContent = IOUtils.toString(in);
       }
 
-      Instant operationLockEpoch = Instant.ofEpochSecond(Long.parseLong(content[0]));
+      Instant operationLockEpoch = getOperationLockEpoch(operation, operationContent);
       if (operationLockEpoch
           .plus(LOCK_EXPIRATION_SECONDS, SECONDS)
           .isBefore(operationExpirationTime)) {
-        expiredOperations.put(operation, content);
+        expiredOperations.put(operation, operationContent);
         logger.atInfo().log("Operation %s expired.", operation.getPath());
       } else {
         logger.atInfo().log("Operation %s not expired.", operation.getPath());
       }
     }
 
-    Function<Map.Entry<FileStatus, String[]>, Boolean> operationRecovery =
+    Function<Map.Entry<FileStatus, String>, Boolean> operationRecovery =
         expiredOperation -> {
           FileStatus operation = expiredOperation.getKey();
-          String[] operationContent = expiredOperation.getValue();
+          String operationContent = expiredOperation.getValue();
 
           String operationId = getOperationId(operation);
           try {
             if (operation.getPath().toString().contains("_delete_")) {
               logger.atInfo().log("Repairing FS after %s delete operation.", operation.getPath());
-              ghFs.delete(new Path(operationContent[1]), /* recursive= */ true);
+              DeleteOperation operationObject =
+                  GSON.fromJson(operationContent, DeleteOperation.class);
+              ghFs.delete(new Path(operationObject.getResource()), /* recursive= */ true);
               gcsAtomic.unlockPaths(
-                  operationId, StorageResourceId.fromObjectName(operationContent[1]));
+                  operationId, StorageResourceId.fromObjectName(operationObject.getResource()));
             } else if (operation.getPath().toString().contains("_rename_")) {
-              boolean copySucceeded = Boolean.valueOf(operationContent[3]);
-              if (copySucceeded) {
+              RenameOperation operationObject =
+                  GSON.fromJson(operationContent, RenameOperation.class);
+              if (operationObject.getCopySucceeded()) {
                 logger.atInfo().log(
                     "Repairing FS after %s rename operation (deleting source (%s)).",
-                    operation.getPath(), operationContent[1]);
-                ghFs.delete(new Path(operationContent[1]), /* recursive= */ true);
+                    operation.getPath(), operationObject.getSrcResource());
+                ghFs.delete(new Path(operationObject.getSrcResource()), /* recursive= */ true);
               } else {
                 logger.atInfo().log(
                     "Repairing FS after %s rename operation"
                         + " (deleting destination (%s) and renaming (%s -> %s)).",
                     operation.getPath(),
-                    operationContent[2],
-                    operationContent[1],
-                    operationContent[2]);
-                ghFs.delete(new Path(operationContent[2]), /* recursive= */ true);
-                ghFs.rename(new Path(operationContent[1]), new Path(operationContent[2]));
+                    operationObject.getDstResource(),
+                    operationObject.getSrcResource(),
+                    operationObject.getDstResource());
+                ghFs.delete(new Path(operationObject.getDstResource()), /* recursive= */ true);
+                ghFs.rename(
+                    new Path(operationObject.getSrcResource()),
+                    new Path(operationObject.getDstResource()));
               }
               gcsAtomic.unlockPaths(
                   operationId,
-                  StorageResourceId.fromObjectName(operationContent[1]),
-                  StorageResourceId.fromObjectName(operationContent[2]));
+                  StorageResourceId.fromObjectName(operationObject.getSrcResource()),
+                  StorageResourceId.fromObjectName(operationObject.getDstResource()));
             } else {
               throw new IllegalStateException("Unknown operation type: " + operation.getPath());
             }
@@ -149,7 +159,7 @@ public class AtomicGcsFsck {
           return true;
         };
 
-    for (Map.Entry<FileStatus, String[]> expiredOperation : expiredOperations.entrySet()) {
+    for (Map.Entry<FileStatus, String> expiredOperation : expiredOperations.entrySet()) {
       long start = System.currentTimeMillis();
       try {
         boolean succeeded = operationRecovery.apply(expiredOperation);
@@ -167,6 +177,17 @@ public class AtomicGcsFsck {
             "Operation %s failed to roll forward in %dms", expiredOperation, finish - start);
       }
     }
+  }
+
+  private static Instant getOperationLockEpoch(FileStatus operation, String operationContent) {
+    if (operation.getPath().toString().contains("_delete_")) {
+      return Instant.ofEpochSecond(
+          GSON.fromJson(operationContent, DeleteOperation.class).getLockEpochSeconds());
+    } else if (operation.getPath().toString().contains("_rename_")) {
+      return Instant.ofEpochSecond(
+          GSON.fromJson(operationContent, RenameOperation.class).getLockEpochSeconds());
+    }
+    throw new IllegalStateException("Unknown operation type: " + operation.getPath());
   }
 
   private static String getOperationId(FileStatus operation) {

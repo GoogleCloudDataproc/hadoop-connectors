@@ -37,6 +37,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.Timesta
 import com.google.cloud.hadoop.util.LazyExecutorService;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.CharMatcher;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -48,6 +49,7 @@ import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.gson.Gson;
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -68,6 +70,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -82,7 +85,9 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Provides a POSIX like file system layered on top of Google Cloud Storage (GCS).
@@ -94,6 +99,8 @@ import java.util.regex.Pattern;
 public class GoogleCloudStorageFileSystem {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
+  private static final Gson GSON = new Gson();
 
   private static final ThreadFactory DAEMON_THREAD_FACTORY =
       new ThreadFactoryBuilder().setNameFormat("gcsfs-thread-%d").setDaemon(true).build();
@@ -444,9 +451,6 @@ public class GoogleCloudStorageFileSystem {
       Future<?> lockUpdateFuture = Futures.immediateCancelledFuture();
       try {
         Instant operationInstant = Instant.now();
-        List<String> lockRecords =
-            ImmutableList.of(
-                String.valueOf(operationInstant.getEpochSecond()), resourceId.toString());
         URI operationLockPath =
             writeOperationFile(
                 path.getAuthority(),
@@ -455,7 +459,11 @@ public class GoogleCloudStorageFileSystem {
                 "delete",
                 operationId,
                 operationInstant,
-                lockRecords);
+                ImmutableList.of(
+                    GSON.toJson(
+                        new DeleteOperation()
+                            .setLockEpochSeconds(operationInstant.getEpochSecond())
+                            .setResource(resourceId.toString()))));
         List<String> logRecords =
             Streams.concat(itemsToDelete.stream(), bucketsToDelete.stream())
                 .map(i -> i.getItemInfo().getResourceId().toString())
@@ -470,7 +478,16 @@ public class GoogleCloudStorageFileSystem {
             logRecords);
         // Schedule lock expiration update
         lockUpdateFuture =
-            scheduleLockUpdate(() -> renewLockOrExit(operationId, operationLockPath));
+            scheduleLockUpdate(
+                () ->
+                    renewLockOrExit(
+                        operationId,
+                        operationLockPath,
+                        l -> {
+                          DeleteOperation operation = GSON.fromJson(l, DeleteOperation.class);
+                          operation.setLockEpochSeconds(Instant.now().getEpochSecond());
+                          return GSON.toJson(operation);
+                        }));
 
         deleteInternal(itemsToDelete, bucketsToDelete);
       } finally {
@@ -495,11 +512,12 @@ public class GoogleCloudStorageFileSystem {
     }
   }
 
-  private void renewLockOrExit(String operationId, URI operationLockPath) {
+  private void renewLockOrExit(
+      String operationId, URI operationLockPath, Function<String, String> renewFn) {
     // read lock file info
     for (int i = 0; i < 10; i++) {
       try {
-        renewLock(operationId, operationLockPath);
+        renewLock(operationId, operationLockPath, renewFn);
       } catch (IOException e) {
         logger.atWarning().withCause(e).log(
             "Failed to renew '%s' lock for %s operation, retry #%d",
@@ -906,12 +924,6 @@ public class GoogleCloudStorageFileSystem {
     Instant operationInstant = Instant.now();
     if (options.enableCooperativeLocking()
         && srcInfo.getItemInfo().getBucketName().equals(dst.getAuthority())) {
-      List<String> lockRecords =
-          ImmutableList.of(
-              String.valueOf(operationInstant.getEpochSecond()),
-              srcInfo.getPath().toString(),
-              dst.toString(),
-              "false");
       URI operationLockPath =
           writeOperationFile(
               dst.getAuthority(),
@@ -920,7 +932,13 @@ public class GoogleCloudStorageFileSystem {
               "rename",
               operationId,
               operationInstant,
-              lockRecords);
+              ImmutableList.of(
+                  GSON.toJson(
+                      new RenameOperation()
+                          .setLockEpochSeconds(operationInstant.getEpochSecond())
+                          .setSrcResource(srcInfo.getPath().toString())
+                          .setDstResource(dst.toString())
+                          .setCopySucceeded(false))));
       List<String> logRecords =
           Streams.concat(
                   srcToDstItemNames.entrySet().stream(),
@@ -936,7 +954,17 @@ public class GoogleCloudStorageFileSystem {
           operationInstant,
           logRecords);
       // Schedule lock expiration update
-      lockUpdateFuture = scheduleLockUpdate(() -> renewLockOrExit(operationId, operationLockPath));
+      lockUpdateFuture =
+          scheduleLockUpdate(
+              () ->
+                  renewLockOrExit(
+                      operationId,
+                      operationLockPath,
+                      l -> {
+                        RenameOperation operation = GSON.fromJson(l, RenameOperation.class);
+                        operation.setLockEpochSeconds(Instant.now().getEpochSecond());
+                        return GSON.toJson(operation);
+                      }));
     }
 
     // Create the destination directory.
@@ -949,12 +977,6 @@ public class GoogleCloudStorageFileSystem {
 
     if (options.enableCooperativeLocking()
         && srcInfo.getItemInfo().getBucketName().equals(dst.getAuthority())) {
-      List<String> lockRecords =
-          ImmutableList.of(
-              String.valueOf(operationInstant.getEpochSecond()),
-              srcInfo.getPath().toString(),
-              dst.toString(),
-              "true");
       writeOperationFile(
           dst.getAuthority(),
           OPERATION_LOCK_FILE_FORMAT,
@@ -962,7 +984,13 @@ public class GoogleCloudStorageFileSystem {
           "rename",
           operationId,
           operationInstant,
-          lockRecords);
+          ImmutableList.of(
+              GSON.toJson(
+                  new RenameOperation()
+                      .setLockEpochSeconds(Instant.now().getEpochSecond())
+                      .setSrcResource(srcInfo.getPath().toString())
+                      .setDstResource(dst.toString())
+                      .setCopySucceeded(true))));
     }
 
     // So far, only the destination directories are updated. Only do those now:
@@ -1004,18 +1032,20 @@ public class GoogleCloudStorageFileSystem {
     }
   }
 
-  private void renewLock(String operationId, URI operationLockPath) throws IOException {
+  private void renewLock(
+      String operationId, URI operationLockPath, Function<String, String> renewFn)
+      throws IOException {
     StorageResourceId lockId = StorageResourceId.fromObjectName(operationLockPath.toString());
     GoogleCloudStorageItemInfo lockInfo = gcs.getItemInfo(lockId);
     checkState(lockInfo.exists(), "lock file for %s operation should exist", operationId);
 
-    List<String> newLockRecords;
+    String lock;
     try (BufferedReader reader =
         new BufferedReader(Channels.newReader(gcs.open(lockId), UTF_8.name()))) {
-      newLockRecords = reader.lines().collect(toCollection(ArrayList::new));
+      lock = reader.lines().collect(Collectors.joining());
     }
 
-    newLockRecords.set(0, String.valueOf(Instant.now().getEpochSecond()));
+    lock = renewFn.apply(lock);
     CreateFileOptions updateOptions =
         new CreateFileOptions(
             /* overwriteExisting= */ true,
@@ -1024,7 +1054,7 @@ public class GoogleCloudStorageFileSystem {
             /* checkNoDirectoryConflict= */ false,
             /* ensureParentDirectoriesExist= */ false,
             lockInfo.getContentGeneration());
-    writeOperationUri(operationLockPath, updateOptions, newLockRecords);
+    writeOperationUri(operationLockPath, updateOptions, ImmutableList.of(lock));
   }
 
   /** Copies items in given map that maps source items to destination items. */
@@ -1796,5 +1826,121 @@ public class GoogleCloudStorageFileSystem {
   private Future<?> scheduleLockUpdate(Runnable updateFn) {
     return scheduledThreadPool.scheduleAtFixedRate(
         updateFn, /* initialDelay= */ 1, /* period= */ 1, TimeUnit.MINUTES);
+  }
+
+  public static class DeleteOperation {
+    private long lockEpochSeconds;
+    private String resource = null;
+
+    public long getLockEpochSeconds() {
+      return lockEpochSeconds;
+    }
+
+    public DeleteOperation setLockEpochSeconds(long lockEpochSeconds) {
+      this.lockEpochSeconds = lockEpochSeconds;
+      return this;
+    }
+
+    public String getResource() {
+      return resource;
+    }
+
+    public DeleteOperation setResource(String resource) {
+      this.resource = resource;
+      return this;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      return obj instanceof DeleteOperation && equalsInternal((DeleteOperation) obj);
+    }
+
+    private boolean equalsInternal(DeleteOperation other) {
+      return Objects.equals(lockEpochSeconds, other.lockEpochSeconds)
+          && Objects.equals(resource, other.resource);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(lockEpochSeconds, resource);
+    }
+
+    @Override
+    public String toString() {
+      return MoreObjects.toStringHelper(this)
+          .add("lockEpochSeconds", lockEpochSeconds)
+          .add("resource", resource)
+          .toString();
+    }
+  }
+
+  public static class RenameOperation {
+    private long lockEpochSeconds;
+    private String srcResource;
+    private String dstResource;
+    private boolean copySucceeded;
+
+    public long getLockEpochSeconds() {
+      return lockEpochSeconds;
+    }
+
+    public RenameOperation setLockEpochSeconds(long lockEpochSeconds) {
+      this.lockEpochSeconds = lockEpochSeconds;
+      return this;
+    }
+
+    public String getSrcResource() {
+      return srcResource;
+    }
+
+    public RenameOperation setSrcResource(String srcResource) {
+      this.srcResource = srcResource;
+      return this;
+    }
+
+    public String getDstResource() {
+      return dstResource;
+    }
+
+    public RenameOperation setDstResource(String fstResource) {
+      this.dstResource = dstResource;
+      return this;
+    }
+
+    public boolean getCopySucceeded() {
+      return copySucceeded;
+    }
+
+    public RenameOperation setCopySucceeded(boolean copySucceeded) {
+      this.copySucceeded = copySucceeded;
+      return this;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      return obj instanceof RenameOperation && equalsInternal((RenameOperation) obj);
+    }
+
+    private boolean equalsInternal(RenameOperation other) {
+      return Objects.equals(lockEpochSeconds, other.lockEpochSeconds)
+          && Objects.equals(srcResource, other.srcResource)
+          && Objects.equals(dstResource, other.dstResource)
+          && Objects.equals(copySucceeded, other.copySucceeded);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(lockEpochSeconds, srcResource, dstResource, copySucceeded);
+    }
+
+    @Override
+    public String toString() {
+      return MoreObjects.toStringHelper(this)
+          .add("lockEpochSeconds", lockEpochSeconds)
+          .add("srcResource", srcResource)
+          .add("dstResource", dstResource)
+          .add("copySucceeded", copySucceeded)
+          .toString();
+    }
   }
 }
