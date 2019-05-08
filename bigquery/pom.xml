@@ -217,6 +217,12 @@
                     <exclude>bigquery.v2.json</exclude>
                   </excludes>
                 </filter>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>**/*.proto</exclude>
+                  </excludes>
+                </filter>
               </filters>
               <artifactSet>
                 <includes>
