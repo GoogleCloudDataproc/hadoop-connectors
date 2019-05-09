@@ -105,10 +105,10 @@ public class BigQueryConfiguration {
    * a {@link String}.
    */
   public static final String OUTPUT_TABLE_SCHEMA_KEY = "mapred.bq.output.table.schema";
-  
+
   /**
-   * Configuration key for the output table partitioning used by the output format. This key is stored as
-   * a {@link String}.
+   * Configuration key for the output table partitioning used by the output format. This key is
+   * stored as a {@link String}.
    */
   public static final String OUTPUT_TABLE_PARTITIONING_KEY = "mapred.bq.output.table.partitioning";
 

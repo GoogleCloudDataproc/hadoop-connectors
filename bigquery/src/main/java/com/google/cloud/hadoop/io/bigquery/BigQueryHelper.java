@@ -107,7 +107,7 @@ public class BigQueryHelper {
 
     service.tables().insert(projectId, tableRef.getDatasetId(), table).execute();
   }
-  
+
   /**
    * Imports data from GCS into BigQuery via a load job. Optionally polls for completion before
    * returning.
@@ -125,18 +125,26 @@ public class BigQueryHelper {
    * @throws InterruptedException if interrupted while waiting for job completion.
    */
   public void importFromGcs(
-      String projectId, 
-      TableReference tableRef, 
+      String projectId,
+      TableReference tableRef,
       @Nullable TableSchema schema,
-      @Nullable String kmsKeyName, 
-      BigQueryFileFormat sourceFormat, 
+      @Nullable String kmsKeyName,
+      BigQueryFileFormat sourceFormat,
       String writeDisposition,
-      List<String> gcsPaths, 
-      boolean awaitCompletion) throws IOException, InterruptedException {
-    
-    importFromGcs(projectId, tableRef, schema, null, kmsKeyName, sourceFormat, writeDisposition,
-        gcsPaths, awaitCompletion);
+      List<String> gcsPaths,
+      boolean awaitCompletion)
+      throws IOException, InterruptedException {
 
+    importFromGcs(
+        projectId,
+        tableRef,
+        schema,
+        null,
+        kmsKeyName,
+        sourceFormat,
+        writeDisposition,
+        gcsPaths,
+        awaitCompletion);
   }
 
   /**
@@ -168,12 +176,12 @@ public class BigQueryHelper {
       boolean awaitCompletion)
       throws IOException, InterruptedException {
     logger.atInfo().log(
-        "Importing into table '%s' from %s paths; path[0] is '%s'; awaitCompletion: %s;  TimePartitioning: {}",
+        "Importing into table '%s' from %s paths; path[0] is '%s'; awaitCompletion: %s;  TimePartitioning: %s",
         BigQueryStrings.toString(tableRef),
         gcsPaths.size(),
         gcsPaths.isEmpty() ? "(empty)" : gcsPaths.get(0),
         awaitCompletion,
-        timePartitioning != null ? timePartitioning : "null");
+        timePartitioning);
 
     // Create load conf with minimal requirements.
     JobConfigurationLoad loadConfig = new JobConfigurationLoad();
@@ -181,9 +189,7 @@ public class BigQueryHelper {
     loadConfig.setSourceFormat(sourceFormat.getFormatIdentifier());
     loadConfig.setSourceUris(gcsPaths);
     loadConfig.setDestinationTable(tableRef);
-    if(timePartitioning != null) {
-      loadConfig.setTimePartitioning(timePartitioning);
-    }
+    loadConfig.setTimePartitioning(timePartitioning);
     loadConfig.setWriteDisposition(writeDisposition);
     if (!Strings.isNullOrEmpty(kmsKeyName)) {
       loadConfig.setDestinationEncryptionConfiguration(

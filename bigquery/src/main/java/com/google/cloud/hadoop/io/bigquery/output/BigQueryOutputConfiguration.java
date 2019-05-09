@@ -314,7 +314,7 @@ public class BigQueryOutputConfiguration {
     }
     return Optional.empty();
   }
-  
+
   /**
    * Gets the output table time partitioning based on the given configuration.
    *
@@ -322,7 +322,8 @@ public class BigQueryOutputConfiguration {
    * @return the derived table schema, absent value if no table schema exists in the configuration.
    * @throws IOException if a table schema was set in the configuration but couldn't be parsed.
    */
-  static Optional<BigQueryTimePartitioning> getTablePartitioning(Configuration conf) throws IOException {
+  static Optional<BigQueryTimePartitioning> getTablePartitioning(Configuration conf)
+      throws IOException {
     String fieldsJson = conf.get(BigQueryConfiguration.OUTPUT_TABLE_PARTITIONING_KEY);
     if (!Strings.isNullOrEmpty(fieldsJson)) {
       try {
@@ -330,12 +331,12 @@ public class BigQueryOutputConfiguration {
         return Optional.of(BigQueryTimePartitioning.wrap(tablePartitioning));
       } catch (IOException e) {
         throw new IOException(
-            "Unable to parse key '" + BigQueryConfiguration.OUTPUT_TABLE_PARTITIONING_KEY + "'.", e);
+            "Unable to parse key '" + BigQueryConfiguration.OUTPUT_TABLE_PARTITIONING_KEY + "'.",
+            e);
       }
     }
     return Optional.empty();
   }
-
 
   /**
    * Gets the output table KMS key name based on the given configuration.

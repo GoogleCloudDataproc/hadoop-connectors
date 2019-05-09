@@ -18,8 +18,7 @@ public class BigQueryTimePartitioningTest {
     bigQueryTimePartitioning.setRequirePartitionFilter(true);
     assertEquals(TIME_PARTITIONING_JSON, bigQueryTimePartitioning.getAsJson());
   }
-  
-  
+
   @Test
   public void testConvertFromJson() throws IOException {
     BigQueryTimePartitioning bigQueryTimePartitioning = new BigQueryTimePartitioning();
@@ -27,10 +26,12 @@ public class BigQueryTimePartitioningTest {
     bigQueryTimePartitioning.setExpirationMs(1000L);
     bigQueryTimePartitioning.setField("ingestDate");
     bigQueryTimePartitioning.setRequirePartitionFilter(true);
-    
-    assertEquals(bigQueryTimePartitioning.get(), bigQueryTimePartitioning.getFromJson(TIME_PARTITIONING_JSON));
+
+    assertEquals(
+        bigQueryTimePartitioning.get(),
+        bigQueryTimePartitioning.getFromJson(TIME_PARTITIONING_JSON));
   }
-  
+
   @Test
   public void testConversion_OnlyTypeIsPresent() throws IOException {
     BigQueryTimePartitioning bigQueryTimePartitioning = new BigQueryTimePartitioning();
@@ -38,5 +39,4 @@ public class BigQueryTimePartitioningTest {
     String json = bigQueryTimePartitioning.getAsJson();
     assertEquals("DAY", BigQueryTimePartitioning.getFromJson(json).getType());
   }
-
 }
