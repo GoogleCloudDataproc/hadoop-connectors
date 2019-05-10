@@ -96,6 +96,7 @@
     <hadoop.three.version>3.2.0</hadoop.three.version>
     <junit.version>4.13-beta-1</junit.version>
     <mockito.version>2.27.0</mockito.version>
+    <jacoco.version>0.8.2</jacoco.version>
   </properties>
 
   <modules>
@@ -104,6 +105,7 @@
     <module>gcsio/pom.xml</module>
     <module>util/pom.xml</module>
     <module>util-hadoop/pom.xml</module>
+    <module>bigdata-interop-coverage/pom.xml</module>
   </modules>
 
   <profiles>
@@ -115,6 +117,29 @@
       <activation>
         <activeByDefault>true</activeByDefault>
       </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.jacoco</groupId>
+            <artifactId>jacoco-maven-plugin</artifactId>
+            <version>${jacoco.version}</version>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>prepare-agent</goal>
+                </goals>
+              </execution>
+              <execution>
+                <id>report</id>
+                <phase>prepare-package</phase>
+                <goals>
+                  <goal>report</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
       <dependencyManagement>
         <dependencies>
           <dependency>
@@ -247,6 +272,8 @@
               </execution>
             </executions>
           </plugin>
+
+
         </plugins>
       </build>
     </profile>
@@ -397,6 +424,7 @@
         <filtering>true</filtering>
       </resource>
     </resources>
+
     <pluginManagement>
       <plugins>
         <plugin>
@@ -453,6 +481,7 @@
       </plugins>
     </pluginManagement>
     <plugins>
+
       <plugin>
         <artifactId>maven-enforcer-plugin</artifactId>
         <executions>
