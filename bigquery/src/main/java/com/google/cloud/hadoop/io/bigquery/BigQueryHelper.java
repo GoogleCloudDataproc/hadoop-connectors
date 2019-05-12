@@ -139,7 +139,7 @@ public class BigQueryHelper {
         projectId,
         tableRef,
         schema,
-        null,
+        /* timePartitioning= */ null,
         kmsKeyName,
         sourceFormat,
         writeDisposition,
@@ -176,7 +176,7 @@ public class BigQueryHelper {
       boolean awaitCompletion)
       throws IOException, InterruptedException {
     logger.atInfo().log(
-        "Importing into table '%s' from %s paths; path[0] is '%s'; awaitCompletion: %s;  TimePartitioning: %s",
+        "Importing into table '%s' from %s paths; path[0] is '%s'; awaitCompletion: %s;  timePartitioning: %s",
         BigQueryStrings.toString(tableRef),
         gcsPaths.size(),
         gcsPaths.isEmpty() ? "(empty)" : gcsPaths.get(0),

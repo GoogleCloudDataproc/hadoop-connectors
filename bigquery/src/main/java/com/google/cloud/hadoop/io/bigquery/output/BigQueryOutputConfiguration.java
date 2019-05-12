@@ -319,8 +319,10 @@ public class BigQueryOutputConfiguration {
    * Gets the output table time partitioning based on the given configuration.
    *
    * @param conf the configuration to reference the keys from.
-   * @return the derived table schema, absent value if no table schema exists in the configuration.
-   * @throws IOException if a table schema was set in the configuration but couldn't be parsed.
+   * @return the derived table time partitioning, absent value if no table time partitioning exists
+   *     in the configuration.
+   * @throws IOException if a table time partitioning was set in the configuration but couldn't be
+   *     parsed.
    */
   static Optional<BigQueryTimePartitioning> getTablePartitioning(Configuration conf)
       throws IOException {

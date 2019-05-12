@@ -29,7 +29,7 @@ public class BigQueryTimePartitioningTest {
 
     assertEquals(
         bigQueryTimePartitioning.get(),
-        bigQueryTimePartitioning.getFromJson(TIME_PARTITIONING_JSON));
+        BigQueryTimePartitioning.getFromJson(TIME_PARTITIONING_JSON));
   }
 
   @Test
@@ -37,6 +37,7 @@ public class BigQueryTimePartitioningTest {
     BigQueryTimePartitioning bigQueryTimePartitioning = new BigQueryTimePartitioning();
     bigQueryTimePartitioning.setType("DAY");
     String json = bigQueryTimePartitioning.getAsJson();
+    assertEquals("{\"type\":\"DAY\"}", json);
     assertEquals("DAY", BigQueryTimePartitioning.getFromJson(json).getType());
   }
 }
