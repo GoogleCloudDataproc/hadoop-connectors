@@ -6,25 +6,35 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.time.temporal.ChronoUnit.MILLIS;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 
 import com.google.cloud.hadoop.gcsio.GcsAtomicOperations;
 import com.google.cloud.hadoop.gcsio.GcsAtomicOperations.Operation;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.DeleteOperation;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.RenameOperation;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.common.base.Splitter;
 import com.google.common.flogger.GoogleLogger;
 import com.google.gson.Gson;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.function.Function;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -45,6 +55,7 @@ public class AtomicGcsFsck {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   private static final Gson GSON = new Gson();
+  public static final Splitter RENAME_LOG_RECORD_SPLITTER = Splitter.on(" -> ");
 
   private final String bucket;
   private final Configuration conf;
@@ -70,8 +81,8 @@ public class AtomicGcsFsck {
 
     URI bucketUri = URI.create(bucket);
     String bucketName = bucketUri.getAuthority();
-    GoogleHadoopFileSystem ghFs = (GoogleHadoopFileSystem) FileSystem.get(bucketUri, conf);
-    GoogleCloudStorageFileSystem gcsFs = ghFs.getGcsFs();
+    GoogleHadoopFileSystem ghfs = (GoogleHadoopFileSystem) FileSystem.get(bucketUri, conf);
+    GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
     GcsAtomicOperations gcsAtomic = gcsFs.getGcsAtomic();
 
     Instant operationExpirationTime = Instant.now();
@@ -88,7 +99,7 @@ public class AtomicGcsFsck {
       URI operationPattern =
           bucketUri.resolve(
               "/" + GcsAtomicOperations.LOCK_DIRECTORY + "*" + operationId + "*.lock");
-      FileStatus[] operationStatuses = ghFs.globStatus(new Path(operationPattern));
+      FileStatus[] operationStatuses = ghfs.globStatus(new Path(operationPattern));
       checkState(
           operationStatuses.length < 2,
           "operation %s should not have more than one lock file",
@@ -110,7 +121,7 @@ public class AtomicGcsFsck {
       FileStatus operation = operationStatuses[0];
 
       Instant lockInstant = Instant.ofEpochSecond(lockedOperation.getLockEpochSeconds());
-      Instant renewedInstant = getLockRenewedInstant(ghFs, operation);
+      Instant renewedInstant = getLockRenewedInstant(ghfs, operation);
       if (isLockExpired(renewedInstant, operationExpirationTime)
           && isLockExpired(lockInstant, operationExpirationTime)) {
         expiredOperations.put(operation, lockedOperation);
@@ -130,7 +141,7 @@ public class AtomicGcsFsck {
             if (operation.getPath().toString().contains("_delete_")) {
               logger.atInfo().log("Repairing FS after %s delete operation.", operation.getPath());
               DeleteOperation operationObject =
-                  getOperationObject(ghFs, operation, DeleteOperation.class);
+                  getOperationObject(ghfs, operation, DeleteOperation.class);
               gcsAtomic.lockOperation(
                   bucketName, operationId, lockedOperation.getLockEpochSeconds());
               Future<?> lockUpdateFuture =
@@ -140,7 +151,8 @@ public class AtomicGcsFsck {
                       DeleteOperation.class,
                       (o, i) -> o.setLockEpochSeconds(i.getEpochSecond()));
               try {
-                ghFs.delete(new Path(operationObject.getResource()), /* recursive= */ true);
+                List<String> loggedResources = getOperationLog(ghfs, operation, l -> l);
+                deleteResource(ghfs, operationObject.getResource(), loggedResources);
                 gcsAtomic.unlockPaths(
                     operationId, StorageResourceId.fromObjectName(operationObject.getResource()));
               } finally {
@@ -148,7 +160,7 @@ public class AtomicGcsFsck {
               }
             } else if (operation.getPath().toString().contains("_rename_")) {
               RenameOperation operationObject =
-                  getOperationObject(ghFs, operation, RenameOperation.class);
+                  getOperationObject(ghfs, operation, RenameOperation.class);
               gcsAtomic.lockOperation(
                   bucketName, operationId, lockedOperation.getLockEpochSeconds());
               Future<?> lockUpdateFuture =
@@ -158,11 +170,23 @@ public class AtomicGcsFsck {
                       RenameOperation.class,
                       (o, i) -> o.setLockEpochSeconds(i.getEpochSecond()));
               try {
+                List<Pair<String, String>> loggedResources =
+                    getOperationLog(
+                        ghfs,
+                        operation,
+                        l -> {
+                          List<String> srcToDst = RENAME_LOG_RECORD_SPLITTER.splitToList(l);
+                          checkState(srcToDst.size() == 2);
+                          return Pair.of(srcToDst.get(0), srcToDst.get(1));
+                        });
                 if (operationObject.getCopySucceeded()) {
                   logger.atInfo().log(
                       "Repairing FS after %s rename operation (deleting source (%s)).",
                       operation.getPath(), operationObject.getSrcResource());
-                  ghFs.delete(new Path(operationObject.getSrcResource()), /* recursive= */ true);
+                  deleteResource(
+                      ghfs,
+                      operationObject.getSrcResource(),
+                      loggedResources.stream().map(Pair::getLeft).collect(toList()));
                 } else {
                   logger.atInfo().log(
                       "Repairing FS after %s rename operation"
@@ -171,10 +195,30 @@ public class AtomicGcsFsck {
                       operationObject.getDstResource(),
                       operationObject.getSrcResource(),
                       operationObject.getDstResource());
-                  ghFs.delete(new Path(operationObject.getDstResource()), /* recursive= */ true);
-                  ghFs.rename(
-                      new Path(operationObject.getSrcResource()),
-                      new Path(operationObject.getDstResource()));
+                  deleteResource(
+                      ghfs,
+                      operationObject.getDstResource(),
+                      loggedResources.stream().map(Pair::getRight).collect(toList()));
+                  gcsFs
+                      .getGcs()
+                      .copy(
+                          bucketName,
+                          loggedResources.stream()
+                              .map(
+                                  p ->
+                                      StorageResourceId.fromObjectName(p.getLeft()).getObjectName())
+                              .collect(toList()),
+                          bucketName,
+                          loggedResources.stream()
+                              .map(
+                                  p ->
+                                      StorageResourceId.fromObjectName(p.getRight())
+                                          .getObjectName())
+                              .collect(toList()));
+                  deleteResource(
+                      ghfs,
+                      operationObject.getSrcResource(),
+                      loggedResources.stream().map(Pair::getLeft).collect(toList()));
                 }
                 gcsAtomic.unlockPaths(
                     operationId,
@@ -212,6 +256,30 @@ public class AtomicGcsFsck {
     }
   }
 
+  private void deleteResource(
+      GoogleHadoopFileSystem ghfs, String resource, List<String> loggedResources)
+      throws IOException {
+    Path lockedResource = new Path(resource);
+    Set<String> allObjects =
+        Arrays.stream(ghfs.listStatus(lockedResource))
+            .map(s -> s.getPath().toString())
+            .collect(toSet());
+    List<StorageResourceId> objectsToDelete = new ArrayList<>(loggedResources.size());
+    for (String loggedObject : loggedResources) {
+      if (allObjects.contains(loggedObject)) {
+        objectsToDelete.add(StorageResourceId.fromObjectName(loggedObject));
+      }
+    }
+    GoogleCloudStorage gcs = ghfs.getGcsFs().getGcs();
+    gcs.deleteObjects(objectsToDelete);
+
+    // delete directory if empty
+    allObjects.removeAll(loggedResources);
+    if (allObjects.isEmpty() && ghfs.exists(lockedResource)) {
+      ghfs.delete(lockedResource, /* recursive= */ false);
+    }
+  }
+
   private boolean isLockExpired(Instant lockInstant, Instant expirationInstant) {
     return lockInstant
         .plus(GCS_COOPERATIVE_LOCKING_EXPIRATION_TIMEOUT_MS.get(conf, conf::getLong), MILLIS)
@@ -238,6 +306,20 @@ public class AtomicGcsFsck {
       operationContent = IOUtils.toString(in);
     }
     return GSON.fromJson(operationContent, clazz);
+  }
+
+  private static <T> List<T> getOperationLog(
+      GoogleHadoopFileSystem ghfs, FileStatus operation, Function<String, T> logRecordFn)
+      throws IOException {
+    List<T> log = new ArrayList<>();
+    Path operationLog = new Path(operation.getPath().toString().replace(".lock", ".log"));
+    try (BufferedReader in = new BufferedReader(new InputStreamReader(ghfs.open(operationLog)))) {
+      String line;
+      while ((line = in.readLine()) != null) {
+        log.add(logRecordFn.apply(line));
+      }
+    }
+    return log;
   }
 
   private static String getOperationId(FileStatus operation) {
