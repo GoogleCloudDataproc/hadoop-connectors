@@ -1,14 +1,14 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_COOPERATIVE_LOCKING_ENABLE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_COOPERATIVE_LOCKING_EXPIRATION_TIMEOUT_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-import static java.time.temporal.ChronoUnit.SECONDS;
+import static java.time.temporal.ChronoUnit.MILLIS;
 
 import com.google.cloud.hadoop.gcsio.GcsAtomicOperations;
 import com.google.cloud.hadoop.gcsio.GcsAtomicOperations.Operation;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.DeleteOperation;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.RenameOperation;
@@ -42,15 +42,26 @@ public class AtomicGcsFsck {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  private static final int LOCK_EXPIRATION_SECONDS = 120;
-
   private static final Gson GSON = new Gson();
 
-  public static void main(String[] args) throws Exception {
-    String bucket = args[0];
-    checkArgument(bucket.startsWith("gs://"), "bucket parameter should have 'gs://' scheme");
+  private final String bucket;
+  private final Configuration conf;
 
-    Configuration conf = new Configuration();
+  public static void main(String[] args) throws Exception {
+    new AtomicGcsFsck(args[0]).repair();
+  }
+
+  AtomicGcsFsck(String bucket) {
+    this(bucket, new Configuration());
+  }
+
+  AtomicGcsFsck(String bucket, Configuration conf) {
+    this.bucket = bucket;
+    checkArgument(bucket.startsWith("gs://"), "bucket parameter should have 'gs://' scheme");
+    this.conf = conf;
+  }
+
+  void repair() throws Exception {
     // Disable cooperative locking to prevent blocking
     conf.set(GCS_COOPERATIVE_LOCKING_ENABLE.getKey(), "false");
     conf.set(GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.getKey(), "false");
@@ -58,7 +69,6 @@ public class AtomicGcsFsck {
     URI bucketUri = URI.create(bucket);
     GoogleHadoopFileSystem ghFs = (GoogleHadoopFileSystem) FileSystem.get(bucketUri, conf);
     GoogleCloudStorageFileSystem gcsFs = ghFs.getGcsFs();
-    GoogleCloudStorage gcs = gcsFs.getGcs();
     GcsAtomicOperations gcsAtomic = gcsFs.getGcsAtomic();
 
     Instant operationExpirationTime = Instant.now();
@@ -102,7 +112,7 @@ public class AtomicGcsFsck {
 
       Instant operationLockEpoch = getOperationLockEpoch(operation, operationContent);
       if (operationLockEpoch
-          .plus(LOCK_EXPIRATION_SECONDS, SECONDS)
+          .plus(GCS_COOPERATIVE_LOCKING_EXPIRATION_TIMEOUT_MS.get(conf, conf::getLong), MILLIS)
           .isBefore(operationExpirationTime)) {
         expiredOperations.put(operation, operationContent);
         logger.atInfo().log("Operation %s expired.", operation.getPath());

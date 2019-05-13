@@ -52,8 +52,8 @@ public class GcsAtomicOperations {
 
   private static final Gson GSON = new Gson();
 
-  static final String LOCK_FILE = "all.lock";
-  static final String LOCK_PATH = LOCK_DIRECTORY + LOCK_FILE;
+  public static final String LOCK_FILE = "all.lock";
+  public static final String LOCK_PATH = LOCK_DIRECTORY + LOCK_FILE;
 
   private static final String LOCK_METADATA_KEY = "lock";
   private static final int MAX_LOCKS_COUNT = 20;
@@ -61,7 +61,7 @@ public class GcsAtomicOperations {
   private final GoogleCloudStorageImpl gcs;
 
   public GcsAtomicOperations(GoogleCloudStorage gcs) {
-    this.gcs = (GoogleCloudStorageImpl) gcs;
+    this.gcs = gcs instanceof GoogleCloudStorageImpl ? (GoogleCloudStorageImpl) gcs : null;
   }
 
   public Set<Operation> getLockedOperations(String bucketName) throws IOException {

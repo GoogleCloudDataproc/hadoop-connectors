@@ -490,12 +490,9 @@ public class GoogleCloudStorageFileSystem {
                         }));
 
         deleteInternal(itemsToDelete, bucketsToDelete);
+        gcsAtomic.unlockPaths(operationId, resourceId);
       } finally {
-        try {
-          gcsAtomic.unlockPaths(operationId, resourceId);
-        } finally {
-          lockUpdateFuture.cancel(/* mayInterruptIfRunning= */ false);
-        }
+        lockUpdateFuture.cancel(/* mayInterruptIfRunning= */ false);
       }
     } else {
       deleteInternal(itemsToDelete, bucketsToDelete);
@@ -852,12 +849,10 @@ public class GoogleCloudStorageFileSystem {
       String operationId = UUID.randomUUID().toString();
       StorageResourceId srcResourceId = pathCodec.validatePathAndGetId(srcInfo.getPath(), true);
       StorageResourceId dstResourceId = pathCodec.validatePathAndGetId(dst, true);
+
       gcsAtomic.lockPaths(operationId, srcResourceId, dstResourceId);
-      try {
-        renameDirectoryInternal(srcInfo, dst, operationId);
-      } finally {
-        gcsAtomic.unlockPaths(operationId, srcResourceId, dstResourceId);
-      }
+      renameDirectoryInternal(srcInfo, dst, operationId);
+      gcsAtomic.unlockPaths(operationId, srcResourceId, dstResourceId);
     } else if (srcInfo.isDirectory()) {
       renameDirectoryInternal(srcInfo, dst, /* operationId= */ null);
     } else {
@@ -1902,7 +1897,7 @@ public class GoogleCloudStorageFileSystem {
       return dstResource;
     }
 
-    public RenameOperation setDstResource(String fstResource) {
+    public RenameOperation setDstResource(String dstResource) {
       this.dstResource = dstResource;
       return this;
     }
