@@ -17,10 +17,12 @@ import com.google.common.flogger.GoogleLogger;
 import com.google.gson.Gson;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Future;
 import java.util.function.Function;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -67,6 +69,7 @@ public class AtomicGcsFsck {
     conf.set(GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.getKey(), "false");
 
     URI bucketUri = URI.create(bucket);
+    String bucketName = bucketUri.getAuthority();
     GoogleHadoopFileSystem ghFs = (GoogleHadoopFileSystem) FileSystem.get(bucketUri, conf);
     GoogleCloudStorageFileSystem gcsFs = ghFs.getGcsFs();
     GcsAtomicOperations gcsAtomic = gcsFs.getGcsAtomic();
@@ -79,7 +82,7 @@ public class AtomicGcsFsck {
       return;
     }
 
-    Map<FileStatus, String> expiredOperations = new HashMap<>();
+    Map<FileStatus, Operation> expiredOperations = new HashMap<>();
     for (Operation lockedOperation : lockedOperations) {
       String operationId = lockedOperation.getOperationId();
       URI operationPattern =
@@ -105,71 +108,91 @@ public class AtomicGcsFsck {
       }
 
       FileStatus operation = operationStatuses[0];
-      String operationContent;
-      try (FSDataInputStream in = ghFs.open(operation.getPath())) {
-        operationContent = IOUtils.toString(in);
-      }
 
-      Instant operationLockEpoch = getOperationLockEpoch(operation, operationContent);
-      if (operationLockEpoch
-          .plus(GCS_COOPERATIVE_LOCKING_EXPIRATION_TIMEOUT_MS.get(conf, conf::getLong), MILLIS)
-          .isBefore(operationExpirationTime)) {
-        expiredOperations.put(operation, operationContent);
+      Instant lockInstant = Instant.ofEpochSecond(lockedOperation.getLockEpochSeconds());
+      Instant renewedInstant = getLockRenewedInstant(ghFs, operation);
+      if (isLockExpired(renewedInstant, operationExpirationTime)
+          && isLockExpired(lockInstant, operationExpirationTime)) {
+        expiredOperations.put(operation, lockedOperation);
         logger.atInfo().log("Operation %s expired.", operation.getPath());
       } else {
         logger.atInfo().log("Operation %s not expired.", operation.getPath());
       }
     }
 
-    Function<Map.Entry<FileStatus, String>, Boolean> operationRecovery =
+    Function<Map.Entry<FileStatus, Operation>, Boolean> operationRecovery =
         expiredOperation -> {
           FileStatus operation = expiredOperation.getKey();
-          String operationContent = expiredOperation.getValue();
+          Operation lockedOperation = expiredOperation.getValue();
 
           String operationId = getOperationId(operation);
           try {
             if (operation.getPath().toString().contains("_delete_")) {
               logger.atInfo().log("Repairing FS after %s delete operation.", operation.getPath());
               DeleteOperation operationObject =
-                  GSON.fromJson(operationContent, DeleteOperation.class);
-              ghFs.delete(new Path(operationObject.getResource()), /* recursive= */ true);
-              gcsAtomic.unlockPaths(
-                  operationId, StorageResourceId.fromObjectName(operationObject.getResource()));
+                  getOperationObject(ghFs, operation, DeleteOperation.class);
+              gcsAtomic.lockOperation(
+                  bucketName, operationId, lockedOperation.getLockEpochSeconds());
+              Future<?> lockUpdateFuture =
+                  gcsFs.scheduleLockUpdate(
+                      operationId,
+                      new URI(operation.getPath().toString()),
+                      DeleteOperation.class,
+                      (o, i) -> o.setLockEpochSeconds(i.getEpochSecond()));
+              try {
+                ghFs.delete(new Path(operationObject.getResource()), /* recursive= */ true);
+                gcsAtomic.unlockPaths(
+                    operationId, StorageResourceId.fromObjectName(operationObject.getResource()));
+              } finally {
+                lockUpdateFuture.cancel(/* mayInterruptIfRunning= */ false);
+              }
             } else if (operation.getPath().toString().contains("_rename_")) {
               RenameOperation operationObject =
-                  GSON.fromJson(operationContent, RenameOperation.class);
-              if (operationObject.getCopySucceeded()) {
-                logger.atInfo().log(
-                    "Repairing FS after %s rename operation (deleting source (%s)).",
-                    operation.getPath(), operationObject.getSrcResource());
-                ghFs.delete(new Path(operationObject.getSrcResource()), /* recursive= */ true);
-              } else {
-                logger.atInfo().log(
-                    "Repairing FS after %s rename operation"
-                        + " (deleting destination (%s) and renaming (%s -> %s)).",
-                    operation.getPath(),
-                    operationObject.getDstResource(),
-                    operationObject.getSrcResource(),
-                    operationObject.getDstResource());
-                ghFs.delete(new Path(operationObject.getDstResource()), /* recursive= */ true);
-                ghFs.rename(
-                    new Path(operationObject.getSrcResource()),
-                    new Path(operationObject.getDstResource()));
+                  getOperationObject(ghFs, operation, RenameOperation.class);
+              gcsAtomic.lockOperation(
+                  bucketName, operationId, lockedOperation.getLockEpochSeconds());
+              Future<?> lockUpdateFuture =
+                  gcsFs.scheduleLockUpdate(
+                      operationId,
+                      new URI(operation.getPath().toString()),
+                      RenameOperation.class,
+                      (o, i) -> o.setLockEpochSeconds(i.getEpochSecond()));
+              try {
+                if (operationObject.getCopySucceeded()) {
+                  logger.atInfo().log(
+                      "Repairing FS after %s rename operation (deleting source (%s)).",
+                      operation.getPath(), operationObject.getSrcResource());
+                  ghFs.delete(new Path(operationObject.getSrcResource()), /* recursive= */ true);
+                } else {
+                  logger.atInfo().log(
+                      "Repairing FS after %s rename operation"
+                          + " (deleting destination (%s) and renaming (%s -> %s)).",
+                      operation.getPath(),
+                      operationObject.getDstResource(),
+                      operationObject.getSrcResource(),
+                      operationObject.getDstResource());
+                  ghFs.delete(new Path(operationObject.getDstResource()), /* recursive= */ true);
+                  ghFs.rename(
+                      new Path(operationObject.getSrcResource()),
+                      new Path(operationObject.getDstResource()));
+                }
+                gcsAtomic.unlockPaths(
+                    operationId,
+                    StorageResourceId.fromObjectName(operationObject.getSrcResource()),
+                    StorageResourceId.fromObjectName(operationObject.getDstResource()));
+              } finally {
+                lockUpdateFuture.cancel(/* mayInterruptIfRunning= */ false);
               }
-              gcsAtomic.unlockPaths(
-                  operationId,
-                  StorageResourceId.fromObjectName(operationObject.getSrcResource()),
-                  StorageResourceId.fromObjectName(operationObject.getDstResource()));
             } else {
               throw new IllegalStateException("Unknown operation type: " + operation.getPath());
             }
-          } catch (IOException e) {
+          } catch (IOException | URISyntaxException e) {
             throw new RuntimeException("Failed to recover operation: ", e);
           }
           return true;
         };
 
-    for (Map.Entry<FileStatus, String> expiredOperation : expiredOperations.entrySet()) {
+    for (Map.Entry<FileStatus, Operation> expiredOperation : expiredOperations.entrySet()) {
       long start = System.currentTimeMillis();
       try {
         boolean succeeded = operationRecovery.apply(expiredOperation);
@@ -189,15 +212,32 @@ public class AtomicGcsFsck {
     }
   }
 
-  private static Instant getOperationLockEpoch(FileStatus operation, String operationContent) {
+  private boolean isLockExpired(Instant lockInstant, Instant expirationInstant) {
+    return lockInstant
+        .plus(GCS_COOPERATIVE_LOCKING_EXPIRATION_TIMEOUT_MS.get(conf, conf::getLong), MILLIS)
+        .isBefore(expirationInstant);
+  }
+
+  private static Instant getLockRenewedInstant(GoogleHadoopFileSystem ghfs, FileStatus operation)
+      throws IOException {
     if (operation.getPath().toString().contains("_delete_")) {
       return Instant.ofEpochSecond(
-          GSON.fromJson(operationContent, DeleteOperation.class).getLockEpochSeconds());
-    } else if (operation.getPath().toString().contains("_rename_")) {
+          getOperationObject(ghfs, operation, DeleteOperation.class).getLockEpochSeconds());
+    }
+    if (operation.getPath().toString().contains("_rename_")) {
       return Instant.ofEpochSecond(
-          GSON.fromJson(operationContent, RenameOperation.class).getLockEpochSeconds());
+          getOperationObject(ghfs, operation, RenameOperation.class).getLockEpochSeconds());
     }
     throw new IllegalStateException("Unknown operation type: " + operation.getPath());
+  }
+
+  private static <T> T getOperationObject(
+      GoogleHadoopFileSystem ghfs, FileStatus operation, Class<T> clazz) throws IOException {
+    String operationContent;
+    try (FSDataInputStream in = ghfs.open(operation.getPath())) {
+      operationContent = IOUtils.toString(in);
+    }
+    return GSON.fromJson(operationContent, clazz);
   }
 
   private static String getOperationId(FileStatus operation) {

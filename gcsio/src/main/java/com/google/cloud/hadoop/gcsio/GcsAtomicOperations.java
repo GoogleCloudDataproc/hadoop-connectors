@@ -29,7 +29,6 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.common.base.MoreObjects;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import com.google.gson.Gson;
 import java.io.IOException;
@@ -40,6 +39,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
@@ -80,31 +80,28 @@ public class GcsAtomicOperations {
     return operations;
   }
 
+  public void lockOperation(String bucketName, String operationId, long lockEpochSeconds)
+      throws IOException {
+    long startMs = System.currentTimeMillis();
+    logger.atFine().log("lockOperation(%s, %d)", operationId, lockEpochSeconds);
+    modifyLock(this::updateLockEpochSeconds, bucketName, operationId, lockEpochSeconds);
+    logger.atFine().log(
+        "[%dms] lockOperation(%s, %s)",
+        System.currentTimeMillis() - startMs, operationId, lockEpochSeconds);
+  }
+
   public void lockPaths(String operationId, StorageResourceId... resources) throws IOException {
     long startMs = System.currentTimeMillis();
     logger.atFine().log("lockPaths(%s, %s)", operationId, lazy(() -> Arrays.toString(resources)));
-    modifyLock(this::addLockRecords, operationId, resources);
+    Set<String> objects = validateResources(resources);
+    String bucketName = resources[0].getBucketName();
+    modifyLock(this::addLockRecords, bucketName, operationId, objects);
     logger.atFine().log(
         "[%dms] lockPaths(%s, %s)",
         System.currentTimeMillis() - startMs, operationId, lazy(() -> Arrays.toString(resources)));
   }
 
-  public void unlockPaths(String operationId, StorageResourceId... resources) throws IOException {
-    long startMs = System.currentTimeMillis();
-    logger.atFine().log("unlockPaths(%s, %s)", operationId, lazy(() -> Arrays.toString(resources)));
-    modifyLock(this::removeLockRecords, operationId, resources);
-    logger.atFine().log(
-        "[%dms] unlockPaths(%s, %s)",
-        System.currentTimeMillis() - startMs, operationId, lazy(() -> Arrays.toString(resources)));
-  }
-
-  private void modifyLock(
-      LockRecordsModificationFunction<Boolean, OperationLocks, String, Set<String>> modificationFn,
-      String operationId,
-      StorageResourceId... resources)
-      throws IOException {
-    long startMs = System.currentTimeMillis();
-
+  private Set<String> validateResources(StorageResourceId[] resources) {
     checkNotNull(resources, "resources should not be null");
     checkArgument(resources.length > 0, "resources should not be empty");
     String bucketName = resources[0].getBucketName();
@@ -112,9 +109,27 @@ public class GcsAtomicOperations {
         Arrays.stream(resources).allMatch(r -> r.getBucketName().equals(bucketName)),
         "All resources should be in the same bucket");
 
-    ImmutableSet<String> objects =
-        Arrays.stream(resources).map(StorageResourceId::getObjectName).collect(toImmutableSet());
+    return Arrays.stream(resources).map(StorageResourceId::getObjectName).collect(toImmutableSet());
+  }
 
+  public void unlockPaths(String operationId, StorageResourceId... resources) throws IOException {
+    long startMs = System.currentTimeMillis();
+    logger.atFine().log("unlockPaths(%s, %s)", operationId, lazy(() -> Arrays.toString(resources)));
+    Set<String> objects = validateResources(resources);
+    String bucketName = resources[0].getBucketName();
+    modifyLock(this::removeLockRecords, bucketName, operationId, objects);
+    logger.atFine().log(
+        "[%dms] unlockPaths(%s, %s)",
+        System.currentTimeMillis() - startMs, operationId, lazy(() -> Arrays.toString(resources)));
+  }
+
+  private <T> void modifyLock(
+      LockRecordsModificationFunction<Boolean, OperationLocks, String, T> modificationFn,
+      String bucketName,
+      String operationId,
+      T modificationFnParam)
+      throws IOException {
+    long startMs = System.currentTimeMillis();
     StorageResourceId lockId = getLockId(bucketName);
 
     ExponentialBackOff backOff =
@@ -138,7 +153,7 @@ public class GcsAtomicOperations {
                 ? new OperationLocks().setFormatVersion(OperationLocks.FORMAT_VERSION)
                 : getLockRecords(lockInfo);
 
-        if (!modificationFn.apply(lockRecords, operationId, objects)) {
+        if (!modificationFn.apply(lockRecords, operationId, modificationFnParam)) {
           sleepUninterruptibly(backOff.nextBackOffMillis(), MILLISECONDS);
           continue;
         }
@@ -164,10 +179,8 @@ public class GcsAtomicOperations {
         gcs.updateMetadata(lockInfo, metadata);
 
         logger.atFine().log(
-            "updated lock file in %dms for %s client and %s resources",
-            System.currentTimeMillis() - startMs,
-            operationId,
-            lazy(() -> Arrays.toString(resources)));
+            "updated lock file in %dms for %s operation with %s parameter",
+            System.currentTimeMillis() - startMs, operationId, lazy(modificationFnParam::toString));
         break;
       } catch (IOException e) {
         // continue after sleep if update failed due to file generation mismatch or other
@@ -178,8 +191,8 @@ public class GcsAtomicOperations {
               lockId, operationId);
         } else {
           logger.atWarning().withCause(e).log(
-              "Failed to modify lock for %s operation on %s resources, retrying.",
-              operationId, Arrays.toString(resources));
+              "Failed to modify lock for %s operation with %s parameter, retrying.",
+              operationId, modificationFnParam);
         }
         sleepUninterruptibly(backOff.nextBackOffMillis(), MILLISECONDS);
       }
@@ -200,6 +213,24 @@ public class GcsAtomicOperations {
         lockRecords.getFormatVersion(),
         OperationLocks.FORMAT_VERSION);
     return lockRecords;
+  }
+
+  private boolean updateLockEpochSeconds(
+      OperationLocks lockRecords, String operationId, long lockEpochSeconds) {
+    Optional<Operation> operationOptional =
+        lockRecords.getOperations().stream()
+            .filter(o -> o.getOperationId().equals(operationId))
+            .findAny();
+    checkState(operationOptional.isPresent(), "operation %s not found", operationId);
+    Operation operation = operationOptional.get();
+    checkState(
+        lockEpochSeconds == operation.getLockEpochSeconds(),
+        "operation %s should have %s lock epoch, but was %s",
+        operationId,
+        lockEpochSeconds,
+        operation.getLockEpochSeconds());
+    operation.setLockEpochSeconds(Instant.now().getEpochSecond());
+    return true;
   }
 
   private boolean addLockRecords(
