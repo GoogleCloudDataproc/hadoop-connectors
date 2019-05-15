@@ -4,6 +4,10 @@
 
   2. Support nested record type in field schema in BigQuery connector.
 
+  3. Add a property to specify BigQuery tables partitioning definition:
+
+       mapred.bq.output.table.partitioning
+
 
 0.13.16 - 2019-02-25
 
