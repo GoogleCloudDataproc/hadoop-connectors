@@ -1,4 +1,4 @@
-1.9.17 - 2019-XX-XX
+1.9.17 - 2019-05-15
 
   1. Add a property to parallelize GCS requests in `getFileStatus` and
      `listStatus` methods to reduce latency:
