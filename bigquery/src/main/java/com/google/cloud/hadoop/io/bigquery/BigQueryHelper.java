@@ -13,6 +13,8 @@
  */
 package com.google.cloud.hadoop.io.bigquery;
 
+import static com.google.common.flogger.LazyArgs.lazy;
+
 import com.google.api.services.bigquery.Bigquery;
 import com.google.api.services.bigquery.Bigquery.Jobs.Insert;
 import com.google.api.services.bigquery.model.Dataset;
@@ -115,45 +117,6 @@ public class BigQueryHelper {
    * @param projectId the project on whose behalf to perform the load.
    * @param tableRef the reference to the destination table.
    * @param schema the schema of the source data to populate the destination table by.
-   * @param kmsKeyName the Cloud KMS encryption key used to protect the output table.
-   * @param sourceFormat the file format of the source data.
-   * @param writeDisposition the write disposition of the output table.
-   * @param gcsPaths the location of the source data in GCS.
-   * @param awaitCompletion if true, block and poll until job completes, otherwise return as soon as
-   *     the job has been successfully dispatched.
-   * @throws IOException
-   * @throws InterruptedException if interrupted while waiting for job completion.
-   */
-  public void importFromGcs(
-      String projectId,
-      TableReference tableRef,
-      @Nullable TableSchema schema,
-      @Nullable String kmsKeyName,
-      BigQueryFileFormat sourceFormat,
-      String writeDisposition,
-      List<String> gcsPaths,
-      boolean awaitCompletion)
-      throws IOException, InterruptedException {
-
-    importFromGcs(
-        projectId,
-        tableRef,
-        schema,
-        /* timePartitioning= */ null,
-        kmsKeyName,
-        sourceFormat,
-        writeDisposition,
-        gcsPaths,
-        awaitCompletion);
-  }
-
-  /**
-   * Imports data from GCS into BigQuery via a load job. Optionally polls for completion before
-   * returning.
-   *
-   * @param projectId the project on whose behalf to perform the load.
-   * @param tableRef the reference to the destination table.
-   * @param schema the schema of the source data to populate the destination table by.
    * @param timePartitioning time partitioning to populate the destination table.
    * @param kmsKeyName the Cloud KMS encryption key used to protect the output table.
    * @param sourceFormat the file format of the source data.
@@ -176,8 +139,9 @@ public class BigQueryHelper {
       boolean awaitCompletion)
       throws IOException, InterruptedException {
     logger.atInfo().log(
-        "Importing into table '%s' from %s paths; path[0] is '%s'; awaitCompletion: %s;  timePartitioning: %s",
-        BigQueryStrings.toString(tableRef),
+        "Importing into table '%s' from %s paths; path[0] is '%s'; awaitCompletion: %s;"
+            + " timePartitioning: %s",
+        lazy(() -> BigQueryStrings.toString(tableRef)),
         gcsPaths.size(),
         gcsPaths.isEmpty() ? "(empty)" : gcsPaths.get(0),
         awaitCompletion,
