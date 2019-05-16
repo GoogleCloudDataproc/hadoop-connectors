@@ -2,142 +2,68 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
   <parent>
-    <artifactId>bigdataoss-parent</artifactId>
     <groupId>com.google.cloud.bigdataoss</groupId>
+    <artifactId>bigdataoss-parent</artifactId>
     <version>2.0.0-SNAPSHOT</version>
   </parent>
-  <modelVersion>4.0.0</modelVersion>
-  <artifactId>bigdata-interop-coverage</artifactId>
-  <properties>
-    <build.directory.gcs>../gcs/target</build.directory.gcs>
-    <build.directory.gcsio>../gcsio/target</build.directory.gcsio>
-    <build.directory.bigquery>../bigquery/target</build.directory.bigquery>
-    <build.directory.util>../util/target</build.directory.util>
-    <build.directory.util-hadoop>../util-hadoop/target</build.directory.util-hadoop>
 
-    <classes.directory.gcs>../gcs/target/classes</classes.directory.gcs>
-    <classes.directory.gcsio>../gcsio/target/classes</classes.directory.gcsio>
-    <classes.directory.bigquery>../bigquery/target/classes</classes.directory.bigquery>
-    <classes.directory.util>../util/target/classes</classes.directory.util>
-    <classes.directory.util-hadoop>../util-hadoop/target/classes</classes.directory.util-hadoop>
+  <artifactId>coverage</artifactId>
+  <version>2.0.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
 
-    <sources.directory.gcs>../gcs/src/main/java</sources.directory.gcs>
-    <sources.directory.gcsio>../gcsio/src/main/java</sources.directory.gcsio>
-    <sources.directory.bigquery>../bigquery/src/main/java</sources.directory.bigquery>
-    <sources.directory.util>../util/src/main/java</sources.directory.util>
-    <sources.directory.util-hadoop>../util-hadoop/src/main/java</sources.directory.util-hadoop>
-    
-    <generated-sources.directory.gcs>../gcs/target/generated-sources/annotations</generated-sources.directory.gcs>
-    <generated-sources.directory.gcsio>../gcsio/target/generated-sources/annotations
-    </generated-sources.directory.gcsio>
-    <generated-sources.directory.bigquery>../bigquery/target/generated-sources/annotations
-    </generated-sources.directory.bigquery>
-    <generated-sources.directory.util>../util/target/generated-sources/annotations
-    </generated-sources.directory.util>
-    <generated-sources.directory.util-hadoop>../util-hadoop/target/generated-sources/annotations
-    </generated-sources.directory.util-hadoop>
-  </properties>
-  <build>
-    <plugins>
-      <!-- Dependencies -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-dependency-plugin</artifactId>
-        <executions>
-          <!-- Copy the ant tasks jar. Needed for ts.jacoco.report-ant . -->
-          <execution>
-            <id>jacoco-dependency-ant</id>
-            <goals>
-              <goal>copy</goal>
-            </goals>
-            <phase>process-test-resources</phase>
-            <inherited>false</inherited>
-            <configuration>
-              <artifactItems>
-                <artifactItem>
-                  <groupId>org.jacoco</groupId>
-                  <artifactId>org.jacoco.ant</artifactId>
-                  <version>${jacoco.version}</version>
-                </artifactItem>
-              </artifactItems>
-              <stripVersion>true</stripVersion>
-              <outputDirectory>${basedir}/target/jacoco-jars</outputDirectory>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <!-- Ant plugin. -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-antrun-plugin</artifactId>
-        <version>1.6</version>
-        <executions>
-          <execution>
-            <phase>post-integration-test</phase>
-            <goals>
-              <goal>run</goal>
-            </goals>
-            <configuration>
-              <target>
-                <!-- Execute an ant task within maven -->
-                <echo message="Generating JaCoCo Reports"/>
-                <taskdef name="report" classname="org.jacoco.ant.ReportTask">
-                  <classpath path="${basedir}/target/jacoco-jars/org.jacoco.ant.jar"/>
-                </taskdef>
-                <mkdir dir="${basedir}/target/coverage-report"/>
-                <report>
-                  <executiondata>
-                    <fileset dir="${build.directory.gcs}">
-                      <include name="jacoco.exec"/>
-                    </fileset>
-                    <fileset dir="${build.directory.gcsio}">
-                      <include name="jacoco.exec"/>
-                    </fileset>
-                    <fileset dir="${build.directory.bigquery}">
-                      <include name="jacoco.exec"/>
-                    </fileset>
-                    <fileset dir="${build.directory.util}">
-                      <include name="jacoco.exec"/>
-                    </fileset>
-                    <fileset dir="${build.directory.util-hadoop}">
-                      <include name="jacoco.exec"/>
-                    </fileset>
-                  </executiondata>
-                  <structure name="Jacoco Coverage Project">
-                    <group name="bigdata-interop">
-                      <classfiles>
-                        <fileset dir="${classes.directory.gcs}"/>
-                        <fileset dir="${classes.directory.gcsio}"/>
-                        <fileset dir="${classes.directory.bigquery}"/>
-                        <fileset dir="${classes.directory.util}"/>
-                        <fileset dir="${classes.directory.util-hadoop}"/>
-                      </classfiles>
-                      <sourcefiles encoding="UTF-8">
-                        <fileset dir="${sources.directory.gcs}"/>
-                        <fileset dir="${sources.directory.gcsio}"/>
-                        <fileset dir="${sources.directory.bigquery}"/>
-                        <fileset dir="${sources.directory.util}"/>
-                        <fileset dir="${sources.directory.util-hadoop}"/>
-                      </sourcefiles>
-                    </group>
-                  </structure>
-                  <html destdir="${basedir}/target/coverage-report/html"/>
-                  <xml destfile="${basedir}/target/coverage-report/coverage-report.xml"/>
-                  <csv destfile="${basedir}/target/coverage-report/coverage-report.csv"/>
-                </report>
-              </target>
-            </configuration>
-          </execution>
-        </executions>
-        <dependencies>
-          <dependency>
+  <profiles>
+    <profile>
+      <id>coverage</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
             <groupId>org.jacoco</groupId>
-            <artifactId>org.jacoco.ant</artifactId>
-            <version>${jacoco.version}</version>
-          </dependency>
-        </dependencies>
-      </plugin>
-    </plugins>
-  </build>
+            <artifactId>jacoco-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <phase>verify</phase>
+                <goals>
+                  <goal>report-aggregate</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.google.cloud.bigdataoss</groupId>
+      <artifactId>bigquery-connector</artifactId>
+      <version>${hadoop.identifier}-${bigquery-connector.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud.bigdataoss</groupId>
+      <artifactId>gcs-connector</artifactId>
+      <version>${hadoop.identifier}-${bigdataoss.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud.bigdataoss</groupId>
+      <artifactId>gcsio</artifactId>
+      <version>${bigdataoss.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud.bigdataoss</groupId>
+      <artifactId>util</artifactId>
+      <version>${bigdataoss.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud.bigdataoss</groupId>
+      <artifactId>util-hadoop</artifactId>
+      <version>${hadoop.identifier}-${bigdataoss.version}</version>
+    </dependency>
+  </dependencies>
 </project>
