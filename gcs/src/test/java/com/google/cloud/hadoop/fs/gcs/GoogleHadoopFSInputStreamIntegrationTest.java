@@ -94,7 +94,6 @@ public class GoogleHadoopFSInputStreamIntegrationTest
     @Test
     public void testRead() throws IOException {
         GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) ghfs;
-//        byte[] data = new byte[10];
         Path directory = new Path(
                 String.format(
                         gsDirectory, myGhfs.getRootBucketName()));
