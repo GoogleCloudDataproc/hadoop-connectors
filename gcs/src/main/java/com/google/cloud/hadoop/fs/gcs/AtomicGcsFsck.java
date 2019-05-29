@@ -36,10 +36,13 @@ import java.util.function.Function;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
 
 /**
  * FSCK tool to recover failed directory mutations guarded by GCS Connector Cooperative Locking
@@ -50,31 +53,27 @@ import org.apache.hadoop.fs.Path;
  *       com.google.cloud.hadoop.fs.gcs.AtomicGcsFsck gs://my-bucket
  * </code>
  */
-public class AtomicGcsFsck {
+public class AtomicGcsFsck extends Configured implements Tool {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   private static final Gson GSON = new Gson();
-  public static final Splitter RENAME_LOG_RECORD_SPLITTER = Splitter.on(" -> ");
-
-  private final String bucket;
-  private final Configuration conf;
+  private static final Splitter RENAME_LOG_RECORD_SPLITTER = Splitter.on(" -> ");
 
   public static void main(String[] args) throws Exception {
-    new AtomicGcsFsck(args[0]).repair();
+    // Let ToolRunner handle generic command-line options
+    int res = ToolRunner.run(new Configuration(), new AtomicGcsFsck(), args);
+
+    System.exit(res);
   }
 
-  AtomicGcsFsck(String bucket) {
-    this(bucket, new Configuration());
-  }
-
-  AtomicGcsFsck(String bucket, Configuration conf) {
-    this.bucket = bucket;
+  @Override
+  public int run(String[] args) throws Exception {
+    String bucket = args[0];
     checkArgument(bucket.startsWith("gs://"), "bucket parameter should have 'gs://' scheme");
-    this.conf = conf;
-  }
 
-  void repair() throws Exception {
+    Configuration conf = getConf();
+
     // Disable cooperative locking to prevent blocking
     conf.set(GCS_COOPERATIVE_LOCKING_ENABLE.getKey(), "false");
     conf.set(GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.getKey(), "false");
@@ -90,7 +89,7 @@ public class AtomicGcsFsck {
     Set<Operation> lockedOperations = gcsAtomic.getLockedOperations(bucketUri.getAuthority());
     if (lockedOperations.isEmpty()) {
       logger.atInfo().log("No expired operation locks");
-      return;
+      return 0;
     }
 
     Map<FileStatus, Operation> expiredOperations = new HashMap<>();
@@ -122,8 +121,8 @@ public class AtomicGcsFsck {
 
       Instant lockInstant = Instant.ofEpochSecond(lockedOperation.getLockEpochSeconds());
       Instant renewedInstant = getLockRenewedInstant(ghfs, operation);
-      if (isLockExpired(renewedInstant, operationExpirationTime)
-          && isLockExpired(lockInstant, operationExpirationTime)) {
+      if (isLockExpired(conf, renewedInstant, operationExpirationTime)
+          && isLockExpired(conf, lockInstant, operationExpirationTime)) {
         expiredOperations.put(operation, lockedOperation);
         logger.atInfo().log("Operation %s expired.", operation.getPath());
       } else {
@@ -254,6 +253,7 @@ public class AtomicGcsFsck {
             "Operation %s failed to roll forward in %dms", expiredOperation, finish - start);
       }
     }
+    return 0;
   }
 
   private void deleteResource(
@@ -280,7 +280,8 @@ public class AtomicGcsFsck {
     }
   }
 
-  private boolean isLockExpired(Instant lockInstant, Instant expirationInstant) {
+  private boolean isLockExpired(
+      Configuration conf, Instant lockInstant, Instant expirationInstant) {
     return lockInstant
         .plus(GCS_COOPERATIVE_LOCKING_EXPIRATION_TIMEOUT_MS.get(conf, conf::getLong), MILLIS)
         .isBefore(expirationInstant);

@@ -146,7 +146,10 @@ public class CooperativeLockingRepairIntegrationTest {
     assertThat(gcsFs.exists(dstDirUri)).isTrue();
     assertThat(gcsFs.exists(dstDirUri.resolve(fileName))).isFalse();
 
-    new AtomicGcsFsck("gs://" + bucketName, getTestConfiguration()).repair();
+    AtomicGcsFsck fsck = new AtomicGcsFsck();
+    fsck.setConf(getTestConfiguration());
+
+    fsck.run(new String[] {"gs://" + bucketName});
 
     assertThat(gcsFs.exists(srcDirUri)).isFalse();
     assertThat(gcsFs.exists(srcDirUri.resolve(fileName))).isFalse();
@@ -216,7 +219,10 @@ public class CooperativeLockingRepairIntegrationTest {
     assertThat(gcsFs.exists(dstDirUri)).isTrue();
     assertThat(gcsFs.exists(dstDirUri.resolve(fileName))).isTrue();
 
-    new AtomicGcsFsck("gs://" + bucketName, getTestConfiguration()).repair();
+    AtomicGcsFsck fsck = new AtomicGcsFsck();
+    fsck.setConf(getTestConfiguration());
+
+    fsck.run(new String[] {"gs://" + bucketName});
 
     assertThat(gcsFs.exists(srcDirUri)).isFalse();
     assertThat(gcsFs.exists(srcDirUri.resolve(fileName))).isFalse();
@@ -283,7 +289,10 @@ public class CooperativeLockingRepairIntegrationTest {
     assertThat(gcsFs.exists(dirUri)).isTrue();
     assertThat(gcsFs.exists(dirUri.resolve(fileName))).isTrue();
 
-    new AtomicGcsFsck("gs://" + bucketName, getTestConfiguration()).repair();
+    AtomicGcsFsck fsck = new AtomicGcsFsck();
+    fsck.setConf(getTestConfiguration());
+
+    fsck.run(new String[] {"gs://" + bucketName});
 
     assertThat(gcsFs.exists(dirUri)).isFalse();
     assertThat(gcsFs.exists(dirUri.resolve(fileName))).isFalse();
