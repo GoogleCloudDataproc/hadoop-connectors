@@ -154,6 +154,9 @@ public class GcsAtomicOperations {
                 : getLockRecords(lockInfo);
 
         if (!modificationFn.apply(lockRecords, operationId, modificationFnParam)) {
+          logger.atInfo().atMostEvery(5, SECONDS).log(
+              "Failed to update %s entries in %s file: resources could be locked. Re-trying.",
+              modificationFnParam, lockRecords.getOperations().size(), lockId);
           sleepUninterruptibly(backOff.nextBackOffMillis(), MILLISECONDS);
           continue;
         }
@@ -179,7 +182,7 @@ public class GcsAtomicOperations {
         gcs.updateMetadata(lockInfo, metadata);
 
         logger.atFine().log(
-            "updated lock file in %dms for %s operation with %s parameter",
+            "Updated lock file in %dms for %s operation with %s parameter",
             System.currentTimeMillis() - startMs, operationId, lazy(modificationFnParam::toString));
         break;
       } catch (IOException e) {
