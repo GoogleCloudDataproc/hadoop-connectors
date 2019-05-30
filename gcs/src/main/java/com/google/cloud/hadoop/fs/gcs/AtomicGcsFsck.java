@@ -61,6 +61,16 @@ public class AtomicGcsFsck extends Configured implements Tool {
   private static final Splitter RENAME_LOG_RECORD_SPLITTER = Splitter.on(" -> ");
 
   public static void main(String[] args) throws Exception {
+    if (args.length == 1 && "--help".equals(args[0])) {
+      System.out.println(
+          "FSCK tool to recover failed directory mutations guarded by"
+              + " GCS Connector Cooperative Locking feature.\n\n"
+              + ("Usage:\n\thadoop jar /usr/lib/hadoop/lib/gcs-connector.jar "
+                  + AtomicGcsFsck.class.getCanonicalName()
+                  + " gs://<BUCKET>"));
+      return;
+    }
+
     // Let ToolRunner handle generic command-line options
     int res = ToolRunner.run(new Configuration(), new AtomicGcsFsck(), args);
 
