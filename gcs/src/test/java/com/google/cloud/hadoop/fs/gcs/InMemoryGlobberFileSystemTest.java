@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 Google Inc. All Rights Reserved.
+ * Copyright 2019 Google Inc. All Rights Reserved.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -14,70 +14,70 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest;
 import com.google.common.base.Throwables;
-import com.google.common.flogger.LoggerConfig;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.junit.ClassRule;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.logging.Level;
+import java.util.UUID;
 
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestBase.loadConfig;
 import static com.google.common.truth.Truth.assertWithMessage;
 
-/** Unittests for {@link InMemoryGlobberFileSystem} class. */
+/**
+ * Integration tests for {@link InMemoryGlobberFileSystem} class.
+ */
+
 @RunWith(JUnit4.class)
-public class InMemoryGlobberFileSystemTest extends GoogleHadoopFileSystemIntegrationTest {
+public class InMemoryGlobberFileSystemTest {
+  private static HadoopFileSystemIntegrationHelper ghfsHelper;
+  private static FileSystem ghfs;
 
-  @ClassRule
-  public static NotInheritableExternalResource storageResource =
-      new NotInheritableExternalResource(InMemoryGlobberFileSystemTest.class) {
-        @Override
-        public void before() throws Throwable {
-          // Disable logging.
-          LoggerConfig.getConfig("").setLevel(Level.OFF);
+  @BeforeClass
+  public static void setup() throws Throwable {
+    GoogleHadoopFileSystemIntegrationTest.storageResource.before();
+    ghfsHelper = GoogleHadoopFileSystemIntegrationTest.ghfsHelper;
+    ghfs = GoogleHadoopFileSystemIntegrationTest.ghfs;
+  }
 
-          ghfs = GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem();
-          ghfsFileSystemDescriptor = (FileSystemDescriptor) ghfs;
+  @AfterClass
+  public static void cleanup() {
+    ghfs = null;
+    ghfsHelper = null;
+    GoogleHadoopFileSystemIntegrationTest.storageResource.after();
+  }
 
-          GoogleHadoopFileSystemIntegrationTest.postCreateInit();
-        }
+  private String gsDirectory = "gs://%s/inmemoryglobberfilesystemtest/";
 
-        @Override
-        public void after() {
-          GoogleHadoopFileSystemIntegrationTest.storageResource.after();
-        }
-      };
 
   @Test
-  public void testGetNullFileStatus() throws IOException, URISyntaxException {
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
-    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
-    ghfsHelper.writeFile(filePath, "foo", 1, /* overwrite= */ true);
-
-    FileStatus status = ghfs.getFileStatus(filePath);
+  public void testGetNullFileStatus() throws IOException {
+    GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) ghfs;
+    byte[] data = new byte[0];
+    Path directory = new Path(String.format(gsDirectory, myGhfs.getRootBucketName()));
+    Path file = new Path(directory, String.format("file-%s", UUID.randomUUID()));
+    ghfsHelper.writeFile(file, data, 100, /* overwrite= */ false);
+    FileStatus status = ghfs.getFileStatus(file);
     List<FileStatus> fileStatuses = Arrays.asList(status);
 
     FileSystem helperFileSystem =
             InMemoryGlobberFileSystem.createInstance(loadConfig(), ghfs.getWorkingDirectory(), fileStatuses);
 
     try {
-      helperFileSystem.getFileStatus(filePath);
+      helperFileSystem.getFileStatus(file);
     } catch (FileNotFoundException e) {
       assertWithMessage("Path should not exist", Throwables.getStackTraceAsString(e))
               .that(e)
               .hasMessageThat()
-              .startsWith(String.format("Path '%s' (qualified: '%s') does not exist.", filePath.toString(), filePath.toString()));
+              .startsWith(String.format("Path '%s' (qualified: '%s') does not exist.", file.toString(), file.toString()));
     }
   }
 }
