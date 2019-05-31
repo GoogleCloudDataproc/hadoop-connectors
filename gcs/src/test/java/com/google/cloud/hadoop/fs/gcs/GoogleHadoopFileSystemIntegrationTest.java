@@ -18,6 +18,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.cr
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksumType;
@@ -52,12 +53,9 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/**
- * Integration tests for GoogleHadoopFileSystem class.
- */
+/** Integration tests for GoogleHadoopFileSystem class. */
 @RunWith(JUnit4.class)
-public class GoogleHadoopFileSystemIntegrationTest
-    extends GoogleHadoopFileSystemTestBase {
+public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSystemTestBase {
 
   @ClassRule
   public static NotInheritableExternalResource storageResource =
@@ -98,21 +96,20 @@ public class GoogleHadoopFileSystemIntegrationTest
   // Tests that exercise behavior defined in HdfsBehavior.
   // -----------------------------------------------------------------
 
-  /**
-   * Validates rename().
-   */
-  @Test @Override
-  public void testRename()
-      throws IOException {
-    renameHelper(new HdfsBehavior() {
-        /**
-         * Returns the MethodOutcome of trying to rename an existing file into the root directory.
-         */
-        @Override
-        public MethodOutcome renameFileIntoRootOutcome() {
-          return new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE);
-        }
-      });
+  /** Validates rename(). */
+  @Test
+  @Override
+  public void testRename() throws IOException {
+    renameHelper(
+        new HdfsBehavior() {
+          /**
+           * Returns the MethodOutcome of trying to rename an existing file into the root directory.
+           */
+          @Override
+          public MethodOutcome renameFileIntoRootOutcome() {
+            return new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE);
+          }
+        });
   }
 
   @Test
@@ -215,17 +212,13 @@ public class GoogleHadoopFileSystemIntegrationTest
       assertThat(e.getLocalizedMessage()).startsWith("Wrong bucket:");
     }
   }
-  /**
-   * Verify that default constructor does not throw.
-   */
+  /** Verify that default constructor does not throw. */
   @Test
   public void testDefaultConstructor() {
     new GoogleHadoopFileSystem();
   }
 
-  /**
-   * Verify that getHomeDirectory() returns expected value.
-   */
+  /** Verify that getHomeDirectory() returns expected value. */
   @Test
   public void testGetHomeDirectory() {
     URI homeDir = ghfs.getHomeDirectory().toUri();
@@ -241,12 +234,9 @@ public class GoogleHadoopFileSystemIntegrationTest
         .isTrue();
   }
 
-  /**
-   * Test getHadoopPath() invalid args.
-   */
+  /** Test getHadoopPath() invalid args. */
   @Test
-  public void testGetHadoopPathInvalidArgs()
-      throws URISyntaxException {
+  public void testGetHadoopPathInvalidArgs() throws URISyntaxException {
     IllegalArgumentException expected =
         assertThrows(
             IllegalArgumentException.class,
@@ -254,14 +244,10 @@ public class GoogleHadoopFileSystemIntegrationTest
     assertThat(expected).hasMessageThat().startsWith("Authority of URI");
   }
 
-  /**
-   * Validates that we correctly build our Options object
-   * from a Hadoop config.
-   */
+  /** Validates that we correctly build our Options object from a Hadoop config. */
   @Test
   public void testBuildOptionsFromConfig() throws IOException {
-    Configuration config = loadConfig(
-        "projectId", "serviceAccount", "priveKeyFile");
+    Configuration config = loadConfig("projectId", "serviceAccount", "priveKeyFile");
 
     GoogleCloudStorageFileSystemOptions.Builder optionsBuilder =
         GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config);
@@ -337,8 +323,7 @@ public class GoogleHadoopFileSystemIntegrationTest
   }
 
   @Test
-  public void testInitializeThrowsWhenCredentialsNotFound()
-      throws URISyntaxException, IOException {
+  public void testInitializeThrowsWhenCredentialsNotFound() throws URISyntaxException, IOException {
     String fakeClientId = "fooclient";
     URI gsUri = new URI("gs://foobar/");
     String fakeProjectId = "123456";
@@ -363,12 +348,10 @@ public class GoogleHadoopFileSystemIntegrationTest
     assertThat(thrown).hasMessageThat().contains("No valid credential configuration discovered");
   }
 
-  /**
-   * Validates initialize() with configuration key fs.gs.working.dir set.
-   */
-  @Test @Override
-  public void testInitializeWithWorkingDirectory()
-      throws IOException, URISyntaxException {
+  /** Validates initialize() with configuration key fs.gs.working.dir set. */
+  @Test
+  @Override
+  public void testInitializeWithWorkingDirectory() throws IOException, URISyntaxException {
     // We can just test by calling initialize multiple times (for each test condition) because
     // there is nothing in initialize() which must be run only once. If this changes, this test
     // method will need to resort to using a new GoogleHadoopFileSystem() for each item
@@ -573,9 +556,7 @@ public class GoogleHadoopFileSystemIntegrationTest
     ghfs.delete(testRoot, true);
   }
 
-  /**
-   * Tests getFileStatus() with non-default permissions.
-   */
+  /** Tests getFileStatus() with non-default permissions. */
   @Test
   public void testConfigurablePermissions() throws IOException {
     String testPermissions = "777";
@@ -596,6 +577,7 @@ public class GoogleHadoopFileSystemIntegrationTest
 
   /**
    * Test getFileStatus() uses the user reported by UGI
+   *
    * @throws IOException
    */
   @Test
@@ -617,6 +599,30 @@ public class GoogleHadoopFileSystemIntegrationTest
 
     // Cleanup.
     assertThat(ghfs.delete(filePath, true)).isTrue();
+  }
+
+  /** Validates rename() dst as null. */
+  @Test
+  public void rename_dstAsNull_throwException() {
+    GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
+    String gsDirectory = "gs://%s/testConcat/";
+    Path directory = new Path(String.format(gsDirectory, myGhfs.getRootBucketName()));
+    Throwable exception =
+        assertThrows(
+            java.lang.IllegalArgumentException.class, () -> myGhfs.rename(directory, null));
+    assertEquals(exception.getMessage(), "dst must not be null");
+  }
+
+  /** Validates rename() src as null. */
+  @Test
+  public void rename_srcAsNull_throwException() {
+    GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
+    String gsDirectory = "gs://%s/testConcat/";
+    Path directory = new Path(String.format(gsDirectory, myGhfs.getRootBucketName()));
+    Throwable exception =
+        assertThrows(
+            java.lang.IllegalArgumentException.class, () -> myGhfs.rename(null, directory));
+    assertEquals(exception.getMessage(), "src must not be null");
   }
 
   @Test
