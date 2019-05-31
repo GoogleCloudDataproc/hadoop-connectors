@@ -14,7 +14,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import com.google.cloud.hadoop.gcsio.*;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.AfterClass;
@@ -27,7 +27,7 @@ import java.io.IOException;
 import java.util.UUID;
 
 import static com.google.common.truth.Truth.assertThat;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertThrows;
 
 @RunWith(JUnit4.class)
 public class GoogleHadoopFSInputStreamIntegrationTest {
@@ -49,13 +49,14 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     GoogleHadoopFileSystemIntegrationTest.storageResource.after();
   }
 
-  private String gsDirectory = "gs://%s/testFSInputStream/";
+  private static String TEST_DIRECTORY_PATH_FORMAT = "gs://%s/testFSInputStream/";
 
   @Test
   public void testSeekIllegalArgument() throws IOException {
     GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) ghfs;
     byte[] data = new byte[0];
-    Path directory = new Path(String.format(gsDirectory, myGhfs.getRootBucketName()));
+    Path directory =
+        new Path(String.format(TEST_DIRECTORY_PATH_FORMAT, myGhfs.getRootBucketName()));
     Path file = new Path(directory, String.format("file-%s", UUID.randomUUID()));
     ghfsHelper.writeFile(file, data, 100, /* overwrite= */ false);
     GoogleHadoopFSInputStream in =
@@ -65,7 +66,8 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
             GoogleCloudStorageReadOptions.DEFAULT,
             new FileSystem.Statistics(ghfs.getScheme()));
     Throwable exception = assertThrows(java.io.EOFException.class, () -> in.seek(1));
-    assertTrue(exception.getMessage().contains("Invalid seek offset"));
+    assertThat(exception).hasMessageThat().contains("Invalid seek offset");
+
     // Cleanup.
     assertThat(ghfs.delete(directory, true)).isTrue();
   }
@@ -73,7 +75,8 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
   @Test
   public void testRead() throws IOException {
     GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) ghfs;
-    Path directory = new Path(String.format(gsDirectory, myGhfs.getRootBucketName()));
+    Path directory =
+        new Path(String.format(TEST_DIRECTORY_PATH_FORMAT, myGhfs.getRootBucketName()));
     Path file = new Path(directory, String.format("file-%s", UUID.randomUUID()));
     ghfsHelper.writeFile(file, "Some text", 100, /* overwrite= */ false);
     GoogleHadoopFSInputStream in =
@@ -92,7 +95,8 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
   public void testAvailable() throws IOException {
     GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) ghfs;
     byte[] data = new byte[10];
-    Path directory = new Path(String.format(gsDirectory, myGhfs.getRootBucketName()));
+    Path directory =
+        new Path(String.format(TEST_DIRECTORY_PATH_FORMAT, myGhfs.getRootBucketName()));
     Path file = new Path(directory, String.format("file-%s", UUID.randomUUID()));
     ghfsHelper.writeFile(file, data, 100, /* overwrite= */ false);
     GoogleHadoopFSInputStream in =
