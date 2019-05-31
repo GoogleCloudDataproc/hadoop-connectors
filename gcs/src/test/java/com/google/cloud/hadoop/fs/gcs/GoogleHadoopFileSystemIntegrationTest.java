@@ -604,11 +604,9 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   @Test
   public void rename_dstAsNull_throwException() {
     GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
-    String testDirecoryPath = "gs://%s/testRename/";
-    Path directory = new Path(String.format(testDirecoryPath, myGhfs.getRootBucketName()));
+    Path directory = new Path(String.format("gs://%s/testRename/", myGhfs.getRootBucketName()));
     Throwable exception =
-        assertThrows(
-            java.lang.IllegalArgumentException.class, () -> myGhfs.rename(directory, null));
+        assertThrows(IllegalArgumentException.class, () -> myGhfs.rename(directory, null));
     assertThat(exception).hasMessageThat().contains("dst must not be null");
   }
 
@@ -616,11 +614,9 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   @Test
   public void rename_srcAsNull_throwException() {
     GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
-    String testDirecoryPath = "gs://%s/testRename/";
-    Path directory = new Path(String.format(testDirecoryPath, myGhfs.getRootBucketName()));
+    Path directory = new Path(String.format("gs://%s/testRename/", myGhfs.getRootBucketName()));
     Throwable exception =
-        assertThrows(
-            java.lang.IllegalArgumentException.class, () -> myGhfs.rename(null, directory));
+        assertThrows(IllegalArgumentException.class, () -> myGhfs.rename(null, directory));
     assertThat(exception).hasMessageThat().contains("src must not be null");
   }
 
