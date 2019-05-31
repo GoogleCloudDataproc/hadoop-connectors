@@ -14,7 +14,9 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest;
 import com.google.common.base.Throwables;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -25,17 +27,21 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestBase.loadConfig;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem;
+import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
+import static org.junit.Assert.assertThrows;
 
 /**
  * Integration tests for {@link InMemoryGlobberFileSystem} class.
  */
-
 @RunWith(JUnit4.class)
 public class InMemoryGlobberFileSystemTest {
   private static HadoopFileSystemIntegrationHelper ghfsHelper;
@@ -55,29 +61,21 @@ public class InMemoryGlobberFileSystemTest {
     GoogleHadoopFileSystemIntegrationTest.storageResource.after();
   }
 
-  private String gsDirectory = "gs://%s/inmemoryglobberfilesystemtest/";
-
-
   @Test
   public void testGetNullFileStatus() throws IOException {
-    GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) ghfs;
-    byte[] data = new byte[0];
-    Path directory = new Path(String.format(gsDirectory, myGhfs.getRootBucketName()));
-    Path file = new Path(directory, String.format("file-%s", UUID.randomUUID()));
-    ghfsHelper.writeFile(file, data, 100, /* overwrite= */ false);
-    FileStatus status = ghfs.getFileStatus(file);
+    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
+    ghfsHelper.writeFile(filePath, "foo", 1, /* overwrite= */ true);
+
+    FileStatus status = ghfs.getFileStatus(filePath);
     List<FileStatus> fileStatuses = Arrays.asList(status);
 
     FileSystem helperFileSystem =
-            InMemoryGlobberFileSystem.createInstance(loadConfig(), ghfs.getWorkingDirectory(), fileStatuses);
+            InMemoryGlobberFileSystem.createInstance(loadConfig(), ghfs.getWorkingDirectory(),fileStatuses);
 
-    try {
-      helperFileSystem.getFileStatus(file);
-    } catch (FileNotFoundException e) {
-      assertWithMessage("Path should not exist", Throwables.getStackTraceAsString(e))
-              .that(e)
-              .hasMessageThat()
-              .startsWith(String.format("Path '%s' (qualified: '%s') does not exist.", file.toString(), file.toString()));
-    }
+    ghfsHelper.delete(filePath.toUri(),true);
+    FileNotFoundException e =
+            assertThrows(FileNotFoundException.class, () -> helperFileSystem.getFileStatus(ghfs.getWorkingDirectory()));
+    assertThat(e.getLocalizedMessage()).startsWith(String.format("Path '%s' (qualified: '%s') does not exist.",ghfs.getWorkingDirectory(),ghfs.getWorkingDirectory()));
   }
 }
