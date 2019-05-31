@@ -18,7 +18,6 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.cr
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksumType;
@@ -610,7 +609,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     Throwable exception =
         assertThrows(
             java.lang.IllegalArgumentException.class, () -> myGhfs.rename(directory, null));
-    assertEquals(exception.getMessage(), "dst must not be null");
+    assertThat(exception).hasMessageThat().contains("dst must not be null");
   }
 
   /** Validates rename() src as null. */
@@ -622,7 +621,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     Throwable exception =
         assertThrows(
             java.lang.IllegalArgumentException.class, () -> myGhfs.rename(null, directory));
-    assertEquals(exception.getMessage(), "src must not be null");
+    assertThat(exception).hasMessageThat().contains("src must not be null");
   }
 
   @Test
