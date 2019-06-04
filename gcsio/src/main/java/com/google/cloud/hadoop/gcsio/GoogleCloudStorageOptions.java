@@ -72,6 +72,9 @@ public abstract class GoogleCloudStorageOptions {
 
   public static final GoogleCloudStorageOptions DEFAULT = builder().build();
 
+  /** Default setting for enabling grpc reads/writes. */
+  public static final boolean ENABLE_GRPC_DEFAULT = false;
+
   /** @deprecated use {@link #builder()} instead */
   @Deprecated
   public static Builder newBuilder() {
@@ -97,7 +100,8 @@ public abstract class GoogleCloudStorageOptions {
         .setReadChannelOptions(GoogleCloudStorageReadOptions.DEFAULT)
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
         .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
-        .setCooperativeLockingOptions(CooperativeLockingOptions.DEFAULT);
+        .setCooperativeLockingOptions(CooperativeLockingOptions.DEFAULT)
+        .setGrpcEnabled(ENABLE_GRPC_DEFAULT);
   }
 
   @Nullable
@@ -150,6 +154,8 @@ public abstract class GoogleCloudStorageOptions {
   public abstract RequesterPaysOptions getRequesterPaysOptions();
 
   public abstract CooperativeLockingOptions getCooperativeLockingOptions();
+
+  public abstract boolean isGrpcEnabled();
 
   public abstract Builder toBuilder();
 
@@ -209,6 +215,8 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setCooperativeLockingOptions(
         CooperativeLockingOptions cooperativeLockingOptions);
+
+    public abstract Builder setGrpcEnabled(boolean grpcEnabled);
 
     abstract GoogleCloudStorageOptions autoBuild();
 
