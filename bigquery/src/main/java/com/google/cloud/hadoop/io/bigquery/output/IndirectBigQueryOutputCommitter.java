@@ -59,7 +59,7 @@ public class IndirectBigQueryOutputCommitter extends ForwardingBigQueryFileOutpu
     // Get the destination configuration information.
     Configuration conf = context.getConfiguration();
     TableReference destTable = BigQueryOutputConfiguration.getTableReference(conf);
-    String destProjectId = BigQueryOutputConfiguration.getProjectId(conf);
+    String destProjectId = BigQueryOutputConfiguration.getJobProjectId(conf);
     String writeDisposition = BigQueryOutputConfiguration.getWriteDisposition(conf);
     Optional<BigQueryTableSchema> destSchema = BigQueryOutputConfiguration.getTableSchema(conf);
     Optional<BigQueryTimePartitioning> timePartitioning =
