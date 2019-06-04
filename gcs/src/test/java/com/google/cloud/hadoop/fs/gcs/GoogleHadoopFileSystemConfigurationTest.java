@@ -98,6 +98,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.cooperative.locking.expiration.timeout.ms", 120_000L);
           put("fs.gs.cooperative.locking.max.concurrent.operations", 20);
           put("fs.gs.storage.http.headers.", ImmutableMap.of());
+          put("fs.gs.grpc.enable", false);
         }
       };
 
