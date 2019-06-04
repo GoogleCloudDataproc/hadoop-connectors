@@ -148,7 +148,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   @Test
   public void testCouldUseFlatGlob() throws IOException, URISyntaxException {
     Configuration lazyConf = new Configuration();
-    lazyConf.set(GCS_LAZY_INITIALIZATION_ENABLE.getKey(), "true");
+    lazyConf.setBoolean(GCS_LAZY_INITIALIZATION_ENABLE.getKey(), true);
     GoogleHadoopFileSystem lazyFs = new GoogleHadoopFileSystem();
     assertThat(lazyFs.couldUseFlatGlob(new Path(new URI("gs://**/test/")))).isFalse();
     lazyFs.close();

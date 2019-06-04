@@ -656,31 +656,32 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
-  public void testInitializeWithEmptyWorkingDirectory() throws IOException {
+  public void testInitializeWithEmptyWorkingDirectory_shouldHaveUserSpecificWorkingDirectory()
+      throws IOException {
     GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) ghfs;
     Configuration config = loadConfig();
-    ghfs.initialize(myGhfs.initUri, config);
     String rootBucketName = myGhfs.getRootBucketName();
     config.unset(GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY.getKey());
     ghfs.initialize(myGhfs.initUri, config);
 
-    assertThat(ghfs.getHomeDirectory().toString()).startsWith("gs://" + rootBucketName);
+    assertThat(ghfs.getHomeDirectory().toString())
+        .startsWith("gs://" + rootBucketName + "/user/" + System.getProperty("user.name"));
   }
 
   @Test
   public void testGlobStatusOptions() throws IOException {
-    testGlobStatusFlatConcurrent(true, true);
-    testGlobStatusFlatConcurrent(true, false);
-    testGlobStatusFlatConcurrent(false, true);
-    testGlobStatusFlatConcurrent(false, false);
+    testGlobStatusFlatConcurrent(/* flat glob = */ true, /* concurrent glob = */ true);
+    testGlobStatusFlatConcurrent(/* flat glob = */ true, /* concurrent glob = */ false);
+    testGlobStatusFlatConcurrent(/* flat glob = */ false, /* concurrent glob = */ true);
+    testGlobStatusFlatConcurrent(/* flat glob = */ false, /* concurrent glob = */ false);
   }
 
-  private void testGlobStatusFlatConcurrent(boolean flat, boolean concurent) throws IOException {
+  private void testGlobStatusFlatConcurrent(boolean flat, boolean concurrent) throws IOException {
     Configuration configuration = getConfigurationWtihImplementation();
     configuration.setBoolean(
         GoogleHadoopFileSystemConfiguration.GCS_FLAT_GLOB_ENABLE.getKey(), flat);
     configuration.setBoolean(
-        GoogleHadoopFileSystemConfiguration.GCS_CONCURRENT_GLOB_ENABLE.getKey(), concurent);
+        GoogleHadoopFileSystemConfiguration.GCS_CONCURRENT_GLOB_ENABLE.getKey(), concurrent);
 
     ghfs.initialize(ghfs.getUri(), configuration);
     Path testRoot = new Path("/directory1/");
@@ -690,7 +691,6 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
         new Path("/directory1/subdirectory1/file1"), "data".getBytes(StandardCharsets.UTF_8));
     FileStatus[] rootDirectories = ghfs.globStatus(new Path("/d*"));
 
-    assertThat(rootDirectories).hasLength(1);
     assertThat(rootDirectories).isEqualTo("directory1");
     assertThat(ghfs.delete(testRoot, /* recursive= */ true)).isTrue();
   }
