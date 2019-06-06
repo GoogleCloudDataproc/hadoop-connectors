@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -32,21 +33,26 @@ import static org.junit.Assert.assertThrows;
 @RunWith(JUnit4.class)
 public class GoogleHadoopFSInputStreamIntegrationTest {
 
+  static FileSystem ghfs;
+  static FileSystemDescriptor ghfsFileSystemDescriptor;
+
   private static HadoopFileSystemIntegrationHelper ghfsHelper;
-  private static FileSystem ghfs;
+  private static GoogleCloudStorageFileSystem gcsfs;
+  private static GoogleHadoopFileSystemIntegrationHelper ghfsIHelper;
 
   @BeforeClass
-  public static void setup() throws Throwable {
-    GoogleHadoopFileSystemIntegrationTest.storageResource.before();
-    ghfsHelper = GoogleHadoopFileSystemIntegrationTest.ghfsHelper;
-    ghfs = GoogleHadoopFileSystemIntegrationTest.ghfs;
+  public static void beforeClass() throws Throwable {
+    ghfsIHelper = new GoogleHadoopFileSystemIntegrationHelper();
+    gcsfs = ghfsIHelper.initializeGcfs();
+    GoogleHadoopFileSystem testInstance = new GoogleHadoopFileSystem();
+    ghfs = ghfsIHelper.initializeGhfs(testInstance);
+    ghfsFileSystemDescriptor = testInstance;
+    ghfsHelper = new HadoopFileSystemIntegrationHelper(ghfs, ghfsFileSystemDescriptor);
   }
 
   @AfterClass
-  public static void cleanup() {
-    ghfs = null;
-    ghfsHelper = null;
-    GoogleHadoopFileSystemIntegrationTest.storageResource.after();
+  public static void afterClass() throws IOException {
+    ghfsIHelper.after(gcsfs);
   }
 
   private static String TEST_DIRECTORY_PATH_FORMAT = "gs://%s/testFSInputStream/";
