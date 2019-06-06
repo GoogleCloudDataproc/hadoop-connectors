@@ -17,6 +17,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.DeleteOperatio
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.RenameOperation;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import com.google.gson.Gson;
 import java.io.BufferedReader;
@@ -50,12 +51,18 @@ import org.apache.hadoop.util.ToolRunner;
  *
  * <p>Usage: <code>
  *   hadoop jar /usr/lib/hadoop/lib/gcs-connector.jar
- *       com.google.cloud.hadoop.fs.gcs.AtomicGcsFsck gs://my-bucket
+ *       com.google.cloud.hadoop.fs.gcs.AtomicGcsFsck --rollForward gs://my-bucket
  * </code>
  */
 public class AtomicGcsFsck extends Configured implements Tool {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
+  private static final String COMMAND_CHECK = "--check";
+  private static final String COMMAND_ROLL_FORWARD = "--rollForward";
+
+  private static final Set<String> FSCK_COMMANDS =
+      ImmutableSet.of(COMMAND_CHECK, COMMAND_ROLL_FORWARD);
 
   private static final Gson GSON = new Gson();
   private static final Splitter RENAME_LOG_RECORD_SPLITTER = Splitter.on(" -> ");
@@ -64,10 +71,17 @@ public class AtomicGcsFsck extends Configured implements Tool {
     if (args.length == 1 && "--help".equals(args[0])) {
       System.out.println(
           "FSCK tool to recover failed directory mutations guarded by"
-              + " GCS Connector Cooperative Locking feature.\n\n"
-              + ("Usage:\n\thadoop jar /usr/lib/hadoop/lib/gcs-connector.jar "
-                  + AtomicGcsFsck.class.getCanonicalName()
-                  + " gs://<BUCKET>"));
+              + " GCS Connector Cooperative Locking feature."
+              + "\n\nUsage:"
+              + String.format(
+                  "\n\thadoop jar /usr/lib/hadoop/lib/gcs-connector.jar %s <COMMAND> gs://<BUCKET>",
+                  AtomicGcsFsck.class.getCanonicalName())
+              + "\n\nSupported commands:"
+              + String.format(
+                  "\n\t%s - prints out failed operation for the bucket", COMMAND_CHECK)
+              + String.format(
+                  "\n\t%s - recover directory operations in the bucket by rolling them forward",
+                  COMMAND_ROLL_FORWARD));
       return;
     }
 
@@ -79,7 +93,13 @@ public class AtomicGcsFsck extends Configured implements Tool {
 
   @Override
   public int run(String[] args) throws Exception {
-    String bucket = args[0];
+    checkArgument(
+        args.length == 2, "2 arguments should be specified, but were: %s", Arrays.asList(args));
+
+    String command = args[0];
+    checkArgument(FSCK_COMMANDS.contains(command), "Unknown %s command, should be %s", command);
+
+    String bucket = args[1];
     checkArgument(bucket.startsWith("gs://"), "bucket parameter should have 'gs://' scheme");
 
     Configuration conf = getConf();
@@ -138,6 +158,10 @@ public class AtomicGcsFsck extends Configured implements Tool {
       } else {
         logger.atInfo().log("Operation %s not expired.", operation.getPath());
       }
+    }
+
+    if (COMMAND_CHECK.equals(command)) {
+      return 0;
     }
 
     Function<Map.Entry<FileStatus, Operation>, Boolean> operationRecovery =

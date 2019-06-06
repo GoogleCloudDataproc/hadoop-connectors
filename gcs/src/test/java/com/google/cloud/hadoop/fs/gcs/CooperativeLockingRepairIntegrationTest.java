@@ -149,7 +149,7 @@ public class CooperativeLockingRepairIntegrationTest {
     AtomicGcsFsck fsck = new AtomicGcsFsck();
     fsck.setConf(getTestConfiguration());
 
-    fsck.run(new String[] {"gs://" + bucketName});
+    fsck.run(new String[] {"--rollForward" , "gs://" + bucketName});
 
     assertThat(gcsFs.exists(srcDirUri)).isFalse();
     assertThat(gcsFs.exists(srcDirUri.resolve(fileName))).isFalse();
@@ -222,7 +222,7 @@ public class CooperativeLockingRepairIntegrationTest {
     AtomicGcsFsck fsck = new AtomicGcsFsck();
     fsck.setConf(getTestConfiguration());
 
-    fsck.run(new String[] {"gs://" + bucketName});
+    fsck.run(new String[] {"--rollForward" , "gs://" + bucketName});
 
     assertThat(gcsFs.exists(srcDirUri)).isFalse();
     assertThat(gcsFs.exists(srcDirUri.resolve(fileName))).isFalse();
@@ -292,7 +292,7 @@ public class CooperativeLockingRepairIntegrationTest {
     AtomicGcsFsck fsck = new AtomicGcsFsck();
     fsck.setConf(getTestConfiguration());
 
-    fsck.run(new String[] {"gs://" + bucketName});
+    fsck.run(new String[] {"--rollForward" , "gs://" + bucketName});
 
     assertThat(gcsFs.exists(dirUri)).isFalse();
     assertThat(gcsFs.exists(dirUri.resolve(fileName))).isFalse();
