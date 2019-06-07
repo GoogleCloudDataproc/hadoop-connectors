@@ -60,9 +60,10 @@ public class AtomicGcsFsck extends Configured implements Tool {
 
   private static final String COMMAND_CHECK = "--check";
   private static final String COMMAND_ROLL_FORWARD = "--rollForward";
+  private static final String COMMAND_ROLL_BACK = "--rollBack";
 
   private static final Set<String> FSCK_COMMANDS =
-      ImmutableSet.of(COMMAND_CHECK, COMMAND_ROLL_FORWARD);
+      ImmutableSet.of(COMMAND_CHECK, COMMAND_ROLL_FORWARD, COMMAND_ROLL_BACK);
 
   private static final Gson GSON = new Gson();
   private static final Splitter RENAME_LOG_RECORD_SPLITTER = Splitter.on(" -> ");
@@ -77,11 +78,13 @@ public class AtomicGcsFsck extends Configured implements Tool {
                   "\n\thadoop jar /usr/lib/hadoop/lib/gcs-connector.jar %s <COMMAND> gs://<BUCKET>",
                   AtomicGcsFsck.class.getCanonicalName())
               + "\n\nSupported commands:"
-              + String.format(
-                  "\n\t%s - prints out failed operation for the bucket", COMMAND_CHECK)
+              + String.format("\n\t%s - prints out failed operation for the bucket", COMMAND_CHECK)
               + String.format(
                   "\n\t%s - recover directory operations in the bucket by rolling them forward",
-                  COMMAND_ROLL_FORWARD));
+                  COMMAND_ROLL_FORWARD)
+              + String.format(
+                  "\n\t%s - recover directory operations in the bucket by rolling them back",
+                  COMMAND_ROLL_BACK));
       return;
     }
 
@@ -172,6 +175,12 @@ public class AtomicGcsFsck extends Configured implements Tool {
           String operationId = getOperationId(operation);
           try {
             if (operation.getPath().toString().contains("_delete_")) {
+              if (COMMAND_ROLL_BACK.equals(command)) {
+                logger.atInfo().log(
+                    "Rolling back delete operations (%s) not supported, skipping.",
+                    operation.getPath());
+                return false;
+              }
               logger.atInfo().log("Repairing FS after %s delete operation.", operation.getPath());
               DeleteOperation operationObject =
                   getOperationObject(ghfs, operation, DeleteOperation.class);
@@ -213,45 +222,91 @@ public class AtomicGcsFsck extends Configured implements Tool {
                           return Pair.of(srcToDst.get(0), srcToDst.get(1));
                         });
                 if (operationObject.getCopySucceeded()) {
-                  logger.atInfo().log(
-                      "Repairing FS after %s rename operation (deleting source (%s)).",
-                      operation.getPath(), operationObject.getSrcResource());
-                  deleteResource(
-                      ghfs,
-                      operationObject.getSrcResource(),
-                      loggedResources.stream().map(Pair::getLeft).collect(toList()));
+                  if (COMMAND_ROLL_BACK.equals(command)) {
+                    logger.atInfo().log(
+                        "Repairing FS after %s rename operation"
+                            + " (deleting source (%s) and renaming (%s -> %s)).",
+                        operation.getPath(),
+                        operationObject.getSrcResource(),
+                        operationObject.getDstResource(),
+                        operationObject.getSrcResource());
+                    deleteResource(
+                        ghfs,
+                        operationObject.getSrcResource(),
+                        loggedResources.stream().map(Pair::getLeft).collect(toList()));
+                    gcsFs
+                        .getGcs()
+                        .copy(
+                            bucketName,
+                            loggedResources.stream()
+                                .map(
+                                    p ->
+                                        StorageResourceId.fromObjectName(p.getRight())
+                                            .getObjectName())
+                                .collect(toList()),
+                            bucketName,
+                            loggedResources.stream()
+                                .map(
+                                    p ->
+                                        StorageResourceId.fromObjectName(p.getLeft())
+                                            .getObjectName())
+                                .collect(toList()));
+                    deleteResource(
+                        ghfs,
+                        operationObject.getDstResource(),
+                        loggedResources.stream().map(Pair::getRight).collect(toList()));
+                  } else {
+                    logger.atInfo().log(
+                        "Repairing FS after %s rename operation (deleting source (%s)).",
+                        operation.getPath(), operationObject.getSrcResource());
+                    deleteResource(
+                        ghfs,
+                        operationObject.getSrcResource(),
+                        loggedResources.stream().map(Pair::getLeft).collect(toList()));
+                  }
                 } else {
-                  logger.atInfo().log(
-                      "Repairing FS after %s rename operation"
-                          + " (deleting destination (%s) and renaming (%s -> %s)).",
-                      operation.getPath(),
-                      operationObject.getDstResource(),
-                      operationObject.getSrcResource(),
-                      operationObject.getDstResource());
-                  deleteResource(
-                      ghfs,
-                      operationObject.getDstResource(),
-                      loggedResources.stream().map(Pair::getRight).collect(toList()));
-                  gcsFs
-                      .getGcs()
-                      .copy(
-                          bucketName,
-                          loggedResources.stream()
-                              .map(
-                                  p ->
-                                      StorageResourceId.fromObjectName(p.getLeft()).getObjectName())
-                              .collect(toList()),
-                          bucketName,
-                          loggedResources.stream()
-                              .map(
-                                  p ->
-                                      StorageResourceId.fromObjectName(p.getRight())
-                                          .getObjectName())
-                              .collect(toList()));
-                  deleteResource(
-                      ghfs,
-                      operationObject.getSrcResource(),
-                      loggedResources.stream().map(Pair::getLeft).collect(toList()));
+                  if (COMMAND_ROLL_BACK.equals(command)) {
+                    logger.atInfo().log(
+                        "Repairing FS after %s rename operation (deleting destination (%s)).",
+                        operation.getPath(), operationObject.getDstResource());
+                    deleteResource(
+                        ghfs,
+                        operationObject.getDstResource(),
+                        loggedResources.stream().map(Pair::getLeft).collect(toList()));
+                  } else {
+                    logger.atInfo().log(
+                        "Repairing FS after %s rename operation"
+                            + " (deleting destination (%s) and renaming (%s -> %s)).",
+                        operation.getPath(),
+                        operationObject.getDstResource(),
+                        operationObject.getSrcResource(),
+                        operationObject.getDstResource());
+                    deleteResource(
+                        ghfs,
+                        operationObject.getDstResource(),
+                        loggedResources.stream().map(Pair::getRight).collect(toList()));
+                    gcsFs
+                        .getGcs()
+                        .copy(
+                            bucketName,
+                            loggedResources.stream()
+                                .map(
+                                    p ->
+                                        StorageResourceId.fromObjectName(p.getLeft())
+                                            .getObjectName())
+                                .collect(toList()),
+                            bucketName,
+                            loggedResources.stream()
+                                .map(
+                                    p ->
+                                        StorageResourceId.fromObjectName(p.getRight())
+                                            .getObjectName())
+                                .collect(toList()));
+                    deleteResource(
+                        ghfs,
+                        operationObject.getSrcResource(),
+                        loggedResources.stream().map(Pair::getLeft).collect(toList()));
+                  }
                 }
                 gcsAtomic.unlockPaths(
                     operationId,
@@ -276,10 +331,16 @@ public class AtomicGcsFsck extends Configured implements Tool {
         long finish = System.currentTimeMillis();
         if (succeeded) {
           logger.atInfo().log(
-              "Operation %s successfully rolled forward in %dms", expiredOperation, finish - start);
+              "Operation %s successfully %s in %dms",
+              expiredOperation,
+              COMMAND_ROLL_FORWARD.equals(command) ? "rolled forward" : "rolled back",
+              finish - start);
         } else {
           logger.atSevere().log(
-              "Operation %s failed to roll forward in %dms", expiredOperation, finish - start);
+              "Operation %s failed to %s in %dms",
+              expiredOperation,
+              COMMAND_ROLL_FORWARD.equals(command) ? "rolled forward" : "rolled back",
+              finish - start);
         }
       } catch (Exception e) {
         long finish = System.currentTimeMillis();

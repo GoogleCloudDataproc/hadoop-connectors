@@ -108,8 +108,19 @@ public class CooperativeLockingRepairIntegrationTest {
   }
 
   @Test
-  public void moveDirectoryOperationRepairedAfterFailedCopy() throws Exception {
-    String bucketName = gcsfsIHelper.createUniqueBucket("cooperative-rename-repair-failed-copy");
+  public void moveDirectoryOperationRolledForwardAfterFailedCopy() throws Exception {
+    moveDirectoryOperationRepairedAfterFailedCopy("--rollForward");
+  }
+
+  @Test
+  public void moveDirectoryOperationRolledBackAfterFailedCopy() throws Exception {
+    moveDirectoryOperationRepairedAfterFailedCopy("--rollBack");
+  }
+
+  private void moveDirectoryOperationRepairedAfterFailedCopy(String command) throws Exception {
+    String bucketName =
+        gcsfsIHelper.createUniqueBucket(
+            "cooperative-rename-" + command.toLowerCase().replace("--roll", "") + "-failed-move");
     URI bucketUri = new URI("gs://" + bucketName + "/");
     String dirName = "rename_" + UUID.randomUUID();
     String fileName = "file";
@@ -149,12 +160,14 @@ public class CooperativeLockingRepairIntegrationTest {
     AtomicGcsFsck fsck = new AtomicGcsFsck();
     fsck.setConf(getTestConfiguration());
 
-    fsck.run(new String[] {"--rollForward" , "gs://" + bucketName});
+    fsck.run(new String[] {command, "gs://" + bucketName});
 
-    assertThat(gcsFs.exists(srcDirUri)).isFalse();
-    assertThat(gcsFs.exists(srcDirUri.resolve(fileName))).isFalse();
-    assertThat(gcsFs.exists(dstDirUri)).isTrue();
-    assertThat(gcsFs.exists(dstDirUri.resolve(fileName))).isTrue();
+    URI deletedDirUri = "--rollForward".equals(command) ? srcDirUri : dstDirUri;
+    URI repairedDirUri = "--rollForward".equals(command) ? dstDirUri : srcDirUri;
+    assertThat(gcsFs.exists(deletedDirUri)).isFalse();
+    assertThat(gcsFs.exists(deletedDirUri.resolve(fileName))).isFalse();
+    assertThat(gcsFs.exists(repairedDirUri)).isTrue();
+    assertThat(gcsFs.exists(repairedDirUri.resolve(fileName))).isTrue();
 
     // Validate lock files
     List<URI> lockFiles =
@@ -222,7 +235,7 @@ public class CooperativeLockingRepairIntegrationTest {
     AtomicGcsFsck fsck = new AtomicGcsFsck();
     fsck.setConf(getTestConfiguration());
 
-    fsck.run(new String[] {"--rollForward" , "gs://" + bucketName});
+    fsck.run(new String[] {"--rollForward", "gs://" + bucketName});
 
     assertThat(gcsFs.exists(srcDirUri)).isFalse();
     assertThat(gcsFs.exists(srcDirUri.resolve(fileName))).isFalse();
@@ -254,7 +267,7 @@ public class CooperativeLockingRepairIntegrationTest {
   }
 
   @Test
-  public void deleteDirectoryOperationRepaired() throws Exception {
+  public void deleteDirectoryOperationRolledForward() throws Exception {
     String bucketName = gcsfsIHelper.createUniqueBucket("cooperative-delete-repair");
     URI bucketUri = new URI("gs://" + bucketName + "/");
     String fileName = "file";
@@ -292,7 +305,7 @@ public class CooperativeLockingRepairIntegrationTest {
     AtomicGcsFsck fsck = new AtomicGcsFsck();
     fsck.setConf(getTestConfiguration());
 
-    fsck.run(new String[] {"--rollForward" , "gs://" + bucketName});
+    fsck.run(new String[] {"--rollForward", "gs://" + bucketName});
 
     assertThat(gcsFs.exists(dirUri)).isFalse();
     assertThat(gcsFs.exists(dirUri.resolve(fileName))).isFalse();
