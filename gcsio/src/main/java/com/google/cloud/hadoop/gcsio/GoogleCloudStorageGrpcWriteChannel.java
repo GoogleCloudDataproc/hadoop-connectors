@@ -239,7 +239,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
                 streamFinished = lastReadBytes == -1 || pipeSource.read() == -1;
                 pipeSource.reset();
 
-                return ByteString.copyFrom(data, 0, bytesToRead);
+                return ByteString.copyFrom(data, 0, bytesRead);
               }
 
               private boolean chunkFinished(int chunkSize) {
