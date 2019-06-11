@@ -14,107 +14,110 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
+
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import java.io.EOFException;
+import java.net.URI;
+import java.nio.channels.ClosedChannelException;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-import java.io.IOException;
-import java.util.UUID;
-
-import static com.google.common.truth.Truth.assertThat;
-import static org.junit.Assert.assertThrows;
-
 @RunWith(JUnit4.class)
 public class GoogleHadoopFSInputStreamIntegrationTest {
-
-  static FileSystem ghfs;
-  static FileSystemDescriptor ghfsFileSystemDescriptor;
-
-  private static HadoopFileSystemIntegrationHelper ghfsHelper;
-  private static GoogleCloudStorageFileSystem gcsfs;
-  private static GoogleHadoopFileSystemIntegrationHelper ghfsIHelper;
+  private static GoogleCloudStorageFileSystemIntegrationHelper gcsFsIHelper;
 
   @BeforeClass
-  public static void beforeClass() throws Throwable {
-    ghfsIHelper = new GoogleHadoopFileSystemIntegrationHelper();
-    gcsfs = ghfsIHelper.initializeGcfs();
-    GoogleHadoopFileSystem testInstance = new GoogleHadoopFileSystem();
-    ghfs = ghfsIHelper.initializeGhfs(testInstance);
-    ghfsFileSystemDescriptor = testInstance;
-    ghfsHelper = new HadoopFileSystemIntegrationHelper(ghfs, ghfsFileSystemDescriptor);
+  public static void beforeClass() throws Exception {
+    gcsFsIHelper =
+        GoogleCloudStorageFileSystemIntegrationHelper.create(
+            GoogleHadoopFileSystemIntegrationHelper.APP_NAME);
+    gcsFsIHelper.beforeAllTests();
   }
 
   @AfterClass
-  public static void afterClass() throws IOException {
-    ghfsIHelper.after(gcsfs);
+  public static void afterClass() {
+    gcsFsIHelper.afterAllTests();
   }
 
-  private static String TEST_DIRECTORY_PATH_FORMAT = "gs://%s/testFSInputStream/";
-
   @Test
-  public void testSeekIllegalArgument() throws IOException {
-    GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) ghfs;
-    byte[] data = new byte[0];
-    Path directory =
-        new Path(String.format(TEST_DIRECTORY_PATH_FORMAT, myGhfs.getRootBucketName()));
-    Path file = new Path(directory, String.format("file-%s", UUID.randomUUID()));
-    ghfsHelper.writeFile(file, data, 100, /* overwrite= */ false);
+  public void testSeek_illegalArgument() throws Exception {
+    StorageResourceId testFile =
+        new StorageResourceId(
+            gcsFsIHelper.sharedBucketName1, "GHFSInputStream_testSeek_illegalArgument");
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+            testFile.toString(), GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
+
+    String testContent = "test content";
+    gcsFsIHelper.writeTextFile(testFile.getBucketName(), testFile.getObjectName(), testContent);
+
     GoogleHadoopFSInputStream in =
         new GoogleHadoopFSInputStream(
-            myGhfs,
-            myGhfs.getGcsPath(file),
+            ghfs,
+            new URI(testFile.toString()),
             GoogleCloudStorageReadOptions.DEFAULT,
             new FileSystem.Statistics(ghfs.getScheme()));
-    Throwable exception = assertThrows(java.io.EOFException.class, () -> in.seek(1));
+
+    Throwable exception = assertThrows(EOFException.class, () -> in.seek(testContent.length()));
     assertThat(exception).hasMessageThat().contains("Invalid seek offset");
-
-    // Cleanup.
-    assertThat(ghfs.delete(directory, true)).isTrue();
   }
 
   @Test
-  public void testRead() throws IOException {
-    GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) ghfs;
-    Path directory =
-        new Path(String.format(TEST_DIRECTORY_PATH_FORMAT, myGhfs.getRootBucketName()));
-    Path file = new Path(directory, String.format("file-%s", UUID.randomUUID()));
-    ghfsHelper.writeFile(file, "Some text", 100, /* overwrite= */ false);
+  public void testRead() throws Exception {
+    StorageResourceId testFile =
+        new StorageResourceId(gcsFsIHelper.sharedBucketName1, "GHFSInputStream_testRead");
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+            testFile.toString(), GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
+
+    String testContent = "test content";
+    gcsFsIHelper.writeTextFile(testFile.getBucketName(), testFile.getObjectName(), testContent);
+
     GoogleHadoopFSInputStream in =
         new GoogleHadoopFSInputStream(
-            myGhfs,
-            myGhfs.getGcsPath(file),
+            ghfs,
+            new URI(testFile.toString()),
             GoogleCloudStorageReadOptions.DEFAULT,
             new FileSystem.Statistics(ghfs.getScheme()));
-    assertThat(in.read(new byte[2], 1, 1)).isEqualTo(1);
-    assertThat(in.read(1, new byte[2], 1, 1)).isEqualTo(1);
-    // Cleanup.
-    assertThat(ghfs.delete(directory, true)).isTrue();
+
+    byte[] value = new byte[2];
+    byte[] expected = Arrays.copyOfRange(testContent.getBytes(StandardCharsets.UTF_8), 0, 2);
+
+    assertThat(in.read(value, 0, 1)).isEqualTo(1);
+    assertThat(in.read(1, value, 1, 1)).isEqualTo(1);
+    assertThat(value).isEqualTo(expected);
   }
 
   @Test
-  public void testAvailable() throws IOException {
-    GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) ghfs;
-    byte[] data = new byte[10];
-    Path directory =
-        new Path(String.format(TEST_DIRECTORY_PATH_FORMAT, myGhfs.getRootBucketName()));
-    Path file = new Path(directory, String.format("file-%s", UUID.randomUUID()));
-    ghfsHelper.writeFile(file, data, 100, /* overwrite= */ false);
+  public void testAvailable() throws Exception {
+    StorageResourceId testFile =
+        new StorageResourceId(gcsFsIHelper.sharedBucketName1, "GHFSInputStream_testAvailable");
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+            testFile.toString(), GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
+
+    String testContent = "test content";
+    gcsFsIHelper.writeTextFile(testFile.getBucketName(), testFile.getObjectName(), testContent);
+
     GoogleHadoopFSInputStream in =
         new GoogleHadoopFSInputStream(
-            myGhfs,
-            myGhfs.getGcsPath(file),
+            ghfs,
+            new URI(testFile.toString()),
             GoogleCloudStorageReadOptions.DEFAULT,
             new FileSystem.Statistics(ghfs.getScheme()));
+
     assertThat(in.available()).isEqualTo(0);
     in.close();
-    assertThrows(java.nio.channels.ClosedChannelException.class, () -> in.available());
-    // Cleanup.
-    assertThat(ghfs.delete(directory, true)).isTrue();
+    assertThrows(ClosedChannelException.class, in::available);
   }
 }
