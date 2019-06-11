@@ -268,41 +268,41 @@ public class BigQueryOutputConfigurationTest {
     assertThrows(IOException.class, () -> BigQueryOutputConfiguration.validateConfiguration(conf));
   }
 
-  /** Test the getOutputProjectId returns the correct data. */
+  /** Test the getProjectId returns the correct data. */
   @Test
-  public void testGetOutputProjectId() throws IOException {
+  public void testGetProjectId() throws IOException {
     conf.set(BigQueryConfiguration.OUTPUT_PROJECT_ID_KEY, TEST_PROJECT_ID);
 
-    String result = BigQueryOutputConfiguration.getOutputProjectId(conf);
+    String result = BigQueryOutputConfiguration.getProjectId(conf);
 
     assertThat(result).isEqualTo(TEST_PROJECT_ID);
   }
 
-  /** Test the getOutputProjectId returns the correct data. */
+  /** Test the getProjectId returns the correct data. */
   @Test
-  public void testGetOutputProjectIdBackup() throws IOException {
+  public void testGetProjectIdBackup() throws IOException {
     conf.set(BigQueryConfiguration.PROJECT_ID_KEY, TEST_PROJECT_ID);
 
-    String result = BigQueryOutputConfiguration.getOutputProjectId(conf);
+    String result = BigQueryOutputConfiguration.getProjectId(conf);
 
     assertThat(result).isEqualTo(TEST_PROJECT_ID);
   }
 
-  /** Test the getOutputProjectId returns the correct data. */
+  /** Test the getProjectId returns the correct data. */
   @Test
-  public void testGetOutputProjectIdPrecedence() throws IOException {
+  public void testGetProjectIdPrecedence() throws IOException {
     conf.set(BigQueryConfiguration.OUTPUT_PROJECT_ID_KEY, TEST_PROJECT_ID);
     conf.set(BigQueryConfiguration.PROJECT_ID_KEY, TEST_LOAD_PROJECT_ID);
 
-    String result = BigQueryOutputConfiguration.getOutputProjectId(conf);
+    String result = BigQueryOutputConfiguration.getProjectId(conf);
 
     assertThat(result).isEqualTo(TEST_PROJECT_ID);
   }
 
-  /** Test the getOutputProjectId errors on missing data. */
+  /** Test the getProjectId errors on missing data. */
   @Test
-  public void testGetOutputProjectIdMissing() throws IOException {
-    assertThrows(IOException.class, () -> BigQueryOutputConfiguration.getOutputProjectId(conf));
+  public void testGetProjectIdMissing() throws IOException {
+    assertThrows(IOException.class, () -> BigQueryOutputConfiguration.getProjectId(conf));
   }
 
   /** Test the getJobProjectId returns the correct data. */

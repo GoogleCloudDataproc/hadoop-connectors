@@ -257,11 +257,16 @@ public class BigQueryOutputConfiguration {
    * If the {@link BigQueryConfiguration#OUTPUT_PROJECT_ID_KEY} is missing, this
    * resolves to referencing the {@link BigQueryConfiguration#PROJECT_ID_KEY} key.
    *
+   * The load job can be configured with two project identifiers. Configuration key
+   * {@link BigQueryConfiguration#PROJECT_ID_KEY} can set the project on whose behalf
+   * to perform BigQuery load operation, while {@link BigQueryConfiguration#OUTPUT_PROJECT_ID_KEY}
+   * can be used to name the project that the target dataset belongs to.
+   *
    * @param conf the configuration to reference the keys from.
    * @return the project id based on the given configuration.
    * @throws IOException if a required key is missing.
    */
-  public static String getOutputProjectId(Configuration conf) throws IOException {
+  public static String getProjectId(Configuration conf) throws IOException {
     // Reference the default project ID as a backup.
     String projectId = conf.get(BigQueryConfiguration.OUTPUT_PROJECT_ID_KEY);
     if (Strings.isNullOrEmpty(projectId)) {
@@ -280,6 +285,11 @@ public class BigQueryOutputConfiguration {
    *
    * If the {@link BigQueryConfiguration#PROJECT_ID_KEY} is missing, this resolves to
    * referencing the {@link BigQueryConfiguration#OUTPUT_PROJECT_ID_KEY} key.
+   *
+   * The load job can be configured with two project identifiers. Configuration key
+   * {@link BigQueryConfiguration#PROJECT_ID_KEY} can set the project on whose behalf
+   * to perform BigQuery load operation, while {@link BigQueryConfiguration#OUTPUT_PROJECT_ID_KEY}
+   * can be used to name the project that the target dataset belongs to.
    *
    * @param conf the configuration to reference the keys from.
    * @return the project id based on the given configuration.
@@ -310,7 +320,7 @@ public class BigQueryOutputConfiguration {
    */
   static TableReference getTableReference(Configuration conf) throws IOException {
     // Ensure the BigQuery output information is valid.
-    String projectId = getOutputProjectId(conf);
+    String projectId = getProjectId(conf);
     String datasetId =
         ConfigurationUtil.getMandatoryConfig(conf, BigQueryConfiguration.OUTPUT_DATASET_ID_KEY);
     String tableId =
