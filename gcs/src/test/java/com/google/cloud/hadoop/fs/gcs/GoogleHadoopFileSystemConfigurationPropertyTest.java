@@ -18,7 +18,7 @@ public class GoogleHadoopFileSystemConfigurationPropertyTest {
   @Test
   public void testPropertyCreation_withNullDeprecationKey() {
     GoogleHadoopFileSystemConfigurationProperty<Integer> newKeyWithoutDeprecatedKey =
-        new GoogleHadoopFileSystemConfigurationProperty<>("actual.key", 0, (String) null);
+        new GoogleHadoopFileSystemConfigurationProperty<>("actual.key", 0, (String[]) null);
 
     assertThat(newKeyWithoutDeprecatedKey.getDefault()).isEqualTo(0);
   }
