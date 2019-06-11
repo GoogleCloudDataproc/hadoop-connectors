@@ -669,7 +669,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
-  public void testGlobStatusOptions() throws IOException {
+  public void testGlobStatusOptions_directoriesNamesShouldBeConsistent() throws IOException {
     testGlobStatusFlatConcurrent(/* flat glob = */ true, /* concurrent glob = */ true);
     testGlobStatusFlatConcurrent(/* flat glob = */ true, /* concurrent glob = */ false);
     testGlobStatusFlatConcurrent(/* flat glob = */ false, /* concurrent glob = */ true);
