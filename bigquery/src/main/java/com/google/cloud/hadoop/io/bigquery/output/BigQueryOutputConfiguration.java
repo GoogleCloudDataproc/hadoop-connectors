@@ -234,6 +234,7 @@ public class BigQueryOutputConfiguration {
     ConfigurationUtil.getMandatoryConfig(conf, REQUIRED_KEYS);
 
     // Run through the individual getters as they manage error handling.
+    getProjectId(conf);
     getJobProjectId(conf);
     getTableSchema(conf);
     getFileFormat(conf);
