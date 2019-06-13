@@ -132,9 +132,9 @@ public class DirectBigQueryRecordReader extends RecordReader<NullWritable, Gener
     private final GenericDatumReader<GenericRecord> reader;
 
     // TODO: replace nulls with reusable objects
-    public AvroRecordIterator(Schema schema, ByteString bytes) {
+    AvroRecordIterator(Schema schema, ByteString bytes) {
       reader = new GenericDatumReader<>(schema);
-      in = new DecoderFactory().binaryDecoder(bytes.toByteArray(), null);
+      in = new DecoderFactory().binaryDecoder(bytes.toByteArray(), /* reuse= */ null);
     }
 
     @Override
@@ -142,18 +142,16 @@ public class DirectBigQueryRecordReader extends RecordReader<NullWritable, Gener
       try {
         return !in.isEnd();
       } catch (IOException e) {
-        throw new RuntimeException(
-            "Failed to check for more records", e);
+        throw new RuntimeException("Failed to check for more records", e);
       }
     }
 
     @Override
     public GenericRecord next() {
       try {
-        return reader.read(null, in);
+        return reader.read(/* reuse= */ null, in);
       } catch (IOException e) {
-        throw new RuntimeException(
-            "Failed to read more records", e);
+        throw new RuntimeException("Failed to read more records", e);
       }
     }
   }

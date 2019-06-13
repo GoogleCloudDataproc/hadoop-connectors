@@ -53,7 +53,6 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 @InterfaceStability.Evolving
 public class DirectBigQueryInputFormat extends InputFormat<NullWritable, GenericRecord> {
 
-  private static final String STANDARD_TABLE_TYPE = "TABLE";
   private static final String DIRECT_PARALLELISM_KEY = MRJobConfig.NUM_MAPS;
   private static final int DIRECT_PARALLELISM_DEFAULT = 10;
 
@@ -105,7 +104,7 @@ public class DirectBigQueryInputFormat extends InputFormat<NullWritable, Generic
   }
 
   private static ReadSession startSession(
-      Configuration configuration, Table table, BigQueryStorageClient client) throws IOException {
+      Configuration configuration, Table table, BigQueryStorageClient client) {
     // Extract relevant configuration settings.
     String jobProjectId = configuration.get(BigQueryConfiguration.PROJECT_ID_KEY);
     String filter = configuration.get(BigQueryConfiguration.SQL_FILTER_KEY, "");
@@ -215,7 +214,7 @@ public class DirectBigQueryInputFormat extends InputFormat<NullWritable, Generic
       return Objects.hash(name, schema, limit);
     }
 
-    private Object[] vals() {
+    private Object[] values() {
       return new Object[] {name, schema, limit};
     }
 
@@ -224,7 +223,7 @@ public class DirectBigQueryInputFormat extends InputFormat<NullWritable, Generic
       if (!(o instanceof DirectBigQueryInputSplit)) {
         return false;
       }
-      return Arrays.equals(vals(), ((DirectBigQueryInputSplit) o).vals());
+      return Arrays.equals(values(), ((DirectBigQueryInputSplit) o).values());
     }
 
     @Override

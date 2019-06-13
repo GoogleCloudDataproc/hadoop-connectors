@@ -101,6 +101,10 @@
       <artifactId>gson</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.google.protobuf</groupId>
+      <artifactId>protobuf-java</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
     </dependency>
@@ -207,7 +211,6 @@
                 <filter>
                   <artifact>com.google.flogger:flogger-log4j-backend</artifact>
                   <includes>
-                    <!--Avoid cleanup with minimizeJar that breaks Log4j logging-->
                     <include>**</include>
                   </includes>
                 </filter>
