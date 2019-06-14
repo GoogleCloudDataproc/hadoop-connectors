@@ -55,8 +55,7 @@ public class GoogleHadoopOutputStreamIntegrationTest {
             testFile.toString(), GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
     Configuration config = getTestConfig();
 
-    config.setInt(
-        GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE.getKey(), 0);
+    config.setInt(GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE.getKey(), 0);
     GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
     myGhfs.initialize(ghfs.initUri, config);
 
@@ -71,5 +70,4 @@ public class GoogleHadoopOutputStreamIntegrationTest {
             CreateFileOptions.DEFAULT);
     assertThat(out).isInstanceOf(GoogleHadoopOutputStream.class);
   }
-
 }
