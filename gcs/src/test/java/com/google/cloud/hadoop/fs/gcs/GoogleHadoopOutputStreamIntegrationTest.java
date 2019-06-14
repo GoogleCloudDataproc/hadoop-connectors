@@ -22,7 +22,9 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelp
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import java.net.URI;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -61,7 +63,6 @@ public class GoogleHadoopOutputStreamIntegrationTest {
 
     String testContent = "test content";
     gcsFsIHelper.writeTextFile(testFile.getBucketName(), testFile.getObjectName(), testContent);
-
     GoogleHadoopOutputStream out =
         new GoogleHadoopOutputStream(
             myGhfs,
@@ -69,5 +70,8 @@ public class GoogleHadoopOutputStreamIntegrationTest {
             new FileSystem.Statistics(ghfs.getScheme()),
             CreateFileOptions.DEFAULT);
     assertThat(out).isInstanceOf(GoogleHadoopOutputStream.class);
+    out.write(1);
+    out.close();
+    assertThat(myGhfs.getFileStatus(new Path(testFile.toString())).getLen()).isEqualTo(1);
   }
 }
