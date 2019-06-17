@@ -209,6 +209,12 @@
                   </includes>
                 </filter>
                 <filter>
+                  <artifact>com.google.guava:*</artifact>
+                  <includes>
+                    <include>com/google/common/base/*</include>
+                  </includes>
+                </filter>
+                <filter>
                   <artifact>com.google.flogger:flogger-log4j-backend</artifact>
                   <includes>
                     <include>**</include>

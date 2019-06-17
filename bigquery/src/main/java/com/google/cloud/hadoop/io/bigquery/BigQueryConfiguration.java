@@ -174,8 +174,6 @@ public class BigQueryConfiguration {
           OUTPUT_TABLE_ID_KEY,
           OUTPUT_TABLE_SCHEMA_KEY);
 
-  public static final String SQL_FILTER_KEY = "mapred.bq.input.sql.filter";
-  public static final String SELECTED_FIELDS_KEY = "mapred.bq.input.selected.fields";
   public static final String SKEW_LIMIT_KEY = "mapred.bq.input.skew.limit";
   public static final double SKEW_LIMIT_DEFAULT = 1.5;
 

@@ -107,9 +107,9 @@ public class DirectBigQueryInputFormat extends InputFormat<NullWritable, Generic
       Configuration configuration, Table table, BigQueryStorageClient client) {
     // Extract relevant configuration settings.
     String jobProjectId = configuration.get(BigQueryConfiguration.PROJECT_ID_KEY);
-    String filter = configuration.get(BigQueryConfiguration.SQL_FILTER_KEY, "");
+    String filter = configuration.get("mapred.bq.input.sql.filter", "");
     Collection<String> selectedFields =
-        configuration.getStringCollection(BigQueryConfiguration.SELECTED_FIELDS_KEY);
+        configuration.getStringCollection("mapred.bq.input.selected.fields");
 
     Builder readOptions = TableReadOptions.newBuilder().setRowRestriction(filter);
     if (!selectedFields.isEmpty()) {

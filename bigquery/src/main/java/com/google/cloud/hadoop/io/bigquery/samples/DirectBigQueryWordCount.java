@@ -25,7 +25,6 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
@@ -113,9 +112,9 @@ public class DirectBigQueryWordCount {
     BigQueryConfiguration.configureBigQueryInput(conf, inputQualifiedTableId);
 
     // Set column and predicate filters
-    conf.set(BigQueryConfiguration.SELECTED_FIELDS_KEY, "word,word_count");
-    conf.set(BigQueryConfiguration.SQL_FILTER_KEY, "word >= 'A' AND word <= 'zzz'");
-    conf.set(MRJobConfig.NUM_MAPS, "999");
+    conf.set("spark.hadoop.mapred.bq.input.selected.fields", "word,word_count");
+    conf.set("spark.hadoop.mapred.bq.input.sql.filter", "word >= 'A' AND word <= 'zzz'");
+    conf.set("spark.hadoop.mapreduce.job.maps", "999");
 
     // This helps Hadoop identify the Jar which contains the mapper and reducer by specifying a
     // class in that Jar. This is required if the jar is being passed on the command line to Hadoop.
