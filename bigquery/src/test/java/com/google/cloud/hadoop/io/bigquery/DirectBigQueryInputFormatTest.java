@@ -95,8 +95,8 @@ public class DirectBigQueryInputFormatTest {
     config.set(BigQueryConfiguration.INPUT_TABLE_ID_KEY, tableId);
     config.set(MRJobConfig.NUM_MAPS, "3");
     config.set(BigQueryConfiguration.SKEW_LIMIT_KEY, "1.2");
-    config.set("mapred.bq.input.sql.filter", "foo == 0");
-    config.set("mapred.bq.input.selected.fields", "foo,bar");
+    config.set(BigQueryConfiguration.SQL_FILTER_KEY, "foo == 0");
+    config.set(BigQueryConfiguration.SELECTED_FIELDS_KEY, "foo,bar");
 
     input = new TestDirectBigQueryInputFormat();
   }
