@@ -160,7 +160,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     lazyFs.trimToPrefixWithoutGlob("gs://**/test");
     assertThat(lazyFs.trimToPrefixWithoutGlob("gs://**/test")).isEqualTo("gs://");
   }
-  /** Tests getGcsPath(). */
+
   @Test
   public void testGetGcsPath() throws URISyntaxException {
     GoogleHadoopFileSystem myghfs = (GoogleHadoopFileSystem) ghfs;
@@ -168,7 +168,6 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     assertThat(myghfs.getGcsPath(new Path(gcsPath))).isEqualTo(gcsPath);
   }
 
-  /** Tests ports are not used */
   @Test
   public void testGetDefaultPortIndicatesPortsAreNotUsed() throws Exception {
     Configuration config = new Configuration();

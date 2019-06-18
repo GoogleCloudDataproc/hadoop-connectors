@@ -317,7 +317,7 @@ public class GoogleHadoopFileSystemNewUriFormatIntegrationTest
     URI initUri = new URI("gs://" + ghfsHelper.getUniqueBucketName("init"));
     ghfs.initialize(initUri, conf);
 
-    RuntimeException thrown = assertThrows(RuntimeException.class, () -> testInstance.getGcsFs());
+    RuntimeException thrown = assertThrows(RuntimeException.class, testInstance::getGcsFs);
 
     assertThat(thrown).hasMessageThat().contains("Failed to create GCS FS");
   }

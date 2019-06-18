@@ -107,9 +107,9 @@ public class GoogleCloudStorageFileSystemTest
     optionsBuilder.getCloudStorageOptionsBuilder().setProjectId("");
     new GoogleCloudStorageFileSystem(cred, optionsBuilder.build());
 
-    optionsBuilder.getCloudStorageOptionsBuilder().setProjectId("projectId");
     optionsBuilder
         .getCloudStorageOptionsBuilder()
+        .setProjectId("projectId")
         .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT);
 
     // Verify that appName == null or empty throws IllegalArgumentException.

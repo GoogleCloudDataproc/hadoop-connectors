@@ -649,7 +649,8 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     assertThat(fileChecksum.getAlgorithmName()).isEqualTo(checksumType.getAlgorithmName());
     assertThat(fileChecksum.getLength()).isEqualTo(checksumType.getByteLength());
     assertThat(fileChecksum.getBytes()).isEqualTo(checksumFn.apply(fileContent));
-    assertThat(fileChecksum.toString()).contains("%s: ".format(checksumType.getAlgorithmName()));
+    assertThat(fileChecksum.toString())
+        .contains(String.format("%s: ", checksumType.getAlgorithmName()));
 
     // Cleanup.
     assertThat(ghfs.delete(filePath, /* recursive= */ true)).isTrue();
@@ -660,20 +661,22 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
       throws IOException {
     GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) ghfs;
     Configuration config = loadConfig();
-    String rootBucketName = myGhfs.getRootBucketName();
     config.unset(GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY.getKey());
     ghfs.initialize(myGhfs.initUri, config);
 
-    assertThat(ghfs.getHomeDirectory().toString())
-        .startsWith("gs://" + rootBucketName + "/user/" + System.getProperty("user.name"));
+    String expectedHomeDir =
+        String.format(
+            "gs://%s/user/%s", myGhfs.getRootBucketName(), System.getProperty("user.name"));
+
+    assertThat(ghfs.getHomeDirectory().toString()).startsWith(expectedHomeDir);
   }
 
   @Test
   public void testGlobStatusOptions_directoriesNamesShouldBeConsistent() throws IOException {
-    testGlobStatusFlatConcurrent(/* flat glob = */ true, /* concurrent glob = */ true);
-    testGlobStatusFlatConcurrent(/* flat glob = */ true, /* concurrent glob = */ false);
-    testGlobStatusFlatConcurrent(/* flat glob = */ false, /* concurrent glob = */ true);
-    testGlobStatusFlatConcurrent(/* flat glob = */ false, /* concurrent glob = */ false);
+    testGlobStatusFlatConcurrent(/* flat= */ true, /* concurrent= */ true);
+    testGlobStatusFlatConcurrent(/* flat= */ true, /* concurrent= */ false);
+    testGlobStatusFlatConcurrent(/* flat= */ false, /* concurrent= */ true);
+    testGlobStatusFlatConcurrent(/* flat= */ false, /* concurrent= */ false);
   }
 
   private void testGlobStatusFlatConcurrent(boolean flat, boolean concurrent) throws IOException {
@@ -682,33 +685,36 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
         GoogleHadoopFileSystemConfiguration.GCS_FLAT_GLOB_ENABLE.getKey(), flat);
     configuration.setBoolean(
         GoogleHadoopFileSystemConfiguration.GCS_CONCURRENT_GLOB_ENABLE.getKey(), concurrent);
-
     ghfs.initialize(ghfs.getUri(), configuration);
+
     Path testRoot = new Path("/directory1/");
     ghfs.mkdirs(testRoot);
     ghfs.mkdirs(new Path("/directory1/subdirectory1"));
     createFile(
         new Path("/directory1/subdirectory1/file1"), "data".getBytes(StandardCharsets.UTF_8));
+
     FileStatus[] rootDirectories = ghfs.globStatus(new Path("/d*"));
 
     assertThat(rootDirectories).isEqualTo("directory1");
+
+    // Cleanup.
     assertThat(ghfs.delete(testRoot, /* recursive= */ true)).isTrue();
   }
 
   @Test
-  public void testCreateFSDataOutputStream() throws IOException {
-    Path path = new Path("/directory1/");
-
+  public void testCreateFSDataOutputStream() {
     assertThrows(
         "hadoopPath must not be null", IllegalArgumentException.class, () -> ghfs.create(null));
+
     assertThrows(
         "replication must be a positive integer: -1",
         IllegalArgumentException.class,
-        () -> ghfs.create(path, (short) -1));
+        () -> ghfs.create(new Path("/directory1/"), (short) -1));
+
     assertThrows(
         "blockSize must be a positive integer: -1",
         IllegalArgumentException.class,
-        () -> ghfs.create(path, true, -1, (short) 1, -1));
+        () -> ghfs.create(new Path("/directory1/"), true, -1, (short) 1, -1));
   }
 
   @Test
