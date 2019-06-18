@@ -16,6 +16,7 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -24,8 +25,8 @@ import static org.junit.Assert.assertThrows;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksumType;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
@@ -42,7 +43,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
-import org.apache.commons.codec.binary.Hex;
+import java.util.stream.Stream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileChecksum;
@@ -160,7 +161,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
-  public void initialize_ThrowsExceptionWhenPathNull() throws Exception {
+  public void initialize_throwsExceptionWhenPathNull() throws Exception {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
     IllegalArgumentException exception =
         assertThrows(
@@ -169,7 +170,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
-  public void initialize_ThrowsExceptionWhenConfigNull() throws Exception {
+  public void initialize_throwsExceptionWhenConfigNull() throws Exception {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
     URI correctUri = new URI("s:/foo/bar");
     IllegalArgumentException exception =
@@ -178,7 +179,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
-  public void initialize_ThrowsExceptionWhenPathSchemeNull() throws Exception {
+  public void initialize_throwsExceptionWhenPathSchemeNull() throws Exception {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
     URI incorrectUri = new URI("foo/bar");
     IllegalArgumentException exception =
@@ -198,10 +199,6 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   public void getCanonicalServiceName_delegationTokensNotNull() throws Exception {
     Configuration config = new Configuration();
 
-    config.set(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(), "test_project");
-    config.setInt(GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_BUFFER_SIZE.getKey(), 512);
-    config.setLong(GoogleHadoopFileSystemConfiguration.BLOCK_SIZE.getKey(), 1024);
-
     // Token binding config
     config.set(
         DELEGATION_TOKEN_BINDING_CLASS.getKey(), TestDelegationTokenBindingImpl.class.getName());
@@ -217,20 +214,22 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
   @Test
   public void checkOpenUnchecked() throws IOException {
-    Configuration config = loadConfig();
     GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
-    System.out.println(myGhfs.getStorageStatistics());
+    // System.out.println(myGhfs.getStorageStatistics());
+
     RuntimeException exception = assertThrows(RuntimeException.class, myGhfs::checkOpenUnchecked);
     assertThat(exception)
         .hasMessageThat()
         .startsWith("GoogleHadoopFileSystem has been closed or not initialized");
-    myGhfs.initialize(ghfs.getUri(), config);
-    System.out.println(myGhfs.getStorageStatistics());
+
+    myGhfs.initialize(ghfs.getUri(), loadConfig());
+    // System.out.println(myGhfs.getStorageStatistics());
+
     myGhfs.checkOpenUnchecked();
   }
 
   @Test
-  public void open_ThrowsExceptionWhenHadoopPathNull() {
+  public void open_throwsExceptionWhenHadoopPathNull() {
     GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
     IllegalArgumentException exception =
         assertThrows(IllegalArgumentException.class, () -> myGhfs.open(null, 1));
@@ -238,7 +237,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
-  public void create_ThrowsExceptionWhenHadoopPathIsNull() throws Exception {
+  public void create_throwsExceptionWhenHadoopPathIsNull() throws Exception {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
     IllegalArgumentException exception =
         assertThrows(IllegalArgumentException.class, () -> myGhfs.create(null, true, 1));
@@ -246,31 +245,29 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
-  public void create_ThrowsExceptionWhenReplicationIsNotPositiveInteger() throws Exception {
+  public void create_throwsExceptionWhenReplicationIsNotPositiveInteger() throws Exception {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
     URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     short replicationSmallerThanZero = -1;
-    IllegalArgumentException replicationSmallerThanZeroException =
+
+    IllegalArgumentException exception =
         assertThrows(
             IllegalArgumentException.class,
             () -> myGhfs.create(filePath, true, 1, replicationSmallerThanZero, 1));
-    assertThat(replicationSmallerThanZeroException)
-        .hasMessageThat()
-        .startsWith("replication must be a positive integer");
+    assertThat(exception).hasMessageThat().startsWith("replication must be a positive integer");
   }
 
   @Test
-  public void create_ThrowsExceptionWhenBlockSizeIsNotPositiveInteger() throws Exception {
+  public void create_throwsExceptionWhenBlockSizeIsNotPositiveInteger() throws Exception {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
     URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
-    short correctReplication = 1;
     long blockSizeSmallerThanZero = -1;
     IllegalArgumentException blockSmallerThanZeroException =
         assertThrows(
             IllegalArgumentException.class,
-            () -> myGhfs.create(filePath, true, 1, correctReplication, blockSizeSmallerThanZero));
+            () -> myGhfs.create(filePath, true, 1, (short) 1, blockSizeSmallerThanZero));
     assertThat(blockSmallerThanZeroException)
         .hasMessageThat()
         .startsWith("blockSize must be a positive integer");
@@ -279,14 +276,10 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   @Test
   public void createNonRecursive_throwsExceptionWhenHadoopPathNull() throws IOException {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
-    short replication = 1;
-    long blockSize = 1;
     NullPointerException exception =
         assertThrows(
             NullPointerException.class,
-            () ->
-                myGhfs.createNonRecursive(
-                    null, true, 1, replication, blockSize, () -> System.out.print(".")));
+            () -> myGhfs.createNonRecursive(/* f= */ null, true, 1, (short) 1, 1, () -> {}));
     assertThat(exception).hasMessageThat().startsWith("hadoopPath must not be null");
   }
 
@@ -295,17 +288,12 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) ghfs;
     URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
-    short replication = 1;
-    long blockSize = 1;
-    FSDataOutputStream createNonRecursiveOutputStream =
-        myGhfs.createNonRecursive(
-            filePath, true, 1, replication, blockSize, () -> System.out.print("."));
-    try {
+    try (FSDataOutputStream createNonRecursiveOutputStream =
+        myGhfs.createNonRecursive(filePath, true, 1, (short) 1, 1, () -> {})) {
       createNonRecursiveOutputStream.write(1);
+
       assertThat(createNonRecursiveOutputStream.size()).isEqualTo(1);
       assertThat(createNonRecursiveOutputStream.getPos()).isEqualTo(1);
-    } finally {
-      createNonRecursiveOutputStream.close();
     }
   }
 
@@ -313,19 +301,15 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   public void createNonRecursive_throwsExceptionWhenParentFolderNoExists() {
     GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) ghfs;
     Path filePath = new Path("bad/path");
-    short replication = 1;
-    long blockSize = 1;
     FileNotFoundException exception =
         assertThrows(
             FileNotFoundException.class,
-            () ->
-                myGhfs.createNonRecursive(
-                    filePath, true, 1, replication, blockSize, () -> System.out.print(".")));
+            () -> myGhfs.createNonRecursive(filePath, true, 1, (short) 1, 1, () -> {}));
     assertThat(exception).hasMessageThat().startsWith("Can not create");
   }
 
   @Test
-  public void delete_ThrowsExceptionWhenHadoopPathNull() throws IOException {
+  public void delete_throwsExceptionWhenHadoopPathNull() throws IOException {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
     IllegalArgumentException exception =
         assertThrows(IllegalArgumentException.class, () -> myGhfs.delete(null, true));
@@ -333,11 +317,10 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
-  public void listStatus_ThrowsExceptionWhenHadoopPathNull() throws IOException {
+  public void listStatus_throwsExceptionWhenHadoopPathNull() throws IOException {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
-    Path nullPath = null;
     IllegalArgumentException exception =
-        assertThrows(IllegalArgumentException.class, () -> myGhfs.listStatus(nullPath));
+        assertThrows(IllegalArgumentException.class, () -> myGhfs.listStatus((Path) null));
     assertThat(exception).hasMessageThat().startsWith("hadoopPath must not be null");
   }
 
@@ -758,7 +741,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   public void getFileStatus_throwsExceptionWhenHadooptPathNull() {
     GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
     IllegalArgumentException exception =
-        assertThrows(java.lang.IllegalArgumentException.class, () -> myGhfs.getFileStatus(null));
+        assertThrows(IllegalArgumentException.class, () -> myGhfs.getFileStatus(null));
     assertThat(exception).hasMessageThat().contains("hadoopPath must not be null");
   }
 
@@ -770,7 +753,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     FileNotFoundException exception =
-        assertThrows(java.io.FileNotFoundException.class, () -> myGhfs.getFileStatus(filePath));
+        assertThrows(FileNotFoundException.class, () -> myGhfs.getFileStatus(filePath));
     assertThat(exception).hasMessageThat().startsWith("File not found");
   }
 
@@ -824,12 +807,12 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
     IllegalArgumentException exception =
         assertThrows(
-            java.lang.IllegalArgumentException.class,
+            IllegalArgumentException.class,
             () ->
                 myGhfs.append(
-                    null,
+                    /* hadoopPath= */ null,
                     GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE.getDefault(),
-                    null));
+                    () -> {}));
     assertThat(exception).hasMessageThat().contains("hadoopPath must not be null");
   }
 
@@ -838,41 +821,37 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     Configuration config = getConfigurationWtihImplementation();
     GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
     myGhfs.initialize(ghfs.getUri(), config);
-    String gsDirectory = "gs://%s/testConcat/";
-    Path directory = new Path(String.format(gsDirectory, myGhfs.getRootBucketName()));
+    Path directory = new Path(String.format("gs://%s/testConcat/", myGhfs.getRootBucketName()));
 
-    int numFiles = 3;
-    Path[] srcs = new Path[numFiles];
-    long[] fileLength = new long[numFiles];
-    Path target = new Path(directory, "target");
-    for (int i = 0; i < numFiles; i++) {
+    long expectedLength = 0;
+    List<Path> files = new ArrayList<>();
+    for (int i = 0; i < 3; i++) {
       Path file = new Path(directory, String.format("file-%s", UUID.randomUUID()));
-      ghfsHelper.writeFile(file, UUID.randomUUID().toString(), 1, /* overwrite= */ false);
-      srcs[i] = file;
-      fileLength[i] = myGhfs.getFileStatus(file).getLen();
+      ghfsHelper.writeFile(file, "data_" + file, 1, /* overwrite= */ false);
+      files.add(file);
+      expectedLength += myGhfs.getFileStatus(file).getLen();
     }
 
     // Create target file
-    ghfsHelper.writeFile(target, new byte[0], 1, /* overwrite= */ false);
+    Path target = new Path(directory, "target");
+    ghfsHelper.writeFile(target, new byte[0], /* numWrites= */ 1, /* overwrite= */ false);
 
-    long sumCreatedFileLength = 0;
-    for (int i = 0; i < fileLength.length; i++) sumCreatedFileLength += fileLength[i];
+    myGhfs.concat(target, files.toArray(new Path[0]));
 
-    // Concat
-    myGhfs.concat(target, srcs);
-    assertThat(myGhfs.getFileStatus(target).getLen()).isEqualTo(sumCreatedFileLength);
+    assertThat(myGhfs.getFileStatus(target).getLen()).isEqualTo(expectedLength);
+
+    // cleanup
     assertThat(ghfs.delete(directory, true)).isTrue();
   }
 
   @Test
-  public void concat_throwsExceptionWhenSourceAreEmpty() throws IOException {
+  public void concat_throwsExceptionWhenSourceAreEmpty() {
     GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
-    String gsDirectory = "gs://%s/testConcat/";
-    Path directory = new Path(String.format(gsDirectory, myGhfs.getRootBucketName()));
+    Path directory =
+        new Path(String.format("gs://%s/testConcat_exception/", myGhfs.getRootBucketName()));
     Path target = new Path(directory, "target");
     IllegalArgumentException exception =
-        assertThrows(
-            java.lang.IllegalArgumentException.class, () -> myGhfs.concat(target, new Path[0]));
+        assertThrows(IllegalArgumentException.class, () -> myGhfs.concat(target, new Path[0]));
     assertThat(exception).hasMessageThat().contains("psrcs must have at least one source");
   }
 
@@ -881,14 +860,12 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     Configuration config = getConfigurationWtihImplementation();
     GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
     myGhfs.initialize(ghfs.getUri(), config);
-    String gsDirectory = "gs://%s/testConcat/";
-    Path directory = new Path(String.format(gsDirectory, myGhfs.getRootBucketName()));
+    Path directory =
+        new Path(String.format("gs://%s/testConcat_exception/", myGhfs.getRootBucketName()));
     Path target = new Path(directory, "target");
-    Path[] srcsWithTarget = new Path[1];
-    srcsWithTarget[0] = target;
+    Path[] srcsWithTarget = new Path[] {target};
     IllegalArgumentException exception =
-        assertThrows(
-            java.lang.IllegalArgumentException.class, () -> myGhfs.concat(target, srcsWithTarget));
+        assertThrows(IllegalArgumentException.class, () -> myGhfs.concat(target, srcsWithTarget));
     assertThat(exception).hasMessageThat().contains("target must not be contained in sources");
   }
 
@@ -911,10 +888,10 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
-  public void fileChecksum_throwsExceptionWHenHadoopPathAsNull() throws Exception {
+  public void fileChecksum_throwsExceptionWHenHadoopPathAsNull() {
     GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
     IllegalArgumentException exception =
-        assertThrows(java.lang.IllegalArgumentException.class, () -> myGhfs.getFileChecksum(null));
+        assertThrows(IllegalArgumentException.class, () -> myGhfs.getFileChecksum(null));
     assertThat(exception).hasMessageThat().contains("hadoopPath must not be null");
   }
 
@@ -926,7 +903,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     FileNotFoundException exception =
-        assertThrows(java.io.FileNotFoundException.class, () -> myGhfs.getFileChecksum(filePath));
+        assertThrows(FileNotFoundException.class, () -> myGhfs.getFileChecksum(filePath));
     assertThat(exception.getMessage().startsWith("File not found"));
   }
 
@@ -1005,9 +982,11 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     createFile(
         new Path("/directory1/subdirectory1/file1"), "data".getBytes(StandardCharsets.UTF_8));
 
-    FileStatus[] rootDirectories = ghfs.globStatus(new Path("/d*"));
+    FileStatus[] rootDirStatuses = ghfs.globStatus(new Path("/d*"));
+    List<String> rootDirs =
+        Stream.of(rootDirStatuses).map(d -> d.getPath().toString()).collect(toImmutableList());
 
-    assertThat(rootDirectories).isEqualTo("directory1");
+    assertThat(rootDirs).containsExactly(ghfs.getWorkingDirectory() + "directory1");
 
     // Cleanup.
     assertThat(ghfs.delete(testRoot, /* recursive= */ true)).isTrue();
@@ -1034,9 +1013,9 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     Path path = new Path("/directory1/");
 
     assertThrows(
-        "src and dst must not be null", NullPointerException.class, () -> ghfs.rename(null, null));
-    assertThrows("src must not be null", NullPointerException.class, () -> ghfs.rename(null, path));
-    assertThrows("dst must not be null", NullPointerException.class, () -> ghfs.rename(path, null));
+        "src must not be null", IllegalArgumentException.class, () -> ghfs.rename(null, path));
+    assertThrows(
+        "dst must not be null", IllegalArgumentException.class, () -> ghfs.rename(path, null));
   }
 
   @Test

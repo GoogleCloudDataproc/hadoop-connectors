@@ -16,7 +16,6 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -63,13 +62,13 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
   }
 
   @Test
-  public void getXAttr_returnEmptyHashMapOnEmptyNames() throws Exception {
+  public void getXAttr_returnEmptyMapOnEmptyNames() throws Exception {
     URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     ghfsHelper.writeFile(filePath, "obj-test-get-xattr", 1, /* overwrite= */ false);
-    List<String> emptyList = new ArrayList<>();
-    Map xAttrs = ghfs.getXAttrs(filePath, emptyList);
-    assertThat(xAttrs).isInstanceOf(HashMap.class);
+
+    Map xAttrs = ghfs.getXAttrs(filePath, new ArrayList<>());
+
     assertThat(xAttrs).isEmpty();
 
     // Cleanup.
@@ -139,26 +138,26 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
   }
 
   @Test
-  public void setXAttr_ThrowsExceptionOnNullFlags() {
+  public void setXAttr_throwsExceptionOnNullFlags() {
     URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     Throwable exception =
         assertThrows(
             java.lang.IllegalArgumentException.class,
-            () -> ghfs.setXAttr(filePath, "test-key", "val".getBytes(UTF_8), null));
-    assertThat(exception.getMessage()).isEqualTo("flags should not be null or empty");
+            () -> ghfs.setXAttr(filePath, "test-key", "val".getBytes(UTF_8), /* flag= */ null));
+    assertThat(exception).hasMessageThat().isEqualTo("flags should not be null or empty");
   }
 
   @Test
-  public void setXAttr_ThroswExceptionOnEmptyFlags() {
+  public void setXAttr_throwsExceptionOnEmptyFlags() {
     URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
-    EnumSet<XAttrSetFlag> emptyList = EnumSet.noneOf(XAttrSetFlag.class);
+    EnumSet<XAttrSetFlag> emptyFlags = EnumSet.noneOf(XAttrSetFlag.class);
     Throwable exception =
         assertThrows(
             java.lang.IllegalArgumentException.class,
-            () -> ghfs.setXAttr(filePath, "test-key", "val".getBytes(UTF_8), emptyList));
-    assertThat(exception.getMessage()).isEqualTo("flags should not be null or empty");
+            () -> ghfs.setXAttr(filePath, "test-key", "val".getBytes(UTF_8), emptyFlags));
+    assertThat(exception).hasMessageThat().isEqualTo("flags should not be null or empty");
   }
 
   @Test
