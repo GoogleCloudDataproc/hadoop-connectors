@@ -126,20 +126,11 @@ public class GoogleCloudStorageTest {
             PerformanceCachingGoogleCloudStorageOptions.builder()
                 .setListCachingEnabled(true)
                 .build());
-    ThrottledGoogleCloudStorage throttledGoogleCloudStorage =
-        new ThrottledGoogleCloudStorage(gcs, RateLimiter.create(2));
-    ThrottledGoogleCloudStorage throttledGoogleCloudStorageWithOneOperation =
-        new ThrottledGoogleCloudStorage(
-            new Double(2.00),
-            gcs,
-            EnumSet.of(ThrottledGoogleCloudStorage.StorageOperation.CREATE_OBJECT));
 
     return Arrays.asList(
         new Object[] {gcs},
         new Object[] {zeroLaggedGcs},
-        new Object[] {performanceCachingGcs},
-        new Object[] {throttledGoogleCloudStorage},
-        new Object[] {throttledGoogleCloudStorageWithOneOperation});
+        new Object[] {performanceCachingGcs});
   }
 
   private final GoogleCloudStorage rawStorage;
