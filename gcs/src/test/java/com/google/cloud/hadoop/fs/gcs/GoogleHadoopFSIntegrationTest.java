@@ -14,44 +14,53 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem;
 import static com.google.common.truth.Truth.assertThat;
-import static org.apache.hadoop.fs.FileSystemTestHelper.createFile;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertThrows;
 
-import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksumType;
-import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.DirectoryNotEmptyException;
-import java.util.*;
+import java.util.EnumSet;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.*;
+import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.CreateFlag;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FsServerDefaults;
+import org.apache.hadoop.fs.InvalidPathException;
+import org.apache.hadoop.fs.Options;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.util.Progressable;
 import org.junit.After;
-import org.junit.Before;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/** Integration tests for GoogleHadoopFS class. */
+/** Integration tests for {@link GoogleHadoopFS} class. */
 @RunWith(JUnit4.class)
 public class GoogleHadoopFSIntegrationTest {
-  private static URI initUri;
-  private GoogleHadoopFileSystem fs;
-  private FsPermission permissions;
 
-  @Before
-  public void before() throws IOException {
-    initUri = new Path("gs://test/").toUri();
-    fs = createInMemoryGoogleHadoopFileSystem();
-    fs.initialize(initUri, loadConfig());
-    permissions = new FsPermission((short) 000);
+  private static GoogleCloudStorageFileSystemIntegrationHelper gcsFsIHelper;
+  private static URI initUri;
+
+  @BeforeClass
+  public static void beforeClass() throws Exception {
+    gcsFsIHelper =
+        GoogleCloudStorageFileSystemIntegrationHelper.create(
+            GoogleHadoopFileSystemIntegrationHelper.APP_NAME);
+    gcsFsIHelper.beforeAllTests();
+    initUri = new URI("gs://" + gcsFsIHelper.sharedBucketName1);
+  }
+
+  @AfterClass
+  public static void afterClass() {
+    gcsFsIHelper.afterAllTests();
   }
 
   @After
@@ -62,213 +71,258 @@ public class GoogleHadoopFSIntegrationTest {
   @Test
   public void testInitializationWithUriAndConf_shouldGiveFsStatusWithNotUsedMemory()
       throws IOException, URISyntaxException {
-    GoogleHadoopFS googleHadoopFS = new GoogleHadoopFS(initUri, loadConfig());
-    assertThat(googleHadoopFS.getFsStatus().getUsed()).isEqualTo(0);
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    GoogleHadoopFS ghfs = new GoogleHadoopFS(initUri, config);
+
+    assertThat(ghfs.getFsStatus().getUsed()).isEqualTo(0);
   }
 
   @Test
   public void testInitializationWithGhfsUriAndConf_shouldGiveFsStatusWithNotUsedMemory()
       throws IOException, URISyntaxException {
-    GoogleHadoopFS googleHadoopFS = new GoogleHadoopFS(fs, initUri, loadConfig());
-    assertThat(googleHadoopFS.getFsStatus().getUsed()).isEqualTo(0);
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    GoogleHadoopFS ghfs = new GoogleHadoopFS(new GoogleHadoopFileSystem(), initUri, config);
+
+    assertThat(ghfs.getFsStatus().getUsed()).isEqualTo(0);
   }
 
   @Test
-  public void testCreateInternal_shouldCreateNewGhfs() throws IOException, URISyntaxException {
-    GoogleHadoopFS googleHadoopFS = new GoogleHadoopFS(fs, initUri, loadConfig());
-    Path file = new Path(initUri + "file");
-    EnumSet<CreateFlag> flag = EnumSet.noneOf(CreateFlag.class);
-    flag.add(CreateFlag.CREATE);
-    FsPermission absolutePermission = null;
-    short replication = 1;
-    int bufferSize = 128;
-    long blockSize = 32;
-    Progressable progress = null;
-    Options.ChecksumOpt checksumOpt = new Options.ChecksumOpt();
-    boolean createParent = true;
-    FSDataOutputStream fsDataOutputStream =
-        googleHadoopFS.createInternal(
-            file,
-            flag,
-            absolutePermission,
-            bufferSize,
-            replication,
-            blockSize,
-            progress,
-            checksumOpt,
-            createParent);
-    assertThat(fsDataOutputStream).isNotNull();
-    createParent = false;
-    fsDataOutputStream =
-        googleHadoopFS.createInternal(
-            file,
-            flag,
-            absolutePermission,
-            bufferSize,
-            replication,
-            blockSize,
-            progress,
-            checksumOpt,
-            createParent);
-    assertThat(fsDataOutputStream).isNotNull();
+  public void testCreateInternal_shouldCreateParent() throws Exception {
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    GoogleHadoopFS ghfs = new GoogleHadoopFS(initUri, config);
+
+    Path filePath =
+        new Path(initUri.resolve("/testCreateInternal_shouldCreateParent/dir/file").toString());
+
+    try (FSDataOutputStream stream =
+        ghfs.createInternal(
+            filePath,
+            EnumSet.of(CreateFlag.CREATE),
+            /* absolutePermission= */ null,
+            /* bufferSize= */ 128,
+            /* replication= */ (short) 1,
+            /* blockSize= */ 32,
+            () -> {},
+            new Options.ChecksumOpt(),
+            /* createParent= */ true)) {
+      stream.write(1);
+
+      assertThat(stream.size()).isEqualTo(1);
+    }
+
+    FileStatus parentStatus = ghfs.getFileStatus(filePath.getParent());
+    assertThat(parentStatus.getModificationTime()).isGreaterThan(0L);
+  }
+
+  @Test
+  public void testCreateInternal_shouldNotCreateParent() throws Exception {
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    GoogleHadoopFS ghfs = new GoogleHadoopFS(initUri, config);
+
+    Path filePath =
+        new Path(initUri.resolve("/testCreateInternal_shouldNotCreateParent/dir/file").toString());
+
+    try (FSDataOutputStream stream =
+        ghfs.createInternal(
+            filePath,
+            EnumSet.of(CreateFlag.CREATE),
+            /* absolutePermission= */ null,
+            /* bufferSize= */ 128,
+            /* replication= */ (short) 1,
+            /* blockSize= */ 32,
+            () -> {},
+            new Options.ChecksumOpt(),
+            /* createParent= */ false)) {
+      stream.write(1);
+
+      assertThat(stream.size()).isEqualTo(1);
+    }
+
+    // GoogleHadoopFS ignores 'createParent' flag and always creates parent
+    FileStatus parentStatus = ghfs.getFileStatus(filePath.getParent().getParent());
+    assertThat(parentStatus.getModificationTime()).isGreaterThan(0L);
   }
 
   @Test
   public void testGetUriDefaultPort_shouldBeEqualToGhfsDefaultPort()
       throws IOException, URISyntaxException {
-    GoogleHadoopFS googleHadoopFS = new GoogleHadoopFS(fs, initUri, loadConfig());
-    assertThat(googleHadoopFS.getUriDefaultPort()).isEqualTo(fs.getDefaultPort());
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    GoogleHadoopFS ghfs = new GoogleHadoopFS(initUri, config);
+
+    assertThat(ghfs.getUriDefaultPort()).isEqualTo(-1);
   }
 
   @Test
   public void testGetUri_shouldBeEqualToGhfsUri() throws IOException, URISyntaxException {
-    GoogleHadoopFS googleHadoopFS = new GoogleHadoopFS(fs, initUri, loadConfig());
-    assertThat(googleHadoopFS.getUri()).isEqualTo(fs.getUri());
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    GoogleHadoopFS ghfs = new GoogleHadoopFS(initUri, config);
+
+    assertThat(ghfs.getUri()).isEqualTo(initUri.resolve("/"));
   }
 
   @Test
   public void testValidName_shouldNotContainPoints() throws IOException, URISyntaxException {
-    GoogleHadoopFS googleHadoopFS = new GoogleHadoopFS(fs, initUri, loadConfig());
-    assertThat(googleHadoopFS.isValidName("gs://test//")).isTrue();
-    assertThat(googleHadoopFS.isValidName("hdfs://test//")).isTrue();
-    assertThat(googleHadoopFS.isValidName("gs//test/../")).isFalse();
-    assertThat(googleHadoopFS.isValidName("gs//test//.")).isFalse();
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    GoogleHadoopFS ghfs = new GoogleHadoopFS(initUri, config);
+
+    assertThat(ghfs.isValidName("gs://test//")).isTrue();
+    assertThat(ghfs.isValidName("hdfs://test//")).isTrue();
+    assertThat(ghfs.isValidName("gs//test/../")).isFalse();
+    assertThat(ghfs.isValidName("gs//test//.")).isFalse();
   }
 
   @Test
   public void testCheckPath_shouldThrowExceptionForMismatchingBucket()
       throws IOException, URISyntaxException {
-    GoogleHadoopFS googleHadoopFS = new GoogleHadoopFS(fs, initUri, loadConfig());
-    Path file = new Path("gs://fake/" + "file");
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    GoogleHadoopFS ghfs = new GoogleHadoopFS(initUri, config);
+
+    Path testPath = new Path("gs://fake/file");
+
     InvalidPathException e =
-        assertThrows(InvalidPathException.class, () -> googleHadoopFS.checkPath(file));
-    assertThat(e.getLocalizedMessage()).startsWith("Invalid path");
+        assertThrows(InvalidPathException.class, () -> ghfs.checkPath(testPath));
+
+    assertThat(e).hasMessageThat().startsWith("Invalid path");
   }
 
   @Test
   public void testGetUserDefault_shouldReturnSpecifiedConfiguration()
       throws IOException, URISyntaxException {
-    Path file = new Path("gs://fake/" + "file");
-    Configuration conf = new Configuration();
-    conf.setLong(GoogleHadoopFileSystemConfiguration.BLOCK_SIZE.getKey(), 1);
-    conf.set(
-        GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE.getKey(),
-        String.valueOf(GcsFileChecksumType.MD5));
-    GoogleHadoopFS googleHadoopFS = new GoogleHadoopFS(fs, initUri, conf);
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    config.setLong(GoogleHadoopFileSystemConfiguration.BLOCK_SIZE.getKey(), 1);
+    config.setInt("io.bytes.per.checksum", 2);
+    GoogleHadoopFS ghfs = new GoogleHadoopFS(initUri, config);
 
-    assertThat(googleHadoopFS.getServerDefaults(file).getBlockSize()).isEqualTo(1);
+    FsServerDefaults defaults = ghfs.getServerDefaults(new Path("gs://fake/file"));
+
+    assertThat(defaults.getBlockSize()).isEqualTo(1);
+    assertThat(defaults.getBytesPerChecksum()).isEqualTo(2);
   }
 
   @Test
-  public void testMkdirs_shouldRespectFilePermissions() throws IOException, URISyntaxException {
-    Path path = new Path("gs://test/1/2");
-    GoogleHadoopFS googleHadoopFS = prepareGoogleHadoopFS(path);
+  public void testMkdirs_shouldReturnDefaultFilePermissions()
+      throws IOException, URISyntaxException {
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    config.set("fs.gs.reported.permissions", "357");
+    GoogleHadoopFS ghfs = new GoogleHadoopFS(initUri, config);
 
-    googleHadoopFS.mkdir(path, permissions, true);
-    googleHadoopFS.mkdir(path, permissions, false);
+    FsPermission permission = new FsPermission("000");
+    FsPermission expectedPermission = new FsPermission("357");
 
-    assertThat(googleHadoopFS.getFileStatus(path).getPermission()).isEqualTo(permissions);
-    assertThat(googleHadoopFS.getFileStatus(path).getPermission()).isEqualTo(permissions);
+    Path path = new Path(initUri.resolve("/testMkdirs_shouldRespectFilePermissions").toString());
+    ghfs.mkdir(path, permission, /* createParent= */ true);
+
+    assertThat(ghfs.getFileStatus(path).getPermission()).isEqualTo(expectedPermission);
   }
 
   @Test
   public void testDeleteRecursive_shouldDeleteAllInPath() throws IOException, URISyntaxException {
-    Path path = new Path("gs://test/1/2");
-    GoogleHadoopFS googleHadoopFS = prepareGoogleHadoopFS(path);
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    GoogleHadoopFS ghfs = new GoogleHadoopFS(initUri, config);
 
-    googleHadoopFS.mkdir(path, permissions, true);
-    googleHadoopFS.delete(new Path(new URI("gs://test")), true);
+    FsPermission permission = new FsPermission("000");
 
-    assertFalse(googleHadoopFS.delete(path, true));
+    URI parentDir = initUri.resolve("/testDeleteRecursive_shouldDeleteAllInPath");
+    Path testDir = new Path(parentDir.resolve("test_dir").toString());
+    URI testFile = parentDir.resolve("test_file");
+    Path testFilePath = new Path(testFile.toString());
+
+    ghfs.mkdir(testDir, permission, /* createParent= */ true);
+    gcsFsIHelper.writeTextFile(initUri.getAuthority(), testFile.getPath(), "file data");
+
+    assertThat(ghfs.getFileStatus(testDir)).isNotNull();
+    assertThat(ghfs.getFileStatus(testFilePath)).isNotNull();
+    assertThat(ghfs.getFileStatus(testDir.getParent())).isNotNull();
+
+    ghfs.delete(testDir.getParent(), /* recursive= */ true);
+
+    assertThrows(FileNotFoundException.class, () -> ghfs.getFileStatus(testDir));
+    assertThrows(FileNotFoundException.class, () -> ghfs.getFileStatus(testFilePath));
+    assertThrows(FileNotFoundException.class, () -> ghfs.getFileStatus(testDir.getParent()));
   }
 
   @Test
-  public void testDeleteNotRecursive_shouldBeAppliedToNotEmptyDirectories()
+  public void testDeleteNotRecursive_shouldBeAppliedToHierarchyOfDirectories()
       throws IOException, URISyntaxException {
-    Path path = new Path("gs://test/1/2");
-    GoogleHadoopFS googleHadoopFS = prepareGoogleHadoopFS(path);
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    GoogleHadoopFS ghfs = new GoogleHadoopFS(initUri, config);
 
-    googleHadoopFS.mkdir(path, permissions, true);
+    FsPermission permission = new FsPermission("000");
+
+    URI parentDir = initUri.resolve("/testDeleteRecursive_shouldDeleteAllInPath");
+    Path testDir = new Path(parentDir.resolve("test_dir").toString());
+
+    ghfs.mkdir(testDir, permission, /* createParent= */ true);
 
     assertThrows(
         DirectoryNotEmptyException.class,
-        () -> googleHadoopFS.delete(new Path(new URI("gs://test")), false));
-    assertTrue(googleHadoopFS.delete(path, false));
+        () -> ghfs.delete(testDir.getParent(), /* recursive= */ false));
   }
 
   @Test
   public void testGetFileStatus_shouldReturnDetails() throws IOException, URISyntaxException {
-    Path path = new Path("gs://test/1/2");
-    GoogleHadoopFS googleHadoopFS = prepareGoogleHadoopFS(path);
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    GoogleHadoopFS ghfs = new GoogleHadoopFS(initUri, config);
 
-    createFile(fs, path);
+    URI testFile = initUri.resolve("/testGetFileStatus_shouldReturnDetails");
+    Path testFilePath = new Path(testFile.toString());
 
-    assertThat(googleHadoopFS.getFileStatus(path).getReplication()).isEqualTo((short) 3);
+    gcsFsIHelper.writeTextFile(testFile.getAuthority(), testFile.getPath(), "file content");
+
+    FileStatus fileStatus = ghfs.getFileStatus(testFilePath);
+    assertThat(fileStatus.getReplication()).isEqualTo(3);
   }
 
   @Test
   public void testGetFileBlockLocations_shouldReturnLocalhost()
       throws IOException, URISyntaxException {
-    Path path = new Path("gs://test/1/2");
-    GoogleHadoopFS googleHadoopFS = prepareGoogleHadoopFS(path);
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    GoogleHadoopFS ghfs = new GoogleHadoopFS(initUri, config);
 
-    createFile(fs, path);
+    URI testFile = initUri.resolve("/testGetFileBlockLocations_shouldReturnLocalhost");
+    Path testFilePath = new Path(testFile.toString());
 
-    assertThat(googleHadoopFS.getFileBlockLocations(path, (long) 1, (long) 1).clone()[0].getHosts())
-        .isEqualTo(new String[] {"localhost"});
-  }
+    gcsFsIHelper.writeTextFile(testFile.getAuthority(), testFile.getPath(), "file content");
 
-  @Test
-  public void testGetFsStatus_shouldReturnStatisticsWith() throws IOException, URISyntaxException {
-    Path path = new Path("gs://test/1/2");
-    GoogleHadoopFS googleHadoopFS = prepareGoogleHadoopFS(path);
-
-    assertThat(googleHadoopFS.getFsStatus().getUsed()).isEqualTo(0);
+    BlockLocation[] fileBlockLocations = ghfs.getFileBlockLocations(testFilePath, 1, 1);
+    assertThat(fileBlockLocations).hasLength(1);
+    assertThat(fileBlockLocations[0].getHosts()).isEqualTo(new String[] {"localhost"});
   }
 
   @Test
   public void testListStatus_shouldReturnOneStatus() throws IOException, URISyntaxException {
-    Path path = new Path("gs://test/1/2");
-    GoogleHadoopFS googleHadoopFS = prepareGoogleHadoopFS(path);
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    GoogleHadoopFS ghfs = new GoogleHadoopFS(initUri, config);
 
-    createFile(fs, path);
+    URI testFile = initUri.resolve("/testListStatus_shouldReturnOneStatus");
+    Path testFilePath = new Path(testFile.toString());
 
-    assertThat(googleHadoopFS.listStatus(path).length).isEqualTo(1);
+    assertThrows(FileNotFoundException.class, () -> ghfs.listStatus(testFilePath));
+
+    gcsFsIHelper.writeTextFile(testFile.getAuthority(), testFile.getPath(), "file content");
+
+    assertThat(ghfs.listStatus(testFilePath)).hasLength(1);
   }
 
   @Test
   public void testRenameInternal_shouldMakeOldPathNotFound()
       throws IOException, URISyntaxException {
-    Path path = new Path("gs://test/1/2");
-    Path renamedPath = new Path("gs://test/2/");
-    GoogleHadoopFS googleHadoopFS = prepareGoogleHadoopFS(path);
-    createFile(fs, path);
+    Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
+    GoogleHadoopFS ghfs = new GoogleHadoopFS(initUri, config);
 
-    assertThat(googleHadoopFS.listStatus(path).length).isEqualTo(1);
-    googleHadoopFS.renameInternal(path, renamedPath);
-    assertThrows(FileNotFoundException.class, () -> googleHadoopFS.listStatus(path));
-    assertThat(googleHadoopFS.listStatus(renamedPath).length).isEqualTo(1);
-  }
+    URI srcFile = initUri.resolve("/testRenameInternal_shouldMakeOldPathNotFound/src");
+    Path srcPath = new Path(srcFile);
+    URI dstFile = initUri.resolve("/testRenameInternal_shouldMakeOldPathNotFound/dst");
+    Path dstPath = new Path(dstFile);
 
-  private Configuration loadConfig() {
-    Configuration config = new Configuration();
+    gcsFsIHelper.writeTextFile(srcFile.getAuthority(), srcFile.getPath(), "file content");
 
-    config.set(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(), "test_project");
-    config.setInt(GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_BUFFER_SIZE.getKey(), 512);
-    config.setLong(GoogleHadoopFileSystemConfiguration.BLOCK_SIZE.getKey(), 1024);
-    // Token binding config
-    config.set(
-        DELEGATION_TOKEN_BINDING_CLASS.getKey(), TestDelegationTokenBindingImpl.class.getName());
-    config.set(
-        TestDelegationTokenBindingImpl.TestAccessTokenProviderImpl.TOKEN_CONFIG_PROPERTY_NAME,
-        "qWDAWFA3WWFAWFAWFAW3FAWF3AWF3WFAF33GR5G5"); // Bogus auth token
+    assertThat(ghfs.listStatus(srcPath)).hasLength(1);
+    assertThrows(FileNotFoundException.class, () -> ghfs.listStatus(dstPath));
 
-    return config;
-  }
+    ghfs.renameInternal(srcPath, dstPath);
 
-  private GoogleHadoopFS prepareGoogleHadoopFS(Path path) throws IOException, URISyntaxException {
-    Configuration configuration = new Configuration();
-    configuration.set(PERMISSIONS_TO_REPORT.getKey(), String.valueOf(this.permissions));
-    return new GoogleHadoopFS(fs, path.toUri(), configuration);
+    assertThrows(FileNotFoundException.class, () -> ghfs.listStatus(srcPath));
+    assertThat(ghfs.listStatus(dstPath)).hasLength(1);
   }
 }
