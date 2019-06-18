@@ -20,6 +20,7 @@ import static com.google.common.truth.Truth.assertThat;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import java.net.URI;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -49,29 +50,32 @@ public class GoogleHadoopOutputStreamIntegrationTest {
   }
 
   @Test
-  public void createGoogleHadoopOutputStream_WhenBufferSizeAsZero() throws Exception {
+  public void write_withZeroBufferSize() throws Exception {
     StorageResourceId testFile =
-        new StorageResourceId(gcsFsIHelper.sharedBucketName1, "GHFSInputStream_testAvailable");
-    GoogleHadoopFileSystem ghfs =
-        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
-            testFile.toString(), GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
+        new StorageResourceId(
+            gcsFsIHelper.sharedBucketName1, "GHFSOutputStream_write_withZeroBufferSize");
+
     Configuration config = getTestConfig();
-
     config.setInt(GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE.getKey(), 0);
-    GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
-    myGhfs.initialize(ghfs.initUri, config);
 
-    String testContent = "test content";
-    gcsFsIHelper.writeTextFile(testFile.getBucketName(), testFile.getObjectName(), testContent);
-    GoogleHadoopOutputStream out =
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(testFile.toString(), config);
+
+    AsyncWriteChannelOptions writeOptions =
+        ghfs.getGcsFs().getOptions().getCloudStorageOptions().getWriteChannelOptions();
+    assertThat(writeOptions.getBufferSize()).isEqualTo(0);
+
+    try (GoogleHadoopOutputStream out =
         new GoogleHadoopOutputStream(
-            myGhfs,
+            ghfs,
             new URI(testFile.toString()),
             new FileSystem.Statistics(ghfs.getScheme()),
-            CreateFileOptions.DEFAULT);
-    assertThat(out).isInstanceOf(GoogleHadoopOutputStream.class);
-    out.write(1);
-    out.close();
-    assertThat(myGhfs.getFileStatus(new Path(testFile.toString())).getLen()).isEqualTo(1);
+            CreateFileOptions.DEFAULT)) {
+      out.write(1);
+    }
+
+    FileStatus fileStatus = ghfs.getFileStatus(new Path(testFile.toString()));
+
+    assertThat(fileStatus.getLen()).isEqualTo(1);
   }
 }
