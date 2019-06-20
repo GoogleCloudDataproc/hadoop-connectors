@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestString;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.truth.Truth.assertThat;
 
@@ -25,6 +26,7 @@ import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
+import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -168,6 +170,92 @@ public class GoogleCloudStorageNewIntegrationTest {
             listRequestString(testBucket, testDir, maxResults, "token_2"),
             listRequestString(testBucket, testDir, maxResults, "token_3"),
             listRequestString(testBucket, testDir, maxResults, "token_4"));
+  }
+
+  @Test
+  public void listObjectInfo_withLimit_oneGcsRequest() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "f3");
+
+    // Set limit to 1
+    List<GoogleCloudStorageItemInfo> itemInfo =
+        gcs.listObjectInfo(testBucket, testDir, PATH_DELIMITER, 1);
+    assertThat(itemInfo.get(0).getObjectName()).isEqualTo(testDir + "f1");
+
+    int maxResults = 2;
+    // Assert that only 1 GCS request was sent
+    assertThat(itemInfo.size()).isEqualTo(1);
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestString(testBucket, true, testDir, maxResults, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_withLimit_multipleGcsRequests() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    int maxResults = 1;
+    GoogleCloudStorage gcs =
+        new GoogleCloudStorageImpl(
+            gcsOptions.toBuilder().setMaxListItemsPerCall(maxResults).build(), gcsRequestsTracker);
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "f3");
+
+    // Set limit to 2
+    List<GoogleCloudStorageItemInfo> itemInfo =
+        gcs.listObjectInfo(testBucket, testDir, PATH_DELIMITER, 2);
+    assertThat(itemInfo.size()).isEqualTo(2);
+    // Assert that 3 GCS requests were sent
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestString(testBucket, true, testDir, maxResults, /* pageToken= */ null),
+            listRequestString(testBucket, true, testDir, maxResults, "token_1"),
+            listRequestString(testBucket, true, testDir, maxResults, "token_2"));
+  }
+
+  @Test
+  public void listObjectInfo_withoutLimits() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    int maxResults = 1;
+    GoogleCloudStorage gcs =
+        new GoogleCloudStorageImpl(
+            gcsOptions.toBuilder().setMaxListItemsPerCall(maxResults).build(), gcsRequestsTracker);
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "f3");
+
+    List<GoogleCloudStorageItemInfo> itemInfo =
+        gcs.listObjectInfo(testBucket, testDir, PATH_DELIMITER);
+
+    // Assert that 4 GCS requests were sent
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestString(testBucket, true, testDir, maxResults, /* pageToken= */ null),
+            listRequestString(testBucket, true, testDir, maxResults, "token_1"),
+            listRequestString(testBucket, true, testDir, maxResults, "token_2"),
+            listRequestString(testBucket, true, testDir, maxResults, "token_3"));
+  }
+
+  @Test
+  public void getItemInfo_oneGcsRequest() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = createObjectsInTestDir(testBucket, "f1");
+
+    GoogleCloudStorageItemInfo infoItem =
+        gcs.getItemInfo(
+            StorageResourceId.fromObjectName(
+                "gs://" + testBucket + PATH_DELIMITER + testDir + "f1"));
+    assertThat(infoItem.getObjectName()).isEqualTo(testDir + "f1");
+
+    // Assert that 1 GCS requests were sent
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(getRequestString(testBucket, URLEncoder.encode(testDir + "f1", "UTF-8")));
   }
 
   private String createObjectsInTestDir(String bucketName, String... objects) throws Exception {
