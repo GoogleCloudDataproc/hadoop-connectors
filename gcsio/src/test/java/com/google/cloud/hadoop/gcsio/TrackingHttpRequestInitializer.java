@@ -101,7 +101,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     return String.format(UPLOAD_REQUEST_FORMAT, bucketName, object);
   }
 
-  public static String batchRequestString(){
+  public static String batchRequestString() {
     return String.format(BATCH_REQUEST_FORMAT);
   }
 
