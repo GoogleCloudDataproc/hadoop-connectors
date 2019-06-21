@@ -18,7 +18,7 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.AUTHENTICATION_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_COOPERATIVE_LOCKING_EXPIRATION_TIMEOUT_MS;
-import static com.google.cloud.hadoop.gcsio.GcsAtomicOperations.LOCK_DIRECTORY;
+import static com.google.cloud.hadoop.gcsio.atomic.GcsAtomicOperations.LOCK_DIRECTORY;
 import static com.google.cloud.hadoop.util.EntriesCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
 import static com.google.cloud.hadoop.util.EntriesCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX;
 import static com.google.cloud.hadoop.util.EntriesCredentialConfiguration.SERVICE_ACCOUNT_KEYFILE_SUFFIX;
@@ -101,7 +101,7 @@ public class CooperativeLockingRepairIntegrationTest {
 
   @AfterClass
   public static void afterClass() throws Throwable {
-    gcsfsIHelper.afterAllTests(gcsfsIHelper.gcsfs.getGcs());
+    gcsfsIHelper.afterAllTests();
     GoogleCloudStorageFileSystem gcsfs = gcsfsIHelper.gcsfs;
     assertThat(gcsfs.exists(new URI("gs://" + gcsfsIHelper.sharedBucketName1))).isFalse();
     assertThat(gcsfs.exists(new URI("gs://" + gcsfsIHelper.sharedBucketName2))).isFalse();
@@ -171,7 +171,7 @@ public class CooperativeLockingRepairIntegrationTest {
 
     // Validate lock files
     List<URI> lockFiles =
-        gcsFs.listFileInfo(bucketUri.resolve(LOCK_DIRECTORY), false).stream()
+        gcsFs.listFileInfo(bucketUri.resolve(LOCK_DIRECTORY)).stream()
             .map(FileInfo::getPath)
             .collect(toList());
 
@@ -244,7 +244,7 @@ public class CooperativeLockingRepairIntegrationTest {
 
     // Validate lock files
     List<URI> lockFiles =
-        gcsFs.listFileInfo(bucketUri.resolve(LOCK_DIRECTORY), false).stream()
+        gcsFs.listFileInfo(bucketUri.resolve(LOCK_DIRECTORY)).stream()
             .map(FileInfo::getPath)
             .collect(toList());
 
@@ -312,7 +312,7 @@ public class CooperativeLockingRepairIntegrationTest {
 
     // Validate lock files
     List<URI> lockFiles =
-        gcsFs.listFileInfo(bucketUri.resolve(LOCK_DIRECTORY), false).stream()
+        gcsFs.listFileInfo(bucketUri.resolve(LOCK_DIRECTORY)).stream()
             .map(FileInfo::getPath)
             .collect(toList());
 

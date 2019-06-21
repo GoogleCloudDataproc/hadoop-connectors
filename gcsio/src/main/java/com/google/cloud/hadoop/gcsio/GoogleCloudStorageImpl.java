@@ -667,7 +667,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
   }
 
-  void deleteObject(StorageResourceId resourceId, long metaGeneration) throws IOException {
+  public void deleteObject(StorageResourceId resourceId, long metaGeneration) throws IOException {
     String bucketName = resourceId.getBucketName();
     Storage.Objects.Delete deleteObject =
         configureRequest(gcs.objects().delete(bucketName, resourceId.getObjectName()), bucketName)

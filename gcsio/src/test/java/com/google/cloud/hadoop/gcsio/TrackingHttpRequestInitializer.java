@@ -107,8 +107,10 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     return String.format(POST_REQUEST_FORMAT, bucketName, object);
   }
 
-  public static String uploadRequestString(String bucketName, String object) {
-    return String.format(UPLOAD_REQUEST_FORMAT, bucketName, object);
+  public static String uploadRequestString(
+      String bucketName, String object, boolean generationMatch) {
+    String request = String.format(UPLOAD_REQUEST_FORMAT, bucketName, object);
+    return generationMatch ? request : request.replaceAll("ifGenerationMatch=0&", "");
   }
 
   public static String updateMetadataRequestString(

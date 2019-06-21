@@ -9,13 +9,13 @@ import static java.time.temporal.ChronoUnit.MILLIS;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 
-import com.google.cloud.hadoop.gcsio.GcsAtomicOperations;
-import com.google.cloud.hadoop.gcsio.GcsAtomicOperations.Operation;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.DeleteOperation;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.RenameOperation;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.atomic.GcsAtomicOperations;
+import com.google.cloud.hadoop.gcsio.atomic.Operation;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;

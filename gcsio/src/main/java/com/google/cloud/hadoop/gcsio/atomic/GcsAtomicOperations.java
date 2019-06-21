@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.google.cloud.hadoop.gcsio;
+package com.google.cloud.hadoop.gcsio.atomic;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -28,20 +28,21 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import com.google.api.client.util.ExponentialBackOff;
-import com.google.common.base.MoreObjects;
+import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
+import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.common.flogger.GoogleLogger;
 import com.google.gson.Gson;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 public class GcsAtomicOperations {
@@ -60,8 +61,8 @@ public class GcsAtomicOperations {
 
   private final GoogleCloudStorageImpl gcs;
 
-  public GcsAtomicOperations(GoogleCloudStorage gcs) {
-    this.gcs = gcs instanceof GoogleCloudStorageImpl ? (GoogleCloudStorageImpl) gcs : null;
+  public GcsAtomicOperations(GoogleCloudStorageImpl gcs) {
+    this.gcs = gcs;
   }
 
   public Set<Operation> getLockedOperations(String bucketName) throws IOException {
@@ -207,7 +208,7 @@ public class GcsAtomicOperations {
     return StorageResourceId.fromObjectName(lockObject);
   }
 
-  private OperationLocks getLockRecords(GoogleCloudStorageItemInfo lockInfo) throws IOException {
+  private OperationLocks getLockRecords(GoogleCloudStorageItemInfo lockInfo) {
     String lockContent = new String(lockInfo.getMetadata().get(LOCK_METADATA_KEY), UTF_8);
     OperationLocks lockRecords = GSON.fromJson(lockContent, OperationLocks.class);
     checkState(
@@ -299,82 +300,5 @@ public class GcsAtomicOperations {
   @FunctionalInterface
   private interface LockRecordsModificationFunction<T, T1, T2, T3> {
     T apply(T1 p1, T2 p2, T3 p3);
-  }
-
-  public static class OperationLocks {
-    public static final long FORMAT_VERSION = 1;
-
-    private long formatVersion = -1;
-    private Set<Operation> operations =
-        new TreeSet<>(Comparator.comparing(Operation::getOperationId));
-
-    public long getFormatVersion() {
-      return formatVersion;
-    }
-
-    public OperationLocks setFormatVersion(long formatVersion) {
-      this.formatVersion = formatVersion;
-      return this;
-    }
-
-    public Set<Operation> getOperations() {
-      return operations;
-    }
-
-    public OperationLocks setOperations(Set<Operation> operations) {
-      this.operations = new TreeSet<>(Comparator.comparing(Operation::getOperationId));
-      this.operations.addAll(operations);
-      return this;
-    }
-
-    @Override
-    public String toString() {
-      return MoreObjects.toStringHelper(this)
-          .add("formatVersion", formatVersion)
-          .add("operations", operations)
-          .toString();
-    }
-  }
-
-  public static class Operation {
-    private String operationId;
-    private long lockEpochSeconds;
-    private Set<String> resources = new TreeSet<>();
-
-    public String getOperationId() {
-      return operationId;
-    }
-
-    public Operation setOperationId(String operationId) {
-      this.operationId = operationId;
-      return this;
-    }
-
-    public long getLockEpochSeconds() {
-      return lockEpochSeconds;
-    }
-
-    public Operation setLockEpochSeconds(long lockEpochSeconds) {
-      this.lockEpochSeconds = lockEpochSeconds;
-      return this;
-    }
-
-    public Set<String> getResources() {
-      return resources;
-    }
-
-    public Operation setResources(Set<String> resources) {
-      this.resources = new TreeSet<>(resources);
-      return this;
-    }
-
-    @Override
-    public String toString() {
-      return MoreObjects.toStringHelper(this)
-          .add("operationId", operationId)
-          .add("lockEpochSeconds", lockEpochSeconds)
-          .add("resources", resources)
-          .toString();
-    }
   }
 }

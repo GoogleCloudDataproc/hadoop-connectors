@@ -16,11 +16,11 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.GcsAtomicOperations.LOCK_DIRECTORY;
-import static com.google.cloud.hadoop.gcsio.GcsAtomicOperations.LOCK_PATH;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.deleteRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.updateMetadataRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.uploadRequestString;
+import static com.google.cloud.hadoop.gcsio.atomic.GcsAtomicOperations.LOCK_DIRECTORY;
+import static com.google.cloud.hadoop.gcsio.atomic.GcsAtomicOperations.LOCK_PATH;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.truth.Truth.assertThat;
 import static java.util.stream.Collectors.toList;
@@ -89,7 +89,7 @@ public class CooperativeLockingIntegrationTest {
 
   @AfterClass
   public static void afterClass() throws Throwable {
-    gcsfsIHelper.afterAllTests(gcsfsIHelper.gcsfs.getGcs());
+    gcsfsIHelper.afterAllTests();
     GoogleCloudStorageFileSystem gcsfs = gcsfsIHelper.gcsfs;
     assertThat(gcsfs.exists(new URI("gs://" + gcsfsIHelper.sharedBucketName1))).isFalse();
     assertThat(gcsfs.exists(new URI("gs://" + gcsfsIHelper.sharedBucketName2))).isFalse();
@@ -115,8 +115,8 @@ public class CooperativeLockingIntegrationTest {
     gcsFs.rename(srcDirUri, dstDirUri);
 
     assertThat(trackingRequestInitializer.getAllRequestStrings())
-        .containsAllOf(
-            uploadRequestString(bucketName, LOCK_PATH),
+        .containsAtLeast(
+            uploadRequestString(bucketName, LOCK_PATH, /* generationMatch= */ true),
             updateMetadataRequestString(bucketName, LOCK_PATH, /* metaGeneration= */ 1),
             deleteRequestString(bucketName, LOCK_PATH, /* metaGeneration= */ 2));
 
@@ -127,7 +127,7 @@ public class CooperativeLockingIntegrationTest {
 
     // Validate lock files
     List<URI> lockFiles =
-        gcsFs.listFileInfo(bucketUri.resolve(LOCK_DIRECTORY), false).stream()
+        gcsFs.listFileInfo(bucketUri.resolve(LOCK_DIRECTORY)).stream()
             .map(FileInfo::getPath)
             .collect(toList());
 
@@ -167,8 +167,8 @@ public class CooperativeLockingIntegrationTest {
     gcsFs.delete(dirUri, /* recursive= */ true);
 
     assertThat(trackingRequestInitializer.getAllRequestStrings())
-        .containsAllOf(
-            uploadRequestString(bucketName, LOCK_PATH),
+        .containsAtLeast(
+            uploadRequestString(bucketName, LOCK_PATH, /* generationMatch= */ true),
             updateMetadataRequestString(bucketName, LOCK_PATH, /* metaGeneration= */ 1),
             deleteRequestString(bucketName, LOCK_PATH, /* metaGeneration= */ 2));
 
@@ -177,7 +177,7 @@ public class CooperativeLockingIntegrationTest {
 
     // Validate lock files
     List<URI> lockFiles =
-        gcsFs.listFileInfo(bucketUri.resolve(LOCK_DIRECTORY), false).stream()
+        gcsFs.listFileInfo(bucketUri.resolve(LOCK_DIRECTORY)).stream()
             .map(FileInfo::getPath)
             .collect(toList());
 

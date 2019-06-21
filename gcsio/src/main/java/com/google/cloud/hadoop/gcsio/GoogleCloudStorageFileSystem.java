@@ -18,8 +18,8 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.CreateFileOptions.DEFAULT_CONTENT_TYPE;
 import static com.google.cloud.hadoop.gcsio.CreateFileOptions.EMPTY_ATTRIBUTES;
-import static com.google.cloud.hadoop.gcsio.GcsAtomicOperations.LOCK_DIRECTORY;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
+import static com.google.cloud.hadoop.gcsio.atomic.GcsAtomicOperations.LOCK_DIRECTORY;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -34,6 +34,7 @@ import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.util.Clock;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.TimestampUpdatePredicate;
+import com.google.cloud.hadoop.gcsio.atomic.GcsAtomicOperations;
 import com.google.cloud.hadoop.util.LazyExecutorService;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.CharMatcher;
@@ -195,12 +196,15 @@ public class GoogleCloudStorageFileSystem {
     checkArgument(credential != null, "credential must not be null");
 
     this.options = options;
-    this.gcs = new GoogleCloudStorageImpl(options.getCloudStorageOptions(), credential);
-    this.gcsAtomic = new GcsAtomicOperations(gcs);
+    GoogleCloudStorageImpl gcsImpl =
+        new GoogleCloudStorageImpl(options.getCloudStorageOptions(), credential);
+    this.gcs = gcsImpl;
+    this.gcsAtomic = new GcsAtomicOperations(gcsImpl);
     this.pathCodec = options.getPathCodec();
 
     if (options.isPerformanceCacheEnabled()) {
-      gcs = new PerformanceCachingGoogleCloudStorage(gcs, options.getPerformanceCacheOptions());
+      this.gcs =
+          new PerformanceCachingGoogleCloudStorage(this.gcs, options.getPerformanceCacheOptions());
     }
   }
 
@@ -221,9 +225,9 @@ public class GoogleCloudStorageFileSystem {
    * GoogleCloudStorage {@code gcs}. Any options pertaining to GCS creation will be ignored.
    */
   public GoogleCloudStorageFileSystem(
-      GoogleCloudStorage gcs, GoogleCloudStorageFileSystemOptions options) throws IOException {
+      GoogleCloudStorage gcs, GoogleCloudStorageFileSystemOptions options) {
     this.gcs = gcs;
-    this.gcsAtomic = new GcsAtomicOperations(gcs);
+    this.gcsAtomic = new GcsAtomicOperations((GoogleCloudStorageImpl) gcs);
     this.options = options;
     this.pathCodec = options.getPathCodec();
   }
