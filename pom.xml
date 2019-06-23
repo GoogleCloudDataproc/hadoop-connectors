@@ -517,7 +517,7 @@
           </excludes>
           <reuseForks>false</reuseForks>
           <forkCount>2</forkCount>
-          <argLine>-mx4g</argLine>
+          <argLine>-mx2560m</argLine>
         </configuration>
       </plugin>
       <plugin>
