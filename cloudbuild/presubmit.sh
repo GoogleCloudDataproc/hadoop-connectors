@@ -23,5 +23,8 @@ cd /bigdata-interop
 # Print Maven info
 ./mvnw -v
 
-# Run unit tests
-./mvnw -B -e "-P${HADOOP_PROFILE}" -DargLine="-mx3g" clean test
+# Run unit tests and generate test coverage report
+./mvnw -B -e "-P${HADOOP_PROFILE}" -Pcoverage -DargLine="-mx3g" clean verify
+
+# Upload test coverage report to Codecov
+bash <(curl -s https://codecov.io/bash) -F "${HADOOP_PROFILE},unittest"
