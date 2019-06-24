@@ -16,16 +16,20 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.RenameOperatio
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.atomic.GcsAtomicOperations;
 import com.google.cloud.hadoop.gcsio.atomic.Operation;
+import com.google.common.base.Charsets;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.io.ByteSource;
 import com.google.gson.Gson;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Instant;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -34,11 +38,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.function.Function;
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -212,14 +213,14 @@ public class AtomicGcsFsck extends Configured implements Tool {
                       RenameOperation.class,
                       (o, i) -> o.setLockEpochSeconds(i.getEpochSecond()));
               try {
-                List<Pair<String, String>> loggedResources =
+                List<Map.Entry<String, String>> loggedResources =
                     getOperationLog(
                         ghfs,
                         operation,
                         l -> {
                           List<String> srcToDst = RENAME_LOG_RECORD_SPLITTER.splitToList(l);
                           checkState(srcToDst.size() == 2);
-                          return Pair.of(srcToDst.get(0), srcToDst.get(1));
+                          return new AbstractMap.SimpleEntry<>(srcToDst.get(0), srcToDst.get(1));
                         });
                 if (operationObject.getCopySucceeded()) {
                   if (COMMAND_ROLL_BACK.equals(command)) {
@@ -233,7 +234,7 @@ public class AtomicGcsFsck extends Configured implements Tool {
                     deleteResource(
                         ghfs,
                         operationObject.getSrcResource(),
-                        loggedResources.stream().map(Pair::getLeft).collect(toList()));
+                        loggedResources.stream().map(Map.Entry::getKey).collect(toList()));
                     gcsFs
                         .getGcs()
                         .copy(
@@ -241,20 +242,20 @@ public class AtomicGcsFsck extends Configured implements Tool {
                             loggedResources.stream()
                                 .map(
                                     p ->
-                                        StorageResourceId.fromObjectName(p.getRight())
+                                        StorageResourceId.fromObjectName(p.getValue())
                                             .getObjectName())
                                 .collect(toList()),
                             bucketName,
                             loggedResources.stream()
                                 .map(
                                     p ->
-                                        StorageResourceId.fromObjectName(p.getLeft())
+                                        StorageResourceId.fromObjectName(p.getKey())
                                             .getObjectName())
                                 .collect(toList()));
                     deleteResource(
                         ghfs,
                         operationObject.getDstResource(),
-                        loggedResources.stream().map(Pair::getRight).collect(toList()));
+                        loggedResources.stream().map(Map.Entry::getValue).collect(toList()));
                   } else {
                     logger.atInfo().log(
                         "Repairing FS after %s rename operation (deleting source (%s)).",
@@ -262,7 +263,7 @@ public class AtomicGcsFsck extends Configured implements Tool {
                     deleteResource(
                         ghfs,
                         operationObject.getSrcResource(),
-                        loggedResources.stream().map(Pair::getLeft).collect(toList()));
+                        loggedResources.stream().map(Map.Entry::getKey).collect(toList()));
                   }
                 } else {
                   if (COMMAND_ROLL_BACK.equals(command)) {
@@ -272,7 +273,7 @@ public class AtomicGcsFsck extends Configured implements Tool {
                     deleteResource(
                         ghfs,
                         operationObject.getDstResource(),
-                        loggedResources.stream().map(Pair::getLeft).collect(toList()));
+                        loggedResources.stream().map(Map.Entry::getKey).collect(toList()));
                   } else {
                     logger.atInfo().log(
                         "Repairing FS after %s rename operation"
@@ -284,7 +285,7 @@ public class AtomicGcsFsck extends Configured implements Tool {
                     deleteResource(
                         ghfs,
                         operationObject.getDstResource(),
-                        loggedResources.stream().map(Pair::getRight).collect(toList()));
+                        loggedResources.stream().map(Map.Entry::getValue).collect(toList()));
                     gcsFs
                         .getGcs()
                         .copy(
@@ -292,20 +293,20 @@ public class AtomicGcsFsck extends Configured implements Tool {
                             loggedResources.stream()
                                 .map(
                                     p ->
-                                        StorageResourceId.fromObjectName(p.getLeft())
+                                        StorageResourceId.fromObjectName(p.getKey())
                                             .getObjectName())
                                 .collect(toList()),
                             bucketName,
                             loggedResources.stream()
                                 .map(
                                     p ->
-                                        StorageResourceId.fromObjectName(p.getRight())
+                                        StorageResourceId.fromObjectName(p.getValue())
                                             .getObjectName())
                                 .collect(toList()));
                     deleteResource(
                         ghfs,
                         operationObject.getSrcResource(),
-                        loggedResources.stream().map(Pair::getLeft).collect(toList()));
+                        loggedResources.stream().map(Map.Entry::getKey).collect(toList()));
                   }
                 }
                 gcsAtomic.unlockPaths(
@@ -397,10 +398,14 @@ public class AtomicGcsFsck extends Configured implements Tool {
 
   private static <T> T getOperationObject(
       GoogleHadoopFileSystem ghfs, FileStatus operation, Class<T> clazz) throws IOException {
-    String operationContent;
-    try (FSDataInputStream in = ghfs.open(operation.getPath())) {
-      operationContent = IOUtils.toString(in);
-    }
+    ByteSource operationByteSource =
+        new ByteSource() {
+          @Override
+          public InputStream openStream() throws IOException {
+            return ghfs.open(operation.getPath());
+          }
+        };
+    String operationContent = operationByteSource.asCharSource(Charsets.UTF_8).read();
     return GSON.fromJson(operationContent, clazz);
   }
 
