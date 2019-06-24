@@ -23,6 +23,7 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.dataResp
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.metadataResponse;
 import static com.google.common.truth.Truth.assertThat;
 import static java.util.stream.Collectors.toList;
+import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.testing.http.MockHttpTransport;
@@ -237,5 +238,189 @@ public class GoogleCloudStorageReadChannelTest {
         requests.stream().map(r -> r.getHeaders().getRange()).collect(toList());
 
     assertThat(rangeHeaders).containsExactly("bytes=8-9", "bytes=7-7").inOrder();
+  }
+
+  @Test
+  public void testReadWhenBufferHasNoSpace() throws IOException {
+    int seekPosition = 5;
+    byte[] buffer = {};
+    byte[] testData = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
+    byte[] testData2 = Arrays.copyOfRange(testData, seekPosition, testData.length);
+
+    MockHttpTransport transport =
+        GoogleCloudStorageTestUtils.mockTransport(
+            // 1st read request response
+            dataRangeResponse(Arrays.copyOfRange(testData, 1, testData.length), 1, testData.length),
+            // 2nd read request response
+            dataRangeResponse(testData2, seekPosition, testData2.length));
+
+    List<HttpRequest> requests = new ArrayList<>();
+
+    Storage storage = new Storage(transport, JSON_FACTORY, requests::add);
+
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder()
+            .setBackoffInitialIntervalMillis(10000)
+            .setFastFailOnNotFound(false)
+            .setFadvise(Fadvise.AUTO)
+            .setMinRangeRequestSize(1)
+            .setInplaceSeekLimit(2)
+            .build();
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
+    assertThat(readChannel.read(ByteBuffer.wrap(buffer))).isEqualTo(0);
+  }
+
+  @Test
+  public void testReadWhenPositionIsEqualToSize() throws IOException {
+    int seekPosition = 5;
+    byte[] testData = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
+    byte[] testData2 = Arrays.copyOfRange(testData, seekPosition, testData.length);
+
+    MockHttpTransport transport =
+        GoogleCloudStorageTestUtils.mockTransport(
+            // 1st read request response
+            dataRangeResponse(Arrays.copyOfRange(testData, 1, testData.length), 1, testData.length),
+            // 2nd read request response
+            dataRangeResponse(testData2, seekPosition, testData2.length));
+
+    List<HttpRequest> requests = new ArrayList<>();
+
+    Storage storage = new Storage(transport, JSON_FACTORY, requests::add);
+
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder()
+            .setBackoffInitialIntervalMillis(10000)
+            .setFastFailOnNotFound(false)
+            .setFadvise(Fadvise.AUTO)
+            .setMinRangeRequestSize(1)
+            .setInplaceSeekLimit(2)
+            .build();
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
+    readChannel.setSize(0);
+    assertThat(readChannel.read(ByteBuffer.wrap(testData))).isEqualTo(-1);
+  }
+
+  @Test
+  public void testInitMetadataForGzipEncoded_shouldSetMaxLongSize() throws IOException {
+    int seekPosition = 5;
+    byte[] testData = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
+    byte[] testData2 = Arrays.copyOfRange(testData, seekPosition, testData.length);
+
+    MockHttpTransport transport =
+        GoogleCloudStorageTestUtils.mockTransport(
+            // 1st read request response
+            dataRangeResponse(Arrays.copyOfRange(testData, 1, testData.length), 1, testData.length),
+            // 2nd read request response
+            dataRangeResponse(testData2, seekPosition, testData2.length));
+
+    List<HttpRequest> requests = new ArrayList<>();
+
+    Storage storage = new Storage(transport, JSON_FACTORY, requests::add);
+
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder()
+            .setBackoffInitialIntervalMillis(10000)
+            .setFastFailOnNotFound(false)
+            .setFadvise(Fadvise.AUTO)
+            .setMinRangeRequestSize(1)
+            .setInplaceSeekLimit(2)
+            .build();
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
+    readChannel.initMetadata("gzip", 23, null);
+    assertThat(readChannel.size()).isEqualTo(Long.MAX_VALUE);
+  }
+
+  @Test
+  public void testInitGenerationThrowsExceptionForNull() throws IOException {
+    int seekPosition = 5;
+    byte[] testData = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
+    byte[] testData2 = Arrays.copyOfRange(testData, seekPosition, testData.length);
+
+    MockHttpTransport transport =
+        GoogleCloudStorageTestUtils.mockTransport(
+            // 1st read request response
+            dataRangeResponse(Arrays.copyOfRange(testData, 1, testData.length), 1, testData.length),
+            // 2nd read request response
+            dataRangeResponse(testData2, seekPosition, testData2.length));
+
+    List<HttpRequest> requests = new ArrayList<>();
+
+    Storage storage = new Storage(transport, JSON_FACTORY, requests::add);
+
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder()
+            .setBackoffInitialIntervalMillis(10000)
+            .setFastFailOnNotFound(false)
+            .setFadvise(Fadvise.AUTO)
+            .setMinRangeRequestSize(1)
+            .setInplaceSeekLimit(2)
+            .setGenerationReadConsistency(
+                GoogleCloudStorageReadOptions.GenerationReadConsistency.BEST_EFFORT)
+            .build();
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
+    IOException thrown =
+        assertThrows(IOException.class, () -> readChannel.initMetadata("", 1, null));
+    assertThat(thrown).hasMessageThat().contains("Generation Read Consistency is");
+  }
+
+  @Test
+  public void testInitGenerationSucceedesWithString() throws IOException {
+    int seekPosition = 5;
+    byte[] testData = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
+    byte[] testData2 = Arrays.copyOfRange(testData, seekPosition, testData.length);
+
+    MockHttpTransport transport =
+        GoogleCloudStorageTestUtils.mockTransport(
+            // 1st read request response
+            dataRangeResponse(Arrays.copyOfRange(testData, 1, testData.length), 1, testData.length),
+            // 2nd read request response
+            dataRangeResponse(testData2, seekPosition, testData2.length));
+
+    List<HttpRequest> requests = new ArrayList<>();
+
+    Storage storage = new Storage(transport, JSON_FACTORY, requests::add);
+
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder()
+            .setBackoffInitialIntervalMillis(10000)
+            .setFastFailOnNotFound(false)
+            .setFadvise(Fadvise.AUTO)
+            .setMinRangeRequestSize(1)
+            .setInplaceSeekLimit(2)
+            .setGenerationReadConsistency(
+                GoogleCloudStorageReadOptions.GenerationReadConsistency.LATEST)
+            .build();
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
+    readChannel.initMetadata("", 1, "1234");
+  }
+
+  @Test
+  public void testReadForGzipEncoded_shouldReadAllBytes() throws IOException {
+    int seekPosition = 5;
+    byte[] testData = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
+    byte[] testData2 = Arrays.copyOfRange(testData, seekPosition, testData.length);
+
+    MockHttpTransport transport =
+        GoogleCloudStorageTestUtils.mockTransport(
+            // 1st read request response
+            dataRangeResponse(Arrays.copyOfRange(testData, 1, testData.length), 1, testData.length),
+            // 2nd read request response
+            dataRangeResponse(testData2, seekPosition, testData2.length));
+
+    List<HttpRequest> requests = new ArrayList<>();
+
+    Storage storage = new Storage(transport, JSON_FACTORY, requests::add);
+
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder()
+            .setBackoffInitialIntervalMillis(10000)
+            .setFastFailOnNotFound(false)
+            .setFadvise(Fadvise.AUTO)
+            .setMinRangeRequestSize(1)
+            .setInplaceSeekLimit(2)
+            .build();
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
+    readChannel.initMetadata("gzip", 23, null);
+    assertThat(readChannel.read(ByteBuffer.wrap(testData))).isEqualTo(9);
   }
 }
