@@ -30,10 +30,13 @@ import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import org.junit.AfterClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -204,5 +207,41 @@ public class GoogleCloudStorageImplTest {
         dstBucketName, ImmutableList.of(copiedResourceId.getObjectName()));
 
     assertObjectContent(gcs, copiedResourceId, partition, partitionsCount);
+  }
+
+  @Test
+  public void testGoogleCloudStorageItemInfoMetadataEquals() throws IOException {
+    GoogleCloudStorageImpl gcs =
+        makeStorage(
+            GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+                .setCopyWithRewriteEnabled(true)
+                .setMaxBytesRewrittenPerCall(512 * 1024 * 1024)
+                .build());
+
+    String bucketName = BUCKET_HELPER.getUniqueBucketName("metadata-equals");
+    gcs.create(bucketName);
+
+    StorageResourceId testObject = new StorageResourceId(bucketName, "testMetadataEquals_Object");
+    StorageResourceId anotherTestObject =
+        new StorageResourceId(bucketName, "testMetadataEquals_AnotherObject");
+
+    Map<String, byte[]> metadata =
+        ImmutableMap.of(
+            "key1", "value1".getBytes(StandardCharsets.UTF_8),
+            "key2", "value2".getBytes(StandardCharsets.UTF_8));
+    Map<String, byte[]> anotherMetadata =
+        ImmutableMap.of(
+            "key3", "value3".getBytes(StandardCharsets.UTF_8),
+            "key4", "value4".getBytes(StandardCharsets.UTF_8));
+    gcs.createEmptyObject(testObject, new CreateObjectOptions(true, "text/plain", metadata));
+
+    gcs.createEmptyObject(
+        anotherTestObject, new CreateObjectOptions(true, "text/plain", anotherMetadata));
+
+    GoogleCloudStorageItemInfo itemInfo = gcs.getItemInfo(testObject);
+    GoogleCloudStorageItemInfo anotheriItemInfo = gcs.getItemInfo(anotherTestObject);
+
+    assertThat(itemInfo.metadataEquals(itemInfo.getMetadata())).isTrue();
+    assertThat(itemInfo.metadataEquals(anotheriItemInfo.getMetadata())).isFalse();
   }
 }
