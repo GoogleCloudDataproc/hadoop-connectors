@@ -3978,4 +3978,100 @@ public class GoogleCloudStorageTest {
     verify(mockStorageObjectsGet, times(2)).setGeneration(eq(null));
     verify(mockExceptionStream, times(2)).read(any(byte[].class), eq(0), anyInt());
   }
+
+  @Test
+  public void
+      GoogleCloudStorageReadOptions_builder_throwsExceptionWhenInplaceSeekLimitLowerThanZero() {
+    long inplaceSeekLimit = -123;
+    IllegalStateException exception =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                GoogleCloudStorageReadOptions.builder()
+                    .setInplaceSeekLimit(inplaceSeekLimit)
+                    .build());
+    assertThat(exception)
+        .hasMessageThat()
+        .isEqualTo(
+            String.format("inplaceSeekLimit must be non-negative! Got %s", inplaceSeekLimit));
+  }
+
+  @Test
+  public void
+      GoogleCloudStorageOptions_build_throwsExceptionWhenMaxBytesRewrittenPerCallNotMbMultiple() {
+    long maxBytesRewrittenPerCall = 1;
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                GoogleCloudStorageOptions.newBuilder()
+                    .setMaxBytesRewrittenPerCall(maxBytesRewrittenPerCall)
+                    .build());
+    assertThat(exception)
+        .hasMessageThat()
+        .isEqualTo(
+            String.format(
+                "maxBytesRewrittenPerCall must be an integral multiple of 1 MiB (1048576), but was: %s",
+                maxBytesRewrittenPerCall));
+  }
+
+  @Test
+  public void GoogleCloudStorageOptions_build_throwsExceptionWhenProxyNotSetAndPasswordNotNull() {
+    String proxyPassword = "foo";
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> GoogleCloudStorageOptions.newBuilder().setProxyPassword(proxyPassword).build());
+    assertThat(exception)
+        .hasMessageThat()
+        .isEqualTo(
+            "if proxyAddress is null then proxyUsername and proxyPassword should be null too");
+  }
+
+  @Test
+  public void GoogleCloudStorageOptions_build_throwsExceptionWhenProxyNotSetAndUsernameNotNull() {
+    String proxyUsername = "foo";
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> GoogleCloudStorageOptions.newBuilder().setProxyUsername(proxyUsername).build());
+    assertThat(exception)
+        .hasMessageThat()
+        .isEqualTo(
+            "if proxyAddress is null then proxyUsername and proxyPassword should be null too");
+  }
+
+  @Test
+  public void GoogleCloudStorageOptions_build_throwsExceptionWhenProxySetAndUsernameNull() {
+    String proxyConfig = "foo";
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                GoogleCloudStorageOptions.newBuilder()
+                    .setProxyAddress(proxyConfig)
+                    .setProxyPassword(proxyConfig)
+                    .setProxyUsername(null)
+                    .build());
+    assertThat(exception)
+        .hasMessageThat()
+        .isEqualTo("both proxyUsername and proxyPassword should be null or not null together");
+  }
+
+  @Test
+  public void GoogleCloudStorageOptions_build_throwsExceptionWhenProxySetAndPasswordNull() {
+    String proxyConfig = "foo";
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                GoogleCloudStorageOptions.newBuilder()
+                    .setProxyAddress(proxyConfig)
+                    .setProxyPassword(null)
+                    .setProxyUsername(proxyConfig)
+                    .build());
+    assertThat(exception)
+        .hasMessageThat()
+        .isEqualTo("both proxyUsername and proxyPassword should be null or not null together");
+  }
 }
