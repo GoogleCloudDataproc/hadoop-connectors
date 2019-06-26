@@ -89,7 +89,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
   @Override
   public void setDirectUploadEnabled(boolean enableDirectUpload) {
-    // TODO(julianandrews): Figure out if we need to support non-resumable uploads.
+    // TODO(b/135137933): Figure out if we need to support non-resumable uploads.
     // It doesn't look as if the connector uses it at all, but there's code
     // to support it, so maybe I'm missing something.
     if (enableDirectUpload) {
@@ -197,7 +197,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       return responseObserver.getResponse();
     }
 
-    // TODO(julianandrews): Keep a buffer for the chunk data and resume on recoverable errors.
+    // TODO(b/135137444): Keep a buffer for the chunk data and resume on recoverable errors.
     /** Handler for responses from the Insert streaming RPC. */
     private class InsertChunkResponseObserver
         implements ClientResponseObserver<InsertObjectRequest, Object> {
