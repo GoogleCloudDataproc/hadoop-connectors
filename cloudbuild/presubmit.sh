@@ -27,4 +27,4 @@ cd /bigdata-interop
 ./mvnw -B -e "-P${HADOOP_PROFILE}" -Pcoverage clean verify
 
 # Upload test coverage report to Codecov
-bash <(curl -s https://codecov.io/bash) -K -F "${HADOOP_PROFILE}-unittest"
+bash <(curl -s https://codecov.io/bash) -K -F "${HADOOP_PROFILE}unittest"
