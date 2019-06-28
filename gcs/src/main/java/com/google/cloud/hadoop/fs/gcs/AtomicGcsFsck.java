@@ -14,8 +14,8 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.DeleteOperation;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.RenameOperation;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
-import com.google.cloud.hadoop.gcsio.atomic.GcsAtomicOperations;
-import com.google.cloud.hadoop.gcsio.atomic.Operation;
+import com.google.cloud.hadoop.gcsio.cooplocking.Operations;
+import com.google.cloud.hadoop.gcsio.cooplocking.OperationLock;
 import com.google.common.base.Charsets;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
@@ -116,22 +116,22 @@ public class AtomicGcsFsck extends Configured implements Tool {
     String bucketName = bucketUri.getAuthority();
     GoogleHadoopFileSystem ghfs = (GoogleHadoopFileSystem) FileSystem.get(bucketUri, conf);
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
-    GcsAtomicOperations gcsAtomic = gcsFs.getGcsAtomic();
+    Operations gcsAtomic = gcsFs.getGcsAtomic();
 
     Instant operationExpirationTime = Instant.now();
 
-    Set<Operation> lockedOperations = gcsAtomic.getLockedOperations(bucketUri.getAuthority());
+    Set<OperationLock> lockedOperations = gcsAtomic.getLockedOperations(bucketUri.getAuthority());
     if (lockedOperations.isEmpty()) {
       logger.atInfo().log("No expired operation locks");
       return 0;
     }
 
-    Map<FileStatus, Operation> expiredOperations = new HashMap<>();
-    for (Operation lockedOperation : lockedOperations) {
+    Map<FileStatus, OperationLock> expiredOperations = new HashMap<>();
+    for (OperationLock lockedOperation : lockedOperations) {
       String operationId = lockedOperation.getOperationId();
       URI operationPattern =
           bucketUri.resolve(
-              "/" + GcsAtomicOperations.LOCK_DIRECTORY + "*" + operationId + "*.lock");
+              "/" + Operations.LOCK_DIRECTORY + "*" + operationId + "*.lock");
       FileStatus[] operationStatuses = ghfs.globStatus(new Path(operationPattern));
       checkState(
           operationStatuses.length < 2,
@@ -168,10 +168,10 @@ public class AtomicGcsFsck extends Configured implements Tool {
       return 0;
     }
 
-    Function<Map.Entry<FileStatus, Operation>, Boolean> operationRecovery =
+    Function<Map.Entry<FileStatus, OperationLock>, Boolean> operationRecovery =
         expiredOperation -> {
           FileStatus operation = expiredOperation.getKey();
-          Operation lockedOperation = expiredOperation.getValue();
+          OperationLock lockedOperation = expiredOperation.getValue();
 
           String operationId = getOperationId(operation);
           try {
@@ -325,7 +325,7 @@ public class AtomicGcsFsck extends Configured implements Tool {
           return true;
         };
 
-    for (Map.Entry<FileStatus, Operation> expiredOperation : expiredOperations.entrySet()) {
+    for (Map.Entry<FileStatus, OperationLock> expiredOperation : expiredOperations.entrySet()) {
       long start = System.currentTimeMillis();
       try {
         boolean succeeded = operationRecovery.apply(expiredOperation);

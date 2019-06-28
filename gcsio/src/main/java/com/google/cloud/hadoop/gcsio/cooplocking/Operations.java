@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.google.cloud.hadoop.gcsio.atomic;
+package com.google.cloud.hadoop.gcsio.cooplocking;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -45,7 +45,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-public class GcsAtomicOperations {
+public class Operations {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
@@ -61,21 +61,21 @@ public class GcsAtomicOperations {
 
   private final GoogleCloudStorageImpl gcs;
 
-  public GcsAtomicOperations(GoogleCloudStorageImpl gcs) {
+  public Operations(GoogleCloudStorageImpl gcs) {
     this.gcs = gcs;
   }
 
-  public Set<Operation> getLockedOperations(String bucketName) throws IOException {
+  public Set<OperationLock> getLockedOperations(String bucketName) throws IOException {
     long startMs = System.currentTimeMillis();
     logger.atFine().log("getLockedOperations(%s)", bucketName);
     StorageResourceId lockId = getLockId(bucketName);
     GoogleCloudStorageItemInfo lockInfo = gcs.getItemInfo(lockId);
-    Set<Operation> operations =
+    Set<OperationLock> operations =
         !lockInfo.exists()
                 || lockInfo.getMetaGeneration() == 0
                 || lockInfo.getMetadata().get(LOCK_METADATA_KEY) == null
             ? new HashSet<>()
-            : getLockRecords(lockInfo).getOperations();
+            : getLockRecords(lockInfo).getLocks();
     logger.atFine().log(
         "[%dms] lockPaths(%s): %s", System.currentTimeMillis() - startMs, bucketName, operations);
     return operations;
@@ -157,21 +157,21 @@ public class GcsAtomicOperations {
         if (!modificationFn.apply(lockRecords, operationId, modificationFnParam)) {
           logger.atInfo().atMostEvery(5, SECONDS).log(
               "Failed to update %s entries in %s file: resources could be locked. Re-trying.",
-              modificationFnParam, lockRecords.getOperations().size(), lockId);
+              modificationFnParam, lockRecords.getLocks().size(), lockId);
           sleepUninterruptibly(backOff.nextBackOffMillis(), MILLISECONDS);
           continue;
         }
 
         // Unlocked all objects - delete lock object
-        if (lockRecords.getOperations().isEmpty()) {
+        if (lockRecords.getLocks().isEmpty()) {
           gcs.deleteObject(lockInfo.getResourceId(), lockInfo.getMetaGeneration());
           break;
         }
 
-        if (lockRecords.getOperations().size() > MAX_LOCKS_COUNT) {
+        if (lockRecords.getLocks().size() > MAX_LOCKS_COUNT) {
           logger.atInfo().atMostEvery(5, SECONDS).log(
               "Skipping lock entries update in %s file: too many (%d) locked resources. Re-trying.",
-              lockRecords.getOperations().size(), lockId);
+              lockRecords.getLocks().size(), lockId);
           sleepUninterruptibly(backOff.nextBackOffMillis(), MILLISECONDS);
           continue;
         }
@@ -221,12 +221,12 @@ public class GcsAtomicOperations {
 
   private boolean updateLockEpochSeconds(
       OperationLocks lockRecords, String operationId, long lockEpochSeconds) {
-    Optional<Operation> operationOptional =
-        lockRecords.getOperations().stream()
+    Optional<OperationLock> operationOptional =
+        lockRecords.getLocks().stream()
             .filter(o -> o.getOperationId().equals(operationId))
             .findAny();
     checkState(operationOptional.isPresent(), "operation %s not found", operationId);
-    Operation operation = operationOptional.get();
+    OperationLock operation = operationOptional.get();
     checkState(
         lockEpochSeconds == operation.getLockEpochSeconds(),
         "operation %s should have %s lock epoch, but was %s",
@@ -240,7 +240,7 @@ public class GcsAtomicOperations {
   private boolean addLockRecords(
       OperationLocks lockRecords, String operationId, Set<String> resourcesToAdd) {
     // TODO: optimize to match more efficiently
-    if (lockRecords.getOperations().stream()
+    if (lockRecords.getLocks().stream()
         .flatMap(operation -> operation.getResources().stream())
         .anyMatch(
             resource -> {
@@ -258,9 +258,9 @@ public class GcsAtomicOperations {
 
     long lockEpochSeconds = Instant.now().getEpochSecond();
     lockRecords
-        .getOperations()
+        .getLocks()
         .add(
-            new Operation()
+            new OperationLock()
                 .setOperationId(operationId)
                 .setResources(resourcesToAdd)
                 .setLockEpochSeconds(lockEpochSeconds));
@@ -274,8 +274,8 @@ public class GcsAtomicOperations {
 
   private boolean removeLockRecords(
       OperationLocks lockRecords, String operationId, Set<String> resourcesToRemove) {
-    List<Operation> operationLocksToRemove =
-        lockRecords.getOperations().stream()
+    List<OperationLock> operationLocksToRemove =
+        lockRecords.getLocks().stream()
             .filter(o -> o.getResources().stream().anyMatch(resourcesToRemove::contains))
             .collect(Collectors.toList());
     checkState(
@@ -284,14 +284,14 @@ public class GcsAtomicOperations {
         "All resources %s should belong to %s operation, but was %s",
         resourcesToRemove.size(),
         operationLocksToRemove.size());
-    Operation operationToRemove = operationLocksToRemove.get(0);
+    OperationLock operationToRemove = operationLocksToRemove.get(0);
     checkState(
         operationToRemove.getResources().equals(resourcesToRemove),
         "All of %s resources should be locked by operation, but was locked only %s resources",
         resourcesToRemove,
         operationToRemove.getResources());
     checkState(
-        lockRecords.getOperations().remove(operationToRemove),
+        lockRecords.getLocks().remove(operationToRemove),
         "operation %s was not removed",
         operationToRemove);
     return true;
