@@ -36,8 +36,14 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   private static final String GET_REQUEST_FORMAT =
       "GET:https://www.googleapis.com/storage/v1/b/%s/o/%s";
 
+  private static final String GET_BUCKET_REQUEST_FORMAT =
+      "GET:https://www.googleapis.com/storage/v1/b/%s";
+
   private static final String POST_REQUEST_FORMAT =
       "POST:https://www.googleapis.com/storage/v1/b/%s/o/%s";
+
+  private static final String POST_COPY_REQUEST_FORMAT =
+      "POST:https://www.googleapis.com/storage/v1/b/%s/o/%s/%s/b/%s/o/%s";
 
   private static final String UPLOAD_REQUEST_FORMAT =
       "POST:https://www.googleapis.com/upload/storage/v1/b/%s/o"
@@ -110,8 +116,18 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     return String.format(GET_REQUEST_FORMAT, bucketName, object);
   }
 
+  public static String getBucketRequestString(String bucketname) {
+    return String.format(GET_BUCKET_REQUEST_FORMAT, bucketname);
+  }
+
   public static String postRequestString(String bucketName, String object) {
     return String.format(POST_REQUEST_FORMAT, bucketName, object);
+  }
+
+  public static String copyRequestString(
+      String srcBucketName, String srcObjectName, String dstBucketName, String dstObjectName, String copyRequestType) {
+    return String.format(
+        POST_COPY_REQUEST_FORMAT, srcBucketName, srcObjectName, copyRequestType, dstBucketName, dstObjectName);
   }
 
   public static String uploadRequestString(

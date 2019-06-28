@@ -18,6 +18,8 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.batchRequestString;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.copyRequestString;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getBucketRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.postRequestString;
@@ -363,6 +365,121 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             postRequestString(testBucket, URLEncoder.encode(testDir + "f1", UTF_8.name())));
+  }
+
+  @Test
+  public void updateItems_withLimits_MultipleBatchGcsRequests() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs =
+        new GoogleCloudStorageImpl(
+            gcsOptions.toBuilder().setMaxRequestsPerBatch(2).build(), gcsRequestsTracker);
+
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "f3");
+
+    Map<String, byte[]> updatedMetadata = ImmutableMap.of("test-metadata", "test-value".getBytes());
+
+    List<GoogleCloudStorageItemInfo> updatedObjects =
+        gcs.updateItems(
+            ImmutableList.of(
+                new UpdatableItemInfo(
+                    new StorageResourceId(testBucket, testDir + "f1"), updatedMetadata),
+                new UpdatableItemInfo(
+                    new StorageResourceId(testBucket, testDir + "f2"), updatedMetadata),
+                new UpdatableItemInfo(
+                    new StorageResourceId(testBucket, testDir + "f3"), updatedMetadata)));
+
+    assertThat(toObjectNames(updatedObjects))
+        .containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");
+    assertThat(updatedObjects.get(0).getMetadata().keySet()).isEqualTo(updatedMetadata.keySet());
+
+    // Assert that 5 GCS requests were sent
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            batchRequestString(),
+            postRequestString(testBucket, URLEncoder.encode(testDir + "f1", UTF_8.name())),
+            postRequestString(testBucket, URLEncoder.encode(testDir + "f2", UTF_8.name())),
+            batchRequestString(),
+            postRequestString(testBucket, URLEncoder.encode(testDir + "f3", UTF_8.name())));
+  }
+
+  @Test
+  public void copy_withoutLimits_withDisabledCopyWithRewrites() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket1 = gcsfsIHelper.sharedBucketName1;
+    String testBucket2 = gcsfsIHelper.sharedBucketName2;
+    String testDir = createObjectsInTestDir(testBucket1, "f1", "f2", "f3");
+
+    gcs.copy(
+        testBucket1,
+        ImmutableList.of(testDir + "f1", testDir + "f2"),
+        testBucket2,
+        ImmutableList.of(testDir + "f4", testDir + "f5"));
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            getBucketRequestString(testBucket1),
+            getBucketRequestString(testBucket2),
+            batchRequestString(),
+            copyRequestString(
+                testBucket1,
+                URLEncoder.encode(testDir + "f1", UTF_8.name()),
+                testBucket2,
+                URLEncoder.encode(testDir + "f4", UTF_8.name()),
+                "copyTo"),
+            copyRequestString(
+                testBucket1,
+                URLEncoder.encode(testDir + "f2", UTF_8.name()),
+                testBucket2,
+                URLEncoder.encode(testDir + "f5", UTF_8.name()),
+                "copyTo"));
+
+    List<String> listedObjects = gcs.listObjectNames(testBucket2, testDir, PATH_DELIMITER);
+    assertThat(listedObjects).containsExactly(testDir + "f4", testDir + "f5");
+  }
+
+  @Test
+  public void copy_withoutLimits_withEnabledCopyWithRewrites() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs =
+        new GoogleCloudStorageImpl(
+            gcsOptions.toBuilder().setCopyWithRewriteEnabled(true).build(), gcsRequestsTracker);
+
+    String testBucket1 = gcsfsIHelper.sharedBucketName1;
+    String testBucket2 = gcsfsIHelper.sharedBucketName2;
+    String testDir = createObjectsInTestDir(testBucket1, "f1", "f2", "f3");
+
+    gcs.copy(
+        testBucket1,
+        ImmutableList.of(testDir + "f1", testDir + "f2"),
+        testBucket2,
+        ImmutableList.of(testDir + "f4", testDir + "f5"));
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            getBucketRequestString(testBucket1),
+            getBucketRequestString(testBucket2),
+            batchRequestString(),
+            copyRequestString(
+                testBucket1,
+                URLEncoder.encode(testDir + "f1", UTF_8.name()),
+                testBucket2,
+                URLEncoder.encode(testDir + "f4", UTF_8.name()),
+                "rewriteTo"),
+            copyRequestString(
+                testBucket1,
+                URLEncoder.encode(testDir + "f2", UTF_8.name()),
+                testBucket2,
+                URLEncoder.encode(testDir + "f5", UTF_8.name()),
+                "rewriteTo"));
+
+    List<String> listedObjects = gcs.listObjectNames(testBucket2, testDir, PATH_DELIMITER);
+    assertThat(listedObjects).containsExactly(testDir + "f4", testDir + "f5");
   }
 
   private static List<String> toObjectNames(List<GoogleCloudStorageItemInfo> listedObjects) {
