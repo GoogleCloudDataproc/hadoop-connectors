@@ -1,11 +1,11 @@
-package com.google.cloud.hadoop.gcsio.cooplocking;
+package com.google.cloud.hadoop.gcsio.cooplock;
 
 import com.google.common.base.MoreObjects;
 import java.util.Set;
 import java.util.TreeSet;
 
 /** Class that represent cooperative locking operation */
-public class OperationLock {
+public class CoopLockRecord {
   private String operationId;
   private long lockEpochSeconds;
   private Set<String> resources = new TreeSet<>();
@@ -14,7 +14,7 @@ public class OperationLock {
     return operationId;
   }
 
-  public OperationLock setOperationId(String operationId) {
+  public CoopLockRecord setOperationId(String operationId) {
     this.operationId = operationId;
     return this;
   }
@@ -23,7 +23,7 @@ public class OperationLock {
     return lockEpochSeconds;
   }
 
-  public OperationLock setLockEpochSeconds(long lockEpochSeconds) {
+  public CoopLockRecord setLockEpochSeconds(long lockEpochSeconds) {
     this.lockEpochSeconds = lockEpochSeconds;
     return this;
   }
@@ -32,7 +32,7 @@ public class OperationLock {
     return resources;
   }
 
-  public OperationLock setResources(Set<String> resources) {
+  public CoopLockRecord setResources(Set<String> resources) {
     this.resources = new TreeSet<>(resources);
     return this;
   }

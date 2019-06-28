@@ -18,7 +18,7 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.AUTHENTICATION_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_COOPERATIVE_LOCKING_EXPIRATION_TIMEOUT_MS;
-import static com.google.cloud.hadoop.gcsio.cooplocking.Operations.LOCK_DIRECTORY;
+import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao.LOCK_DIRECTORY;
 import static com.google.cloud.hadoop.util.EntriesCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
 import static com.google.cloud.hadoop.util.EntriesCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX;
 import static com.google.cloud.hadoop.util.EntriesCredentialConfiguration.SERVICE_ACCOUNT_KEYFILE_SUFFIX;
@@ -33,13 +33,13 @@ import com.google.api.client.http.HttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.DeleteOperation;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.RenameOperation;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageIntegrationHelper;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.cooplock.DeleteOperation;
+import com.google.cloud.hadoop.gcsio.cooplock.RenameOperation;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
@@ -58,7 +58,7 @@ import org.junit.runners.JUnit4;
 
 /** Integration tests for GoogleCloudStorageFileSystem class. */
 @RunWith(JUnit4.class)
-public class CooperativeLockingRepairIntegrationTest {
+public class CoopLockRepairIntegrationTest {
 
   private static final Gson GSON = new Gson();
 
@@ -157,7 +157,7 @@ public class CooperativeLockingRepairIntegrationTest {
     assertThat(gcsFs.exists(dstDirUri)).isTrue();
     assertThat(gcsFs.exists(dstDirUri.resolve(fileName))).isFalse();
 
-    AtomicGcsFsck fsck = new AtomicGcsFsck();
+    CoopLockFsck fsck = new CoopLockFsck();
     fsck.setConf(getTestConfiguration());
 
     fsck.run(new String[] {command, "gs://" + bucketName});
@@ -232,7 +232,7 @@ public class CooperativeLockingRepairIntegrationTest {
     assertThat(gcsFs.exists(dstDirUri)).isTrue();
     assertThat(gcsFs.exists(dstDirUri.resolve(fileName))).isTrue();
 
-    AtomicGcsFsck fsck = new AtomicGcsFsck();
+    CoopLockFsck fsck = new CoopLockFsck();
     fsck.setConf(getTestConfiguration());
 
     fsck.run(new String[] {"--rollForward", "gs://" + bucketName});
@@ -302,7 +302,7 @@ public class CooperativeLockingRepairIntegrationTest {
     assertThat(gcsFs.exists(dirUri)).isTrue();
     assertThat(gcsFs.exists(dirUri.resolve(fileName))).isTrue();
 
-    AtomicGcsFsck fsck = new AtomicGcsFsck();
+    CoopLockFsck fsck = new CoopLockFsck();
     fsck.setConf(getTestConfiguration());
 
     fsck.run(new String[] {"--rollForward", "gs://" + bucketName});

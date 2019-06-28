@@ -19,16 +19,16 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.deleteRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.updateMetadataRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.uploadRequestString;
-import static com.google.cloud.hadoop.gcsio.cooplocking.Operations.LOCK_DIRECTORY;
-import static com.google.cloud.hadoop.gcsio.cooplocking.Operations.LOCK_PATH;
+import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao.LOCK_DIRECTORY;
+import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao.LOCK_PATH;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.truth.Truth.assertThat;
 import static java.util.stream.Collectors.toList;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.http.HttpRequestInitializer;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.DeleteOperation;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.RenameOperation;
+import com.google.cloud.hadoop.gcsio.cooplock.DeleteOperation;
+import com.google.cloud.hadoop.gcsio.cooplock.RenameOperation;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
@@ -46,7 +46,7 @@ import org.junit.runners.JUnit4;
 
 /** Integration tests for GoogleCloudStorageFileSystem class. */
 @RunWith(JUnit4.class)
-public class CooperativeLockingIntegrationTest {
+public class CoopLockIntegrationTest {
 
   private static final Gson GSON = new Gson();
 

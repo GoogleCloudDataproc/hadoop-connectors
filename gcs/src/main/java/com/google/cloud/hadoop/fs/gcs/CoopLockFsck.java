@@ -11,11 +11,12 @@ import static java.util.stream.Collectors.toSet;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.DeleteOperation;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.RenameOperation;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
-import com.google.cloud.hadoop.gcsio.cooplocking.Operations;
-import com.google.cloud.hadoop.gcsio.cooplocking.OperationLock;
+import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationDao;
+import com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecord;
+import com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao;
+import com.google.cloud.hadoop.gcsio.cooplock.DeleteOperation;
+import com.google.cloud.hadoop.gcsio.cooplock.RenameOperation;
 import com.google.common.base.Charsets;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
@@ -52,10 +53,10 @@ import org.apache.hadoop.util.ToolRunner;
  *
  * <p>Usage: <code>
  *   hadoop jar /usr/lib/hadoop/lib/gcs-connector.jar
- *       com.google.cloud.hadoop.fs.gcs.AtomicGcsFsck --rollForward gs://my-bucket
+ *       com.google.cloud.hadoop.fs.gcs.CoopLockFsck --rollForward gs://my-bucket
  * </code>
  */
-public class AtomicGcsFsck extends Configured implements Tool {
+public class CoopLockFsck extends Configured implements Tool {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
@@ -77,7 +78,7 @@ public class AtomicGcsFsck extends Configured implements Tool {
               + "\n\nUsage:"
               + String.format(
                   "\n\thadoop jar /usr/lib/hadoop/lib/gcs-connector.jar %s <COMMAND> gs://<BUCKET>",
-                  AtomicGcsFsck.class.getCanonicalName())
+                  CoopLockFsck.class.getCanonicalName())
               + "\n\nSupported commands:"
               + String.format("\n\t%s - prints out failed operation for the bucket", COMMAND_CHECK)
               + String.format(
@@ -90,7 +91,7 @@ public class AtomicGcsFsck extends Configured implements Tool {
     }
 
     // Let ToolRunner handle generic command-line options
-    int res = ToolRunner.run(new Configuration(), new AtomicGcsFsck(), args);
+    int res = ToolRunner.run(new Configuration(), new CoopLockFsck(), args);
 
     System.exit(res);
   }
@@ -109,29 +110,31 @@ public class AtomicGcsFsck extends Configured implements Tool {
     Configuration conf = getConf();
 
     // Disable cooperative locking to prevent blocking
-    conf.set(GCS_COOPERATIVE_LOCKING_ENABLE.getKey(), "false");
-    conf.set(GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.getKey(), "false");
+    conf.setBoolean(GCS_COOPERATIVE_LOCKING_ENABLE.getKey(), false);
+    conf.setBoolean(GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.getKey(), false);
 
     URI bucketUri = URI.create(bucket);
     String bucketName = bucketUri.getAuthority();
     GoogleHadoopFileSystem ghfs = (GoogleHadoopFileSystem) FileSystem.get(bucketUri, conf);
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
-    Operations gcsAtomic = gcsFs.getGcsAtomic();
+    GoogleCloudStorage gcs = gcsFs.getGcs();
+    CoopLockRecordsDao lockRecordsDao = gcsFs.getCoopLockRecordsDao();
+    CoopLockOperationDao lockOperationDao = new CoopLockOperationDao(gcs, gcsFs.getPathCodec());
 
     Instant operationExpirationTime = Instant.now();
 
-    Set<OperationLock> lockedOperations = gcsAtomic.getLockedOperations(bucketUri.getAuthority());
+    Set<CoopLockRecord> lockedOperations =
+        lockRecordsDao.getLockedOperations(bucketUri.getAuthority());
     if (lockedOperations.isEmpty()) {
       logger.atInfo().log("No expired operation locks");
       return 0;
     }
 
-    Map<FileStatus, OperationLock> expiredOperations = new HashMap<>();
-    for (OperationLock lockedOperation : lockedOperations) {
+    Map<FileStatus, CoopLockRecord> expiredOperations = new HashMap<>();
+    for (CoopLockRecord lockedOperation : lockedOperations) {
       String operationId = lockedOperation.getOperationId();
       URI operationPattern =
-          bucketUri.resolve(
-              "/" + Operations.LOCK_DIRECTORY + "*" + operationId + "*.lock");
+          bucketUri.resolve("/" + CoopLockRecordsDao.LOCK_DIRECTORY + "*" + operationId + "*.lock");
       FileStatus[] operationStatuses = ghfs.globStatus(new Path(operationPattern));
       checkState(
           operationStatuses.length < 2,
@@ -147,7 +150,7 @@ public class AtomicGcsFsck extends Configured implements Tool {
             lockedOperation.getResources().stream()
                 .map(r -> StorageResourceId.fromObjectName(bucketUri.resolve("/" + r).toString()))
                 .toArray(StorageResourceId[]::new);
-        gcsAtomic.unlockPaths(lockedOperation.getOperationId(), lockedResources);
+        lockRecordsDao.unlockPaths(lockedOperation.getOperationId(), lockedResources);
         continue;
       }
 
@@ -168,10 +171,10 @@ public class AtomicGcsFsck extends Configured implements Tool {
       return 0;
     }
 
-    Function<Map.Entry<FileStatus, OperationLock>, Boolean> operationRecovery =
+    Function<Map.Entry<FileStatus, CoopLockRecord>, Boolean> operationRecovery =
         expiredOperation -> {
           FileStatus operation = expiredOperation.getKey();
-          OperationLock lockedOperation = expiredOperation.getValue();
+          CoopLockRecord lockedOperation = expiredOperation.getValue();
 
           String operationId = getOperationId(operation);
           try {
@@ -185,10 +188,10 @@ public class AtomicGcsFsck extends Configured implements Tool {
               logger.atInfo().log("Repairing FS after %s delete operation.", operation.getPath());
               DeleteOperation operationObject =
                   getOperationObject(ghfs, operation, DeleteOperation.class);
-              gcsAtomic.lockOperation(
+              lockRecordsDao.lockOperation(
                   bucketName, operationId, lockedOperation.getLockEpochSeconds());
               Future<?> lockUpdateFuture =
-                  gcsFs.scheduleLockUpdate(
+                  lockOperationDao.scheduleLockUpdate(
                       operationId,
                       new URI(operation.getPath().toString()),
                       DeleteOperation.class,
@@ -196,7 +199,7 @@ public class AtomicGcsFsck extends Configured implements Tool {
               try {
                 List<String> loggedResources = getOperationLog(ghfs, operation, l -> l);
                 deleteResource(ghfs, operationObject.getResource(), loggedResources);
-                gcsAtomic.unlockPaths(
+                lockRecordsDao.unlockPaths(
                     operationId, StorageResourceId.fromObjectName(operationObject.getResource()));
               } finally {
                 lockUpdateFuture.cancel(/* mayInterruptIfRunning= */ false);
@@ -204,10 +207,10 @@ public class AtomicGcsFsck extends Configured implements Tool {
             } else if (operation.getPath().toString().contains("_rename_")) {
               RenameOperation operationObject =
                   getOperationObject(ghfs, operation, RenameOperation.class);
-              gcsAtomic.lockOperation(
+              lockRecordsDao.lockOperation(
                   bucketName, operationId, lockedOperation.getLockEpochSeconds());
               Future<?> lockUpdateFuture =
-                  gcsFs.scheduleLockUpdate(
+                  lockOperationDao.scheduleLockUpdate(
                       operationId,
                       new URI(operation.getPath().toString()),
                       RenameOperation.class,
@@ -235,23 +238,16 @@ public class AtomicGcsFsck extends Configured implements Tool {
                         ghfs,
                         operationObject.getSrcResource(),
                         loggedResources.stream().map(Map.Entry::getKey).collect(toList()));
-                    gcsFs
-                        .getGcs()
-                        .copy(
-                            bucketName,
-                            loggedResources.stream()
-                                .map(
-                                    p ->
-                                        StorageResourceId.fromObjectName(p.getValue())
-                                            .getObjectName())
-                                .collect(toList()),
-                            bucketName,
-                            loggedResources.stream()
-                                .map(
-                                    p ->
-                                        StorageResourceId.fromObjectName(p.getKey())
-                                            .getObjectName())
-                                .collect(toList()));
+                    gcs.copy(
+                        bucketName,
+                        loggedResources.stream()
+                            .map(
+                                p -> StorageResourceId.fromObjectName(p.getValue()).getObjectName())
+                            .collect(toList()),
+                        bucketName,
+                        loggedResources.stream()
+                            .map(p -> StorageResourceId.fromObjectName(p.getKey()).getObjectName())
+                            .collect(toList()));
                     deleteResource(
                         ghfs,
                         operationObject.getDstResource(),
@@ -286,30 +282,23 @@ public class AtomicGcsFsck extends Configured implements Tool {
                         ghfs,
                         operationObject.getDstResource(),
                         loggedResources.stream().map(Map.Entry::getValue).collect(toList()));
-                    gcsFs
-                        .getGcs()
-                        .copy(
-                            bucketName,
-                            loggedResources.stream()
-                                .map(
-                                    p ->
-                                        StorageResourceId.fromObjectName(p.getKey())
-                                            .getObjectName())
-                                .collect(toList()),
-                            bucketName,
-                            loggedResources.stream()
-                                .map(
-                                    p ->
-                                        StorageResourceId.fromObjectName(p.getValue())
-                                            .getObjectName())
-                                .collect(toList()));
+                    gcs.copy(
+                        bucketName,
+                        loggedResources.stream()
+                            .map(p -> StorageResourceId.fromObjectName(p.getKey()).getObjectName())
+                            .collect(toList()),
+                        bucketName,
+                        loggedResources.stream()
+                            .map(
+                                p -> StorageResourceId.fromObjectName(p.getValue()).getObjectName())
+                            .collect(toList()));
                     deleteResource(
                         ghfs,
                         operationObject.getSrcResource(),
                         loggedResources.stream().map(Map.Entry::getKey).collect(toList()));
                   }
                 }
-                gcsAtomic.unlockPaths(
+                lockRecordsDao.unlockPaths(
                     operationId,
                     StorageResourceId.fromObjectName(operationObject.getSrcResource()),
                     StorageResourceId.fromObjectName(operationObject.getDstResource()));
@@ -325,7 +314,7 @@ public class AtomicGcsFsck extends Configured implements Tool {
           return true;
         };
 
-    for (Map.Entry<FileStatus, OperationLock> expiredOperation : expiredOperations.entrySet()) {
+    for (Map.Entry<FileStatus, CoopLockRecord> expiredOperation : expiredOperations.entrySet()) {
       long start = System.currentTimeMillis();
       try {
         boolean succeeded = operationRecovery.apply(expiredOperation);

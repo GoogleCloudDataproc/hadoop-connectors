@@ -16,17 +16,12 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.CreateFileOptions.DEFAULT_CONTENT_TYPE;
-import static com.google.cloud.hadoop.gcsio.CreateFileOptions.EMPTY_ATTRIBUTES;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
-import static com.google.cloud.hadoop.gcsio.cooplocking.Operations.LOCK_DIRECTORY;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.toCollection;
 
@@ -34,36 +29,28 @@ import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.util.Clock;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.TimestampUpdatePredicate;
-import com.google.cloud.hadoop.gcsio.cooplocking.Operations;
+import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationDao;
+import com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao;
 import com.google.cloud.hadoop.util.LazyExecutorService;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.CharMatcher;
-import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.google.common.collect.Streams;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.gson.Gson;
-import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.FileAlreadyExistsException;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -71,7 +58,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -81,15 +67,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BiConsumer;
-import java.util.function.Function;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * Provides a POSIX like file system layered on top of Google Cloud Storage (GCS).
@@ -101,8 +83,6 @@ import java.util.stream.Collectors;
 public class GoogleCloudStorageFileSystem {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-
-  private static final Gson GSON = new Gson();
 
   private static final ThreadFactory DAEMON_THREAD_FACTORY =
       new ThreadFactoryBuilder().setNameFormat("gcsfs-thread-%d").setDaemon(true).build();
@@ -122,26 +102,16 @@ public class GoogleCloudStorageFileSystem {
                   .or(CharMatcher.anyOf("_.-")))
           .precomputed();
 
-  private static final Set<String> VALID_OPERATIONS = ImmutableSet.of("delete", "rename");
-  private static final String OPERATION_LOG_FILE_FORMAT = "%s_%s_%s.log";
-  private static final String OPERATION_LOCK_FILE_FORMAT = "%s_%s_%s.lock";
-  private static final CreateFileOptions CREATE_FILE_OPTIONS =
-      new CreateFileOptions(/* overwriteExisting= */ false, "application/text", EMPTY_ATTRIBUTES);
-  private static final CreateFileOptions UPDATE_FILE_OPTIONS =
-      new CreateFileOptions(/* overwriteExisting= */ true, "application/text", EMPTY_ATTRIBUTES);
-
-  private static DateTimeFormatter LOCK_FILE_DATE_TIME_FORMAT =
-      DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss.SSSXXX").withZone(ZoneId.of("UTC"));
-
   // GCS access instance.
   private GoogleCloudStorage gcs;
 
-  private final Operations gcsAtomic;
+  // FS options
+  private final GoogleCloudStorageFileSystemOptions options;
 
   private final PathCodec pathCodec;
 
-  // FS options
-  private final GoogleCloudStorageFileSystemOptions options;
+  private final CoopLockRecordsDao coopLockRecordsDao;
+  private final CoopLockOperationDao coopLockOperationDao;
 
   // Executor for updating directory timestamps.
   private ExecutorService updateTimestampsExecutor = createUpdateTimestampsExecutor();
@@ -195,12 +165,14 @@ public class GoogleCloudStorageFileSystem {
 
     checkArgument(credential != null, "credential must not be null");
 
-    this.options = options;
     GoogleCloudStorageImpl gcsImpl =
         new GoogleCloudStorageImpl(options.getCloudStorageOptions(), credential);
     this.gcs = gcsImpl;
-    this.gcsAtomic = new Operations(gcsImpl);
+    this.options = options;
     this.pathCodec = options.getPathCodec();
+
+    this.coopLockRecordsDao = new CoopLockRecordsDao(gcsImpl);
+    this.coopLockOperationDao = new CoopLockOperationDao(gcsImpl, pathCodec);
 
     if (options.isPerformanceCacheEnabled()) {
       this.gcs =
@@ -212,7 +184,8 @@ public class GoogleCloudStorageFileSystem {
    * Constructs a GoogleCloudStorageFilesystem based on an already-configured underlying
    * GoogleCloudStorage {@code gcs}.
    */
-  public GoogleCloudStorageFileSystem(GoogleCloudStorage gcs) throws IOException {
+  @VisibleForTesting
+  public GoogleCloudStorageFileSystem(GoogleCloudStorage gcs) {
     this(
         gcs,
         GoogleCloudStorageFileSystemOptions.newBuilder()
@@ -224,16 +197,18 @@ public class GoogleCloudStorageFileSystem {
    * Constructs a GoogleCloudStorageFilesystem based on an already-configured underlying
    * GoogleCloudStorage {@code gcs}. Any options pertaining to GCS creation will be ignored.
    */
+  @VisibleForTesting
   public GoogleCloudStorageFileSystem(
       GoogleCloudStorage gcs, GoogleCloudStorageFileSystemOptions options) {
     this.gcs = gcs;
-    this.gcsAtomic = new Operations((GoogleCloudStorageImpl) gcs);
     this.options = options;
     this.pathCodec = options.getPathCodec();
+    this.coopLockRecordsDao = null;
+    this.coopLockOperationDao = null;
   }
 
-  public Operations getGcsAtomic() {
-    return gcsAtomic;
+  public CoopLockRecordsDao getCoopLockRecordsDao() {
+    return coopLockRecordsDao;
   }
 
   @VisibleForTesting
@@ -452,47 +427,17 @@ public class GoogleCloudStorageFileSystem {
       String operationId = UUID.randomUUID().toString();
       StorageResourceId resourceId = pathCodec.validatePathAndGetId(fileInfo.getPath(), true);
 
-      gcsAtomic.lockPaths(operationId, resourceId);
+      coopLockRecordsDao.lockPaths(operationId, resourceId);
       Future<?> lockUpdateFuture = Futures.immediateCancelledFuture();
       try {
-        Instant operationInstant = Instant.now();
-        URI operationLockPath =
-            writeOperationFile(
-                path.getAuthority(),
-                OPERATION_LOCK_FILE_FORMAT,
-                CREATE_FILE_OPTIONS,
-                "delete",
-                operationId,
-                operationInstant,
-                ImmutableList.of(
-                    GSON.toJson(
-                        new DeleteOperation()
-                            .setLockEpochSeconds(operationInstant.getEpochSecond())
-                            .setResource(resourceId.toString()))));
-        List<String> logRecords =
-            Streams.concat(itemsToDelete.stream(), bucketsToDelete.stream())
-                .map(i -> i.getItemInfo().getResourceId().toString())
-                .collect(toImmutableList());
-        writeOperationFile(
-            path.getAuthority(),
-            OPERATION_LOG_FILE_FORMAT,
-            CREATE_FILE_OPTIONS,
-            "delete",
-            operationId,
-            operationInstant,
-            logRecords);
-        // Schedule lock expiration update
         lockUpdateFuture =
-            scheduleLockUpdate(
-                operationId,
-                operationLockPath,
-                DeleteOperation.class,
-                (o, i) -> o.setLockEpochSeconds(i.getEpochSecond()));
+            coopLockOperationDao.persistDeleteOperation(
+                path, itemsToDelete, bucketsToDelete, operationId, resourceId, lockUpdateFuture);
 
         deleteInternal(itemsToDelete, bucketsToDelete);
-        gcsAtomic.unlockPaths(operationId, resourceId);
+        coopLockRecordsDao.unlockPaths(operationId, resourceId);
       } finally {
-        lockUpdateFuture.cancel(/* mayInterruptIfRunning= */ false);
+        lockUpdateFuture.cancel(/* mayInterruptIfRunning= */ true);
       }
     } else {
       deleteInternal(itemsToDelete, bucketsToDelete);
@@ -507,24 +452,6 @@ public class GoogleCloudStorageFileSystem {
       // Any path that was deleted, we should update the parent except for parents we also deleted
       tryUpdateTimestampsForParentDirectories(itemsToDeleteNames, itemsToDeleteNames);
     }
-  }
-
-  private void renewLockOrExit(
-      String operationId, URI operationLockPath, Function<String, String> renewFn) {
-    // read lock file info
-    for (int i = 0; i < 10; i++) {
-      try {
-        renewLock(operationId, operationLockPath, renewFn);
-      } catch (IOException e) {
-        logger.atWarning().withCause(e).log(
-            "Failed to renew '%s' lock for %s operation, retry #%d",
-            operationLockPath, operationId, i + 1);
-      }
-      sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
-    }
-    logger.atSevere().log(
-        "Failed to renew '%s' lock for %s operation, exiting", operationLockPath, operationId);
-    System.exit(1);
   }
 
   /** Deletes all items in the given path list followed by all bucket items. */
@@ -850,9 +777,9 @@ public class GoogleCloudStorageFileSystem {
       StorageResourceId srcResourceId = pathCodec.validatePathAndGetId(srcInfo.getPath(), true);
       StorageResourceId dstResourceId = pathCodec.validatePathAndGetId(dst, true);
 
-      gcsAtomic.lockPaths(operationId, srcResourceId, dstResourceId);
+      coopLockRecordsDao.lockPaths(operationId, srcResourceId, dstResourceId);
       renameDirectoryInternal(srcInfo, dst, operationId);
-      gcsAtomic.unlockPaths(operationId, srcResourceId, dstResourceId);
+      coopLockRecordsDao.unlockPaths(operationId, srcResourceId, dstResourceId);
     } else if (srcInfo.isDirectory()) {
       renameDirectoryInternal(srcInfo, dst, /* operationId= */ null);
     } else {
@@ -919,42 +846,14 @@ public class GoogleCloudStorageFileSystem {
     Instant operationInstant = Instant.now();
     if (options.enableCooperativeLocking()
         && srcInfo.getItemInfo().getBucketName().equals(dst.getAuthority())) {
-      URI operationLockPath =
-          writeOperationFile(
-              dst.getAuthority(),
-              OPERATION_LOCK_FILE_FORMAT,
-              CREATE_FILE_OPTIONS,
-              "rename",
-              operationId,
-              operationInstant,
-              ImmutableList.of(
-                  GSON.toJson(
-                      new RenameOperation()
-                          .setLockEpochSeconds(operationInstant.getEpochSecond())
-                          .setSrcResource(srcInfo.getPath().toString())
-                          .setDstResource(dst.toString())
-                          .setCopySucceeded(false))));
-      List<String> logRecords =
-          Streams.concat(
-                  srcToDstItemNames.entrySet().stream(),
-                  srcToDstMarkerItemNames.entrySet().stream())
-              .map(e -> e.getKey().getItemInfo().getResourceId() + " -> " + e.getValue())
-              .collect(toImmutableList());
-      writeOperationFile(
-          dst.getAuthority(),
-          OPERATION_LOG_FILE_FORMAT,
-          CREATE_FILE_OPTIONS,
-          "rename",
-          operationId,
-          operationInstant,
-          logRecords);
-      // Schedule lock expiration update
       lockUpdateFuture =
-          scheduleLockUpdate(
+          coopLockOperationDao.persistUpdateOperation(
+              srcInfo,
+              dst,
               operationId,
-              operationLockPath,
-              RenameOperation.class,
-              (o, i) -> o.setLockEpochSeconds(i.getEpochSecond()));
+              srcToDstItemNames,
+              srcToDstMarkerItemNames,
+              operationInstant);
     }
 
     // Create the destination directory.
@@ -967,20 +866,7 @@ public class GoogleCloudStorageFileSystem {
 
     if (options.enableCooperativeLocking()
         && srcInfo.getItemInfo().getBucketName().equals(dst.getAuthority())) {
-      writeOperationFile(
-          dst.getAuthority(),
-          OPERATION_LOCK_FILE_FORMAT,
-          UPDATE_FILE_OPTIONS,
-          "rename",
-          operationId,
-          operationInstant,
-          ImmutableList.of(
-              GSON.toJson(
-                  new RenameOperation()
-                      .setLockEpochSeconds(Instant.now().getEpochSecond())
-                      .setSrcResource(srcInfo.getPath().toString())
-                      .setDstResource(dst.toString())
-                      .setCopySucceeded(true))));
+      coopLockOperationDao.checkpointUpdateOperation(srcInfo, dst, operationId, operationInstant);
     }
 
     // So far, only the destination directories are updated. Only do those now:
@@ -1020,31 +906,6 @@ public class GoogleCloudStorageFileSystem {
     if (lockUpdateFuture != null) {
       lockUpdateFuture.cancel(/* mayInterruptIfRunning= */ false);
     }
-  }
-
-  private void renewLock(
-      String operationId, URI operationLockPath, Function<String, String> renewFn)
-      throws IOException {
-    StorageResourceId lockId = StorageResourceId.fromObjectName(operationLockPath.toString());
-    GoogleCloudStorageItemInfo lockInfo = gcs.getItemInfo(lockId);
-    checkState(lockInfo.exists(), "lock file for %s operation should exist", operationId);
-
-    String lock;
-    try (BufferedReader reader =
-        new BufferedReader(Channels.newReader(gcs.open(lockId), UTF_8.name()))) {
-      lock = reader.lines().collect(Collectors.joining());
-    }
-
-    lock = renewFn.apply(lock);
-    CreateFileOptions updateOptions =
-        new CreateFileOptions(
-            /* overwriteExisting= */ true,
-            DEFAULT_CONTENT_TYPE,
-            EMPTY_ATTRIBUTES,
-            /* checkNoDirectoryConflict= */ false,
-            /* ensureParentDirectoriesExist= */ false,
-            lockInfo.getContentGeneration());
-    writeOperationUri(operationLockPath, updateOptions, ImmutableList.of(lock));
   }
 
   /** Copies items in given map that maps source items to destination items. */
@@ -1778,171 +1639,5 @@ public class GoogleCloudStorageFileSystem {
     return index < 0
         ? pathCodec.getPath(resourceId.getBucketName(), null, true)
         : pathCodec.getPath(resourceId.getBucketName(), objectName.substring(0, index + 1), false);
-  }
-
-  private URI writeOperationFile(
-      String bucket,
-      String fileNameFormat,
-      CreateFileOptions createFileOptions,
-      String operation,
-      String operationId,
-      Instant operationInstant,
-      List<String> records)
-      throws IOException {
-    checkArgument(
-        VALID_OPERATIONS.contains(operation),
-        "operation must be one of $s, but was '%s'",
-        VALID_OPERATIONS,
-        operation);
-    String date = LOCK_FILE_DATE_TIME_FORMAT.format(operationInstant);
-    String file = String.format(LOCK_DIRECTORY + fileNameFormat, date, operation, operationId);
-    URI path = pathCodec.getPath(bucket, file, /* allowEmptyObjectName= */ false);
-    writeOperationUri(path, createFileOptions, records);
-    return path;
-  }
-
-  private void writeOperationUri(
-      URI path, CreateFileOptions createFileOptions, List<String> records) throws IOException {
-    try (WritableByteChannel channel = create(path, createFileOptions)) {
-      for (String record : records) {
-        channel.write(ByteBuffer.wrap(record.getBytes(UTF_8)));
-        channel.write(ByteBuffer.wrap(new byte[] {'\n'}));
-      }
-    }
-  }
-
-  private ScheduledExecutorService scheduledThreadPool = Executors.newScheduledThreadPool(1);
-
-  public <T> Future<?> scheduleLockUpdate(
-      String operationId, URI operationLockPath, Class<T> clazz, BiConsumer<T, Instant> renewFn) {
-    return scheduledThreadPool.scheduleAtFixedRate(
-        () ->
-            renewLockOrExit(
-                operationId,
-                operationLockPath,
-                l -> {
-                  T operation = GSON.fromJson(l, clazz);
-                  renewFn.accept(operation, Instant.now());
-                  return GSON.toJson(operation);
-                }),
-        /* initialDelay= */ 1,
-        /* period= */ 1,
-        TimeUnit.MINUTES);
-  }
-
-  public static class DeleteOperation {
-    private long lockEpochSeconds;
-    private String resource = null;
-
-    public long getLockEpochSeconds() {
-      return lockEpochSeconds;
-    }
-
-    public DeleteOperation setLockEpochSeconds(long lockEpochSeconds) {
-      this.lockEpochSeconds = lockEpochSeconds;
-      return this;
-    }
-
-    public String getResource() {
-      return resource;
-    }
-
-    public DeleteOperation setResource(String resource) {
-      this.resource = resource;
-      return this;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      return obj instanceof DeleteOperation && equalsInternal((DeleteOperation) obj);
-    }
-
-    private boolean equalsInternal(DeleteOperation other) {
-      return Objects.equals(lockEpochSeconds, other.lockEpochSeconds)
-          && Objects.equals(resource, other.resource);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(lockEpochSeconds, resource);
-    }
-
-    @Override
-    public String toString() {
-      return MoreObjects.toStringHelper(this)
-          .add("lockEpochSeconds", lockEpochSeconds)
-          .add("resource", resource)
-          .toString();
-    }
-  }
-
-  public static class RenameOperation {
-    private long lockEpochSeconds;
-    private String srcResource;
-    private String dstResource;
-    private boolean copySucceeded;
-
-    public long getLockEpochSeconds() {
-      return lockEpochSeconds;
-    }
-
-    public RenameOperation setLockEpochSeconds(long lockEpochSeconds) {
-      this.lockEpochSeconds = lockEpochSeconds;
-      return this;
-    }
-
-    public String getSrcResource() {
-      return srcResource;
-    }
-
-    public RenameOperation setSrcResource(String srcResource) {
-      this.srcResource = srcResource;
-      return this;
-    }
-
-    public String getDstResource() {
-      return dstResource;
-    }
-
-    public RenameOperation setDstResource(String dstResource) {
-      this.dstResource = dstResource;
-      return this;
-    }
-
-    public boolean getCopySucceeded() {
-      return copySucceeded;
-    }
-
-    public RenameOperation setCopySucceeded(boolean copySucceeded) {
-      this.copySucceeded = copySucceeded;
-      return this;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      return obj instanceof RenameOperation && equalsInternal((RenameOperation) obj);
-    }
-
-    private boolean equalsInternal(RenameOperation other) {
-      return Objects.equals(lockEpochSeconds, other.lockEpochSeconds)
-          && Objects.equals(srcResource, other.srcResource)
-          && Objects.equals(dstResource, other.dstResource)
-          && Objects.equals(copySucceeded, other.copySucceeded);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(lockEpochSeconds, srcResource, dstResource, copySucceeded);
-    }
-
-    @Override
-    public String toString() {
-      return MoreObjects.toStringHelper(this)
-          .add("lockEpochSeconds", lockEpochSeconds)
-          .add("srcResource", srcResource)
-          .add("dstResource", dstResource)
-          .add("copySucceeded", copySucceeded)
-          .toString();
-    }
   }
 }

@@ -1,4 +1,4 @@
-package com.google.cloud.hadoop.gcsio.cooplocking;
+package com.google.cloud.hadoop.gcsio.cooplock;
 
 import static com.google.common.base.Preconditions.checkState;
 
@@ -7,33 +7,34 @@ import java.util.Comparator;
 import java.util.Set;
 import java.util.TreeSet;
 
-public class OperationLocks {
+public class CoopLockRecords {
   /** Supported version of operation locks */
   public static final long FORMAT_VERSION = 1;
 
   private long formatVersion = -1;
-  private Set<OperationLock> locks =
-      new TreeSet<>(Comparator.comparing(OperationLock::getOperationId));
+  private Set<CoopLockRecord> locks =
+      new TreeSet<>(Comparator.comparing(CoopLockRecord::getOperationId));
 
   public long getFormatVersion() {
     return formatVersion;
   }
 
-  public OperationLocks setFormatVersion(long formatVersion) {
+  public CoopLockRecords setFormatVersion(long formatVersion) {
     this.formatVersion = formatVersion;
     return this;
   }
 
-  public Set<OperationLock> getLocks() {
+  public Set<CoopLockRecord> getLocks() {
     checkState(
         FORMAT_VERSION == formatVersion,
         "%s operation lock version is not supported, supported version is %s",
-        formatVersion, FORMAT_VERSION);
+        formatVersion,
+        FORMAT_VERSION);
     return locks;
   }
 
-  public OperationLocks setLocks(Set<OperationLock> locks) {
-    this.locks = new TreeSet<>(Comparator.comparing(OperationLock::getOperationId));
+  public CoopLockRecords setLocks(Set<CoopLockRecord> locks) {
+    this.locks = new TreeSet<>(Comparator.comparing(CoopLockRecord::getOperationId));
     this.locks.addAll(locks);
     return this;
   }

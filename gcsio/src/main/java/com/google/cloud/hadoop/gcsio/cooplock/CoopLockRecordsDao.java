@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.google.cloud.hadoop.gcsio.cooplocking;
+package com.google.cloud.hadoop.gcsio.cooplock;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -45,7 +45,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-public class Operations {
+public class CoopLockRecordsDao {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
@@ -61,16 +61,16 @@ public class Operations {
 
   private final GoogleCloudStorageImpl gcs;
 
-  public Operations(GoogleCloudStorageImpl gcs) {
+  public CoopLockRecordsDao(GoogleCloudStorageImpl gcs) {
     this.gcs = gcs;
   }
 
-  public Set<OperationLock> getLockedOperations(String bucketName) throws IOException {
+  public Set<CoopLockRecord> getLockedOperations(String bucketName) throws IOException {
     long startMs = System.currentTimeMillis();
     logger.atFine().log("getLockedOperations(%s)", bucketName);
     StorageResourceId lockId = getLockId(bucketName);
     GoogleCloudStorageItemInfo lockInfo = gcs.getItemInfo(lockId);
-    Set<OperationLock> operations =
+    Set<CoopLockRecord> operations =
         !lockInfo.exists()
                 || lockInfo.getMetaGeneration() == 0
                 || lockInfo.getMetadata().get(LOCK_METADATA_KEY) == null
@@ -125,7 +125,7 @@ public class Operations {
   }
 
   private <T> void modifyLock(
-      LockRecordsModificationFunction<Boolean, OperationLocks, String, T> modificationFn,
+      LockRecordsModificationFunction<Boolean, CoopLockRecords, String, T> modificationFn,
       String bucketName,
       String operationId,
       T modificationFnParam)
@@ -148,10 +148,10 @@ public class Operations {
           gcs.createEmptyObject(lockId, new CreateObjectOptions(false));
           lockInfo = gcs.getItemInfo(lockId);
         }
-        OperationLocks lockRecords =
+        CoopLockRecords lockRecords =
             lockInfo.getMetaGeneration() == 0
                     || lockInfo.getMetadata().get(LOCK_METADATA_KEY) == null
-                ? new OperationLocks().setFormatVersion(OperationLocks.FORMAT_VERSION)
+                ? new CoopLockRecords().setFormatVersion(CoopLockRecords.FORMAT_VERSION)
                 : getLockRecords(lockInfo);
 
         if (!modificationFn.apply(lockRecords, operationId, modificationFnParam)) {
@@ -176,7 +176,7 @@ public class Operations {
           continue;
         }
 
-        String lockContent = GSON.toJson(lockRecords, OperationLocks.class);
+        String lockContent = GSON.toJson(lockRecords, CoopLockRecords.class);
         Map<String, byte[]> metadata = new HashMap<>(lockInfo.getMetadata());
         metadata.put(LOCK_METADATA_KEY, lockContent.getBytes(UTF_8));
 
@@ -208,25 +208,25 @@ public class Operations {
     return StorageResourceId.fromObjectName(lockObject);
   }
 
-  private OperationLocks getLockRecords(GoogleCloudStorageItemInfo lockInfo) {
+  private CoopLockRecords getLockRecords(GoogleCloudStorageItemInfo lockInfo) {
     String lockContent = new String(lockInfo.getMetadata().get(LOCK_METADATA_KEY), UTF_8);
-    OperationLocks lockRecords = GSON.fromJson(lockContent, OperationLocks.class);
+    CoopLockRecords lockRecords = GSON.fromJson(lockContent, CoopLockRecords.class);
     checkState(
-        lockRecords.getFormatVersion() == OperationLocks.FORMAT_VERSION,
+        lockRecords.getFormatVersion() == CoopLockRecords.FORMAT_VERSION,
         "Unsupported metadata format: expected %d, but was %d",
         lockRecords.getFormatVersion(),
-        OperationLocks.FORMAT_VERSION);
+        CoopLockRecords.FORMAT_VERSION);
     return lockRecords;
   }
 
   private boolean updateLockEpochSeconds(
-      OperationLocks lockRecords, String operationId, long lockEpochSeconds) {
-    Optional<OperationLock> operationOptional =
+      CoopLockRecords lockRecords, String operationId, long lockEpochSeconds) {
+    Optional<CoopLockRecord> operationOptional =
         lockRecords.getLocks().stream()
             .filter(o -> o.getOperationId().equals(operationId))
             .findAny();
     checkState(operationOptional.isPresent(), "operation %s not found", operationId);
-    OperationLock operation = operationOptional.get();
+    CoopLockRecord operation = operationOptional.get();
     checkState(
         lockEpochSeconds == operation.getLockEpochSeconds(),
         "operation %s should have %s lock epoch, but was %s",
@@ -238,7 +238,7 @@ public class Operations {
   }
 
   private boolean addLockRecords(
-      OperationLocks lockRecords, String operationId, Set<String> resourcesToAdd) {
+      CoopLockRecords lockRecords, String operationId, Set<String> resourcesToAdd) {
     // TODO: optimize to match more efficiently
     if (lockRecords.getLocks().stream()
         .flatMap(operation -> operation.getResources().stream())
@@ -260,7 +260,7 @@ public class Operations {
     lockRecords
         .getLocks()
         .add(
-            new OperationLock()
+            new CoopLockRecord()
                 .setOperationId(operationId)
                 .setResources(resourcesToAdd)
                 .setLockEpochSeconds(lockEpochSeconds));
@@ -273,18 +273,18 @@ public class Operations {
   }
 
   private boolean removeLockRecords(
-      OperationLocks lockRecords, String operationId, Set<String> resourcesToRemove) {
-    List<OperationLock> operationLocksToRemove =
+      CoopLockRecords lockRecords, String operationId, Set<String> resourcesToRemove) {
+    List<CoopLockRecord> operationLocksToRemoveRecord =
         lockRecords.getLocks().stream()
             .filter(o -> o.getResources().stream().anyMatch(resourcesToRemove::contains))
             .collect(Collectors.toList());
     checkState(
-        operationLocksToRemove.size() == 1
-            && operationLocksToRemove.get(0).getOperationId().equals(operationId),
+        operationLocksToRemoveRecord.size() == 1
+            && operationLocksToRemoveRecord.get(0).getOperationId().equals(operationId),
         "All resources %s should belong to %s operation, but was %s",
         resourcesToRemove.size(),
-        operationLocksToRemove.size());
-    OperationLock operationToRemove = operationLocksToRemove.get(0);
+        operationLocksToRemoveRecord.size());
+    CoopLockRecord operationToRemove = operationLocksToRemoveRecord.get(0);
     checkState(
         operationToRemove.getResources().equals(resourcesToRemove),
         "All of %s resources should be locked by operation, but was locked only %s resources",
