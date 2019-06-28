@@ -354,7 +354,7 @@ public class CoopLockRepairIntegrationTest {
   private GoogleCloudStorageFileSystem newGcsFs(
       GoogleCloudStorageFileSystemOptions gcsfsOptions, HttpRequestInitializer requestInitializer)
       throws IOException {
-    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, requestInitializer);
+    GoogleCloudStorageImpl gcs = new GoogleCloudStorageImpl(gcsOptions, requestInitializer);
     return new GoogleCloudStorageFileSystem(gcs, gcsfsOptions);
   }
 }

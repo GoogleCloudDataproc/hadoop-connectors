@@ -207,6 +207,20 @@ public class GoogleCloudStorageFileSystem {
     this.coopLockOperationDao = null;
   }
 
+  /**
+   * Constructs a GoogleCloudStorageFilesystem based on an already-configured underlying
+   * GoogleCloudStorageImpl {@code gcs}. Any options pertaining to GCS creation will be ignored.
+   */
+  @VisibleForTesting
+  public GoogleCloudStorageFileSystem(
+      GoogleCloudStorageImpl gcs, GoogleCloudStorageFileSystemOptions options) {
+    this.gcs = gcs;
+    this.options = options;
+    this.pathCodec = options.getPathCodec();
+    this.coopLockRecordsDao = new CoopLockRecordsDao(gcs);
+    this.coopLockOperationDao = new CoopLockOperationDao(gcs, pathCodec);
+  }
+
   public CoopLockRecordsDao getCoopLockRecordsDao() {
     return coopLockRecordsDao;
   }
