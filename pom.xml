@@ -363,12 +363,6 @@
         <scope>test</scope>
       </dependency>
       <dependency>
-        <groupId>com.googlecode.thread-weaver</groupId>
-        <artifactId>threadweaver</artifactId>
-        <version>${google.thread-weaver.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
         <groupId>com.google.truth</groupId>
         <artifactId>truth</artifactId>
         <version>${google.truth.version}</version>
