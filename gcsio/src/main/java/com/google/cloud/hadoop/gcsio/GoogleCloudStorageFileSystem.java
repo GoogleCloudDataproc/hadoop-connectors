@@ -411,8 +411,8 @@ public class GoogleCloudStorageFileSystem {
     List<FileInfo> bucketsToDelete = new ArrayList<>();
     (fileInfo.getItemInfo().isBucket() ? bucketsToDelete : itemsToDelete).add(fileInfo);
 
+    coopLockOp.ifPresent(o -> o.persistAndScheduleRenewal(itemsToDelete, bucketsToDelete));
     try {
-      coopLockOp.ifPresent(o -> o.persistAndScheduleRenewal(itemsToDelete, bucketsToDelete));
 
       deleteInternal(itemsToDelete, bucketsToDelete);
 
@@ -790,10 +790,7 @@ public class GoogleCloudStorageFileSystem {
         options.enableCooperativeLocking() && src.getAuthority().equals(dst.getAuthority())
             ? Optional.of(CoopLockOperationRename.create(gcs, pathCodec, src, dst))
             : Optional.empty();
-
     coopLockOp.ifPresent(CoopLockOperationRename::lock);
-
-    Pattern markerFilePattern = options.getMarkerFilePattern();
 
     // Mapping from each src to its respective dst.
     // Sort src items so that parent directories appear before their children.
@@ -809,6 +806,7 @@ public class GoogleCloudStorageFileSystem {
     dst = FileInfo.convertToDirectoryPath(pathCodec, dst);
 
     // Create a list of sub-items to copy.
+    Pattern markerFilePattern = options.getMarkerFilePattern();
     String prefix = src.toString();
     for (FileInfo srcItemInfo : srcItemInfos) {
       String relativeItemName = srcItemInfo.getPath().toString().substring(prefix.length());
