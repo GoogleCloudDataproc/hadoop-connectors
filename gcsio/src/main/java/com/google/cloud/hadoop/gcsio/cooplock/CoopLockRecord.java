@@ -76,7 +76,9 @@ public class CoopLockRecord {
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this)
+        .add("clientId", clientId)
         .add("operationId", operationId)
+        .add("operationEpochSeconds", operationEpochSeconds)
         .add("lockEpochSeconds", lockEpochSeconds)
         .add("resources", resources)
         .toString();

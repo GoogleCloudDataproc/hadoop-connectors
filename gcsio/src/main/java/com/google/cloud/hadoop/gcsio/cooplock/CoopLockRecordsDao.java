@@ -314,7 +314,7 @@ public class CoopLockRecordsDao {
     return true;
   }
 
-  public static String newClientId(String operationId) {
+  private static String newClientId(String operationId) {
     InetAddress localHost;
     try {
       localHost = InetAddress.getLocalHost();

@@ -23,6 +23,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.time.temporal.ChronoUnit.MILLIS;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
@@ -53,6 +54,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.function.Function;
@@ -108,7 +110,7 @@ public class CoopLockFsck extends Configured implements Tool {
     }
 
     // Let ToolRunner handle generic command-line options
-    int res = ToolRunner.run(new Configuration(), new CoopLockFsck(), args);
+    int res = ToolRunner.run(new CoopLockFsck(), args);
 
     System.exit(res);
   }
@@ -127,8 +129,7 @@ public class CoopLockFsck extends Configured implements Tool {
     Configuration conf = getConf();
 
     // Disable cooperative locking to prevent blocking
-    conf.setBoolean(GCS_COOPERATIVE_LOCKING_ENABLE.getKey(), false);
-    conf.setBoolean(GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.getKey(), false);
+    conf.setBoolean(GCS_COOPERATIVE_LOCKING_ENABLE.getKey(), true);
 
     URI bucketUri = URI.create(bucket);
     String bucketName = bucketUri.getAuthority();
@@ -138,7 +139,7 @@ public class CoopLockFsck extends Configured implements Tool {
     CoopLockRecordsDao lockRecordsDao = new CoopLockRecordsDao(gcs);
     CoopLockOperationDao lockOperationDao = new CoopLockOperationDao(gcs, gcsFs.getPathCodec());
 
-    Instant operationExpirationTime = Instant.now();
+    Instant operationExpirationInstant = Instant.now();
 
     Set<CoopLockRecord> lockedOperations =
         lockRecordsDao.getLockedOperations(bucketUri.getAuthority());
@@ -147,42 +148,14 @@ public class CoopLockFsck extends Configured implements Tool {
       return 0;
     }
 
-    Map<FileStatus, CoopLockRecord> expiredOperations = new HashMap<>();
-    for (CoopLockRecord lockedOperation : lockedOperations) {
-      String operationId = lockedOperation.getOperationId();
-      URI operationPattern =
-          bucketUri.resolve("/" + CoopLockRecordsDao.LOCK_DIRECTORY + "*" + operationId + "*.lock");
-      FileStatus[] operationStatuses = ghfs.globStatus(new Path(operationPattern));
-      checkState(
-          operationStatuses.length < 2,
-          "operation %s should not have more than one lock file",
-          operationId);
-
-      // Lock file not created - nothing to repair
-      if (operationStatuses.length == 0) {
-        logger.atInfo().log(
-            "Operation %s for %s resources doesn't have lock file, unlocking",
-            lockedOperation.getOperationId(), lockedOperation.getResources());
-        StorageResourceId[] lockedResources =
-            lockedOperation.getResources().stream()
-                .map(r -> StorageResourceId.fromObjectName(bucketUri.resolve("/" + r).toString()))
-                .toArray(StorageResourceId[]::new);
-        lockRecordsDao.unlockPaths(lockedOperation.getOperationId(), lockedResources);
-        continue;
-      }
-
-      FileStatus operation = operationStatuses[0];
-
-      Instant lockInstant = Instant.ofEpochSecond(lockedOperation.getLockEpochSeconds());
-      Instant renewedInstant = getLockRenewedInstant(ghfs, operation);
-      if (isLockExpired(conf, renewedInstant, operationExpirationTime)
-          && isLockExpired(conf, lockInstant, operationExpirationTime)) {
-        expiredOperations.put(operation, lockedOperation);
-        logger.atInfo().log("Operation %s expired.", operation.getPath());
-      } else {
-        logger.atInfo().log("Operation %s not expired.", operation.getPath());
-      }
-    }
+    Map<FileStatus, CoopLockRecord> expiredOperations =
+    lockedOperations.stream()
+        .map(
+            o -> getOperationIfExpiredUnchecked(
+                ghfs, lockRecordsDao, bucketUri, o, operationExpirationInstant))
+        .filter(Optional::isPresent)
+        .map(Optional::get)
+        .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
 
     if (COMMAND_CHECK.equals(command)) {
       return 0;
@@ -356,6 +329,51 @@ public class CoopLockFsck extends Configured implements Tool {
       }
     }
     return 0;
+  }
+
+  private Optional<Map.Entry<FileStatus, CoopLockRecord>> getOperationIfExpiredUnchecked(      GoogleHadoopFileSystem ghfs, CoopLockRecordsDao lockRecordsDao, URI bucketUri, CoopLockRecord operation, Instant operationExpirationInstant){
+    try {
+      return getOperationIfExpired(
+          ghfs, lockRecordsDao, bucketUri, operation, operationExpirationInstant);
+    } catch (IOException e) {
+      throw new RuntimeException(String.format("Failed to check if %s operation expired", operation), e);
+    }
+  }
+  private Optional<Map.Entry<FileStatus, CoopLockRecord>> getOperationIfExpired(
+      GoogleHadoopFileSystem ghfs, CoopLockRecordsDao lockRecordsDao, URI bucketUri, CoopLockRecord operation, Instant operationExpirationInstant) throws IOException {
+      String operationId = operation.getOperationId();
+      URI operationPattern =
+          bucketUri.resolve("/" + CoopLockRecordsDao.LOCK_DIRECTORY + "*" + operationId + "*.lock");
+      FileStatus[] operationStatuses = ghfs.globStatus(new Path(operationPattern));
+      checkState(
+          operationStatuses.length < 2,
+          "operation %s should not have more than one lock file",
+          operationId);
+
+      // Lock file not created - nothing to repair
+      if (operationStatuses.length == 0) {
+        logger.atInfo().log(
+            "Operation %s for %s resources doesn't have lock file, unlocking",
+            operation.getOperationId(), operation.getResources());
+        StorageResourceId[] lockedResources =
+            operation.getResources().stream()
+                .map(r -> new StorageResourceId(bucketUri.getAuthority(), r))
+                .toArray(StorageResourceId[]::new);
+        lockRecordsDao.unlockPaths(operation.getOperationId(), lockedResources);
+        return Optional.empty();
+      }
+
+      FileStatus operationStatus = operationStatuses[0];
+
+      Instant lockInstant = Instant.ofEpochSecond(operation.getLockEpochSeconds());
+      if (isLockExpired(ghfs.getConf(), lockInstant, operationExpirationInstant) &&
+      isLockExpired(ghfs.getConf(), getLockRenewedInstant(ghfs, operationStatus), operationExpirationInstant)) {
+        logger.atInfo().log("Operation %s expired.", operationStatus.getPath());
+        return Optional.of(new AbstractMap.SimpleEntry<>(operationStatus, operation));
+      }
+
+      logger.atInfo().log("Operation %s not expired.", operationStatus.getPath());
+    return Optional.empty();
   }
 
   private void deleteResource(
