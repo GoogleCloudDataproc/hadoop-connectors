@@ -161,9 +161,7 @@ public class GoogleCloudStorageFileSystem {
 
     checkArgument(credential != null, "credential must not be null");
 
-    GoogleCloudStorageImpl gcsImpl =
-        new GoogleCloudStorageImpl(options.getCloudStorageOptions(), credential);
-    this.gcs = gcsImpl;
+    this.gcs = new GoogleCloudStorageImpl(options.getCloudStorageOptions(), credential);
     this.options = options;
     this.pathCodec = options.getPathCodec();
 
