@@ -35,6 +35,8 @@ import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.common.flogger.GoogleLogger;
 import com.google.gson.Gson;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
@@ -44,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class CoopLockRecordsDao {
@@ -78,26 +81,33 @@ public class CoopLockRecordsDao {
             ? new HashSet<>()
             : getLockRecords(lockInfo).getLocks();
     logger.atFine().log(
-        "[%dms] getLockedOperations(%s): %s", System.currentTimeMillis() - startMs, bucketName, operations);
+        "[%dms] getLockedOperations(%s): %s",
+        System.currentTimeMillis() - startMs, bucketName, operations);
     return operations;
   }
 
-  public void lockOperation(String bucketName, String operationId, long lockEpochSeconds)
+  public void relockOperation(String bucketName, String operationId, String clientId)
       throws IOException {
     long startMs = System.currentTimeMillis();
-    logger.atFine().log("lockOperation(%s, %d)", operationId, lockEpochSeconds);
-    modifyLock(this::updateLockEpochSeconds, bucketName, operationId, lockEpochSeconds);
+    logger.atFine().log("lockOperation(%s, %d)", operationId, clientId);
+    modifyLock(
+        records -> reacquireOperationLock(records, operationId, clientId), bucketName, operationId);
     logger.atFine().log(
         "[%dms] lockOperation(%s, %s)",
-        System.currentTimeMillis() - startMs, operationId, lockEpochSeconds);
+        System.currentTimeMillis() - startMs, operationId, clientId);
   }
 
-  public void lockPaths(String operationId, StorageResourceId... resources) throws IOException {
+  public void lockPaths(
+      String operationId, Instant operationInstant, StorageResourceId... resources)
+      throws IOException {
     long startMs = System.currentTimeMillis();
     logger.atFine().log("lockPaths(%s, %s)", operationId, lazy(() -> Arrays.toString(resources)));
     Set<String> objects = validateResources(resources);
     String bucketName = resources[0].getBucketName();
-    modifyLock(this::addLockRecords, bucketName, operationId, objects);
+    modifyLock(
+        records -> addLockRecords(records, operationId, operationInstant, objects),
+        bucketName,
+        operationId);
     logger.atFine().log(
         "[%dms] lockPaths(%s, %s)",
         System.currentTimeMillis() - startMs, operationId, lazy(() -> Arrays.toString(resources)));
@@ -108,7 +118,8 @@ public class CoopLockRecordsDao {
     logger.atFine().log("unlockPaths(%s, %s)", operationId, lazy(() -> Arrays.toString(resources)));
     Set<String> objects = validateResources(resources);
     String bucketName = resources[0].getBucketName();
-    modifyLock(this::removeLockRecords, bucketName, operationId, objects);
+    modifyLock(
+        records -> removeLockRecords(records, operationId, objects), bucketName, operationId);
     logger.atFine().log(
         "[%dms] unlockPaths(%s, %s)",
         System.currentTimeMillis() - startMs, operationId, lazy(() -> Arrays.toString(resources)));
@@ -125,11 +136,8 @@ public class CoopLockRecordsDao {
     return Arrays.stream(resources).map(StorageResourceId::getObjectName).collect(toImmutableSet());
   }
 
-  private <T> void modifyLock(
-      LockRecordsModificationFunction<Boolean, CoopLockRecords, String, T> modificationFn,
-      String bucketName,
-      String operationId,
-      T modificationFnParam)
+  private void modifyLock(
+      Function<CoopLockRecords, Boolean> modificationFn, String bucketName, String operationId)
       throws IOException {
     long startMs = System.currentTimeMillis();
     StorageResourceId lockId = getLockId(bucketName);
@@ -155,10 +163,10 @@ public class CoopLockRecordsDao {
                 ? new CoopLockRecords().setFormatVersion(CoopLockRecords.FORMAT_VERSION)
                 : getLockRecords(lockInfo);
 
-        if (!modificationFn.apply(lockRecords, operationId, modificationFnParam)) {
+        if (!modificationFn.apply(lockRecords)) {
           logger.atInfo().atMostEvery(5, SECONDS).log(
               "Failed to update %s entries in %s file: resources could be locked, retrying.",
-              modificationFnParam, lockRecords.getLocks().size(), lockId);
+              lockRecords.getLocks().size(), lockId);
           sleepUninterruptibly(RETRY_INTERVAL_MILLIS, MILLISECONDS);
           continue;
         }
@@ -184,8 +192,8 @@ public class CoopLockRecordsDao {
         gcs.updateMetadata(lockInfo, metadata);
 
         logger.atFine().log(
-            "Updated lock file in %dms for %s operation with %s parameter",
-            System.currentTimeMillis() - startMs, operationId, lazy(modificationFnParam::toString));
+            "Updated lock file in %dms for %s operation",
+            System.currentTimeMillis() - startMs, operationId);
         break;
       } catch (IOException e) {
         // continue after sleep if update failed due to file generation mismatch or other
@@ -196,8 +204,7 @@ public class CoopLockRecordsDao {
               lockId, operationId);
         } else {
           logger.atWarning().withCause(e).log(
-              "Failed to modify lock for %s operation with %s parameter, retrying.",
-              operationId, modificationFnParam);
+              "Failed to modify lock for %s operation, retrying.", operationId);
         }
         sleepUninterruptibly(backOff.nextBackOffMillis(), MILLISECONDS);
       }
@@ -219,8 +226,8 @@ public class CoopLockRecordsDao {
     return lockRecords;
   }
 
-  private boolean updateLockEpochSeconds(
-      CoopLockRecords lockRecords, String operationId, long lockEpochSeconds) {
+  private boolean reacquireOperationLock(
+      CoopLockRecords lockRecords, String operationId, String clientId) {
     Optional<CoopLockRecord> operationOptional =
         lockRecords.getLocks().stream()
             .filter(o -> o.getOperationId().equals(operationId))
@@ -228,17 +235,26 @@ public class CoopLockRecordsDao {
     checkState(operationOptional.isPresent(), "operation %s not found", operationId);
     CoopLockRecord operation = operationOptional.get();
     checkState(
-        lockEpochSeconds == operation.getLockEpochSeconds(),
-        "operation %s should have %s lock epoch, but was %s",
+        clientId.equals(operation.getClientId()),
+        "operation %s should be locked by %s client, but was %s",
         operationId,
-        lockEpochSeconds,
-        operation.getLockEpochSeconds());
+        clientId,
+        operation.getClientId());
+    Instant lockInstant = Instant.ofEpochSecond(operation.getLockEpochSeconds());
+    checkState(
+        lockInstant.plus(Duration.ofMinutes(2)).isBefore(Instant.now()),
+        "operation %s should be expire, but it was locked at %s",
+        operationId,
+        lockInstant);
     operation.setLockEpochSeconds(Instant.now().getEpochSecond());
     return true;
   }
 
   private boolean addLockRecords(
-      CoopLockRecords lockRecords, String operationId, Set<String> resourcesToAdd) {
+      CoopLockRecords lockRecords,
+      String operationId,
+      Instant operationInstant,
+      Set<String> resourcesToAdd) {
     // TODO: optimize to match more efficiently
     boolean atLestOneResourceAlreadyLocked =
         lockRecords.getLocks().stream()
@@ -258,13 +274,14 @@ public class CoopLockRecordsDao {
       return false;
     }
 
-    lockRecords
-        .getLocks()
-        .add(
-            new CoopLockRecord()
-                .setOperationId(operationId)
-                .setResources(resourcesToAdd)
-                .setLockEpochSeconds(Instant.now().getEpochSecond()));
+    CoopLockRecord record =
+        new CoopLockRecord()
+            .setClientId(newClientId(operationId))
+            .setOperationId(operationId)
+            .setResources(resourcesToAdd)
+            .setOperationEpochSeconds(operationInstant.getEpochSecond())
+            .setLockEpochSeconds(Instant.now().getEpochSecond());
+    lockRecords.getLocks().add(record);
 
     return true;
   }
@@ -275,17 +292,16 @@ public class CoopLockRecordsDao {
 
   private boolean removeLockRecords(
       CoopLockRecords lockRecords, String operationId, Set<String> resourcesToRemove) {
-    List<CoopLockRecord> operationLocksToRemoveRecord =
+    List<CoopLockRecord> recordsToRemove =
         lockRecords.getLocks().stream()
             .filter(o -> o.getResources().stream().anyMatch(resourcesToRemove::contains))
             .collect(Collectors.toList());
     checkState(
-        operationLocksToRemoveRecord.size() == 1
-            && operationLocksToRemoveRecord.get(0).getOperationId().equals(operationId),
+        recordsToRemove.size() == 1 && recordsToRemove.get(0).getOperationId().equals(operationId),
         "All resources %s should belong to %s operation, but was %s",
         resourcesToRemove.size(),
-        operationLocksToRemoveRecord.size());
-    CoopLockRecord operationToRemove = operationLocksToRemoveRecord.get(0);
+        recordsToRemove.size());
+    CoopLockRecord operationToRemove = recordsToRemove.get(0);
     checkState(
         operationToRemove.getResources().equals(resourcesToRemove),
         "All of %s resources should be locked by operation, but was locked only %s resources",
@@ -298,8 +314,15 @@ public class CoopLockRecordsDao {
     return true;
   }
 
-  @FunctionalInterface
-  private interface LockRecordsModificationFunction<T, T1, T2, T3> {
-    T apply(T1 p1, T2 p2, T3 p3);
+  public static String newClientId(String operationId) {
+    InetAddress localHost;
+    try {
+      localHost = InetAddress.getLocalHost();
+    } catch (UnknownHostException e) {
+      throw new RuntimeException(
+          String.format("Failed to get clientId for %s operation", operationId), e);
+    }
+    String epochMillis = String.valueOf(Instant.now().toEpochMilli());
+    return localHost.getCanonicalHostName() + "-" + epochMillis.substring(epochMillis.length() - 6);
   }
 }

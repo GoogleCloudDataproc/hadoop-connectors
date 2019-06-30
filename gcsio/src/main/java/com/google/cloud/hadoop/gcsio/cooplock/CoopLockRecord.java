@@ -22,7 +22,9 @@ import java.util.TreeSet;
 
 /** Class that represent cooperative locking operation */
 public class CoopLockRecord {
+  private String clientId;
   private String operationId;
+  private long operationEpochSeconds;
   private long lockEpochSeconds;
   private Set<String> resources = new TreeSet<>();
 
@@ -30,8 +32,26 @@ public class CoopLockRecord {
     return operationId;
   }
 
+  public CoopLockRecord setClientId(String clientId) {
+    this.clientId = clientId;
+    return this;
+  }
+
+  public String getClientId() {
+    return clientId;
+  }
+
   public CoopLockRecord setOperationId(String operationId) {
     this.operationId = operationId;
+    return this;
+  }
+
+  public long getOperationEpochSeconds() {
+    return operationEpochSeconds;
+  }
+
+  public CoopLockRecord setOperationEpochSeconds(long operationEpochSeconds) {
+    this.operationEpochSeconds = operationEpochSeconds;
     return this;
   }
 

@@ -69,7 +69,7 @@ public class CoopLockOperationDelete {
 
   public void lock() {
     try {
-      coopLockRecordsDao.lockPaths(operationId, resourceId);
+      coopLockRecordsDao.lockPaths(operationId, operationInstant, resourceId);
     } catch (IOException e) {
       throw new RuntimeException(String.format("Failed to acquire lock for %s operation", this), e);
     }

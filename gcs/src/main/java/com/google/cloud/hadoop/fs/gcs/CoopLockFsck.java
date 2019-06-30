@@ -205,8 +205,8 @@ public class CoopLockFsck extends Configured implements Tool {
               logger.atInfo().log("Repairing FS after %s delete operation.", operation.getPath());
               DeleteOperation operationObject =
                   getOperationObject(ghfs, operation, DeleteOperation.class);
-              lockRecordsDao.lockOperation(
-                  bucketName, operationId, lockedOperation.getLockEpochSeconds());
+              lockRecordsDao.relockOperation(
+                  bucketName, operationId, lockedOperation.getClientId());
               Future<?> lockUpdateFuture =
                   lockOperationDao.scheduleLockUpdate(
                       operationId,
@@ -224,8 +224,8 @@ public class CoopLockFsck extends Configured implements Tool {
             } else if (operation.getPath().toString().contains("_rename_")) {
               RenameOperation operationObject =
                   getOperationObject(ghfs, operation, RenameOperation.class);
-              lockRecordsDao.lockOperation(
-                  bucketName, operationId, lockedOperation.getLockEpochSeconds());
+              lockRecordsDao.relockOperation(
+                  bucketName, operationId, lockedOperation.getClientId());
               Future<?> lockUpdateFuture =
                   lockOperationDao.scheduleLockUpdate(
                       operationId,

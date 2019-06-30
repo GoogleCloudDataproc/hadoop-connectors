@@ -75,7 +75,7 @@ public class CoopLockOperationRename {
 
   public void lock() {
     try {
-      coopLockRecordsDao.lockPaths(operationId, srcResourceId, dstResourceId);
+      coopLockRecordsDao.lockPaths(operationId, operationInstant, srcResourceId, dstResourceId);
     } catch (IOException e) {
       throw new RuntimeException(String.format("Failed to acquire lock %s operation", this), e);
     }
