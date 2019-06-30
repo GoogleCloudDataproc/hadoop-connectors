@@ -11,6 +11,7 @@ import static java.util.stream.Collectors.toSet;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationDao;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecord;
@@ -117,8 +118,8 @@ public class CoopLockFsck extends Configured implements Tool {
     String bucketName = bucketUri.getAuthority();
     GoogleHadoopFileSystem ghfs = (GoogleHadoopFileSystem) FileSystem.get(bucketUri, conf);
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
-    GoogleCloudStorage gcs = gcsFs.getGcs();
-    CoopLockRecordsDao lockRecordsDao = gcsFs.getCoopLockRecordsDao();
+    GoogleCloudStorageImpl gcs = (GoogleCloudStorageImpl) gcsFs.getGcs();
+    CoopLockRecordsDao lockRecordsDao = new CoopLockRecordsDao(gcs);
     CoopLockOperationDao lockOperationDao = new CoopLockOperationDao(gcs, gcsFs.getPathCodec());
 
     Instant operationExpirationTime = Instant.now();

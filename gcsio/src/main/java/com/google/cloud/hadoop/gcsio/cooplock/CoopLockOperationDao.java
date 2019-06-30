@@ -65,17 +65,15 @@ public class CoopLockOperationDao {
   }
 
   public Future<?> persistDeleteOperation(
-      URI path,
-      List<FileInfo> itemsToDelete,
-      List<FileInfo> bucketsToDelete,
       String operationId,
+      Instant operationInstant,
       StorageResourceId resourceId,
-      Future<?> lockUpdateFuture)
+      List<FileInfo> itemsToDelete,
+      List<FileInfo> bucketsToDelete)
       throws IOException {
-    Instant operationInstant = Instant.now();
     URI operationLockPath =
         writeOperationFile(
-            path.getAuthority(),
+            resourceId.getBucketName(),
             OPERATION_LOCK_FILE_FORMAT,
             CREATE_OBJECT_OPTIONS,
             "delete",
@@ -91,7 +89,7 @@ public class CoopLockOperationDao {
             .map(i -> i.getItemInfo().getResourceId().toString())
             .collect(toImmutableList());
     writeOperationFile(
-        path.getAuthority(),
+        resourceId.getBucketName(),
         OPERATION_LOG_FILE_FORMAT,
         CREATE_OBJECT_OPTIONS,
         "delete",
@@ -99,27 +97,24 @@ public class CoopLockOperationDao {
         operationInstant,
         logRecords);
     // Schedule lock expiration update
-    lockUpdateFuture =
-        scheduleLockUpdate(
-            operationId,
-            operationLockPath,
-            DeleteOperation.class,
-            (o, i) -> o.setLockEpochSeconds(i.getEpochSecond()));
-    return lockUpdateFuture;
+    return scheduleLockUpdate(
+        operationId,
+        operationLockPath,
+        DeleteOperation.class,
+        (o, i) -> o.setLockEpochSeconds(i.getEpochSecond()));
   }
 
   public Future<?> persistUpdateOperation(
-      FileInfo srcInfo,
-      URI dst,
       String operationId,
+      Instant operationInstant,
+      StorageResourceId src,
+      StorageResourceId dst,
       Map<FileInfo, URI> srcToDstItemNames,
-      Map<FileInfo, URI> srcToDstMarkerItemNames,
-      Instant operationInstant)
+      Map<FileInfo, URI> srcToDstMarkerItemNames)
       throws IOException {
-    Future<?> lockUpdateFuture;
     URI operationLockPath =
         writeOperationFile(
-            dst.getAuthority(),
+            dst.getBucketName(),
             OPERATION_LOCK_FILE_FORMAT,
             CREATE_OBJECT_OPTIONS,
             "rename",
@@ -129,7 +124,7 @@ public class CoopLockOperationDao {
                 GSON.toJson(
                     new RenameOperation()
                         .setLockEpochSeconds(operationInstant.getEpochSecond())
-                        .setSrcResource(srcInfo.getPath().toString())
+                        .setSrcResource(src.toString())
                         .setDstResource(dst.toString())
                         .setCopySucceeded(false))));
     List<String> logRecords =
@@ -138,7 +133,7 @@ public class CoopLockOperationDao {
             .map(e -> e.getKey().getItemInfo().getResourceId() + " -> " + e.getValue())
             .collect(toImmutableList());
     writeOperationFile(
-        dst.getAuthority(),
+        dst.getBucketName(),
         OPERATION_LOG_FILE_FORMAT,
         CREATE_OBJECT_OPTIONS,
         "rename",
@@ -146,19 +141,18 @@ public class CoopLockOperationDao {
         operationInstant,
         logRecords);
     // Schedule lock expiration update
-    lockUpdateFuture =
-        scheduleLockUpdate(
-            operationId,
-            operationLockPath,
-            RenameOperation.class,
-            (o, i) -> o.setLockEpochSeconds(i.getEpochSecond()));
-    return lockUpdateFuture;
+    return scheduleLockUpdate(
+        operationId,
+        operationLockPath,
+        RenameOperation.class,
+        (o, i) -> o.setLockEpochSeconds(i.getEpochSecond()));
   }
 
   public void checkpointUpdateOperation(
-      FileInfo srcInfo, URI dst, String operationId, Instant operationInstant) throws IOException {
+      StorageResourceId src, StorageResourceId dst, String operationId, Instant operationInstant)
+      throws IOException {
     writeOperationFile(
-        dst.getAuthority(),
+        dst.getBucketName(),
         OPERATION_LOCK_FILE_FORMAT,
         UPDATE_OBJECT_OPTIONS,
         "rename",
@@ -168,7 +162,7 @@ public class CoopLockOperationDao {
             GSON.toJson(
                 new RenameOperation()
                     .setLockEpochSeconds(Instant.now().getEpochSecond())
-                    .setSrcResource(srcInfo.getPath().toString())
+                    .setSrcResource(src.toString())
                     .setDstResource(dst.toString())
                     .setCopySucceeded(true))));
   }
