@@ -413,7 +413,6 @@ public class GoogleCloudStorageFileSystem {
 
     coopLockOp.ifPresent(o -> o.persistAndScheduleRenewal(itemsToDelete, bucketsToDelete));
     try {
-
       deleteInternal(itemsToDelete, bucketsToDelete);
 
       coopLockOp.ifPresent(CoopLockOperationDelete::unlock);

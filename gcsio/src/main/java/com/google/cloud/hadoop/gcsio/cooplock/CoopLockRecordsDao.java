@@ -35,6 +35,7 @@ import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.common.flogger.GoogleLogger;
 import com.google.gson.Gson;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -46,18 +47,18 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 public class CoopLockRecordsDao {
-
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   public static final String LOCK_DIRECTORY = "_lock/";
 
-  private static final Gson GSON = new Gson();
-
-  public static final String LOCK_FILE = "all.lock";
+  private static final String LOCK_FILE = "all.lock";
   public static final String LOCK_PATH = LOCK_DIRECTORY + LOCK_FILE;
 
   private static final String LOCK_METADATA_KEY = "lock";
   private static final int MAX_LOCKS_COUNT = 20;
+  private static final int RETRY_INTERVAL_MILLIS = 2_000;
+
+  private static final Gson GSON = new Gson();
 
   private final GoogleCloudStorageImpl gcs;
 
@@ -77,7 +78,7 @@ public class CoopLockRecordsDao {
             ? new HashSet<>()
             : getLockRecords(lockInfo).getLocks();
     logger.atFine().log(
-        "[%dms] lockPaths(%s): %s", System.currentTimeMillis() - startMs, bucketName, operations);
+        "[%dms] getLockedOperations(%s): %s", System.currentTimeMillis() - startMs, bucketName, operations);
     return operations;
   }
 
@@ -102,17 +103,6 @@ public class CoopLockRecordsDao {
         System.currentTimeMillis() - startMs, operationId, lazy(() -> Arrays.toString(resources)));
   }
 
-  private Set<String> validateResources(StorageResourceId[] resources) {
-    checkNotNull(resources, "resources should not be null");
-    checkArgument(resources.length > 0, "resources should not be empty");
-    String bucketName = resources[0].getBucketName();
-    checkState(
-        Arrays.stream(resources).allMatch(r -> r.getBucketName().equals(bucketName)),
-        "All resources should be in the same bucket");
-
-    return Arrays.stream(resources).map(StorageResourceId::getObjectName).collect(toImmutableSet());
-  }
-
   public void unlockPaths(String operationId, StorageResourceId... resources) throws IOException {
     long startMs = System.currentTimeMillis();
     logger.atFine().log("unlockPaths(%s, %s)", operationId, lazy(() -> Arrays.toString(resources)));
@@ -122,6 +112,17 @@ public class CoopLockRecordsDao {
     logger.atFine().log(
         "[%dms] unlockPaths(%s, %s)",
         System.currentTimeMillis() - startMs, operationId, lazy(() -> Arrays.toString(resources)));
+  }
+
+  private Set<String> validateResources(StorageResourceId[] resources) {
+    checkNotNull(resources, "resources should not be null");
+    checkArgument(resources.length > 0, "resources should not be empty");
+    String bucketName = resources[0].getBucketName();
+    checkState(
+        Arrays.stream(resources).allMatch(r -> r.getBucketName().equals(bucketName)),
+        "All resources should be in the same bucket");
+
+    return Arrays.stream(resources).map(StorageResourceId::getObjectName).collect(toImmutableSet());
   }
 
   private <T> void modifyLock(
@@ -137,7 +138,7 @@ public class CoopLockRecordsDao {
         new ExponentialBackOff.Builder()
             .setInitialIntervalMillis(100)
             .setMultiplier(1.2)
-            .setMaxIntervalMillis(30_000)
+            .setMaxIntervalMillis((int) Duration.ofSeconds(MAX_LOCKS_COUNT).toMillis())
             .setMaxElapsedTimeMillis(Integer.MAX_VALUE)
             .build();
 
@@ -145,7 +146,7 @@ public class CoopLockRecordsDao {
       try {
         GoogleCloudStorageItemInfo lockInfo = gcs.getItemInfo(lockId);
         if (!lockInfo.exists()) {
-          gcs.createEmptyObject(lockId, new CreateObjectOptions(false));
+          gcs.createEmptyObject(lockId, new CreateObjectOptions(/* overwriteExisting= */ false));
           lockInfo = gcs.getItemInfo(lockId);
         }
         CoopLockRecords lockRecords =
@@ -156,13 +157,13 @@ public class CoopLockRecordsDao {
 
         if (!modificationFn.apply(lockRecords, operationId, modificationFnParam)) {
           logger.atInfo().atMostEvery(5, SECONDS).log(
-              "Failed to update %s entries in %s file: resources could be locked. Re-trying.",
+              "Failed to update %s entries in %s file: resources could be locked, retrying.",
               modificationFnParam, lockRecords.getLocks().size(), lockId);
-          sleepUninterruptibly(backOff.nextBackOffMillis(), MILLISECONDS);
+          sleepUninterruptibly(RETRY_INTERVAL_MILLIS, MILLISECONDS);
           continue;
         }
 
-        // Unlocked all objects - delete lock object
+        // If unlocked all objects - delete lock object
         if (lockRecords.getLocks().isEmpty()) {
           gcs.deleteObject(lockInfo.getResourceId(), lockInfo.getMetaGeneration());
           break;
@@ -170,9 +171,9 @@ public class CoopLockRecordsDao {
 
         if (lockRecords.getLocks().size() > MAX_LOCKS_COUNT) {
           logger.atInfo().atMostEvery(5, SECONDS).log(
-              "Skipping lock entries update in %s file: too many (%d) locked resources. Re-trying.",
+              "Skipping lock entries update in %s file: too many (%d) locked resources, retrying.",
               lockRecords.getLocks().size(), lockId);
-          sleepUninterruptibly(backOff.nextBackOffMillis(), MILLISECONDS);
+          sleepUninterruptibly(RETRY_INTERVAL_MILLIS, MILLISECONDS);
           continue;
         }
 
@@ -191,7 +192,7 @@ public class CoopLockRecordsDao {
         // IOException
         if (e.getMessage().contains("conditionNotMet")) {
           logger.atInfo().atMostEvery(5, SECONDS).log(
-              "Failed to update entries (conditionNotMet) in %s file for operation %s. Re-trying.",
+              "Failed to update entries (conditionNotMet) in %s file for operation %s, retrying.",
               lockId, operationId);
         } else {
           logger.atWarning().withCause(e).log(
@@ -204,8 +205,7 @@ public class CoopLockRecordsDao {
   }
 
   private StorageResourceId getLockId(String bucketName) {
-    String lockObject = "gs://" + bucketName + "/" + LOCK_PATH;
-    return StorageResourceId.fromObjectName(lockObject);
+    return new StorageResourceId(bucketName, LOCK_PATH);
   }
 
   private CoopLockRecords getLockRecords(GoogleCloudStorageItemInfo lockInfo) {
@@ -240,30 +240,31 @@ public class CoopLockRecordsDao {
   private boolean addLockRecords(
       CoopLockRecords lockRecords, String operationId, Set<String> resourcesToAdd) {
     // TODO: optimize to match more efficiently
-    if (lockRecords.getLocks().stream()
-        .flatMap(operation -> operation.getResources().stream())
-        .anyMatch(
-            resource -> {
-              for (String resourceToAdd : resourcesToAdd) {
-                if (resourceToAdd.equals(resource)
-                    || isChildObject(resource, resourceToAdd)
-                    || isChildObject(resourceToAdd, resource)) {
-                  return true;
-                }
-              }
-              return false;
-            })) {
+    boolean atLestOneResourceAlreadyLocked =
+        lockRecords.getLocks().stream()
+            .flatMap(operation -> operation.getResources().stream())
+            .anyMatch(
+                lockedResource -> {
+                  for (String resourceToAdd : resourcesToAdd) {
+                    if (resourceToAdd.equals(lockedResource)
+                        || isChildObject(lockedResource, resourceToAdd)
+                        || isChildObject(resourceToAdd, lockedResource)) {
+                      return true;
+                    }
+                  }
+                  return false;
+                });
+    if (atLestOneResourceAlreadyLocked) {
       return false;
     }
 
-    long lockEpochSeconds = Instant.now().getEpochSecond();
     lockRecords
         .getLocks()
         .add(
             new CoopLockRecord()
                 .setOperationId(operationId)
                 .setResources(resourcesToAdd)
-                .setLockEpochSeconds(lockEpochSeconds));
+                .setLockEpochSeconds(Instant.now().getEpochSecond()));
 
     return true;
   }
