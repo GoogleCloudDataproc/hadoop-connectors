@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.gcsio.cooplock;
 
+import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationType.DELETE;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.cloud.hadoop.gcsio.FileInfo;
@@ -69,7 +70,7 @@ public class CoopLockOperationDelete {
 
   public void lock() {
     try {
-      coopLockRecordsDao.lockPaths(operationId, operationInstant, resourceId);
+      coopLockRecordsDao.lockPaths(operationId, operationInstant, DELETE, resourceId);
     } catch (IOException e) {
       throw new RuntimeException(String.format("Failed to acquire lock for %s operation", this), e);
     }

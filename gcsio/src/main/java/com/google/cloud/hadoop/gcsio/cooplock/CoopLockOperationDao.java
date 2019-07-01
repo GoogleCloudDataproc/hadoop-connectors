@@ -19,7 +19,6 @@ package com.google.cloud.hadoop.gcsio.cooplock;
 import static com.google.cloud.hadoop.gcsio.CreateObjectOptions.DEFAULT_CONTENT_TYPE;
 import static com.google.cloud.hadoop.gcsio.CreateObjectOptions.EMPTY_METADATA;
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao.LOCK_DIRECTORY;
-import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
@@ -32,7 +31,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.PathCodec;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Streams;
 import com.google.common.flogger.GoogleLogger;
 import com.google.gson.Gson;
@@ -47,7 +45,6 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -59,9 +56,11 @@ import java.util.stream.Collectors;
 public class CoopLockOperationDao {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  private static final Set<String> VALID_OPERATIONS = ImmutableSet.of("delete", "rename");
+  public static final String RENAME_LOG_RECORD_SEPARATOR = " -> ";
+
   private static final String OPERATION_LOG_FILE_FORMAT = "%s_%s_%s.log";
   private static final String OPERATION_LOCK_FILE_FORMAT = "%s_%s_%s.lock";
+
   private static final CreateObjectOptions CREATE_OBJECT_OPTIONS =
       new CreateObjectOptions(/* overwriteExisting= */ false, "application/text", EMPTY_METADATA);
   private static final CreateObjectOptions UPDATE_OBJECT_OPTIONS =
@@ -92,7 +91,7 @@ public class CoopLockOperationDao {
             resourceId.getBucketName(),
             OPERATION_LOCK_FILE_FORMAT,
             CREATE_OBJECT_OPTIONS,
-            "delete",
+            CoopLockOperationType.DELETE,
             operationId,
             operationInstant,
             ImmutableList.of(
@@ -108,7 +107,7 @@ public class CoopLockOperationDao {
         resourceId.getBucketName(),
         OPERATION_LOG_FILE_FORMAT,
         CREATE_OBJECT_OPTIONS,
-        "delete",
+        CoopLockOperationType.DELETE,
         operationId,
         operationInstant,
         logRecords);
@@ -133,7 +132,7 @@ public class CoopLockOperationDao {
             dst.getBucketName(),
             OPERATION_LOCK_FILE_FORMAT,
             CREATE_OBJECT_OPTIONS,
-            "rename",
+            CoopLockOperationType.RENAME,
             operationId,
             operationInstant,
             ImmutableList.of(
@@ -146,13 +145,17 @@ public class CoopLockOperationDao {
     List<String> logRecords =
         Streams.concat(
                 srcToDstItemNames.entrySet().stream(), srcToDstMarkerItemNames.entrySet().stream())
-            .map(e -> e.getKey().getItemInfo().getResourceId() + " -> " + e.getValue())
+            .map(
+                e ->
+                    e.getKey().getItemInfo().getResourceId()
+                        + RENAME_LOG_RECORD_SEPARATOR
+                        + e.getValue())
             .collect(toImmutableList());
     writeOperationFile(
         dst.getBucketName(),
         OPERATION_LOG_FILE_FORMAT,
         CREATE_OBJECT_OPTIONS,
-        "rename",
+        CoopLockOperationType.RENAME,
         operationId,
         operationInstant,
         logRecords);
@@ -171,7 +174,7 @@ public class CoopLockOperationDao {
         dst.getBucketName(),
         OPERATION_LOCK_FILE_FORMAT,
         UPDATE_OBJECT_OPTIONS,
-        "rename",
+        CoopLockOperationType.RENAME,
         operationId,
         operationInstant,
         ImmutableList.of(
@@ -189,9 +192,10 @@ public class CoopLockOperationDao {
     for (int i = 0; i < 10; i++) {
       try {
         renewLock(operationId, operationLockPath, renewFn);
+        return;
       } catch (IOException e) {
         logger.atWarning().withCause(e).log(
-            "Failed to renew '%s' lock for %s operation, retry #%d",
+            "Failed to renew '%s' lock for %s operation, attempt #%d",
             operationLockPath, operationId, i + 1);
       }
       sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
@@ -230,18 +234,13 @@ public class CoopLockOperationDao {
       String bucket,
       String fileNameFormat,
       CreateObjectOptions createObjectOptions,
-      String operation,
+      CoopLockOperationType operationType,
       String operationId,
       Instant operationInstant,
       List<String> records)
       throws IOException {
-    checkArgument(
-        VALID_OPERATIONS.contains(operation),
-        "operation must be one of $s, but was '%s'",
-        VALID_OPERATIONS,
-        operation);
     String date = LOCK_FILE_DATE_TIME_FORMAT.format(operationInstant);
-    String file = String.format(LOCK_DIRECTORY + fileNameFormat, date, operation, operationId);
+    String file = String.format(LOCK_DIRECTORY + fileNameFormat, date, operationType, operationId);
     URI path = pathCodec.getPath(bucket, file, /* allowEmptyObjectName= */ false);
     StorageResourceId resourceId =
         pathCodec.validatePathAndGetId(path, /* allowEmptyObjectName= */ false);

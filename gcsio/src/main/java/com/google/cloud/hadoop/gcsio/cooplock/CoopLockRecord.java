@@ -25,11 +25,12 @@ public class CoopLockRecord {
   private String clientId;
   private String operationId;
   private long operationEpochSeconds;
+  private CoopLockOperationType operationType;
   private long lockEpochSeconds;
   private Set<String> resources = new TreeSet<>();
 
-  public String getOperationId() {
-    return operationId;
+  public String getClientId() {
+    return clientId;
   }
 
   public CoopLockRecord setClientId(String clientId) {
@@ -37,8 +38,8 @@ public class CoopLockRecord {
     return this;
   }
 
-  public String getClientId() {
-    return clientId;
+  public String getOperationId() {
+    return operationId;
   }
 
   public CoopLockRecord setOperationId(String operationId) {
@@ -52,6 +53,15 @@ public class CoopLockRecord {
 
   public CoopLockRecord setOperationEpochSeconds(long operationEpochSeconds) {
     this.operationEpochSeconds = operationEpochSeconds;
+    return this;
+  }
+
+  public CoopLockOperationType getOperationType() {
+    return operationType;
+  }
+
+  public CoopLockRecord setOperationType(CoopLockOperationType operationType) {
+    this.operationType = operationType;
     return this;
   }
 
@@ -79,6 +89,7 @@ public class CoopLockRecord {
         .add("clientId", clientId)
         .add("operationId", operationId)
         .add("operationEpochSeconds", operationEpochSeconds)
+        .add("operationType", operationType)
         .add("lockEpochSeconds", lockEpochSeconds)
         .add("resources", resources)
         .toString();

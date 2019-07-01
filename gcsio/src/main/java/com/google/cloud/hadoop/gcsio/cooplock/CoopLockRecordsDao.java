@@ -86,26 +86,32 @@ public class CoopLockRecordsDao {
     return operations;
   }
 
-  public void relockOperation(String bucketName, String operationId, String clientId)
+  public void relockOperation(
+      String bucketName, String operationId, String clientId, long lockEpochSeconds)
       throws IOException {
     long startMs = System.currentTimeMillis();
     logger.atFine().log("lockOperation(%s, %d)", operationId, clientId);
     modifyLock(
-        records -> reacquireOperationLock(records, operationId, clientId), bucketName, operationId);
+        records -> reacquireOperationLock(records, operationId, clientId, lockEpochSeconds),
+        bucketName,
+        operationId);
     logger.atFine().log(
         "[%dms] lockOperation(%s, %s)",
         System.currentTimeMillis() - startMs, operationId, clientId);
   }
 
   public void lockPaths(
-      String operationId, Instant operationInstant, StorageResourceId... resources)
+      String operationId,
+      Instant operationInstant,
+      CoopLockOperationType operationType,
+      StorageResourceId... resources)
       throws IOException {
     long startMs = System.currentTimeMillis();
     logger.atFine().log("lockPaths(%s, %s)", operationId, lazy(() -> Arrays.toString(resources)));
     Set<String> objects = validateResources(resources);
     String bucketName = resources[0].getBucketName();
     modifyLock(
-        records -> addLockRecords(records, operationId, operationInstant, objects),
+        records -> addLockRecords(records, operationId, operationInstant, operationType, objects),
         bucketName,
         operationId);
     logger.atFine().log(
@@ -227,7 +233,7 @@ public class CoopLockRecordsDao {
   }
 
   private boolean reacquireOperationLock(
-      CoopLockRecords lockRecords, String operationId, String clientId) {
+      CoopLockRecords lockRecords, String operationId, String clientId, long lockEpochSeconds) {
     Optional<CoopLockRecord> operationOptional =
         lockRecords.getLocks().stream()
             .filter(o -> o.getOperationId().equals(operationId))
@@ -240,12 +246,11 @@ public class CoopLockRecordsDao {
         operationId,
         clientId,
         operation.getClientId());
-    Instant lockInstant = Instant.ofEpochSecond(operation.getLockEpochSeconds());
     checkState(
-        lockInstant.plus(Duration.ofMinutes(2)).isBefore(Instant.now()),
-        "operation %s should be expire, but it was locked at %s",
-        operationId,
-        lockInstant);
+        lockEpochSeconds == operation.getLockEpochSeconds(),
+        "operation %s should be locked at %s epoch seconds but was at %s",
+        lockEpochSeconds,
+        operation.getLockEpochSeconds());
     operation.setLockEpochSeconds(Instant.now().getEpochSecond());
     return true;
   }
@@ -254,6 +259,7 @@ public class CoopLockRecordsDao {
       CoopLockRecords lockRecords,
       String operationId,
       Instant operationInstant,
+      CoopLockOperationType operationType,
       Set<String> resourcesToAdd) {
     // TODO: optimize to match more efficiently
     boolean atLestOneResourceAlreadyLocked =
@@ -278,9 +284,10 @@ public class CoopLockRecordsDao {
         new CoopLockRecord()
             .setClientId(newClientId(operationId))
             .setOperationId(operationId)
-            .setResources(resourcesToAdd)
             .setOperationEpochSeconds(operationInstant.getEpochSecond())
-            .setLockEpochSeconds(Instant.now().getEpochSecond());
+            .setLockEpochSeconds(Instant.now().getEpochSecond())
+            .setOperationType(operationType)
+            .setResources(resourcesToAdd);
     lockRecords.getLocks().add(record);
 
     return true;
