@@ -33,6 +33,7 @@ import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Streams;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.gson.Gson;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -70,6 +71,11 @@ public class CoopLockOperationDao {
       DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss.SSSXXX").withZone(ZoneId.of("UTC"));
 
   private static final Gson GSON = new Gson();
+
+  private final ScheduledExecutorService scheduledThreadPool =
+      Executors.newScheduledThreadPool(
+          /* corePoolSize= */ 0,
+          new ThreadFactoryBuilder().setNameFormat("coop-lock-thread-%d").setDaemon(true).build());
 
   private GoogleCloudStorage gcs;
   private PathCodec pathCodec;
@@ -208,7 +214,8 @@ public class CoopLockOperationDao {
   private void renewLock(
       String operationId, URI operationLockPath, Function<String, String> renewFn)
       throws IOException {
-    StorageResourceId lockId = StorageResourceId.fromObjectName(operationLockPath.toString());
+    StorageResourceId lockId =
+        pathCodec.validatePathAndGetId(operationLockPath, /* allowEmptyObjectNames =*/ false);
     GoogleCloudStorageItemInfo lockInfo = gcs.getItemInfo(lockId);
     checkState(lockInfo.exists(), "lock file for %s operation should exist", operationId);
 
@@ -222,12 +229,10 @@ public class CoopLockOperationDao {
     CreateObjectOptions updateOptions =
         new CreateObjectOptions(
             /* overwriteExisting= */ true, DEFAULT_CONTENT_TYPE, EMPTY_METADATA);
-    StorageResourceId operationLockPathResourceId =
+    StorageResourceId lockIdWithGeneration =
         new StorageResourceId(
-            operationLockPath.getAuthority(),
-            operationLockPath.getPath(),
-            lockInfo.getContentGeneration());
-    writeOperation(operationLockPathResourceId, updateOptions, ImmutableList.of(lock));
+            lockId.getBucketName(), lockId.getObjectName(), lockInfo.getContentGeneration());
+    writeOperation(lockIdWithGeneration, updateOptions, ImmutableList.of(lock));
   }
 
   private URI writeOperationFile(
@@ -258,8 +263,6 @@ public class CoopLockOperationDao {
       }
     }
   }
-
-  private ScheduledExecutorService scheduledThreadPool = Executors.newScheduledThreadPool(1);
 
   public <T> Future<?> scheduleLockUpdate(
       String operationId, URI operationLockPath, Class<T> clazz, BiConsumer<T, Instant> renewFn) {

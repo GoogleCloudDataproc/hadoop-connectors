@@ -21,6 +21,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationDao.RENAME_LOG_RECORD_SEPARATOR;
 import static com.google.common.base.Preconditions.checkState;
 import static java.time.temporal.ChronoUnit.MILLIS;
+import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 
@@ -207,7 +208,7 @@ class CoopLockFsckRunner {
             RenameOperation.class,
             (o, i) -> o.setLockEpochSeconds(i.getEpochSecond()));
     try {
-      Map<String, String> loggedResources =
+      LinkedHashMap<String, String> loggedResources =
           getOperationLog(
                   operationStatus,
                   l -> {
@@ -220,7 +221,10 @@ class CoopLockFsckRunner {
                   toMap(
                       AbstractMap.SimpleEntry::getKey,
                       AbstractMap.SimpleEntry::getValue,
-                      (e1, e2) -> e1,
+                      (e1, e2) -> {
+                        throw new RuntimeException(
+                            String.format("Found entries with duplicate keys: %s and %s", e1, e2));
+                      },
                       LinkedHashMap::new));
       if (operationObject.getCopySucceeded()) {
         if (CoopLockFsck.COMMAND_ROLL_BACK.equals(command)) {
@@ -288,8 +292,15 @@ class CoopLockFsckRunner {
         "Repairing FS after %s rename operation (deleting %s (%s) and renaming (%s -> %s)).",
         operationLock.getPath(), dstResourceType, dstResource, srcResource, dstResource);
     deleteResource(dstResource, loggedDstResources);
-    gcs.copy(bucketName, loggedSrcResources, bucketName, loggedDstResources);
+    gcs.copy(bucketName, toNames(loggedSrcResources), bucketName, toNames(loggedDstResources));
+    // TODO: checkpoint repair operation after copy to make repair operation repairable
     deleteResource(srcResource, loggedSrcResources);
+  }
+
+  private static List<String> toNames(List<String> resources) {
+    return resources.stream()
+        .map(r -> StorageResourceId.fromObjectName(r).getObjectName())
+        .collect(toList());
   }
 
   private Optional<Map.Entry<FileStatus, CoopLockRecord>> getOperationLockIfExpiredUnchecked(
