@@ -125,7 +125,7 @@ public class CoopLockOperationDao {
         (o, i) -> o.setLockEpochSeconds(i.getEpochSecond()));
   }
 
-  public Future<?> persistUpdateOperation(
+  public Future<?> persistRenameOperation(
       String operationId,
       Instant operationInstant,
       StorageResourceId src,
@@ -173,8 +173,12 @@ public class CoopLockOperationDao {
         (o, i) -> o.setLockEpochSeconds(i.getEpochSecond()));
   }
 
-  public void checkpointUpdateOperation(
-      StorageResourceId src, StorageResourceId dst, String operationId, Instant operationInstant)
+  public void checkpointRenameOperation(
+      StorageResourceId src,
+      StorageResourceId dst,
+      String operationId,
+      Instant operationInstant,
+      boolean copySucceeded)
       throws IOException {
     writeOperationFile(
         dst.getBucketName(),
@@ -189,7 +193,7 @@ public class CoopLockOperationDao {
                     .setLockEpochSeconds(Instant.now().getEpochSecond())
                     .setSrcResource(src.toString())
                     .setDstResource(dst.toString())
-                    .setCopySucceeded(true))));
+                    .setCopySucceeded(copySucceeded))));
   }
 
   private void renewLockOrExit(

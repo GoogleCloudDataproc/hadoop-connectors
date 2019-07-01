@@ -230,11 +230,14 @@ class CoopLockFsckRunner {
         if (CoopLockFsck.COMMAND_ROLL_BACK.equals(command)) {
           deleteAndRenameToRepairRenameOperation(
               operationStatus,
+              operation,
+              operationObject,
               operationObject.getDstResource(),
               new ArrayList<>(loggedResources.values()),
               operationObject.getSrcResource(),
               "source",
-              new ArrayList<>(loggedResources.keySet()));
+              new ArrayList<>(loggedResources.keySet()),
+              /* copySucceeded= */ false);
         } else {
           deleteToRepairRenameOperation(
               operationStatus,
@@ -252,11 +255,14 @@ class CoopLockFsckRunner {
         } else {
           deleteAndRenameToRepairRenameOperation(
               operationStatus,
+              operation,
+              operationObject,
               operationObject.getSrcResource(),
               new ArrayList<>(loggedResources.keySet()),
               operationObject.getDstResource(),
               "destination",
-              new ArrayList<>(loggedResources.values()));
+              new ArrayList<>(loggedResources.values()),
+              /* copySucceeded= */ true);
         }
       }
       lockRecordsDao.unlockPaths(
@@ -282,18 +288,29 @@ class CoopLockFsckRunner {
 
   private void deleteAndRenameToRepairRenameOperation(
       FileStatus operationLock,
+      CoopLockRecord operation,
+      RenameOperation operationObject,
       String srcResource,
       List<String> loggedSrcResources,
       String dstResource,
       String dstResourceType,
-      List<String> loggedDstResources)
+      List<String> loggedDstResources,
+      boolean copySucceeded)
       throws IOException {
     logger.atInfo().log(
         "Repairing FS after %s rename operation (deleting %s (%s) and renaming (%s -> %s)).",
         operationLock.getPath(), dstResourceType, dstResource, srcResource, dstResource);
     deleteResource(dstResource, loggedDstResources);
     gcs.copy(bucketName, toNames(loggedSrcResources), bucketName, toNames(loggedDstResources));
-    // TODO: checkpoint repair operation after copy to make repair operation repairable
+
+    // Update rename operation checkpoint before proceeding to allow repair of failed repair
+    lockOperationDao.checkpointRenameOperation(
+        StorageResourceId.fromObjectName(operationObject.getSrcResource()),
+        StorageResourceId.fromObjectName(operationObject.getDstResource()),
+        operation.getOperationId(),
+        Instant.ofEpochSecond(operation.getOperationEpochSeconds()),
+        copySucceeded);
+
     deleteResource(srcResource, loggedSrcResources);
   }
 

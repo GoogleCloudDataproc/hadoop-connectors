@@ -87,7 +87,7 @@ public class CoopLockOperationRename {
       Map<FileInfo, URI> srcToDstItemNames, Map<FileInfo, URI> srcToDstMarkerItemNames) {
     try {
       lockUpdateFuture =
-          coopLockOperationDao.persistUpdateOperation(
+          coopLockOperationDao.persistRenameOperation(
               operationId,
               operationInstant,
               srcResourceId,
@@ -101,8 +101,8 @@ public class CoopLockOperationRename {
 
   public void checkpoint() {
     try {
-      coopLockOperationDao.checkpointUpdateOperation(
-          srcResourceId, dstResourceId, operationId, operationInstant);
+      coopLockOperationDao.checkpointRenameOperation(
+          srcResourceId, dstResourceId, operationId, operationInstant, /* copySucceeded= */ true);
     } catch (IOException e) {
       throw new RuntimeException(String.format("Failed to checkpoint %s operation", this), e);
     }
