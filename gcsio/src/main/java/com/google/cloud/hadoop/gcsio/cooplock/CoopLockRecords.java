@@ -24,8 +24,13 @@ import java.util.Set;
 import java.util.TreeSet;
 
 public class CoopLockRecords {
-  /** Supported version of operation locks */
-  public static final long FORMAT_VERSION = 1;
+  /**
+   * Supported version of operation locks persistent objects format.
+   *
+   * <p>When making any changes to cooperative locking persistent objects format (adding, renaming
+   * or removing fields), then you need to increase this version number to prevent corruption.
+   */
+  public static final long FORMAT_VERSION = 2;
 
   private long formatVersion = -1;
   private Set<CoopLockRecord> locks =
