@@ -18,7 +18,9 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.batchRequestString;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.composeRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.copyRequestString;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.deleteRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getBucketRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestString;
@@ -480,6 +482,85 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     List<String> listedObjects = gcs.listObjectNames(testBucket2, testDir, PATH_DELIMITER);
     assertThat(listedObjects).containsExactly(testDir + "f4", testDir + "f5");
+  }
+
+  @Test
+  public void deleteObjects_withoutLimit() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "f3");
+
+    gcs.deleteObjects(
+        ImmutableList.of(
+            new StorageResourceId(testBucket, testDir + "f1"),
+            new StorageResourceId(testBucket, testDir + "f2")));
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            batchRequestString(),
+            getRequestString(testBucket, URLEncoder.encode(testDir + "f1", UTF_8.name())),
+            getRequestString(testBucket, URLEncoder.encode(testDir + "f2", UTF_8.name())),
+            batchRequestString(),
+            deleteRequestString(
+                testBucket, URLEncoder.encode(testDir + "f1", UTF_8.name()), "token_4"),
+            deleteRequestString(
+                testBucket, URLEncoder.encode(testDir + "f2", UTF_8.name()), "token_5"));
+
+    List<String> listedObjects = gcs.listObjectNames(testBucket, testDir, PATH_DELIMITER);
+    assertThat(listedObjects).containsExactly(testDir + "f3");
+  }
+
+  @Test
+  public void deleteObjects_withLimit_zeroBatchGcsRequest() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs =
+        new GoogleCloudStorageImpl(
+            gcsOptions.toBuilder().setMaxRequestsPerBatch(1).build(), gcsRequestsTracker);
+
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "f3");
+
+    gcs.deleteObjects(
+        ImmutableList.of(
+            new StorageResourceId(testBucket, testDir + "f1"),
+            new StorageResourceId(testBucket, testDir + "f2")));
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(testBucket, URLEncoder.encode(testDir + "f1", UTF_8.name())),
+            deleteRequestString(
+                testBucket, URLEncoder.encode(testDir + "f1", UTF_8.name()), "token_1"),
+            getRequestString(testBucket, URLEncoder.encode(testDir + "f2", UTF_8.name())),
+            deleteRequestString(
+                testBucket, URLEncoder.encode(testDir + "f2", UTF_8.name()), "token_3"));
+
+    List<String> listedObjects = gcs.listObjectNames(testBucket, testDir, PATH_DELIMITER);
+    assertThat(listedObjects).containsExactly(testDir + "f3");
+  }
+
+  @Test
+  public void composeObject_withoutLimit() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = createObjectsInTestDir(testBucket, "f1", "f2");
+
+    gcs.compose(testBucket, ImmutableList.of(testDir + "f1", testDir + "f2"), testDir + "f3", null);
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(testBucket, URLEncoder.encode(testDir + "f3", UTF_8.name())),
+            composeRequestString(
+                testBucket, URLEncoder.encode(testDir + "f3", UTF_8.name()), "token_1"));
+
+    List<String> listedObjects = gcs.listObjectNames(testBucket, testDir, PATH_DELIMITER);
+    assertThat(listedObjects).containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");
   }
 
   private static List<String> toObjectNames(List<GoogleCloudStorageItemInfo> listedObjects) {

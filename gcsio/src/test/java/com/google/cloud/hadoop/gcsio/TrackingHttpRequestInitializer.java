@@ -62,7 +62,15 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   private static final String BATCH_REQUEST_FORMAT =
       "POST:https://www.googleapis.com/batch/storage/v1";
 
+  private static final String DELETE_REQUEST_FORMAT =
+      "DELETE:https://www.googleapis.com/storage/v1/b/%s/o/%s?%s";
+
+  private static final String COMPOSE_REQUEST_FORMAT =
+      "POST:https://www.googleapis.com/storage/v1/b/%s/o/%s/compose?%s";
+
   private static final String PAGE_TOKEN_PARAM_PATTERN = "&pageToken=[^&]+";
+
+  private static final String GENERATION_MATCH_TOKEN_PARAM_PATTERN = "ifGenerationMatch=[^&]+";
 
   private final HttpRequestInitializer delegate;
 
@@ -97,15 +105,23 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
 
   public ImmutableList<String> getAllRequestStrings() {
     AtomicLong pageTokenId = new AtomicLong();
+    AtomicLong generationMatchTokenId = new AtomicLong();
     return requests.stream()
         .map(GoogleCloudStorageIntegrationHelper::requestToString)
         // Replace randomized pageToken with predictable value so it could be asserted in tests
         .map(r -> replacePageTokenWithId(r, pageTokenId.getAndIncrement()))
+        .map(r -> replaceGenerationMatchToken(r, generationMatchTokenId.getAndIncrement()))
         .collect(toImmutableList());
   }
 
   private String replacePageTokenWithId(String request, long pageTokenId) {
     return request.replaceAll(PAGE_TOKEN_PARAM_PATTERN, "&pageToken=token_" + pageTokenId);
+  }
+
+  private String replaceGenerationMatchToken(String request, long generationMatchTokenId) {
+    return request.replaceAll(
+        GENERATION_MATCH_TOKEN_PARAM_PATTERN,
+        "ifGenerationMatch=GenerationMatch_token_" + generationMatchTokenId);
   }
 
   public void reset() {
@@ -125,9 +141,18 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   }
 
   public static String copyRequestString(
-      String srcBucketName, String srcObjectName, String dstBucketName, String dstObjectName, String copyRequestType) {
+      String srcBucketName,
+      String srcObjectName,
+      String dstBucketName,
+      String dstObjectName,
+      String copyRequestType) {
     return String.format(
-        POST_COPY_REQUEST_FORMAT, srcBucketName, srcObjectName, copyRequestType, dstBucketName, dstObjectName);
+        POST_COPY_REQUEST_FORMAT,
+        srcBucketName,
+        srcObjectName,
+        copyRequestType,
+        dstBucketName,
+        dstObjectName);
   }
 
   public static String uploadRequestString(
@@ -155,6 +180,24 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     return String.format(BATCH_REQUEST_FORMAT);
   }
 
+  public static String deleteRequestString(
+      String bucketName, String object, String generationMatchToken) {
+    return String.format(
+        DELETE_REQUEST_FORMAT,
+        bucketName,
+        object,
+        evaluateGenerationMatchToken(generationMatchToken));
+  }
+
+  public static String composeRequestString(
+      String bucketName, String object, String generationMatchToken) {
+    return String.format(
+        COMPOSE_REQUEST_FORMAT,
+        bucketName,
+        object,
+        evaluateGenerationMatchToken(generationMatchToken));
+  }
+
   public static String listRequestString(
       String bucket, String prefix, int maxResults, String pageToken) {
     return listRequestString(
@@ -170,5 +213,11 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     String pageTokenParam = pageToken == null ? "" : "&pageToken=" + pageToken;
     return String.format(
         LIST_REQUEST_FORMAT, bucket, includeTrailingDelimiter, maxResults, pageTokenParam, prefix);
+  }
+
+  private static String evaluateGenerationMatchToken(String generationMatchToken) {
+    return generationMatchToken == null
+        ? "ifGenerationMatch=GenerationMatch_"
+        : "ifGenerationMatch=GenerationMatch_" + generationMatchToken;
   }
 }
