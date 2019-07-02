@@ -15,6 +15,7 @@
 package com.google.cloud.hadoop.util;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonError.ErrorInfo;
@@ -168,6 +169,9 @@ public class ApiErrorExtractorTest {
     // Check failure cases.
     assertThat(errorExtractor.rateLimited(notRateLimited)).isFalse();
     assertThat(errorExtractor.rateLimited(new IOException(notRateLimited))).isFalse();
+    assertThat(errorExtractor.rateLimited(new IOException(statusOk))).isFalse();
+    Throwable nullError = null;
+    assertThat(errorExtractor.rateLimited(nullError)).isFalse();
   }
 
   /**
@@ -275,6 +279,8 @@ public class ApiErrorExtractorTest {
     // Check failure case.
     assertThat(errorExtractor.resourceNotReady(statusOk)).isFalse();
     assertThat(errorExtractor.resourceNotReady(new IOException(statusOk))).isFalse();
+    IOException withJsonError = null;
+    assertThat(errorExtractor.resourceNotReady(withJsonError)).isFalse();
   }
 
   @Test
@@ -283,14 +289,187 @@ public class ApiErrorExtractorTest {
         42, "Detail Reason", "Detail message", "Top Level HTTP Message");
     assertThat(errorExtractor.getErrorMessage(withJsonError)).isEqualTo("Top Level HTTP Message");
 
-    IOException nullJsonError = googleJsonResponseException(
+    IOException nullJsonErrorWithMessage = googleJsonResponseException(
         42, null, null, "Top Level HTTP Message");
-    assertThat(errorExtractor.getErrorMessage(nullJsonError)).isEqualTo("Top Level HTTP Message");
+    assertThat(errorExtractor.getErrorMessage(nullJsonErrorWithMessage)).isEqualTo("Top Level HTTP Message");
   }
 
-  /**
-   * Builds a fake GoogleJsonResponseException for testing API error handling.
-   */
+  @Test
+  public void accessDeniedNonRecoverable_GoogleJsonErrorWithAccountDisabledReturnTrue()
+      throws IOException {
+    IOException withJsonError =
+        googleJsonResponseException(
+            HttpStatusCodes.STATUS_CODE_FORBIDDEN,
+            ApiErrorExtractor.ACCOUNT_DISABLED_REASON_CODE,
+            "Forbidden",
+            "Forbidden");
+    assertThat(errorExtractor.accessDeniedNonRecoverable(withJsonError)).isTrue();
+  }
+
+  @Test
+  public void accessDeniedNonRecoverable_GoogleJsonErrorWithAccessNotConfiguredReturnTrue()
+      throws IOException {
+    IOException withJsonError =
+        googleJsonResponseException(
+            HttpStatusCodes.STATUS_CODE_FORBIDDEN,
+            ApiErrorExtractor.ACCESS_NOT_CONFIGURED_REASON_CODE,
+            "Forbidden",
+            "Forbidden");
+    assertThat(errorExtractor.accessDeniedNonRecoverable(withJsonError)).isTrue();
+  }
+
+  @Test
+  public void accessDeniedNonRecoverable_GoogleJsonErrorWithStatusOkReturnFalse() {
+    assertThat(errorExtractor.accessDeniedNonRecoverable(statusOk)).isFalse();
+  }
+
+  @Test
+  public void accessDeniedNonRecoverable_GoogleJsonErroAsNullReturnFalse() {
+    IOException withJsonError = null;
+    assertThat(errorExtractor.accessDeniedNonRecoverable(withJsonError)).isFalse();
+  }
+
+  @Test
+  public void isClientError_GoogleJsonErrorWithAccessDeniedReturnTrue() {
+    assertThat(errorExtractor.isClientError(accessDenied)).isTrue();
+  }
+
+  @Test
+  public void isClientError_GoogleJsonErrorWithStatusBadGatewayReturnFalse() throws IOException {
+    IOException withJsonError =
+        googleJsonResponseException(
+            HttpStatusCodes.STATUS_CODE_BAD_GATEWAY, "Bad gateway", "Bad gateway", "Bad gateway");
+    assertThat(errorExtractor.isClientError(withJsonError)).isFalse();
+  }
+
+  @Test
+  public void isClientError_GoogleJsonErrorAsNullReturnFalse() {
+    IOException withJsonError = null;
+    assertThat(errorExtractor.isClientError(withJsonError)).isFalse();
+  }
+
+  @Test
+  public void isInternalServerError_GoogleJsonErrorWithAccessDeniedReturnFalse() {
+    assertThat(errorExtractor.isInternalServerError(accessDenied)).isFalse();
+  }
+
+  @Test
+  public void isInternalServerError_GoogleJsonErrorWithStatusBadGatewayReturnTrue()
+      throws IOException {
+    IOException withJsonError =
+        googleJsonResponseException(
+            HttpStatusCodes.STATUS_CODE_BAD_GATEWAY, "Bad gateway", "Bad gateway", "Bad gateway");
+    assertThat(errorExtractor.isInternalServerError(withJsonError)).isTrue();
+  }
+
+  @Test
+  public void isInternalServerError_GoogleJsonErrorAsNullReturnFalse() {
+    IOException withJsonError = null;
+    assertThat(errorExtractor.isInternalServerError(withJsonError)).isFalse();
+  }
+
+  @Test
+  public void fieldSizeTooLarge_GoogleJsonErrorWithstatusOkReturnFalse() {
+    assertThat(errorExtractor.fieldSizeTooLarge(new IOException(statusOk))).isFalse();
+  }
+
+  @Test
+  public void fieldSizeTooLarge_GoogleJsonErrorWithFieldSizeTooLargeReturnTrue()
+      throws IOException {
+    IOException withJsonError =
+        googleJsonResponseException(
+            413,
+            ApiErrorExtractor.FIELD_SIZE_TOO_LARGE,
+            "Value for field 'foo' is too large",
+            "Value for field 'foo' is too large");
+    assertThat(errorExtractor.fieldSizeTooLarge(withJsonError)).isTrue();
+  }
+
+  @Test
+  public void fieldSizeTooLarge_GoogleJsonErrorAsNullReturnFalse() {
+    IOException withJsonError = null;
+    assertThat(errorExtractor.fieldSizeTooLarge(withJsonError)).isFalse();
+  }
+
+  @Test
+  public void preconditionNotMet_GoogleJsonErrorHttpStatusPrecondidiotFailedTrue()
+      throws IOException {
+    IOException withJsonError =
+        googleJsonResponseException(
+            ApiErrorExtractor.STATUS_CODE_PRECONDITION_FAILED,
+            "preconditionNotMet",
+            "Precondition not met",
+            "Precondition not met");
+    assertThat(errorExtractor.preconditionNotMet(withJsonError)).isTrue();
+  }
+
+  @Test
+  public void preconditionNotMet_GoogleJsonErrorPredictionFailedReturnTrue() throws IOException {
+    GoogleJsonError gje = new GoogleJsonError();
+    gje.setCode(HttpStatusCodes.STATUS_CODE_PRECONDITION_FAILED);
+    assertThat(errorExtractor.preconditionNotMet(gje)).isTrue();
+  }
+
+  @Test
+  public void preconditionNotMet_GoogleJsonErrorBadGatewayReturnFalse() throws IOException {
+    GoogleJsonError gje = new GoogleJsonError();
+    gje.setCode(HttpStatusCodes.STATUS_CODE_BAD_GATEWAY);
+    assertThat(errorExtractor.preconditionNotMet(gje)).isFalse();
+  }
+
+  @Test
+  public void userProjectMissing_GoogleJsonErrorAsNullReturnFalse() throws IOException {
+    IOException withJsonError =
+        googleJsonResponseException(
+            HttpStatusCodes.STATUS_CODE_BAD_REQUEST,
+            "preconditionNotMet",
+            "Precondition not met",
+            "Precondition not met");
+    assertThat(errorExtractor.userProjectMissing(withJsonError)).isFalse();
+  }
+
+  @Test
+  public void userProjectMissing_GoogleJsonErrorWithStatusOkReturnFalse() throws IOException {
+    IOException nullJsonError = googleJsonResponseException(42, null, null, null);
+    assertThat(errorExtractor.userProjectMissing(nullJsonError)).isFalse();
+  }
+
+  @Test
+  public void toUserPresentableException() {
+    String action = "foo";
+    IOException exception =
+        assertThrows(
+            IOException.class,
+            () -> errorExtractor.toUserPresentableException(accessDenied, action));
+    assertThat(exception)
+        .hasMessageThat()
+        .isEqualTo(String.format("Encountered an error while %s: Forbidden", action));
+  }
+
+  @Test
+  public void toUserPresentableException_actionAsNull() {
+    String action = null;
+    IOException exception =
+        assertThrows(
+            IOException.class,
+            () -> errorExtractor.toUserPresentableException(accessDenied, action));
+    assertThat(exception).hasMessageThat().isEqualTo("Forbidden");
+  }
+
+  @Test
+  public void testToUserPresentableMessage() {
+    assertThat(
+        errorExtractor.toUserPresentableMessage(new IOException(accessDenied)).equals("Forbidden"));
+  }
+
+  @Test
+  public void getDebugInfo_accessDeniedReturnNull() {
+    assertThat(errorExtractor.getDebugInfo(new IOException(accessDenied))).isNull();
+  }
+
+    /**
+     * Builds a fake GoogleJsonResponseException for testing API error handling.
+     */
   private static GoogleJsonResponseException googleJsonResponseException(
       int httpStatus, String reason, String message) throws IOException {
     return googleJsonResponseException(httpStatus, reason, message, message);
