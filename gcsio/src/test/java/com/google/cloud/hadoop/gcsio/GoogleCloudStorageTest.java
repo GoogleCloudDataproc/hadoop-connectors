@@ -77,7 +77,6 @@ import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
@@ -310,8 +309,8 @@ public class GoogleCloudStorageTest {
                     .setGeneration(12345L)
                     .setMetageneration(1L)));
 
-    List<HttpRequest> requests = new ArrayList<>();
-    Storage storage = new Storage(transport, JSON_FACTORY, requests::add);
+    TrackingHttpRequestInitializer httpRequestInitializer = new TrackingHttpRequestInitializer();
+    Storage storage = new Storage(transport, JSON_FACTORY, httpRequestInitializer);
     GoogleCloudStorage gcs = new GoogleCloudStorageImpl(GCS_OPTIONS, storage);
 
     try (WritableByteChannel writeChannel =
@@ -320,9 +319,10 @@ public class GoogleCloudStorageTest {
       writeChannel.write(ByteBuffer.wrap(testData));
     }
 
-    assertThat(requests).hasSize(4);
+    ImmutableList<HttpRequest> requests = httpRequestInitializer.getAllRequests();
+    assertThat(requests).hasSize(3);
 
-    HttpRequest writeRequest = requests.get(3);
+    HttpRequest writeRequest = requests.get(2);
     assertThat(writeRequest.getContent().getLength()).isEqualTo(testData.length);
     try (ByteArrayOutputStream writtenData = new ByteArrayOutputStream(testData.length)) {
       writeRequest.getContent().writeTo(writtenData);
