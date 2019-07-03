@@ -27,7 +27,6 @@ import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listR
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.postRequestString;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.truth.Truth.assertThat;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.toList;
 
 import com.google.api.client.auth.oauth2.Credential;
@@ -36,7 +35,6 @@ import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -254,8 +252,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(object.getObjectName()).isEqualTo(testDir + "f1");
     // Assert that 1 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(testBucket, URLEncoder.encode(testDir + "f1", UTF_8.name())));
+        .containsExactly(getRequestString(testBucket, testDir + "f1"));
   }
 
   @Test
@@ -281,9 +278,9 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             batchRequestString(),
-            getRequestString(testBucket, URLEncoder.encode(testDir + "f1", UTF_8.name())),
-            getRequestString(testBucket, URLEncoder.encode(testDir + "f2", UTF_8.name())),
-            getRequestString(testBucket, URLEncoder.encode(testDir + "f3", UTF_8.name())));
+            getRequestString(testBucket, testDir + "f1"),
+            getRequestString(testBucket, testDir + "f2"),
+            getRequestString(testBucket, testDir + "f3"));
   }
 
   @Test
@@ -309,9 +306,9 @@ public class GoogleCloudStorageNewIntegrationTest {
     // Assert that 3 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
-            getRequestString(testBucket, URLEncoder.encode(testDir + "f1", UTF_8.name())),
-            getRequestString(testBucket, URLEncoder.encode(testDir + "f2", UTF_8.name())),
-            getRequestString(testBucket, URLEncoder.encode(testDir + "f3", UTF_8.name())));
+            getRequestString(testBucket, testDir + "f1"),
+            getRequestString(testBucket, testDir + "f2"),
+            getRequestString(testBucket, testDir + "f3"));
   }
 
   @Test
@@ -339,10 +336,10 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             batchRequestString(),
-            getRequestString(testBucket, URLEncoder.encode(testDir + "f1", UTF_8.name())),
-            getRequestString(testBucket, URLEncoder.encode(testDir + "f2", UTF_8.name())),
+            getRequestString(testBucket, testDir + "f1"),
+            getRequestString(testBucket, testDir + "f2"),
             batchRequestString(),
-            getRequestString(testBucket, URLEncoder.encode(testDir + "f3", UTF_8.name())));
+            getRequestString(testBucket, testDir + "f3"));
   }
 
   @Test
@@ -365,8 +362,7 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     // Assert that 2 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            postRequestString(testBucket, URLEncoder.encode(testDir + "f1", UTF_8.name())));
+        .containsExactly(postRequestString(testBucket, testDir + "f1"));
   }
 
   @Test
@@ -400,10 +396,10 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             batchRequestString(),
-            postRequestString(testBucket, URLEncoder.encode(testDir + "f1", UTF_8.name())),
-            postRequestString(testBucket, URLEncoder.encode(testDir + "f2", UTF_8.name())),
+            postRequestString(testBucket, testDir + "f1"),
+            postRequestString(testBucket, testDir + "f2"),
             batchRequestString(),
-            postRequestString(testBucket, URLEncoder.encode(testDir + "f3", UTF_8.name())));
+            postRequestString(testBucket, testDir + "f3"));
   }
 
   @Test
@@ -427,18 +423,8 @@ public class GoogleCloudStorageNewIntegrationTest {
             getBucketRequestString(testBucket1),
             getBucketRequestString(testBucket2),
             batchRequestString(),
-            copyRequestString(
-                testBucket1,
-                URLEncoder.encode(testDir + "f1", UTF_8.name()),
-                testBucket2,
-                URLEncoder.encode(testDir + "f4", UTF_8.name()),
-                "copyTo"),
-            copyRequestString(
-                testBucket1,
-                URLEncoder.encode(testDir + "f2", UTF_8.name()),
-                testBucket2,
-                URLEncoder.encode(testDir + "f5", UTF_8.name()),
-                "copyTo"));
+            copyRequestString(testBucket1, testDir + "f1", testBucket2, testDir + "f4", "copyTo"),
+            copyRequestString(testBucket1, testDir + "f2", testBucket2, testDir + "f5", "copyTo"));
 
     List<String> listedObjects = gcs.listObjectNames(testBucket2, testDir, PATH_DELIMITER);
     assertThat(listedObjects).containsExactly(testDir + "f4", testDir + "f5");
@@ -468,17 +454,9 @@ public class GoogleCloudStorageNewIntegrationTest {
             getBucketRequestString(testBucket2),
             batchRequestString(),
             copyRequestString(
-                testBucket1,
-                URLEncoder.encode(testDir + "f1", UTF_8.name()),
-                testBucket2,
-                URLEncoder.encode(testDir + "f4", UTF_8.name()),
-                "rewriteTo"),
+                testBucket1, testDir + "f1", testBucket2, testDir + "f4", "rewriteTo"),
             copyRequestString(
-                testBucket1,
-                URLEncoder.encode(testDir + "f2", UTF_8.name()),
-                testBucket2,
-                URLEncoder.encode(testDir + "f5", UTF_8.name()),
-                "rewriteTo"));
+                testBucket1, testDir + "f2", testBucket2, testDir + "f5", "rewriteTo"));
 
     List<String> listedObjects = gcs.listObjectNames(testBucket2, testDir, PATH_DELIMITER);
     assertThat(listedObjects).containsExactly(testDir + "f4", testDir + "f5");
@@ -501,13 +479,11 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             batchRequestString(),
-            getRequestString(testBucket, URLEncoder.encode(testDir + "f1", UTF_8.name())),
-            getRequestString(testBucket, URLEncoder.encode(testDir + "f2", UTF_8.name())),
+            getRequestString(testBucket, testDir + "f1"),
+            getRequestString(testBucket, testDir + "f2"),
             batchRequestString(),
-            deleteRequestString(
-                testBucket, URLEncoder.encode(testDir + "f1", UTF_8.name()), "token_4"),
-            deleteRequestString(
-                testBucket, URLEncoder.encode(testDir + "f2", UTF_8.name()), "token_5"));
+            deleteRequestString(testBucket, testDir + "f1", "token_4"),
+            deleteRequestString(testBucket, testDir + "f2", "token_5"));
 
     List<String> listedObjects = gcs.listObjectNames(testBucket, testDir, PATH_DELIMITER);
     assertThat(listedObjects).containsExactly(testDir + "f3");
@@ -531,12 +507,10 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
-            getRequestString(testBucket, URLEncoder.encode(testDir + "f1", UTF_8.name())),
-            deleteRequestString(
-                testBucket, URLEncoder.encode(testDir + "f1", UTF_8.name()), "token_1"),
-            getRequestString(testBucket, URLEncoder.encode(testDir + "f2", UTF_8.name())),
-            deleteRequestString(
-                testBucket, URLEncoder.encode(testDir + "f2", UTF_8.name()), "token_3"));
+            getRequestString(testBucket, testDir + "f1"),
+            deleteRequestString(testBucket, testDir + "f1", "token_1"),
+            getRequestString(testBucket, testDir + "f2"),
+            deleteRequestString(testBucket, testDir + "f2", "token_3"));
 
     List<String> listedObjects = gcs.listObjectNames(testBucket, testDir, PATH_DELIMITER);
     assertThat(listedObjects).containsExactly(testDir + "f3");
@@ -555,9 +529,8 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
-            getRequestString(testBucket, URLEncoder.encode(testDir + "f3", UTF_8.name())),
-            composeRequestString(
-                testBucket, URLEncoder.encode(testDir + "f3", UTF_8.name()), "token_1"));
+            getRequestString(testBucket, testDir + "f3"),
+            composeRequestString(testBucket, testDir + "f3", "token_1"));
 
     List<String> listedObjects = gcs.listObjectNames(testBucket, testDir, PATH_DELIMITER);
     assertThat(listedObjects).containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");

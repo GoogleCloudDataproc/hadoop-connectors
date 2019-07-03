@@ -52,7 +52,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   private static final String UPDATE_METADATA_REQUEST_FORMAT =
       "POST:https://www.googleapis.com/storage/v1/b/%s/o/%s?ifMetagenerationMatch=%d";
 
-  private static final String DELETE_REQUEST_FORMAT =
+  private static final String DELETE_META_REQUEST_FORMAT =
       "DELETE:https://www.googleapis.com/storage/v1/b/%s/o/%s?ifMetagenerationMatch=%d";
 
   private static final String LIST_REQUEST_FORMAT =
@@ -128,16 +128,17 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     requests.clear();
   }
 
-  public static String getRequestString(String bucketName, String object) {
-    return String.format(GET_REQUEST_FORMAT, bucketName, object);
+  public static String getRequestString(String bucketName, String object) throws UnsupportedEncodingException {
+    return String.format(GET_REQUEST_FORMAT, bucketName, URLEncoder.encode(object, UTF_8));
   }
 
   public static String getBucketRequestString(String bucketname) {
     return String.format(GET_BUCKET_REQUEST_FORMAT, bucketname);
   }
 
-  public static String postRequestString(String bucketName, String object) {
-    return String.format(POST_REQUEST_FORMAT, bucketName, object);
+  public static String postRequestString(String bucketName, String object)
+      throws UnsupportedEncodingException {
+    return String.format(POST_REQUEST_FORMAT, bucketName, URLEncoder.encode(object, UTF_8));
   }
 
   public static String copyRequestString(
@@ -145,14 +146,15 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
       String srcObjectName,
       String dstBucketName,
       String dstObjectName,
-      String copyRequestType) {
+      String copyRequestType)
+      throws UnsupportedEncodingException {
     return String.format(
         POST_COPY_REQUEST_FORMAT,
         srcBucketName,
-        srcObjectName,
+        URLEncoder.encode(srcObjectName, UTF_8),
         copyRequestType,
         dstBucketName,
-        dstObjectName);
+        URLEncoder.encode(dstObjectName, UTF_8));
   }
 
   public static String uploadRequestString(
@@ -173,7 +175,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   public static String deleteRequestString(String bucketName, String object, long metaGeneration)
       throws UnsupportedEncodingException {
     return String.format(
-        DELETE_REQUEST_FORMAT, bucketName, URLEncoder.encode(object, UTF_8), metaGeneration);
+        DELETE_META_REQUEST_FORMAT, bucketName, URLEncoder.encode(object, UTF_8), metaGeneration);
   }
 
   public static String batchRequestString() {
@@ -181,20 +183,21 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   }
 
   public static String deleteRequestString(
-      String bucketName, String object, String generationMatchToken) {
+      String bucketName, String object, String generationMatchToken) throws UnsupportedEncodingException {
     return String.format(
         DELETE_REQUEST_FORMAT,
         bucketName,
-        object,
+        URLEncoder.encode(object, UTF_8),
         evaluateGenerationMatchToken(generationMatchToken));
   }
 
   public static String composeRequestString(
-      String bucketName, String object, String generationMatchToken) {
+      String bucketName, String object, String generationMatchToken)
+      throws UnsupportedEncodingException {
     return String.format(
         COMPOSE_REQUEST_FORMAT,
         bucketName,
-        object,
+        URLEncoder.encode(object, UTF_8),
         evaluateGenerationMatchToken(generationMatchToken));
   }
 
