@@ -81,6 +81,9 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
 
   private static final String BATCH_REQUEST = "POST:https://www.googleapis.com/batch/storage/v1";
 
+  private static final String LIST_SIMPLE_REQUEST_FORMAT =
+      "GET:https://www.googleapis.com/storage/v1/b/%s/o?maxResults=%d&prefix=%s";
+
   private static final String COMPOSE_REQUEST_FORMAT =
       "POST:https://www.googleapis.com/storage/v1/b/%s/o/%s/compose"
           + "?ifGenerationMatch=generationId_%d";
@@ -265,6 +268,10 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
 
   public static String listBucketsRequestString(String projectId) {
     return String.format(LIST_BUCKETS_REQUEST_FORMAT, projectId);
+  }
+
+  public static String listRequestString(String bucket, String prefix, int maxResults) {
+    return String.format(LIST_SIMPLE_REQUEST_FORMAT, bucket, maxResults, prefix);
   }
 
   public static String listRequestString(
