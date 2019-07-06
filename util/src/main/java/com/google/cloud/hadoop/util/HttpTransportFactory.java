@@ -18,9 +18,8 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.api.client.googleapis.GoogleUtils;
 import com.google.api.client.http.HttpTransport;
-import com.google.api.client.http.apache.v2.ApacheHttpTransport;
+import com.google.api.client.http.apache.ApacheHttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.util.SslUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.flogger.GoogleLogger;
@@ -32,23 +31,12 @@ import java.net.Proxy;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.GeneralSecurityException;
-import java.security.KeyStore;
 import javax.annotation.Nullable;
-import javax.net.ssl.SSLContext;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.Credentials;
 import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.client.CredentialsProvider;
-import org.apache.http.config.RegistryBuilder;
-import org.apache.http.config.SocketConfig;
-import org.apache.http.conn.HttpClientConnectionManager;
-import org.apache.http.conn.socket.ConnectionSocketFactory;
-import org.apache.http.conn.socket.PlainConnectionSocketFactory;
-import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
-import org.apache.http.impl.client.BasicCredentialsProvider;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.impl.client.DefaultHttpClient;
 
 /**
  * Factory for creating HttpTransport types.
@@ -147,56 +135,27 @@ public class HttpTransportFactory {
    * @throws IOException If there is an issue connecting to Google's certification server.
    * @throws GeneralSecurityException If there is a security issue with the keystore.
    */
-  private static ApacheHttpTransport createApacheHttpTransport(
+  public static ApacheHttpTransport createApacheHttpTransport(
       @Nullable URI proxyUri, @Nullable Credentials proxyCredentials)
       throws IOException, GeneralSecurityException {
     checkArgument(
         proxyUri != null || proxyCredentials == null,
         "if proxyUri is null than proxyCredentials should be null too");
 
-    HttpClientBuilder httpClientBuilder =
-        HttpClientBuilder.create()
-            .useSystemProperties()
-            .setConnectionManager(newApacheConnectionManager())
-            .disableRedirectHandling()
-            .disableAutomaticRetries();
-
-    if (proxyUri != null) {
-      httpClientBuilder.setProxy(new HttpHost(proxyUri.getHost(), proxyUri.getPort()));
-    }
+    ApacheHttpTransport transport =
+        new ApacheHttpTransport.Builder()
+            .trustCertificates(GoogleUtils.getCertificateTrustStore())
+            .setProxy(
+                proxyUri == null ? null : new HttpHost(proxyUri.getHost(), proxyUri.getPort()))
+            .build();
 
     if (proxyCredentials != null) {
-      CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
-      credentialsProvider.setCredentials(
-          new AuthScope(proxyUri.getHost(), proxyUri.getPort()), proxyCredentials);
-      httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider);
+      ((DefaultHttpClient) transport.getHttpClient())
+          .getCredentialsProvider()
+          .setCredentials(new AuthScope(proxyUri.getHost(), proxyUri.getPort()), proxyCredentials);
     }
 
-    return new ApacheHttpTransport(httpClientBuilder.build());
-  }
-
-  private static SSLContext newSslContext() throws IOException, GeneralSecurityException {
-    KeyStore trustStore = GoogleUtils.getCertificateTrustStore();
-    SSLContext sslContext = SslUtils.getTlsSslContext();
-    SslUtils.initSslContext(sslContext, trustStore, SslUtils.getPkixTrustManagerFactory());
-    return sslContext;
-  }
-
-  private static HttpClientConnectionManager newApacheConnectionManager()
-      throws IOException, GeneralSecurityException {
-    PoolingHttpClientConnectionManager connectionManager =
-        new PoolingHttpClientConnectionManager(
-            RegistryBuilder.<ConnectionSocketFactory>create()
-                .register("http", PlainConnectionSocketFactory.getSocketFactory())
-                .register("https", new SSLConnectionSocketFactory(newSslContext()))
-                .build());
-    // Disable the stale connection check (previously configured in the HttpConnectionParams
-    connectionManager.setValidateAfterInactivity(-1);
-    connectionManager.setMaxTotal(200);
-    connectionManager.setDefaultMaxPerRoute(20);
-    connectionManager.setDefaultSocketConfig(
-        SocketConfig.custom().setRcvBufSize(8192).setSndBufSize(8192).build());
-    return connectionManager;
+    return transport;
   }
 
   /**

@@ -95,8 +95,8 @@
     <google.cloud-bigquery-storage.version>0.99.0-beta</google.cloud-bigquery-storage.version>
     <google.flogger.version>0.4</google.flogger.version>
     <google.guava.version>28.0-jre</google.guava.version>
-    <google.protobuf.version>3.9.0-rc-1</google.protobuf.version>
-    <google.truth.version>1.0-rc2</google.truth.version>
+    <google.protobuf.version>3.8.0</google.protobuf.version>
+    <google.truth.version>0.46</google.truth.version>
     <hadoop.two.version>2.9.2</hadoop.two.version>
     <hadoop.three.version>3.2.0</hadoop.three.version>
     <junit.version>4.13-beta-3</junit.version>
@@ -280,11 +280,6 @@
       <dependency>
         <groupId>com.google.http-client</groupId>
         <artifactId>google-http-client</artifactId>
-        <version>${google.api.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.http-client</groupId>
-        <artifactId>google-http-client-apache-v2</artifactId>
         <version>${google.api.version}</version>
       </dependency>
       <dependency>
