@@ -17,7 +17,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static org.apache.commons.codec.CharEncoding.UTF_8;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.api.client.http.HttpExecuteInterceptor;
 import com.google.api.client.http.HttpRequest;
@@ -59,8 +59,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
       "GET:https://www.googleapis.com/storage/v1/b/%s/o"
           + "?delimiter=/&includeTrailingDelimiter=%s&maxResults=%d%s&prefix=%s";
 
-  private static final String BATCH_REQUEST_FORMAT =
-      "POST:https://www.googleapis.com/batch/storage/v1";
+  private static final String BATCH_REQUEST = "POST:https://www.googleapis.com/batch/storage/v1";
 
   private static final String DELETE_REQUEST_FORMAT =
       "DELETE:https://www.googleapis.com/storage/v1/b/%s/o/%s?%s";
@@ -128,17 +127,18 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     requests.clear();
   }
 
-  public static String getRequestString(String bucketName, String object) throws UnsupportedEncodingException {
-    return String.format(GET_REQUEST_FORMAT, bucketName, URLEncoder.encode(object, UTF_8));
+  public static String getRequestString(String bucketName, String object)
+      throws UnsupportedEncodingException {
+    return String.format(GET_REQUEST_FORMAT, bucketName, URLEncoder.encode(object, UTF_8.name()));
   }
 
-  public static String getBucketRequestString(String bucketname) {
-    return String.format(GET_BUCKET_REQUEST_FORMAT, bucketname);
+  public static String getBucketRequestString(String bucketName) {
+    return String.format(GET_BUCKET_REQUEST_FORMAT, bucketName);
   }
 
   public static String postRequestString(String bucketName, String object)
       throws UnsupportedEncodingException {
-    return String.format(POST_REQUEST_FORMAT, bucketName, URLEncoder.encode(object, UTF_8));
+    return String.format(POST_REQUEST_FORMAT, bucketName, URLEncoder.encode(object, UTF_8.name()));
   }
 
   public static String copyRequestString(
@@ -151,10 +151,10 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     return String.format(
         POST_COPY_REQUEST_FORMAT,
         srcBucketName,
-        URLEncoder.encode(srcObjectName, UTF_8),
+        URLEncoder.encode(srcObjectName, UTF_8.name()),
         copyRequestType,
         dstBucketName,
-        URLEncoder.encode(dstObjectName, UTF_8));
+        URLEncoder.encode(dstObjectName, UTF_8.name()));
   }
 
   public static String uploadRequestString(
@@ -168,26 +168,30 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     return String.format(
         UPDATE_METADATA_REQUEST_FORMAT,
         bucketName,
-        URLEncoder.encode(object, UTF_8),
+        URLEncoder.encode(object, UTF_8.name()),
         metaGeneration);
   }
 
   public static String deleteRequestString(String bucketName, String object, long metaGeneration)
       throws UnsupportedEncodingException {
     return String.format(
-        DELETE_META_REQUEST_FORMAT, bucketName, URLEncoder.encode(object, UTF_8), metaGeneration);
+        DELETE_META_REQUEST_FORMAT,
+        bucketName,
+        URLEncoder.encode(object, UTF_8.name()),
+        metaGeneration);
   }
 
   public static String batchRequestString() {
-    return String.format(BATCH_REQUEST_FORMAT);
+    return BATCH_REQUEST;
   }
 
   public static String deleteRequestString(
-      String bucketName, String object, String generationMatchToken) throws UnsupportedEncodingException {
+      String bucketName, String object, String generationMatchToken)
+      throws UnsupportedEncodingException {
     return String.format(
         DELETE_REQUEST_FORMAT,
         bucketName,
-        URLEncoder.encode(object, UTF_8),
+        URLEncoder.encode(object, UTF_8.name()),
         evaluateGenerationMatchToken(generationMatchToken));
   }
 
@@ -197,7 +201,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     return String.format(
         COMPOSE_REQUEST_FORMAT,
         bucketName,
-        URLEncoder.encode(object, UTF_8),
+        URLEncoder.encode(object, UTF_8.name()),
         evaluateGenerationMatchToken(generationMatchToken));
   }
 

@@ -119,8 +119,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
-            getRequestString(bucketName, dirObject),
-            getRequestString(bucketName, dirObject + "/"));
+            getRequestString(bucketName, dirObject), getRequestString(bucketName, dirObject + "/"));
 
     assertThat(dirInfo.exists()).isTrue();
     assertThat(dirInfo.getPath().toString()).isEqualTo(dirObjectUri + "/");
@@ -171,8 +170,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     FileInfo dirInfo = gcsFs.getFileInfo(new URI("gs://" + bucketName).resolve(dirObject + "/"));
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject + "/"));
+        .containsExactly(getRequestString(bucketName, dirObject + "/"));
 
     assertThat(dirInfo.exists()).isTrue();
     assertThat(dirInfo.getPath().toString()).isEqualTo(dirObjectUri + "/");
