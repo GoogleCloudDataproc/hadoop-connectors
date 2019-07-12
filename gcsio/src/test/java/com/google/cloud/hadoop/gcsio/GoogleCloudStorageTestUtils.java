@@ -31,6 +31,7 @@ import com.google.api.client.testing.http.MockLowLevelHttpResponse;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.Bucket;
 import com.google.api.services.storage.model.Buckets;
+import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
@@ -178,13 +179,15 @@ public final class GoogleCloudStorageTestUtils {
   }
 
   public static MockLowLevelHttpResponse bucketsResponse(Buckets buckets) throws IOException {
-
     return dataResponse(JSON_FACTORY.toByteArray(buckets));
   }
 
   public static MockLowLevelHttpResponse bucketResponse(Bucket bucket) throws IOException {
-
     return dataResponse(JSON_FACTORY.toByteArray(bucket));
+  }
+
+  public static MockLowLevelHttpResponse objectsResponse(Objects objects) throws IOException {
+    return dataResponse(JSON_FACTORY.toByteArray(objects));
   }
 
   public static MockLowLevelHttpResponse resumableUploadResponse(String bucket, String object) {

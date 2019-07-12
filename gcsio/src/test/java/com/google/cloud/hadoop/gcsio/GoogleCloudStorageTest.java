@@ -16,13 +16,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.createItemInfoForStorageObject;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInferredDirectory;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.JSON_FACTORY;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.emptyResponse;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.fakeResponse;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.metadataResponse;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.resumableUploadResponse;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.bucketsResponse;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.bucketResponse;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.*;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.assertThrows;
@@ -98,6 +92,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.function.ThrowingRunnable;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
@@ -130,6 +125,7 @@ public class GoogleCloudStorageTest {
   private static final ImmutableMap<String, byte[]> EMPTY_METADATA = ImmutableMap.of();
 
   private ExecutorService executorService;
+  private BatchHelper.Factory batchFactory;
 
   @Mock private Storage mockStorage;
   @Mock private Storage.Objects mockStorageObjects;
@@ -1895,31 +1891,29 @@ public class GoogleCloudStorageTest {
   /** Test successful operation of GoogleCloudStorage.delete(2) with generationId. */
   @Test
   public void testDeleteObjectWithGenerationId() throws IOException {
-    when(mockBatchFactory.newBatchHelper(any(), any(Storage.class), anyLong(), anyLong(), anyInt()))
-        .thenReturn(mockBatchHelper);
-    when(mockStorage.objects()).thenReturn(mockStorageObjects);
-    when(mockStorageObjects.delete(eq(BUCKET_NAME), eq(OBJECT_NAME)))
-        .thenReturn(mockStorageObjectsDelete);
+    MockHttpTransport transport =
+        GoogleCloudStorageTestUtils.mockTransport(
+            /* requestsPerBatch= */ objectsResponse(
+                new Objects()
+                    .setItems(
+                        ImmutableList.of(
+                            new StorageObject().setName(OBJECT_NAME + "1"),
+                            new StorageObject().setName(OBJECT_NAME)))),
+            objectsResponse(
+                new Objects()
+                    .setItems(
+                        ImmutableList.of(
+                            new StorageObject().setName(OBJECT_NAME + "1"),
+                            new StorageObject().setName(OBJECT_NAME + "2")))));
+    TrackingHttpRequestInitializer httpRequestInitializer = new TrackingHttpRequestInitializer();
+    Storage storage = new Storage(transport, JSON_FACTORY, httpRequestInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(GCS_OPTIONS, storage);
 
-    doAnswer(
-            invocationOnMock -> {
-              @SuppressWarnings("unchecked")
-              JsonBatchCallback<Void> callback =
-                  (JsonBatchCallback<Void>) invocationOnMock.getArguments()[1];
-              callback.onSuccess(null, new HttpHeaders());
-              return null;
-            })
-        .when(mockBatchHelper)
-        .queue(any(), any());
+    List<String> objectNames = gcs.listObjectNames(BUCKET_NAME, "prefix", "delimiter", 100L);
 
-    gcs.deleteObjects(Lists.newArrayList(new StorageResourceId(BUCKET_NAME, OBJECT_NAME, 222L)));
-
-    verify(mockBatchFactory).newBatchHelper(any(), eq(mockStorage), anyLong(), anyLong(), anyInt());
-    verify(mockStorage, atLeastOnce()).objects();
-    verify(mockStorageObjects).delete(eq(BUCKET_NAME), eq(OBJECT_NAME));
-    verify(mockStorageObjectsDelete).setIfGenerationMatch(eq(222L));
-    verify(mockBatchHelper).flush();
-    verify(mockBatchHelper).queue(any(), any());
+    List<StorageResourceId> storageResourceIds =
+        Arrays.asList(new StorageResourceId(BUCKET_NAME, objectNames.get(0)));
+    gcs.deleteObjects(storageResourceIds);
   }
 
   /**
@@ -2037,52 +2031,89 @@ public class GoogleCloudStorageTest {
 
   /** Test argument sanitization for GoogleCloudStorage.copy(4). */
   @Test
-  public void testCopyObjectsIllegalArguments() {
+  public void testCopyObjectsIllegalArguments() throws IOException {
+    MockHttpTransport transport;
+    TrackingHttpRequestInitializer httpRequestInitializer = new TrackingHttpRequestInitializer();
+    Storage storage;
+    GoogleCloudStorage gcs;
+
     for (String[] objectPair : ILLEGAL_OBJECTS) {
+      transport =
+          GoogleCloudStorageTestUtils.mockTransport(
+              objectsResponse(
+                  new Objects()
+                      .setItems(
+                          ImmutableList.of(
+                              new StorageObject().setName(objectPair[0]),
+                              new StorageObject().setName(objectPair[1])))),
+              objectsResponse(
+                  new Objects()
+                      .setItems(
+                          ImmutableList.of(
+                              new StorageObject().setName(objectPair[0]),
+                              new StorageObject().setName(objectPair[1])))));
+      httpRequestInitializer = new TrackingHttpRequestInitializer();
+      storage = new Storage(transport, JSON_FACTORY, httpRequestInitializer);
+      gcs = new GoogleCloudStorageImpl(GCS_OPTIONS, storage);
       // Src is bad.
+      GoogleCloudStorage finalGcs = gcs;
       assertThrows(
           IllegalArgumentException.class,
           () ->
-              gcs.copy(
+              finalGcs.copy(
                   objectPair[0],
                   Lists.newArrayList(objectPair[1]),
                   BUCKET_NAME,
                   Lists.newArrayList(OBJECT_NAME)));
-
       // Dst is bad.
       assertThrows(
           IllegalArgumentException.class,
           () ->
-              gcs.copy(
+              finalGcs.copy(
                   BUCKET_NAME,
                   Lists.newArrayList(OBJECT_NAME),
                   objectPair[0],
                   Lists.newArrayList(objectPair[1])));
     }
-
+    transport =
+        GoogleCloudStorageTestUtils.mockTransport(
+            objectsResponse(
+                new Objects()
+                    .setItems(
+                        ImmutableList.of(
+                            new StorageObject().setName(OBJECT_NAME),
+                            new StorageObject().setName(OBJECT_NAME)))),
+            objectsResponse(
+                new Objects()
+                    .setItems(
+                        ImmutableList.of(
+                            new StorageObject().setName(OBJECT_NAME),
+                            new StorageObject().setName(OBJECT_NAME)))));
+    storage = new Storage(transport, JSON_FACTORY, httpRequestInitializer);
+    gcs = new GoogleCloudStorageImpl(GCS_OPTIONS, storage);
     // Failure if src == dst.
+    GoogleCloudStorage finalGcs = gcs;
     assertThrows(
         IllegalArgumentException.class,
         () ->
-            gcs.copy(
+            finalGcs.copy(
                 BUCKET_NAME,
                 ImmutableList.of(OBJECT_NAME),
                 BUCKET_NAME,
                 ImmutableList.of(OBJECT_NAME)));
-
     // Null lists.
     assertThrows(
         IllegalArgumentException.class,
-        () -> gcs.copy(BUCKET_NAME, null, BUCKET_NAME, ImmutableList.of(OBJECT_NAME)));
+        () -> finalGcs.copy(BUCKET_NAME, null, BUCKET_NAME, ImmutableList.of(OBJECT_NAME)));
     assertThrows(
         IllegalArgumentException.class,
-        () -> gcs.copy(BUCKET_NAME, ImmutableList.of(OBJECT_NAME), BUCKET_NAME, null));
+        () -> finalGcs.copy(BUCKET_NAME, ImmutableList.of(OBJECT_NAME), BUCKET_NAME, null));
 
     // Mismatched number of objects.
     assertThrows(
         IllegalArgumentException.class,
         () ->
-            gcs.copy(
+            finalGcs.copy(
                 BUCKET_NAME,
                 ImmutableList.of(OBJECT_NAME),
                 BUCKET_NAME,
@@ -2095,24 +2126,20 @@ public class GoogleCloudStorageTest {
   @Test
   public void testCopyObjectsNormalOperationSameBucket()
       throws IOException {
+    MockHttpTransport transport =
+        GoogleCloudStorageTestUtils.mockTransport(
+            objectsResponse(
+                new Objects()
+                    .setItems(ImmutableList.of(new StorageObject().setName(OBJECT_NAME)))));
+    TrackingHttpRequestInitializer httpRequestInitializer = new TrackingHttpRequestInitializer();
+    Storage storage = new Storage(transport, JSON_FACTORY, httpRequestInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(GCS_OPTIONS, storage);
     String dstObjectName = OBJECT_NAME + "-copy";
-    when(mockBatchFactory.newBatchHelper(any(), any(Storage.class), anyLong(), anyLong(), anyInt()))
-        .thenReturn(mockBatchHelper);
-    when(mockStorage.objects()).thenReturn(mockStorageObjects);
-    when(mockStorageObjects.copy(
-            eq(BUCKET_NAME), eq(OBJECT_NAME), eq(BUCKET_NAME), eq(dstObjectName), isNull()))
-        .thenReturn(mockStorageObjectsCopy);
-
-    gcs.copy(BUCKET_NAME, ImmutableList.of(OBJECT_NAME),
-             BUCKET_NAME, ImmutableList.of(dstObjectName));
-
-    verify(mockBatchFactory).newBatchHelper(any(), eq(mockStorage), anyLong(), anyLong(), anyInt());
-    verify(mockStorage).objects();
-    verify(mockStorageObjects)
-        .copy(eq(BUCKET_NAME), eq(OBJECT_NAME), eq(BUCKET_NAME), eq(dstObjectName), isNull());
-    verify(mockBatchHelper).queue(eq(mockStorageObjectsCopy), any());
-
-    verify(mockBatchHelper).flush();
+    gcs.copy(
+        BUCKET_NAME,
+        Lists.newArrayList(OBJECT_NAME),
+        BUCKET_NAME,
+        Lists.newArrayList(dstObjectName));
   }
 
   /**
@@ -2199,41 +2226,34 @@ public class GoogleCloudStorageTest {
       throws IOException {
     String dstObjectName = OBJECT_NAME + "-copy";
     String dstBucketName = BUCKET_NAME + "-copy";
-    when(mockBatchFactory.newBatchHelper(any(), any(Storage.class), anyLong(), anyLong(), anyInt()))
-        .thenReturn(mockBatchHelper);
-    when(mockStorage.buckets()).thenReturn(mockStorageBuckets);
-    when(mockStorageBuckets.get(eq(BUCKET_NAME))).thenReturn(mockStorageBucketsGet);
-    when(mockStorageBuckets.get(eq(dstBucketName))).thenReturn(mockStorageBucketsGet2);
-    when(mockStorageBucketsGet.execute())
-        .thenReturn(new Bucket()
-            .setName(BUCKET_NAME)
-            .setTimeCreated(new DateTime(1111L))
-            .setLocation("us-west-123")
-            .setStorageClass("class-af4"));
-    when(mockStorageBucketsGet2.execute())
-        .thenReturn(new Bucket()
-            .setName(dstBucketName)
-            .setTimeCreated(new DateTime(2222L))
-            .setLocation("us-west-123")
-            .setStorageClass("class-af4"));
-    when(mockStorage.objects()).thenReturn(mockStorageObjects);
-    when(mockStorageObjects.copy(
-            eq(BUCKET_NAME), eq(OBJECT_NAME), eq(dstBucketName), eq(dstObjectName), isNull()))
-        .thenReturn(mockStorageObjectsCopy);
-
-    gcs.copy(BUCKET_NAME, ImmutableList.of(OBJECT_NAME),
-             dstBucketName, ImmutableList.of(dstObjectName));
-
-    verify(mockStorage, times(2)).buckets();
-    verify(mockStorageBuckets, times(2)).get(any(String.class));
-    verify(mockStorageBucketsGet).execute();
-    verify(mockStorageBucketsGet2).execute();
-    verify(mockBatchFactory).newBatchHelper(any(), eq(mockStorage), anyLong(), anyLong(), anyInt());
-    verify(mockStorage).objects();
-    verify(mockStorageObjects)
-        .copy(eq(BUCKET_NAME), eq(OBJECT_NAME), eq(dstBucketName), eq(dstObjectName), isNull());
-    verify(mockBatchHelper).queue(eq(mockStorageObjectsCopy), any());
-    verify(mockBatchHelper).flush();
+    MockHttpTransport transport =
+        GoogleCloudStorageTestUtils.mockTransport(
+            bucketResponse(
+                new Bucket()
+                    .setName(BUCKET_NAME)
+                    .setLocation("us-central1-a")
+                    .setStorageClass("class-af4")
+                    .setTimeCreated(new DateTime(1111L))),
+            bucketResponse(
+                new Bucket()
+                    .setName(dstBucketName)
+                    .setLocation("us-central1-a")
+                    .setStorageClass("class-af4")
+                    .setTimeCreated(new DateTime(1111L))),
+            bucketResponse(
+                new Bucket()
+                    .setName(dstBucketName)
+                    .setLocation("us-central1-a")
+                    .setStorageClass("class-af4")
+                    .setTimeCreated(new DateTime(1111L))));
+    TrackingHttpRequestInitializer httpRequestInitializer = new TrackingHttpRequestInitializer();
+    Storage storage = new Storage(transport, JSON_FACTORY, httpRequestInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(GCS_OPTIONS, storage);
+    gcs.copy(
+        BUCKET_NAME,
+        Lists.newArrayList(OBJECT_NAME),
+        dstBucketName,
+        Lists.newArrayList(dstObjectName));
   }
 
   /**
@@ -2340,65 +2360,45 @@ public class GoogleCloudStorageTest {
   @Test
   public void testCopyObjectsIncompatibleBuckets()
       throws IOException {
-    String dstObjectName = OBJECT_NAME + "-copy";
-    String dstBucketName = BUCKET_NAME + "-copy";
-    when(mockStorage.buckets()).thenReturn(mockStorageBuckets);
-    when(mockStorageBuckets.get(eq(BUCKET_NAME))).thenReturn(mockStorageBucketsGet);
-    when(mockStorageBuckets.get(eq(dstBucketName))).thenReturn(mockStorageBucketsGet2);
-    when(mockStorageBucketsGet.execute())
-        .thenReturn(new Bucket()
-            .setName(BUCKET_NAME)
-            .setTimeCreated(new DateTime(1111L))
-            .setLocation("us-east")  // Incompatible location.
-            .setStorageClass("class-af4"))
-        .thenReturn(new Bucket()
-            .setName(BUCKET_NAME)
-            .setTimeCreated(new DateTime(1111L))
-            .setLocation("us-west-123")
-            .setStorageClass("class-be2"));  // Incompatible storage class.
-    when(mockStorageBucketsGet2.execute())
-        .thenReturn(new Bucket()
-            .setName(dstBucketName)
-            .setTimeCreated(new DateTime(2222L))
-            .setLocation("us-west-123")
-            .setStorageClass("class-af4"))
-        .thenReturn(new Bucket()
-            .setName(dstBucketName)
-            .setTimeCreated(new DateTime(2222L))
-            .setLocation("us-west-123")
-            .setStorageClass("class-af4"));
-
-    // Note: This is slightly fragile to check for getMessage() contents, but it's better to at
-    // least do some checking that this is indeed the exception we intended to throw and now some
-    // other generic IOException from unknown causes.
-    UnsupportedOperationException e1 =
-        assertThrows(
-            UnsupportedOperationException.class,
-            () ->
-                gcs.copy(
-                    BUCKET_NAME,
-                    ImmutableList.of(OBJECT_NAME),
-                    dstBucketName,
-                    ImmutableList.of(dstObjectName)));
-    assertThat(e1).hasMessageThat().contains("not supported");
-    assertThat(e1).hasMessageThat().contains("storage location");
-
-    UnsupportedOperationException e2 =
-        assertThrows(
-            UnsupportedOperationException.class,
-            () ->
-                gcs.copy(
-                    BUCKET_NAME,
-                    ImmutableList.of(OBJECT_NAME),
-                    dstBucketName,
-                    ImmutableList.of(dstObjectName)));
-    assertThat(e2).hasMessageThat().contains("not supported");
-    assertThat(e2).hasMessageThat().contains("storage class");
-
-    verify(mockStorage, times(4)).buckets();
-    verify(mockStorageBuckets, times(4)).get(any(String.class));
-    verify(mockStorageBucketsGet, times(2)).execute();
-    verify(mockStorageBucketsGet2, times(2)).execute();
+    TrackingHttpRequestInitializer httpRequestInitializer = new TrackingHttpRequestInitializer();
+    MockHttpTransport transport =
+        GoogleCloudStorageTestUtils.mockTransport(
+            /* requestsPerBatch= */ bucketResponse(
+                new Bucket()
+                    .setName(BUCKET_NAME)
+                    .setTimeCreated(new DateTime(1111L))
+                    .setLocation("us-west-123")
+                    .setStorageClass("class-af4")),
+            bucketResponse(
+                new Bucket()
+                    .setName(BUCKET_NAME + "2")
+                    .setTimeCreated(new DateTime(1111L))
+                    .setLocation("us-west-123")
+                    .setStorageClass("class-b2")),
+            bucketResponse(
+                new Bucket()
+                    .setName(BUCKET_NAME)
+                    .setTimeCreated(new DateTime(1111L))
+                    .setLocation("us-west-121")
+                    .setStorageClass("class-af4")),
+            bucketResponse(
+                new Bucket()
+                    .setName(BUCKET_NAME + "2")
+                    .setTimeCreated(new DateTime(1111L))
+                    .setLocation("us-west-123")
+                    .setStorageClass("class-af4")));
+    Storage storage = new Storage(transport, JSON_FACTORY, httpRequestInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(GCS_OPTIONS, storage);
+    // Src is bad.
+    ThrowingRunnable throwingRunnable =
+        () ->
+            gcs.copy(
+                BUCKET_NAME,
+                Lists.newArrayList(OBJECT_NAME),
+                BUCKET_NAME + "2",
+                Lists.newArrayList(OBJECT_NAME + "copy"));
+    assertThrows(UnsupportedOperationException.class, throwingRunnable);
+    assertThrows(UnsupportedOperationException.class, throwingRunnable);
   }
 
   /**
@@ -2435,47 +2435,22 @@ public class GoogleCloudStorageTest {
   @Test
   public void testListBucketInfo()
       throws IOException {
-    setupMocksForListBuckets();
+    List<Bucket> bucketsList =
+        Arrays.asList(createTestBucket(0), createTestBucket(1), createTestBucket(2));
+
+    MockHttpTransport transport =
+        GoogleCloudStorageTestUtils.mockTransport(
+            bucketsResponse(new Buckets().setItems(bucketsList)));
+
+    TrackingHttpRequestInitializer httpRequestInitializer = new TrackingHttpRequestInitializer();
+    Storage storage = new Storage(transport, JSON_FACTORY, httpRequestInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(GCS_OPTIONS, storage);
 
     List<GoogleCloudStorageItemInfo> bucketInfos = gcs.listBucketInfo();
     assertThat(bucketInfos).hasSize(3);
     assertThat(bucketInfos.get(0).getBucketName()).isEqualTo("bucket0");
     assertThat(bucketInfos.get(1).getBucketName()).isEqualTo("bucket1");
     assertThat(bucketInfos.get(2).getBucketName()).isEqualTo("bucket2");
-
-    verifyMocksForListBuckets();
-  }
-
-  /**
-   * Sets up mocks for a list-bucket operation.
-   */
-  private void setupMocksForListBuckets()
-      throws IOException {
-    when(mockStorage.buckets()).thenReturn(mockStorageBuckets);
-    when(mockStorageBuckets.list(eq(PROJECT_ID))).thenReturn(mockStorageBucketsList);
-    when(mockStorageBucketsList.execute())
-        .thenReturn(new Buckets()
-            .setItems(ImmutableList.of(
-                createTestBucket(0),
-                createTestBucket(1)))
-            .setNextPageToken("token0"))
-        .thenReturn(new Buckets()
-            .setItems(ImmutableList.of(
-                createTestBucket(2)))
-            .setNextPageToken(null));
-  }
-
-  /**
-   * Verifies mock operations for a list-bucket operation.
-   */
-  private void verifyMocksForListBuckets()
-      throws IOException {
-    verify(mockStorage).buckets();
-    verify(mockStorageBuckets).list(eq(PROJECT_ID));
-    verify(mockStorageBucketsList)
-        .setMaxResults(eq(GoogleCloudStorageOptions.MAX_LIST_ITEMS_PER_CALL_DEFAULT));
-    verify(mockStorageBucketsList).setPageToken("token0");
-    verify(mockStorageBucketsList, times(2)).execute();
   }
 
   /**
@@ -2497,65 +2472,63 @@ public class GoogleCloudStorageTest {
   @Test
   public void testListObjectNamesPrefix()
       throws IOException {
+
+    MockHttpTransport transport =
+        GoogleCloudStorageTestUtils.mockTransport(
+            objectsResponse(
+                new Objects()
+                    .setPrefixes(ImmutableList.of("foo/bar/baz/dir0/", "foo/bar/baz/dir1/"))
+                    .setNextPageToken("token0")),
+            objectsResponse(
+                new Objects()
+                    .setItems(
+                        ImmutableList.of(
+                            new StorageObject().setName("foo/bar/baz/"),
+                            new StorageObject().setName("foo/bar/baz/obj0"),
+                            new StorageObject().setName("foo/bar/baz/obj1")))
+                    .setNextPageToken(null)),
+            metadataResponse(new StorageObject().setBucket(BUCKET_NAME)));
+
+    TrackingHttpRequestInitializer httpRequestInitializer = new TrackingHttpRequestInitializer();
+    Storage storage = new Storage(transport, JSON_FACTORY, httpRequestInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(GCS_OPTIONS, storage);
+
     String objectPrefix = "foo/bar/baz/";
     String delimiter = "/";
-    when(mockStorage.objects()).thenReturn(mockStorageObjects);
-    when(mockStorageObjects.list(eq(BUCKET_NAME))).thenReturn(mockStorageObjectsList);
-    when(mockStorageObjectsList.getPrefix()).thenReturn(objectPrefix);
-    when(mockStorageObjectsList.execute())
-        .thenReturn(new Objects()
-            .setPrefixes(ImmutableList.of(
-                "foo/bar/baz/dir0/",
-                "foo/bar/baz/dir1/"))
-            .setNextPageToken("token0"))
-        .thenReturn(new Objects()
-            .setItems(ImmutableList.of(
-                new StorageObject().setName("foo/bar/baz/"),
-                new StorageObject().setName("foo/bar/baz/obj0"),
-                new StorageObject().setName("foo/bar/baz/obj1")))
-            .setNextPageToken(null));
 
     List<String> objectNames = gcs.listObjectNames(BUCKET_NAME, objectPrefix, delimiter);
     assertThat(objectNames)
         .containsExactly(
             "foo/bar/baz/dir0/", "foo/bar/baz/dir1/", "foo/bar/baz/obj0", "foo/bar/baz/obj1")
         .inOrder();
-
-    verify(mockStorage).objects();
-    verify(mockStorageObjects).list(eq(BUCKET_NAME));
-    verify(mockStorageObjectsList)
-        .setMaxResults(eq(GoogleCloudStorageOptions.MAX_LIST_ITEMS_PER_CALL_DEFAULT));
-    verify(mockStorageObjectsList).setDelimiter(eq(delimiter));
-    verify(mockStorageObjectsList).setIncludeTrailingDelimiter(eq(Boolean.FALSE));
-    verify(mockStorageObjectsList).setPrefix(eq(objectPrefix));
-    verify(mockStorageObjectsList).setPageToken("token0");
-    verify(mockStorageObjectsList).getPrefix();
-    verify(mockStorageObjectsList, times(2)).execute();
   }
 
   /** Test GoogleCloudStorage.listObjectNames(3) with maxResults set. */
   @Test
   public void testListObjectNamesPrefixLimited() throws IOException {
+
+    MockHttpTransport transport =
+        GoogleCloudStorageTestUtils.mockTransport(
+            objectsResponse(
+                new Objects()
+                    .setPrefixes(ImmutableList.of("foo/bar/baz/dir0/", "foo/bar/baz/dir1/"))
+                    .setItems(
+                        ImmutableList.of(
+                            new StorageObject().setName("foo/bar/baz/"),
+                            new StorageObject().setName("foo/bar/baz/obj0")))
+                    .setNextPageToken("token0")),
+            objectsResponse(
+                new Objects()
+                    .setItems(ImmutableList.of(new StorageObject().setName("foo/bar/baz/obj1")))
+                    .setNextPageToken(null)));
+
+    TrackingHttpRequestInitializer httpRequestInitializer = new TrackingHttpRequestInitializer();
+    Storage storage = new Storage(transport, JSON_FACTORY, httpRequestInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(GCS_OPTIONS, storage);
+
     String objectPrefix = "foo/bar/baz/";
     String delimiter = "/";
     long maxResults = 3;
-    when(mockStorage.objects()).thenReturn(mockStorageObjects);
-    when(mockStorageObjects.list(eq(BUCKET_NAME)))
-        .thenReturn(mockStorageObjectsList);
-    when(mockStorageObjectsList.getPrefix()).thenReturn(objectPrefix);
-    when(mockStorageObjectsList.execute())
-        .thenReturn(
-            new Objects()
-                .setPrefixes(ImmutableList.of("foo/bar/baz/dir0/", "foo/bar/baz/dir1/"))
-                .setItems(
-                    ImmutableList.of(
-                        new StorageObject().setName("foo/bar/baz/"),
-                        new StorageObject().setName("foo/bar/baz/obj0")))
-                .setNextPageToken("token0"))
-        .thenReturn(
-            new Objects()
-                .setItems(ImmutableList.of(new StorageObject().setName("foo/bar/baz/obj1")))
-                .setNextPageToken(null));
 
     List<String> objectNames =
         gcs.listObjectNames(BUCKET_NAME, objectPrefix, delimiter, maxResults);
@@ -2563,14 +2536,9 @@ public class GoogleCloudStorageTest {
         .containsExactly("foo/bar/baz/dir0/", "foo/bar/baz/dir1/", "foo/bar/baz/obj0")
         .inOrder();
 
-    verify(mockStorage).objects();
-    verify(mockStorageObjects).list(eq(BUCKET_NAME));
-    verify(mockStorageObjectsList).setMaxResults(eq(maxResults + 1));
-    verify(mockStorageObjectsList).setDelimiter(eq(delimiter));
-    verify(mockStorageObjectsList).setIncludeTrailingDelimiter(eq(Boolean.FALSE));
-    verify(mockStorageObjectsList).setPrefix(eq(objectPrefix));
-    verify(mockStorageObjectsList).getPrefix();
-    verify(mockStorageObjectsList).execute();
+    assertThat(objectNames)
+        .containsExactly("foo/bar/baz/dir0/", "foo/bar/baz/dir1/", "foo/bar/baz/obj0")
+        .inOrder();
   }
 
   /**
@@ -2621,38 +2589,40 @@ public class GoogleCloudStorageTest {
   @Test
   public void testListObjectInfoBasic()
       throws IOException {
+
+    List<StorageObject> fakeObjectList =
+        ImmutableList.of(
+            new StorageObject()
+                .setName("foo/bar/baz/")
+                .setBucket(BUCKET_NAME)
+                .setUpdated(new DateTime(11L))
+                .setSize(BigInteger.valueOf(111L))
+                .setGeneration(1L)
+                .setMetageneration(1L),
+            new StorageObject()
+                .setName("foo/bar/baz/obj0")
+                .setBucket(BUCKET_NAME)
+                .setUpdated(new DateTime(22L))
+                .setSize(BigInteger.valueOf(222L))
+                .setGeneration(2L)
+                .setMetageneration(2L),
+            new StorageObject()
+                .setName("foo/bar/baz/obj1")
+                .setBucket(BUCKET_NAME)
+                .setUpdated(new DateTime(33L))
+                .setSize(BigInteger.valueOf(333L))
+                .setGeneration(3L)
+                .setMetageneration(3L));
     String objectPrefix = "foo/bar/baz/";
     String delimiter = "/";
-    when(mockStorage.objects()).thenReturn(mockStorageObjects);
-    when(mockStorageObjects.list(eq(BUCKET_NAME)))
-        .thenReturn(mockStorageObjectsList);
-    List<StorageObject> fakeObjectList = ImmutableList.of(
-        new StorageObject()
-            .setName("foo/bar/baz/")
-            .setBucket(BUCKET_NAME)
-            .setUpdated(new DateTime(11L))
-            .setSize(BigInteger.valueOf(111L))
-            .setGeneration(1L)
-            .setMetageneration(1L),
-        new StorageObject()
-            .setName("foo/bar/baz/obj0")
-            .setBucket(BUCKET_NAME)
-            .setUpdated(new DateTime(22L))
-            .setSize(BigInteger.valueOf(222L))
-            .setGeneration(2L)
-            .setMetageneration(2L),
-        new StorageObject()
-            .setName("foo/bar/baz/obj1")
-            .setBucket(BUCKET_NAME)
-            .setUpdated(new DateTime(33L))
-            .setSize(BigInteger.valueOf(333L))
-            .setGeneration(3L)
-            .setMetageneration(3L));
-    when(mockStorageObjectsList.getPrefix()).thenReturn(objectPrefix);
-    when(mockStorageObjectsList.execute())
-        .thenReturn(new Objects()
-            .setItems(fakeObjectList)
-            .setNextPageToken(null));
+
+    MockHttpTransport transport =
+        GoogleCloudStorageTestUtils.mockTransport(
+            objectsResponse(new Objects().setItems(fakeObjectList).setNextPageToken(null)));
+
+    TrackingHttpRequestInitializer httpRequestInitializer = new TrackingHttpRequestInitializer();
+    Storage storage = new Storage(transport, JSON_FACTORY, httpRequestInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(GCS_OPTIONS, storage);
 
     List<GoogleCloudStorageItemInfo> objectInfos =
         gcs.listObjectInfo(BUCKET_NAME, objectPrefix, delimiter);
@@ -2667,16 +2637,6 @@ public class GoogleCloudStorageTest {
     assertThat(objectInfos.get(1).getCreationTime())
         .isEqualTo(fakeObjectList.get(2).getUpdated().getValue());
     assertThat(objectInfos.get(1).getSize()).isEqualTo(fakeObjectList.get(2).getSize().longValue());
-
-    verify(mockStorage).objects();
-    verify(mockStorageObjects).list(eq(BUCKET_NAME));
-    verify(mockStorageObjectsList)
-        .setMaxResults(eq(GoogleCloudStorageOptions.MAX_LIST_ITEMS_PER_CALL_DEFAULT));
-    verify(mockStorageObjectsList).setDelimiter(eq(delimiter));
-    verify(mockStorageObjectsList).setIncludeTrailingDelimiter(eq(Boolean.TRUE));
-    verify(mockStorageObjectsList).setPrefix(eq(objectPrefix));
-    verify(mockStorageObjectsList).getPrefix();
-    verify(mockStorageObjectsList).execute();
   }
 
   @Test
