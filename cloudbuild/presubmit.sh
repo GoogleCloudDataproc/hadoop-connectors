@@ -17,7 +17,7 @@
 set -euxo pipefail
 
 readonly HADOOP_PROFILE="$1"
-readonly TEST_TYPE="$2"
+readonly TEST_TYPE="${2:-unittest}"
 
 cd /bigdata-interop
 
