@@ -23,9 +23,20 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 
 import com.google.api.client.util.Clock;
-import com.google.cloud.hadoop.gcsio.*;
+import com.google.cloud.hadoop.gcsio.CreateFileOptions;
+import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.gcsio.LaggedGoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.LaggedGoogleCloudStorage.ListVisibilityCalculator;
+import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorage;
+import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
+import com.google.cloud.hadoop.gcsio.VerificationAttributes;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
@@ -35,7 +46,12 @@ import com.google.common.base.Suppliers;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.google.common.collect.*;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.MapDifference;
+import com.google.common.collect.Maps;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
 import com.google.common.primitives.Bytes;
@@ -1295,39 +1311,39 @@ public class GoogleCloudStorageTest {
   }
 
   @Test
-  public void testGoogleCloudStorageItemInfoEquals() throws IOException {
+  public void googleCloudStorageItemInfo_equals() throws IOException {
     String bucketName = getSharedBucketName();
 
-    StorageResourceId testObject = new StorageResourceId(bucketName, "testEquals_Object");
-    StorageResourceId anotherTestObject =
-        new StorageResourceId(bucketName, "testEquals_ObjectDifferent");
-    // Don't use hashes in object creation, just validate the round trip. This of course
-    // could lead to flaky looking tests due to bit flip errors.
-    writeObject(rawStorage, testObject, /* objectSize= */ 1024);
-    writeObject(rawStorage, anotherTestObject, /* objectSize= */ 1024);
+    StorageResourceId object1 = new StorageResourceId(bucketName, "testEquals_Object_1");
+    StorageResourceId object2 = new StorageResourceId(bucketName, "testEquals_Object_2");
 
-    GoogleCloudStorageItemInfo itemInfo = rawStorage.getItemInfo(testObject);
-    GoogleCloudStorageItemInfo anotheriItemInfo = rawStorage.getItemInfo(anotherTestObject);
+    writeObject(rawStorage, object1, /* objectSize= */ 1024);
+    writeObject(rawStorage, object2, /* objectSize= */ 1024);
 
-    assertThat(itemInfo.equals(itemInfo)).isTrue();
-    assertThat(itemInfo.equals(anotherTestObject)).isFalse();
+    GoogleCloudStorageItemInfo itemInfo1 = rawStorage.getItemInfo(object1);
+    GoogleCloudStorageItemInfo itemInfo2 = rawStorage.getItemInfo(object2);
+
+    assertThat(itemInfo1.equals(itemInfo1)).isTrue();
+    assertThat(itemInfo1.equals(itemInfo2)).isFalse();
   }
 
   @Test
-  public void testGoogleCloudStorageItemInfoToString() throws IOException {
+  public void googleCloudStorageItemInfo_toString() throws IOException {
     String bucketName = getSharedBucketName();
 
-    StorageResourceId testObject = new StorageResourceId(bucketName, "testToString_Object");
-    StorageResourceId anotherTestObject =
-        new StorageResourceId(bucketName, "testToString_ObjectDifferent");
-    // Don't use hashes in object creation, just validate the round trip. This of course
-    // could lead to flaky looking tests due to bit flip errors.
-    writeObject(rawStorage, testObject, /* objectSize= */ 1024);
+    StorageResourceId object1 = new StorageResourceId(bucketName, "testToString_Object_1");
+    StorageResourceId object2 = new StorageResourceId(bucketName, "testToString_Object_2");
 
-    GoogleCloudStorageItemInfo itemInfo = rawStorage.getItemInfo(testObject);
-    GoogleCloudStorageItemInfo anotheriItemInfo = rawStorage.getItemInfo(anotherTestObject);
-    assertThat(itemInfo.toString()).contains("created on:");
-    assertThat(anotheriItemInfo.toString()).contains("exists: no");
+    writeObject(rawStorage, object1, /* objectSize= */ 1024);
+
+    GoogleCloudStorageItemInfo itemInfo1 = rawStorage.getItemInfo(object1);
+    GoogleCloudStorageItemInfo itemInfo2 = rawStorage.getItemInfo(object2);
+
+    assertThat(itemInfo1.exists()).isTrue();
+    assertThat(itemInfo1.toString()).contains("created on:");
+
+    assertThat(itemInfo2.exists()).isFalse();
+    assertThat(itemInfo2.toString()).contains("exists: no");
   }
 
   static <K, V> void assertMapsEqual(

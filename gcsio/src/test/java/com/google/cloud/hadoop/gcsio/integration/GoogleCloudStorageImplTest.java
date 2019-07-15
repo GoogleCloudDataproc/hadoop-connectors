@@ -210,38 +210,30 @@ public class GoogleCloudStorageImplTest {
   }
 
   @Test
-  public void testGoogleCloudStorageItemInfoMetadataEquals() throws IOException {
+  public void googleCloudStorageItemInfo_metadataEquals() throws IOException {
     GoogleCloudStorageImpl gcs =
-        makeStorage(
-            GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-                .setCopyWithRewriteEnabled(true)
-                .setMaxBytesRewrittenPerCall(512 * 1024 * 1024)
-                .build());
+        makeStorage(GoogleCloudStorageTestHelper.getStandardOptionBuilder().build());
 
     String bucketName = BUCKET_HELPER.getUniqueBucketName("metadata-equals");
     gcs.create(bucketName);
 
-    StorageResourceId testObject = new StorageResourceId(bucketName, "testMetadataEquals_Object");
-    StorageResourceId anotherTestObject =
-        new StorageResourceId(bucketName, "testMetadataEquals_AnotherObject");
+    StorageResourceId object = new StorageResourceId(bucketName, "testMetadataEquals_Object");
 
-    Map<String, byte[]> metadata =
+    Map<String, byte[]> metadata1 =
         ImmutableMap.of(
             "key1", "value1".getBytes(StandardCharsets.UTF_8),
             "key2", "value2".getBytes(StandardCharsets.UTF_8));
-    Map<String, byte[]> anotherMetadata =
+    Map<String, byte[]> metadata2 =
         ImmutableMap.of(
             "key3", "value3".getBytes(StandardCharsets.UTF_8),
             "key4", "value4".getBytes(StandardCharsets.UTF_8));
-    gcs.createEmptyObject(testObject, new CreateObjectOptions(true, "text/plain", metadata));
 
-    gcs.createEmptyObject(
-        anotherTestObject, new CreateObjectOptions(true, "text/plain", anotherMetadata));
+    gcs.createEmptyObject(object, new CreateObjectOptions(true, "text/plain", metadata1));
 
-    GoogleCloudStorageItemInfo itemInfo = gcs.getItemInfo(testObject);
-    GoogleCloudStorageItemInfo anotheriItemInfo = gcs.getItemInfo(anotherTestObject);
+    GoogleCloudStorageItemInfo itemInfo1 = gcs.getItemInfo(object);
 
-    assertThat(itemInfo.metadataEquals(itemInfo.getMetadata())).isTrue();
-    assertThat(itemInfo.metadataEquals(anotheriItemInfo.getMetadata())).isFalse();
+    assertThat(itemInfo1.metadataEquals(metadata1)).isTrue();
+    assertThat(itemInfo1.metadataEquals(itemInfo1.getMetadata())).isTrue();
+    assertThat(itemInfo1.metadataEquals(metadata2)).isFalse();
   }
 }
