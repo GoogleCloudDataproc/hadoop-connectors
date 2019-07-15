@@ -30,7 +30,7 @@ steps:
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
 
-  # 4. Run Hadoop 2 integration tests concurrently
+  # 4. Run Hadoop 2 integration tests concurrently with Hadoop 2 and Hadoop 3 unit tests
   - name: 'gcr.io/$PROJECT_ID/dataproc-bigdata-interop-presubmit'
     id: 'integration-tests-hadoop2'
     waitFor: ['docker-build']
@@ -44,7 +44,7 @@ steps:
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
 
-  # 5. Run Hadoop 3 integration tests sequentially
+  # 5. Run Hadoop 3 integration tests sequentially after `integration-tests-hadoop2` step
   - name: 'gcr.io/$PROJECT_ID/dataproc-bigdata-interop-presubmit'
     id: 'integration-tests-hadoop3'
     waitFor: ['integration-tests-hadoop2']
@@ -58,6 +58,7 @@ steps:
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
 
+# Tests take on average 17 minutes to run
 timeout: 1800s
 
 options:
