@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Google Inc. All Rights Reserved.
+ * Copyright 2019 Google LLC. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.util;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -26,6 +27,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -33,23 +35,28 @@ import org.junit.runners.JUnit4;
 /** Unit tests for {@link LazyExecutorService}. */
 @RunWith(JUnit4.class)
 public class LazyExecutorServiceTest {
+
+  private LazyExecutorService lazyExecutorService;
+
+  @Before
+  public void before() {
+    lazyExecutorService = new LazyExecutorService();
+  }
+
   @Test
   public void testConstructorWithBackingService() {
-    LazyExecutorService backingService = new LazyExecutorService();
-    LazyExecutorService lazyExecutorService = new LazyExecutorService(backingService);
+    lazyExecutorService = new LazyExecutorService(new LazyExecutorService());
     assertThat(lazyExecutorService.isShutdown()).isFalse();
   }
 
   @Test
   public void testIsTerminated() {
-    LazyExecutorService lazyExecutorService = new LazyExecutorService();
     lazyExecutorService.shutdown();
     assertThat(lazyExecutorService.isTerminated()).isTrue();
   }
 
   @Test
   public void testAwaitTermination() throws Exception {
-    LazyExecutorService lazyExecutorService = new LazyExecutorService();
     assertThat(lazyExecutorService.awaitTermination(1, TimeUnit.MILLISECONDS)).isFalse();
     lazyExecutorService.shutdown();
     assertThat(lazyExecutorService.awaitTermination(1, TimeUnit.MILLISECONDS)).isTrue();
@@ -57,69 +64,54 @@ public class LazyExecutorServiceTest {
 
   @Test
   public void testSubmitTask() {
-    LazyExecutorService lazyExecutorService = new LazyExecutorService();
-    Runnable runnable = () -> {};
-    assertThat(lazyExecutorService.submit(runnable).isDone()).isTrue();
+    Future<?> future = lazyExecutorService.submit(() -> {});
+    assertThat(future.isDone()).isTrue();
   }
 
   @Test
   public void testSubmitTaskWithResult() {
-    LazyExecutorService lazyExecutorService = new LazyExecutorService();
-    Runnable runnable = () -> {};
-    assertThat(lazyExecutorService.submit(runnable, null).isDone()).isTrue();
+    Future<Object> future = lazyExecutorService.submit(() -> {}, /* result= */ null);
+    assertThat(future.isDone()).isTrue();
   }
 
   @Test
   public void testInvokeAllSubmitAllTasks() throws Exception {
-    LazyExecutorService lazyExecutorService = new LazyExecutorService();
-    Callable callable = () -> null;
-    List<Callable<Void>> monitorTasks = Lists.newLinkedList();
-    monitorTasks.add(callable);
-    monitorTasks.add(callable);
-
-    assertThat(lazyExecutorService.invokeAll(monitorTasks).size()).isEqualTo(2);
+    List<Callable<Void>> tasks = ImmutableList.of(() -> null, () -> null);
+    List<Future<Void>> futures = lazyExecutorService.invokeAll(tasks);
+    assertThat(futures).hasSize(2);
   }
 
   @Test
   public void testInvokeAllSubmitAllTasksWithTimeout() throws Exception {
-    LazyExecutorService lazyExecutorService = new LazyExecutorService();
-    Callable callable = () -> null;
-    List<Callable<Void>> monitorTasks = Lists.newLinkedList();
-    monitorTasks.add(callable);
-    monitorTasks.add(callable);
-
-    assertThat(lazyExecutorService.invokeAll(monitorTasks, 1, TimeUnit.MILLISECONDS).size())
-        .isEqualTo(2);
+    List<Callable<Void>> tasks = ImmutableList.of(() -> null, () -> null);
+    List<Future<Void>> futures = lazyExecutorService.invokeAll(tasks, 1, TimeUnit.MILLISECONDS);
+    assertThat(futures).hasSize(2);
   }
 
   @Test
   public void testBackingService_shouldBeShutDownWithMainService() {
     LazyExecutorService backingService = new LazyExecutorService();
-    LazyExecutorService lazyExecutorService = new LazyExecutorService(backingService);
+    lazyExecutorService = new LazyExecutorService(backingService);
     backingService.shutdown();
     assertThat(lazyExecutorService.isShutdown()).isTrue();
   }
 
   @Test
   public void testSubmitTaskToDeadExecutorService_shouldThrowRejectedExecutionException() {
-    LazyExecutorService lazyExecutorService = new LazyExecutorService();
     lazyExecutorService.shutdown();
-    Runnable runnable = () -> {};
-    assertThrows(RejectedExecutionException.class, () -> lazyExecutorService.submit(runnable));
+    assertThrows(RejectedExecutionException.class, () -> lazyExecutorService.submit(() -> {}));
   }
 
   @Test
   public void testCancelledTask() {
-    LazyExecutorService backingService = new LazyExecutorService();
-    LazyExecutorService lazyExecutorService = new LazyExecutorService(backingService);
-    Runnable runnable = () -> {};
-    Future future = lazyExecutorService.submit(runnable);
+    lazyExecutorService = new LazyExecutorService(new LazyExecutorService());
+    Future<?> future = lazyExecutorService.submit(() -> {});
     lazyExecutorService.shutdownNow();
 
     assertThat(future.isCancelled()).isTrue();
     assertThat(future.isDone()).isTrue();
-    assertThrows(CancellationException.class, () -> future.get());
+    assertThrows(CancellationException.class, future::get);
     assertThrows(CancellationException.class, () -> future.get(1, TimeUnit.MILLISECONDS));
-    assertThat(future.cancel(true)).isFalse();
+    assertThat(future.cancel(/* mayInterruptIfRunning= */ true)).isFalse();
   }
 }
