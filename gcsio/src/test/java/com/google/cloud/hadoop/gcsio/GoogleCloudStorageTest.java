@@ -608,6 +608,7 @@ public class GoogleCloudStorageTest {
                 .setBucket(BUCKET_NAME)
                 .setName(OBJECT_NAME)
                 .setUpdated(new DateTime(11L))
+                .setTimeCreated(new DateTime(11L))
                 .setSize(BigInteger.valueOf(size))
                 .setContentEncoding(encoding)
                 .setGeneration(1L)
@@ -2139,6 +2140,7 @@ public class GoogleCloudStorageTest {
     Bucket returnedBucket = new Bucket()
         .setName(BUCKET_NAME)
         .setTimeCreated(new DateTime(1111L))
+        .setUpdated(new DateTime(1111L))
         .setLocation("us-west-123")
         .setStorageClass("class-af4");
     when(mockStorageBucketsGet.execute())
@@ -2459,6 +2461,7 @@ public class GoogleCloudStorageTest {
         new StorageObject()
             .setName(dir0Name)
             .setBucket(BUCKET_NAME)
+            .setTimeCreated(new DateTime(11L))
             .setUpdated(new DateTime(11L))
             .setSize(BigInteger.valueOf(111L))
             .setGeneration(1L)
@@ -2467,6 +2470,7 @@ public class GoogleCloudStorageTest {
         new StorageObject()
             .setName(dir1Name)
             .setBucket(BUCKET_NAME)
+            .setTimeCreated(new DateTime(22L))
             .setUpdated(new DateTime(22L))
             .setSize(BigInteger.valueOf(222L))
             .setGeneration(2L)
@@ -2513,6 +2517,7 @@ public class GoogleCloudStorageTest {
         new StorageObject()
             .setName(dir0Name)
             .setBucket(BUCKET_NAME)
+            .setTimeCreated(new DateTime(11L))
             .setUpdated(new DateTime(11L))
             .setSize(BigInteger.valueOf(111L))
             .setGeneration(1L)
@@ -2521,6 +2526,7 @@ public class GoogleCloudStorageTest {
         new StorageObject()
             .setName(dir1Name)
             .setBucket(BUCKET_NAME)
+            .setTimeCreated(new DateTime(22L))
             .setUpdated(new DateTime(22L))
             .setSize(BigInteger.valueOf(222L))
             .setGeneration(2L)
@@ -2529,6 +2535,7 @@ public class GoogleCloudStorageTest {
         new StorageObject()
             .setName(dir2Name)
             .setBucket(BUCKET_NAME)
+            .setTimeCreated(new DateTime(33L))
             .setUpdated(new DateTime(33L))
             .setSize(BigInteger.valueOf(333L))
             .setGeneration(3L)
@@ -2619,6 +2626,7 @@ public class GoogleCloudStorageTest {
         new StorageObject()
             .setName(dir1Name)
             .setBucket(BUCKET_NAME)
+            .setTimeCreated(new DateTime(22L))
             .setUpdated(new DateTime(22L))
             .setSize(BigInteger.valueOf(222L))
             .setGeneration(2L)
@@ -2682,6 +2690,7 @@ public class GoogleCloudStorageTest {
         new StorageObject()
             .setName(dir1Name)
             .setBucket(BUCKET_NAME)
+            .setTimeCreated(new DateTime(22L))
             .setUpdated(new DateTime(22L))
             .setSize(BigInteger.valueOf(222L))
             .setGeneration(2L)
@@ -2802,8 +2811,8 @@ public class GoogleCloudStorageTest {
 
     // Not found.
     GoogleCloudStorageItemInfo info = gcs.getItemInfo(new StorageResourceId(BUCKET_NAME));
-    GoogleCloudStorageItemInfo expected = new GoogleCloudStorageItemInfo(
-        new StorageResourceId(BUCKET_NAME), 0L, -1L, null, null);
+    GoogleCloudStorageItemInfo expected =
+        new GoogleCloudStorageItemInfo(new StorageResourceId(BUCKET_NAME), 0L, 0L, -1L, null, null);
     assertThat(info).isEqualTo(expected);
 
     // Throw.
@@ -2829,6 +2838,7 @@ public class GoogleCloudStorageTest {
         .thenReturn(new StorageObject()
             .setBucket(BUCKET_NAME)
             .setName(OBJECT_NAME)
+            .setTimeCreated(new DateTime(1234L))
             .setUpdated(new DateTime(1234L))
             .setSize(BigInteger.valueOf(42L))
             .setContentType("text/plain")
@@ -2839,6 +2849,7 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorageItemInfo expected =
         new GoogleCloudStorageItemInfo(
             new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+            1234L,
             1234L,
             42L,
             null,
@@ -2909,6 +2920,7 @@ public class GoogleCloudStorageTest {
         new GoogleCloudStorageItemInfo(
             new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
             0L,
+            0L,
             -1L,
             null,
             null,
@@ -2948,6 +2960,7 @@ public class GoogleCloudStorageTest {
                     new Bucket()
                         .setName(BUCKET_NAME)
                         .setTimeCreated(new DateTime(1234L))
+                        .setUpdated(new DateTime(1234L))
                         .setLocation("us-west-123")
                         .setStorageClass("class-af4"),
                     new HttpHeaders());
@@ -2974,6 +2987,7 @@ public class GoogleCloudStorageTest {
                     new StorageObject()
                         .setBucket(BUCKET_NAME)
                         .setName(OBJECT_NAME)
+                        .setTimeCreated(new DateTime(1234L))
                         .setUpdated(new DateTime(1234L))
                         .setSize(BigInteger.valueOf(42L))
                         .setContentType("image/png")
@@ -2998,6 +3012,7 @@ public class GoogleCloudStorageTest {
         new GoogleCloudStorageItemInfo(
             new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
             1234L,
+            1234L,
             42L,
             null,
             null,
@@ -3007,8 +3022,9 @@ public class GoogleCloudStorageTest {
             /* contentGeneration= */ 1,
             /* metaGeneration= */ 1);
     GoogleCloudStorageItemInfo expectedRoot = GoogleCloudStorageItemInfo.ROOT_INFO;
-    GoogleCloudStorageItemInfo expectedBucket = new GoogleCloudStorageItemInfo(
-        new StorageResourceId(BUCKET_NAME), 1234L, 0L, "us-west-123", "class-af4");
+    GoogleCloudStorageItemInfo expectedBucket =
+        new GoogleCloudStorageItemInfo(
+            new StorageResourceId(BUCKET_NAME), 1234L, 1234L, 0L, "us-west-123", "class-af4");
 
     assertThat(itemInfos.get(0)).isEqualTo(expectedObject);
     assertThat(itemInfos.get(1)).isEqualTo(expectedRoot);
@@ -3617,7 +3633,8 @@ public class GoogleCloudStorageTest {
         .setName(name)
         .setLocation("us-central1-a")
         .setStorageClass("class-af4")
-        .setTimeCreated(new DateTime(1111L));
+        .setTimeCreated(new DateTime(1111L))
+        .setUpdated(new DateTime(1111L));
   }
 
   private static StorageObject newStorageObject(String bucketName, String objectName) {
@@ -3628,6 +3645,7 @@ public class GoogleCloudStorageTest {
         .setSize(BigInteger.valueOf(r.nextInt(Integer.MAX_VALUE)))
         .setGeneration((long) r.nextInt(Integer.MAX_VALUE))
         .setMetageneration((long) r.nextInt(Integer.MAX_VALUE))
-        .setUpdated(new DateTime(new Date()));
+        .setUpdated(new DateTime(new Date()))
+        .setTimeCreated(new DateTime(new Date()));
   }
 }

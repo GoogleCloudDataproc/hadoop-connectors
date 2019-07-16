@@ -41,9 +41,9 @@ public class InMemoryBucketEntry {
    *     gs://<bucketName>/<objectName>}.
    */
   public InMemoryBucketEntry(
-      String bucketName, long createTimeMillis, CreateBucketOptions options) {
+      String bucketName, long createTimeMillis, long modificationTimeMillis, CreateBucketOptions options) {
     info = new GoogleCloudStorageItemInfo(
-        new StorageResourceId(bucketName), createTimeMillis, 0,
+        new StorageResourceId(bucketName), createTimeMillis, modificationTimeMillis, 0,
         MoreObjects.firstNonNull(options.getLocation(), "us-central"),
         MoreObjects.firstNonNull(options.getStorageClass(), "inmemory-class"));
   }
