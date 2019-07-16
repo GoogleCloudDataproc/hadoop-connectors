@@ -107,6 +107,7 @@ public class InMemoryObjectEntry {
       String bucketName,
       String objectName,
       long createTimeMillis,
+      long modificationTimeMillis,
       String contentType,
       Map<String, byte[]> metadata) {
     // Override close() to commit its completed byte array into completedContents to reflect
@@ -125,6 +126,7 @@ public class InMemoryObjectEntry {
                   new GoogleCloudStorageItemInfo(
                       info.getResourceId(),
                       info.getCreationTime(),
+                      info.getModificationTime(),
                       /* size= */ completedContents.length,
                       /* location= */ null,
                       /* storageClass= */ null,
@@ -151,6 +153,7 @@ public class InMemoryObjectEntry {
         new GoogleCloudStorageItemInfo(
             new StorageResourceId(bucketName, objectName),
             createTimeMillis,
+            modificationTimeMillis,
             /* size= */ 0,
             /* location= */ null,
             /* storageClass= */ null,
@@ -210,6 +213,7 @@ public class InMemoryObjectEntry {
     copy.info =
         new GoogleCloudStorageItemInfo(
             new StorageResourceId(bucketName, objectName),
+            System.currentTimeMillis(),
             System.currentTimeMillis(),
             info.getSize(),
             /* location= */ null,
@@ -302,6 +306,7 @@ public class InMemoryObjectEntry {
         new GoogleCloudStorageItemInfo(
             info.getResourceId(),
             info.getCreationTime(),
+            info.getModificationTime(),
             /* size= */ completedContents.length,
             /* location= */ null,
             /* storageClass= */ null,

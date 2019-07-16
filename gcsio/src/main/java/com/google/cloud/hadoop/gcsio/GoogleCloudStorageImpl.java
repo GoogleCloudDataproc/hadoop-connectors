@@ -1104,9 +1104,14 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     List<Bucket> allBuckets = listBucketsInternal();
     List<GoogleCloudStorageItemInfo> bucketInfos = new ArrayList<>(allBuckets.size());
     for (Bucket bucket : allBuckets) {
-      bucketInfos.add(new GoogleCloudStorageItemInfo(
-          new StorageResourceId(bucket.getName()), bucket.getTimeCreated().getValue(), 0,
-          bucket.getLocation(), bucket.getStorageClass()));
+      bucketInfos.add(
+          new GoogleCloudStorageItemInfo(
+              new StorageResourceId(bucket.getName()),
+              bucket.getTimeCreated().getValue(),
+              bucket.getUpdated().getValue(),
+              0,
+              bucket.getLocation(),
+              bucket.getStorageClass()));
     }
     return bucketInfos;
   }
@@ -1485,8 +1490,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         resourceId.getBucketName(), bucket.getName());
 
     // For buckets, size is 0.
-    return new GoogleCloudStorageItemInfo(resourceId, bucket.getTimeCreated().getValue(),
-        0, bucket.getLocation(), bucket.getStorageClass());
+    return new GoogleCloudStorageItemInfo(
+        resourceId,
+        bucket.getTimeCreated().getValue(),
+        bucket.getUpdated().getValue(),
+        0,
+        bucket.getLocation(),
+        bucket.getStorageClass());
   }
 
   /**
@@ -1527,6 +1537,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // The GoogleCloudStorageItemInfo thus has 'null' for location and storage class.
     return new GoogleCloudStorageItemInfo(
         resourceId,
+        object.getTimeCreated().getValue(),
         object.getUpdated().getValue(),
         object.getSize().longValue(),
         /* location= */ null,

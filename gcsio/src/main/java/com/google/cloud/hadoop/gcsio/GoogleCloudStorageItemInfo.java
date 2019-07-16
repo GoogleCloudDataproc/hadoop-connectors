@@ -38,7 +38,7 @@ public class GoogleCloudStorageItemInfo {
 
   // Info about the root of GCS namespace.
   public static final GoogleCloudStorageItemInfo ROOT_INFO =
-      new GoogleCloudStorageItemInfo(StorageResourceId.ROOT, 0, 0, null, null);
+      new GoogleCloudStorageItemInfo(StorageResourceId.ROOT, 0, 0, 0, null, null);
 
   // Instead of returning null metadata, we'll return this map.
   private static final ImmutableMap<String, byte[]> EMPTY_METADATA = ImmutableMap.of();
@@ -49,6 +49,7 @@ public class GoogleCloudStorageItemInfo {
     return new GoogleCloudStorageItemInfo(
         resourceId,
         /* creationTime= */ 0,
+        /* modificationTime= */ 0,
         /* size= */ 0,
         /* location= */ null,
         /* storageClass= */ null);
@@ -61,6 +62,7 @@ public class GoogleCloudStorageItemInfo {
     return new GoogleCloudStorageItemInfo(
         resourceId,
         /* creationTime= */ 0,
+        /* modificationTime= */ 0,
         /* size= */ -1,
         /* location= */ null,
         /* storageClass= */ null);
@@ -72,6 +74,10 @@ public class GoogleCloudStorageItemInfo {
   // Creation time of this item.
   // Time is expressed as milliseconds since January 1, 1970 UTC.
   private final long creationTime;
+
+  // Modification time of this item.
+  // Time is expressed as milliseconds since January 1, 1970 UTC.
+  private final long modificationTime;
 
   // Size of an object (number of bytes).
   // Size is -1 for items that do not exist.
@@ -102,10 +108,11 @@ public class GoogleCloudStorageItemInfo {
    * @param size Size of the given object (number of bytes) or -1 if the object does not exist.
    */
   public GoogleCloudStorageItemInfo(StorageResourceId resourceId,
-      long creationTime, long size, String location, String storageClass) {
+      long creationTime, long modificationTime, long size, String location, String storageClass) {
     this(
         resourceId,
         creationTime,
+        modificationTime,
         size,
         location,
         storageClass,
@@ -127,6 +134,7 @@ public class GoogleCloudStorageItemInfo {
   public GoogleCloudStorageItemInfo(
       StorageResourceId resourceId,
       long creationTime,
+      long modificationTime,
       long size,
       String location,
       String storageClass,
@@ -138,6 +146,7 @@ public class GoogleCloudStorageItemInfo {
     this(
         resourceId,
         creationTime,
+        modificationTime,
         size,
         location,
         storageClass,
@@ -160,6 +169,7 @@ public class GoogleCloudStorageItemInfo {
   public GoogleCloudStorageItemInfo(
       StorageResourceId resourceId,
       long creationTime,
+      long modificationTime,
       long size,
       String location,
       String storageClass,
@@ -173,6 +183,7 @@ public class GoogleCloudStorageItemInfo {
         "resourceId must not be null! Use StorageResourceId.ROOT to represent GCS root.");
     this.resourceId = resourceId;
     this.creationTime = creationTime;
+    this.modificationTime = modificationTime;
     this.size = size;
     this.location = location;
     this.storageClass = storageClass;
@@ -212,6 +223,15 @@ public class GoogleCloudStorageItemInfo {
    */
   public long getCreationTime() {
     return creationTime;
+  }
+
+  /**
+   * Gets modification time of this item.
+   *
+   * Time is expressed as milliseconds since January 1, 1970 UTC.
+   */
+  public long getModificationTime() {
+    return modificationTime;
   }
 
   /**
