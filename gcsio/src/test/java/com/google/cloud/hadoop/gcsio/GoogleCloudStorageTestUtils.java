@@ -29,9 +29,6 @@ import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.testing.http.MockLowLevelHttpRequest;
 import com.google.api.client.testing.http.MockLowLevelHttpResponse;
 import com.google.api.services.storage.Storage;
-import com.google.api.services.storage.model.Bucket;
-import com.google.api.services.storage.model.Buckets;
-import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
@@ -160,11 +157,6 @@ public final class GoogleCloudStorageTestUtils {
     return new MockLowLevelHttpResponse().setStatusCode(statusCode);
   }
 
-  public static MockLowLevelHttpResponse metadataResponse(StorageObject metadataObject)
-      throws IOException {
-    return dataResponse(JSON_FACTORY.toByteArray(metadataObject));
-  }
-
   public static MockLowLevelHttpResponse dataRangeResponse(
       byte[] content, long rangeStart, long totalSize) {
     long rangeEnd = rangeStart + content.length - 1;
@@ -172,22 +164,14 @@ public final class GoogleCloudStorageTestUtils {
         .addHeader("Content-Range", rangeStart + "-" + rangeEnd + "/" + totalSize);
   }
 
+  public static MockLowLevelHttpResponse jsonDataResponse(Object object) throws IOException {
+    return dataResponse(JSON_FACTORY.toByteArray(object));
+  }
+
   public static MockLowLevelHttpResponse dataResponse(byte[] content) {
     return new MockLowLevelHttpResponse()
         .addHeader("Content-Length", String.valueOf(content.length))
         .setContent(content);
-  }
-
-  public static MockLowLevelHttpResponse bucketsResponse(Buckets buckets) throws IOException {
-    return dataResponse(JSON_FACTORY.toByteArray(buckets));
-  }
-
-  public static MockLowLevelHttpResponse bucketResponse(Bucket bucket) throws IOException {
-    return dataResponse(JSON_FACTORY.toByteArray(bucket));
-  }
-
-  public static MockLowLevelHttpResponse objectsResponse(Objects objects) throws IOException {
-    return dataResponse(JSON_FACTORY.toByteArray(objects));
   }
 
   public static MockLowLevelHttpResponse resumableUploadResponse(String bucket, String object) {
