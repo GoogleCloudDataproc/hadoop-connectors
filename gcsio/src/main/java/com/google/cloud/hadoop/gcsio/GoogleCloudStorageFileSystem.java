@@ -311,7 +311,6 @@ public class GoogleCloudStorageFileSystem {
           options.getExistingGenerationId());
     }
     WritableByteChannel channel = gcs.create(resourceId, objectOptionsFromFileOptions(options));
-    tryUpdateTimestampsForParentDirectories(ImmutableList.of(path), ImmutableList.<URI>of());
     return channel;
   }
 
@@ -421,14 +420,6 @@ public class GoogleCloudStorageFileSystem {
     }
 
     repairImplicitDirectory(parentInfoFuture);
-
-    // if we deleted a bucket, then there no need to update timestamps
-    if (bucketsToDelete.isEmpty()) {
-      List<URI> itemsToDeleteNames =
-          itemsToDelete.stream().map(FileInfo::getPath).collect(toCollection(ArrayList::new));
-      // Any path that was deleted, we should update the parent except for parents we also deleted
-      tryUpdateTimestampsForParentDirectories(itemsToDeleteNames, itemsToDeleteNames);
-    }
   }
 
   /** Deletes all items in the given path list followed by all bucket items. */
@@ -554,13 +545,6 @@ public class GoogleCloudStorageFileSystem {
       gcs.create(bucketInfo.getBucketName());
     }
     gcs.createEmptyObjects(subdirsToCreate);
-
-    // Update parent directories, but not the ones we just created because we just created them.
-    List<URI> createdDirectories =
-        subdirsToCreate.stream()
-            .map(s -> pathCodec.getPath(s.getBucketName(), s.getObjectName(), false))
-            .collect(toImmutableList());
-    tryUpdateTimestampsForParentDirectories(createdDirectories, createdDirectories);
   }
 
   /**
@@ -760,8 +744,6 @@ public class GoogleCloudStorageFileSystem {
           srcResourceId.getBucketName(), ImmutableList.of(srcResourceId.getObjectName()),
           dstResourceId.getBucketName(), ImmutableList.of(dstResourceId.getObjectName()));
 
-      tryUpdateTimestampsForParentDirectories(ImmutableList.of(dst), ImmutableList.<URI>of());
-
       // TODO(b/110833109): populate generation ID in StorageResourceId when getting info
       gcs.deleteObjects(
           ImmutableList.of(
@@ -770,8 +752,6 @@ public class GoogleCloudStorageFileSystem {
                   srcInfo.getItemInfo().getObjectName(),
                   srcInfo.getItemInfo().getContentGeneration())));
 
-      // Any path that was deleted, we should update the parent except for parents we also deleted
-      tryUpdateTimestampsForParentDirectories(ImmutableList.of(src), ImmutableList.<URI>of());
     }
   }
 
@@ -830,16 +810,6 @@ public class GoogleCloudStorageFileSystem {
 
       coopLockOp.ifPresent(CoopLockOperationRename::checkpoint);
 
-      // So far, only the destination directories are updated. Only do those now:
-      if (!srcToDstItemNames.isEmpty() || !srcToDstMarkerItemNames.isEmpty()) {
-        List<URI> allDestinationUris =
-            new ArrayList<>(srcToDstItemNames.size() + srcToDstMarkerItemNames.size());
-        allDestinationUris.addAll(srcToDstItemNames.values());
-        allDestinationUris.addAll(srcToDstMarkerItemNames.values());
-
-        tryUpdateTimestampsForParentDirectories(allDestinationUris, allDestinationUris);
-      }
-
       List<FileInfo> bucketsToDelete = new ArrayList<>(1);
       List<FileInfo> srcItemsToDelete = new ArrayList<>(srcToDstItemNames.size() + 1);
       srcItemsToDelete.addAll(srcToDstItemNames.keySet());
@@ -855,14 +825,6 @@ public class GoogleCloudStorageFileSystem {
       deleteInternal(new ArrayList<>(srcToDstMarkerItemNames.keySet()), new ArrayList<>());
       // Then delete rest of the items that we successfully copied.
       deleteInternal(srcItemsToDelete, bucketsToDelete);
-
-      // if we deleted a bucket, then there no need to update timestamps
-      if (bucketsToDelete.isEmpty()) {
-        List<URI> srcItemNames =
-            srcItemInfos.stream().map(FileInfo::getPath).collect(toCollection(ArrayList::new));
-        // Any path that was deleted, we should update the parent except for parents we also deleted
-        tryUpdateTimestampsForParentDirectories(srcItemNames, srcItemNames);
-      }
 
       coopLockOp.ifPresent(CoopLockOperationRename::unlock);
     } finally {
@@ -1337,85 +1299,6 @@ public class GoogleCloudStorageFileSystem {
 
     // Not a top-level directory, create 0 sized object.
     gcs.createEmptyObject(resourceId);
-
-    tryUpdateTimestampsForParentDirectories(ImmutableList.of(path), ImmutableList.<URI>of());
-  }
-
-  /**
-   * For each listed modified object, attempt to update the modification time
-   * of the parent directory.
-   * @param modifiedObjects The objects that have been modified
-   * @param excludedParents A list of parent directories that we shouldn't attempt to update.
-   */
-  protected void updateTimestampsForParentDirectories(
-      List<URI> modifiedObjects, List<URI> excludedParents) throws IOException {
-    logger.atFine().log(
-        "updateTimestampsForParentDirectories(%s, %s)", modifiedObjects, excludedParents);
-
-    TimestampUpdatePredicate updatePredicate =
-        options.getShouldIncludeInTimestampUpdatesPredicate();
-    Set<URI> excludedParentPathsSet = new HashSet<>(excludedParents);
-
-    Set<URI> parentUrisToUpdate = Sets.newHashSetWithExpectedSize(modifiedObjects.size());
-    for (URI modifiedObjectUri : modifiedObjects) {
-      URI parentPathUri = getParentPath(modifiedObjectUri);
-      if (!excludedParentPathsSet.contains(parentPathUri)
-          && updatePredicate.shouldUpdateTimestamp(parentPathUri)) {
-        parentUrisToUpdate.add(parentPathUri);
-      }
-    }
-
-    Map<String, byte[]> modificationAttributes = new HashMap<>();
-    FileInfo.addModificationTimeToAttributes(modificationAttributes, Clock.SYSTEM);
-
-    List<UpdatableItemInfo> itemUpdates = new ArrayList<>(parentUrisToUpdate.size());
-
-    for (URI parentUri : parentUrisToUpdate) {
-      StorageResourceId resourceId = pathCodec.validatePathAndGetId(parentUri, true);
-      if (!resourceId.isBucket() && !resourceId.isRoot()) {
-        itemUpdates.add(new UpdatableItemInfo(resourceId, modificationAttributes));
-      }
-    }
-
-    if (!itemUpdates.isEmpty()) {
-      gcs.updateItems(itemUpdates);
-    } else {
-      logger.atFine().log("All paths were excluded from directory timestamp updating.");
-    }
-  }
-
-  /**
-   * For each listed modified object, attempt to update the modification time of the parent
-   * directory.
-   *
-   * <p>This method will log & swallow exceptions thrown by the GCSIO layer.
-   *
-   * @param modifiedObjects The objects that have been modified
-   * @param excludedParents A list of parent directories that we shouldn't attempt to update.
-   */
-  protected void tryUpdateTimestampsForParentDirectories(
-      final List<URI> modifiedObjects, final List<URI> excludedParents) {
-    logger.atFine().log(
-        "tryUpdateTimestampsForParentDirectories(%s, %s)", modifiedObjects, excludedParents);
-
-    // If we're calling tryUpdateTimestamps, we don't actually care about the results. Submit
-    // these requests via a background thread and continue on.
-    try {
-      @SuppressWarnings("unused") // go/futurereturn-lsc
-      Future<?> possiblyIgnoredError =
-          updateTimestampsExecutor.submit(
-              () -> {
-                try {
-                  updateTimestampsForParentDirectories(modifiedObjects, excludedParents);
-                } catch (IOException ioe) {
-                  logger.atFine().withCause(ioe).log(
-                      "Exception caught when trying to update parent directory timestamps.");
-                }
-              });
-    } catch (RejectedExecutionException ree) {
-      logger.atFine().withCause(ree).log(
-          "Exhausted thread pool and queue space while updating parent timestamps");
-    }
   }
 
   /**

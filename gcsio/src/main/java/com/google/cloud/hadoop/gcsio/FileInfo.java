@@ -43,10 +43,6 @@ public class FileInfo {
   public static final FileInfo ROOT_INFO = new FileInfo(
       GoogleCloudStorageFileSystem.GCS_ROOT, GoogleCloudStorageItemInfo.ROOT_INFO);
 
-  // The metadata key used for storing a custom modification time.
-  // The name and value of this attribute count towards storage pricing.
-  public static final String FILE_MODIFICATION_TIMESTAMP_KEY = "system.gcsfs_mts";
-
   // Path of this file or directory.
   private final URI path;
 
@@ -139,17 +135,7 @@ public class FileInfo {
    * Time is expressed as milliseconds since January 1, 1970 UTC.
    */
   public long getModificationTime() {
-    if (attributes.containsKey(FILE_MODIFICATION_TIMESTAMP_KEY)
-        && attributes.get(FILE_MODIFICATION_TIMESTAMP_KEY) != null) {
-      try {
-        return Longs.fromByteArray(attributes.get(FILE_MODIFICATION_TIMESTAMP_KEY));
-      } catch (IllegalArgumentException iae) {
-        logger.atFine().log(
-            "Failed to parse modification time '%s' millis for object %s",
-            attributes.get(FILE_MODIFICATION_TIMESTAMP_KEY), itemInfo.getObjectName());
-      }
-    }
-    return getCreationTime();
+    return itemInfo.getModificationTime();
   }
 
   /**
@@ -246,17 +232,6 @@ public class FileInfo {
       }
     }
     return path;
-  }
-
-  /**
-   * Add a key and value representing the current time, as determined by the passed clock, to the
-   * passed attributes dictionary.
-   *
-   * @param attributes The file attributes map to update
-   * @param clock The clock to retrieve the current time from
-   */
-  public static void addModificationTimeToAttributes(Map<String, byte[]> attributes, Clock clock) {
-    attributes.put(FILE_MODIFICATION_TIMESTAMP_KEY, Longs.toByteArray(clock.currentTimeMillis()));
   }
 
   /**
