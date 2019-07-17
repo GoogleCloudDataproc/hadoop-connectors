@@ -22,6 +22,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Random;
+import com.google.common.primitives.Bytes;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -95,6 +96,43 @@ public class GoogleHadoopFileSystemSyncableOutputIntegrationTest
       fin.readFully(0, actual);
     }
 
+    assertThat(actual).isEqualTo(expected);
+  }
+
+  @Test
+  public void testAppendFile() throws Exception {
+    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
+
+    // write 5-bytes objects
+    byte[] byteObject = new byte[5];
+    new Random().nextBytes(byteObject);
+
+    byte[] byteObject1 = new byte[5];
+    new Random().nextBytes(byteObject);
+
+    try (FSDataOutputStream fout = ghfs.create(hadoopPath)) {
+      fout.write(byteObject);
+      fout.hsync();
+    }
+    // Test appending three 5-bytes to 5-bytes object using 10 bytes buffer size
+    try (FSDataOutputStream fsout = ghfs.append(hadoopPath, 10, null)) {
+      fsout.write(byteObject1);
+      fsout.hsync();
+      fsout.write(byteObject);
+      fsout.write(byteObject1);
+      fsout.hsync();
+    }
+
+    // Check if file after appending has right size
+    FileStatus status = ghfs.getFileStatus(hadoopPath);
+    assertThat(status.getLen()).isEqualTo(4 * byteObject.length);
+
+    byte[] actual = new byte[4 * byteObject.length];
+    try (FSDataInputStream fin = ghfs.open(hadoopPath)) {
+      fin.readFully(0, actual);
+    }
+    byte [] expected = Bytes.concat(byteObject, byteObject1, byteObject, byteObject1);
     assertThat(actual).isEqualTo(expected);
   }
 }

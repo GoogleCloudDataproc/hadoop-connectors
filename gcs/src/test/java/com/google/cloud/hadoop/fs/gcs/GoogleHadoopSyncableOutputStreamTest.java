@@ -125,7 +125,7 @@ public class GoogleHadoopSyncableOutputStreamTest {
             ghfs.getGcsPath(objectPath),
             new FileSystem.Statistics(ghfs.getScheme()),
             CreateFileOptions.DEFAULT,
-            mockExecutorService);
+            mockExecutorService, false);
 
     IOException fakeIoException = new IOException("fake io exception");
     when(mockExecutorService.submit(any(Callable.class)))

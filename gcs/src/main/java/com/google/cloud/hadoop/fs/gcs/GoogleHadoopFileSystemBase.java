@@ -831,10 +831,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     logger.atFine().log("GHFS.append: %s, bufferSize: %d (ignored)", hadoopPath, bufferSize);
 
+    URI filePath = getGcsPath(hadoopPath);
     long duration = System.nanoTime() - startTime;
     increment(Counter.APPEND);
     increment(Counter.APPEND_TIME, duration);
-    throw new IOException("The append operation is not supported.");
+    return new FSDataOutputStream(
+        new GoogleHadoopSyncableOutputStream(
+            this, filePath, this.statistics, CreateFileOptions.DEFAULT, true),
+        this.statistics);
   }
 
   /**
