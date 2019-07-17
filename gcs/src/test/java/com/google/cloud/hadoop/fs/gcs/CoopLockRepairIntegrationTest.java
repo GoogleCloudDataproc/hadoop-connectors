@@ -122,7 +122,7 @@ public class CoopLockRepairIntegrationTest {
       throws Exception {
     String bucketName =
         gcsfsIHelper.createUniqueBucket(
-            "cooperative-rename-" + command.toLowerCase().replace("--roll", "") + "-failed-move");
+            "coop-rename-" + command.toLowerCase().replace("--roll", "") + "-failed-move");
     URI bucketUri = new URI("gs://" + bucketName + "/");
     String dirName = "rename_" + UUID.randomUUID();
     String fileName = "file";
@@ -196,7 +196,7 @@ public class CoopLockRepairIntegrationTest {
 
   @Test
   public void moveDirectoryOperationRepairedAfterFailedDelete() throws Exception {
-    String bucketName = gcsfsIHelper.createUniqueBucket("cooperative-rename-repair-failed-delete");
+    String bucketName = gcsfsIHelper.createUniqueBucket("coop-rename-repair-failed-delete");
     URI bucketUri = new URI("gs://" + bucketName + "/");
     String dirName = "rename_" + UUID.randomUUID();
     String fileName = "file";
@@ -268,7 +268,7 @@ public class CoopLockRepairIntegrationTest {
 
   @Test
   public void deleteDirectoryOperationRolledForward() throws Exception {
-    String bucketName = gcsfsIHelper.createUniqueBucket("cooperative-delete-repair");
+    String bucketName = gcsfsIHelper.createUniqueBucket("coop-delete-repair");
     URI bucketUri = new URI("gs://" + bucketName + "/");
     String fileName = "file";
     URI dirUri = bucketUri.resolve("delete_" + UUID.randomUUID() + "/");
