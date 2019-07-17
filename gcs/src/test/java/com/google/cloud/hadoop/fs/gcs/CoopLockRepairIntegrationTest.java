@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.AUTHENTICATION_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_COOPERATIVE_LOCKING_EXPIRATION_TIMEOUT_MS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID;
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationType.DELETE;
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationType.RENAME;
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao.LOCK_DIRECTORY;
@@ -330,16 +331,16 @@ public class CoopLockRepairIntegrationTest {
   private Configuration getTestConfiguration() {
     Configuration conf = new Configuration();
     conf.setBoolean(AUTHENTICATION_PREFIX + ENABLE_SERVICE_ACCOUNTS_SUFFIX, true);
-    conf.set(
-        GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(),
-        TestConfiguration.getInstance().getProjectId());
-    conf.set(
-        AUTHENTICATION_PREFIX + SERVICE_ACCOUNT_EMAIL_SUFFIX,
-        TestConfiguration.getInstance().getServiceAccount());
-    conf.set(
-        AUTHENTICATION_PREFIX + SERVICE_ACCOUNT_KEYFILE_SUFFIX,
-        TestConfiguration.getInstance().getPrivateKeyFile());
     conf.setLong(GCS_COOPERATIVE_LOCKING_EXPIRATION_TIMEOUT_MS.getKey(), 0);
+
+    // Configure test authentication
+    TestConfiguration testConf = TestConfiguration.getInstance();
+    conf.set(GCS_PROJECT_ID.getKey(), testConf.getProjectId());
+    if (testConf.getServiceAccount() != null && testConf.getPrivateKeyFile() != null) {
+      conf.set(AUTHENTICATION_PREFIX + SERVICE_ACCOUNT_EMAIL_SUFFIX, testConf.getServiceAccount());
+      conf.set(
+          AUTHENTICATION_PREFIX + SERVICE_ACCOUNT_KEYFILE_SUFFIX, testConf.getPrivateKeyFile());
+    }
     return conf;
   }
 
