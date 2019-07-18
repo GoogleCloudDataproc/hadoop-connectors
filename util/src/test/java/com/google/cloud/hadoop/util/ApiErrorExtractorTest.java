@@ -45,38 +45,38 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/**
- * Unit-tests for ApiErrorExtractor class.
- */
+/** Unit-tests for ApiErrorExtractor class. */
 @RunWith(JUnit4.class)
 public class ApiErrorExtractorTest {
-  private GoogleJsonResponseException accessDenied;  // STATUS_CODE_FORBIDDEN
-  private GoogleJsonResponseException statusOk;  // STATUS_CODE_OK
-  private GoogleJsonResponseException notFound;  // STATUS_CODE_NOT_FOUND
-  private GoogleJsonResponseException badRange;  // STATUS_CODE_RANGE_NOT_SATISFIABLE;
-  private GoogleJsonResponseException alreadyExists;  // STATUS_CODE_CONFLICT
-  private GoogleJsonResponseException rateLimited;  // rate limited
-  private GoogleJsonResponseException notRateLimited;  // not rate limited because of domain
+  private GoogleJsonResponseException accessDenied; // STATUS_CODE_FORBIDDEN
+  private GoogleJsonResponseException statusOk; // STATUS_CODE_OK
+  private GoogleJsonResponseException notFound; // STATUS_CODE_NOT_FOUND
+  private GoogleJsonResponseException badRange; // STATUS_CODE_RANGE_NOT_SATISFIABLE;
+  private GoogleJsonResponseException alreadyExists; // STATUS_CODE_CONFLICT
+  private GoogleJsonResponseException rateLimited; // rate limited
+  private GoogleJsonResponseException notRateLimited; // not rate limited because of domain
   private GoogleJsonResponseException resourceNotReady;
-  private GoogleJsonResponseException bigqueryRateLimited;  // bigquery rate limited
-  private static final int POSSIBLE_RATE_LIMIT = 429;  // Can be many things, but not STATUS_CODE_OK
+  private GoogleJsonResponseException bigqueryRateLimited; // bigquery rate limited
+  private static final int POSSIBLE_RATE_LIMIT = 429; // Can be many things, but not STATUS_CODE_OK
 
   private final ApiErrorExtractor errorExtractor = ApiErrorExtractor.INSTANCE;
 
   @Before
   public void setUp() throws Exception {
-    accessDenied = googleJsonResponseException(
-        HttpStatusCodes.STATUS_CODE_FORBIDDEN, "Forbidden", "Forbidden");
-    statusOk = googleJsonResponseException(
-        HttpStatusCodes.STATUS_CODE_OK, "A reason", "ok");
-    notFound = googleJsonResponseException(
-        HttpStatusCodes.STATUS_CODE_NOT_FOUND, "Not found", "Not found");
-    badRange = googleJsonResponseException(
-        ApiErrorExtractor.STATUS_CODE_RANGE_NOT_SATISFIABLE, "Bad range", "Bad range");
-    alreadyExists = googleJsonResponseException(
-        409, "409", "409");
-    resourceNotReady = googleJsonResponseException(
-        400, ApiErrorExtractor.RESOURCE_NOT_READY_REASON_CODE, "Resource not ready");
+    accessDenied =
+        googleJsonResponseException(
+            HttpStatusCodes.STATUS_CODE_FORBIDDEN, "Forbidden", "Forbidden");
+    statusOk = googleJsonResponseException(HttpStatusCodes.STATUS_CODE_OK, "A reason", "ok");
+    notFound =
+        googleJsonResponseException(
+            HttpStatusCodes.STATUS_CODE_NOT_FOUND, "Not found", "Not found");
+    badRange =
+        googleJsonResponseException(
+            ApiErrorExtractor.STATUS_CODE_RANGE_NOT_SATISFIABLE, "Bad range", "Bad range");
+    alreadyExists = googleJsonResponseException(409, "409", "409");
+    resourceNotReady =
+        googleJsonResponseException(
+            400, ApiErrorExtractor.RESOURCE_NOT_READY_REASON_CODE, "Resource not ready");
 
     // This works because googleJsonResponseException takes final ErrorInfo
     ErrorInfo errorInfo = new ErrorInfo();
@@ -88,9 +88,7 @@ public class ApiErrorExtractorTest {
     bigqueryRateLimited = googleJsonResponseException(POSSIBLE_RATE_LIMIT, errorInfo, "");
   }
 
-  /**
-   * Validates accessDenied().
-   */
+  /** Validates accessDenied(). */
   @Test
   public void testAccessDenied() {
     // Check success case.
@@ -104,9 +102,7 @@ public class ApiErrorExtractorTest {
     assertThat(errorExtractor.accessDenied(new IOException(statusOk))).isFalse();
   }
 
-  /**
-   * Validates itemAlreadyExists().
-   */
+  /** Validates itemAlreadyExists(). */
   @Test
   public void testItemAlreadyExists() {
     // Check success cases.
@@ -120,9 +116,7 @@ public class ApiErrorExtractorTest {
     assertThat(errorExtractor.itemAlreadyExists(new IOException(statusOk))).isFalse();
   }
 
-  /**
-   * Validates itemNotFound().
-   */
+  /** Validates itemNotFound(). */
   @Test
   public void testItemNotFound() {
     // Check success cases.
@@ -139,9 +133,7 @@ public class ApiErrorExtractorTest {
     assertThat(errorExtractor.itemNotFound(new IOException(new IOException()))).isFalse();
   }
 
-  /**
-   * Validates rangeNotSatisfiable().
-   */
+  /** Validates rangeNotSatisfiable(). */
   @Test
   public void testRangeNotSatisfiable() {
     // Check success case.
@@ -156,9 +148,7 @@ public class ApiErrorExtractorTest {
     assertThat(errorExtractor.rangeNotSatisfiable(new IOException(notFound))).isFalse();
   }
 
-  /**
-   * Validates rateLimited().
-   */
+  /** Validates rateLimited(). */
   @Test
   public void testRateLimited() {
     // Check success case.
@@ -170,13 +160,10 @@ public class ApiErrorExtractorTest {
     assertThat(errorExtractor.rateLimited(notRateLimited)).isFalse();
     assertThat(errorExtractor.rateLimited(new IOException(notRateLimited))).isFalse();
     assertThat(errorExtractor.rateLimited(new IOException(statusOk))).isFalse();
-    Throwable nullError = null;
-    assertThat(errorExtractor.rateLimited(nullError)).isFalse();
+    assertThat(errorExtractor.rateLimited((Throwable) null)).isFalse();
   }
 
-  /**
-   * Validates rateLimited() with BigQuery domain / reason codes
-   */
+  /** Validates rateLimited() with BigQuery domain / reason codes */
   @Test
   public void testBigQueryRateLimited() {
     // Check success case.
@@ -189,9 +176,7 @@ public class ApiErrorExtractorTest {
     assertThat(errorExtractor.rateLimited(notRateLimited)).isFalse();
   }
 
-  /**
-   * Validates ioError().
-   */
+  /** Validates ioError(). */
   @Test
   public void testIOError() {
     // Check true cases.
@@ -219,9 +204,7 @@ public class ApiErrorExtractorTest {
     assertThat(errorExtractor.ioError(new RuntimeException(notIOError))).isFalse();
   }
 
-  /**
-   * Validates socketError().
-   */
+  /** Validates socketError(). */
   @Test
   public void testSocketError() {
     // Check true cases.
@@ -249,9 +232,7 @@ public class ApiErrorExtractorTest {
         .isFalse();
   }
 
-  /**
-   * Validates readTimedOut().
-   */
+  /** Validates readTimedOut(). */
   @Test
   public void testReadTimedOut() {
     // Check success case.
@@ -265,9 +246,7 @@ public class ApiErrorExtractorTest {
     assertThat(errorExtractor.readTimedOut(x)).isFalse();
   }
 
-  /**
-   * Validates resourceNotReady().
-   */
+  /** Validates resourceNotReady(). */
   @Test
   public void testResourceNotReady() {
     // Check success case.
@@ -279,19 +258,21 @@ public class ApiErrorExtractorTest {
     // Check failure case.
     assertThat(errorExtractor.resourceNotReady(statusOk)).isFalse();
     assertThat(errorExtractor.resourceNotReady(new IOException(statusOk))).isFalse();
-    IOException withJsonError = null;
-    assertThat(errorExtractor.resourceNotReady(withJsonError)).isFalse();
+    assertThat(errorExtractor.resourceNotReady((IOException) null)).isFalse();
   }
 
   @Test
   public void testGetErrorMessage() throws IOException {
-    IOException withJsonError = googleJsonResponseException(
-        42, "Detail Reason", "Detail message", "Top Level HTTP Message");
+    IOException withJsonError =
+        googleJsonResponseException(
+            42, "Detail Reason", "Detail message", "Top Level HTTP Message");
     assertThat(errorExtractor.getErrorMessage(withJsonError)).isEqualTo("Top Level HTTP Message");
 
-    IOException nullJsonErrorWithMessage = googleJsonResponseException(
-        42, null, null, "Top Level HTTP Message");
-    assertThat(errorExtractor.getErrorMessage(nullJsonErrorWithMessage)).isEqualTo("Top Level HTTP Message");
+    IOException nullJsonErrorWithMessage =
+        googleJsonResponseException(
+            /* httpStatus=*/ 42, /* reason=*/ null, /* message=*/ null, "Top Level HTTP Message");
+    assertThat(errorExtractor.getErrorMessage(nullJsonErrorWithMessage))
+        .isEqualTo("Top Level HTTP Message");
   }
 
   @Test
@@ -324,9 +305,8 @@ public class ApiErrorExtractorTest {
   }
 
   @Test
-  public void accessDeniedNonRecoverable_GoogleJsonErroAsNullReturnFalse() {
-    IOException withJsonError = null;
-    assertThat(errorExtractor.accessDeniedNonRecoverable(withJsonError)).isFalse();
+  public void accessDeniedNonRecoverable_GoogleJsonErrorAsNullReturnFalse() {
+    assertThat(errorExtractor.accessDeniedNonRecoverable((IOException) null)).isFalse();
   }
 
   @Test
@@ -344,8 +324,7 @@ public class ApiErrorExtractorTest {
 
   @Test
   public void isClientError_GoogleJsonErrorAsNullReturnFalse() {
-    IOException withJsonError = null;
-    assertThat(errorExtractor.isClientError(withJsonError)).isFalse();
+    assertThat(errorExtractor.isClientError(null)).isFalse();
   }
 
   @Test
@@ -364,12 +343,11 @@ public class ApiErrorExtractorTest {
 
   @Test
   public void isInternalServerError_GoogleJsonErrorAsNullReturnFalse() {
-    IOException withJsonError = null;
-    assertThat(errorExtractor.isInternalServerError(withJsonError)).isFalse();
+    assertThat(errorExtractor.isInternalServerError(null)).isFalse();
   }
 
   @Test
-  public void fieldSizeTooLarge_GoogleJsonErrorWithstatusOkReturnFalse() {
+  public void fieldSizeTooLarge_GoogleJsonErrorWithStatusOkReturnFalse() {
     assertThat(errorExtractor.fieldSizeTooLarge(new IOException(statusOk))).isFalse();
   }
 
@@ -378,7 +356,7 @@ public class ApiErrorExtractorTest {
       throws IOException {
     IOException withJsonError =
         googleJsonResponseException(
-            413,
+            /* httpStatus= */ 413,
             ApiErrorExtractor.FIELD_SIZE_TOO_LARGE,
             "Value for field 'foo' is too large",
             "Value for field 'foo' is too large");
@@ -387,12 +365,11 @@ public class ApiErrorExtractorTest {
 
   @Test
   public void fieldSizeTooLarge_GoogleJsonErrorAsNullReturnFalse() {
-    IOException withJsonError = null;
-    assertThat(errorExtractor.fieldSizeTooLarge(withJsonError)).isFalse();
+    assertThat(errorExtractor.fieldSizeTooLarge((IOException) null)).isFalse();
   }
 
   @Test
-  public void preconditionNotMet_GoogleJsonErrorHttpStatusPrecondidiotFailedTrue()
+  public void preconditionNotMet_GoogleJsonErrorHttpStatusPreconditionFailedTrue()
       throws IOException {
     IOException withJsonError =
         googleJsonResponseException(
@@ -404,14 +381,14 @@ public class ApiErrorExtractorTest {
   }
 
   @Test
-  public void preconditionNotMet_GoogleJsonErrorPredictionFailedReturnTrue() throws IOException {
+  public void preconditionNotMet_GoogleJsonErrorPredictionFailedReturnTrue() {
     GoogleJsonError gje = new GoogleJsonError();
     gje.setCode(HttpStatusCodes.STATUS_CODE_PRECONDITION_FAILED);
     assertThat(errorExtractor.preconditionNotMet(gje)).isTrue();
   }
 
   @Test
-  public void preconditionNotMet_GoogleJsonErrorBadGatewayReturnFalse() throws IOException {
+  public void preconditionNotMet_GoogleJsonErrorBadGatewayReturnFalse() {
     GoogleJsonError gje = new GoogleJsonError();
     gje.setCode(HttpStatusCodes.STATUS_CODE_BAD_GATEWAY);
     assertThat(errorExtractor.preconditionNotMet(gje)).isFalse();
@@ -430,7 +407,12 @@ public class ApiErrorExtractorTest {
 
   @Test
   public void userProjectMissing_GoogleJsonErrorWithStatusOkReturnFalse() throws IOException {
-    IOException nullJsonError = googleJsonResponseException(42, null, null, null);
+    IOException nullJsonError =
+        googleJsonResponseException(
+            /* httpStatus= */ 42,
+            /* reason= */ null,
+            /* message= */ null,
+            /* httpStatusString= */ null);
     assertThat(errorExtractor.userProjectMissing(nullJsonError)).isFalse();
   }
 
@@ -448,11 +430,9 @@ public class ApiErrorExtractorTest {
 
   @Test
   public void toUserPresentableException_actionAsNull() {
-    String action = null;
     IOException exception =
         assertThrows(
-            IOException.class,
-            () -> errorExtractor.toUserPresentableException(accessDenied, action));
+            IOException.class, () -> errorExtractor.toUserPresentableException(accessDenied, null));
     assertThat(exception).hasMessageThat().isEqualTo("Forbidden");
   }
 
@@ -467,17 +447,13 @@ public class ApiErrorExtractorTest {
     assertThat(errorExtractor.getDebugInfo(new IOException(accessDenied))).isNull();
   }
 
-    /**
-     * Builds a fake GoogleJsonResponseException for testing API error handling.
-     */
+  /** Builds a fake GoogleJsonResponseException for testing API error handling. */
   private static GoogleJsonResponseException googleJsonResponseException(
       int httpStatus, String reason, String message) throws IOException {
     return googleJsonResponseException(httpStatus, reason, message, message);
   }
 
-  /**
-   * Builds a fake GoogleJsonResponseException for testing API error handling.
-   */
+  /** Builds a fake GoogleJsonResponseException for testing API error handling. */
   private static GoogleJsonResponseException googleJsonResponseException(
       int httpStatus, String reason, String message, String httpStatusString) throws IOException {
     ErrorInfo errorInfo = new ErrorInfo();
@@ -487,8 +463,7 @@ public class ApiErrorExtractorTest {
   }
 
   private static GoogleJsonResponseException googleJsonResponseException(
-      final int status, final ErrorInfo errorInfo, final String httpStatusString)
-      throws IOException {
+      int status, ErrorInfo errorInfo, String httpStatusString) throws IOException {
     final JsonFactory jsonFactory = new JacksonFactory();
     HttpTransport transport =
         new MockHttpTransport() {
