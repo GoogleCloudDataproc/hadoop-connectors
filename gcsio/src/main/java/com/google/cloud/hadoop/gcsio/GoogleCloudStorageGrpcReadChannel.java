@@ -401,12 +401,13 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       responseObserver = new ResponseObserver();
       stub.getMedia(buildRequest(readOffset, readLimit), responseObserver);
       position = readOffset;
-      boolean isGenerationReadConsistencyLatest =
-          readOptions.getGenerationReadConsistency().equals(GenerationReadConsistency.LATEST);
-      objectHasher =
-          position == 0 && !isGenerationReadConsistencyLatest
-              ? Optional.of(Hashing.crc32c().newHasher())
-              : Optional.empty();
+      boolean enableChecksums =
+          readOptions.getGrpcChecksumsEnabled()
+              && position == 0
+              && !readOptions
+                  .getGenerationReadConsistency()
+                  .equals(GenerationReadConsistency.LATEST);
+      objectHasher = enableChecksums ? Optional.of(Hashing.crc32c().newHasher()) : Optional.empty();
     }
 
     @Override

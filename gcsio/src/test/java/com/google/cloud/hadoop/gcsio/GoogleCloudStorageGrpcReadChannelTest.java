@@ -151,6 +151,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     GoogleCloudStorageReadOptions options =
         GoogleCloudStorageReadOptions.builder()
             .setGenerationReadConsistency(GenerationReadConsistency.STRICT)
+            .setGrpcChecksumsEnabled(true)
             .build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
@@ -167,6 +168,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     GoogleCloudStorageReadOptions options =
         GoogleCloudStorageReadOptions.builder()
             .setGenerationReadConsistency(GenerationReadConsistency.STRICT)
+            .setGrpcChecksumsEnabled(true)
             .build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
@@ -181,6 +183,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     GoogleCloudStorageReadOptions options =
         GoogleCloudStorageReadOptions.builder()
             .setGenerationReadConsistency(GenerationReadConsistency.STRICT)
+            .setGrpcChecksumsEnabled(true)
             .build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
@@ -196,6 +199,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     GoogleCloudStorageReadOptions options =
         GoogleCloudStorageReadOptions.builder()
             .setGenerationReadConsistency(GenerationReadConsistency.STRICT)
+            .setGrpcChecksumsEnabled(true)
             .build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
@@ -215,6 +219,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     GoogleCloudStorageReadOptions options =
         GoogleCloudStorageReadOptions.builder()
             .setGenerationReadConsistency(GenerationReadConsistency.STRICT)
+            .setGrpcChecksumsEnabled(true)
             .build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
@@ -234,6 +239,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     GoogleCloudStorageReadOptions options =
         GoogleCloudStorageReadOptions.builder()
             .setGenerationReadConsistency(GenerationReadConsistency.STRICT)
+            .setGrpcChecksumsEnabled(true)
             .build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
@@ -252,6 +258,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     GoogleCloudStorageReadOptions options =
         GoogleCloudStorageReadOptions.builder()
             .setGenerationReadConsistency(GenerationReadConsistency.STRICT)
+            .setGrpcChecksumsEnabled(true)
             .setFadvise(Fadvise.AUTO)
             .build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
@@ -273,6 +280,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     GoogleCloudStorageReadOptions options =
         GoogleCloudStorageReadOptions.builder()
             .setGenerationReadConsistency(GenerationReadConsistency.LATEST)
+            .setGrpcChecksumsEnabled(true)
             .build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 

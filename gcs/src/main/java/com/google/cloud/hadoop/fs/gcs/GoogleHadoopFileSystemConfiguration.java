@@ -483,6 +483,11 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final GoogleHadoopFileSystemConfigurationProperty<Boolean> GCS_GRPC_ENABLE =
       new GoogleHadoopFileSystemConfigurationProperty<>("fs.gs.grpc.enable", false);
 
+  /** Configuration key for enabling checksum validation for the gRPC API. */
+  public static final GoogleHadoopFileSystemConfigurationProperty<Boolean>
+      GCS_GRPC_CHECKSUMS_ENABLE =
+          new GoogleHadoopFileSystemConfigurationProperty<>("fs.gs.grpc.checksums.enable", false);
+
   /** Override configuration file path. This file must be a valid Hadoop configuration file. */
   public static final GoogleHadoopFileSystemConfigurationProperty<String> GCS_CONFIG_OVERRIDE_FILE =
       new GoogleHadoopFileSystemConfigurationProperty<>("fs.gs.config.override.file", null);
@@ -586,6 +591,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setFadvise(GCS_INPUT_STREAM_FADVISE.get(config, config::getEnum))
         .setMinRangeRequestSize(GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getInt))
         .setGenerationReadConsistency(GCS_GENERATION_READ_CONSISTENCY.get(config, config::getEnum))
+        .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
         .build();
   }
 
@@ -596,6 +602,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setUploadChunkSize(GCS_OUTPUT_STREAM_UPLOAD_CHUNK_SIZE.get(config, config::getInt))
         .setDirectUploadEnabled(
             GCS_OUTPUT_STREAM_DIRECT_UPLOAD_ENABLE.get(config, config::getBoolean))
+        .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
         .build();
   }
 

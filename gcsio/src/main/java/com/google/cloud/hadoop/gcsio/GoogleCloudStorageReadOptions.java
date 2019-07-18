@@ -54,6 +54,7 @@ public abstract class GoogleCloudStorageReadOptions {
   public static final int DEFAULT_MIN_RANGE_REQUEST_SIZE = 512 * 1024;
   public static final GenerationReadConsistency DEFAULT_GENERATION_READ_CONSISTENCY =
       GenerationReadConsistency.LATEST;
+  public static final boolean GRPC_CHECKSUMS_ENABLED_DEFAULT = false;
 
   // Default builder should be initialized after default values,
   // otherwise it will access not initialized default values.
@@ -72,7 +73,8 @@ public abstract class GoogleCloudStorageReadOptions {
         .setInplaceSeekLimit(DEFAULT_INPLACE_SEEK_LIMIT)
         .setFadvise(DEFAULT_FADVISE)
         .setMinRangeRequestSize(DEFAULT_MIN_RANGE_REQUEST_SIZE)
-        .setGenerationReadConsistency(DEFAULT_GENERATION_READ_CONSISTENCY);
+        .setGenerationReadConsistency(DEFAULT_GENERATION_READ_CONSISTENCY)
+        .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT);
   }
 
   /** See {@link Builder#setBackoffInitialIntervalMillis}. */
@@ -110,6 +112,9 @@ public abstract class GoogleCloudStorageReadOptions {
 
   /** See {@link Builder#setGenerationReadConsistency}. */
   public abstract GenerationReadConsistency getGenerationReadConsistency();
+
+  /** See {@link Builder#setGrpcChecksumsEnabled}. */
+  public abstract boolean getGrpcChecksumsEnabled();
 
   public abstract Builder toBuilder();
 
@@ -217,13 +222,23 @@ public abstract class GoogleCloudStorageReadOptions {
      */
     public abstract Builder setGenerationReadConsistency(GenerationReadConsistency consistency);
 
+    /**
+     * Sets whether to validate checksums when doing gRPC reads. If enabled, for sequential reads of
+     * a whole object, the object checksums will be validated.
+     *
+     * <p>TODO(b/134521856): Update this to discuss per-request checksums once the server supplies
+     * them and we're validating them.
+     */
+    public abstract Builder setGrpcChecksumsEnabled(boolean grpcChecksumsEnabled);
+
     abstract GoogleCloudStorageReadOptions autoBuild();
 
     public GoogleCloudStorageReadOptions build() {
       GoogleCloudStorageReadOptions options = autoBuild();
       checkState(
           options.getInplaceSeekLimit() >= 0,
-          "inplaceSeekLimit must be non-negative! Got %s", options.getInplaceSeekLimit());
+          "inplaceSeekLimit must be non-negative! Got %s",
+          options.getInplaceSeekLimit());
       return options;
     }
   }
