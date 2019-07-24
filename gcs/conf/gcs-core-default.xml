@@ -573,6 +573,17 @@
   </property>
 
   <property>
+    <name>fs.gs.inputstream.fast.fail.on.gzip.encoding</name>
+    <value>false</value>
+    <description>
+      If true, on opening a file we will check if object has Content encoding set to gzip, to
+      immediately * throw an IOException (files with this encoding are problematic because Hadoop has
+      a convention to decode them on client). If false, then channels may not throw exceptions for
+      such cases.
+    </description>
+  </property>
+
+  <property>
     <name>fs.gs.inputstream.inplace.seek.limit</name>
     <value>8388608</value>
     <description>

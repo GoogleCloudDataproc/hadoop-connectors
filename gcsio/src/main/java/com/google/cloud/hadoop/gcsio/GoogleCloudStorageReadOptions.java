@@ -47,6 +47,7 @@ public abstract class GoogleCloudStorageReadOptions {
   public static final int DEFAULT_BACKOFF_MAX_INTERVAL_MILLIS = 10 * 1000;
   public static final int DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS = 2 * 60 * 1000;
   public static final boolean DEFAULT_FAST_FAIL_ON_NOT_FOUND = true;
+  public static final boolean DEFAULT_FAST_FAIL_ON_GZIP_ENCODING = false;
   public static final int DEFAULT_BUFFER_SIZE = 0;
   public static final long DEFAULT_INPLACE_SEEK_LIMIT = 0L;
   public static final Fadvise DEFAULT_FADVISE = Fadvise.SEQUENTIAL;
@@ -66,6 +67,7 @@ public abstract class GoogleCloudStorageReadOptions {
         .setBackoffMaxIntervalMillis(DEFAULT_BACKOFF_MAX_INTERVAL_MILLIS)
         .setBackoffMaxElapsedTimeMillis(DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS)
         .setFastFailOnNotFound(DEFAULT_FAST_FAIL_ON_NOT_FOUND)
+        .setFastFailOnGzipEncoding(DEFAULT_FAST_FAIL_ON_GZIP_ENCODING)
         .setBufferSize(DEFAULT_BUFFER_SIZE)
         .setInplaceSeekLimit(DEFAULT_INPLACE_SEEK_LIMIT)
         .setFadvise(DEFAULT_FADVISE)
@@ -90,6 +92,9 @@ public abstract class GoogleCloudStorageReadOptions {
 
   /** See {@link Builder#setFastFailOnNotFound}. */
   public abstract boolean getFastFailOnNotFound();
+
+  /** See {@link Builder#setFastFailOnGzipEncoding}. */
+  public abstract boolean getFastFailOnGzipEncoding();
 
   /** See {@link Builder#setBufferSize}. */
   public abstract int getBufferSize();
@@ -152,6 +157,14 @@ public abstract class GoogleCloudStorageReadOptions {
      * extraneous checks on open().
      */
     public abstract Builder setFastFailOnNotFound(boolean fastFailOnNotFound);
+
+    /**
+     * True if attempts to open a new channel on a object with Content-Encoding: gzip to immediately
+     * throw an IOException (files with this encoding are problematic because Hadoop has a
+     * convention to decode them on client). If false, then channels may not throw exceptions for
+     * such cases until attempting to call read().
+     */
+    public abstract Builder setFastFailOnGzipEncoding(boolean fastFailOnGzipEncoding);
 
     /**
      * If set to a positive value, low-level streams will be wrapped inside a BufferedInputStream of

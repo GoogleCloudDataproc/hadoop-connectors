@@ -252,6 +252,13 @@ exist at the same path on all nodes
     call. If the client code can handle late failures on not-found errors, or
     has independently already ensured that a file exists before calling open(),
     then set this property to false for more efficient reads.
+    
+*   `fs.gs.inputstream.fast.fail.on.gzip.encoding` (default: `false`)
+
+    If `true`, on opening a file we will check if object has Content encoding set to gzip, to
+    immediately * throw an IOException (files with this encoding are problematic because Hadoop has
+    a convention to decode them on client). If false, then channels may not throw exceptions for
+    such cases.
 
 *   `fs.gs.generation.read.consistency` (default: `LATEST`)
 

@@ -28,6 +28,7 @@ import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.postR
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.truth.Truth.assertThat;
 import static java.util.stream.Collectors.toList;
+import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
@@ -35,6 +36,10 @@ import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+
+import java.io.IOException;
+import java.nio.channels.SeekableByteChannel;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -534,6 +539,65 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     List<String> listedObjects = gcs.listObjectNames(testBucket, testDir, PATH_DELIMITER);
     assertThat(listedObjects).containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");
+  }
+
+  @Test
+  public void failFastOnGzipEncodingFlagTrue_throwExceptionWhenGzipContentTypeFileOpen()
+      throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String bucketName = gcsfsIHelper.getUniqueBucketName("fail-fast-gzip-true");
+    gcs.create(bucketName);
+    StorageResourceId object = new StorageResourceId(bucketName, name.getMethodName());
+
+    Map<String, byte[]> metadata = ImmutableMap.of("foo", "bar".getBytes(StandardCharsets.UTF_8));
+
+    String contentType = "application/gzip";
+
+    gcs.createEmptyObject(object, new CreateObjectOptions(true, contentType, metadata));
+
+    GoogleCloudStorageItemInfo itemInfo = gcs.getItemInfo(object);
+
+    assertThat(itemInfo.getContentType()).isEqualTo(contentType);
+
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnGzipEncoding(true).build();
+
+    IOException exception =
+        assertThrows(IOException.class, () -> gcs.open(itemInfo.getResourceId(), readOptions));
+    assertThat(exception).hasMessageThat().contains("Gzip encoding is deprecated");
+  }
+
+  @Test
+  public void failFastOnGzipEncodingFlagFalse_dontThrowExceptionWhenGzipContentTypeFileOpen()
+      throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String bucketName = gcsfsIHelper.getUniqueBucketName("fail-fast-gzip-false");
+    gcs.create(bucketName);
+    StorageResourceId object = new StorageResourceId(bucketName, name.getMethodName());
+
+    Map<String, byte[]> metadata = ImmutableMap.of("foo", "bar".getBytes(StandardCharsets.UTF_8));
+
+    String contentType = "application/gzip";
+
+    gcs.createEmptyObject(object, new CreateObjectOptions(true, contentType, metadata));
+
+    GoogleCloudStorageItemInfo itemInfo = gcs.getItemInfo(object);
+
+    assertThat(itemInfo.getContentType()).isEqualTo(contentType);
+
+    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder().build();
+
+    SeekableByteChannel channel = gcs.open(itemInfo.getResourceId(), readOptions);
+
+    assertThat(channel.isOpen()).isTrue();
+
+    channel.close();
   }
 
   private static List<String> toObjectNames(List<GoogleCloudStorageItemInfo> listedObjects) {
