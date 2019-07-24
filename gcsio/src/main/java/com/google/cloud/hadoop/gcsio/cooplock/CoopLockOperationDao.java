@@ -22,6 +22,8 @@ import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao.LOCK_DIR
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
+import static java.lang.Thread.currentThread;
+import static java.lang.Thread.sleep;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
@@ -213,40 +215,50 @@ public class CoopLockOperationDao {
       Duration timeout) {
     Stopwatch stopwatch = Stopwatch.createStarted();
     ExecutorService timeoutExecutor = Executors.newSingleThreadExecutor();
+    Future<?> timeoutFuture =
+        timeoutExecutor.submit(
+            () -> {
+              try {
+                sleep(timeout.toMillis());
+              } catch (InterruptedException e) {
+                // Proceed further if interrupted
+              }
+              // timeoutFuture was cancelled
+              if (currentThread().isInterrupted()) {
+                return;
+              }
+              logger.atSevere().log(
+                  "Renewal of '%s' lock for %s operation timed out (timeout %s), exiting",
+                  operationLockPath, operationId, timeout);
+              System.exit(1);
+            });
+
+    int attempt = 1;
     try {
-      Future<?> timeoutFuture =
-          timeoutExecutor.submit(
-              () -> {
-                sleepUninterruptibly(timeout);
-                logger.atSevere().log(
-                    "Renewal of '%s' lock for %s operation timed out (timeout %s), exiting",
-                    operationLockPath, operationId, timeout);
-                System.exit(1);
-              });
-      int attempt = 1;
       do {
         try {
           renewLock(operationId, operationLockPath, renewFn);
-          timeoutFuture.cancel(/* mayInterruptIfRunning= */ true);
+          checkState(
+              timeoutFuture.cancel(/* mayInterruptIfRunning= */ true),
+              "timeoutFuture should be successfully canceled");
           return;
         } catch (IOException e) {
           logger.atWarning().withCause(e).log(
               "Failed to renew '%s' lock for %s operation, attempt #%d",
               operationLockPath, operationId, attempt++);
-        } catch (Exception e) {
-          logger.atSevere().withCause(e).log(
-              "Failed to renew '%s' lock for %s operation, exiting",
-              operationLockPath, operationId);
-          System.exit(1);
         }
         sleepUninterruptibly(LOCK_RENEW_RETRY_BACK_OFF);
       } while (timeout.compareTo(stopwatch.elapsed()) > 0);
+      logger.atSevere().log(
+          "Renewal of '%s' lock for %s operation timed out (timeout %s), exiting",
+          operationLockPath, operationId, timeout);
+    } catch (Exception e) {
+      logger.atSevere().withCause(e).log(
+          "Failed to renew '%s' lock for %s operation, exiting", operationLockPath, operationId);
     } finally {
+      timeoutFuture.cancel(/* mayInterruptIfRunning= */ true);
       timeoutExecutor.shutdownNow();
     }
-    logger.atSevere().log(
-        "Renewal of '%s' lock for %s operation timed out (timeout %s), exiting",
-        operationLockPath, operationId, timeout);
     System.exit(1);
   }
 
