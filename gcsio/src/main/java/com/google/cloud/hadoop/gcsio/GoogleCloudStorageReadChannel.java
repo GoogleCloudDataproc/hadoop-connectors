@@ -217,6 +217,11 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     GoogleCloudStorageItemInfo info = getInitialMetadata();
     if (info != null) {
       initMetadata(info);
+
+      if (readOptions.getFastFailOnGzipEncoding() && gzipEncoded
+          || info.getContentType() != null && info.getContentType().contains(GZIP_ENCODING)) {
+        throw new IOException("Gzip encoding is deprecated");
+      }
     }
   }
 
