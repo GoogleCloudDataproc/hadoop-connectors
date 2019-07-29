@@ -111,10 +111,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   private static final String USER_PROJECT_FIELD_NAME = "userProject";
 
-  private static final String GZIP_ENCODING = "gzip";
-
-  private static final String GZIP_TYPE = "application/gzip";
-
   // A function to encode metadata map values
   private static String encodeMetadataValues(byte[] bytes) {
     return bytes == null ? Data.NULL_STRING : BaseEncoding.base64().encode(bytes);
@@ -603,12 +599,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       if (!info.exists()) {
         throw GoogleCloudStorageExceptions.getFileNotFoundException(
             resourceId.getBucketName(), resourceId.getObjectName());
-      }
-
-      if (readOptions.getFastFailOnGzipEncoding()
-          && (GZIP_ENCODING.equals(info.getContentEncoding())
-              || GZIP_TYPE.equals(info.getContentType()))) {
-        throw new IOException("Gzip encoding is deprecated");
       }
     } else {
       info = null;
