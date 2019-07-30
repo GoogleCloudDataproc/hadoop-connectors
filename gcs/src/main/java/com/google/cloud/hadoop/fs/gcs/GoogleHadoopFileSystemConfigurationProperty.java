@@ -90,7 +90,7 @@ public class GoogleHadoopFileSystemConfigurationProperty<T> {
   }
 
   private static <S> S logProperty(String key, S value) {
-    logger.atFine().log("%s = %s", key, value);
+    logger.atFinest().log("logProperty: key: %s, value: %s", key, value);
     return value;
   }
 }

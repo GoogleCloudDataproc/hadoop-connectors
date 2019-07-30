@@ -31,7 +31,7 @@ class LegacyPathCodec implements PathCodec {
 
   @Override
   public StorageResourceId validatePathAndGetId(URI path, boolean allowEmptyObjectName) {
-    logger.atFine().log("validatePathAndGetId('%s', %s)", path, allowEmptyObjectName);
+    logger.atFinest().log("validatePathAndGetId('%s', %s)", path, allowEmptyObjectName);
     Preconditions.checkNotNull(path);
 
     if (!GoogleCloudStorageFileSystem.SCHEME.equals(path.getScheme())) {

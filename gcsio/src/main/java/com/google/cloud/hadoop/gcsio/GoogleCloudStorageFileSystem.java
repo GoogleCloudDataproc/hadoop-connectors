@@ -253,7 +253,7 @@ public class GoogleCloudStorageFileSystem {
    * @throws IOException
    */
   public WritableByteChannel create(URI path) throws IOException {
-    logger.atFine().log("create(%s)", path);
+    logger.atFinest().log("create(path: %s)", path);
     return create(path, CreateFileOptions.DEFAULT);
   }
 
@@ -265,7 +265,7 @@ public class GoogleCloudStorageFileSystem {
    * @throws IOException
    */
   public WritableByteChannel create(URI path, CreateFileOptions options) throws IOException {
-    logger.atFine().log("create(%s)", path);
+    logger.atFinest().log("create(path: %s)", path);
     Preconditions.checkNotNull(path, "path could not be null");
     if (FileInfo.isDirectoryPath(path)) {
       throw new IOException(
@@ -339,7 +339,7 @@ public class GoogleCloudStorageFileSystem {
    */
   public SeekableByteChannel open(URI path, GoogleCloudStorageReadOptions readOptions)
       throws IOException {
-    logger.atFine().log("open(%s, %s)", path, readOptions);
+    logger.atFinest().log("open(path: %s, readOptions: %s)", path, readOptions);
     Preconditions.checkNotNull(path);
     checkArgument(!FileInfo.isDirectoryPath(path), "Cannot open a directory for reading: %s", path);
 
@@ -373,7 +373,7 @@ public class GoogleCloudStorageFileSystem {
   public void delete(URI path, boolean recursive) throws IOException {
     Preconditions.checkNotNull(path, "path can not be null");
     checkArgument(!path.equals(GCS_ROOT), "Cannot delete root path (%s)", path);
-    logger.atFine().log("delete(%s, %s)", path, recursive);
+    logger.atFinest().log("delete(path: %s, recursive: %s)", path, recursive);
 
     FileInfo fileInfo = getFileInfo(path);
     if (!fileInfo.exists()) {
@@ -481,7 +481,7 @@ public class GoogleCloudStorageFileSystem {
    */
   public boolean exists(URI path)
       throws IOException {
-    logger.atFine().log("exists(%s)", path);
+    logger.atFinest().log("exists(path: %s)", path);
     return getFileInfo(path).exists();
   }
 
@@ -493,7 +493,7 @@ public class GoogleCloudStorageFileSystem {
    * @throws IOException
    */
   public void mkdirs(URI path) throws IOException {
-    logger.atFine().log("mkdirs(%s)", path);
+    logger.atFinest().log("mkdirs(path: %s)", path);
     Preconditions.checkNotNull(path);
 
     if (path.equals(GCS_ROOT)) {
@@ -523,7 +523,7 @@ public class GoogleCloudStorageFileSystem {
     }
     // Add the bucket portion.
     itemIds.add(new StorageResourceId(resourceId.getBucketName()));
-    logger.atFine().log("mkdirs: items: %s", itemIds);
+    logger.atFinest().log("mkdirs(items: %s)", itemIds);
 
     List<GoogleCloudStorageItemInfo> itemInfos = gcs.getItemInfos(itemIds);
 
@@ -593,7 +593,7 @@ public class GoogleCloudStorageFileSystem {
    * @throws IOException
    */
   public void rename(URI src, URI dst) throws IOException {
-    logger.atFine().log("rename(%s, %s)", src, dst);
+    logger.atFinest().log("rename(src: %s, dst: %s)", src, dst);
     Preconditions.checkNotNull(src);
     Preconditions.checkNotNull(dst);
     checkArgument(!src.equals(GCS_ROOT), "Root path cannot be renamed.");
@@ -927,7 +927,7 @@ public class GoogleCloudStorageFileSystem {
 
     Preconditions.checkNotNull(fileInfo);
     URI path = fileInfo.getPath();
-    logger.atFine().log("listFileNames(%s)", path);
+    logger.atFinest().log("listFileNames(path: %s, recursive: %s)", path, recursive);
     List<URI> paths = new ArrayList<>();
     List<String> childNames;
 
@@ -941,7 +941,7 @@ public class GoogleCloudStorageFileSystem {
           for (String childName : childNames) {
             URI childPath = pathCodec.getPath(childName, null, true);
             paths.add(childPath);
-            logger.atFine().log("listFileNames: added: %s", childPath);
+            logger.atFinest().log("listFileNames: added: %s", childPath);
           }
         } else {
           // A null delimiter asks GCS to return all objects with a given prefix,
@@ -960,13 +960,13 @@ public class GoogleCloudStorageFileSystem {
           for (String childName : childNames) {
             URI childPath = pathCodec.getPath(itemInfo.getBucketName(), childName, false);
             paths.add(childPath);
-            logger.atFine().log("listFileNames: added: %s", childPath);
+            logger.atFinest().log("listFileNames: added: %s", childPath);
           }
         }
       }
     } else {
       paths.add(path);
-      logger.atFine().log(
+      logger.atFinest().log(
           "listFileNames: added single original path since !isDirectory(): %s", path);
     }
 
