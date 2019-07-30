@@ -137,7 +137,7 @@ public class GoogleCloudStorageFileSystem {
   static final Comparator<FileInfo> FILE_INFO_PATH_COMPARATOR =
       comparing(FileInfo::getPath, PATH_COMPARATOR);
 
-  /** A PathCodec that maintains compatibility with versions of GCS FS < 1.4.5. */
+  /** A PathCodec that maintains compatibility with versions of GCS FS &lt; 1.4.5. */
   public static final PathCodec LEGACY_PATH_CODEC = new LegacyPathCodec();
 
   /**
@@ -576,12 +576,12 @@ public class GoogleCloudStorageFileSystem {
    *
    * Otherwise, the expected behavior is as follows:
    * -- if src is a directory
-   *    -- dst is an existing file => disallowed
-   *    -- dst is a directory => rename the directory.
+   *    -- dst is an existing file =&gt; disallowed
+   *    -- dst is a directory =&gt; rename the directory.
    *
    * -- if src is a file
-   *    -- dst is a file => rename the file.
-   *    -- dst is a directory => similar to the previous case after
+   *    -- dst is a file =&gt; rename the file.
+   *    -- dst is a directory =&gt; similar to the previous case after
    *                             appending src file-name to dst
    *
    * Note:
@@ -1410,7 +1410,7 @@ public class GoogleCloudStorageFileSystem {
    * For each listed modified object, attempt to update the modification time of the parent
    * directory.
    *
-   * <p>This method will log & swallow exceptions thrown by the GCSIO layer.
+   * <p>This method will log and swallow exceptions thrown by the GCSIO layer.
    *
    * @param modifiedObjects The objects that have been modified
    * @param excludedParents A list of parent directories that we shouldn't attempt to update.

@@ -85,7 +85,7 @@ public class BigQueryTableFieldSchema {
   /**
    * Sets the nested schema fields if the type property is set to RECORD.
    *
-   * @see TableFieldSchema#setFields(java.util.List<TableFieldSchema> fields)
+   * @see TableFieldSchema#setFields
    */
   public BigQueryTableFieldSchema setFields(java.util.List<BigQueryTableFieldSchema> fields) {
     fieldSchema.setFields(fields.stream().map(field -> field.get()).collect(Collectors.toList()));

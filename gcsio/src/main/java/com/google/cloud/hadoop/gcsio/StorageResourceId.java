@@ -194,7 +194,7 @@ public class StorageResourceId {
   }
 
   /**
-   * Returns a string of the form gs://<bucketName>/<objectName>.
+   * Returns a string of the form gs://&lt;bucketName&gt;/&lt;objectName&gt;.
    */
   @Override
   public String toString() {

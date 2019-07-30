@@ -39,7 +39,7 @@ public class InMemoryBucketEntry {
 
   /**
    * @param bucketName The name representing the bucketName portion of a GCS path, e.g.
-   *     gs://<bucketName>/<objectName>.
+   *     gs://&lt;bucketName&gt;/&lt;objectName&gt;.
    */
   public InMemoryBucketEntry(
       String bucketName, long createTimeMillis, CreateBucketOptions options) {
