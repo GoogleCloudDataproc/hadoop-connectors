@@ -76,9 +76,9 @@ public class GoogleHadoopFS extends AbstractFileSystem {
       Progressable progress,
       ChecksumOpt checksumOpt,
       boolean createParent) throws IOException {
-    logger.atFine().log(
-        "createInternal: flag: %s, absolutePermission: %s, bufferSize: %s, replication: %s,"
-            + "blockSize: %s, progress: %s, checksumOpt: %s, createParent: %s",
+    logger.atFinest().log(
+        "createInternal(flag: %s, absolutePermission: %s, bufferSize: %s, replication: %s,"
+            + "blockSize: %s, progress: %s, checksumOpt: %s, createParent: %s)",
         flag,
         absolutePermission,
         bufferSize,
@@ -89,7 +89,7 @@ public class GoogleHadoopFS extends AbstractFileSystem {
         createParent);
     if (!createParent) {
       // TODO: don't ignore 'createParent' flag
-      logger.atFine().log("Ignoring createParent=false. Creating parents anyways.");
+      logger.atFinest().log("Ignoring createParent=false. Creating parents anyways.");
     }
     // AbstractFileSystems rely on permission to not overwrite.
     boolean overwriteFile = true;
@@ -142,7 +142,7 @@ public class GoogleHadoopFS extends AbstractFileSystem {
   @SuppressWarnings("deprecation")
   @Override
   public FsServerDefaults getServerDefaults() throws IOException {
-    logger.atFinest().log("getServerDefaults, rootBucketName: %s", ghfs.getRootBucketName());
+    logger.atFinest().log("getServerDefaults for rootBucketName: %s", ghfs.getRootBucketName());
     return ghfs.getServerDefaults();
   }
 
@@ -150,10 +150,10 @@ public class GoogleHadoopFS extends AbstractFileSystem {
   @Override
   public void mkdir(final Path dir, final FsPermission permission, final boolean createParent)
       throws IOException {
-    logger.atFine().log(
+    logger.atFinest().log(
         "mkdir(dir: %s, permission: %s, createParent %s)", dir, permission, createParent);
     if (!createParent) {
-      logger.atFine().log("Ignoring createParent=false. Creating parents anyways.");
+      logger.atFinest().log("Ignoring createParent=false. Creating parents anyways.");
     }
     ghfs.mkdirs(dir, permission);
   }
@@ -211,8 +211,9 @@ public class GoogleHadoopFS extends AbstractFileSystem {
 
   @Override
   public FileStatus getFileStatus(final Path f) throws IOException {
-    logger.atFinest().log("getFileStatus(path: %s)", f);
-    return ghfs.getFileStatus(f);
+    FileStatus fileStatus = ghfs.getFileStatus(f);
+    logger.atFinest().log("getFileStatus(path: %s) returned %s", f, fileStatus);
+    return fileStatus;
   }
 
   @Override

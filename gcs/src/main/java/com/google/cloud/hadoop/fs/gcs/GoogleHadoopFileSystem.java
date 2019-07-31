@@ -71,12 +71,13 @@ public class GoogleHadoopFileSystem extends GoogleHadoopFileSystemBase {
     checkArgument(rootBucket != null, "No bucket specified in GCS URI: %s", initUri);
     // Validate root bucket name
     pathCodec.getPath(rootBucket, /* objectName= */ null, /* allowEmptyObjectName= */ true);
-    logger.atFine().log(
-        "GHFS.configureBuckets: GoogleHadoopFileSystem root in bucket: %s", rootBucket);
+    logger.atFinest().log(
+        "configureBuckets, GoogleHadoopFileSystem root in bucket: %s", rootBucket);
   }
 
   @Override
   protected void checkPath(Path path) {
+    logger.atFinest().log("checkPath(path: %s)", path);
     // Validate scheme
     super.checkPath(path);
     URI uri = path.toUri();
@@ -112,7 +113,7 @@ public class GoogleHadoopFileSystem extends GoogleHadoopFileSystemBase {
    */
   @Override
   public Path getHadoopPath(URI gcsPath) {
-    logger.atFine().log("GHFS.getHadoopPath: %s", gcsPath);
+    logger.atFinest().log("getHadoopPath(gcsPath: %s)", gcsPath);
 
     // Handle root. Delegate to getGcsPath on "gs:/" to resolve the appropriate gs://<bucket> URI.
     if (gcsPath.equals(getGcsPath(getFileSystemRoot()))) {
@@ -129,7 +130,7 @@ public class GoogleHadoopFileSystem extends GoogleHadoopFileSystemBase {
         resourceId.getBucketName(), rootBucket);
 
     Path hadoopPath = new Path(getScheme() + "://" + rootBucket + '/' + resourceId.getObjectName());
-    logger.atFine().log("GHFS.getHadoopPath: %s -> %s", gcsPath, hadoopPath);
+    logger.atFinest().log("getHadoopPath: gcsPath: %s, hadoopPath: %s", gcsPath, hadoopPath);
     return hadoopPath;
   }
 
@@ -139,7 +140,7 @@ public class GoogleHadoopFileSystem extends GoogleHadoopFileSystemBase {
    */
   @Override
   public URI getGcsPath(Path hadoopPath) {
-    logger.atFine().log("GHFS.getGcsPath: %s", hadoopPath);
+    logger.atFinest().log("getGcsPath(hadoopPath: %s)", hadoopPath);
 
     // Convert to fully qualified absolute path; the Path object will callback to get our current
     // workingDirectory as part of fully resolving the path.
@@ -154,7 +155,7 @@ public class GoogleHadoopFileSystem extends GoogleHadoopFileSystemBase {
 
     // Construct GCS path uri.
     URI gcsPath = pathCodec.getPath(rootBucket, objectName, true);
-    logger.atFine().log("GHFS.getGcsPath: %s -> %s", hadoopPath, gcsPath);
+    logger.atFinest().log("getGcsPath: hadoopPath: %s ,gcsPath: %s", hadoopPath, gcsPath);
     return gcsPath;
   }
 

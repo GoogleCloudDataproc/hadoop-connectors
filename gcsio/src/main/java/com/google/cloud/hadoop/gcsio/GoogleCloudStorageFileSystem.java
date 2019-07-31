@@ -155,7 +155,7 @@ public class GoogleCloudStorageFileSystem {
    */
   public GoogleCloudStorageFileSystem(
       Credential credential, GoogleCloudStorageFileSystemOptions options) throws IOException {
-    logger.atFine().log("GCSFS(%s)", options.getCloudStorageOptions().getAppName());
+    logger.atFinest().log("GCSFS(appName: %s)", options.getCloudStorageOptions().getAppName());
     options.throwIfNotValid();
 
     checkArgument(credential != null, "credential must not be null");
@@ -962,7 +962,7 @@ public class GoogleCloudStorageFileSystem {
           for (String childName : childNames) {
             URI childPath = pathCodec.getPath(childName, null, true);
             paths.add(childPath);
-            logger.atFinest().log("listFileNames: added: %s", childPath);
+            logger.atFinest().log("listFileNames: path added: %s", childPath);
           }
         } else {
           // A null delimiter asks GCS to return all objects with a given prefix,
@@ -981,7 +981,7 @@ public class GoogleCloudStorageFileSystem {
           for (String childName : childNames) {
             URI childPath = pathCodec.getPath(itemInfo.getBucketName(), childName, false);
             paths.add(childPath);
-            logger.atFinest().log("listFileNames: added: %s", childPath);
+            logger.atFinest().log("listFileNames: path added: %s", childPath);
           }
         }
       }
@@ -1010,7 +1010,7 @@ public class GoogleCloudStorageFileSystem {
 
     GoogleCloudStorageItemInfo info = getFromFuture(infoFuture, "Failed to get info from future");
     StorageResourceId resourceId = info.getResourceId();
-    logger.atFine().log("repairImplicitDirectory(%s)", resourceId);
+    logger.atFinest().log("repairImplicitDirectory(resourceId: %s)", resourceId);
 
     if (info.exists()
         || resourceId.isRoot()
@@ -1054,7 +1054,7 @@ public class GoogleCloudStorageFileSystem {
    * @param prefix the prefix to use to list all matching objects.
    */
   public List<FileInfo> listAllFileInfoForPrefix(URI prefix) throws IOException {
-    logger.atFine().log("listAllFileInfoForPrefixPage(%s)", prefix);
+    logger.atFinest().log("listAllFileInfoForPrefixPage(prefix: %s)", prefix);
     StorageResourceId prefixId = getPrefixId(prefix);
     List<GoogleCloudStorageItemInfo> itemInfos =
         gcs.listObjectInfo(
@@ -1073,7 +1073,8 @@ public class GoogleCloudStorageFileSystem {
    */
   public ListPage<FileInfo> listAllFileInfoForPrefixPage(URI prefix, String pageToken)
       throws IOException {
-    logger.atFine().log("listAllFileInfoForPrefixPage(%s, %s)", prefix, pageToken);
+    logger.atFinest().log(
+        "listAllFileInfoForPrefixPage(prefix: %s, pageToken:%s)", prefix, pageToken);
     StorageResourceId prefixId = getPrefixId(prefix);
     ListPage<GoogleCloudStorageItemInfo> itemInfosPage =
         gcs.listObjectInfoPage(
@@ -1108,7 +1109,7 @@ public class GoogleCloudStorageFileSystem {
    */
   public List<FileInfo> listFileInfo(URI path) throws IOException {
     Preconditions.checkNotNull(path, "path can not be null");
-    logger.atFine().log("listFileInfo(%s)", path);
+    logger.atFinest().log("listFileInfo(path: %s)", path);
 
     StorageResourceId pathId = pathCodec.validatePathAndGetId(path, true);
     StorageResourceId dirId =
@@ -1168,7 +1169,7 @@ public class GoogleCloudStorageFileSystem {
    * @throws IOException
    */
   public FileInfo getFileInfo(URI path) throws IOException {
-    logger.atFine().log("getFileInfo(%s)", path);
+    logger.atFinest().log("getFileInfo(path: %s)", path);
     checkArgument(path != null, "path must not be null");
     // Validate the given path. true == allow empty object name.
     // One should be able to get info about top level directory (== bucket),
@@ -1178,7 +1179,7 @@ public class GoogleCloudStorageFileSystem {
         FileInfo.fromItemInfo(
             pathCodec,
             getFileInfoInternal(resourceId, gcs.getOptions().isInferImplicitDirectoriesEnabled()));
-    logger.atFine().log("getFileInfo: %s", fileInfo);
+    logger.atFinest().log("getFileInfo: fileInfo: %s", fileInfo);
     return fileInfo;
   }
 
@@ -1249,7 +1250,7 @@ public class GoogleCloudStorageFileSystem {
    */
   public List<FileInfo> getFileInfos(List<URI> paths) throws IOException {
     checkArgument(paths != null, "paths must not be null");
-    logger.atFine().log("getFileInfos(%d paths)", paths.size());
+    logger.atFinest().log("getFileInfos(paths: %s)", paths);
 
     if (paths.size() == 1) {
       return new ArrayList<>(Collections.singleton(getFileInfo(paths.get(0))));
@@ -1289,7 +1290,7 @@ public class GoogleCloudStorageFileSystem {
   /** Releases resources used by this instance. */
   public void close() {
     if (gcs != null) {
-      logger.atFine().log("close()");
+      logger.atFinest().log("close()");
       try {
         gcs.close();
       } finally {
@@ -1315,7 +1316,7 @@ public class GoogleCloudStorageFileSystem {
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      logger.atFine().withCause(e).log(
+      logger.atFinest().withCause(e).log(
           "Failed to await termination: forcibly shutting down executor service");
       executor.shutdownNow();
     }
@@ -1338,7 +1339,7 @@ public class GoogleCloudStorageFileSystem {
   @VisibleForTesting
   public void mkdir(URI path) throws IOException {
 
-    logger.atFine().log("mkdir(%s)", path);
+    logger.atFinest().log("mkdir(path: %s)", path);
     Preconditions.checkNotNull(path);
     checkArgument(!path.equals(GCS_ROOT), "Cannot create root directory.");
 
@@ -1368,8 +1369,9 @@ public class GoogleCloudStorageFileSystem {
    */
   protected void updateTimestampsForParentDirectories(
       List<URI> modifiedObjects, List<URI> excludedParents) throws IOException {
-    logger.atFine().log(
-        "updateTimestampsForParentDirectories(%s, %s)", modifiedObjects, excludedParents);
+    logger.atFinest().log(
+        "updateTimestampsForParentDirectories(modifiedObjects: %s, excludedParents: %s)",
+        modifiedObjects, excludedParents);
 
     Predicate<URI> updatePredicate = options.getShouldIncludeInTimestampUpdatesPredicate();
     Set<URI> excludedParentPathsSet = new HashSet<>(excludedParents);
@@ -1397,7 +1399,7 @@ public class GoogleCloudStorageFileSystem {
     if (!itemUpdates.isEmpty()) {
       gcs.updateItems(itemUpdates);
     } else {
-      logger.atFine().log("All paths were excluded from directory timestamp updating.");
+      logger.atFinest().log("All paths were excluded from directory timestamp updating.");
     }
   }
 
@@ -1412,8 +1414,9 @@ public class GoogleCloudStorageFileSystem {
    */
   protected void tryUpdateTimestampsForParentDirectories(
       final List<URI> modifiedObjects, final List<URI> excludedParents) {
-    logger.atFine().log(
-        "tryUpdateTimestampsForParentDirectories(%s, %s)", modifiedObjects, excludedParents);
+    logger.atFinest().log(
+        "tryUpdateTimestampsForParentDirectories(modifiedObjects: %s, excludedParents: %s)",
+        modifiedObjects, excludedParents);
 
     // If we're calling tryUpdateTimestamps, we don't actually care about the results. Submit
     // these requests via a background thread and continue on.
@@ -1425,12 +1428,12 @@ public class GoogleCloudStorageFileSystem {
                 try {
                   updateTimestampsForParentDirectories(modifiedObjects, excludedParents);
                 } catch (IOException ioe) {
-                  logger.atFine().withCause(ioe).log(
+                  logger.atFinest().withCause(ioe).log(
                       "Exception caught when trying to update parent directory timestamps.");
                 }
               });
     } catch (RejectedExecutionException ree) {
-      logger.atFine().withCause(ree).log(
+      logger.atFinest().withCause(ree).log(
           "Exhausted thread pool and queue space while updating parent timestamps");
     }
   }
@@ -1503,7 +1506,9 @@ public class GoogleCloudStorageFileSystem {
    * @param allowEmptyObjectName If true, a missing object name is not considered invalid.
    */
   static String validateObjectName(String objectName, boolean allowEmptyObjectName) {
-    logger.atFine().log("validateObjectName('%s', %s)", objectName, allowEmptyObjectName);
+    logger.atFinest().log(
+        "validateObjectName(objectName: '%s', allowEmptyObjectName: %s)",
+        objectName, allowEmptyObjectName);
 
     if (isNullOrEmpty(objectName) || objectName.equals(PATH_DELIMITER)) {
       if (allowEmptyObjectName) {
@@ -1530,7 +1535,7 @@ public class GoogleCloudStorageFileSystem {
       objectName = objectName.substring(1);
     }
 
-    logger.atFine().log("validateObjectName -> '%s'", objectName);
+    logger.atFinest().log("validateObjectName: objectName: '%s'", objectName);
     return objectName;
   }
 
