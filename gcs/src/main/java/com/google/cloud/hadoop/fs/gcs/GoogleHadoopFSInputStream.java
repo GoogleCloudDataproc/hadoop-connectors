@@ -68,7 +68,8 @@ class GoogleHadoopFSInputStream extends FSInputStream {
       GoogleCloudStorageReadOptions readOptions,
       FileSystem.Statistics statistics)
       throws IOException {
-    logger.atFine().log("GoogleHadoopFSInputStream(%s)", gcsPath);
+    logger.atFinest().log(
+        "GoogleHadoopFSInputStream(gcsPath: %s, readOptions: %s)", gcsPath, readOptions);
     this.ghfs = ghfs;
     this.gcsPath = gcsPath;
     this.statistics = statistics;
