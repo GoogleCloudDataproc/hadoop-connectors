@@ -16,13 +16,15 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_TYPE;
 import static com.google.common.truth.Truth.assertThat;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.Assert.assertThrows;
 
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Random;
-import com.google.common.primitives.Bytes;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -100,39 +102,50 @@ public class GoogleHadoopFileSystemSyncableOutputIntegrationTest
   }
 
   @Test
-  public void testAppendFile() throws Exception {
+  public void append_shouldAppendNewData() throws Exception {
     URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
 
-    // write 5-bytes objects
-    byte[] byteObject = new byte[5];
-    new Random().nextBytes(byteObject);
+    ghfsHelper.writeTextFile(path.getAuthority(), path.getPath(), "original-content");
 
-    byte[] byteObject1 = new byte[5];
-    new Random().nextBytes(byteObject);
+    // Test appending three 9-character strings to existing object using 20 bytes buffer size
+    try (FSDataOutputStream os = ghfs.append(hadoopPath, 20, /* progress= */ () -> {})) {
+      os.write("_append-1".getBytes(UTF_8));
 
-    try (FSDataOutputStream fout = ghfs.create(hadoopPath)) {
-      fout.write(byteObject);
-      fout.hsync();
+      // Validate that file content didn't change after write call
+      assertThat(ghfsHelper.readTextFile(hadoopPath)).isEqualTo("original-content");
+
+      os.hsync();
+
+      // Validate that hsync persisted data
+      assertThat(ghfsHelper.readTextFile(hadoopPath)).isEqualTo("original-content_append-1");
+
+      os.write("_append-2".getBytes(UTF_8));
+      os.write("_append-3".getBytes(UTF_8));
     }
-    // Test appending three 5-bytes to 5-bytes object using 10 bytes buffer size
-    try (FSDataOutputStream fsout = ghfs.append(hadoopPath, 10, null)) {
-      fsout.write(byteObject1);
-      fsout.hsync();
-      fsout.write(byteObject);
-      fsout.write(byteObject1);
-      fsout.hsync();
-    }
+
+    String expectedContent = "original-content_append-1_append-2_append-3";
+
+    assertThat(ghfsHelper.readTextFile(hadoopPath)).isEqualTo(expectedContent);
 
     // Check if file after appending has right size
-    FileStatus status = ghfs.getFileStatus(hadoopPath);
-    assertThat(status.getLen()).isEqualTo(4 * byteObject.length);
+    assertThat(ghfs.getFileStatus(hadoopPath).getLen()).isEqualTo(expectedContent.length());
+  }
 
-    byte[] actual = new byte[4 * byteObject.length];
-    try (FSDataInputStream fin = ghfs.open(hadoopPath)) {
-      fin.readFully(0, actual);
-    }
-    byte [] expected = Bytes.concat(byteObject, byteObject1, byteObject, byteObject1);
-    assertThat(actual).isEqualTo(expected);
+  @Test
+  public void append_shouldFail_whenFileDoesNotExist() throws Exception {
+    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
+
+    // Test appending three 9-character strings to existing object using 20 bytes buffer size
+    FSDataOutputStream fsos = ghfs.append(hadoopPath, 20, /* progress= */ () -> {});
+    fsos.write("_append-1".getBytes(UTF_8));
+
+    assertThrows(GoogleJsonResponseException.class, fsos::hsync);
+
+    assertThrows(NullPointerException.class, fsos::close);
+
+    // Validate that file wasn't created
+    assertThat(ghfs.exists(hadoopPath)).isFalse();
   }
 }

@@ -140,7 +140,13 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
       FileSystem.Statistics statistics,
       CreateFileOptions createFileOptions)
       throws IOException {
-    this(ghfs, gcsPath, statistics, createFileOptions, TEMPFILE_CLEANUP_THREADPOOL, false);
+    this(
+        ghfs,
+        gcsPath,
+        statistics,
+        createFileOptions,
+        TEMPFILE_CLEANUP_THREADPOOL,
+        /* appendMode= */ false);
   }
 
   /** Creates a new GoogleHadoopSyncableOutputStream suitable for appending to existing files. */
@@ -170,20 +176,19 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
     this.deletionFutures = new ArrayList<>();
     this.cleanupThreadpool = cleanupThreadpool;
 
-    if (!appendMode) {
-    // The first component of the stream will go straight to the destination filename to optimize
-    // the case where no hsync() or a single hsync() is called during the lifetime of the stream;
-    // committing the first component thus doesn't require any compose() call under the hood.
-    this.curGcsPath = gcsPath;
-    this.curDelegate = new GoogleHadoopOutputStream(ghfs, curGcsPath, statistics, fileOptions);
-    this.curComponentIndex = 0;
-    } else {
+    if (appendMode) {
       // When appending first component has to go to new temporary file.
-      this.curComponentIndex = 1;
       this.curGcsPath = getNextTemporaryPath();
-      this.curDelegate = new GoogleHadoopOutputStream(ghfs, curGcsPath, statistics, fileOptions);
+      this.curComponentIndex = 1;
+    } else {
+      // The first component of the stream will go straight to the destination filename to optimize
+      // the case where no hsync() or a single hsync() is called during the lifetime of the stream;
+      // committing the first component thus doesn't require any compose() call under the hood.
+      this.curGcsPath = gcsPath;
+      this.curComponentIndex = 0;
     }
 
+    this.curDelegate = new GoogleHadoopOutputStream(ghfs, curGcsPath, statistics, fileOptions);
     this.curDestGenerationId = StorageResourceId.UNKNOWN_GENERATION_ID;
   }
 
