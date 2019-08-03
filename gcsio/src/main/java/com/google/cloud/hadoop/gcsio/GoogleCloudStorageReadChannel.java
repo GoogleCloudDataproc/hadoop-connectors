@@ -217,11 +217,6 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     GoogleCloudStorageItemInfo info = getInitialMetadata();
     if (info != null) {
       initMetadata(info);
-
-      if (readOptions.getFastFailOnGzipEncoding() && gzipEncoded
-          || info.getContentType() != null && info.getContentType().contains(GZIP_ENCODING)) {
-        throw new IOException("Gzip encoding is deprecated");
-      }
     }
   }
 
@@ -814,11 +809,11 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         !metadataInitialized,
         "can not initialize metadata, it already initialized for '%s'", resourceIdString);
     gzipEncoded = nullToEmpty(encoding).contains(GZIP_ENCODING);
-    if (gzipEncoded) {
-      size = Long.MAX_VALUE;
-    } else {
-      size = sizeFromMetadata;
+    if (gzipEncoded && !readOptions.getSupportContentEncoding()) {
+      throw new IOException(
+          "Can't read GZIP encoded files - content encoding support is disabled.");
     }
+    size = gzipEncoded ? Long.MAX_VALUE : sizeFromMetadata;
     randomAccess = !gzipEncoded && readOptions.getFadvise() == Fadvise.RANDOM;
     checkEncodingAndAccess();
 

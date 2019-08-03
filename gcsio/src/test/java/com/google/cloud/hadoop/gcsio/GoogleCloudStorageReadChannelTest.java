@@ -321,9 +321,7 @@ public class GoogleCloudStorageReadChannelTest {
   }
 
   @Test
-  public void
-      GoogleCloudStorageReadChannel_failFastOnGzipEncodingFlagTrue_throwExceptionWhenGzipContentEncoding()
-          throws Exception {
+  public void open_gzipContentEncoding_succeeds_whenContentEncodingSupported() throws Exception {
     MockHttpTransport transport =
         GoogleCloudStorageTestUtils.mockTransport(
             jsonDataResponse(newStorageObject().setContentEncoding("gzip")));
@@ -331,30 +329,29 @@ public class GoogleCloudStorageReadChannelTest {
     Storage storage = new Storage(transport, JSON_FACTORY, r -> {});
 
     GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnGzipEncoding(true).build();
+        GoogleCloudStorageReadOptions.builder().setSupportContentEncoding(true).build();
 
-    IOException exception =
-        assertThrows(IOException.class, () -> createReadChannel(storage, readOptions));
-    assertThat(exception).hasMessageThat().contains("Gzip encoding is deprecated");
+    try (GoogleCloudStorageReadChannel channel = createReadChannel(storage, readOptions)) {
+      channel.position();
+    }
   }
 
   @Test
-  public void
-      GoogleCloudStorageReadChannel_failFastOnGzipEncodingFlagTrue_throwExceptionWhenGzipContentType()
-          throws Exception {
-
+  public void open_gzipContentEncoding_throwsIOException_ifContentEncodingNotSupported()
+      throws Exception {
     MockHttpTransport transport =
         GoogleCloudStorageTestUtils.mockTransport(
-            jsonDataResponse(newStorageObject().setContentType("application/gzip")));
+            jsonDataResponse(newStorageObject().setContentEncoding("gzip")));
 
     Storage storage = new Storage(transport, JSON_FACTORY, r -> {});
 
     GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnGzipEncoding(true).build();
+        GoogleCloudStorageReadOptions.builder().setSupportContentEncoding(false).build();
 
-    IOException exception =
-        assertThrows(IOException.class, () -> createReadChannel(storage, readOptions));
-    assertThat(exception).hasMessageThat().contains("Gzip encoding is deprecated");
+    IOException e = assertThrows(IOException.class, () -> createReadChannel(storage, readOptions));
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo("Can't read GZIP encoded files - content encoding support is disabled.");
   }
 
   private static GoogleCloudStorageReadOptions.Builder newLazyReadOptionsBuilder() {

@@ -573,13 +573,11 @@
   </property>
 
   <property>
-    <name>fs.gs.inputstream.fast.fail.on.gzip.encoding</name>
+    <name>fs.gs.inputstream.support.content.encoding.enable</name>
     <value>false</value>
     <description>
-      If true, on opening a file we will check if object has Content encoding set to gzip, to
-      immediately * throw an IOException (files with this encoding are problematic because Hadoop has
-      a convention to decode them on client). If false, then channels may not throw exceptions for
-      such cases.
+      If set to false then reading files with GZIP content encoding (HTTP header
+      "Content-Encoding: gzip") will result in failure (`IOException` is thrown).
     </description>
   </property>
 
