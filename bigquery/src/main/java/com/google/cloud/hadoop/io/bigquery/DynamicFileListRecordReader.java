@@ -191,11 +191,11 @@ public class DynamicFileListRecordReader<K, V>
     if (needRefresh) {
       throw new IllegalStateException(
           String.format(
-              "Couldn't obtain any files after %d attempts. This could happen if in the first"
+              "Couldn't obtain any files after %d attempt(s). This could happen if in the first"
                   + " failed task attempt BigQuery returned 0 records, but didn't create 0-record"
                   + " file, in this case the second task attempt record reader will wait"
                   + " indefinitely, but no files will appear.",
-              pollAttempt + 1));
+              pollAttempt));
     }
 
     if (isNextFileReady()) {
