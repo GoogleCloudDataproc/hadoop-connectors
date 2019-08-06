@@ -1,3 +1,7 @@
+1. Add a property to specify create disposition in Bigquery connector:
+
+       mapred.bq.output.table.createdisposition
+
 ### 1.0.0-RC3 - 2019-XX-XX
 
 1.  POM updates for GCS connector 2.0.0.
