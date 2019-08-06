@@ -71,7 +71,7 @@
 
     This feature is configurable with the property:
 
-        fs.gs.inputstream.support.content.encoding.enable (default: false)
+        fs.gs.inputstream.support.gzip.encoding.enable (default: false)
 
 ### 1.9.14 - 2019-02-13
 

@@ -253,7 +253,7 @@ exist at the same path on all nodes
     has independently already ensured that a file exists before calling open(),
     then set this property to false for more efficient reads.
 
-*   `fs.gs.inputstream.support.content.encoding.enable` (default: `false`)
+*   `fs.gs.inputstream.support.gzip.encoding.enable` (default: `false`)
 
     If set to `false` then reading files with GZIP content encoding (HTTP header
     `Content-Encoding: gzip`) will result in failure (`IOException` is thrown).

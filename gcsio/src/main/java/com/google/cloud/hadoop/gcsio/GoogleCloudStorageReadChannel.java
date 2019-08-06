@@ -809,7 +809,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         !metadataInitialized,
         "can not initialize metadata, it already initialized for '%s'", resourceIdString);
     gzipEncoded = nullToEmpty(encoding).contains(GZIP_ENCODING);
-    if (gzipEncoded && !readOptions.getSupportContentEncoding()) {
+    if (gzipEncoded && !readOptions.getSupportGzipEncoding()) {
       throw new IOException(
           "Can't read GZIP encoded files - content encoding support is disabled.");
     }

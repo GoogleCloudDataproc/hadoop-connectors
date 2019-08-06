@@ -573,7 +573,7 @@
   </property>
 
   <property>
-    <name>fs.gs.inputstream.support.content.encoding.enable</name>
+    <name>fs.gs.inputstream.support.gzip.encoding.enable</name>
     <value>false</value>
     <description>
       If set to false then reading files with GZIP content encoding (HTTP header

@@ -329,7 +329,7 @@ public class GoogleCloudStorageReadChannelTest {
     Storage storage = new Storage(transport, JSON_FACTORY, r -> {});
 
     GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder().setSupportContentEncoding(true).build();
+        GoogleCloudStorageReadOptions.builder().setSupportGzipEncoding(true).build();
 
     try (GoogleCloudStorageReadChannel channel = createReadChannel(storage, readOptions)) {
       channel.position();
@@ -346,7 +346,7 @@ public class GoogleCloudStorageReadChannelTest {
     Storage storage = new Storage(transport, JSON_FACTORY, r -> {});
 
     GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder().setSupportContentEncoding(false).build();
+        GoogleCloudStorageReadOptions.builder().setSupportGzipEncoding(false).build();
 
     IOException e = assertThrows(IOException.class, () -> createReadChannel(storage, readOptions));
     assertThat(e)
