@@ -16,14 +16,16 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.FileInfo.fromItemInfo;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInferredDirectory;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.copyRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.deleteRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestString;
-import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.postRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.uploadRequestString;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.truth.Truth.assertThat;
+import static java.util.stream.Collectors.toList;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
@@ -42,7 +44,7 @@ import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/** Integration tests for GoogleCloudStorageFileSystem class. */
+/** Integration tests for {@link GoogleCloudStorageFileSystem} class. */
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageFileSystemNewIntegrationTest {
 
@@ -97,7 +99,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
-    String dirObject = "mkdirs_shouldCreateNewDirectory_" + UUID.randomUUID();
+    String dirObject = getTestResource();
     URI dirObjectUri = new URI("gs://" + bucketName).resolve(dirObject);
 
     gcsFs.mkdir(dirObjectUri);
@@ -117,7 +119,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
-    String dirObject = "getFileInfo_sequential_" + UUID.randomUUID();
+    String dirObject = getTestResource();
     URI dirObjectUri = new URI("gs://" + bucketName).resolve("/" + dirObject);
 
     gcsfsIHelper.createObjectsWithSubdirs(
@@ -143,7 +145,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
-    String dirObject = "getFileInfo_parallel_" + UUID.randomUUID();
+    String dirObject = getTestResource();
     URI dirObjectUri = new URI("gs://" + bucketName).resolve("/" + dirObject);
 
     gcsfsIHelper.createObjectsWithSubdirs(
@@ -163,13 +165,34 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
   }
 
   @Test
+  public void getFileInfo_single_file_sequential() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    String fileObject = getTestResource() + "/f1";
+    URI fileObjectUri = new URI("gs://" + bucketName).resolve("/" + fileObject);
+
+    gcsfsIHelper.createObjectsWithSubdirs(bucketName, fileObject);
+
+    FileInfo fileInfo = gcsFs.getFileInfo(fileObjectUri);
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(getRequestString(bucketName, fileObject));
+
+    assertThat(fileInfo.exists()).isTrue();
+    assertThat(fileInfo.getPath()).isEqualTo(fileObjectUri);
+  }
+
+  @Test
   public void getDirInfo_sequential() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
     GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
-    String dirObject = "getDirInfo_sequential_" + UUID.randomUUID();
+    String dirObject = getTestResource();
     URI dirObjectUri = new URI("gs://" + bucketName).resolve("/" + dirObject);
 
     gcsfsIHelper.createObjectsWithSubdirs(
@@ -194,7 +217,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
-    String dirObject = "getDirInfo_parallel_" + UUID.randomUUID();
+    String dirObject = getTestResource();
     URI dirObjectUri = new URI("gs://" + bucketName).resolve("/" + dirObject);
 
     gcsfsIHelper.createObjectsWithSubdirs(
@@ -213,14 +236,142 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
   }
 
   @Test
-  public void listFileInfo_file_sequential() throws Exception {
+  public void getFileInfos_sequential() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
     GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
-    String fileObject = "listFileInfo_file_sequential_" + UUID.randomUUID();
-    URI fileObjectUri = new URI("gs://" + bucketName).resolve(fileObject);
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource();
+
+    gcsfsIHelper.createObjectsWithSubdirs(
+        bucketName, dirObject + "/f1", dirObject + "/f2", dirObject + "/subdir/f3");
+
+    List<FileInfo> fileInfos =
+        gcsFs.getFileInfos(
+            ImmutableList.of(
+                bucketUri.resolve(dirObject + "/f1"),
+                bucketUri.resolve(dirObject + "/f2"),
+                bucketUri.resolve(dirObject + "/subdir/f3")));
+
+    assertThat(fileInfos.stream().map(FileInfo::exists).collect(toList()))
+        .containsExactly(true, true, true);
+    assertThat(fileInfos.stream().map(FileInfo::getPath).collect(toList()))
+        .containsExactly(
+            bucketUri.resolve(dirObject + "/f1"),
+            bucketUri.resolve(dirObject + "/f2"),
+            bucketUri.resolve(dirObject + "/subdir/f3"));
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(bucketName, dirObject + "/f1"),
+            getRequestString(bucketName, dirObject + "/f2"),
+            getRequestString(bucketName, dirObject + "/subdir/f3"));
+  }
+
+  @Test
+  public void getFileInfos_parallel() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorageFileSystem gcsFs =
+        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build(), gcsRequestsTracker);
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource();
+
+    gcsfsIHelper.createObjectsWithSubdirs(
+        bucketName, dirObject + "/f1", dirObject + "/f2", dirObject + "/subdir/f3");
+
+    List<FileInfo> fileInfos =
+        gcsFs.getFileInfos(
+            ImmutableList.of(
+                bucketUri.resolve(dirObject + "/f1"),
+                bucketUri.resolve(dirObject + "/f2"),
+                bucketUri.resolve(dirObject + "/subdir/f3")));
+
+    assertThat(fileInfos.stream().map(FileInfo::exists).collect(toList()))
+        .containsExactly(true, true, true);
+    assertThat(fileInfos.stream().map(FileInfo::getPath).collect(toList()))
+        .containsExactly(
+            bucketUri.resolve(dirObject + "/f1"),
+            bucketUri.resolve(dirObject + "/f2"),
+            bucketUri.resolve(dirObject + "/subdir/f3"));
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestString(bucketName, dirObject + "/f1/", 2, null),
+            getRequestString(bucketName, dirObject + "/f1"),
+            getRequestString(bucketName, dirObject + "/f1/"),
+            listRequestString(bucketName, dirObject + "/f2/", 2, null),
+            getRequestString(bucketName, dirObject + "/f2"),
+            getRequestString(bucketName, dirObject + "/f2/"),
+            listRequestString(bucketName, dirObject + "/subdir/f3/", 2, null),
+            getRequestString(bucketName, dirObject + "/subdir/f3"),
+            getRequestString(bucketName, dirObject + "/subdir/f3/"));
+  }
+
+  @Test
+  public void listFileNames() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource();
+
+    gcsfsIHelper.createObjectsWithSubdirs(
+        bucketName, dirObject + "/f1", dirObject + "/f2", dirObject + "/subdir/f3");
+
+    List<URI> listedNames =
+        gcsFs.listFileNames(inferredDirInfo(gcsFs, bucketName, dirObject), /* recursive= */ false);
+
+    assertThat(listedNames)
+        .containsExactly(
+            bucketUri.resolve(dirObject + "/f1"),
+            bucketUri.resolve(dirObject + "/f2"),
+            bucketUri.resolve(dirObject + "/subdir/"));
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(listRequestString(bucketName, false, dirObject + "/", 1024, null));
+  }
+
+  @Test
+  public void listFileNames_recursive() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource();
+
+    gcsfsIHelper.createObjectsWithSubdirs(
+        bucketName, dirObject + "/f1", dirObject + "/f2", dirObject + "/subdir/f3");
+
+    List<URI> listedNames =
+        gcsFs.listFileNames(inferredDirInfo(gcsFs, bucketName, dirObject), /* recursive= */ true);
+
+    assertThat(listedNames)
+        .containsExactly(
+            bucketUri.resolve(dirObject + "/f1"),
+            bucketUri.resolve(dirObject + "/f2"),
+            bucketUri.resolve(dirObject + "/subdir/"),
+            bucketUri.resolve(dirObject + "/subdir/f3"));
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(listRequestString(bucketName, dirObject + "/", 1024));
+  }
+
+  @Test
+  public void listFileInfo_single_file_sequential() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    String fileObject = getTestResource();
+    URI fileObjectUri = new URI("gs://" + bucketName + "/").resolve(fileObject);
 
     gcsfsIHelper.createObjectsWithSubdirs(bucketName, fileObject);
 
@@ -230,6 +381,9 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
         .containsExactly(getRequestString(bucketName, fileObject));
 
     assertThat(fileInfos).hasSize(1);
+    FileInfo fileInfo = fileInfos.get(0);
+    assertThat(fileInfo.exists()).isTrue();
+    assertThat(fileInfo.getPath()).isEqualTo(fileObjectUri);
   }
 
   @Test
@@ -242,8 +396,8 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
-    String fileObject = "listFileInfo_file_parallel_" + UUID.randomUUID();
-    URI fileObjectUri = new URI("gs://" + bucketName).resolve(fileObject);
+    String fileObject = getTestResource();
+    URI fileObjectUri = new URI("gs://" + bucketName + "/").resolve(fileObject);
 
     gcsfsIHelper.createObjectsWithSubdirs(bucketName, fileObject);
 
@@ -261,6 +415,9 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
                 /* pageToken= */ null));
 
     assertThat(fileInfos).hasSize(1);
+    FileInfo fileInfo = fileInfos.get(0);
+    assertThat(fileInfo.exists()).isTrue();
+    assertThat(fileInfo.getPath()).isEqualTo(fileObjectUri);
   }
 
   @Test
@@ -270,12 +427,12 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
-    String dirObject = "listFileInfo_directory_sequential_" + UUID.randomUUID();
-    URI dirObjectUri = new URI("gs://" + bucketName).resolve(dirObject);
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource();
 
     gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "/file1", dirObject + "/file2");
 
-    List<FileInfo> fileInfos = gcsFs.listFileInfo(dirObjectUri);
+    List<FileInfo> fileInfos = gcsFs.listFileInfo(bucketUri.resolve(dirObject));
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
@@ -288,7 +445,11 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
                 /* maxResults= */ 1024,
                 /* pageToken= */ null));
 
-    assertThat(fileInfos).hasSize(2);
+    assertThat(fileInfos.stream().map(FileInfo::exists).collect(toList()))
+        .containsExactly(true, true);
+    assertThat(fileInfos.stream().map(FileInfo::getPath).collect(toList()))
+        .containsExactly(
+            bucketUri.resolve(dirObject + "/file1"), bucketUri.resolve(dirObject + "/file2"));
   }
 
   @Test
@@ -301,12 +462,12 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
-    String dirObject = "listFileInfo_directory_parallel_" + UUID.randomUUID();
-    URI dirObjectUri = new URI("gs://" + bucketName).resolve(dirObject);
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource();
 
     gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "/file1", dirObject + "/file2");
 
-    List<FileInfo> fileInfos = gcsFs.listFileInfo(dirObjectUri);
+    List<FileInfo> fileInfos = gcsFs.listFileInfo(bucketUri.resolve(dirObject));
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
@@ -319,269 +480,169 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
                 /* maxResults= */ 1024,
                 /* pageToken= */ null));
 
-    assertThat(fileInfos).hasSize(2);
-  }
-
-  @Test
-  public void deleteFile_sequential() throws Exception {
-    TrackingHttpRequestInitializer gcsRequestsTracker =
-        new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
-
-    String bucketName = gcsfsIHelper.sharedBucketName1;
-    String dirObject = name.getMethodName() + "_" + UUID.randomUUID() + "/";
-
-    gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "f1");
-
-    URI objectToBeDeletedUri = new URI("gs://" + bucketName + "/" + dirObject + "f1");
-
-    gcsFs.delete(objectToBeDeletedUri, false);
-    // This test performs additional POST request to dirObject when run singly, as result
-    // generationId for delete operation need to be increased for DELETE request.
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
+    assertThat(fileInfos.stream().map(FileInfo::exists).collect(toList()))
+        .containsExactly(true, true);
+    assertThat(fileInfos.stream().map(FileInfo::getPath).collect(toList()))
         .containsExactly(
-            getRequestString(bucketName, dirObject + "f1"),
-            getRequestString(bucketName, dirObject),
-            deleteRequestString(bucketName, dirObject + "f1", 1));
+            bucketUri.resolve(dirObject + "/file1"), bucketUri.resolve(dirObject + "/file2"));
   }
 
   @Test
-  public void deleteFile_parallel() throws Exception {
+  public void delete_file_sequential() throws Exception {
     GoogleCloudStorageFileSystemOptions gcsFsOptions =
-        newGcsFsOptions().setStatusParallelEnabled(true).build();
+        newGcsFsOptions()
+            // disable timestamp updater
+            .setShouldIncludeInTimestampUpdatesPredicate(ignore -> false)
+            .build();
 
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
     GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
-    String dirObject = name.getMethodName() + "_" + UUID.randomUUID() + "/";
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource();
 
-    gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "f1");
+    gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "/f1");
 
-    URI objectToBeDeletedUri = new URI("gs://" + bucketName + "/" + dirObject + "f1");
+    gcsFs.delete(bucketUri.resolve(dirObject + "/f1"), /* recursive= */ false);
 
-    gcsFs.delete(objectToBeDeletedUri, false);
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject + "f1"),
-            listRequestString(bucketName, false, dirObject + "f1/", 2, null),
-            getRequestString(bucketName, dirObject + "f1/"),
-            getRequestString(bucketName, dirObject),
-            listRequestString(bucketName, false, dirObject, 2, null),
-            deleteRequestString(bucketName, dirObject + "f1", 5),
-            postRequestString(bucketName, dirObject));
-  }
-
-  @Test
-  public void renameFile_sequential() throws Exception {
-    TrackingHttpRequestInitializer gcsRequestsTracker =
-        new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
-
-    String bucketName = gcsfsIHelper.sharedBucketName1;
-    String dirObject = name.getMethodName() + "_" + UUID.randomUUID() + "/";
-
-    gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "f1");
-
-    URI srcObjectUri = new URI("gs://" + bucketName + "/" + dirObject + "f1");
-    URI dstObjectUri = new URI("gs://" + bucketName + "/" + dirObject + "f2");
-
-    gcsFs.rename(srcObjectUri, dstObjectUri);
     // This test performs additional POST request to dirObject when run singly, as result
     // generationId for delete operation need to be increased for DELETE request.
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
-            getRequestString(bucketName, dirObject + "f1"),
-            getRequestString(bucketName, dirObject + "f2"),
-            getRequestString(bucketName, dirObject + "f2/"),
-            listRequestString(bucketName, false, dirObject + "f2/", 2, null),
-            getRequestString(bucketName, dirObject),
-            getRequestString(bucketName, dirObject + "f2/"),
-            listRequestString(bucketName, false, dirObject + "f2/", 2, null),
-            getRequestString(bucketName, dirObject),
-            copyRequestString(bucketName, dirObject + "f1", bucketName, dirObject + "f2", "copyTo"),
-            deleteRequestString(bucketName, dirObject + "f1", 9),
-            postRequestString(bucketName, dirObject));
+            getRequestString(bucketName, dirObject + "/"),
+            getRequestString(bucketName, dirObject + "/f1"),
+            deleteRequestString(bucketName, dirObject + "/f1", 1));
+
+    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isFalse();
   }
 
   @Test
-  public void renameFile_parallel() throws Exception {
+  public void delete_file_parallel() throws Exception {
     GoogleCloudStorageFileSystemOptions gcsFsOptions =
-        newGcsFsOptions().setStatusParallelEnabled(true).build();
+        newGcsFsOptions()
+            // disable timestamp updater
+            .setShouldIncludeInTimestampUpdatesPredicate(ignore -> false)
+            .setStatusParallelEnabled(true)
+            .build();
 
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
     GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
 
     String bucketName = gcsfsIHelper.sharedBucketName1;
-    String dirObject = name.getMethodName() + "_" + UUID.randomUUID() + "/";
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource();
 
-    gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "f1");
+    gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "/f1");
 
-    URI srcObjectUri = new URI("gs://" + bucketName + "/" + dirObject + "f1");
-    URI dstObjectUri = new URI("gs://" + bucketName + "/" + dirObject + "f2");
+    gcsFs.delete(bucketUri.resolve(dirObject + "/f1"), /* recursive= */ false);
 
-    gcsFs.rename(srcObjectUri, dstObjectUri);
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(bucketName, dirObject + "/"),
+            listRequestString(bucketName, false, dirObject + "/", 2, null),
+            getRequestString(bucketName, dirObject + "/f1"),
+            getRequestString(bucketName, dirObject + "/f1/"),
+            listRequestString(bucketName, false, dirObject + "/f1/", 2, null),
+            deleteRequestString(bucketName, dirObject + "/f1", 1));
+
+    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isFalse();
+  }
+
+  @Test
+  public void rename_file_sequential() throws Exception {
+    GoogleCloudStorageFileSystemOptions gcsFsOptions =
+        newGcsFsOptions()
+            // disable timestamp updater
+            .setShouldIncludeInTimestampUpdatesPredicate(ignore -> false)
+            .build();
+
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource();
+
+    gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "/f1");
+
+    gcsFs.rename(bucketUri.resolve(dirObject + "/f1"), bucketUri.resolve(dirObject + "/f2"));
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(bucketName, dirObject + "/f1"),
+            getRequestString(bucketName, dirObject + "/f2"),
+            getRequestString(bucketName, dirObject + "/f2/"),
+            listRequestString(bucketName, false, dirObject + "/f2/", 2, null),
+            getRequestString(bucketName, dirObject + "/"),
+            getRequestString(bucketName, dirObject + "/f2/"),
+            listRequestString(bucketName, false, dirObject + "/f2/", 2, null),
+            getRequestString(bucketName, dirObject + "/"),
+            copyRequestString(
+                bucketName, dirObject + "/f1", bucketName, dirObject + "/f2", "copyTo"),
+            deleteRequestString(bucketName, dirObject + "/f1", 1));
+
+    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isFalse();
+    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f2"))).isTrue();
+  }
+
+  @Test
+  public void rename_file_parallel() throws Exception {
+    GoogleCloudStorageFileSystemOptions gcsFsOptions =
+        newGcsFsOptions()
+            // disable timestamp updater
+            .setShouldIncludeInTimestampUpdatesPredicate(ignore -> false)
+            .setStatusParallelEnabled(true)
+            .build();
+
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource();
+
+    gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "/f1");
+
+    gcsFs.rename(bucketUri.resolve(dirObject + "/f1"), bucketUri.resolve(dirObject + "/f2"));
 
     // This test performs additional POST request to dirObject when run singly, as result
     // generationId for delete operation need to be increased for DELETE request.
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
-            listRequestString(bucketName, false, dirObject + "f1/", 2, null),
-            getRequestString(bucketName, dirObject + "f1"),
-            getRequestString(bucketName, dirObject + "f1/"),
-            getRequestString(bucketName, dirObject + "f2"),
-            getRequestString(bucketName, dirObject + "f2/"),
-            listRequestString(bucketName, false, dirObject + "f2/", 2, null),
-            getRequestString(bucketName, dirObject),
-            listRequestString(bucketName, false, dirObject, 2, null),
-            getRequestString(bucketName, dirObject + "f2/"),
-            listRequestString(bucketName, false, dirObject + "f2/", 2, null),
-            getRequestString(bucketName, dirObject),
-            listRequestString(bucketName, false, dirObject, 2, null),
-            copyRequestString(bucketName, dirObject + "f1", bucketName, dirObject + "f2", "copyTo"),
-            deleteRequestString(bucketName, dirObject + "f1", 13),
-            postRequestString(bucketName, dirObject));
+            getRequestString(bucketName, dirObject + "/f1"),
+            getRequestString(bucketName, dirObject + "/f1/"),
+            listRequestString(bucketName, false, dirObject + "/f1/", 2, null),
+            getRequestString(bucketName, dirObject + "/f2"),
+            getRequestString(bucketName, dirObject + "/f2/"),
+            listRequestString(bucketName, false, dirObject + "/f2/", 2, null),
+            getRequestString(bucketName, dirObject + "/"),
+            listRequestString(bucketName, false, dirObject + "/", 2, null),
+            getRequestString(bucketName, dirObject + "/f2/"),
+            listRequestString(bucketName, false, dirObject + "/f2/", 2, null),
+            getRequestString(bucketName, dirObject + "/"),
+            listRequestString(bucketName, false, dirObject + "/", 2, null),
+            copyRequestString(
+                bucketName, dirObject + "/f1", bucketName, dirObject + "/f2", "copyTo"),
+            deleteRequestString(bucketName, dirObject + "/f1", 1));
+
+    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isFalse();
+    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f2"))).isTrue();
   }
 
-  @Test
-  public void getFileInfo_single_file() throws Exception {
-    TrackingHttpRequestInitializer gcsRequestsTracker =
-        new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
-
-    String bucketName = gcsfsIHelper.sharedBucketName1;
-    String dirObject = name.getMethodName() + "_" + UUID.randomUUID() + "/";
-
-    gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "f1");
-
-    gcsFs.getFileInfo(new URI("gs://" + bucketName + "/" + dirObject + "f1"));
-
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(getRequestString(bucketName, dirObject + "f1"));
+  private String getTestResource() {
+    return name.getMethodName() + "_" + UUID.randomUUID();
   }
 
-  @Test
-  public void getFileInfos_sequence() throws Exception {
-    TrackingHttpRequestInitializer gcsRequestsTracker =
-        new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
-
-    String bucketName = gcsfsIHelper.sharedBucketName1;
-    String dirObject = name.getMethodName() + "_" + UUID.randomUUID() + "/";
-
-    gcsfsIHelper.createObjectsWithSubdirs(
-        bucketName, dirObject + "f1", dirObject + "f2", dirObject + "subdir/f3");
-
-    gcsFs.getFileInfos(
-        ImmutableList.of(
-            new URI("gs://" + bucketName + "/" + dirObject + "f1"),
-            new URI("gs://" + bucketName + "/" + dirObject + "f2"),
-            new URI("gs://" + bucketName + "/" + dirObject + "subdir/f3")));
-
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject + "f1"),
-            getRequestString(bucketName, dirObject + "f2"),
-            getRequestString(bucketName, dirObject + "subdir/f3"));
-  }
-
-  @Test
-  public void getFileInfos_parallel() throws Exception {
-    TrackingHttpRequestInitializer gcsRequestsTracker =
-        new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build(), gcsRequestsTracker);
-
-    String bucketName = gcsfsIHelper.sharedBucketName1;
-    String dirObject = name.getMethodName() + "_" + UUID.randomUUID() + "/";
-
-    gcsfsIHelper.createObjectsWithSubdirs(
-        bucketName, dirObject + "f1", dirObject + "f2", dirObject + "subdir/f3");
-
-    gcsFs.getFileInfos(
-        ImmutableList.of(
-            new URI("gs://" + bucketName + "/" + dirObject + "f1"),
-            new URI("gs://" + bucketName + "/" + dirObject + "f2"),
-            new URI("gs://" + bucketName + "/" + dirObject + "subdir/f3")));
-
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            listRequestString(bucketName, dirObject + "f1/", 2, null),
-            getRequestString(bucketName, dirObject + "f1"),
-            getRequestString(bucketName, dirObject + "f1/"),
-            listRequestString(bucketName, dirObject + "f2/", 2, null),
-            getRequestString(bucketName, dirObject + "f2"),
-            getRequestString(bucketName, dirObject + "f2/"),
-            listRequestString(bucketName, dirObject + "subdir/f3/", 2, null),
-            getRequestString(bucketName, dirObject + "subdir/f3"),
-            getRequestString(bucketName, dirObject + "subdir/f3/"));
-  }
-
-  @Test
-  public void listFileNames_sequential() throws Exception {
-    TrackingHttpRequestInitializer gcsRequestsTracker =
-        new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
-
-    String bucketName = gcsfsIHelper.sharedBucketName1;
-    String dirObject = name.getMethodName() + "_" + UUID.randomUUID() + "/";
-
-    gcsfsIHelper.createObjectsWithSubdirs(
-        bucketName, dirObject + "f1", dirObject + "f2", dirObject + "subdir/f3");
-
-    FileInfo testFile = gcsFs.getFileInfo(new URI("gs://" + bucketName + "/" + dirObject));
-    gcsFs.listFileNames(testFile);
-
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject),
-            listRequestString(bucketName, dirObject, 1024, null));
-  }
-
-  @Test
-  public void listFileNames_sequential_recursive() throws Exception {
-    TrackingHttpRequestInitializer gcsRequestsTracker =
-        new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
-
-    String bucketName = gcsfsIHelper.sharedBucketName1;
-    String dirObject = name.getMethodName() + "_" + UUID.randomUUID() + "/";
-
-    gcsfsIHelper.createObjectsWithSubdirs(
-        bucketName, dirObject + "f1", dirObject + "f2", dirObject + "subdir/f3");
-
-    FileInfo testFile = gcsFs.getFileInfo(new URI("gs://" + bucketName + "/" + dirObject));
-    gcsFs.listFileNames(testFile, true);
-
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject),
-            listRequestString(bucketName, dirObject, 1024));
-  }
-
-  @Test
-  public void listFileNames_parallel_recursive() throws Exception {
-    TrackingHttpRequestInitializer gcsRequestsTracker =
-        new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(newGcsFsOptions().setStatusParallelEnabled(true).build(), gcsRequestsTracker);
-
-    String bucketName = gcsfsIHelper.sharedBucketName1;
-    String dirObject = name.getMethodName() + "_" + UUID.randomUUID() + "/";
-
-    gcsfsIHelper.createObjectsWithSubdirs(
-        bucketName, dirObject + "f1", dirObject + "f2", dirObject + "subdir/f3");
-
-    FileInfo testFile = gcsFs.getFileInfo(new URI("gs://" + bucketName + "/" + dirObject));
-    gcsFs.listFileNames(testFile, true);
-
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(bucketName, dirObject),
-            listRequestString(bucketName, dirObject, 2, null),
-            listRequestString(bucketName, dirObject, 1024));
+  private FileInfo inferredDirInfo(
+      GoogleCloudStorageFileSystem gcsFs, String bucketName, String dirObject) {
+    StorageResourceId resourceId =
+        new StorageResourceId(bucketName, dirObject.endsWith("/") ? dirObject : dirObject + "/");
+    return fromItemInfo(gcsFs.getPathCodec(), createInferredDirectory(resourceId));
   }
 
   private GoogleCloudStorageFileSystemOptions.Builder newGcsFsOptions() {
