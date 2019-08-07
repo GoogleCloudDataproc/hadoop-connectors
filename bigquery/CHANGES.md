@@ -1,7 +1,3 @@
-1. Add a property to specify create disposition in Bigquery connector:
-
-       mapred.bq.output.table.createdisposition
-
 ### 1.0.0-RC3 - 2019-XX-XX
 
 1.  POM updates for GCS connector 2.0.0.
@@ -39,6 +35,10 @@
     By default max number of attempts is unlimited (`-1` value):
 
         mapred.bq.dynamic.file.list.record.reader.poll.max.attempts (default: -1)
+
+1. Add a property to specify create table disposition:
+
+       mapred.bq.output.table.createdisposition
 
 ### 0.13.14 - 2019-02-13
 
