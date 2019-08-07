@@ -36,7 +36,7 @@
 
         mapred.bq.dynamic.file.list.record.reader.poll.max.attempts (default: -1)
 
-1. Add a property to specify create table disposition:
+1. Add a property to specify output table create disposition:
 
        mapred.bq.output.table.createdisposition (default: CREATE_IF_NEEDED)
 
