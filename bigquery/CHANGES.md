@@ -38,7 +38,7 @@
 
 1. Add a property to specify create table disposition:
 
-       mapred.bq.output.table.createdisposition
+       mapred.bq.output.table.createdisposition (default: CREATE_IF_NEEDED)
 
 ### 0.13.14 - 2019-02-13
 
