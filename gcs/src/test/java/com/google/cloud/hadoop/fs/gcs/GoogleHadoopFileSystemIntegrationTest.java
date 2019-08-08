@@ -106,7 +106,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   /** Validates rename(). */
   @Test
   @Override
-  public void testRename() throws IOException {
+  public void testRename() throws Exception {
     renameHelper(
         new HdfsBehavior() {
           /**

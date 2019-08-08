@@ -109,7 +109,7 @@ public class WebHdfsIntegrationTest extends HadoopFileSystemTestBase {
    */
   @Test @Override
   public void testDelete()
-      throws IOException {
+          throws Exception {
     deleteHelper(new HdfsBehavior());
   }
 
@@ -127,7 +127,7 @@ public class WebHdfsIntegrationTest extends HadoopFileSystemTestBase {
    */
   @Test @Override
   public void testRename()
-      throws IOException {
+          throws Exception {
     renameHelper(new HdfsBehavior() {
         @Override
         public MethodOutcome renameRootOutcome() {

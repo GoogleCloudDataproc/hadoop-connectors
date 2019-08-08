@@ -330,7 +330,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
    */
   @Test @Override
   public void testDelete()
-      throws IOException {
+          throws Exception {
     deleteHelper(new HdfsBehavior());
   }
 
@@ -348,7 +348,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
    */
   @Test @Override
   public void testRename()
-      throws IOException {
+          throws Exception {
     renameHelper(new HdfsBehavior());
   }
 

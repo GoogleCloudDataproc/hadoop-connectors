@@ -98,7 +98,7 @@ public class LocalFileSystemIntegrationTest
    */
   @Test @Override
   public void testDelete()
-      throws IOException {
+          throws Exception {
     deleteHelper(new HdfsBehavior());
   }
 
@@ -160,7 +160,7 @@ public class LocalFileSystemIntegrationTest
               return new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE);
             }
           });
-    } catch (AssertionError ae) {
+    } catch (AssertionError | Exception ae) {
       // LocalFileSystem behaves differently for the case where dst is an existing directory,
       // and src is a directory with a file underneath it. GHFS places the src directory
       // as a subdirectory into dst; LocalFileSystem just clobbers dst directly.

@@ -201,8 +201,10 @@
               <includes>
                 <include>**/*IntegrationTest.java</include>
               </includes>
-              <reuseForks>false</reuseForks>
-              <forkCount>1C</forkCount>
+              <reuseForks>true</reuseForks>
+              <forkCount>1</forkCount>
+              <parallel>methods</parallel>
+              <useUnlimitedThreads>true</useUnlimitedThreads>
             </configuration>
           </plugin>
         </plugins>
