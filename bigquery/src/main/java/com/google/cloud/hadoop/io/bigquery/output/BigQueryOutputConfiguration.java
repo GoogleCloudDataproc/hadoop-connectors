@@ -464,7 +464,7 @@ public class BigQueryOutputConfiguration {
    * table for loading data.
    *
    * @param conf the configuration to reference the keys from.
-   * @return the write disposition of the output table.
+   * @return the create disposition of the output table.
    */
   public static String getCreateDisposition(Configuration conf) {
     return conf.get(
