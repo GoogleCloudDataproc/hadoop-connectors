@@ -167,7 +167,7 @@ public class BigQueryHelper {
       logger.atInfo().log("No import schema provided, auto detecting schema.");
       loadConfig.setAutodetect(true);
     } else {
-      logger.atInfo().log("Using provided import schema '%s'", schema);
+      logger.atInfo().log("Using provided import schema '%s'.", schema);
     }
 
     JobConfiguration config = new JobConfiguration();
@@ -258,12 +258,12 @@ public class BigQueryHelper {
 
   /** Returns true if the table exists, or false if not. */
   public boolean tableExists(TableReference tableRef) throws IOException {
-    Bigquery.Tables.Get request =
-        service
-            .tables()
-            .get(tableRef.getProjectId(), tableRef.getDatasetId(), tableRef.getTableId());
     try {
-      Table fetchedTable = request.execute();
+      Table fetchedTable =
+          service
+              .tables()
+              .get(tableRef.getProjectId(), tableRef.getDatasetId(), tableRef.getTableId())
+              .execute();
       logger.atFine().log(
           "Successfully fetched table '%s' for tableRef '%s'", fetchedTable, tableRef);
       return true;
