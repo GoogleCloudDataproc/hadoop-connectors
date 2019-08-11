@@ -40,7 +40,7 @@ import java.util.UUID;
 import javax.annotation.Nullable;
 
 /** Wrapper for BigQuery API. */
-class BigQueryHelper {
+public class BigQueryHelper {
   // BigQuery job_ids must match this pattern.
   public static final String BIGQUERY_JOB_ID_PATTERN = "[a-zA-Z0-9_-]+";
 
