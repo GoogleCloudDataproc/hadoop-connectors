@@ -79,7 +79,7 @@ public class CoopLockOperationDao {
 
   private static final int LOCK_MODIFY_RETRY_BACK_OFF_MILLIS = 1_100;
 
-  private static final int MAX_LOCK_RENEW_TIMEOUT_MLLIS = LOCK_MODIFY_RETRY_BACK_OFF_MILLIS * 10;
+  private static final int MAX_LOCK_RENEW_TIMEOUT_MILLIS = LOCK_MODIFY_RETRY_BACK_OFF_MILLIS * 10;
 
   private static final DateTimeFormatter LOCK_FILE_DATE_TIME_FORMAT =
       DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss.SSSXXX").withZone(ZoneOffset.UTC);
@@ -344,7 +344,7 @@ public class CoopLockOperationDao {
       String operationId, URI operationLockPath, Class<T> clazz, BiConsumer<T, Instant> renewFn) {
     long lockRenewalPeriodMilli = options.getLockExpirationTimeoutMilli() / 2;
     long lockRenewTimeoutMilli =
-        Math.min(options.getLockExpirationTimeoutMilli() / 4, MAX_LOCK_RENEW_TIMEOUT_MLLIS);
+        Math.min(options.getLockExpirationTimeoutMilli() / 4, MAX_LOCK_RENEW_TIMEOUT_MILLIS);
     return scheduledThreadPool.scheduleAtFixedRate(
         () ->
             renewLockOrExit(
