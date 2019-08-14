@@ -67,8 +67,6 @@ public class CoopLockOperationDao {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  private static final String RENAME_LOG_RECORD_SEPARATOR = "->";
-
   private static final String OPERATION_LOG_FILE_FORMAT = "%s_%s_%s.log";
   private static final String OPERATION_LOCK_FILE_FORMAT = "%s_%s_%s.lock";
 
