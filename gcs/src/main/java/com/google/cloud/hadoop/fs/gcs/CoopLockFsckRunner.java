@@ -204,7 +204,8 @@ class CoopLockFsckRunner {
             (o, i) -> o.setLockEpochMilli(i.toEpochMilli()));
     try {
       LinkedHashMap<String, String> loggedResources =
-          getOperationLog(operationStatus, CoopLockOperationDao::decodeRenameLogRecord).stream()
+          getOperationLog(operationStatus, l -> GSON.fromJson(l, RenameOperationLogRecord.class))
+              .stream()
               .collect(
                   toMap(
                       RenameOperationLogRecord::getSrc,

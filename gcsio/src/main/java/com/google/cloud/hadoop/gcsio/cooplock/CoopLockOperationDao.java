@@ -165,7 +165,7 @@ public class CoopLockOperationDao {
     List<String> logRecords =
         Streams.concat(
                 srcToDstItemNames.entrySet().stream(), srcToDstMarkerItemNames.entrySet().stream())
-            .map(CoopLockOperationDao::encodeRenameLogRecord)
+            .map(e -> GSON.toJson(toRenameOperationLogRecord(e)))
             .collect(toImmutableList());
     writeOperationFile(
         dst.getBucketName(),
@@ -355,15 +355,11 @@ public class CoopLockOperationDao {
         MILLISECONDS);
   }
 
-  private static String encodeRenameLogRecord(Map.Entry<FileInfo, URI> record) {
-    return GSON.toJson(
-        new RenameOperationLogRecord()
-            .setSrc(record.getKey().getItemInfo().getResourceId().toString())
-            .setDst(record.getValue().toString()));
-  }
-
-  public static RenameOperationLogRecord decodeRenameLogRecord(String encodedRecord) {
-    return GSON.fromJson(encodedRecord, RenameOperationLogRecord.class);
+  private static RenameOperationLogRecord toRenameOperationLogRecord(
+      Map.Entry<FileInfo, URI> record) {
+    return new RenameOperationLogRecord()
+        .setSrc(record.getKey().getItemInfo().getResourceId().toString())
+        .setDst(record.getValue().toString());
   }
 
   private static ExponentialBackOff newLockModifyBackoff() {
