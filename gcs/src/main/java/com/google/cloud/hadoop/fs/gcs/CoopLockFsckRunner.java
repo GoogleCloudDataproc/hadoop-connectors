@@ -16,8 +16,11 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.CoopLockFsck.COMMAND_ALL_ARGUMENT;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_COOPERATIVE_LOCKING_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_COOPERATIVE_LOCKING_EXPIRATION_TIMEOUT_MS;
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.toList;
@@ -35,6 +38,7 @@ import com.google.cloud.hadoop.gcsio.cooplock.DeleteOperation;
 import com.google.cloud.hadoop.gcsio.cooplock.RenameOperation;
 import com.google.cloud.hadoop.gcsio.cooplock.RenameOperationLogRecord;
 import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.ByteSource;
@@ -74,6 +78,7 @@ class CoopLockFsckRunner {
   private final Configuration conf;
   private final String bucketName;
   private final String command;
+  private final String operationId;
 
   private final GoogleHadoopFileSystem ghfs;
   private final GoogleCloudStorageFileSystem gcsFs;
@@ -81,13 +86,15 @@ class CoopLockFsckRunner {
   private final CoopLockRecordsDao lockRecordsDao;
   private final CoopLockOperationDao lockOperationDao;
 
-  public CoopLockFsckRunner(Configuration conf, URI bucketUri, String command) throws IOException {
+  public CoopLockFsckRunner(Configuration conf, URI bucketUri, String command, String operationId)
+      throws IOException {
     // Disable cooperative locking to prevent blocking
     conf.setBoolean(GCS_COOPERATIVE_LOCKING_ENABLE.getKey(), false);
 
     this.conf = conf;
     this.bucketName = bucketUri.getAuthority();
     this.command = command;
+    this.operationId = operationId;
 
     this.ghfs = (GoogleHadoopFileSystem) FileSystem.get(bucketUri, conf);
     this.gcsFs = ghfs.getGcsFs();
@@ -112,6 +119,16 @@ class CoopLockFsckRunner {
 
     if (CoopLockFsck.COMMAND_CHECK.equals(command)) {
       return 0;
+    }
+
+    if (!COMMAND_ALL_ARGUMENT.equals(operationId)) {
+      Optional<Map.Entry<FileStatus, CoopLockRecord>> operationEntry =
+          expiredOperations.entrySet().stream()
+              .filter(e -> e.getValue().getOperationId().equals(operationId))
+              .findAny();
+      checkArgument(operationEntry.isPresent(), "%s operation not found", operationId);
+      expiredOperations =
+          ImmutableMap.of(operationEntry.get().getKey(), operationEntry.get().getValue());
     }
 
     Function<Map.Entry<FileStatus, CoopLockRecord>, Boolean> operationRecovery =
