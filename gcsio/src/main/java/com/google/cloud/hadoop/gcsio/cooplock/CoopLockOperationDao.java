@@ -67,7 +67,7 @@ public class CoopLockOperationDao {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  public static final String RENAME_LOG_RECORD_SEPARATOR = " -> ";
+  private static final String RENAME_LOG_RECORD_SEPARATOR = "->";
 
   private static final String OPERATION_LOG_FILE_FORMAT = "%s_%s_%s.log";
   private static final String OPERATION_LOCK_FILE_FORMAT = "%s_%s_%s.lock";
@@ -167,11 +167,7 @@ public class CoopLockOperationDao {
     List<String> logRecords =
         Streams.concat(
                 srcToDstItemNames.entrySet().stream(), srcToDstMarkerItemNames.entrySet().stream())
-            .map(
-                e ->
-                    e.getKey().getItemInfo().getResourceId()
-                        + RENAME_LOG_RECORD_SEPARATOR
-                        + e.getValue())
+            .map(CoopLockOperationDao::encodeRenameLogRecord)
             .collect(toImmutableList());
     writeOperationFile(
         dst.getBucketName(),
@@ -359,6 +355,17 @@ public class CoopLockOperationDao {
         /* initialDelay= */ lockRenewalPeriodMilli,
         /* period= */ lockRenewalPeriodMilli,
         MILLISECONDS);
+  }
+
+  private static String encodeRenameLogRecord(Map.Entry<FileInfo, URI> record) {
+    return GSON.toJson(
+        new RenameOperationLogRecord()
+            .setSrc(record.getKey().getItemInfo().getResourceId().toString())
+            .setDst(record.getValue().toString()));
+  }
+
+  public static RenameOperationLogRecord decodeRenameLogRecord(String encodedRecord) {
+    return GSON.fromJson(encodedRecord, RenameOperationLogRecord.class);
   }
 
   private static ExponentialBackOff newLockModifyBackoff() {
