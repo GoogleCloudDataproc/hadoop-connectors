@@ -35,7 +35,7 @@ import org.apache.hadoop.util.ToolRunner;
  * <p>Usage:
  *
  * <pre>{@code
- * hadoop jar /usr/lib/hadoop/lib/gcs-connector.jar  com.google.cloud.hadoop.fs.gcs.CoopLockFsck \
+ * hadoop jar /usr/lib/hadoop/lib/gcs-connector.jar com.google.cloud.hadoop.fs.gcs.CoopLockFsck \
  *     --{check,rollBack,rollForward} gs://<bucket_name> [all|<operation-id>]
  * }</pre>
  */
