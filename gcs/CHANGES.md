@@ -60,7 +60,7 @@
 
         hadoop jar /usr/lib/hadoop/lib/gcs-connector.jar \
             com.google.cloud.hadoop.fs.gcs.CoopLockFsck \
-            --rollForward gs://my-bucket
+            --rollForward gs://my-bucket all|<operation-id>
 
 1.  Implement Hadoop File System `append` method using GCS compose API.
 
