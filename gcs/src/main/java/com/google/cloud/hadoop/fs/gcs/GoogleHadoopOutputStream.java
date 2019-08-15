@@ -66,12 +66,8 @@ class GoogleHadoopOutputStream extends OutputStream {
       FileSystem.Statistics statistics,
       CreateFileOptions createFileOptions)
       throws IOException {
-    logger.atFinest().log(
-        "GoogleHadoopOutputStream(gcsPath:%s, createFileOptions: getAttributes: %s, getContentType: %s, getExistingGenerationId: %s)",
-        gcsPath,
-        createFileOptions.getAttributes(),
-        createFileOptions.getContentType(),
-        createFileOptions.getExistingGenerationId());
+    logger.atFine().log(
+        "GoogleHadoopOutputStream(gcsPath:%s, createFileOptions: %s)", gcsPath, createFileOptions);
     this.ghfs = ghfs;
     this.gcsPath = gcsPath;
     this.statistics = statistics;

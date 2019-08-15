@@ -77,8 +77,9 @@ public class GoogleHadoopFS extends AbstractFileSystem {
       ChecksumOpt checksumOpt,
       boolean createParent) throws IOException {
     logger.atFinest().log(
-        "createInternal(flag: %s, absolutePermission: %s, bufferSize: %s, replication: %s,"
-            + "blockSize: %s, progress: %s, checksumOpt: %s, createParent: %s)",
+        "createInternal(file: %s, flag: %s, absolutePermission: %s, bufferSize: %d, "
+            + "replication: %b, blockSize: %d, progress: %s, checksumOpt: %s, createParent: %b)",
+        file,
         flag,
         absolutePermission,
         bufferSize,
@@ -89,7 +90,7 @@ public class GoogleHadoopFS extends AbstractFileSystem {
         createParent);
     if (!createParent) {
       // TODO: don't ignore 'createParent' flag
-      logger.atFinest().log("Ignoring createParent=false. Creating parents anyways.");
+      logger.atFine().log("Ignoring createParent=false. Creating parents anyways.");
     }
     // AbstractFileSystems rely on permission to not overwrite.
     boolean overwriteFile = true;
@@ -100,8 +101,7 @@ public class GoogleHadoopFS extends AbstractFileSystem {
   @Override
   public int getUriDefaultPort() {
     int defaultPort = ghfs.getDefaultPort();
-    logger.atFinest().log(
-        "getUriDefaultPort: %s, rootBucketName: %s", defaultPort, ghfs.getRootBucketName());
+    logger.atFinest().log("getUriDefaultPort(): %d", defaultPort);
     return defaultPort;
   }
 
@@ -142,7 +142,7 @@ public class GoogleHadoopFS extends AbstractFileSystem {
   @SuppressWarnings("deprecation")
   @Override
   public FsServerDefaults getServerDefaults() throws IOException {
-    logger.atFinest().log("getServerDefaults for rootBucketName: %s", ghfs.getRootBucketName());
+    logger.atFinest().log("getServerDefaults()");
     return ghfs.getServerDefaults();
   }
 
@@ -151,28 +151,28 @@ public class GoogleHadoopFS extends AbstractFileSystem {
   public void mkdir(final Path dir, final FsPermission permission, final boolean createParent)
       throws IOException {
     logger.atFinest().log(
-        "mkdir(dir: %s, permission: %s, createParent %s)", dir, permission, createParent);
+        "mkdir(dir: %s, permission: %s, createParent %b)", dir, permission, createParent);
     if (!createParent) {
-      logger.atFinest().log("Ignoring createParent=false. Creating parents anyways.");
+      logger.atFine().log("Ignoring createParent=false. Creating parents anyways.");
     }
     ghfs.mkdirs(dir, permission);
   }
 
   @Override
   public boolean delete(final Path f, final boolean recursive) throws IOException {
-    logger.atFinest().log("delete(path: %s, recursive: %s)", f, recursive);
+    logger.atFinest().log("delete(path: %s, recursive: %b)", f, recursive);
     return ghfs.delete(f, recursive);
   }
 
   @Override
   public FSDataInputStream open(final Path f, int bufferSize) throws IOException {
-    logger.atFinest().log("open(path: %s, bufferSize: %s)", f, bufferSize);
+    logger.atFinest().log("open(path: %s, bufferSize: %d)", f, bufferSize);
     return ghfs.open(f, bufferSize);
   }
 
   @Override
   public boolean setReplication(final Path f, final short replication) throws IOException {
-    logger.atFinest().log("setReplication(path: %s, replication: %s)", f, replication);
+    logger.atFinest().log("setReplication(path: %s, replication: %d)", f, replication);
     return ghfs.setReplication(f, replication);
   }
 
@@ -198,34 +198,32 @@ public class GoogleHadoopFS extends AbstractFileSystem {
 
   @Override
   public void setTimes(final Path f, final long mtime, final long atime) throws IOException {
-    logger.atFinest().log("setTimes(path: %s, mtime: %s, atime: %s)", f, mtime, atime);
+    logger.atFinest().log("setTimes(path: %s, mtime: %d, atime: %d)", f, mtime, atime);
     ghfs.setTimes(f, mtime, atime);
   }
 
   @Override
   public FileChecksum getFileChecksum(final Path f) throws IOException {
-    FileChecksum fileChecksum = ghfs.getFileChecksum(f);
-    logger.atFinest().log("getFileChecksum(path: %s) returned %s", f, fileChecksum);
-    return fileChecksum;
+    logger.atFinest().log("getFileChecksum(path: %s)", f);
+    return ghfs.getFileChecksum(f);
   }
 
   @Override
   public FileStatus getFileStatus(final Path f) throws IOException {
-    FileStatus fileStatus = ghfs.getFileStatus(f);
-    logger.atFinest().log("getFileStatus(path: %s) returned %s", f, fileStatus);
-    return fileStatus;
+    logger.atFinest().log("getFileStatus(path: %s)", f);
+    return ghfs.getFileStatus(f);
   }
 
   @Override
   public BlockLocation[] getFileBlockLocations(final Path f, final long start, final long len)
       throws IOException {
-    logger.atFinest().log("getFileBlockLocations(path: %s, start: %s, len: %s)", f, start, len);
+    logger.atFinest().log("getFileBlockLocations(path: %s, start: %d, len: %d)", f, start, len);
     return ghfs.getFileBlockLocations(f, start, len);
   }
 
   @Override
   public FsStatus getFsStatus() throws IOException {
-    logger.atFinest().log("getStatus, rootBucketName %s", ghfs.getRootBucketName());
+    logger.atFinest().log("getStatus()");
     return ghfs.getStatus();
   }
 
@@ -237,7 +235,7 @@ public class GoogleHadoopFS extends AbstractFileSystem {
 
   @Override
   public void setVerifyChecksum(final boolean verifyChecksum) {
-    logger.atFinest().log("setVerifyChecksum(verifyChecksum: %s)", verifyChecksum);
+    logger.atFinest().log("setVerifyChecksum(verifyChecksum: %b)", verifyChecksum);
     ghfs.setVerifyChecksum(verifyChecksum);
   }
 }
