@@ -22,7 +22,6 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationType.DELETE;
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationType.RENAME;
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao.LOCK_DIRECTORY;
-import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao.LOCK_METADATA_KEY;
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao.LOCK_PATH;
 import static com.google.cloud.hadoop.util.EntriesCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
 import static com.google.cloud.hadoop.util.EntriesCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX;
@@ -318,7 +317,7 @@ public class CoopLockRepairIntegrationTest {
     assertThat(gcsFs.exists(dirUri.resolve(fileName))).isTrue();
 
     FileInfo lockInfo = gcsFs.getFileInfo(bucketUri.resolve(LOCK_PATH));
-    String locks = new String(lockInfo.getAttributes().get(LOCK_METADATA_KEY), UTF_8);
+    String locks = new String(lockInfo.getAttributes().get("lock"), UTF_8);
     CoopLockRecords lockRecords = GSON.fromJson(locks, CoopLockRecords.class);
     String operationId = Iterables.getOnlyElement(lockRecords.getLocks()).getOperationId();
 

@@ -65,7 +65,7 @@ public class CoopLockRecordsDao {
   private static final String LOCK_FILE = "all.lock";
   public static final String LOCK_PATH = LOCK_DIRECTORY + LOCK_FILE;
 
-  public static final String LOCK_METADATA_KEY = "lock";
+  private static final String LOCK_METADATA_KEY = "lock";
 
   private static final int MIN_BACK_OFF_INTERVAL_MILLIS = 500;
   private static final int MAX_BACK_OFF_INTERVAL_MILLIS = 2_000;
