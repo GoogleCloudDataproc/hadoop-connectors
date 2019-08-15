@@ -36,15 +36,16 @@ import org.apache.hadoop.util.ToolRunner;
  *
  * <pre>{@code
  * hadoop jar /usr/lib/hadoop/lib/gcs-connector.jar  com.google.cloud.hadoop.fs.gcs.CoopLockFsck \
- *     --rollForward gs://my-bucket <operation-id>
+ *     --{check,rollBack,rollForward} gs://<bucket_name> [all|<operation-id>]
  * }</pre>
  */
 public class CoopLockFsck extends Configured implements Tool {
 
   static final String COMMAND_CHECK = "--check";
-  static final String COMMAND_ROLL_FORWARD = "--rollForward";
   static final String COMMAND_ROLL_BACK = "--rollBack";
-  static final String COMMAND_ALL_ARGUMENT = "all";
+  static final String COMMAND_ROLL_FORWARD = "--rollForward";
+
+  static final String ARGUMENT_ALL_OPERATIONS = "all";
 
   private static final ImmutableSet<String> FSCK_COMMANDS =
       ImmutableSet.of(COMMAND_CHECK, COMMAND_ROLL_FORWARD, COMMAND_ROLL_BACK);
@@ -58,8 +59,8 @@ public class CoopLockFsck extends Configured implements Tool {
               + " GCS Connector Cooperative Locking feature."
               + "\n\nUsage:"
               + String.format(
-                  "\n\thadoop jar /usr/lib/hadoop/lib/gcs-connector.jar %s <COMMAND>"
-                      + " gs://<BUCKET> [all|<OPERATION_ID>]",
+                  "\n\thadoop jar /usr/lib/hadoop/lib/gcs-connector.jar %s"
+                      + " --{check,rollBack,rollForward} gs://<bucket_name> [all|<operation_id>]",
                   CoopLockFsck.class.getCanonicalName())
               + "\n\nSupported commands:"
               + String.format("\n\t%s - prints out failed operation for the bucket", COMMAND_CHECK)

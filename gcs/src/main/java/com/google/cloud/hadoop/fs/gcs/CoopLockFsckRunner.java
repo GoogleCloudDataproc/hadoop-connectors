@@ -16,7 +16,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.CoopLockFsck.COMMAND_ALL_ARGUMENT;
+import static com.google.cloud.hadoop.fs.gcs.CoopLockFsck.ARGUMENT_ALL_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_COOPERATIVE_LOCKING_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_COOPERATIVE_LOCKING_EXPIRATION_TIMEOUT_MS;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -121,7 +121,7 @@ class CoopLockFsckRunner {
       return 0;
     }
 
-    if (!COMMAND_ALL_ARGUMENT.equals(operationId)) {
+    if (!ARGUMENT_ALL_OPERATIONS.equals(operationId)) {
       Optional<Map.Entry<FileStatus, CoopLockRecord>> operationEntry =
           expiredOperations.entrySet().stream()
               .filter(e -> e.getValue().getOperationId().equals(operationId))
