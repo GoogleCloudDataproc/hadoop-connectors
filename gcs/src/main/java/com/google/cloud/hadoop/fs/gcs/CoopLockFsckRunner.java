@@ -116,6 +116,7 @@ class CoopLockFsckRunner {
             .map(Optional::get)
             .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
 
+    // If this is a check command then return after operations status was printed.
     if (CoopLockFsck.COMMAND_CHECK.equals(command)) {
       return 0;
     }
