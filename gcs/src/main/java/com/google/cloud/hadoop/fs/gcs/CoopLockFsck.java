@@ -83,11 +83,11 @@ public class CoopLockFsck extends Configured implements Tool {
     String command = args[0];
     checkArgument(FSCK_COMMANDS.contains(command), "Unknown %s command, should be %s", command);
 
-    int argsCount = COMMAND_CHECK.equals(command) ? 2 : 3;
+    int expectedArgsNumber = COMMAND_CHECK.equals(command) ? 2 : 3;
     checkArgument(
-        args.length == argsCount,
+        args.length == expectedArgsNumber,
         "%s arguments should be specified for %s command, but were: %s",
-        argsCount,
+        expectedArgsNumber,
         lazy(() -> Arrays.toString(args)));
 
     String bucket = args[1];

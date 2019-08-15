@@ -323,11 +323,15 @@ public class CoopLockRepairIntegrationTest {
     String operationId = Iterables.getOnlyElement(lockRecords.getLocks()).getOperationId();
 
     CoopLockFsck fsck = new CoopLockFsck();
+    fsck.setConf(getTestConfiguration());
+
+    // Wait until lock will expire
+    sleepUninterruptibly(COOP_LOCK_TIMEOUT);
 
     fsck.run(new String[] {"--rollForward", "gs://" + bucketName, operationId});
 
-    assertThat(gcsFs.exists(dirUri)).isTrue();
-    assertThat(gcsFs.exists(dirUri.resolve(fileName))).isTrue();
+    assertThat(gcsFs.exists(dirUri)).isFalse();
+    assertThat(gcsFs.exists(dirUri.resolve(fileName))).isFalse();
 
     // Validate lock files
     List<URI> lockFiles =
