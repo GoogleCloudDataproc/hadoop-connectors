@@ -804,9 +804,6 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   public void renameDirectoryShouldCopyMarkerFilesLast() {}
 
   @Override
-  public void testRenameUpdatesParentDirectoryModificationTimestamps() {}
-
-  @Override
   public void testComposeSuccess() throws IOException {}
 
   @Override

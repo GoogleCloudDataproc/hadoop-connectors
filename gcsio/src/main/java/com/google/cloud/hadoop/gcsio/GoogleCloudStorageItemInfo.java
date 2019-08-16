@@ -107,8 +107,13 @@ public class GoogleCloudStorageItemInfo {
    * @param creationTime Time when object was created (milliseconds since January 1, 1970 UTC).
    * @param size Size of the given object (number of bytes) or -1 if the object does not exist.
    */
-  public GoogleCloudStorageItemInfo(StorageResourceId resourceId,
-      long creationTime, long modificationTime, long size, String location, String storageClass) {
+  public GoogleCloudStorageItemInfo(
+      StorageResourceId resourceId,
+      long creationTime,
+      long modificationTime,
+      long size,
+      String location,
+      String storageClass) {
     this(
         resourceId,
         creationTime,
@@ -228,7 +233,7 @@ public class GoogleCloudStorageItemInfo {
   /**
    * Gets modification time of this item.
    *
-   * Time is expressed as milliseconds since January 1, 1970 UTC.
+   * <p>Time is expressed as milliseconds since January 1, 1970 UTC.
    */
   public long getModificationTime() {
     return modificationTime;

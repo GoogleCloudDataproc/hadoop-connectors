@@ -169,11 +169,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private Storage gcs;
 
   // Thread-pool used for background tasks.
-  private ExecutorService threadPool = Executors.newCachedThreadPool(
-      new ThreadFactoryBuilder()
-          .setNameFormat("gcs-async-channel-pool-%d")
-          .setDaemon(true)
-          .build());
+  private ExecutorService backgroundTasksThreadPool =
+      Executors.newCachedThreadPool(
+          new ThreadFactoryBuilder()
+              .setNameFormat("gcs-async-channel-pool-%d")
+              .setDaemon(true)
+              .build());
 
   // Thread-pool for manual matching of metadata tasks.
   // TODO(user): Wire out GoogleCloudStorageOptions for these.
@@ -182,9 +183,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // Helper delegate for turning IOExceptions from API calls into higher-level semantics.
   private ApiErrorExtractor errorExtractor = ApiErrorExtractor.INSTANCE;
 
-  // Helper for interacting with objects invovled with the API client libraries.
-  private ClientRequestHelper<StorageObject> clientRequestHelper =
-      new ClientRequestHelper<>();
+  // Helper for interacting with objects involved with the API client libraries.
+  private ClientRequestHelper<StorageObject> clientRequestHelper = new ClientRequestHelper<>();
 
   // Factory for BatchHelpers setting up BatchRequests; can be swapped out for testing purposes.
   private BatchHelper.Factory batchFactory = new BatchHelper.Factory();
@@ -294,13 +294,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   @VisibleForTesting
-  void setThreadPool(ExecutorService threadPool) {
-    this.threadPool = threadPool;
-  }
-
-  @VisibleForTesting
-  void setManualBatchingThreadPool(ExecutorService manualBatchingThreadPool) {
-    this.manualBatchingThreadPool = manualBatchingThreadPool;
+  void setBackgroundTasksThreadPool(ExecutorService backgroundTasksThreadPool) {
+    this.backgroundTasksThreadPool = backgroundTasksThreadPool;
   }
 
   @VisibleForTesting
@@ -374,7 +369,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     GoogleCloudStorageWriteChannel channel =
         new GoogleCloudStorageWriteChannel(
-            threadPool,
+            backgroundTasksThreadPool,
             gcs,
             clientRequestHelper,
             resourceId.getBucketName(),
@@ -1124,7 +1119,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               new StorageResourceId(bucket.getName()),
               bucket.getTimeCreated().getValue(),
               bucket.getUpdated().getValue(),
-              0,
+              /* size= */ 0,
               bucket.getLocation(),
               bucket.getStorageClass()));
     }
@@ -1511,7 +1506,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         resourceId,
         bucket.getTimeCreated().getValue(),
         bucket.getUpdated().getValue(),
-        0,
+        /* size= */ 0,
         bucket.getLocation(),
         bucket.getStorageClass());
   }
@@ -1836,8 +1831,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // Calling shutdown() is a no-op if it was already called earlier,
     // therefore no need to guard against that by setting threadPool to null.
     logger.atFine().log("close()");
-    threadPool.shutdown();
-    manualBatchingThreadPool.shutdown();
+    try {
+      backgroundTasksThreadPool.shutdown();
+      manualBatchingThreadPool.shutdown();
+    } finally {
+      backgroundTasksThreadPool = null;
+      manualBatchingThreadPool = null;
+    }
   }
 
   /**

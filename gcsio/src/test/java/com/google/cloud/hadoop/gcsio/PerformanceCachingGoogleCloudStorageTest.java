@@ -20,6 +20,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
 import com.google.api.client.util.Clock;
+import com.google.cloud.hadoop.gcsio.testing.GcsItemInfoTestBuilder;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.common.base.Ticker;
 import com.google.common.collect.ImmutableList;
@@ -39,9 +40,6 @@ import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnit4.class)
 public class PerformanceCachingGoogleCloudStorageTest {
-
-  private static GoogleCloudStorageItemInfoTestBuilder.Builder googleCloudStorageItemInfoTestBuilder =
-      GoogleCloudStorageItemInfoTestBuilder.builder();
 
   private static final HashCode EMPTY_OBJECT_MD5 = Hashing.md5().hashBytes(new byte[0]);
   private static final HashCode EMPTY_OBJECT_CRC32C = Hashing.crc32c().hashBytes(new byte[0]);
@@ -461,8 +459,7 @@ public class PerformanceCachingGoogleCloudStorageTest {
    */
   public static GoogleCloudStorageItemInfo createObjectItemInfo(
       String bucketName, String objectName, CreateObjectOptions createObjectOptions) {
-    GoogleCloudStorageItemInfoTestBuilder.Builder builder = googleCloudStorageItemInfoTestBuilder;
-    builder
+    return GcsItemInfoTestBuilder.create()
         .setStorageResourceId(new StorageResourceId(bucketName, objectName))
         .setCreationTime(0)
         .setModificationTime(0)
@@ -475,8 +472,8 @@ public class PerformanceCachingGoogleCloudStorageTest {
         .setContentGeneration(1)
         .setMetaGeneration(1)
         .setVerificationAttributes(
-            new VerificationAttributes(EMPTY_OBJECT_MD5.asBytes(), EMPTY_OBJECT_CRC32C.asBytes()));
-    return builder.build();
+            new VerificationAttributes(EMPTY_OBJECT_MD5.asBytes(), EMPTY_OBJECT_CRC32C.asBytes()))
+        .build();
   }
 
   public static GoogleCloudStorageItemInfo createInferredDirectory(

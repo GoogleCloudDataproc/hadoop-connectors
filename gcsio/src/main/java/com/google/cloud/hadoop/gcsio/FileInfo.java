@@ -16,11 +16,9 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import com.google.api.client.util.Clock;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.flogger.GoogleLogger;
-import com.google.common.primitives.Longs;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Date;

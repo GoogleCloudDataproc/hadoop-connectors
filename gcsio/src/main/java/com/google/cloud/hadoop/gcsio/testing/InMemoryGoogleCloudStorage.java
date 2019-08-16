@@ -467,7 +467,13 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
       }
     }
     // return not found item
-    return new GoogleCloudStorageItemInfo(resourceId, 0, 0, -1, null, null);
+    return new GoogleCloudStorageItemInfo(
+        resourceId,
+        /* creationTime= */ 0,
+        /* modificationTime= */ 0,
+        /* size= */ -1,
+        /* location= */ null,
+        /* storageClass= */ null);
   }
 
   @Override
