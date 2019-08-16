@@ -635,7 +635,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * @throws IOException
    */
   private void initializeDelegationTokenSupport(Configuration config, URI path) throws IOException {
-    logger.atFinest().log("initializeDelegationTokenSupport(config: %s, path: %s)", config, path);
+    logger.atFine().log("initializeDelegationTokenSupport(config: %s, path: %s)", config, path);
     // Load delegation token binding, if support is configured
     GcsDelegationTokens dts = new GcsDelegationTokens();
     Text service = new Text(getScheme() + "://" + path.getAuthority());
@@ -846,31 +846,31 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   /**
    * Concat existing files into one file.
    *
-   * @param trg the path to the target destination.
-   * @param psrcs the paths to the sources to use for the concatenation.
+   * @param tgt the path to the target destination.
+   * @param srcs the paths to the sources to use for the concatenation.
    * @throws IOException IO failure
    */
   @Override
-  public void concat(Path trg, Path[] psrcs) throws IOException {
-    logger.atFiner().log("concat(trg: %s, psrcs: %s)", trg, lazy(() -> Arrays.toString(psrcs)));
+  public void concat(Path tgt, Path[] srcs) throws IOException {
+    logger.atFiner().log("concat(tgt: %s, srcs: %s)", tgt, lazy(() -> Arrays.toString(srcs)));
 
-    checkArgument(psrcs.length > 0, "psrcs must have at least one source");
+    checkArgument(srcs.length > 0, "srcs must have at least one source");
 
-    URI trgPath = getGcsPath(trg);
-    List<URI> srcPaths = Arrays.stream(psrcs).map(this::getGcsPath).collect(toImmutableList());
+    URI tgtPath = getGcsPath(tgt);
+    List<URI> srcPaths = Arrays.stream(srcs).map(this::getGcsPath).collect(toImmutableList());
 
-    checkArgument(!srcPaths.contains(trgPath), "target must not be contained in sources");
+    checkArgument(!srcPaths.contains(tgtPath), "target must not be contained in sources");
 
     List<List<URI>> partitions =
         Lists.partition(srcPaths, GoogleCloudStorage.MAX_COMPOSE_OBJECTS - 1);
-    logger.atFiner().log("concat(trg: %s, %d partitions: %s)", trg, partitions.size(), partitions);
+    logger.atFinest().log("concat(tgt: %s, %d partitions: %s)", tgt, partitions.size(), partitions);
     for (List<URI> partition : partitions) {
       // We need to include the target in the list of sources to compose since
       // the GCS FS compose operation will overwrite the target, whereas the Hadoop
       // concat operation appends to the target.
-      List<URI> sources = Lists.newArrayList(trgPath);
+      List<URI> sources = Lists.newArrayList(tgtPath);
       sources.addAll(partition);
-      getGcsFs().compose(sources, trgPath, CreateFileOptions.DEFAULT_CONTENT_TYPE);
+      getGcsFs().compose(sources, tgtPath, CreateFileOptions.DEFAULT_CONTENT_TYPE);
     }
   }
 
@@ -898,8 +898,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       return false;
     }
 
-    logger.atFiner().log("rename(src: %s, dst: %s)", src, dst);
-
     checkOpen();
 
     URI srcPath = getGcsPath(src);
@@ -921,6 +919,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     long duration = System.nanoTime() - startTime;
     increment(Counter.RENAME);
     increment(Counter.RENAME_TIME, duration);
+    logger.atFiner().log("rename(src: %s, dst: %s): true", src, dst);
     return true;
   }
 
@@ -980,7 +979,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     checkOpen();
 
-    logger.atFiner().log("listStatus(hadoopPath: %s)", hadoopPath);
+    logger.atFinest().log("listStatus(hadoopPath: %s)", hadoopPath);
 
     URI gcsPath = getGcsPath(hadoopPath);
     List<FileStatus> status;
@@ -1073,12 +1072,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
               .initCause(faee);
     }
 
-    logger.atFiner().log("mkdirs(hadoopPath: %s, permission: %s): true", hadoopPath, permission);
-
     long duration = System.nanoTime() - startTime;
     increment(Counter.MKDIRS);
     increment(Counter.MKDIRS_TIME, duration);
-
+    logger.atFiner().log("mkdirs(hadoopPath: %s, permission: %s): true", hadoopPath, permission);
     return true;
   }
 
@@ -1139,7 +1136,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
             /* owner= */ userName,
             /* group= */ userName,
             getHadoopPath(fileInfo.getPath()));
-    logger.atFiner().log(
+    logger.atFinest().log(
         "getFileStatus(path: %s, userName: %s): %s",
         fileInfo.getPath(), userName, lazy(() -> fileStatusToString(status)));
     return status;
@@ -1246,7 +1243,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     Path encodedFixedPath = getHadoopPath(getGcsPath(encodedPath));
     // Decode URI-encoded path back into a glob path.
     Path fixedPath = new Path(URI.create(encodedFixedPath.toString()));
-    logger.atFiner().log("fixed path pattern: %s => %s", pathPattern, fixedPath);
+    logger.atFinest().log("fixed path pattern: %s => %s", pathPattern, fixedPath);
 
     if (enableConcurrentGlob && couldUseFlatGlob(fixedPath)) {
       return concurrentGlobInternal(fixedPath, filter);
@@ -1726,11 +1723,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   // =================================================================
 
   @Override
-  public boolean deleteOnExit(Path f)
-      throws IOException {
-
+  public boolean deleteOnExit(Path f) throws IOException {
     checkOpen();
-
     boolean result = super.deleteOnExit(f);
     logger.atFiner().log("deleteOnExit(path: %s): %b", f, result);
     return result;
@@ -1743,16 +1737,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   }
 
   @Override
-  public ContentSummary getContentSummary(Path f)
-      throws IOException {
+  public ContentSummary getContentSummary(Path f) throws IOException {
     ContentSummary result = super.getContentSummary(f);
     logger.atFinest().log("getContentSummary(path: %s): %b", f, result);
     return result;
   }
 
   @Override
-  public Token<?> getDelegationToken(String renewer)
-      throws IOException {
+  public Token<?> getDelegationToken(String renewer) throws IOException {
     Token<?> result = null;
 
     if (delegationTokens != null) {
@@ -1764,21 +1756,19 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   }
 
   @Override
-  public void copyFromLocalFile(boolean delSrc, boolean overwrite,
-      Path[] srcs, Path dst)
+  public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path[] srcs, Path dst)
       throws IOException {
-    logger.atFinest().log(
-        "copyFromLocalFile(delSrc: %s, overwrite: %b, %d srcs, dst: %s)",
+    logger.atFiner().log(
+        "copyFromLocalFile(delSrc: %b, overwrite: %b, %d srcs, dst: %s)",
         delSrc, overwrite, srcs.length, dst);
     super.copyFromLocalFile(delSrc, overwrite, srcs, dst);
   }
 
   @Override
-  public void copyFromLocalFile(boolean delSrc, boolean overwrite,
-      Path src, Path dst)
+  public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path src, Path dst)
       throws IOException {
     logger.atFiner().log(
-        "GHFS.copyFromLocalFile(delSrc: %b, overwrite: %s, src: %s, dst: %s)",
+        "copyFromLocalFile(delSrc: %b, overwrite: %b, src: %s, dst: %s)",
         delSrc, overwrite, src, dst);
     super.copyFromLocalFile(delSrc, overwrite, src, dst);
   }
@@ -1786,7 +1776,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public void copyToLocalFile(boolean delSrc, Path src, Path dst)
       throws IOException {
-    logger.atFinest().log("copyToLocalFile(delSrc: %b, src: %s, dst: %s)", delSrc, src, dst);
+    logger.atFiner().log("copyToLocalFile(delSrc: %b, src: %s, dst: %s)", delSrc, src, dst);
     super.copyToLocalFile(delSrc, src, dst);
   }
 
@@ -1794,7 +1784,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   public Path startLocalOutput(Path fsOutputFile, Path tmpLocalFile)
       throws IOException {
     Path result = super.startLocalOutput(fsOutputFile, tmpLocalFile);
-    logger.atFinest().log(
+    logger.atFiner().log(
         "startLocalOutput(fsOutputFile: %s, tmpLocalFile: %s): %s",
         fsOutputFile, tmpLocalFile, result);
     return result;

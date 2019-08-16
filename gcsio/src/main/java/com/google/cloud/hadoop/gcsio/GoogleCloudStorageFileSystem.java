@@ -475,7 +475,7 @@ public class GoogleCloudStorageFileSystem {
    * @throws IOException
    */
   public boolean exists(URI path) throws IOException {
-    logger.atFiner().log("exists(path: %s)", path);
+    logger.atFinest().log("exists(path: %s)", path);
     return getFileInfo(path).exists();
   }
 
@@ -1336,7 +1336,7 @@ public class GoogleCloudStorageFileSystem {
   @VisibleForTesting
   public void mkdir(URI path) throws IOException {
     Preconditions.checkNotNull(path);
-    logger.atFinest().log("mkdir(path: %s)", path);
+    logger.atFine().log("mkdir(path: %s)", path);
     checkArgument(!path.equals(GCS_ROOT), "Cannot create root directory.");
 
     StorageResourceId resourceId = pathCodec.validatePathAndGetId(path, true);

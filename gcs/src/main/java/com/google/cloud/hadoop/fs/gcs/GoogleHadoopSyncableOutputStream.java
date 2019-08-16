@@ -208,7 +208,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
 
   @Override
   public void close() throws IOException {
-    logger.atFiner().log(
+    logger.atFine().log(
         "close(): Current tail file: %s final destination: %s", curGcsPath, finalGcsPath);
     if (!isOpen()) {
       logger.atFinest().log("close(): Ignoring; stream already closed.");
