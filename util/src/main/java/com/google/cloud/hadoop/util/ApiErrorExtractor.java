@@ -22,6 +22,8 @@ import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonError.ErrorInfo;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.HttpStatusCodes;
+import com.google.api.client.json.JsonFactory;
+import com.google.api.client.json.jackson2.JacksonFactory;
 import java.io.IOError;
 import java.io.IOException;
 import java.net.SocketException;
@@ -108,10 +110,9 @@ public class ApiErrorExtractor {
   /**
    * Determines if the given error indicates 'access denied'.
    *
-   * <p> Warning: this method only checks for access denied status code,
-   * however this may include potentially recoverable reason codes such as
-   * rate limiting. For alternative, see
-   * {@link #accessDeniedNonRecoverable(GoogleJsonError)}.
+   * <p>Warning: this method only checks for access denied status code, however this may include
+   * potentially recoverable reason codes such as rate limiting. For alternative, see {@link
+   * #accessDeniedNonRecoverable(GoogleJsonError)}.
    */
   public boolean accessDenied(GoogleJsonError e) {
     return e.getCode() == HttpStatusCodes.STATUS_CODE_FORBIDDEN;
@@ -165,9 +166,7 @@ public class ApiErrorExtractor {
     return false;
   }
 
-  /**
-   * Determines if the error is an internal server error.
-   */
+  /** Determines if the error is an internal server error. */
   public boolean isInternalServerError(GoogleJsonError e) {
     return e.getCode() / 100 == 5;
   }
@@ -492,7 +491,8 @@ public class ApiErrorExtractor {
     return null;
   }
 
-  // sometimes GoogleJsonResponseException is rewrapped to plain IOException making it impossible to decode
+  // sometimes GoogleJsonResponseException is rewrapped to plain IOException making it impossible to
+  // decode
   @Nullable
   public GoogleJsonError unwrapJsonError(Throwable t) {
     // verify rewrapped exceptions
@@ -527,10 +527,9 @@ public class ApiErrorExtractor {
       if (decoded != null && decoded.getCode() != 0) {
         return decoded;
       }
-    } catch (IOException|IllegalArgumentException e) {
+    } catch (IOException | IllegalArgumentException e) {
       // ignore
     }
     return null;
   }
-
 }

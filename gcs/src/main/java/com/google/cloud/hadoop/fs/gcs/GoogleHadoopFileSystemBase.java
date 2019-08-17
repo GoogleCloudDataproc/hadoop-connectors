@@ -883,8 +883,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    *
    * @param src Source path.
    * @param dst Destination path.
-   * @return true if successful, or false if the old name does not exist
-   * or if the new name already belongs to the namespace.
+   * @return true if successful, or false if the old name does not exist or if the new name already
+   *     belongs to the namespace.
    * @throws FileNotFoundException if src does not exist.
    * @throws IOException if an error occurs.
    */
@@ -915,13 +915,13 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         throw e;
       } else {
         // Occasionally log exceptions that have a cause at info level,
-      // because they could surface real issues and help with troubleshooting
-      (logger.atFine().isEnabled() || e.getCause() == null
-              ? logger.atFine()
-              : logger.atInfo().atMostEvery(5, TimeUnit.MINUTES))
-          .withCause(e)
-          .log("rename(src: %s, dst: %s): false [failed]", src, dst);
-      return false;
+        // because they could surface real issues and help with troubleshooting
+        (logger.atFine().isEnabled() || e.getCause() == null
+                ? logger.atFine()
+                : logger.atInfo().atMostEvery(5, TimeUnit.MINUTES))
+            .withCause(e)
+            .log("rename(src: %s, dst: %s): false [failed]", src, dst);
+        return false;
       }
     }
 
@@ -940,8 +940,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     if (error == null) {
       return false;
     }
-    return ERROR_EXTRACTOR.accessDenied(error) ||
-          ERROR_EXTRACTOR.isInternalServerError(error);
+    return ERROR_EXTRACTOR.accessDenied(error) || ERROR_EXTRACTOR.isInternalServerError(error);
   }
 
   /**

@@ -45,8 +45,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-import static org.junit.Assert.*;
-
 /** Unit-tests for ApiErrorExtractor class. */
 @RunWith(JUnit4.class)
 public class ApiErrorExtractorTest {
@@ -279,33 +277,36 @@ public class ApiErrorExtractorTest {
 
   @Test
   public void testUnwrapJsonError() throws IOException {
-    GoogleJsonResponseException withJsonError = googleJsonResponseException(
-          42, "Detail Reason", "Detail message", "Top Level HTTP Message");
+    GoogleJsonResponseException withJsonError =
+        googleJsonResponseException(
+            42, "Detail Reason", "Detail message", "Top Level HTTP Message");
 
     GoogleJsonError originalError = errorExtractor.unwrapJsonError(withJsonError);
-    assertNotNull(originalError);
-    assertEquals(originalError.getCode(), 42);
-    assertEquals(originalError.getMessage(), "Top Level HTTP Message");
+    assertThat(originalError).isNotNull();
+    assertThat(originalError.getCode()).isEqualTo(42);
+    assertThat(originalError.getMessage()).isEqualTo("Top Level HTTP Message");
 
     IOException wrappedException = new IOException(withJsonError.getDetails().toString());
     GoogleJsonError wrappedError = errorExtractor.unwrapJsonError(wrappedException);
-    assertNotNull(wrappedError);
-    assertEquals(wrappedError.getCode(), 42);
-    assertEquals(wrappedError.getMessage(), "Top Level HTTP Message");
+    assertThat(wrappedError).isNotNull();
+    assertThat(wrappedError.getCode()).isEqualTo(42);
+    assertThat(wrappedError.getMessage()).isEqualTo("Top Level HTTP Message");
 
-    IOException nestedException = new IOException(new IOException(withJsonError.getDetails().toString()));
+    IOException nestedException =
+        new IOException(new IOException(withJsonError.getDetails().toString()));
     GoogleJsonError nestedError = errorExtractor.unwrapJsonError(nestedException);
-    assertNotNull(nestedError);
-    assertEquals(nestedError.getCode(), 42);
-    assertEquals(nestedError.getMessage(), "Top Level HTTP Message");
+    assertThat(nestedError).isNotNull();
+    assertThat(nestedError.getCode()).isEqualTo(42);
+    assertThat(nestedError.getMessage()).isEqualTo("Top Level HTTP Message");
 
     IOException multiException = new IOException();
     multiException.addSuppressed(new IOException());
-    multiException.addSuppressed(new IOException(new IOException(withJsonError.getDetails().toString())));
+    multiException.addSuppressed(
+        new IOException(new IOException(withJsonError.getDetails().toString())));
     GoogleJsonError multiError = errorExtractor.unwrapJsonError(multiException);
-    assertNotNull(multiError);
-    assertEquals(multiError.getCode(), 42);
-    assertEquals(multiError.getMessage(), "Top Level HTTP Message");
+    assertThat(multiError).isNotNull();
+    assertThat(multiError.getCode()).isEqualTo(42);
+    assertThat(multiError.getMessage()).isEqualTo("Top Level HTTP Message");
   }
 
   @Test
@@ -376,7 +377,7 @@ public class ApiErrorExtractorTest {
 
   @Test
   public void isInternalServerError_GoogleJsonErrorAsNullReturnFalse() {
-    assertThat(errorExtractor.isInternalServerError(null)).isFalse();
+    assertThat(errorExtractor.isInternalServerError((IOException) null)).isFalse();
   }
 
   @Test
