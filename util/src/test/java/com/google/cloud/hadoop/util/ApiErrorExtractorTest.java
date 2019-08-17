@@ -481,6 +481,40 @@ public class ApiErrorExtractorTest {
     assertThat(errorExtractor.getDebugInfo(new IOException(accessDenied))).isNull();
   }
 
+  @Test
+  public void testUnwrapJsonError() throws IOException {
+    GoogleJsonResponseException withJsonError =
+        googleJsonResponseException(
+            42, "Detail Reason", "Detail message", "Top Level HTTP Message");
+
+    GoogleJsonError originalError = errorExtractor.unwrapJsonError(withJsonError);
+    assertThat(originalError).isNotNull();
+    assertThat(originalError.getCode()).isEqualTo(42);
+    assertThat(originalError.getMessage()).isEqualTo("Top Level HTTP Message");
+
+    IOException wrappedException = new IOException(withJsonError.getDetails().toString());
+    GoogleJsonError wrappedError = errorExtractor.unwrapJsonError(wrappedException);
+    assertThat(wrappedError).isNotNull();
+    assertThat(wrappedError.getCode()).isEqualTo(42);
+    assertThat(wrappedError.getMessage()).isEqualTo("Top Level HTTP Message");
+
+    IOException nestedException =
+        new IOException(new IOException(withJsonError.getDetails().toString()));
+    GoogleJsonError nestedError = errorExtractor.unwrapJsonError(nestedException);
+    assertThat(nestedError).isNotNull();
+    assertThat(nestedError.getCode()).isEqualTo(42);
+    assertThat(nestedError.getMessage()).isEqualTo("Top Level HTTP Message");
+
+    IOException multiException = new IOException();
+    multiException.addSuppressed(new IOException());
+    multiException.addSuppressed(
+        new IOException(new IOException(withJsonError.getDetails().toString())));
+    GoogleJsonError multiError = errorExtractor.unwrapJsonError(multiException);
+    assertThat(multiError).isNotNull();
+    assertThat(multiError.getCode()).isEqualTo(42);
+    assertThat(multiError.getMessage()).isEqualTo("Top Level HTTP Message");
+  }
+
   /** Builds a fake GoogleJsonResponseException for testing API error handling. */
   private static GoogleJsonResponseException googleJsonResponseException(
       int httpStatus, String reason, String message) throws IOException {

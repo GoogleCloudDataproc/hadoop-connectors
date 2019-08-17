@@ -913,16 +913,15 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     } catch (IOException e) {
       if (shouldThrowDuringRename(e)) {
         throw e;
-      } else {
-        // Occasionally log exceptions that have a cause at info level,
-        // because they could surface real issues and help with troubleshooting
-        (logger.atFine().isEnabled() || e.getCause() == null
-                ? logger.atFine()
-                : logger.atInfo().atMostEvery(5, TimeUnit.MINUTES))
-            .withCause(e)
-            .log("rename(src: %s, dst: %s): false [failed]", src, dst);
-        return false;
       }
+      // Occasionally log exceptions that have a cause at info level,
+      // because they could surface real issues and help with troubleshooting
+      (logger.atFine().isEnabled() || e.getCause() == null
+              ? logger.atFine()
+              : logger.atInfo().atMostEvery(5, TimeUnit.MINUTES))
+          .withCause(e)
+          .log("rename(src: %s, dst: %s): false [failed]", src, dst);
+      return false;
     }
 
     long duration = System.nanoTime() - startTime;
@@ -936,11 +935,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   protected boolean shouldThrowDuringRename(IOException e) {
     // should resourceNotReady be rethrown?
     // should accessDeniedNonRecoverable be checked explicitly?
-    GoogleJsonError error = ERROR_EXTRACTOR.unwrapJsonError(e);
-    if (error == null) {
-      return false;
-    }
-    return ERROR_EXTRACTOR.accessDenied(error) || ERROR_EXTRACTOR.isInternalServerError(error);
+    GoogleJsonError error = ApiErrorExtractor.INSTANCE.unwrapJsonError(e);
+    return error != null
+        && (ApiErrorExtractor.INSTANCE.accessDenied(error)
+            || ApiErrorExtractor.INSTANCE.isInternalServerError(error));
   }
 
   /**
