@@ -673,14 +673,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     return result;
   }
 
-  // TODO(user): Improve conversion of exceptions to 'false'.
-  // Hadoop is inconsistent about when methods are expected to throw
-  // and when they should return false. The FileSystem documentation
-  // is unclear on this and many other aspects. For now, we convert
-  // all IOExceptions to false which is not the right thing to do.
-  // We need to find a way to only convert known cases to 'false'
-  // and let the other exceptions bubble up.
-
   /**
    * Opens the given file for reading.
    *
