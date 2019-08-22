@@ -12,9 +12,16 @@ duplication, etc).
 
 ### How it works
 
-Cooperative Locking works by acquiring exclusive time-expiring lock using GCS
-pre-conditions in the `gs://<bucket>/_lock/all.lock` file before each directory
-modification operation and renewing acquired lock during execution operation.
+Cooperative Locking is implemented in Cloud Storage Connector by acquiring
+exclusive time-expiring lock for modified directories using Cloud Storage
+[preconditions](https://cloud.google.com/storage/docs/generations-preconditions#_Preconditions)
+in the `gs://<bucket>/_lock/all.lock` file. This lock is acquired before each
+directory modification operation in the bucket and after that it periodically
+renewed during operation execution until operation will finish.
+
+Cooperative Locking works only for operations performed on directories in the
+same bucket and as a result directory modification operations of the single
+directory tree in the bucket are sequential.
 
 All operations with expired locks could be recovered with FSCK tool.
 
@@ -118,7 +125,7 @@ directory operations in `_lock/` folder:
       grep "lock:" | awk '{print $2}' | base64 --decode | jq
     ```
 
-    Example output:
+    Example of the `all.lock` file `lock` metadata value:
 
     ```json
     {
@@ -145,7 +152,7 @@ directory operations in `_lock/` folder:
     gsutil cat gs://example-bucket/_lock/20190820T163409.446Z_RENAME_2f6e9ca4-0406-4612-82d5-7f07de81aeb0.lock | jq
     ```
 
-    Example output:
+    Example of an operation `*.lock` file content:
 
     ```json
     {
@@ -162,7 +169,7 @@ directory operations in `_lock/` folder:
     gsutil cat gs://example-bucket/_lock/20190820T163409.446Z_RENAME_2f6e9ca4-0406-4612-82d5-7f07de81aeb0.log | jq
     ```
 
-    Example output:
+    Example of an operation `*.log` file content:
 
     ```json
     {
