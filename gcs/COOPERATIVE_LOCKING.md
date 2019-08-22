@@ -111,70 +111,70 @@ hadoop --loglevel debug jar /usr/lib/hadoop/lib/gcs-connector.jar \
 Also you may want to inspect `all.lock`, `*.lock` and `*.log` files for specific
 directory operations in `_lock/` folder:
 
-#### `all.lock` file
+*   `all.lock` file
 
-```shell
-gsutil ls -L gs://example-bucket/_lock/all.lock | \
-  grep "lock:" | awk '{print $2}' | base64 --decode | jq
-```
+    ```shell
+    gsutil ls -L gs://example-bucket/_lock/all.lock | \
+      grep "lock:" | awk '{print $2}' | base64 --decode | jq
+    ```
 
-Example output:
+    Example output:
 
-```json
-{
-  "formatVersion": 3,
-  "locks": [
+    ```json
     {
-      "clientId": "your-host.example.com-232396",
-      "operationId": "d265a5f9-bce0-4ccc-b1a7-9e68476f1db8",
-      "operationTime": "2019-08-22T16:26:36.339985Z",
-      "operationType": "RENAME",
-      "lockExpiration": "2019-08-22T16:29:12.396382Z",
-      "resources": [
-        "rename_dst_dir/",
-        "rename_src_dir/"
+      "formatVersion": 3,
+      "locks": [
+        {
+          "clientId": "your-host.example.com-232396",
+          "operationId": "d265a5f9-bce0-4ccc-b1a7-9e68476f1db8",
+          "operationTime": "2019-08-22T16:26:36.339985Z",
+          "operationType": "RENAME",
+          "lockExpiration": "2019-08-22T16:29:12.396382Z",
+          "resources": [
+            "rename_dst_dir/",
+            "rename_src_dir/"
+          ]
+        }
       ]
     }
-  ]
-}
-```
+    ```
 
-#### Operation `*.lock` file
+*   Operation `*.lock` file
 
-```shell
-gsutil cat gs://example-bucket/_lock/20190820T163409.446Z_RENAME_2f6e9ca4-0406-4612-82d5-7f07de81aeb0.lock | jq
-```
+    ```shell
+    gsutil cat gs://example-bucket/_lock/20190820T163409.446Z_RENAME_2f6e9ca4-0406-4612-82d5-7f07de81aeb0.lock | jq
+    ```
 
-Example output:
+    Example output:
 
-```json
-{
-  "lockExpiration": "2019-08-22T16:31:22.396382Z",
-  "srcResource": "gs://example-bucket/rename_src_dir/",
-  "dstResource": "gs://example-bucket/rename_dst_dir/",
-  "copySucceeded": false
-}
-```
+    ```json
+    {
+      "lockExpiration": "2019-08-22T16:31:22.396382Z",
+      "srcResource": "gs://example-bucket/rename_src_dir/",
+      "dstResource": "gs://example-bucket/rename_dst_dir/",
+      "copySucceeded": false
+    }
+    ```
 
-#### Operation `*.log` file
+*   Operation `*.log` file
 
-```shell
-gsutil cat gs://example-bucket/_lock/20190820T163409.446Z_RENAME_2f6e9ca4-0406-4612-82d5-7f07de81aeb0.log | jq
-```
+    ```shell
+    gsutil cat gs://example-bucket/_lock/20190820T163409.446Z_RENAME_2f6e9ca4-0406-4612-82d5-7f07de81aeb0.log | jq
+    ```
 
-Example output:
+    Example output:
 
-```json
-{
-  "src": "gs://example-bucket/rename_src_dir/f_1",
-  "dst": "gs://example-bucket/rename_dst_dir/f_1"
-}
-{
-  "src": "gs://example-bucket/rename_src_dir/f_2",
-  "dst": "gs://example-bucket/rename_dst_dir/f_2"
-}
-{
-  "src": "gs://example-bucket/rename_src_dir/f_3",
-  "dst": "gs://example-bucket/rename_dst_dir/f_3"
-}
-```
+    ```json
+    {
+      "src": "gs://example-bucket/rename_src_dir/f_1",
+      "dst": "gs://example-bucket/rename_dst_dir/f_1"
+    }
+    {
+      "src": "gs://example-bucket/rename_src_dir/f_2",
+      "dst": "gs://example-bucket/rename_dst_dir/f_2"
+    }
+    {
+      "src": "gs://example-bucket/rename_src_dir/f_3",
+      "dst": "gs://example-bucket/rename_dst_dir/f_3"
+    }
+    ```
