@@ -108,8 +108,10 @@ hadoop --loglevel debug jar /usr/lib/hadoop/lib/gcs-connector.jar \
   --{check|rollBack|rollForward} gs://<bucket_name> [all|<operation-id>]
 ```
 
-Also you may want to inspect `*.log` and `*.lock` files for specific directory
-operations in `_lock/` folder:
+Also you may want to inspect `all.lock`, `*.lock` and `*.log` files for specific
+directory operations in `_lock/` folder:
+
+#### `all.lock` file
 
 ```shell
 gsutil ls -L gs://example-bucket/_lock/all.lock | \
@@ -137,6 +139,8 @@ Example output:
 }
 ```
 
+#### Operation `*.lock` file
+
 ```shell
 gsutil cat gs://example-bucket/_lock/20190820T163409.446Z_RENAME_2f6e9ca4-0406-4612-82d5-7f07de81aeb0.lock | jq
 ```
@@ -151,6 +155,8 @@ Example output:
   "copySucceeded": false
 }
 ```
+
+#### Operation `*.log` file
 
 ```shell
 gsutil cat gs://example-bucket/_lock/20190820T163409.446Z_RENAME_2f6e9ca4-0406-4612-82d5-7f07de81aeb0.log | jq
