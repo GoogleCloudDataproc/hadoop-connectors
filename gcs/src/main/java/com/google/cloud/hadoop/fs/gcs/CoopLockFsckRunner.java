@@ -329,6 +329,7 @@ class CoopLockFsckRunner {
 
     // Lock file not created - nothing to repair
     if (operationLocks.length == 0) {
+      // Release lock if this is not a "check" command and if this or "all" operations are processed
       if (!COMMAND_CHECK.equals(command)
           && (ARGUMENT_ALL_OPERATIONS.equals(fsckOperationId)
               || fsckOperationId.equals(operationRecord.getOperationId()))) {
