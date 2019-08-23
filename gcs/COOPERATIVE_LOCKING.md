@@ -125,7 +125,11 @@ directory operations in `_lock/` folder:
       grep "lock:" | awk '{print $2}' | base64 --decode | jq
     ```
 
-    Example of the `all.lock` file `lock` metadata value:
+    Example of the `all.lock` file `lock` metadata value that has a record of an
+    active lock for a rename operation with operation client host name that
+    performs this operation, unique operation ID, operation start time,
+    operation type initial (not renewed) lock expiration time and locked source
+    and destination directories:
 
     ```json
     {
@@ -152,7 +156,10 @@ directory operations in `_lock/` folder:
     gsutil cat gs://example-bucket/_lock/20190820T163409.446Z_RENAME_2f6e9ca4-0406-4612-82d5-7f07de81aeb0.lock | jq
     ```
 
-    Example of an operation `*.lock` file content:
+    Example of a rename operation `*.lock` file content with operation lock
+    expiration, source and destination directories and `copySucceeded` flag that
+    indicates if copy stage of directory rename operation successfully
+    completed:
 
     ```json
     {
@@ -169,7 +176,8 @@ directory operations in `_lock/` folder:
     gsutil cat gs://example-bucket/_lock/20190820T163409.446Z_RENAME_2f6e9ca4-0406-4612-82d5-7f07de81aeb0.log | jq
     ```
 
-    Example of an operation `*.log` file content:
+    Example of a rename operation `*.log` file content with a each record
+    representing individual file move with source and destination paths:
 
     ```json
     {
