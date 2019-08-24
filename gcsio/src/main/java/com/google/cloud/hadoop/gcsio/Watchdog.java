@@ -191,7 +191,9 @@ final class Watchdog implements Runnable {
         lastActivityAt = clock.millis();
       }
       T next = innerIterator.next();
-      this.state = State.DELIVERING;
+      synchronized (lock) {
+        state = State.DELIVERING;
+      }
       return next;
     }
 
@@ -210,7 +212,7 @@ final class Watchdog implements Runnable {
       Throwable throwable = null;
       synchronized (lock) {
         long waitTime = clock.millis() - lastActivityAt;
-        if (this.state == State.WAITING
+        if (state == State.WAITING
             && (!waitTimeout.isZero() && waitTime >= waitTimeout.toMillis())) {
           throwable = new TimeoutException("Canceled due to timeout waiting for next response");
         }
@@ -226,7 +228,9 @@ final class Watchdog implements Runnable {
     public boolean hasNext() {
       boolean hasNext = false;
       try {
-        this.state = State.WAITING;
+        synchronized (lock) {
+          state = State.WAITING;
+        }
         hasNext = innerIterator.hasNext();
       } finally {
         // stream is complete successfully with no more items or has thrown an exception
@@ -284,10 +288,12 @@ final class Watchdog implements Runnable {
     public void onNext(R value) {
       synchronized (lock) {
         lastActivityAt = clock.millis();
+        state = State.WAITING;
       }
-      this.state = State.WAITING;
       innerStreamObserver.onNext(value);
-      this.state = State.IDLE;
+      synchronized (lock) {
+        state = State.IDLE;
+      }
     }
 
     @Override
