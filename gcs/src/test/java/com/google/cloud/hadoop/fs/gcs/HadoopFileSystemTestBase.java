@@ -352,7 +352,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
       throws IOException {
 
     // Get a temp path and ensure that it does not already exist.
-    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI path = gcsfs.getPathCodec().getPath(sharedBucketName1, getPrefixedObjectName(objectName), /* allowEmptyObjectName= */ true);
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
     assertThrows(FileNotFoundException.class, () -> ghfs.getFileStatus(hadoopPath));
 
@@ -369,7 +369,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   /** Validates append(). */
   @Test
   public void testAppend() throws IOException {
-    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI path = gcsfs.getPathCodec().getPath(sharedBucketName1, getPrefixedObjectName(objectName), /* allowEmptyObjectName= */ true);
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
 
     ghfsHelper.writeTextFile(path.getAuthority(), path.getPath(), "content");
@@ -399,7 +399,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
       throws IOException {
 
     // Write an object.
-    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI path = gcsfs.getPathCodec().getPath(sharedBucketName1, getPrefixedObjectName(objectName), /* allowEmptyObjectName= */ true);
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
     String text = "Hello World!";
     int numBytesWritten = ghfsHelper.writeFile(hadoopPath, text, 1, /* overwrite= */ false);
@@ -472,7 +472,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   public void testFilePositionInDepthSeeks()
       throws IOException {
     // Write an object.
-    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI path = gcsfs.getPathCodec().getPath(sharedBucketName1, getPrefixedObjectName(objectName), /* allowEmptyObjectName= */ true);
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
 
     int bufferSize = 8 * 1024 * 1024;

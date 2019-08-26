@@ -315,4 +315,4 @@ public class CoopLockIntegrationTest {
           });
     };
   }
-}
+  }

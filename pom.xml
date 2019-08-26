@@ -203,17 +203,28 @@
       <build>
         <plugins>
           <plugin>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <excludes>
-                <exclude>none</exclude>
-              </excludes>
-              <includes>
-                <include>**/*IntegrationTest.java</include>
-              </includes>
-              <reuseForks>false</reuseForks>
-              <forkCount>2</forkCount>
-            </configuration>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-failsafe-plugin</artifactId>
+          <executions>
+            <execution>
+              <goals>
+                <goal>integration-test</goal>
+                <goal>verify</goal>
+              </goals>
+            </execution>
+          </executions>
+          <configuration>
+            <excludes>
+              <exclude>none</exclude>
+            </excludes>
+            <includes>
+              <include>**/*IntegrationTest.java</include>
+            </includes>
+            <reuseForks>true</reuseForks>
+            <forkCount>4C</forkCount>
+            <useUnlimitedThreads>true</useUnlimitedThreads>
+            <reportNameSuffix>sponge_log</reportNameSuffix>
+          </configuration>
           </plugin>
         </plugins>
       </build>
@@ -498,6 +509,10 @@
           <version>3.0.0</version>
         </plugin>
         <plugin>
+          <artifactId>maven-failsafe-plugin</artifactId>
+          <version>3.0.0-M3</version>
+        </plugin>
+        <plugin>
           <groupId>org.jacoco</groupId>
           <artifactId>jacoco-maven-plugin</artifactId>
           <version>0.8.5</version>
@@ -537,8 +552,7 @@
             <exclude>**/*IntegrationTest.java</exclude>
           </excludes>
           <reuseForks>false</reuseForks>
-          <forkCount>2</forkCount>
-          <argLine>@{argLine} -mx3g</argLine>
+          <forkCount>4C</forkCount>
           <reportNameSuffix>sponge_log</reportNameSuffix>
         </configuration>
       </plugin>

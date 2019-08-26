@@ -37,15 +37,20 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 /** Load tests for Cooperative Locking feature. */
 @RunWith(JUnit4.class)
 public class CoopLockLoadIntegrationTest {
+  @Rule
+  public TestName testName = new TestName();
 
   private static GoogleCloudStorageOptions gcsOptions;
   private static RetryHttpInitializer httpRequestInitializer;
@@ -187,3 +192,4 @@ public class CoopLockLoadIntegrationTest {
     return new GoogleCloudStorageFileSystem(gcs, gcsFsOptions);
   }
 }
+
