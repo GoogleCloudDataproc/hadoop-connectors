@@ -16,6 +16,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpStatusCodes;
@@ -23,6 +24,8 @@ import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.LowLevelHttpRequest;
 import com.google.api.client.http.LowLevelHttpResponse;
 import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.GenericJson;
+import com.google.api.client.json.Json;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.client.testing.http.HttpTesting;
 import com.google.api.client.testing.http.MockHttpTransport;
@@ -37,6 +40,7 @@ import com.google.common.io.CharStreams;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
 
@@ -170,8 +174,32 @@ public final class GoogleCloudStorageTestUtils {
 
   public static MockLowLevelHttpResponse dataResponse(byte[] content) {
     return new MockLowLevelHttpResponse()
-        .addHeader("Content-Length", String.valueOf(content.length))
-        .setContent(content);
+            .addHeader("Content-Length", String.valueOf(content.length))
+            .setContent(content);
+  }
+
+  public static MockLowLevelHttpResponse jsonErrorResponse(
+      int statusCode, String errorReason, String errorDomain, String errorMessage)
+      throws IOException {
+    GoogleJsonError.ErrorInfo errorInfo = new GoogleJsonError.ErrorInfo();
+    errorInfo.setReason(errorReason);
+    errorInfo.setDomain(errorDomain);
+    errorInfo.setFactory(JSON_FACTORY);
+
+    GoogleJsonError jsonError = new GoogleJsonError();
+    jsonError.setCode(statusCode);
+    jsonError.setErrors(Collections.singletonList(errorInfo));
+    jsonError.setMessage(errorMessage);
+    jsonError.setFactory(JSON_FACTORY);
+
+    GenericJson errorResponse = new GenericJson();
+    errorResponse.set("error", jsonError);
+    errorResponse.setFactory(JSON_FACTORY);
+
+    return new MockLowLevelHttpResponse()
+        .setContent(errorResponse.toPrettyString())
+        .setContentType(Json.MEDIA_TYPE)
+        .setStatusCode(statusCode);
   }
 
   public static MockLowLevelHttpResponse resumableUploadResponse(String bucket, String object) {
@@ -179,5 +207,15 @@ public final class GoogleCloudStorageTestUtils {
     return new MockLowLevelHttpResponse()
         .addHeader(
             "location", String.format(RESUMABLE_UPLOAD_LOCATION_FORMAT, bucket, object, uploadId));
+  }
+
+  public static MockLowLevelHttpResponse inputStreamResponse(String header, Object headerValue, InputStream content) {
+    return inputStreamResponse(ImmutableMap.of(header, headerValue), content);
+  }
+
+  public static MockLowLevelHttpResponse inputStreamResponse(Map<String, Object> headers, InputStream content) {
+    MockLowLevelHttpResponse response = new MockLowLevelHttpResponse();
+    headers.forEach((h, hv) -> response.addHeader(h, String.valueOf(hv)));
+    return response.setContent(content);
   }
 }
