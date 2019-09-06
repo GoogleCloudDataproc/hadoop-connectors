@@ -22,6 +22,8 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -172,6 +174,9 @@ public class BigQueryConfiguration {
 
   /** 64MB default write buffer size. */
   public static final int OUTPUT_WRITE_BUFFER_SIZE_DEFAULT = 64 * 1024 * 1024;
+
+  /** Configuration key for the labels that will be assigned to BigQuery load/extract jobs. */
+  public static final String JOB_LABELS_KEY = "mapred.bq.job.labels";
 
   /**
    * Configure the location of the temporary dataset.
@@ -358,4 +363,44 @@ public class BigQueryConfiguration {
     Preconditions.checkState("gs".equals(fs.getScheme()), "Export FS must be GCS ('gs' scheme).");
     return pathRoot;
   }
+
+  /**
+   * Gets the labels to be associated with the BigQuery job.
+   *
+   * @param conf the configuration to reference the keys from.
+   * @return the labels to be associated with the BigQuery job.
+   * @throws IOException if there's an issue getting labels configuration setting.
+   */
+  public static Map<String, String> getJobLabels(Configuration conf) throws IOException {
+    String[] labelsArray = conf.getStrings(BigQueryConfiguration.JOB_LABELS_KEY);
+    if (labelsArray == null) {
+      return null;
+    }
+
+    Map<String, String> labels = new HashMap<>(labelsArray.length);
+    for (String labelKeyValue : labelsArray) {
+      String[] keyValue = labelKeyValue.split(":", 2);
+      if (keyValue.length < 2) {
+        throw new IOException(
+                "Must supply a valid value for configuration setting: "
+                        + BigQueryConfiguration.JOB_LABELS_KEY);
+
+      }
+      labels.put(keyValue[0], keyValue[1]);
+    }
+    return labels;
+  }
+
+  public static void setJobLabels(Configuration conf, Map<String, String> labels) {
+    Preconditions.checkArgument(
+            labels != null, "labels must not be null or empty.");
+    String[] labelsArray = new String[labels.size()];
+    int idx = 0;
+    for (Map.Entry<String, String> e : labels.entrySet()) {
+      labelsArray[idx++] = String.format("%s:%s", e.getKey(), e.getValue());
+    }
+
+    conf.setStrings(BigQueryConfiguration.JOB_LABELS_KEY, labelsArray);
+  }
+
 }
