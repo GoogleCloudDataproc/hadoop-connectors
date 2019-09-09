@@ -367,8 +367,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     Map<String, String> rewrittenMetadata = encodeMetadata(options.getMetadata());
 
-    GoogleCloudStorageWriteChannel channel =
-        new GoogleCloudStorageWriteChannel(
+    GoogleCloudStorageWriteChannelRetryWrapper channel =
+        new GoogleCloudStorageWriteChannelRetryWrapper(
+            options,
+            storageOptions,
+            resourceId,
             backgroundTasksThreadPool,
             gcs,
             clientRequestHelper,
@@ -379,17 +382,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             /* kmsKeyName= */ null,
             storageOptions.getWriteChannelOptions(),
             writeConditions,
-            rewrittenMetadata) {
-
-          @Override
-          public Storage.Objects.Insert createRequest(InputStreamContent inputStream)
-              throws IOException {
-            return configureRequest(super.createRequest(inputStream), resourceId.getBucketName());
-          }
-        };
-
+            rewrittenMetadata);
     channel.initialize();
-
     return channel;
   }
 

@@ -272,6 +272,9 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
         return uploadObject.execute();
       } catch (IOException ioe) {
         S response = createResponseFromException(ioe);
+        if (Integer.parseInt(ioe.fillInStackTrace().getMessage()) / 100 == 4) {
+          throw new ChunkFailed();
+        }
         if (response != null) {
           logger.atWarning().withCause(ioe).log(
               "Received IOException, but successfully converted to response '%s'.", response);
@@ -310,3 +313,4 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
     }
   }
 }
+

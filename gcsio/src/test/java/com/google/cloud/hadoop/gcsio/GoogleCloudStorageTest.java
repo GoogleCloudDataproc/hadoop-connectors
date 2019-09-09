@@ -25,14 +25,7 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.emptyRes
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.fakeResponse;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.jsonDataResponse;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.resumableUploadResponse;
-import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.copyRequestString;
-import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.deleteBucketRequestString;
-import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.deleteRequestString;
-import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getBucketRequestString;
-import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listBucketsRequestString;
-import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestString;
-import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.resumableUploadChunkRequestString;
-import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.resumableUploadRequestString;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.*;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.assertThrows;
@@ -73,6 +66,7 @@ import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.BackOffFactory;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
+import com.google.cloud.hadoop.util.ChunkFailed;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -328,6 +322,44 @@ public class GoogleCloudStorageTest {
     }
   }
 
+  /**
+   * Test whether resumable upload triggered withGoogleCloudStorageWriteChannelRetryWrapper makes
+   * retry on first PUT upload request failed.
+   */
+  @Test
+  public void testResumableUploadWithRetry() throws Exception {
+    byte[] testData = {0x01, 0x02, 0x03, 0x05, 0x08, 0x09};
+
+    MockHttpTransport transport =
+        GoogleCloudStorageTestUtils.mockTransport(
+            emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
+            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
+            emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
+            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
+            jsonDataResponse(
+                newStorageObject(BUCKET_NAME, OBJECT_NAME)
+                    .setSize(BigInteger.valueOf(testData.length))));
+
+    Storage storage = new Storage(transport, JSON_FACTORY, trackingHttpRequestInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(GCS_OPTIONS, storage);
+
+    try (WritableByteChannel writeChannel =
+        gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME))) {
+      assertThat(writeChannel.isOpen()).isTrue();
+      writeChannel.write(ByteBuffer.wrap(testData));
+    }
+
+    ImmutableList<HttpRequest> requests = trackingHttpRequestInitializer.getAllRequests();
+    assertThat(requests).hasSize(5);
+
+    HttpRequest writeRequest = requests.get(2);
+    assertThat(writeRequest.getContent().getLength()).isEqualTo(testData.length);
+    try (ByteArrayOutputStream writtenData = new ByteArrayOutputStream(testData.length)) {
+      writeRequest.getContent().writeTo(writtenData);
+      assertThat(writtenData.toByteArray()).isEqualTo(testData);
+    }
+  }
+
   /** Test successful operation of GoogleCloudStorage.create(2) with generationId. */
   @Test
   public void testCreateObjectWithGenerationId() throws Exception {
@@ -437,71 +469,28 @@ public class GoogleCloudStorageTest {
    */
   @Test
   public void testCreateObjectApiIOException() throws IOException {
-    // Prepare the mock return values before invoking the method being tested.
-    when(mockStorage.objects()).thenReturn(mockStorageObjects);
+    TrackingHttpRequestInitializer trackingHttpRequestInitializer =
+            new TrackingHttpRequestInitializer();
 
-    when(mockStorageObjects.insert(
-        eq(BUCKET_NAME), any(StorageObject.class), any(AbstractInputStreamContent.class)))
-        .thenReturn(mockStorageObjectsInsert);
+    MockHttpTransport transport =
+            GoogleCloudStorageTestUtils.mockTransport(
+                    jsonDataResponse(newStorageObject(BUCKET_NAME, OBJECT_NAME)),
+                    emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
+                    emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND));
 
-    // Set up the mock Insert to throw an exception when execute() is called.
-    IOException fakeException = new IOException("Fake IOException");
-    setupNonConflictedWrite(fakeException);
-
-    WritableByteChannel writeChannel = gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
-    assertThat(writeChannel.isOpen()).isTrue();
-
-    IOException thrown = assertThrows(IOException.class, writeChannel::close);
-    assertThat(thrown).hasCauseThat().isEqualTo(fakeException);
-
-    verify(mockStorage, times(2)).objects();
-    verify(mockStorageObjects)
-        .insert(eq(BUCKET_NAME), any(StorageObject.class), any(AbstractInputStreamContent.class));
-    verify(mockStorageObjectsInsert).setName(eq(OBJECT_NAME));
-    verify(mockStorageObjectsInsert).setDisableGZipContent(eq(true));
-    verify(mockClientRequestHelper).setChunkSize(any(Storage.Objects.Insert.class), anyInt());
-    verify(mockStorageObjectsInsert).setIfGenerationMatch(eq(0L));
-    verify(mockStorageObjects).get(eq(BUCKET_NAME), eq(OBJECT_NAME));
-    verify(mockStorageObjectsGet).execute();
-    verify(mockErrorExtractor).itemNotFound(any(IOException.class));
-    verify(mockStorageObjectsInsert).execute();
-  }
-
-  /**
-   * Test handling of various types of exceptions thrown during JSON API call for
-   * GoogleCloudStorage.create(2).
-   */
-  @Test
-  public void testCreateObjectApiRuntimeException() throws IOException {
-    // Prepare the mock return values before invoking the method being tested.
-    when(mockStorage.objects()).thenReturn(mockStorageObjects);
-
-    when(mockStorageObjects.insert(
-        eq(BUCKET_NAME), any(StorageObject.class), any(AbstractInputStreamContent.class)))
-        .thenReturn(mockStorageObjectsInsert);
-
-    // Set up the mock Insert to throw an exception when execute() is called.
-    RuntimeException fakeException = new RuntimeException("Fake exception");
-    setupNonConflictedWrite(fakeException);
+    Storage storage = new Storage(transport, JSON_FACTORY, trackingHttpRequestInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(GCS_OPTIONS, storage);
 
     WritableByteChannel writeChannel = gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
     assertThat(writeChannel.isOpen()).isTrue();
 
     IOException thrown = assertThrows(IOException.class, writeChannel::close);
-    assertThat(thrown).hasCauseThat().isEqualTo(fakeException);
-
-    verify(mockStorageObjectsInsert).execute();
-    verify(mockStorage, times(2)).objects();
-    verify(mockStorageObjects)
-        .insert(eq(BUCKET_NAME), any(StorageObject.class), any(AbstractInputStreamContent.class));
-    verify(mockStorageObjects).get(eq(BUCKET_NAME), eq(OBJECT_NAME));
-    verify(mockErrorExtractor, atLeastOnce()).itemNotFound(any(IOException.class));
-    verify(mockStorageObjectsGet).execute();
-    verify(mockStorageObjectsInsert).setName(eq(OBJECT_NAME));
-    verify(mockStorageObjectsInsert).setDisableGZipContent(eq(true));
-    verify(mockStorageObjects).get(anyString(), anyString());
-    verify(mockClientRequestHelper).setChunkSize(any(Storage.Objects.Insert.class), anyInt());
-    verify(mockStorageObjectsInsert).setIfGenerationMatch(anyLong());
+    assertThat(thrown).hasMessageThat().isEqualTo("Upload failed");
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+            .containsExactly(
+                    getRequestString(BUCKET_NAME, OBJECT_NAME),
+                    resumableUploadRequestString(BUCKET_NAME, OBJECT_NAME, 1, true),
+                    resumableUploadRequestString(BUCKET_NAME, OBJECT_NAME, 2, true));
   }
 
   /**
