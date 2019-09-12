@@ -85,14 +85,10 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   private static final String BATCH_REQUEST = "POST:https://www.googleapis.com/batch/storage/v1";
 
   private static final String COMPOSE_REQUEST_FORMAT =
-      "POST:https://www.googleapis.com/storage/v1/b/%s/o/%s/compose"
-          + "?ifGenerationMatch=%s";
+      "POST:https://www.googleapis.com/storage/v1/b/%s/o/%s/compose?ifGenerationMatch=%s";
 
   private static final String CREATE_BUCKET_REQUEST_FORMAT =
       "POST:https://www.googleapis.com/storage/v1/b?project=%s";
-
-  private static final String CREATE_OBJECT_REQUEST_FORMAT =
-      "POST:https://www.googleapis.com/storage/v1/b/%s/o";
 
   private static final String PAGE_TOKEN_PARAM_PATTERN = "pageToken=[^&]+";
 
@@ -278,17 +274,17 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   }
 
   public static String composeRequestString(
+      String bucketName, String object, Integer generationId) {
+    return composeRequestString(bucketName, object, generationId, /* replaceGenerationId= */ true);
+  }
+
+  public static String composeRequestString(
       String bucketName, String object, Integer generationId, boolean replaceGenerationId) {
     return String.format(
         COMPOSE_REQUEST_FORMAT,
         bucketName,
         urlEncode(object),
         replaceGenerationId ? "generationId_" + generationId : generationId);
-  }
-
-  public static String composeRequestString(
-          String bucketName, String object, Integer generationId) {
-    return composeRequestString(bucketName, object, generationId, true);
   }
 
   public static String listBucketsRequestString(String projectId) {
@@ -318,10 +314,6 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
 
   public static String createBucketRequestString(String projectId) {
     return String.format(CREATE_BUCKET_REQUEST_FORMAT, projectId);
-  }
-
-  public static String createObjectRequestString(String bucketName) {
-    return String.format(CREATE_OBJECT_REQUEST_FORMAT, bucketName);
   }
 
   private static String urlEncode(String string) {
