@@ -93,7 +93,17 @@ public class GoogleCloudStorageWriteChannelRetryWrapper implements WritableByteC
 
   @Override
   public int write(ByteBuffer src) throws IOException {
-    return this.channel.write(src);
+    int bytesToWrite = 0;
+    try {
+      bytesToWrite = this.channel.write(src);
+      this.channel.close();
+    } catch (IOException e) {
+      if (e.getCause().getClass() == ChunkFailed.class) {
+        initialize();
+        bytesToWrite = this.channel.write(src);
+      }
+    }
+    return bytesToWrite;
   }
 
   @Override
@@ -103,13 +113,6 @@ public class GoogleCloudStorageWriteChannelRetryWrapper implements WritableByteC
 
   @Override
   public void close() throws IOException {
-    try {
-      this.channel.close();
-    } catch (IOException e) {
-      if (e.getCause().getClass() == ChunkFailed.class) {
-        initialize();
-      }
-      this.channel.close();
-    }
+    this.channel.close();
   }
 }

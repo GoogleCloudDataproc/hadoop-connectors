@@ -489,8 +489,7 @@ public class GoogleCloudStorageTest {
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
             .containsExactly(
                     getRequestString(BUCKET_NAME, OBJECT_NAME),
-                    resumableUploadRequestString(BUCKET_NAME, OBJECT_NAME, 1, true),
-                    resumableUploadRequestString(BUCKET_NAME, OBJECT_NAME, 2, true));
+                    resumableUploadRequestString(BUCKET_NAME, OBJECT_NAME, 1, true));
   }
 
   /**
