@@ -14,14 +14,17 @@
 
 package com.google.cloud.hadoop.util;
 
+import static com.google.cloud.hadoop.util.AsyncWriteChannelOptions.UPLOAD_CACHE_SIZE;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.google.api.client.googleapis.media.MediaHttpUploader;
 import com.google.api.client.googleapis.services.AbstractGoogleClientRequest;
+import com.google.api.client.http.ByteArrayContent;
 import com.google.api.client.http.InputStreamContent;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -78,6 +81,15 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
   // When enabled, we get higher throughput for writing small files.
   private boolean directUploadEnabled = false;
 
+  // Cache size to use.
+  private int cacheSize = UPLOAD_CACHE_SIZE;
+
+  // Cache for retrying first failed PUT request in resumable uploads.
+  private ByteArrayOutputStream cache = new ByteArrayOutputStream(cacheSize);
+
+  // Flag to determine whether retry in resumable uploads is allowed or disabled.
+  private boolean isRetryAllowed = true;
+
   /** Construct a new channel using the given ExecutorService to run background uploads. */
   public AbstractGoogleAsyncWriteChannel(
       ExecutorService threadPool, AsyncWriteChannelOptions options) {
@@ -85,6 +97,7 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
     this.pipeBufferSize = options.getPipeBufferSize();
     setUploadChunkSize(options.getUploadChunkSize());
     setDirectUploadEnabled(options.isDirectUploadEnabled());
+    setUploadCacheSize(options.getUploadCacheSize());
     setContentType("application/octet-stream");
   }
 
@@ -159,6 +172,11 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
   public boolean isDirectUploadEnabled() {
     return directUploadEnabled;
   }
+  
+  /** Sets upload cache size. */
+  public void setUploadCacheSize(int size) {
+    cacheSize = size;
+  }
 
   /**
    * Writes contents of the given buffer to this channel.
@@ -185,6 +203,12 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
       waitForCompletionAndThrowIfUploadFailed();
     }
 
+    if (cacheSize < buffer.remaining()) {
+      this.isRetryAllowed = false;
+    }
+    if (cache != null && this.isRetryAllowed) {
+      cache.write(buffer.array());
+    }
     return pipeSinkChannel.write(buffer);
   }
 
@@ -208,11 +232,32 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
    */
   @Override
   public void close() throws IOException {
+    close(/* retry= */ this.isRetryAllowed);
+  }
+
+  private void close(boolean retry) throws IOException {
     checkState(isInitialized, "initialize() must be invoked before use.");
     if (isOpen()) {
       try {
         pipeSinkChannel.close();
         handleResponse(waitForCompletionAndThrowIfUploadFailed());
+      } catch (IOException e) {
+        if (retry && ApiErrorExtractor.INSTANCE.recursiveCheckForCode(e, 410)) {
+          pipeSinkChannel = null;
+          uploadOperation.cancel(true);
+          uploadOperation = null;
+          isInitialized = false;
+
+          initialize();
+
+          ByteBuffer cacheBuffer = ByteBuffer.wrap(cache.toByteArray());
+          cache = null;
+          write(cacheBuffer);
+
+          close(/* retry= */ false);
+        } else {
+          throw e;
+        }
       } finally {
         pipeSinkChannel = null;
         uploadOperation = null;
