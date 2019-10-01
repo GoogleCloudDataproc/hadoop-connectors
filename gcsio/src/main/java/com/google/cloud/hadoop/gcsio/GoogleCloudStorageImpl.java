@@ -427,7 +427,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         new Bucket()
             .setName(bucketName)
             .setLocation(options.getLocation())
-            .setStorageClass(options.getStorageClass());
+            .setStorageClass(options.getStorageClass())
+            .setBilling(
+                options.getRequesterPays() == null
+                    ? null
+                    : new Bucket.Billing().setRequesterPays(options.getRequesterPays()));
     Storage.Buckets.Insert insertBucket =
         configureRequest(gcs.buckets().insert(storageOptions.getProjectId(), bucket), bucketName);
     // TODO(user): To match the behavior of throwing FileNotFoundException for 404, we probably

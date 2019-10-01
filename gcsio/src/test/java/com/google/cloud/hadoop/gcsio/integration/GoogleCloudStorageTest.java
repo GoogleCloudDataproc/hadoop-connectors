@@ -23,6 +23,7 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 
 import com.google.api.client.util.Clock;
+import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
@@ -40,6 +41,7 @@ import com.google.cloud.hadoop.gcsio.VerificationAttributes;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.cloud.hadoop.util.RequesterPaysOptions;
 import com.google.common.base.Equivalence;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
@@ -70,6 +72,8 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -100,7 +104,12 @@ public class GoogleCloudStorageTest {
   private static String createUniqueBucket(GoogleCloudStorage gcs, String suffix)
       throws IOException {
     String bucketName = getUniqueBucketName(suffix) + "_" + gcs.hashCode();
-    gcs.create(bucketName);
+    if (gcs.getOptions().getRequesterPaysOptions().getMode().equals(RequesterPaysOptions.RequesterPaysMode.ENABLED)) {
+      CreateBucketOptions createBucketOptions = new CreateBucketOptions(null, null, true);
+      gcs.create(bucketName, createBucketOptions);
+    } else {
+      gcs.create(bucketName);
+    }
     return bucketName;
   }
 
@@ -162,8 +171,20 @@ public class GoogleCloudStorageTest {
 
   @AfterClass
   public static void cleanupBuckets() throws IOException {
-    // Use any GCS object (from tested ones) for clean up
-    BUCKET_HELPER.get().cleanup(Iterables.getLast(SHARED_BUCKETS.asMap().keySet()));
+    // Use first GCS object with Requester Pays if exists or
+    // any other (from tested ones) for clean up
+    Set<GoogleCloudStorage> googleCloudStorages = SHARED_BUCKETS.asMap().keySet();
+    GoogleCloudStorage storage =
+        googleCloudStorages.stream()
+            .filter(
+                gcs ->
+                    gcs.getOptions()
+                        .getRequesterPaysOptions()
+                        .getMode()
+                        .equals(RequesterPaysOptions.RequesterPaysMode.ENABLED))
+            .findFirst()
+            .orElseGet(() -> Iterables.getLast(googleCloudStorages));
+    BUCKET_HELPER.get().cleanup(storage);
   }
 
   private String getSharedBucketName() {

@@ -22,7 +22,9 @@ import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.ThrottledGoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.ThrottledGoogleCloudStorage.StorageOperation;
+import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
+import com.google.cloud.hadoop.util.RequesterPaysOptions;
 import com.google.common.util.concurrent.RateLimiter;
 import java.io.IOException;
 import java.util.Arrays;
@@ -40,7 +42,8 @@ public class GoogleCloudStorageIntegrationTest extends GoogleCloudStorageTest {
     return Arrays.asList(
         new Object[] {getGoogleCloudStorage()},
         new Object[] {getApacheGoogleCloudStorage()},
-        new Object[] {getPerformanceCachingGoogleCloudStorage()});
+        new Object[] {getPerformanceCachingGoogleCloudStorage()},
+        new Object[] {getGoogleCloudStorageWithRequesterPays()});
   }
 
   private static GoogleCloudStorage getApacheGoogleCloudStorage() throws IOException {
@@ -68,6 +71,16 @@ public class GoogleCloudStorageIntegrationTest extends GoogleCloudStorageTest {
         RateLimiter.create(2),
         new GoogleCloudStorageImpl(optionsBuilder.build(), credential),
         EnumSet.of(StorageOperation.DELETE_BUCKETS, StorageOperation.CREATE_BUCKET));
+  }
+
+  private static GoogleCloudStorage getGoogleCloudStorageWithRequesterPays() throws IOException {
+    return getGoogleCloudStorage(
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setRequesterPaysOptions(
+                RequesterPaysOptions.builder()
+                    .setMode(RequesterPaysOptions.RequesterPaysMode.ENABLED)
+                    .setProjectId(TestConfiguration.getInstance().getProjectId())
+                    .build()));
   }
 
   public GoogleCloudStorageIntegrationTest(GoogleCloudStorage gcs) {
