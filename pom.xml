@@ -89,7 +89,8 @@
 
     <apache.httpclient.version>4.5.9</apache.httpclient.version>
     <google.api.version>1.30.1</google.api.version>
-    <google.api.grpc.version>0.12.0</google.api.grpc.version>
+    <google.api.grpc.proto-google-iam-v1.version>0.12.0</google.api.grpc.proto-google-iam-v1.version>
+    <google.api.grpc.proto-google-common-protos.version>1.16.0</google.api.grpc.proto-google-common-protos.version>
     <google.api-bigquery.version>v2-rev20190807-${google.api.version}</google.api-bigquery.version>
     <google.api-storage.version>v1-rev20190624-${google.api.version}</google.api-storage.version>
     <google.auth.version>0.17.1</google.auth.version>
@@ -392,7 +393,12 @@
       <dependency>
         <groupId>com.google.api.grpc</groupId>
         <artifactId>proto-google-iam-v1</artifactId>
-        <version>${google.api.grpc.version}</version>
+        <version>${google.api.grpc.proto-google-iam-v1.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.api.grpc</groupId>
+        <artifactId>proto-google-common-protos</artifactId>
+        <version>${google.api.grpc.proto-google-common-protos.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.protobuf</groupId>
