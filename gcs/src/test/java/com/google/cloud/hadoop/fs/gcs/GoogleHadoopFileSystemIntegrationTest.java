@@ -23,6 +23,14 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.fs.permission.FsAction.ALL;
+import static org.apache.hadoop.fs.permission.FsAction.EXECUTE;
+import static org.apache.hadoop.fs.permission.FsAction.NONE;
+import static org.apache.hadoop.fs.permission.FsAction.READ;
+import static org.apache.hadoop.fs.permission.FsAction.READ_EXECUTE;
+import static org.apache.hadoop.fs.permission.FsAction.READ_WRITE;
+import static org.apache.hadoop.fs.permission.FsAction.WRITE;
+import static org.apache.hadoop.fs.permission.FsAction.WRITE_EXECUTE;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksumType;
@@ -53,6 +61,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Before;
 import org.junit.ClassRule;
@@ -753,6 +762,221 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
     FileStatus status = myGhfs.getFileStatus(filePath);
     assertThat(status.getPermission()).isEqualTo(new FsPermission(testPermissions));
+
+    // Cleanup.
+    assertThat(ghfs.delete(filePath, /* recursive= */ true)).isTrue();
+  }
+
+  /** Test if access() happy path */
+  @Test
+  public void testAccess() throws IOException {
+    Configuration conf = getConfigurationWithImplementation();
+    GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
+    myGhfs.initialize(ghfs.getUri(), conf);
+    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
+    ghfsHelper.writeFile(filePath, "foo", 1, /* overwrite= */ true);
+
+    myGhfs.access(filePath, ALL);
+
+    // Cleanup.
+    assertThat(ghfs.delete(filePath, /* recursive= */ true)).isTrue();
+  }
+
+  @Test
+  public void access_withoutAllPermissions() throws IOException {
+    String testPermissions = "000";
+    Configuration conf = getConfigurationWithImplementation();
+    conf.set(GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT.getKey(), testPermissions);
+    GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
+    myGhfs.initialize(ghfs.getUri(), conf);
+    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
+    ghfsHelper.writeFile(filePath, "foo", 1, /* overwrite= */ true);
+
+    myGhfs.access(filePath, NONE);
+
+    // Cleanup.
+    assertThat(ghfs.delete(filePath, /* recursive= */ true)).isTrue();
+  }
+
+  /** Tests access() without all permissions. */
+  @Test
+  public void access_throwsExceptionWithoutAllPermissions() throws IOException {
+    String testPermissions = "000";
+    Configuration conf = getConfigurationWithImplementation();
+    conf.set(GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT.getKey(), testPermissions);
+    GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
+    myGhfs.initialize(ghfs.getUri(), conf);
+    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
+    ghfsHelper.writeFile(filePath, "foo", 1, /* overwrite= */ true);
+
+    AccessControlException exception =
+            assertThrows(AccessControlException.class, () -> myGhfs.access(filePath, ALL));
+    assertThat(exception).hasMessageThat().contains("Permission denied:");
+
+    // Cleanup.
+    assertThat(ghfs.delete(filePath, /* recursive= */ true)).isTrue();
+  }
+
+  @Test
+  public void access_withoutUserWritePermissions() throws IOException {
+    String testPermissions = "500";
+    Configuration conf = getConfigurationWithImplementation();
+    conf.set(GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT.getKey(), testPermissions);
+    GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
+    myGhfs.initialize(ghfs.getUri(), conf);
+    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
+    ghfsHelper.writeFile(filePath, "foo", 1, /* overwrite= */ true);
+
+    myGhfs.access(filePath, READ_EXECUTE);
+
+    // Cleanup.
+    assertThat(ghfs.delete(filePath, /* recursive= */ true)).isTrue();
+  }
+
+  @Test
+  public void access_withUserWritePermissions() throws IOException {
+    String testPermissions = "200";
+    Configuration conf = getConfigurationWithImplementation();
+    conf.set(GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT.getKey(), testPermissions);
+    GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
+    myGhfs.initialize(ghfs.getUri(), conf);
+    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
+    ghfsHelper.writeFile(filePath, "foo", 1, /* overwrite= */ true);
+
+    myGhfs.access(filePath, WRITE);
+
+    // Cleanup.
+    assertThat(ghfs.delete(filePath, /* recursive= */ true)).isTrue();
+  }
+
+  /** Tests access() without write permissions. */
+  @Test
+  public void access_throwsExceptionWithoutUserWritePermissions() throws IOException {
+    String testPermissions = "500";
+    Configuration conf = getConfigurationWithImplementation();
+    conf.set(GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT.getKey(), testPermissions);
+    GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
+    myGhfs.initialize(ghfs.getUri(), conf);
+    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
+    ghfsHelper.writeFile(filePath, "foo", 1, /* overwrite= */ true);
+
+    AccessControlException exception =
+            assertThrows(AccessControlException.class, () -> myGhfs.access(filePath, ALL));
+    assertThat(exception).hasMessageThat().contains("Permission denied:");
+
+    // Cleanup.
+    assertThat(ghfs.delete(filePath, /* recursive= */ true)).isTrue();
+  }
+
+  @Test
+  public void access_withoutReadReadPermissions() throws IOException {
+    String testPermissions = "300";
+    Configuration conf = getConfigurationWithImplementation();
+    conf.set(GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT.getKey(), testPermissions);
+    GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
+    myGhfs.initialize(ghfs.getUri(), conf);
+    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
+    ghfsHelper.writeFile(filePath, "foo", 1, /* overwrite= */ true);
+
+    myGhfs.access(filePath, WRITE_EXECUTE);
+
+    // Cleanup.
+    assertThat(ghfs.delete(filePath, /* recursive= */ true)).isTrue();
+  }
+
+  @Test
+  public void access_withUserReadPermissions() throws IOException {
+    String testPermissions = "400";
+    Configuration conf = getConfigurationWithImplementation();
+    conf.set(GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT.getKey(), testPermissions);
+    GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
+    myGhfs.initialize(ghfs.getUri(), conf);
+    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
+    ghfsHelper.writeFile(filePath, "foo", 1, /* overwrite= */ true);
+
+    myGhfs.access(filePath, READ);
+
+    // Cleanup.
+    assertThat(ghfs.delete(filePath, /* recursive= */ true)).isTrue();
+  }
+
+  /** Tests access() without read permissions. */
+  @Test
+  public void access_throwsExceptionWithoutReadReadPermissions() throws IOException {
+    String testPermissions = "300";
+    Configuration conf = getConfigurationWithImplementation();
+    conf.set(GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT.getKey(), testPermissions);
+    GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
+    myGhfs.initialize(ghfs.getUri(), conf);
+    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
+    ghfsHelper.writeFile(filePath, "foo", 1, /* overwrite= */ true);
+
+    AccessControlException exception =
+            assertThrows(AccessControlException.class, () -> myGhfs.access(filePath, ALL));
+    assertThat(exception).hasMessageThat().contains("Permission denied:");
+
+    // Cleanup.
+    assertThat(ghfs.delete(filePath, /* recursive= */ true)).isTrue();
+  }
+
+  @Test
+  public void access_withoutExecutePermissions() throws IOException {
+    String testPermissions = "600";
+    Configuration conf = getConfigurationWithImplementation();
+    conf.set(GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT.getKey(), testPermissions);
+    GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
+    myGhfs.initialize(ghfs.getUri(), conf);
+    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
+    ghfsHelper.writeFile(filePath, "foo", 1, /* overwrite= */ true);
+
+    myGhfs.access(filePath, READ_WRITE);
+
+    // Cleanup.
+    assertThat(ghfs.delete(filePath, /* recursive= */ true)).isTrue();
+  }
+
+  @Test
+  public void access_withUserExecutePermissions() throws IOException {
+    String testPermissions = "100";
+    Configuration conf = getConfigurationWithImplementation();
+    conf.set(GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT.getKey(), testPermissions);
+    GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
+    myGhfs.initialize(ghfs.getUri(), conf);
+    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
+    ghfsHelper.writeFile(filePath, "foo", 1, /* overwrite= */ true);
+
+    myGhfs.access(filePath, EXECUTE);
+
+    // Cleanup.
+    assertThat(ghfs.delete(filePath, /* recursive= */ true)).isTrue();
+  }
+
+  /** Tests access() without execute permissions. */
+  @Test
+  public void access_throwsExceptionWithoutExecutePermissions() throws IOException {
+    String testPermissions = "600";
+    Configuration conf = getConfigurationWithImplementation();
+    conf.set(GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT.getKey(), testPermissions);
+    GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
+    myGhfs.initialize(ghfs.getUri(), conf);
+    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
+    ghfsHelper.writeFile(filePath, "foo", 1, /* overwrite= */ true);
+
+    AccessControlException exception =
+            assertThrows(AccessControlException.class, () -> myGhfs.access(filePath, ALL));
+    assertThat(exception).hasMessageThat().contains("Permission denied:");
 
     // Cleanup.
     assertThat(ghfs.delete(filePath, /* recursive= */ true)).isTrue();

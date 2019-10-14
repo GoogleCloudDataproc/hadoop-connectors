@@ -110,8 +110,10 @@ import org.apache.hadoop.fs.GlobPattern;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.XAttrSetFlag;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
@@ -1070,6 +1072,43 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         "getFileStatus(path: %s, userName: %s): %s",
         fileInfo.getPath(), userName, lazy(() -> fileStatusToString(status)));
     return status;
+  }
+
+  @Override
+  public void access(Path path, FsAction mode) throws IOException {
+    checkAccessPermissions(getFileStatus(path), mode);
+  }
+
+  /**
+   * This method provides the default implementation of
+   * {@link #access(Path, FsAction)}.
+   *
+   * @param stat FileStatus to check
+   * @param mode type of access to check
+   * @throws AccessControlException if access is denied
+   * @throws IOException for any error
+   */
+  private static void checkAccessPermissions(FileStatus stat, FsAction mode)
+          throws AccessControlException, IOException {
+    FsPermission perm = stat.getPermission();
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    String user = ugi.getShortUserName();
+    if (user.equals(stat.getOwner())) {
+      if (perm.getUserAction().implies(mode)) {
+        return;
+      }
+    } else if (ugi.getGroups().contains(stat.getGroup())) {
+      if (perm.getGroupAction().implies(mode)) {
+        return;
+      }
+    } else {
+      if (perm.getOtherAction().implies(mode)) {
+        return;
+      }
+    }
+    throw new AccessControlException(String.format(
+            "Permission denied: user=%s, path=\"%s\":%s:%s:%s%s", user, stat.getPath(),
+            stat.getOwner(), stat.getGroup(), stat.isDirectory() ? "d" : "-", perm));
   }
 
   /**

@@ -206,6 +206,42 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   public void testConfigurablePermissions() {}
 
   @Override
+  public void testAccess(){}
+
+  @Override
+  public void access_withoutAllPermissions(){}
+
+  @Override
+  public void access_throwsExceptionWithoutAllPermissions(){}
+
+  @Override
+  public void access_withoutUserWritePermissions(){}
+
+  @Override
+  public void access_withUserWritePermissions(){}
+
+  @Override
+  public void access_throwsExceptionWithoutUserWritePermissions(){}
+
+  @Override
+  public void access_withoutReadReadPermissions(){}
+
+  @Override
+  public void access_withUserReadPermissions(){}
+
+  @Override
+  public void access_throwsExceptionWithoutReadReadPermissions(){}
+
+  @Override
+  public void access_withoutExecutePermissions(){}
+
+  @Override
+  public void access_withUserExecutePermissions(){}
+
+  @Override
+  public void access_throwsExceptionWithoutExecutePermissions(){}
+
+  @Override
   public void testFileStatusUser() {}
 
   @Override
