@@ -18,10 +18,12 @@ import static com.google.common.base.Preconditions.checkState;
 
 import com.google.api.client.googleapis.media.MediaHttpUploader;
 import com.google.api.client.googleapis.services.AbstractGoogleClientRequest;
+import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.InputStreamContent;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -32,6 +34,7 @@ import java.nio.channels.Channels;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.WritableByteChannel;
+import java.util.ArrayList;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -77,6 +80,8 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
 
   // When enabled, we get higher throughput for writing small files.
   private boolean directUploadEnabled = false;
+
+  private String resumableUploadSessionId = null;
 
   /** Construct a new channel using the given ExecutorService to run background uploads. */
   public AbstractGoogleAsyncWriteChannel(
@@ -269,8 +274,16 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
       // Try-with-resource will close this end of the pipe so that
       // the writer at the other end will not hang indefinitely.
       try (InputStream uploadPipeSource = pipeSource) {
-        return uploadObject.execute();
+        HttpResponse httpResponseUnparsed = uploadObject.executeUnparsed();
+        ArrayList uploadId = (ArrayList) httpResponseUnparsed.getRequest().getUrl().get("upload_id");
+        if (!uploadId.isEmpty()) {
+          resumableUploadSessionId = uploadId.get(0).toString();
+        }
+        return httpResponseUnparsed.parseAs(uploadObject.getResponseClass());
       } catch (IOException ioe) {
+        if (resumableUploadSessionId != null) {
+          logger.atInfo().withCause(ioe).log("Upload session id: '%s'.", resumableUploadSessionId);
+        }
         S response = createResponseFromException(ioe);
         if (response != null) {
           logger.atWarning().withCause(ioe).log(
@@ -301,8 +314,14 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
       uploadOperation.cancel(true);
       IOException exception = new ClosedByInterruptException();
       exception.addSuppressed(e);
+      if (resumableUploadSessionId != null) {
+        logger.atInfo().withCause(e).log("Upload session id: '%s'.", resumableUploadSessionId);
+      }
       throw exception;
     } catch (ExecutionException e) {
+      if (resumableUploadSessionId != null) {
+        logger.atInfo().withCause(e).log("Upload session id: '%s'.", resumableUploadSessionId);
+      }
       if (e.getCause() instanceof Error) {
         throw (Error) e.getCause();
       }

@@ -169,7 +169,7 @@ public class GoogleCloudStorageMockitoTest {
     when(mockStorageObjects.get(BUCKET_NAME, OBJECT_NAME)).thenReturn(mockStorageObjectsGet);
     when(mockStorageObjectsGet.execute()).thenThrow(new IOException("NotFound"));
     when(mockErrorExtractor.itemNotFound(any(IOException.class))).thenReturn(true);
-    when(mockStorageObjectsInsert.execute()).thenAnswer(answer);
+    when(mockStorageObjectsInsert.executeUnparsed()).thenAnswer(answer);
   }
 
   /**
@@ -267,7 +267,7 @@ public class GoogleCloudStorageMockitoTest {
     verify(mockStorageObjects).get(eq(BUCKET_NAME), eq(OBJECT_NAME));
     verify(mockStorageObjectsGet).execute();
     verify(mockErrorExtractor).itemNotFound(any(IOException.class));
-    verify(mockStorageObjectsInsert).execute();
+    verify(mockStorageObjectsInsert).executeUnparsed();
   }
 
   /**
@@ -293,7 +293,7 @@ public class GoogleCloudStorageMockitoTest {
     IOException thrown = assertThrows(IOException.class, writeChannel::close);
     assertThat(thrown).hasCauseThat().isEqualTo(fakeException);
 
-    verify(mockStorageObjectsInsert).execute();
+    verify(mockStorageObjectsInsert).executeUnparsed();
     verify(mockStorage, times(2)).objects();
     verify(mockStorageObjects)
         .insert(eq(BUCKET_NAME), any(StorageObject.class), any(AbstractInputStreamContent.class));
@@ -340,7 +340,7 @@ public class GoogleCloudStorageMockitoTest {
     verify(mockStorageObjectsInsert).setIfGenerationMatch(eq(0L));
     verify(mockErrorExtractor).itemNotFound(any(IOException.class));
     verify(mockClientRequestHelper).setChunkSize(any(Storage.Objects.Insert.class), anyInt());
-    verify(mockStorageObjectsInsert).execute();
+    verify(mockStorageObjectsInsert).executeUnparsed();
   }
 
   /**
