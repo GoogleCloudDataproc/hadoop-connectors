@@ -437,8 +437,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       responseObserver.done.await();
 
       if (responseObserver.hasError()) {
-        throw new IOException(
-            "StartResumableWriteRequest failed", responseObserver.getError().getCause());
+        throw new IOException("StartResumableWriteRequest failed", responseObserver.getError());
       }
 
       return responseObserver.getResponse().getUploadId();
@@ -455,8 +454,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       responseObserver.done.await();
 
       if (responseObserver.hasError()) {
-        throw new IOException(
-            "QueryWriteStatusRequest failed", responseObserver.getError().getCause());
+        throw new IOException("QueryWriteStatusRequest failed", responseObserver.getError());
       }
 
       return responseObserver.getResponse().getCommittedSize();
