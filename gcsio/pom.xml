@@ -199,6 +199,129 @@
           </execution>
         </executions>
       </plugin>
+      <plugin>
+        <artifactId>maven-shade-plugin</artifactId>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <transformers>
+                <transformer
+                    implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+              </transformers>
+              <filters>
+                <!-- minimizeJar breaks all the dynamic load hacks; add them explicitly -->
+                <filter>
+                  <artifact>com.google.flogger:flogger-log4j-backend</artifact>
+                  <includes>
+                    <include>**</include>
+                  </includes>
+                </filter>
+                <filter>
+                  <artifact>io.grpc:*</artifact>
+                  <includes>
+                    <include>**</include>
+                  </includes>
+                </filter>
+                <filter>
+                  <artifact>io.opencensus:*</artifact>
+                  <includes>
+                    <include>**</include>
+                  </includes>
+                </filter>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>*.json</exclude>
+                    <exclude>google/**</exclude>
+                    <exclude>grpc/**</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+              <artifactSet>
+                <includes>
+                  <include>com.fasterxml.jackson.core:jackson-core</include>
+                  <include>com.google.api-client</include>
+                  <include>com.google.api.grpc</include>
+                  <include>com.google.apis</include>
+                  <include>com.google.auth</include>
+                  <include>com.google.cloud.bigdataoss:gcsio</include>
+                  <include>com.google.cloud.bigdataoss:util-hadoop</include>
+                  <include>com.google.cloud.bigdataoss:util</include>
+                  <include>com.google.flogger</include>
+                  <include>com.google.guava</include>
+                  <include>com.google.http-client</include>
+                  <include>com.google.oauth-client</include>
+                  <include>com.google.protobuf</include>
+                  <!-- Needed by http client and versions conflict -->
+                  <include>commons-codec:commons-codec</include>
+                  <include>io.grpc</include>
+                  <include>io.opencensus</include>
+                  <include>io.perfmark</include>
+                  <include>org.apache.httpcomponents</include>
+                </includes>
+              </artifactSet>
+              <!-- TODO(b/135136403): Reenable minimizeJar.
+                   Disabled because minimizeJar strips out a bunch of files
+                   needed by gRPC for instance NettyChannelProvider and all
+                   it's dependencies. -->
+              <minimizeJar>false</minimizeJar>
+              <relocations>
+                <relocation>
+                  <pattern>com</pattern>
+                  <shadedPattern>com.google.cloud.hadoop.repackaged.gcsio.com</shadedPattern>
+                  <includes>
+                    <include>com.fasterxml.**</include>
+                    <include>com.google.api.**</include>
+                    <include>com.google.auth.**</include>
+                    <include>com.google.cloud.audit.**</include>
+                    <include>com.google.cloud.hadoop.util.**</include>
+                    <include>com.google.common.**</include>
+                    <include>com.google.geo.**</include>
+                    <include>com.google.google.storage.**</include>
+                    <include>com.google.iam.**</include>
+                    <include>com.google.logging.**</include>
+                    <include>com.google.longrunning.**</include>
+                    <include>com.google.rpc.**</include>
+                    <include>com.google.protobuf.**</include>
+                    <include>com.google.thirdparty.**</include>
+                    <include>com.google.type.**</include>
+                  </includes>
+                </relocation>
+                <relocation>
+                  <pattern>org</pattern>
+                  <shadedPattern>com.google.cloud.hadoop.repackaged.gcsio.org</shadedPattern>
+                  <includes>
+                    <include>org.apache.commons.codec.**</include>
+                    <include>org.apache.http.**</include>
+                  </includes>
+                </relocation>
+                <relocation>
+                  <pattern>io</pattern>
+                  <shadedPattern>com.google.cloud.hadoop.repackaged.gcsio.io</shadedPattern>
+                  <includes>
+                    <include>io.grpc.**</include>
+                    <include>io.opencensus.**</include>
+                    <include>io.perfmark.**</include>
+                  </includes>
+                </relocation>
+                <relocation>
+                  <pattern>META-INF/native/io_grpc_netty_</pattern>
+                  <shadedPattern>META-INF/native/com_google_cloud_hadoop_repackaged_gcsio_io_grpc_netty_</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>META-INF/native/libio_grpc_netty_</pattern>
+                  <shadedPattern>META-INF/native/libcom_google_cloud_hadoop_repackaged_gcsio_io_grpc_netty_</shadedPattern>
+                </relocation>
+              </relocations>
+              <shadedArtifactAttached>true</shadedArtifactAttached>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 </project>
