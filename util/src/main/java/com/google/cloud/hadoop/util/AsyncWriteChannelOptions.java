@@ -41,6 +41,8 @@ public abstract class AsyncWriteChannelOptions {
     return builder();
   }
 
+  public abstract Builder toBuilder();
+
   public static final AsyncWriteChannelOptions DEFAULT = builder().build();
 
   public static Builder builder() {
