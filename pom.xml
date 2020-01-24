@@ -98,9 +98,9 @@
     <google.cloud-bigquery-storage.version>0.105.0-beta</google.cloud-bigquery-storage.version>
     <google.flogger.version>0.4</google.flogger.version>
     <google.guava.version>28.0-jre</google.guava.version>
-    <google.protobuf.version>3.9.1</google.protobuf.version>
+    <google.protobuf.version>3.11.0</google.protobuf.version>
     <google.truth.version>1.0</google.truth.version>
-    <grpc.version>1.24.2</grpc.version>
+    <grpc.version>1.26.0</grpc.version>
     <hadoop.two.version>2.9.2</hadoop.two.version>
     <hadoop.three.version>3.2.0</hadoop.three.version>
     <junit.version>4.13-beta-3</junit.version>
