@@ -59,7 +59,7 @@ public class ForwardingGoogleCloudStorageTest {
 
   /** Sample create bucket options. */
   private static final CreateBucketOptions TEST_BUCKET_OPTIONS =
-      new CreateBucketOptions(TEST_STRING, TEST_STRING);
+      new CreateBucketOptions(TEST_STRING, TEST_STRING, false);
 
   /** Sample create object options. */
   private static final GoogleCloudStorageReadOptions TEST_READ_OPTIONS =

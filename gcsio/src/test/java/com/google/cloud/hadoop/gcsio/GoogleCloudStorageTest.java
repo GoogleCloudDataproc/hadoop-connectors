@@ -98,6 +98,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import sun.tools.tree.BooleanExpression;
 
 /**
  * Unit tests for GoogleCloudStorage class. The underlying GCS HTTP requests are mocked, in order to
@@ -1189,18 +1190,47 @@ public class GoogleCloudStorageTest {
   @Test
   public void testCreateBucketWithOptionsNormalOperation() throws IOException {
     MockHttpTransport transport =
+            GoogleCloudStorageTestUtils.mockTransport(jsonDataResponse(newBucket(BUCKET_NAME)));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    String location = "some-location";
+    String storageClass = "storage-class";
+    Boolean requesterPays = false;
+    CreateBucketOptions bucketOptions = new CreateBucketOptions(location, storageClass, requesterPays);
+
+    gcs.create(BUCKET_NAME, bucketOptions);
+
+    assertThat(bucketOptions.getLocation()).isEqualTo(location);
+    assertThat(bucketOptions.getStorageClass()).isEqualTo(storageClass);
+    assertThat(bucketOptions.getRequesterPays()).isFalse();
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+            .containsExactly(createBucketRequestString(PROJECT_ID))
+            .inOrder();
+  }
+
+  /**
+   * Test successful operation of GoogleCloudStorage.create(String, CreateBucketOptions) with
+   * requester pays options
+   */
+  @Test
+  public void testCreateBucketWithRequesterPaysOptionOperation() throws IOException {
+    MockHttpTransport transport =
         GoogleCloudStorageTestUtils.mockTransport(jsonDataResponse(newBucket(BUCKET_NAME)));
 
     GoogleCloudStorage gcs = mockedGcs(transport);
 
     String location = "some-location";
     String storageClass = "storage-class";
-    CreateBucketOptions bucketOptions = new CreateBucketOptions(location, storageClass);
+    Boolean requesterPays = true;
+    CreateBucketOptions bucketOptions =
+        new CreateBucketOptions(location, storageClass, requesterPays);
 
     gcs.create(BUCKET_NAME, bucketOptions);
 
     assertThat(bucketOptions.getLocation()).isEqualTo(location);
     assertThat(bucketOptions.getStorageClass()).isEqualTo(storageClass);
+    assertThat(bucketOptions.getRequesterPays()).isTrue();
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(createBucketRequestString(PROJECT_ID))
         .inOrder();

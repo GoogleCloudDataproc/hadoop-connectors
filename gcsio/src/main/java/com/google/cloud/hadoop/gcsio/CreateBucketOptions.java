@@ -31,12 +31,13 @@ public class CreateBucketOptions {
 
   private final String location;
   private final String storageClass;
+  private final Boolean requesterPays;
 
   /**
    * Create a bucket with all default settings.
    */
   private CreateBucketOptions() {
-    this(null, null);
+    this(/* location */ null, /* storageClass */ null,  /* requesterPays */ false);
   }
 
   /**
@@ -44,9 +45,10 @@ public class CreateBucketOptions {
    *
    * @param location Bucket location
    */
-  public CreateBucketOptions(String location, String storageClass) {
+  public CreateBucketOptions(String location, String storageClass, Boolean requesterPays) {
     this.location = location;
     this.storageClass = storageClass;
+    this.requesterPays = requesterPays;
   }
 
   /**
@@ -63,5 +65,13 @@ public class CreateBucketOptions {
   @Nullable
   public String getStorageClass() {
     return storageClass;
+  }
+
+  /**
+   * Returns the bucket requesterPays.
+   */
+  @Nullable
+  public Boolean getRequesterPays() {
+    return requesterPays;
   }
 }
