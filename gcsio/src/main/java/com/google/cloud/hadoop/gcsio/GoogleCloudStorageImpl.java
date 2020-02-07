@@ -303,14 +303,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // `poolSize` number of `ManagedChannel`s, each with a `subSetting` number of number of subchannels.
     // See the service config proto definition for more details:
     // https://github.com/grpc/grpc-proto/blob/master/grpc/service_config/service_config.proto#L182
-    ImmutableMap<String, Object> pickFirstStrategy =
-        ImmutableMap.<String, Object>of("pick_first", ImmutableMap.of());
+    Map<String, Object> pickFirstStrategy = ImmutableMap.of("pick_first", ImmutableMap.of());
 
-    ImmutableMap<String, Object> childPolicy =
-        ImmutableMap.<String, Object>of("childPolicy", ImmutableList.of(pickFirstStrategy));
+    Map<String, Object> childPolicy =
+        ImmutableMap.of("childPolicy", ImmutableList.of(pickFirstStrategy));
 
-    ImmutableMap<String, Object> grpcLbPolicy =
-        ImmutableMap.<String, Object>of("grpclb", childPolicy);
+    Map<String, Object> grpcLbPolicy = ImmutableMap.of("grpclb", childPolicy);
 
     return ImmutableMap.of(
         "methodConfig", ImmutableList.of(methodConfig),
