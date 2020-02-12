@@ -111,10 +111,10 @@ class CoopLockFsckRunner {
 
     Map<FileStatus, CoopLockRecord> expiredOperations =
         lockedOperations.stream()
-            .map(this::getOperationLockIfExpiredUnchecked)
+            .map(this::getOperationLockIfExpired)
             .filter(Optional::isPresent)
             .map(Optional::get)
-            .filter(operation -> !unlockOperationIfNoLogUnchecked(operation))
+            .filter(this::checkLogExistsAndUnlockOtherwise)
             .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
 
     // If this is a check command then return after operations status was printed.
@@ -306,35 +306,35 @@ class CoopLockFsckRunner {
         .collect(toList());
   }
 
-  private Optional<Map.Entry<FileStatus, CoopLockRecord>> getOperationLockIfExpiredUnchecked(
+  private Optional<Map.Entry<FileStatus, CoopLockRecord>> getOperationLockIfExpired(
       CoopLockRecord operation) {
     try {
-      return getOperationLockIfExpired(operation);
+      return getOperationLockIfExpiredChecked(operation);
     } catch (IOException e) {
       throw new RuntimeException(
           String.format("Failed to check if %s operation expired", operation), e);
     }
   }
 
-  private Optional<Map.Entry<FileStatus, CoopLockRecord>> getOperationLockIfExpired(
+  private Optional<Map.Entry<FileStatus, CoopLockRecord>> getOperationLockIfExpiredChecked(
       CoopLockRecord operationRecord) throws IOException {
     String globPath =
         CoopLockRecordsDao.LOCK_DIRECTORY + "*" + operationRecord.getOperationId() + "*.lock";
     URI globUri =
         gcsFs.getPathCodec().getPath(bucketName, globPath, /* allowEmptyObjectName= */ false);
-    FileStatus[] operationLocks = ghfs.globStatus(new Path(globUri));
+    FileStatus[] operationLock = ghfs.globStatus(new Path(globUri));
     checkState(
-        operationLocks.length < 2,
+        operationLock.length < 2,
         "operation %s should not have more than one lock file",
         operationRecord.getOperationId());
 
-    // Lock file not created - nothing to repair
-    if (operationLocks.length == 0) {
+    // <operation>.lock file not created - nothing to repair
+    if (operationLock.length == 0) {
       unlockOperationIfNecessary(operationRecord, "lock");
       return Optional.empty();
     }
 
-    FileStatus operationStatus = operationLocks[0];
+    FileStatus operationStatus = operationLock[0];
 
     if (operationRecord.getLockExpiration().isBefore(operationExpirationInstant)
         && getRenewedLockExpiration(operationStatus, operationRecord)
@@ -347,36 +347,40 @@ class CoopLockFsckRunner {
     return Optional.empty();
   }
 
-  private boolean unlockOperationIfNoLogUnchecked(
+  /**
+   * Returns {@code true} if operation log exists and {@code false} if it does not exist. As a
+   * sideffect releases operation lock if operation log does not exist.
+   */
+  private boolean checkLogExistsAndUnlockOtherwise(
       Map.Entry<FileStatus, CoopLockRecord> operation) {
     try {
-      return unlockOperationIfNoLog(operation);
+      return checkLogExistsAndUnlockOtherwiseChecked(operation);
     } catch (IOException e) {
       throw new RuntimeException(
           String.format("Failed to check if %s operation expired", operation.getValue()), e);
     }
   }
 
-  private boolean unlockOperationIfNoLog(Map.Entry<FileStatus, CoopLockRecord> operation)
-      throws IOException {
+  private boolean checkLogExistsAndUnlockOtherwiseChecked(
+      Map.Entry<FileStatus, CoopLockRecord> operation) throws IOException {
     CoopLockRecord operationRecord = operation.getValue();
     String globPath =
         CoopLockRecordsDao.LOCK_DIRECTORY + "*" + operationRecord.getOperationId() + "*.log";
     URI globUri =
         gcsFs.getPathCodec().getPath(bucketName, globPath, /* allowEmptyObjectName= */ false);
-    FileStatus[] operationLocks = ghfs.globStatus(new Path(globUri));
+    FileStatus[] operationLog = ghfs.globStatus(new Path(globUri));
     checkState(
-        operationLocks.length < 2,
+        operationLog.length < 2,
         "operation %s should not have more than one log file",
         operationRecord.getOperationId());
 
-    // Log file not created - nothing to repair
-    if (operationLocks.length == 0) {
+    // <operation>.log file not created - nothing to repair
+    if (operationLog.length == 0) {
       unlockOperationIfNecessary(operationRecord, "log");
-      return true;
+      return false;
     }
 
-    return false;
+    return true;
   }
 
   private void unlockOperationIfNecessary(CoopLockRecord operationRecord, String fileType)
