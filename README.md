@@ -29,12 +29,6 @@ jobs on data in BigQuery by implementing the InputFormat & OutputFormat
 interfaces. For more details see
 [the documentation](https://cloud.google.com/dataproc/docs/concepts/connectors/bigquery)
 
-## Google Cloud Pub/Sub connector for Apache Spark Streaming
-
-The Google Cloud Pub/Sub connector for Spark Streaming enables running Spark
-Streaming Job on topics in Pub/Sub by implementing the InputDStream interface.
-For more details see [the README](pubsub/README.md)
-
 ## Building the Cloud Storage and BigQuery connectors
 
 To build the connector for specific Hadoop version, run the following commands
@@ -59,11 +53,6 @@ commands from the main directory:
 
 The Cloud Storage connector JAR can be found in `gcs/target/`. The BigQuery
 connector JAR can be found in `bigquery/target/`.
-
-### Building the Google Cloud Pub/Sub connector
-
-Building the Pub/Sub Connector is described in
-[its README](pubsub/README.md#building-and-testing).
 
 ## Adding the Cloud Storage and BigQuery connectors to your build
 
