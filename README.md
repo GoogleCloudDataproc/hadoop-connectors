@@ -29,6 +29,11 @@ jobs on data in BigQuery by implementing the InputFormat & OutputFormat
 interfaces. For more details see
 [the documentation](https://cloud.google.com/dataproc/docs/concepts/connectors/bigquery)
 
+## Google Cloud Pub/Sub connector for Apache Spark Streaming
+
+This connector is deprecated and was removed - it's recommended to use
+[Apache Bahir](https://bahir.apache.org/) instead.
+
 ## Building the Cloud Storage and BigQuery connectors
 
 To build the connector for specific Hadoop version, run the following commands
