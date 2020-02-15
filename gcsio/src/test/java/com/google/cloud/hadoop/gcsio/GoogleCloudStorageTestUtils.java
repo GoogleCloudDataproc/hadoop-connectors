@@ -119,7 +119,8 @@ public final class GoogleCloudStorageTestUtils {
   public static final HttpTransport HTTP_TRANSPORT = new NetHttpTransport();
   public static final JacksonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
 
-  private static final String GOOGLEAPIS_ENDPOINT = "https://www.googleapis.com";
+  static final String GOOGLEAPIS_ENDPOINT = "https://www.googleapis.com";
+
   private static final String RESUMABLE_UPLOAD_LOCATION_FORMAT =
       GOOGLEAPIS_ENDPOINT + "/upload/storage/v1/b/%s/o?name=%s&uploadType=resumable&upload_id=%s";
 
@@ -136,6 +137,16 @@ public final class GoogleCloudStorageTestUtils {
       Storage storage, GoogleCloudStorageReadOptions options) throws IOException {
     return new GoogleCloudStorageReadChannel(
         storage, BUCKET_NAME, OBJECT_NAME, ERROR_EXTRACTOR, REQUEST_HELPER, options);
+  }
+
+  public static GoogleCloudStorageReadChannel createReadChannel(
+      Storage storage, GoogleCloudStorageReadOptions options, long generation) throws IOException {
+    return new GoogleCloudStorageReadChannel(
+        storage,
+        new StorageResourceId(BUCKET_NAME, OBJECT_NAME, generation),
+        ERROR_EXTRACTOR,
+        REQUEST_HELPER,
+        options);
   }
 
   public static HttpResponse fakeResponse(String header, Object headerValue, InputStream content)
