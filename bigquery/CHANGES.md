@@ -4,6 +4,8 @@
 
 1.  Use `bigquery.googleapis.com` API endpoint.
 
+1.  Remove Log4j backend for Google Flogger.
+
 ### 1.0.1 - 2020-02-13
 
 1.  Fix shaded jar - add back missing relocated dependencies.
