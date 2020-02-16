@@ -1,5 +1,6 @@
 ### 1.1.0 - 2020-XX-XX
 
+1.  Fix proxy authentication when using `JAVA_NET` transport.
 
 ### 1.0.1 - 2020-02-13
 
