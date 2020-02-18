@@ -33,6 +33,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.GenerationRea
 import com.google.cloud.hadoop.util.HadoopConfigurationProperty;
 import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
@@ -178,6 +179,37 @@ public class GoogleHadoopFileSystemConfigurationTest {
 
     // Building configuration using deprecated key (in eg. proxy password) should fail.
     assertThrows(IllegalArgumentException.class, optionsBuilder::build);
+  }
+
+  @Test
+  public void testHttpHeadersProperties_singleHeader() {
+    HadoopConfigurationProperty<String> gcsHttpHeaders =
+        new HadoopConfigurationProperty<>(true, "fs.gs.http.headers");
+
+    Configuration config = new Configuration();
+    config.set(gcsHttpHeaders.getKey() + ".headerkey", "headervalue");
+
+    GoogleCloudStorageFileSystemOptions options =
+        GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
+
+    assertThat(options.getCloudStorageOptions().getHttpRequestHeaders()).isEqualTo(
+        ImmutableMap.of("headerkey", "headervalue"));
+  }
+
+  @Test
+  public void testHttpHeadersProperties_multiHeaders() {
+    HadoopConfigurationProperty<String> gcsHttpHeaders =
+        new HadoopConfigurationProperty<>(true, "fs.gs.http.headers");
+
+    Configuration config = new Configuration();
+    config.set(gcsHttpHeaders.getKey() + ".headerkey1", "headervalue1");
+    config.set(gcsHttpHeaders.getKey() + ".headerkey2", "headervalue2");
+
+    GoogleCloudStorageFileSystemOptions options =
+        GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
+
+    assertThat(options.getCloudStorageOptions().getHttpRequestHeaders()).isEqualTo(
+        ImmutableMap.of("headerkey1", "headervalue1", "headerkey2", "headervalue2"));
   }
 
   @Test

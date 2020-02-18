@@ -7,10 +7,18 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.io.IOException;
+import java.io.StringWriter;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.function.BiFunction;
+import java.util.Map;
+import java.util.HashMap;
 import org.apache.hadoop.conf.Configuration;
 
 /** Hadoop configuration property */
@@ -21,14 +29,24 @@ public class HadoopConfigurationProperty<T> {
   private static final Joiner COMMA_JOINER = Joiner.on(',');
   private static final Splitter COMMA_SPLITTER = Splitter.on(',');
 
+  /** Key for all the hadoop properties. */
+  public static final String PROPERTIES_KEY = "properties";
+  public static final String PROPERTIES_DELIMITER = ".";
+
   private final String key;
   private final List<String> deprecatedKeys;
   private final T defaultValue;
+  private Boolean isPrefix;
 
   private List<String> keyPrefixes = ImmutableList.of("");
 
   public HadoopConfigurationProperty(String key) {
     this(key, null);
+  }
+
+  public HadoopConfigurationProperty(Boolean isPrefix, String prefix) {
+    this(prefix, null);
+    this.isPrefix = isPrefix;
   }
 
   public HadoopConfigurationProperty(String key, T defaultValue, String... deprecatedKeys) {
@@ -82,6 +100,35 @@ public class HadoopConfigurationProperty<T> {
             defaultValue == null ? null : COMMA_JOINER.join((Collection<?>) defaultValue));
     List<String> value = COMMA_SPLITTER.splitToList(nullToEmpty(valueString));
     return logProperty(lookupKey, value);
+  }
+
+  public Map<String, String> getHttpRequestHeaders(Configuration config) throws IOException {
+    if (!isPrefix) {
+      return null;
+    }
+    Map<String, String> httpHeaders = new HashMap<String,String>();
+    // Retrieve all hadoop properties as string and then parse it using JsonParser.
+    StringWriter out = new StringWriter();
+    Configuration.dumpConfiguration(config, out);
+    String allProperties = out.toString();
+    JsonParser jsonParser = new JsonParser();
+    JsonObject jsonObject = jsonParser.parse(allProperties).getAsJsonObject();
+    JsonArray jsonArray = jsonObject.get(PROPERTIES_KEY).getAsJsonArray();
+    Iterator<JsonElement> iterator = jsonArray.iterator();
+
+    while (iterator.hasNext()) {
+      JsonObject headerJsonObject = iterator.next().getAsJsonObject();
+      String headerKey = headerJsonObject.get("key").getAsString();
+      String headerValue = headerJsonObject.get("value").getAsString();
+      // Strip the prefix off from the HTTP header property key. Header key starts from
+      // |key.length() + PROPERTIES_DELIMITER.length()|.
+      if (headerKey.startsWith(key)) {
+        headerKey = headerKey.substring(key.length() + PROPERTIES_DELIMITER.length());
+        httpHeaders.put(headerKey, headerValue);
+      }
+    }
+
+    return httpHeaders;
   }
 
   private String getLookupKey(Configuration config, String key, List<String> deprecatedKeys) {

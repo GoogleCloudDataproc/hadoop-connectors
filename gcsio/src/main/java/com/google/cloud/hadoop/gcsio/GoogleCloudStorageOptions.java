@@ -23,6 +23,7 @@ import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
+import java.util.Map;
 import javax.annotation.Nullable;
 
 /** Configuration options for the GoogleCloudStorage class. */
@@ -158,6 +159,9 @@ public abstract class GoogleCloudStorageOptions {
 
   public abstract CooperativeLockingOptions getCooperativeLockingOptions();
 
+  @Nullable
+  public abstract Map<String, String> getHttpRequestHeaders();
+
   public abstract Builder toBuilder();
 
   public void throwIfNotValid() {
@@ -218,6 +222,8 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setCooperativeLockingOptions(
         CooperativeLockingOptions cooperativeLockingOptions);
+
+    public abstract Builder setHttpRequestHeaders(Map<String, String> httpRequestHeaders);
 
     abstract GoogleCloudStorageOptions autoBuild();
 

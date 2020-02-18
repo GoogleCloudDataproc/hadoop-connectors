@@ -34,6 +34,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
+import java.util.Map;
 import java.util.Set;
 import org.apache.http.HttpStatus;
 
@@ -80,6 +81,9 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
   // Read timeout, in milliseconds.
   private final int readTimeoutMillis;
+
+  // HTTP request headers.
+  private final Map<String, String> headers;
 
   /** A HttpUnsuccessfulResponseHandler logs the URL that generated certain failures. */
   private static class LoggingResponseHandler
@@ -226,7 +230,8 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
       String defaultUserAgent,
       int maxRequestRetries,
       int connectTimeoutMillis,
-      int readTimeoutMillis) {
+      int readTimeoutMillis,
+      Map<String, String> headers) {
     Preconditions.checkNotNull(credential, "A valid Credential is required");
     this.credential = credential;
     this.sleeperOverride = null;
@@ -234,6 +239,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     this.maxRequestRetries = maxRequestRetries;
     this.connectTimeoutMillis = connectTimeoutMillis;
     this.readTimeoutMillis = readTimeoutMillis;
+    this.headers = headers;
   }
 
   /**
@@ -255,7 +261,8 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
         defaultUserAgent,
         DEFAULT_MAX_REQUEST_RETRIES,
         DEFAULT_CONNECT_TIMEOUT,
-        DEFAULT_READ_TIMEOUT);
+        DEFAULT_READ_TIMEOUT,
+        null);
   }
 
   @Override
@@ -294,6 +301,12 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
       logger.atFiner().log(
           "Request is missing a user-agent, adding default value of '%s'", defaultUserAgent);
       request.getHeaders().setUserAgent(defaultUserAgent);
+    }
+
+    if (headers != null) {
+      for (Map.Entry<String, String> header : headers.entrySet()) {
+        request.getHeaders().set(header.getKey(), header.getValue());
+      }
     }
   }
 
