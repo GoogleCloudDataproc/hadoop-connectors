@@ -1,5 +1,9 @@
 ### 2.1.0 - 2020-XX-XX
 
+1.  Update all dependencies to latest versions.
+
+1.  Use `storage.googleapis.com` API endpoint.
+
 1.  Fix proxy authentication when using `JAVA_NET` transport.
 
 ### 2.0.1 - 2020-02-13
