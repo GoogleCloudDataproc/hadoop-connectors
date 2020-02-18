@@ -4,6 +4,8 @@
 
 1.  Use `storage.googleapis.com` API endpoint.
 
+1.  Fix proxy authentication when using `JAVA_NET` transport.
+
 1.  Remove Log4j backend for Google Flogger.
 
 ### 2.0.1 - 2020-02-13
