@@ -231,6 +231,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // Create GCS instance.
     this.gcs =
         new Storage.Builder(httpTransport, JSON_FACTORY, httpRequestInitializer)
+            .setRootUrl(Storage.DEFAULT_ROOT_URL)
             .setApplicationName(options.getAppName())
             .build();
   }
@@ -238,7 +239,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
    *
-   * @param gcs Preconstructed Storage to use for I/O.
+   * @param gcs Pre-constructed Storage to use for I/O.
    */
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage gcs) {
     Preconditions.checkNotNull(options, "options must not be null");
