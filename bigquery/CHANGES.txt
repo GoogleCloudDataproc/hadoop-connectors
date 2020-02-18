@@ -2,6 +2,7 @@
 
   1. POM updates for GCS connector 1.9.18.
 
+  1.  Fix proxy authentication when using `JAVA_NET` transport.
 
 0.13.17 - 2019-05-15
 
