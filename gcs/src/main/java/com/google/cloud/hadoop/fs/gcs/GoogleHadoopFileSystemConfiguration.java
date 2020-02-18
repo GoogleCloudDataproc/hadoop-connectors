@@ -40,12 +40,16 @@ import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
+import java.io.IOException;
 import java.util.Collection;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.permission.FsPermission;
 
-/** This class provides a configuration for the {@link GoogleHadoopFileSystem} implementations. */
+/**
+ * This class provides a configuration for the {@link GoogleHadoopFileSystem} implementations.
+ */
 public class GoogleHadoopFileSystemConfiguration {
+
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   public static final String GCS_CONFIG_PREFIX = "fs.gs";
@@ -89,11 +93,15 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<String> DELEGATION_TOKEN_BINDING_CLASS =
       new HadoopConfigurationProperty<>("fs.gs.delegation.token.binding");
 
-  /** Configuration key for GCS project ID. Default value: none */
+  /**
+   * Configuration key for GCS project ID. Default value: none
+   */
   public static final HadoopConfigurationProperty<String> GCS_PROJECT_ID =
       new HadoopConfigurationProperty<>("fs.gs.project.id");
 
-  /** Configuration key for initial working directory of a GHFS instance. Default value: '/' */
+  /**
+   * Configuration key for initial working directory of a GHFS instance. Default value: '/'
+   */
   public static final HadoopConfigurationProperty<String> GCS_WORKING_DIRECTORY =
       new HadoopConfigurationProperty<>("fs.gs.working.dir", "/");
 
@@ -108,16 +116,22 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCE_BUCKET_DELETE_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.bucket.delete.enable", false);
 
-  /** Configuration key for GCS project ID. Default value: "DISABLED" */
+  /**
+   * Configuration key for GCS project ID. Default value: "DISABLED"
+   */
   public static final HadoopConfigurationProperty<RequesterPaysMode> GCS_REQUESTER_PAYS_MODE =
       new HadoopConfigurationProperty<>(
           "fs.gs.requester.pays.mode", RequesterPaysOptions.REQUESTER_PAYS_MODE_DEFAULT);
 
-  /** Configuration key for GCS Requester Pays Project ID. Default value: none */
+  /**
+   * Configuration key for GCS Requester Pays Project ID. Default value: none
+   */
   public static final HadoopConfigurationProperty<String> GCS_REQUESTER_PAYS_PROJECT_ID =
       new HadoopConfigurationProperty<>("fs.gs.requester.pays.project.id");
 
-  /** Configuration key for GCS Requester Pays Buckets. Default value: none */
+  /**
+   * Configuration key for GCS Requester Pays Buckets. Default value: none
+   */
   public static final HadoopConfigurationProperty<Collection<String>> GCS_REQUESTER_PAYS_BUCKETS =
       new HadoopConfigurationProperty<>("fs.gs.requester.pays.buckets", ImmutableList.of());
 
@@ -146,12 +160,14 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.performance.cache.max.entry.age.ms",
           PerformanceCachingGoogleCloudStorageOptions.MAX_ENTRY_AGE_MILLIS_DEFAULT);
 
-  /** Configuration key for whether or not to enable list caching for the performance cache. */
+  /**
+   * Configuration key for whether or not to enable list caching for the performance cache.
+   */
   public static final HadoopConfigurationProperty<Boolean>
       GCS_PERFORMANCE_CACHE_LIST_CACHING_ENABLE =
-          new HadoopConfigurationProperty<>(
-              "fs.gs.performance.cache.list.caching.enable",
-              PerformanceCachingGoogleCloudStorageOptions.LIST_CACHING_ENABLED);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.performance.cache.list.caching.enable",
+          PerformanceCachingGoogleCloudStorageOptions.LIST_CACHING_ENABLED);
 
   /**
    * If true, executes GCS requests in {@code listStatus} and {@code getFileStatus} methods in
@@ -160,7 +176,9 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_STATUS_PARALLEL_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.status.parallel.enable", false);
 
-  /** Configuration key for enabling lazy initialization of GCS FS instance. */
+  /**
+   * Configuration key for enabling lazy initialization of GCS FS instance.
+   */
   public static final HadoopConfigurationProperty<Boolean> GCS_LAZY_INITIALIZATION_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.lazy.init.enable", false);
 
@@ -171,7 +189,9 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.implicit.dir.repair.enable", true);
 
-  /** Configuration key for changing the path codec from legacy to 'uri path encoding'. */
+  /**
+   * Configuration key for changing the path codec from legacy to 'uri path encoding'.
+   */
   public static final HadoopConfigurationProperty<String> PATH_CODEC =
       new HadoopConfigurationProperty<>("fs.gs.path.encoding", PATH_CODEC_USE_URI_ENCODING);
 
@@ -198,23 +218,33 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_CONCURRENT_GLOB_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.glob.concurrent.enable", true);
 
-  /** Configuration key for marker file pattern. Default value: none */
+  /**
+   * Configuration key for marker file pattern. Default value: none
+   */
   public static final HadoopConfigurationProperty<String> GCS_MARKER_FILE_PATTERN =
       new HadoopConfigurationProperty<>("fs.gs.marker.file.pattern");
 
-  /** Configuration key for a max number of GCS RPCs in batch request. */
+  /**
+   * Configuration key for a max number of GCS RPCs in batch request.
+   */
   public static final HadoopConfigurationProperty<Long> GCS_MAX_REQUESTS_PER_BATCH =
       new HadoopConfigurationProperty<>("fs.gs.max.requests.per.batch", 15L);
 
-  /** Configuration key for a number of threads to execute batch requests. */
+  /**
+   * Configuration key for a number of threads to execute batch requests.
+   */
   public static final HadoopConfigurationProperty<Integer> GCS_BATCH_THREADS =
       new HadoopConfigurationProperty<>("fs.gs.batch.threads", 15);
 
-  /** Configuration key for a max number of GCS RPCs in batch request for copy operations. */
+  /**
+   * Configuration key for a max number of GCS RPCs in batch request for copy operations.
+   */
   public static final HadoopConfigurationProperty<Long> GCS_COPY_MAX_REQUESTS_PER_BATCH =
       new HadoopConfigurationProperty<>("fs.gs.copy.max.requests.per.batch", 15L);
 
-  /** Configuration key for a number of threads to execute batch requests for copy operations. */
+  /**
+   * Configuration key for a number of threads to execute batch requests for copy operations.
+   */
   public static final HadoopConfigurationProperty<Integer> GCS_COPY_BATCH_THREADS =
       new HadoopConfigurationProperty<>("fs.gs.copy.batch.threads", 15);
 
@@ -233,7 +263,9 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Long> GCS_REWRITE_MAX_BYTES_PER_CALL =
       new HadoopConfigurationProperty<>("fs.gs.rewrite.max.bytes.per.call", 512 * 1024 * 1024L);
 
-  /** Configuration key for number of items to return per call to the list* GCS RPCs. */
+  /**
+   * Configuration key for number of items to return per call to the list* GCS RPCs.
+   */
   public static final HadoopConfigurationProperty<Long> GCS_MAX_LIST_ITEMS_PER_CALL =
       new HadoopConfigurationProperty<>("fs.gs.list.max.items.per.call", 1024L);
 
@@ -248,11 +280,15 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Integer> GCS_HTTP_MAX_RETRY =
       new HadoopConfigurationProperty<>("fs.gs.http.max.retry", 10);
 
-  /** Configuration key for the connect timeout (in millisecond) for HTTP request to GCS. */
+  /**
+   * Configuration key for the connect timeout (in millisecond) for HTTP request to GCS.
+   */
   public static final HadoopConfigurationProperty<Integer> GCS_HTTP_CONNECT_TIMEOUT =
       new HadoopConfigurationProperty<>("fs.gs.http.connect-timeout", 20 * 1000);
 
-  /** Configuration key for the connect timeout (in millisecond) for HTTP request to GCS. */
+  /**
+   * Configuration key for the connect timeout (in millisecond) for HTTP request to GCS.
+   */
   public static final HadoopConfigurationProperty<Integer> GCS_HTTP_READ_TIMEOUT =
       new HadoopConfigurationProperty<>("fs.gs.http.read-timeout", 20 * 1000);
 
@@ -280,33 +316,45 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<OutputStreamType> GCS_OUTPUT_STREAM_TYPE =
       new HadoopConfigurationProperty<>("fs.gs.outputstream.type", OutputStreamType.BASIC);
 
-  /** Configuration key for setting write buffer size. */
+  /**
+   * Configuration key for setting write buffer size.
+   */
   public static final HadoopConfigurationProperty<Integer> GCS_OUTPUT_STREAM_BUFFER_SIZE =
       new HadoopConfigurationProperty<>("fs.gs.outputstream.buffer.size", 8 * 1024 * 1024);
 
-  /** Configuration key for setting pipe buffer size. */
+  /**
+   * Configuration key for setting pipe buffer size.
+   */
   public static final HadoopConfigurationProperty<Integer> GCS_OUTPUT_STREAM_PIPE_BUFFER_SIZE =
       new HadoopConfigurationProperty<>("fs.gs.outputstream.pipe.buffer.size", 1024 * 1024);
 
-  /** Configuration key for setting GCS upload chunk size. */
+  /**
+   * Configuration key for setting GCS upload chunk size.
+   */
   // chunk size etc. Get the following value from GCSWC class in a better way. For now, we hard code
   // it to a known good value.
   public static final HadoopConfigurationProperty<Integer> GCS_OUTPUT_STREAM_UPLOAD_CHUNK_SIZE =
       new HadoopConfigurationProperty<>(
           "fs.gs.outputstream.upload.chunk.size", 64 * 1024 * 1024, "fs.gs.io.buffersize.write");
 
-  /** Configuration key for enabling GCS direct upload. */
+  /**
+   * Configuration key for enabling GCS direct upload.
+   */
   public static final HadoopConfigurationProperty<Boolean> GCS_OUTPUT_STREAM_DIRECT_UPLOAD_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.outputstream.direct.upload.enable", false);
 
-  /** Configuration key for the generation consistency read model. */
+  /**
+   * Configuration key for the generation consistency read model.
+   */
   public static final HadoopConfigurationProperty<GenerationReadConsistency>
       GCS_GENERATION_READ_CONSISTENCY =
-          new HadoopConfigurationProperty<>(
-              "fs.gs.generation.read.consistency",
-              GoogleCloudStorageReadOptions.DEFAULT_GENERATION_READ_CONSISTENCY);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.generation.read.consistency",
+          GoogleCloudStorageReadOptions.DEFAULT_GENERATION_READ_CONSISTENCY);
 
-  /** Configuration key for setting read buffer size. */
+  /**
+   * Configuration key for setting read buffer size.
+   */
   public static final HadoopConfigurationProperty<Integer> GCS_INPUT_STREAM_BUFFER_SIZE =
       new HadoopConfigurationProperty<>("fs.gs.inputstream.buffer.size", 0, "fs.gs.io.buffersize");
 
@@ -321,8 +369,8 @@ public class GoogleHadoopFileSystemConfiguration {
    */
   public static final HadoopConfigurationProperty<Boolean>
       GCS_INPUT_STREAM_FAST_FAIL_ON_NOT_FOUND_ENABLE =
-          new HadoopConfigurationProperty<>(
-              "fs.gs.inputstream.fast.fail.on.not.found.enable", true);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.inputstream.fast.fail.on.not.found.enable", true);
 
   /**
    * If true, reading a file with GZIP content encoding (HTTP header "Content-Encoding: gzip") will
@@ -330,8 +378,8 @@ public class GoogleHadoopFileSystemConfiguration {
    */
   public static final HadoopConfigurationProperty<Boolean>
       GCS_INPUT_STREAM_SUPPORT_GZIP_ENCODING_ENABLE =
-          new HadoopConfigurationProperty<>(
-              "fs.gs.inputstream.support.gzip.encoding.enable", false);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.inputstream.support.gzip.encoding.enable", false);
 
   /**
    * If forward seeks are within this many bytes of the current position, seeks are performed by
@@ -340,7 +388,9 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Long> GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT =
       new HadoopConfigurationProperty<>("fs.gs.inputstream.inplace.seek.limit", 8 * 1024 * 1024L);
 
-  /** Tunes reading objects behavior to optimize HTTP GET requests for various use cases. */
+  /**
+   * Tunes reading objects behavior to optimize HTTP GET requests for various use cases.
+   */
   public static final HadoopConfigurationProperty<Fadvise> GCS_INPUT_STREAM_FADVISE =
       new HadoopConfigurationProperty<>("fs.gs.inputstream.fadvise", Fadvise.AUTO);
 
@@ -353,7 +403,9 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.inputstream.min.range.request.size",
           GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE);
 
-  /** Override configuration file path. This file must be a valid Hadoop configuration file. */
+  /**
+   * Override configuration file path. This file must be a valid Hadoop configuration file.
+   */
   public static final HadoopConfigurationProperty<String> GCS_CONFIG_OVERRIDE_FILE =
       new HadoopConfigurationProperty<>("fs.gs.config.override.file", null);
 
@@ -364,24 +416,35 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_COOPERATIVE_LOCKING_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.cooperative.locking.enable", false);
 
-  /** Configuration key for lock expiration when using cooperative locking. */
+  /**
+   * Configuration key for lock expiration when using cooperative locking.
+   */
   public static final HadoopConfigurationProperty<Long>
       GCS_COOPERATIVE_LOCKING_EXPIRATION_TIMEOUT_MS =
-          new HadoopConfigurationProperty<>(
-              "fs.gs.cooperative.locking.expiration.timeout.ms",
-              CooperativeLockingOptions.LOCK_EXPIRATION_TIMEOUT_MS_DEFAULT);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.cooperative.locking.expiration.timeout.ms",
+          CooperativeLockingOptions.LOCK_EXPIRATION_TIMEOUT_MS_DEFAULT);
 
-  /** Configuration key for maximum allowed concurrent operations when using cooperative locking. */
+  /**
+   * Configuration key for maximum allowed concurrent operations when using cooperative locking.
+   */
   public static final HadoopConfigurationProperty<Integer>
       GCS_COOPERATIVE_LOCKING_MAX_CONCURRENT_OPERATIONS =
-          new HadoopConfigurationProperty<>(
-              "fs.gs.cooperative.locking.max.concurrent.operations",
-              CooperativeLockingOptions.MAX_CONCURRENT_OPERATIONS_DEFAULT);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.cooperative.locking.max.concurrent.operations",
+          CooperativeLockingOptions.MAX_CONCURRENT_OPERATIONS_DEFAULT);
+
+  /**
+   * Configuration key for the headers for HTTP request to GCS.
+   */
+  public static final HadoopConfigurationProperty<String>
+      GCS_HTTP_HEADERS = new HadoopConfigurationProperty<>(true, "fs.gs.http.headers");
 
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
   // @VisibleForTesting
-  static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
+  static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config)
+      throws IOException {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))
         .setMarkerFilePattern(GCS_MARKER_FILE_PATTERN.get(config, config::get))
@@ -394,7 +457,8 @@ public class GoogleHadoopFileSystemConfiguration {
   }
 
   @VisibleForTesting
-  static GoogleCloudStorageOptions.Builder getGcsOptionsBuilder(Configuration config) {
+  static GoogleCloudStorageOptions.Builder getGcsOptionsBuilder(Configuration config)
+      throws IOException {
     String projectId = GCS_PROJECT_ID.get(config, config::get);
     return GoogleCloudStorageOptions.builder()
         .setStorageRootUrl(GCS_ROOT_URL.get(config, config::get))
@@ -427,7 +491,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setReadChannelOptions(getReadChannelOptions(config))
         .setWriteChannelOptions(getWriteChannelOptions(config))
         .setRequesterPaysOptions(getRequesterPaysOptions(config, projectId))
-        .setCooperativeLockingOptions(getCooperativeLockingOptions(config));
+        .setCooperativeLockingOptions(getCooperativeLockingOptions(config))
+        .setHttpRequestHeaders(GCS_HTTP_HEADERS.getHttpRequestHeaders(config));
   }
 
   private static PerformanceCachingGoogleCloudStorageOptions getPerformanceCachingOptions(
