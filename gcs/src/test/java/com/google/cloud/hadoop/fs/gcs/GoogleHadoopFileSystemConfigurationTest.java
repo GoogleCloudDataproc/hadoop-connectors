@@ -18,6 +18,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.assertThrows;
 
+import com.google.api.services.storage.Storage;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksumType;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
@@ -51,6 +52,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.copy.with.rewrite.enable", true);
           put("fs.gs.rewrite.max.bytes.per.call", 536870912);
           put("fs.gs.config.override.file", null);
+          put("fs.gs.storage.root.url", Storage.DEFAULT_ROOT_URL);
           put("fs.gs.reported.permissions", "700");
           put("fs.gs.delegation.token.binding", null);
           put("fs.gs.bucket.delete.enable", false);
