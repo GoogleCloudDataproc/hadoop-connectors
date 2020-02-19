@@ -44,11 +44,14 @@ public class HadoopCredentialConfiguration {
    */
   public static final HadoopConfigurationProperty<Boolean> ENABLE_SERVICE_ACCOUNTS_SUFFIX =
       new HadoopConfigurationProperty<>(
-          ".auth.service.account.enable", CredentialOptions.SERVICE_ACCOUNT_ENABLED_DEFAULT);
+          ".auth.service.account.enable",
+          CredentialOptions.SERVICE_ACCOUNT_ENABLED_DEFAULT,
+          ".enable.service.account.auth");
 
   /** Key suffix used to control which email address is associated with the service account. */
   public static final HadoopConfigurationProperty<String> SERVICE_ACCOUNT_EMAIL_SUFFIX =
-      new HadoopConfigurationProperty<>(".auth.service.account.email");
+      new HadoopConfigurationProperty<>(
+          ".auth.service.account.email", /* defaultValue= */ null, ".service.account.auth.email");
 
   /** Key suffix used to specify private key id for the service account. */
   public static final HadoopConfigurationProperty<String> SERVICE_ACCOUNT_PRIVATE_KEY_ID_SUFFIX =
@@ -64,7 +67,10 @@ public class HadoopCredentialConfiguration {
    * nodes and at the same location on all nodes.
    */
   public static final HadoopConfigurationProperty<String> SERVICE_ACCOUNT_KEYFILE_SUFFIX =
-      new HadoopConfigurationProperty<>(".auth.service.account.keyfile");
+      new HadoopConfigurationProperty<>(
+          ".auth.service.account.keyfile",
+          /* defaultValue= */ null,
+          ".service.account.auth.keyfile");
 
   /**
    * Key suffix used to indicate the path to a JSON file containing a Service Account key and
@@ -79,21 +85,24 @@ public class HadoopCredentialConfiguration {
    * credentials.
    */
   public static final HadoopConfigurationProperty<String> CLIENT_ID_SUFFIX =
-      new HadoopConfigurationProperty<>(".auth.client.id");
+      new HadoopConfigurationProperty<>(".auth.client.id", /* defaultValue= */ null, ".client.id");
 
   /**
    * For OAuth-based Installed App authentication, the key suffix specifying the client secret for
    * the credentials.
    */
   public static final HadoopConfigurationProperty<String> CLIENT_SECRET_SUFFIX =
-      new HadoopConfigurationProperty<>(".auth.client.secret");
+      new HadoopConfigurationProperty<>(
+          ".auth.client.secret", /* defaultValue= */ null, ".client.secret");
 
   /**
    * For OAuth-based Installed App authentication, the key suffix specifying the file containing
-   * credentials (JWT).
+   * credentials (JWT). By default we can set this fairly safely (it's only invoked if client ID,
+   * client secret are set and we're not using service accounts).
    */
   public static final HadoopConfigurationProperty<String> OAUTH_CLIENT_FILE_SUFFIX =
-      new HadoopConfigurationProperty<>(".auth.client.file");
+      new HadoopConfigurationProperty<>(
+          ".auth.client.file", System.getProperty("user.home") + "/.credentials/storage.json");
 
   /**
    * For unit-testing, the key suffix allowing null to be returned from credential creation instead
