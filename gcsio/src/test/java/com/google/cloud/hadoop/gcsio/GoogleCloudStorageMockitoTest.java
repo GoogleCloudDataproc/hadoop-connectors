@@ -15,7 +15,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTest.newStorageObject;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.fakeResponse;
+import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.fakeResponse;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.assertThrows;
@@ -678,7 +678,6 @@ public class GoogleCloudStorageMockitoTest {
     verify(mockHeaders).setRange(eq("bytes=3-"));
     verify(mockStorageObjectsGet).execute();
     verify(mockStorageObjectsGet, times(2)).executeMedia();
-    verify(mockStorageObjectsGet, times(2)).setGeneration(eq(null));
     verify(mockExceptionStream, times(2)).read(any(byte[].class), eq(0), anyInt());
   }
 }

@@ -1,4 +1,19 @@
-### 2.1.0 - 2019-XX-XX
+### 2.1.0 - 2020-XX-XX
+
+1.  Update all dependencies to latest versions.
+
+1.  Use `storage.googleapis.com` API endpoint.
+
+1.  Fix proxy authentication when using `JAVA_NET` transport.
+
+1.  Remove Log4j backend for Google Flogger.
+
+### 2.0.1 - 2020-02-13
+
+1.  Cooperative Locking FSCK tool: fix recovery of operations that failed before
+    creating an operation log file.
+
+1.  Change Gson dependency scope from `provided` to `compile` in `gsio` library.
 
 ### 2.0.0 - 2019-08-23
 
@@ -746,7 +761,7 @@
     `rateLimitExceeded (429)` errors by fetching the fresh underlying info and
     ignoring the error if the object already exists with the intended metadata
     and size. This fixes an
-    [issue](https://github.com/GoogleCloudPlatform/bigdata-interop/issues/10)
+    [issue](https://github.com/GoogleCloudDataproc/bigdata-interop/issues/10)
     which mostly affects Spark.
 
 1.  Added logging in `GoogleCloudStorageReadChannel` for high-level retries.
@@ -787,7 +802,7 @@
     with different locations and storage classes.
 
 1.  Fixed
-    [issue](https://github.com/GoogleCloudPlatform/bigdata-interop/issues/5)
+    [issue](https://github.com/GoogleCloudDataproc/bigdata-interop/issues/5)
     where stale cache entries caused stuck phantom directories if the
     directories were deleted using non-Hadoop-based GCS clients.
 
