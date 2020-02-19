@@ -50,6 +50,7 @@ import com.google.api.services.storage.StorageScopes;
 import com.google.cloud.hadoop.util.HttpTransportFactory.HttpTransportType;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
+import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import java.io.File;
@@ -72,7 +73,10 @@ public class CredentialFactory {
 
   static final String CREDENTIAL_ENV_VAR = "GOOGLE_APPLICATION_CREDENTIALS";
 
-  private static final String TOKEN_SERVER_URL = GoogleOAuthConstants.TOKEN_SERVER_URL;
+  private static final String TOKEN_SERVER_URL_ENV_VAR = "GOOGLE_OAUTH_TOKEN_SERVER_URL";
+  private static final String TOKEN_SERVER_URL_DEFAULT = "https://oauth2.googleapis.com/token";
+  private static final String TOKEN_SERVER_URL =
+      MoreObjects.firstNonNull(System.getenv(TOKEN_SERVER_URL_ENV_VAR), TOKEN_SERVER_URL_DEFAULT);
 
   /**
    * Simple HttpRequestInitializer that retries requests that result in 5XX response codes and IO
