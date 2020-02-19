@@ -239,7 +239,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
    *
-   * @param gcs Pre-constructed Storage to use for I/O.
+   * @param gcs Preconstructed Storage to use for I/O.
    */
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage gcs) {
     Preconditions.checkNotNull(options, "options must not be null");
