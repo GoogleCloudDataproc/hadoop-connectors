@@ -39,7 +39,7 @@ public class HadoopConfigurationProperty<T> {
   }
 
   public HadoopConfigurationProperty<T> withPrefixes(List<String> keyPrefixes) {
-    this.keyPrefixes = keyPrefixes;
+    this.keyPrefixes = ImmutableList.copyOf(keyPrefixes);
     return this;
   }
 
