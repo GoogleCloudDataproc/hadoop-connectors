@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ROOT_URL;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.assertThrows;
@@ -210,5 +211,16 @@ public class GoogleHadoopFileSystemConfigurationTest {
       throw new RuntimeException(
           String.format("Failed to get '%s' field value", field.getName()), e);
     }
+  }
+
+  @Test
+  public void customPropertiesValues() {
+    Configuration config = new Configuration();
+    config.set(GCS_ROOT_URL.getKey(), "https://unit-test-storage.googleapis.com/");
+
+    GoogleCloudStorageOptions options =
+        GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
+
+    assertThat(options.getStorageRootUrl()).isEqualTo("https://unit-test-storage.googleapis.com/");
   }
 }

@@ -49,7 +49,6 @@ import com.google.api.services.storage.StorageScopes;
 import com.google.cloud.hadoop.util.HttpTransportFactory.HttpTransportType;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
-import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import java.io.File;

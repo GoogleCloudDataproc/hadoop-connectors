@@ -153,7 +153,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               });
 
   // GCS access instance.
-  private Storage gcs;
+  @VisibleForTesting Storage gcs;
 
   // Thread-pool used for background tasks.
   private ExecutorService backgroundTasksThreadPool =

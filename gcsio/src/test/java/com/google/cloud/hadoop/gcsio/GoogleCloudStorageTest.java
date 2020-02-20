@@ -51,6 +51,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
+import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpStatusCodes;
 import com.google.api.client.http.HttpTransport;
@@ -64,6 +65,7 @@ import com.google.api.services.storage.model.Bucket;
 import com.google.api.services.storage.model.Buckets;
 import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.StorageObject;
+import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
 import com.google.common.collect.ImmutableList;
@@ -147,6 +149,21 @@ public class GoogleCloudStorageTest {
     return createItemInfoForStorageObject(
         new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
         getStorageObjectForEmptyObjectWithMetadata(metadata));
+  }
+
+  @Test
+  public void customStorageApiEndpoint() throws Exception {
+    GoogleCloudStorageOptions options =
+        GoogleCloudStorageOptions.builder()
+            .setAppName("testAppName")
+            .setProjectId("testProjectId")
+            .setStorageRootUrl("https://unit-test-storage.googleapis.com/")
+            .build();
+    Credential credential = GoogleCloudStorageTestHelper.getCredential();
+
+    GoogleCloudStorageImpl gcsImpl = new GoogleCloudStorageImpl(options, credential);
+
+    assertThat(gcsImpl.gcs.getRootUrl()).isEqualTo("https://unit-test-storage.googleapis.com/");
   }
 
   /** Test argument sanitization for GoogleCloudStorage.create(2). */
