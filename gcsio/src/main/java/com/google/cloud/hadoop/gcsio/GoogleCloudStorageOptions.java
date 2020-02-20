@@ -164,7 +164,6 @@ public abstract class GoogleCloudStorageOptions {
 
   public abstract CooperativeLockingOptions getCooperativeLockingOptions();
 
-  @Nullable
   public abstract Map<String, String> getHttpRequestHeaders();
 
   public abstract Builder toBuilder();

@@ -304,10 +304,8 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
       request.getHeaders().setUserAgent(defaultUserAgent);
     }
 
-    if (headers != null) {
-      for (Map.Entry<String, String> header : headers.entrySet()) {
-        request.getHeaders().set(header.getKey(), header.getValue());
-      }
+    for (Map.Entry<String, String> header : headers.entrySet()) {
+      request.getHeaders().set(header.getKey(), header.getValue());
     }
   }
 
