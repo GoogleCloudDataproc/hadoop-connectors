@@ -262,7 +262,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
         DEFAULT_MAX_REQUEST_RETRIES,
         DEFAULT_CONNECT_TIMEOUT,
         DEFAULT_READ_TIMEOUT,
-        null);
+        /* headers= */ null);
   }
 
   @Override

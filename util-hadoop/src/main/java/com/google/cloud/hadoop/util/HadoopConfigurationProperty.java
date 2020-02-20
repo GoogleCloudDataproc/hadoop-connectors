@@ -7,18 +7,11 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import java.io.IOException;
-import java.io.StringWriter;
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.List;
 import java.util.function.BiFunction;
 import java.util.Map;
-import java.util.HashMap;
 import org.apache.hadoop.conf.Configuration;
 
 /** Hadoop configuration property */
@@ -103,7 +96,7 @@ public class HadoopConfigurationProperty<T> {
     return logProperty(lookupKey, value);
   }
 
-  public Map<String, String> getHttpRequestHeaders(Configuration config) throws IOException {
+  public Map<String, String> getHttpRequestHeaders(Configuration config) {
     if (!isPrefix) {
       return null;
     }
