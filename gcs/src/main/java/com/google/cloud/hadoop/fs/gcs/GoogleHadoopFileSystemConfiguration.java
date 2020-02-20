@@ -40,14 +40,12 @@ import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
-import java.io.IOException;
 import java.util.Collection;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.permission.FsPermission;
 
 /** This class provides a configuration for the {@link GoogleHadoopFileSystem} implementations. */
 public class GoogleHadoopFileSystemConfiguration {
-
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   public static final String GCS_CONFIG_PREFIX = "fs.gs";
@@ -387,8 +385,7 @@ public class GoogleHadoopFileSystemConfiguration {
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
   // @VisibleForTesting
-  static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config)
-      throws IOException {
+  static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))
         .setMarkerFilePattern(GCS_MARKER_FILE_PATTERN.get(config, config::get))
@@ -401,8 +398,7 @@ public class GoogleHadoopFileSystemConfiguration {
   }
 
   @VisibleForTesting
-  static GoogleCloudStorageOptions.Builder getGcsOptionsBuilder(Configuration config)
-      throws IOException {
+  static GoogleCloudStorageOptions.Builder getGcsOptionsBuilder(Configuration config) {
     String projectId = GCS_PROJECT_ID.get(config, config::get);
     return GoogleCloudStorageOptions.builder()
         .setStorageRootUrl(GCS_ROOT_URL.get(config, config::get))
