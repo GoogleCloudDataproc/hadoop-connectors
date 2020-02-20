@@ -183,8 +183,8 @@ public class GoogleHadoopFileSystemConfigurationTest {
 
   @Test
   public void testHttpHeadersProperties_singleHeader() {
-    HadoopConfigurationProperty<String> gcsHttpHeaders =
-        new HadoopConfigurationProperty<>(true, "fs.gs.http.headers");
+    HadoopConfigurationProperty<Map<String, String>> gcsHttpHeaders =
+        new HadoopConfigurationProperty<>("fs.gs.http.headers");
 
     Configuration config = new Configuration();
     config.set(gcsHttpHeaders.getKey() + ".headerkey", "headervalue");
@@ -198,8 +198,8 @@ public class GoogleHadoopFileSystemConfigurationTest {
 
   @Test
   public void testHttpHeadersProperties_multiHeaders() {
-    HadoopConfigurationProperty<String> gcsHttpHeaders =
-        new HadoopConfigurationProperty<>(true, "fs.gs.http.headers");
+    HadoopConfigurationProperty<Map<String, String>> gcsHttpHeaders =
+        new HadoopConfigurationProperty<>("fs.gs.http.headers");
 
     Configuration config = new Configuration();
     config.set(gcsHttpHeaders.getKey() + ".headerkey1", "headervalue1");

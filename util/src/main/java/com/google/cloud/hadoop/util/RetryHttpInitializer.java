@@ -31,6 +31,7 @@ import com.google.api.client.util.Sleeper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
@@ -83,7 +84,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
   private final int readTimeoutMillis;
 
   // HTTP request headers.
-  private final Map<String, String> headers;
+  private final ImmutableMap<String, String> headers;
 
   /** A HttpUnsuccessfulResponseHandler logs the URL that generated certain failures. */
   private static class LoggingResponseHandler
@@ -239,7 +240,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     this.maxRequestRetries = maxRequestRetries;
     this.connectTimeoutMillis = connectTimeoutMillis;
     this.readTimeoutMillis = readTimeoutMillis;
-    this.headers = headers;
+    this.headers = ImmutableMap.copyOf(headers);
   }
 
   /**
