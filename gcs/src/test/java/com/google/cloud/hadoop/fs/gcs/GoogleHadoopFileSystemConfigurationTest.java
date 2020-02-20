@@ -192,8 +192,8 @@ public class GoogleHadoopFileSystemConfigurationTest {
     GoogleCloudStorageFileSystemOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
 
-    assertThat(options.getCloudStorageOptions().getHttpRequestHeaders()).isEqualTo(
-        ImmutableMap.of("headerkey", "headervalue"));
+    assertThat(options.getCloudStorageOptions().getHttpRequestHeaders())
+        .isEqualTo(ImmutableMap.of("headerkey", "headervalue"));
   }
 
   @Test
@@ -208,8 +208,8 @@ public class GoogleHadoopFileSystemConfigurationTest {
     GoogleCloudStorageFileSystemOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
 
-    assertThat(options.getCloudStorageOptions().getHttpRequestHeaders()).isEqualTo(
-        ImmutableMap.of("headerkey1", "headervalue1", "headerkey2", "headervalue2"));
+    assertThat(options.getCloudStorageOptions().getHttpRequestHeaders())
+        .isEqualTo(ImmutableMap.of("headerkey1", "headervalue1", "headerkey2", "headervalue2"));
   }
 
   @Test

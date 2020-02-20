@@ -31,6 +31,7 @@ public class HadoopConfigurationProperty<T> {
 
   /** Key for all the hadoop properties. */
   public static final String PROPERTIES_KEY = "properties";
+
   public static final String PROPERTIES_DELIMITER = ".";
 
   private final String key;
@@ -106,29 +107,8 @@ public class HadoopConfigurationProperty<T> {
     if (!isPrefix) {
       return null;
     }
-    Map<String, String> httpHeaders = new HashMap<String,String>();
-    // Retrieve all hadoop properties as string and then parse it using JsonParser.
-    StringWriter out = new StringWriter();
-    Configuration.dumpConfiguration(config, out);
-    String allProperties = out.toString();
-    JsonParser jsonParser = new JsonParser();
-    JsonObject jsonObject = jsonParser.parse(allProperties).getAsJsonObject();
-    JsonArray jsonArray = jsonObject.get(PROPERTIES_KEY).getAsJsonArray();
-    Iterator<JsonElement> iterator = jsonArray.iterator();
 
-    while (iterator.hasNext()) {
-      JsonObject headerJsonObject = iterator.next().getAsJsonObject();
-      String headerKey = headerJsonObject.get("key").getAsString();
-      String headerValue = headerJsonObject.get("value").getAsString();
-      // Strip the prefix off from the HTTP header property key. Header key starts from
-      // |key.length() + PROPERTIES_DELIMITER.length()|.
-      if (headerKey.startsWith(key)) {
-        headerKey = headerKey.substring(key.length() + PROPERTIES_DELIMITER.length());
-        httpHeaders.put(headerKey, headerValue);
-      }
-    }
-
-    return httpHeaders;
+    return config.getPropsWithPrefix(key);
   }
 
   private String getLookupKey(Configuration config, String key, List<String> deprecatedKeys) {
