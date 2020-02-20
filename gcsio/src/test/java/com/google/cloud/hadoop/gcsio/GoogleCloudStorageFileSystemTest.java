@@ -478,9 +478,5 @@ public class GoogleCloudStorageFileSystemTest
    */
   @Test
   @Override
-  public void testReadGenerationBestEffort() throws IOException {}
-
-  @Test
-  @Override
-  public void testReadGenerationStrict() throws IOException {}
+  public void read_failure_ifObjectWasModifiedDuringRead() {}
 }
