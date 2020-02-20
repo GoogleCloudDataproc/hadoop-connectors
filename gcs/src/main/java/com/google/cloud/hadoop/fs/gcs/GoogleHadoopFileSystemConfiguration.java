@@ -382,7 +382,7 @@ public class GoogleHadoopFileSystemConfiguration {
 
   /** Configuration key for the headers for HTTP request to GCS. */
   public static final HadoopConfigurationProperty<Map<String, String>> GCS_HTTP_HEADERS =
-      new HadoopConfigurationProperty<>("fs.gs.http.headers.");
+      new HadoopConfigurationProperty<>("fs.gs.storage.http.headers.");
 
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
