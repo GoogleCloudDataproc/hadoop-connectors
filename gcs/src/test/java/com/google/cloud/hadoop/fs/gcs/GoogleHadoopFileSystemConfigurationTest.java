@@ -100,7 +100,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.cooperative.locking.enable", false);
           put("fs.gs.cooperative.locking.expiration.timeout.ms", 120_000L);
           put("fs.gs.cooperative.locking.max.concurrent.operations", 20);
-          put("fs.gs.http.headers.", null);
+          put("fs.gs.storage.http.headers.", null);
         }
       };
 
@@ -185,7 +185,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
   @Test
   public void testHttpHeadersProperties_singleHeader() {
     HadoopConfigurationProperty<Map<String, String>> gcsHttpHeaders =
-        new HadoopConfigurationProperty<>("fs.gs.http.headers");
+        new HadoopConfigurationProperty<>("fs.gs.storage.http.headers");
 
     Configuration config = new Configuration();
     config.set(gcsHttpHeaders.getKey() + ".headerkey", "headervalue");
@@ -200,7 +200,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
   @Test
   public void testHttpHeadersProperties_multiHeaders() {
     HadoopConfigurationProperty<Map<String, String>> gcsHttpHeaders =
-        new HadoopConfigurationProperty<>("fs.gs.http.headers");
+        new HadoopConfigurationProperty<>("fs.gs.storage.http.headers");
 
     Configuration config = new Configuration();
     config.set(gcsHttpHeaders.getKey() + ".headerkey1", "headervalue1");
