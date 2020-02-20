@@ -23,6 +23,7 @@ import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 
@@ -75,6 +76,9 @@ public abstract class GoogleCloudStorageOptions {
   /** Default setting for number of threads to execute GCS batch requests for copy operations. */
   public static final int COPY_BATCH_THREADS_DEFAULT = BATCH_THREADS_DEFAULT;
 
+  /** Default setting for GCS HTTP request headers. */
+  public static final Map<String, String> HTTP_REQUEST_HEADERS_DEFAULT = ImmutableMap.of();
+
   public static final GoogleCloudStorageOptions DEFAULT = builder().build();
 
   /** @deprecated use {@link #builder()} instead */
@@ -103,7 +107,8 @@ public abstract class GoogleCloudStorageOptions {
         .setReadChannelOptions(GoogleCloudStorageReadOptions.DEFAULT)
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
         .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
-        .setCooperativeLockingOptions(CooperativeLockingOptions.DEFAULT);
+        .setCooperativeLockingOptions(CooperativeLockingOptions.DEFAULT)
+        .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT);
   }
 
   public abstract String getStorageRootUrl();

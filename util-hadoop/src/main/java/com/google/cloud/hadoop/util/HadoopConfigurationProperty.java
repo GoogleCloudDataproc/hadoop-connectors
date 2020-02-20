@@ -12,6 +12,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.function.BiFunction;
 import java.util.Map;
+import java.util.function.Function;
 import org.apache.hadoop.conf.Configuration;
 
 /** Hadoop configuration property */
@@ -22,25 +23,14 @@ public class HadoopConfigurationProperty<T> {
   private static final Joiner COMMA_JOINER = Joiner.on(',');
   private static final Splitter COMMA_SPLITTER = Splitter.on(',');
 
-  /** Key for all the hadoop properties. */
-  public static final String PROPERTIES_KEY = "properties";
-
-  public static final String PROPERTIES_DELIMITER = ".";
-
   private final String key;
   private final List<String> deprecatedKeys;
   private final T defaultValue;
-  private Boolean isPrefix;
 
   private List<String> keyPrefixes = ImmutableList.of("");
 
   public HadoopConfigurationProperty(String key) {
     this(key, null);
-  }
-
-  public HadoopConfigurationProperty(Boolean isPrefix, String prefix) {
-    this(prefix, null);
-    this.isPrefix = isPrefix;
   }
 
   public HadoopConfigurationProperty(String key, T defaultValue, String... deprecatedKeys) {
@@ -72,6 +62,11 @@ public class HadoopConfigurationProperty<T> {
     return logProperty(lookupKey, getterFn.apply(lookupKey, defaultValue));
   }
 
+  public T getAll(Configuration config, Function<String, T> getterFn) {
+    String lookupKey = getLookupKey(config, key, deprecatedKeys);
+    return logProperty(lookupKey, getterFn.apply(lookupKey));
+  }
+
   public String getPassword(Configuration config) {
     checkState(defaultValue == null || defaultValue instanceof String, "Not a string property");
     String lookupKey = getLookupKey(config, key, deprecatedKeys);
@@ -94,14 +89,6 @@ public class HadoopConfigurationProperty<T> {
             defaultValue == null ? null : COMMA_JOINER.join((Collection<?>) defaultValue));
     List<String> value = COMMA_SPLITTER.splitToList(nullToEmpty(valueString));
     return logProperty(lookupKey, value);
-  }
-
-  public Map<String, String> getHttpRequestHeaders(Configuration config) {
-    if (!isPrefix) {
-      return null;
-    }
-
-    return config.getPropsWithPrefix(key);
   }
 
   private String getLookupKey(Configuration config, String key, List<String> deprecatedKeys) {
