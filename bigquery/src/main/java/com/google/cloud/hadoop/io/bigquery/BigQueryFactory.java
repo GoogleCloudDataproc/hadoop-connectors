@@ -94,8 +94,7 @@ public class BigQueryFactory {
       return credential;
     }
 
-    return HadoopCredentialConfiguration.getCredentialFactory(
-            config, ImmutableList.of(BIGQUERY_CONFIG_PREFIX))
+    return HadoopCredentialConfiguration.getCredentialFactory(config, BIGQUERY_CONFIG_PREFIX)
         .getCredential(BIGQUERY_OAUTH_SCOPES);
   }
 
