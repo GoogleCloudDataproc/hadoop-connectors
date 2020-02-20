@@ -39,16 +39,24 @@ public class HadoopCredentialConfiguration {
   public static final String BASE_KEY_PREFIX = "google.cloud";
 
   /**
-   * Key suffix used to disable service accounts. A value of {@code false} will disable the use of
-   * service accounts. The default is to use a service account.
+   * Key suffix for enabling GCE service account authentication. A value of {@code false} will
+   * disable the use of the service accounts for authentication. The default value is {@code true} -
+   * use a service account for authentication.
    */
   public static final HadoopConfigurationProperty<Boolean> ENABLE_SERVICE_ACCOUNTS_SUFFIX =
       new HadoopConfigurationProperty<>(
-          ".auth.service.account.enable", CredentialOptions.SERVICE_ACCOUNT_ENABLED_DEFAULT);
+          ".auth.service.account.enable",
+          CredentialOptions.SERVICE_ACCOUNT_ENABLED_DEFAULT,
+          ".enable.service.account.auth");
 
-  /** Key suffix used to control which email address is associated with the service account. */
+  /**
+   * Key suffix specifying the email address associated with the service account with which to
+   * authenticate. Only required if {@link #ENABLE_SERVICE_ACCOUNTS_SUFFIX} is {@code true} and
+   * we're using {@link #SERVICE_ACCOUNT_KEYFILE_SUFFIX} to authenticate with a private keyfile.
+   */
   public static final HadoopConfigurationProperty<String> SERVICE_ACCOUNT_EMAIL_SUFFIX =
-      new HadoopConfigurationProperty<>(".auth.service.account.email");
+      new HadoopConfigurationProperty<>(
+          ".auth.service.account.email", /* defaultValue= */ null, ".service.account.auth.email");
 
   /** Key suffix used to specify private key id for the service account. */
   public static final HadoopConfigurationProperty<String> SERVICE_ACCOUNT_PRIVATE_KEY_ID_SUFFIX =
@@ -59,12 +67,16 @@ public class HadoopCredentialConfiguration {
       new HadoopConfigurationProperty<>(".auth.service.account.private.key");
 
   /**
-   * Key suffix used to indicate the path to the service account p12 keyfile. If provided, triggers
+   * Key suffix specifying local file containing a service account private {@code .p12} keyfile.
+   * Only used if {@link #SERVICE_ACCOUNT_EMAIL_SUFFIX} is {@code true}; if provided, triggers
    * private keyfile service account authentication. The file will be required to be present on all
    * nodes and at the same location on all nodes.
    */
   public static final HadoopConfigurationProperty<String> SERVICE_ACCOUNT_KEYFILE_SUFFIX =
-      new HadoopConfigurationProperty<>(".auth.service.account.keyfile");
+      new HadoopConfigurationProperty<>(
+          ".auth.service.account.keyfile",
+          /* defaultValue= */ null,
+          ".service.account.auth.keyfile");
 
   /**
    * Key suffix used to indicate the path to a JSON file containing a Service Account key and
@@ -79,21 +91,24 @@ public class HadoopCredentialConfiguration {
    * credentials.
    */
   public static final HadoopConfigurationProperty<String> CLIENT_ID_SUFFIX =
-      new HadoopConfigurationProperty<>(".auth.client.id");
+      new HadoopConfigurationProperty<>(".auth.client.id", /* defaultValue= */ null, ".client.id");
 
   /**
    * For OAuth-based Installed App authentication, the key suffix specifying the client secret for
    * the credentials.
    */
   public static final HadoopConfigurationProperty<String> CLIENT_SECRET_SUFFIX =
-      new HadoopConfigurationProperty<>(".auth.client.secret");
+      new HadoopConfigurationProperty<>(
+          ".auth.client.secret", /* defaultValue= */ null, ".client.secret");
 
   /**
    * For OAuth-based Installed App authentication, the key suffix specifying the file containing
-   * credentials (JWT).
+   * credentials (JWT). By default we can set this fairly safely (it's only invoked if client ID,
+   * client secret are set and we're not using service accounts).
    */
   public static final HadoopConfigurationProperty<String> OAUTH_CLIENT_FILE_SUFFIX =
-      new HadoopConfigurationProperty<>(".auth.client.file");
+      new HadoopConfigurationProperty<>(
+          ".auth.client.file", System.getProperty("user.home") + "/.credentials/storage.json");
 
   /**
    * For unit-testing, the key suffix allowing null to be returned from credential creation instead
@@ -112,38 +127,38 @@ public class HadoopCredentialConfiguration {
    * Configuration key for setting a proxy for the connector to use to connect to GCS. The proxy
    * must be an HTTP proxy of the form "host:port".
    */
-  public static final HadoopConfigurationProperty<String> PROXY_ADDRESS =
-      new HadoopConfigurationProperty<>("fs.gs.proxy.address");
+  public static final HadoopConfigurationProperty<String> PROXY_ADDRESS_SUFFIX =
+      new HadoopConfigurationProperty<>(".proxy.address");
 
   /**
    * Configuration key for setting a proxy username for the connector to use to authenticate with
    * proxy used to connect to GCS.
    */
-  public static final HadoopConfigurationProperty<String> PROXY_USERNAME =
-      new HadoopConfigurationProperty<>("fs.gs.proxy.username");
+  public static final HadoopConfigurationProperty<String> PROXY_USERNAME_SUFFIX =
+      new HadoopConfigurationProperty<>(".proxy.username");
 
   /**
    * Configuration key for setting a proxy password for the connector to use to authenticate with
    * proxy used to connect to GCS.
    */
-  public static final HadoopConfigurationProperty<String> PROXY_PASSWORD =
-      new HadoopConfigurationProperty<>("fs.gs.proxy.password");
+  public static final HadoopConfigurationProperty<String> PROXY_PASSWORD_SUFFIX =
+      new HadoopConfigurationProperty<>(".proxy.password");
 
   /**
    * Configuration key for the name of HttpTransport class to use for connecting to GCS. Must be the
    * name of an HttpTransportFactory.HttpTransportType (APACHE or JAVA_NET).
    */
-  public static final HadoopConfigurationProperty<HttpTransportType> HTTP_TRANSPORT =
+  public static final HadoopConfigurationProperty<HttpTransportType> HTTP_TRANSPORT_SUFFIX =
       new HadoopConfigurationProperty<>(
-          "fs.gs.http.transport.type", CredentialOptions.HTTP_TRANSPORT_TYPE_DEFAULT);
+          ".http.transport.type", CredentialOptions.HTTP_TRANSPORT_TYPE_DEFAULT);
 
   public static final HadoopConfigurationProperty<Class<? extends AccessTokenProvider>>
       ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX =
           new HadoopConfigurationProperty<>(".auth.access.token.provider.impl");
 
   public static CredentialFactory getCredentialFactory(
-      Configuration config, List<String> keyPrefixes) {
-    keyPrefixes = allConfigKeyPrefixes(keyPrefixes);
+      Configuration config, String... keyPrefixesVararg) {
+    List<String> keyPrefixes = getConfigKeyPrefixes(keyPrefixesVararg);
     CredentialOptions credentialOptions =
         CredentialOptions.builder()
             .setServiceAccountEnabled(
@@ -151,15 +166,11 @@ public class HadoopCredentialConfiguration {
                     .withPrefixes(keyPrefixes)
                     .get(config, config::getBoolean))
             .setServiceAccountPrivateKeyId(
-                SERVICE_ACCOUNT_PRIVATE_KEY_ID_SUFFIX
-                    .withPrefixes(keyPrefixes)
-                    .get(config, config::get))
+                SERVICE_ACCOUNT_PRIVATE_KEY_ID_SUFFIX.withPrefixes(keyPrefixes).getPassword(config))
             .setServiceAccountPrivateKey(
-                SERVICE_ACCOUNT_PRIVATE_KEY_SUFFIX
-                    .withPrefixes(keyPrefixes)
-                    .get(config, config::get))
+                SERVICE_ACCOUNT_PRIVATE_KEY_SUFFIX.withPrefixes(keyPrefixes).getPassword(config))
             .setServiceAccountEmail(
-                SERVICE_ACCOUNT_EMAIL_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
+                SERVICE_ACCOUNT_EMAIL_SUFFIX.withPrefixes(keyPrefixes).getPassword(config))
             .setServiceAccountKeyFile(
                 SERVICE_ACCOUNT_KEYFILE_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
             .setServiceAccountJsonKeyFile(
@@ -175,24 +186,29 @@ public class HadoopCredentialConfiguration {
                 ENABLE_NULL_CREDENTIAL_SUFFIX
                     .withPrefixes(keyPrefixes)
                     .get(config, config::getBoolean))
-            .setTransportType(HTTP_TRANSPORT.get(config, config::getEnum))
+            .setTransportType(
+                HTTP_TRANSPORT_SUFFIX.withPrefixes(keyPrefixes).get(config, config::getEnum))
             .setTokenServerUrl(
                 TOKEN_SERVER_URL_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
-            .setProxyAddress(PROXY_ADDRESS.get(config, config::get))
-            .setProxyUsername(PROXY_USERNAME.get(config, config::get))
-            .setProxyPassword(PROXY_PASSWORD.get(config, config::get))
+            .setProxyAddress(
+                PROXY_ADDRESS_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
+            .setProxyUsername(PROXY_USERNAME_SUFFIX.withPrefixes(keyPrefixes).getPassword(config))
+            .setProxyPassword(PROXY_PASSWORD_SUFFIX.withPrefixes(keyPrefixes).getPassword(config))
             .build();
     return new CredentialFactory(credentialOptions);
   }
 
   public static Class<? extends AccessTokenProvider> getAccessTokenProviderImplClass(
-      Configuration config, List<String> keyPrefixes) {
+      Configuration config, String... keyPrefixes) {
     return ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX
-        .withPrefixes(allConfigKeyPrefixes(keyPrefixes))
+        .withPrefixes(getConfigKeyPrefixes(keyPrefixes))
         .get(config, (k, d) -> config.getClass(k, d, AccessTokenProvider.class));
   }
 
-  private static ImmutableList<String> allConfigKeyPrefixes(List<String> keyPrefixes) {
-    return ImmutableList.<String>builder().addAll(keyPrefixes).add(BASE_KEY_PREFIX).build();
+  /**
+   * Returns full list of config prefixes that will be resolved based on the order in returned list.
+   */
+  public static List<String> getConfigKeyPrefixes(String... keyPrefixes) {
+    return ImmutableList.<String>builder().add(keyPrefixes).add(BASE_KEY_PREFIX).build();
   }
 }

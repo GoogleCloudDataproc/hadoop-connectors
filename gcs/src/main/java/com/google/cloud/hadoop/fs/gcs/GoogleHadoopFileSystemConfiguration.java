@@ -17,6 +17,11 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.PATH_CODEC_USE_URI_ENCODING;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.HTTP_TRANSPORT_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_ADDRESS_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_PASSWORD_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_USERNAME_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.getConfigKeyPrefixes;
 import static com.google.common.base.Strings.nullToEmpty;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksumType;
@@ -30,8 +35,6 @@ import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions
 import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.HadoopConfigurationProperty;
-import com.google.cloud.hadoop.util.HadoopCredentialConfiguration;
-import com.google.cloud.hadoop.util.HttpTransportFactory.HttpTransportType;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
 import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.common.annotations.VisibleForTesting;
@@ -44,6 +47,11 @@ import org.apache.hadoop.fs.permission.FsPermission;
 /** This class provides a configuration for the {@link GoogleHadoopFileSystem} implementations. */
 public class GoogleHadoopFileSystemConfiguration {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
+  public static final String GCS_CONFIG_PREFIX = "fs.gs";
+
+  public static final ImmutableList<String> CONFIG_KEY_PREFIXES =
+      ImmutableList.copyOf(getConfigKeyPrefixes(GCS_CONFIG_PREFIX));
 
   // -----------------------------------------------------------------
   // Configuration settings.
@@ -76,50 +84,6 @@ public class GoogleHadoopFileSystemConfiguration {
    */
   public static final HadoopConfigurationProperty<Long> BLOCK_SIZE =
       new HadoopConfigurationProperty<>("fs.gs.block.size", 64 * 1024 * 1024L);
-
-  /**
-   * Configuration key for enabling GCE service account authentication. This key is deprecated. See
-   * {@link HadoopCredentialConfiguration} for current key names.
-   */
-  public static final HadoopConfigurationProperty<String> AUTH_SERVICE_ACCOUNT_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.enable.service.account.auth");
-
-  /**
-   * Configuration key specifying the email address of the service-account with which to
-   * authenticate. Only required if {@link #AUTH_SERVICE_ACCOUNT_ENABLE} is true AND we're using
-   * fs.gs.service.account.auth.keyfile to authenticate with a private keyfile. NB: Once GCE
-   * supports setting multiple service account email addresses for metadata auth, this key will also
-   * be used in the metadata auth flow. This key is deprecated. See {@link
-   * HadoopCredentialConfiguration} for current key names.
-   */
-  public static final HadoopConfigurationProperty<String> AUTH_SERVICE_ACCOUNT_EMAIL =
-      new HadoopConfigurationProperty<>("fs.gs.service.account.auth.email");
-
-  /**
-   * Configuration key specifying local file containing a service-account private .p12 keyfile. Only
-   * used if {@link #AUTH_SERVICE_ACCOUNT_ENABLE} is true; if provided, the keyfile will be used for
-   * service-account authentication. Otherwise, it is assumed that we are on a GCE VM with
-   * metadata-authentication for service-accounts enabled, and the metadata server will be used
-   * instead. Default value: none This key is deprecated. See {@link HadoopCredentialConfiguration}
-   * for current key names.
-   */
-  public static final HadoopConfigurationProperty<String> AUTH_SERVICE_ACCOUNT_KEY_FILE =
-      new HadoopConfigurationProperty<>("fs.gs.service.account.auth.keyfile");
-
-  /**
-   * Configuration key for GCS client ID. Required if {@link #AUTH_SERVICE_ACCOUNT_ENABLE} == false.
-   * Default value: none This key is deprecated. See {@link HadoopCredentialConfiguration} for
-   * current key names.
-   */
-  public static final HadoopConfigurationProperty<String> AUTH_CLIENT_ID =
-      new HadoopConfigurationProperty<>("fs.gs.client.id");
-  /**
-   * Configuration key for GCS client secret. Required if {@link #AUTH_SERVICE_ACCOUNT_ENABLE} ==
-   * false. Default value: none This key is deprecated. See HadoopCredentialConfiguration for
-   * current key names.
-   */
-  public static final HadoopConfigurationProperty<String> AUTH_CLIENT_SECRET =
-      new HadoopConfigurationProperty<>("fs.gs.client.secret");
 
   /** Configuration key for Delegation Token binding class. Default value: none */
   public static final HadoopConfigurationProperty<String> DELEGATION_TOKEN_BINDING_CLASS =
@@ -292,34 +256,6 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Integer> GCS_HTTP_READ_TIMEOUT =
       new HadoopConfigurationProperty<>("fs.gs.http.read-timeout", 20 * 1000);
 
-  /**
-   * Configuration key for setting a proxy for the connector to use to connect to GCS. The proxy
-   * must be an HTTP proxy of the form "host:port".
-   */
-  public static final HadoopConfigurationProperty<String> GCS_PROXY_ADDRESS =
-      HadoopCredentialConfiguration.PROXY_ADDRESS;
-
-  /**
-   * Configuration key for setting a proxy username for the connector to use to authenticate with
-   * proxy used to connect to GCS.
-   */
-  public static final HadoopConfigurationProperty<String> GCS_PROXY_USERNAME =
-      HadoopCredentialConfiguration.PROXY_USERNAME;
-
-  /**
-   * Configuration key for setting a proxy password for the connector to use to authenticate with
-   * proxy used to connect to GCS.
-   */
-  public static final HadoopConfigurationProperty<String> GCS_PROXY_PASSWORD =
-      HadoopCredentialConfiguration.PROXY_PASSWORD;
-
-  /**
-   * Configuration key for the name of HttpTransport class to use for connecting to GCS. Must be the
-   * name of an HttpTransportFactory.HttpTransportType (APACHE or JAVA_NET).
-   */
-  public static final HadoopConfigurationProperty<HttpTransportType> GCS_HTTP_TRANSPORT =
-      HadoopCredentialConfiguration.HTTP_TRANSPORT;
-
   /** Configuration key for adding a suffix to the GHFS application name sent to GCS. */
   public static final HadoopConfigurationProperty<String> GCS_APPLICATION_NAME_SUFFIX =
       new HadoopConfigurationProperty<>("fs.gs.application.name.suffix", "");
@@ -470,10 +406,14 @@ public class GoogleHadoopFileSystemConfiguration {
         .setMaxBytesRewrittenPerCall(GCS_REWRITE_MAX_BYTES_PER_CALL.get(config, config::getLong))
         .setCopyMaxRequestsPerBatch(GCS_COPY_MAX_REQUESTS_PER_BATCH.get(config, config::getLong))
         .setCopyBatchThreads(GCS_COPY_BATCH_THREADS.get(config, config::getInt))
-        .setTransportType(GCS_HTTP_TRANSPORT.get(config, config::getEnum))
-        .setProxyAddress(GCS_PROXY_ADDRESS.get(config, config::get))
-        .setProxyUsername(GCS_PROXY_USERNAME.getPassword(config))
-        .setProxyPassword(GCS_PROXY_PASSWORD.getPassword(config))
+        .setTransportType(
+            HTTP_TRANSPORT_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::getEnum))
+        .setProxyAddress(
+            PROXY_ADDRESS_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::get))
+        .setProxyUsername(
+            PROXY_USERNAME_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config))
+        .setProxyPassword(
+            PROXY_PASSWORD_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config))
         .setProjectId(projectId)
         .setMaxListItemsPerCall(GCS_MAX_LIST_ITEMS_PER_CALL.get(config, config::getLong))
         .setMaxRequestsPerBatch(GCS_MAX_REQUESTS_PER_BATCH.get(config, config::getLong))
