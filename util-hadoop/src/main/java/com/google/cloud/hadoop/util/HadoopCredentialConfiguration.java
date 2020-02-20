@@ -39,8 +39,9 @@ public class HadoopCredentialConfiguration {
   public static final String BASE_KEY_PREFIX = "google.cloud";
 
   /**
-   * Key suffix used to disable service accounts. A value of {@code false} will disable the use of
-   * service accounts. The default is to use a service account.
+   * Key suffix for enabling GCE service account authentication. A value of {@code false} will
+   * disable the use of the service accounts for authentication. The default value is {@code true} -
+   * use a service account for authentication.
    */
   public static final HadoopConfigurationProperty<Boolean> ENABLE_SERVICE_ACCOUNTS_SUFFIX =
       new HadoopConfigurationProperty<>(
@@ -48,7 +49,11 @@ public class HadoopCredentialConfiguration {
           CredentialOptions.SERVICE_ACCOUNT_ENABLED_DEFAULT,
           ".enable.service.account.auth");
 
-  /** Key suffix used to control which email address is associated with the service account. */
+  /**
+   * Key suffix specifying the email address associated with the service account with which to
+   * authenticate. Only required if {@link #ENABLE_SERVICE_ACCOUNTS_SUFFIX} is {@code true} and
+   * we're using {@link #SERVICE_ACCOUNT_KEYFILE_SUFFIX} to authenticate with a private keyfile.
+   */
   public static final HadoopConfigurationProperty<String> SERVICE_ACCOUNT_EMAIL_SUFFIX =
       new HadoopConfigurationProperty<>(
           ".auth.service.account.email", /* defaultValue= */ null, ".service.account.auth.email");
@@ -62,7 +67,8 @@ public class HadoopCredentialConfiguration {
       new HadoopConfigurationProperty<>(".auth.service.account.private.key");
 
   /**
-   * Key suffix used to indicate the path to the service account p12 keyfile. If provided, triggers
+   * Key suffix specifying local file containing a service account private {@code .p12} keyfile.
+   * Only used if {@link #SERVICE_ACCOUNT_EMAIL_SUFFIX} is {@code true}; if provided, triggers
    * private keyfile service account authentication. The file will be required to be present on all
    * nodes and at the same location on all nodes.
    */
