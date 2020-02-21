@@ -132,6 +132,10 @@
     If set, files that match specified pattern are copied last during folder
     rename operation.
 
+*   `fs.gs.storage.http.headers` (default: {})
+
+    Custom HTTP headers added to GCS connector requests.
+
 ### Authentication
 
 When one of the following two properties is set, it will precede all other

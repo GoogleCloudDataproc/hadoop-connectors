@@ -77,7 +77,7 @@ public abstract class GoogleCloudStorageOptions {
   public static final int COPY_BATCH_THREADS_DEFAULT = BATCH_THREADS_DEFAULT;
 
   /** Default setting for GCS HTTP request headers. */
-  public static final Map<String, String> HTTP_REQUEST_HEADERS_DEFAULT = ImmutableMap.of();
+  public static final ImmutableMap<String, String> HTTP_REQUEST_HEADERS_DEFAULT = ImmutableMap.of();
 
   public static final GoogleCloudStorageOptions DEFAULT = builder().build();
 

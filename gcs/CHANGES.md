@@ -13,6 +13,8 @@
         fs.gs.storage.root.url
         fs.gs.token.server.url
 
+1.  Support adding custom HTTP headers to connector requests.
+
 ### 2.0.1 - 2020-02-13
 
 1.  Cooperative Locking FSCK tool: fix recovery of operations that failed before
