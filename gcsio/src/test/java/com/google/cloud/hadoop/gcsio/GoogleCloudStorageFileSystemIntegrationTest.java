@@ -588,7 +588,6 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
           .contains(
               "Note, it is possible that the live version is still available"
                   + " but the requested generation is deleted.");
-      assertThat(expected).hasMessageThat().contains("generation");
     }
   }
 
