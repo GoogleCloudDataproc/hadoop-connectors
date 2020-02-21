@@ -62,6 +62,8 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
   // Default number of read timeout (20 seconds).
   private static final int DEFAULT_READ_TIMEOUT = 20 * 1000;
 
+  private static final ImmutableMap<String, String> DEFAULT_HTTP_HEADERS = ImmutableMap.of();
+
   // To be used as a request interceptor for filling in the "Authorization" header field, as well
   // as a response handler for certain unsuccessful error codes wherein the Credential must refresh
   // its token for a retry.
@@ -263,7 +265,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
         DEFAULT_MAX_REQUEST_RETRIES,
         DEFAULT_CONNECT_TIMEOUT,
         DEFAULT_READ_TIMEOUT,
-        /* headers= */ null);
+        DEFAULT_HTTP_HEADERS);
   }
 
   @Override

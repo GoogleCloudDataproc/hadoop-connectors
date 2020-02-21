@@ -88,7 +88,7 @@ public class CoopLockIntegrationTest {
             gcsOptions.getMaxHttpRequestRetries(),
             gcsOptions.getHttpRequestConnectTimeout(),
             gcsOptions.getHttpRequestReadTimeout(),
-            /* headers= */ null);
+            gcsOptions.getHttpRequestHeaders());
 
     GoogleCloudStorageFileSystem gcsfs =
         new GoogleCloudStorageFileSystem(
