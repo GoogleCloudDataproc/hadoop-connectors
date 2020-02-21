@@ -14,6 +14,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
+import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
@@ -22,6 +23,8 @@ import com.google.google.storage.v1.GetObjectMediaResponse;
 import com.google.google.storage.v1.GetObjectRequest;
 import com.google.google.storage.v1.StorageGrpc.StorageBlockingStub;
 import com.google.protobuf.ByteString;
+import io.grpc.Context;
+import io.grpc.Context.CancellableContext;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import java.io.EOFException;
@@ -35,43 +38,35 @@ import javax.annotation.Nullable;
 public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-
+  // Context of the request that returned resIterator.
+  @Nullable
+  CancellableContext requestContext;
   // GCS gRPC stub.
   private StorageBlockingStub stub;
-
   // Name of the bucket containing the object being read.
   private String bucketName;
-
   // Name of the object being read.
   private String objectName;
-
   // We read from a specific generation, to maintain consistency between read() calls.
   private long objectGeneration;
-
   // The size of this object generation, in bytes.
   private long objectSize;
-
   // True if this channel is open, false otherwise.
   private boolean channelIsOpen = true;
-
   // Current position in the object.
   private long position = 0;
-
   // If a user seeks forwards by a configurably small amount, we continue reading from where
   // we are instead of starting a new connection. The user's intended read position is
   // position + bytesToSkipBeforeReading.
   private long bytesToSkipBeforeReading = 0;
-
   // The user may have read less data than we received from the server. If that's the case, we keep
   // the most recently received content and a reference to how much of it we've returned so far.
   @Nullable
   private ByteString bufferedContent = null;
   private int bufferedContentReadOffset = 0;
-
   // The streaming read operation. If null, there is not an in-flight read in progress.
   @Nullable
   private Iterator<GetObjectMediaResponse> resIterator = null;
-
   // Fine-grained options.
   private GoogleCloudStorageReadOptions readOptions;
 
@@ -117,6 +112,21 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         readOptions);
   }
 
+  private static IOException convertError(StatusRuntimeException error, String bucketName,
+      String objectName) {
+    Status.Code statusCode = Status.fromThrowable(error).getCode();
+    String msg = String.format("Error reading '%s'",
+        StorageResourceId.createReadableString(bucketName, objectName));
+    if (statusCode == Status.Code.NOT_FOUND) {
+      return GoogleCloudStorageExceptions.createFileNotFoundException(
+          bucketName, objectName, new IOException(msg, error));
+    } else if (statusCode == Status.Code.OUT_OF_RANGE) {
+      return new EOFException(msg);
+    } else {
+      return new IOException(msg, error);
+    }
+  }
+
   private int readBufferedContentInto(ByteBuffer byteBuffer) {
     // Handle skipping forward through the buffer for a seek.
     long remainingBufferedBytes = bufferedContent.size() - bufferedContentReadOffset;
@@ -142,11 +152,11 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   @Override
   public int read(ByteBuffer byteBuffer) throws IOException {
-    logger.atFine().log("GCS gRPC read request for up to " + byteBuffer.remaining()
-        + " bytes, from object at offset " + position);
+    logger.atFine().log("GCS gRPC read request for up to %d bytes, from object at offset %d",
+        byteBuffer.remaining(), position());
 
     if (!isOpen()) {
-      throw new java.nio.channels.ClosedChannelException();
+      throw new ClosedChannelException();
     }
 
     int bytesRead = 0;
@@ -169,7 +179,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
           .setObject(objectName)
           .setGeneration(objectGeneration)
           .setReadOffset(position);
-      if(readOptions.getFadvise() == Fadvise.RANDOM ) {
+      if (readOptions.getFadvise() == Fadvise.RANDOM) {
         requestBuilder.setReadLimit(byteBuffer.remaining());
       }
       GetObjectMediaRequest request = requestBuilder.build();
@@ -178,7 +188,13 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         // would mean attaching a CancellableContext, and that means adding an explicit timeout,
         // which for very long downloads is perhaps problematic. Alternately, we could use an
         // asynchronous stub and re-examine how to more efficiently move bytes around.
-        resIterator = stub.getObjectMedia(request);
+        CancellableContext requestContext = Context.current().withCancellation();
+        Context toReattach = requestContext.attach();
+        try {
+          resIterator = stub.getObjectMedia(request);
+        } finally {
+          requestContext.detach(toReattach);
+        }
       } catch (StatusRuntimeException e) {
         throw convertError(e, bucketName, objectName);
       }
@@ -247,21 +263,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     }
   }
 
-  private static IOException convertError(StatusRuntimeException error, String bucketName,
-      String objectName) {
-    Status.Code statusCode = Status.fromThrowable(error).getCode();
-    String msg = String.format("Error reading '%s'",
-        StorageResourceId.createReadableString(bucketName, objectName));
-    if (statusCode == Status.Code.NOT_FOUND) {
-      return GoogleCloudStorageExceptions.createFileNotFoundException(
-          bucketName, objectName, new IOException(msg, error));
-    } else if (statusCode == Status.Code.OUT_OF_RANGE) {
-      return new EOFException(msg);
-    } else {
-      return new IOException(msg, error);
-    }
-  }
-
   @Override
   public int write(ByteBuffer byteBuffer) throws IOException {
     throw new UnsupportedOperationException("Cannot mutate read-only channel");
@@ -286,16 +287,11 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     if (!isOpen()) {
       throw new ClosedChannelException();
     }
-
-    if (newPosition < 0) {
-      throw new EOFException(String.format(
-          "Invalid seek offset: position value (%d) must be >= 0 for '%s'",
-          newPosition, resourceIdString()));
-    } else if (newPosition >= size()) {
-      throw new EOFException(String.format(
-          "Invalid seek offset: position value (%d) must be  less than the total length (%d) of object '%s'",
-          newPosition, size(), resourceIdString()));
-    } else if (newPosition == position) {
+    Preconditions.checkArgument(newPosition >= 0, "Read position must be non-negative, but was %d",
+        newPosition);
+    Preconditions.checkArgument(newPosition >= size(),
+        "Read position must be before end of file (%d), but was %d", size(), newPosition);
+    if (newPosition == position) {
       return this;
     }
 
@@ -338,6 +334,16 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   @Override
   public void close() throws IOException {
+    if (requestContext != null) {
+      requestContext.close();
+      requestContext = null;
+    }
+    if (resIterator != null) {
+      while (resIterator.hasNext()) {
+        resIterator.next();
+      }
+      resIterator = null;
+    }
     channelIsOpen = false;
   }
 }
