@@ -13,6 +13,7 @@
  */
 package com.google.cloud.hadoop.gcsio;
 
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
@@ -163,8 +164,15 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       return bytesRead > 0 ? bytesRead : -1;
     }
     if (resIterator == null) {
-      GetObjectMediaRequest request = GetObjectMediaRequest.newBuilder().setBucket(bucketName)
-          .setObject(objectName).setGeneration(objectGeneration).setReadOffset(position).build();
+      GetObjectMediaRequest.Builder requestBuilder = GetObjectMediaRequest.newBuilder()
+          .setBucket(bucketName)
+          .setObject(objectName)
+          .setGeneration(objectGeneration)
+          .setReadOffset(position);
+      if(readOptions.getFadvise() == Fadvise.RANDOM ) {
+        requestBuilder.setReadLimit(byteBuffer.remaining());
+      }
+      GetObjectMediaRequest request = requestBuilder.build();
       try {
         // It would be nice to explicitly close this RPC if the channel is closed, but doing so
         // would mean attaching a CancellableContext, and that means adding an explicit timeout,
