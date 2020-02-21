@@ -846,7 +846,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     if (resourceId.hasGenerationId()) {
       checkState(
           resourceId.getGenerationId() == generation,
-          "resourceId generation (%s) should be equal to metadata generation (%s) for '%s'",
+          "Provided generation (%s) should be equal to fetched generation (%s) for '%s'",
           resourceId.getGenerationId(),
           generation,
           resourceId);

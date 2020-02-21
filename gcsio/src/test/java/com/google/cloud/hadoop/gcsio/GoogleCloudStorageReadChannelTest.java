@@ -358,7 +358,7 @@ public class GoogleCloudStorageReadChannelTest {
         .hasMessageThat()
         .contains(
             String.format(
-                "resourceId generation (%d) should be equal to metadata generation (%d)",
+                "Provided generation (%d) should be equal to fetched generation (%d)",
                 requestedGeneration, actualGeneration));
   }
 
@@ -386,7 +386,7 @@ public class GoogleCloudStorageReadChannelTest {
         .hasMessageThat()
         .contains(
             String.format(
-                "resourceId generation (%d) should be equal to metadata generation (%d)",
+                "Provided generation (%d) should be equal to fetched generation (%d)",
                 requestedGeneration, actualGeneration));
   }
 
