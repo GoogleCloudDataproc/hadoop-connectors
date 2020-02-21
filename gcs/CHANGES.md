@@ -25,6 +25,9 @@
     fs.gs.storage.http.headers.x-goog-encryption-key-sha256=+eBzkZBt1Mj2CZx69L3c8yXoZB6DtRLlSvXMJB9JGIQ=
     ```
 
+1.  Always set `generation` parameter for read requests and remove
+    `fs.gs.generation.read.consistency` property.
+
 ### 2.0.1 - 2020-02-13
 
 1.  Cooperative Locking FSCK tool: fix recovery of operations that failed before
