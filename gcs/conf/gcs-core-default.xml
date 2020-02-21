@@ -50,7 +50,7 @@
     <name>fs.gs.storage.http.headers</name>
     <value></value>
     <description>
-      Custom HTTP headers added to GCS connector requests.
+      Custom HTTP headers added to Cloud Storage API requests.
     </description>
   </property>
 

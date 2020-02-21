@@ -15,6 +15,7 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_HTTP_HEADERS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ROOT_URL;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_ADDRESS_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_PASSWORD_SUFFIX;
@@ -184,33 +185,38 @@ public class GoogleHadoopFileSystemConfigurationTest {
 
   @Test
   public void testHttpHeadersProperties_singleHeader() {
-    HadoopConfigurationProperty<Map<String, String>> gcsHttpHeaders =
-        new HadoopConfigurationProperty<>("fs.gs.storage.http.headers");
-
     Configuration config = new Configuration();
-    config.set(gcsHttpHeaders.getKey() + ".headerkey", "headervalue");
+    config.set(GCS_HTTP_HEADERS.getKey() + "header-key", "val=ue");
 
     GoogleCloudStorageFileSystemOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
 
     assertThat(options.getCloudStorageOptions().getHttpRequestHeaders())
-        .isEqualTo(ImmutableMap.of("headerkey", "headervalue"));
+        .containsExactly("header-key", "val=ue");
   }
 
   @Test
-  public void testHttpHeadersProperties_multiHeaders() {
-    HadoopConfigurationProperty<Map<String, String>> gcsHttpHeaders =
-        new HadoopConfigurationProperty<>("fs.gs.storage.http.headers");
-
+  public void testHttpHeadersProperties_multipleHeaders() {
     Configuration config = new Configuration();
-    config.set(gcsHttpHeaders.getKey() + ".headerkey1", "headervalue1");
-    config.set(gcsHttpHeaders.getKey() + ".headerkey2", "headervalue2");
+    config.set(GCS_HTTP_HEADERS.getKey() + "x-goog-encryption-algorithm", "AES256");
+    config.set(
+        GCS_HTTP_HEADERS.getKey() + "x-goog-encryption-key",
+        "NwbyGGmcKAX4FxGpOERG2Ap33m5NVOgmXznSGTEvG0I=");
+    config.set(
+        GCS_HTTP_HEADERS.getKey() + "x-goog-encryption-key-sha256",
+        "+eBzkZBt1Mj2CZx69L3c8yXoZB6DtRLlSvXMJB9JGIQ=");
 
     GoogleCloudStorageFileSystemOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
 
     assertThat(options.getCloudStorageOptions().getHttpRequestHeaders())
-        .isEqualTo(ImmutableMap.of("headerkey1", "headervalue1", "headerkey2", "headervalue2"));
+        .containsExactly(
+            "x-goog-encryption-algorithm",
+            "AES256",
+            "x-goog-encryption-key",
+            "NwbyGGmcKAX4FxGpOERG2Ap33m5NVOgmXznSGTEvG0I=",
+            "x-goog-encryption-key-sha256",
+            "+eBzkZBt1Mj2CZx69L3c8yXoZB6DtRLlSvXMJB9JGIQ=");
   }
 
   @Test

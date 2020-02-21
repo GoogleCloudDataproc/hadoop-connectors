@@ -132,9 +132,17 @@
     If set, files that match specified pattern are copied last during folder
     rename operation.
 
-*   `fs.gs.storage.http.headers` (default: {})
+*   `fs.gs.storage.http.headers.<HEADER>` (not set by default)
 
-    Custom HTTP headers added to GCS connector requests.
+    Custom HTTP headers added to Cloud Storage API requests.
+
+    Example:
+
+    ```bash
+    fs.gs.storage.http.headers.x-goog-encryption-algorithm=AES256
+    fs.gs.storage.http.headers.x-goog-encryption-key=NwbyGGmcKAX4FxGpOERG2Ap33m5NVOgmXznSGTEvG0I=
+    fs.gs.storage.http.headers.x-goog-encryption-key-sha256=+eBzkZBt1Mj2CZx69L3c8yXoZB6DtRLlSvXMJB9JGIQ=
+    ```
 
 ### Authentication
 

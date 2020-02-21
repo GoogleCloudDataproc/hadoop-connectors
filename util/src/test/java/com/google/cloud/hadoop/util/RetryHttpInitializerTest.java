@@ -94,7 +94,7 @@ public class RetryHttpInitializerTest {
             HttpRequest.DEFAULT_NUMBER_OF_RETRIES,
             20_000,
             20_000,
-            ImmutableMap.of("header-key", "header-value"));
+            ImmutableMap.of("header-key", "header=value"));
     initializer.setSleeperOverride(mockSleeper);
     requestFactory = fakeTransport.createRequestFactory(initializer);
   }
@@ -116,7 +116,7 @@ public class RetryHttpInitializerTest {
     final String authHeaderValue = "Bearer a1b2c3d4";
     final HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
     assertThat(req.getHeaders().getUserAgent()).isEqualTo("foo-user-agent");
-    assertThat(req.getHeaders().get("header-key")).isEqualTo("header-value");
+    assertThat(req.getHeaders().get("header-key")).isEqualTo("header=value");
     assertThat(req.getInterceptor()).isEqualTo(mockCredential);
 
     // Simulate the actual behavior of inserting a header for the credential.
