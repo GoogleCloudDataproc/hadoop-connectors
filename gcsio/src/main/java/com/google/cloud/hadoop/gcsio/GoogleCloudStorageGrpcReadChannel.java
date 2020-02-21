@@ -184,10 +184,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       }
       GetObjectMediaRequest request = requestBuilder.build();
       try {
-        // It would be nice to explicitly close this RPC if the channel is closed, but doing so
-        // would mean attaching a CancellableContext, and that means adding an explicit timeout,
-        // which for very long downloads is perhaps problematic. Alternately, we could use an
-        // asynchronous stub and re-examine how to more efficiently move bytes around.
+        // TODO: Validate that it's legal to detach a context and then read from the response
+        //   stream afterward.
         CancellableContext requestContext = Context.current().withCancellation();
         Context toReattach = requestContext.attach();
         try {
@@ -287,10 +285,10 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     if (!isOpen()) {
       throw new ClosedChannelException();
     }
-    Preconditions.checkArgument(newPosition >= 0, "Read position must be non-negative, but was %d",
+    Preconditions.checkArgument(newPosition >= 0, "Read position must be non-negative, but was %s",
         newPosition);
-    Preconditions.checkArgument(newPosition >= size(),
-        "Read position must be before end of file (%d), but was %d", size(), newPosition);
+    Preconditions.checkArgument(newPosition < size(),
+        "Read position must be before end of file (%s), but was %s", size(), newPosition);
     if (newPosition == position) {
       return this;
     }
