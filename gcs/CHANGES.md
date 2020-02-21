@@ -15,7 +15,7 @@
 
 1.  Support adding custom HTTP headers to Cloud Storage API requests:
 
-        fs.gs.storage.http.headers.<HEADER> (not set by default)
+        fs.gs.storage.http.headers.<HEADER>=<VALUE> (not set by default)
 
     Example:
 

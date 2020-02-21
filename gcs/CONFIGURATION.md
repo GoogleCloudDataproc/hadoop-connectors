@@ -132,7 +132,7 @@
     If set, files that match specified pattern are copied last during folder
     rename operation.
 
-*   `fs.gs.storage.http.headers.<HEADER>` (not set by default)
+*   `fs.gs.storage.http.headers.<HEADER>=<VALUE>` (not set by default)
 
     Custom HTTP headers added to Cloud Storage API requests.
 

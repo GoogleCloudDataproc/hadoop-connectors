@@ -46,13 +46,6 @@
       to copy files between different locations and storage classes.
     </description>
   </property>
-  <property>
-    <name>fs.gs.storage.http.headers</name>
-    <value></value>
-    <description>
-      Custom HTTP headers added to Cloud Storage API requests.
-    </description>
-  </property>
 
   <!-- Authorization -->
 
