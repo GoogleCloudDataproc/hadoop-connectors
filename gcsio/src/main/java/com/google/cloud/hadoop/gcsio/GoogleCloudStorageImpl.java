@@ -46,6 +46,7 @@ import com.google.api.services.storage.model.ComposeRequest;
 import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.RewriteResponse;
 import com.google.api.services.storage.model.StorageObject;
+import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
@@ -68,16 +69,20 @@ import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.google.storage.v1.StorageGrpc;
+import com.google.google.storage.v1.StorageGrpc.StorageBlockingStub;
 import com.google.google.storage.v1.StorageGrpc.StorageStub;
 import com.google.google.storage.v1.StorageOuterClass;
 import com.google.protobuf.util.Durations;
+import io.grpc.alts.ComputeEngineChannelBuilder;
 import io.grpc.alts.GoogleDefaultChannelBuilder;
+import io.grpc.auth.MoreCallCredentials;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
+import java.security.Security;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -185,6 +190,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   // GCS grpc stub.
   private StorageStub gcsGrpcStub;
+  private StorageBlockingStub gcsGrpcBlockingStub;
 
   // Thread-pool used for background tasks.
   private ExecutorService backgroundTasksThreadPool =
@@ -274,6 +280,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               .defaultServiceConfig(serviceConfig)
               .build())
           .withExecutor(backgroundTasksThreadPool);
+      this.gcsGrpcBlockingStub =
+          StorageGrpc.newBlockingStub(
+              ComputeEngineChannelBuilder.forAddress("storage.googleapis.com",443)
+              .defaultServiceConfig(serviceConfig)
+              .build());
     }
   }
 
@@ -678,8 +689,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
 
     if (storageOptions.isGrpcEnabled()) {
-      return new GoogleCloudStorageGrpcReadChannel(
-          gcsGrpcStub, resourceId.getBucketName(), resourceId.getObjectName(), readOptions);
+      return GoogleCloudStorageGrpcReadChannel.open(
+          gcsGrpcBlockingStub, resourceId.getBucketName(), resourceId.getObjectName(), readOptions);
     }
 
     // The underlying channel doesn't initially read data, which means that we won't see a
