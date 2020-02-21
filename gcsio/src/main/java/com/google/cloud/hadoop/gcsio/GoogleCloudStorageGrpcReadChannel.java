@@ -303,6 +303,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     // Reset any ongoing reads.
     this.bufferedContent = null;
     this.bufferedContentReadOffset = 0;
+    this.bytesToSkipBeforeReading = 0;
     this.resIterator = null;
     return this;
   }

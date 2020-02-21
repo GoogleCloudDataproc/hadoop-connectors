@@ -38,6 +38,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import net.bytebuddy.pool.TypePool.Resolution.Illegal;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -117,6 +118,31 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     assertArrayEquals(fakeService.data.substring(0, FakeService.CHUNK_SIZE * 2).toByteArray(),
         buffer.array());
   }
+
+  @Test
+  public void readAfterRepositioningAfterSkippingSucceeds() throws Exception {
+    fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(100).build());
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder()
+            .setInplaceSeekLimit(10)
+            .build();
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
+
+    ByteBuffer bufferAtBeginning = ByteBuffer.allocate(20);
+    readChannel.read(bufferAtBeginning);
+    readChannel.position(25);
+    ByteBuffer bufferFromSkippedSection = ByteBuffer.allocate(5);
+    readChannel.read(bufferFromSkippedSection);
+    ByteBuffer bufferFromReposition = ByteBuffer.allocate(10);
+    readChannel.position(1);
+    readChannel.read(bufferFromReposition);
+
+    verify(fakeService, times(1)).getObject(eq(GET_OBJECT_REQUEST), any());
+    verify(fakeService, times(1)).getObjectMedia(eq(GET_OBJECT_MEDIA_REQUEST), any());
+    assertArrayEquals(fakeService.data.substring(0, 20).toByteArray(), bufferAtBeginning.array());
+    assertArrayEquals(fakeService.data.substring(25, 30).toByteArray(), bufferFromSkippedSection.array());
+    assertArrayEquals(fakeService.data.substring(1, 11).toByteArray(), bufferFromReposition.array());
+    }
 
   @Test
   public void multipleSequentialReads() throws Exception {
@@ -498,7 +524,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   public void seekFailsOnNegative() throws Exception {
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel();
 
-    assertThrows(EOFException.class, () -> readChannel.position(-1));
+    assertThrows(IllegalArgumentException.class, () -> readChannel.position(-1));
   }
 
   @Test
