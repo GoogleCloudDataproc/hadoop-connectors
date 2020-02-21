@@ -46,7 +46,6 @@ import com.google.api.services.storage.model.ComposeRequest;
 import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.RewriteResponse;
 import com.google.api.services.storage.model.StorageObject;
-import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
@@ -75,14 +74,12 @@ import com.google.google.storage.v1.StorageOuterClass;
 import com.google.protobuf.util.Durations;
 import io.grpc.alts.ComputeEngineChannelBuilder;
 import io.grpc.alts.GoogleDefaultChannelBuilder;
-import io.grpc.auth.MoreCallCredentials;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
-import java.security.Security;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -282,9 +279,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           .withExecutor(backgroundTasksThreadPool);
       this.gcsGrpcBlockingStub =
           StorageGrpc.newBlockingStub(
-              ComputeEngineChannelBuilder.forAddress("storage.googleapis.com",443)
-              .defaultServiceConfig(serviceConfig)
-              .build());
+              ComputeEngineChannelBuilder.forAddress("storage.googleapis.com", 443)
+                  .defaultServiceConfig(serviceConfig)
+                  .build());
     }
   }
 

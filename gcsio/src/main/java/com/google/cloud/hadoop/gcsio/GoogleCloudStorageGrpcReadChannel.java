@@ -39,8 +39,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   // Context of the request that returned resIterator.
-  @Nullable
-  CancellableContext requestContext;
+  @Nullable CancellableContext requestContext;
   // GCS gRPC stub.
   private StorageBlockingStub stub;
   // Name of the bucket containing the object being read.
@@ -61,17 +60,19 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   private long bytesToSkipBeforeReading = 0;
   // The user may have read less data than we received from the server. If that's the case, we keep
   // the most recently received content and a reference to how much of it we've returned so far.
-  @Nullable
-  private ByteString bufferedContent = null;
+  @Nullable private ByteString bufferedContent = null;
   private int bufferedContentReadOffset = 0;
   // The streaming read operation. If null, there is not an in-flight read in progress.
-  @Nullable
-  private Iterator<GetObjectMediaResponse> resIterator = null;
+  @Nullable private Iterator<GetObjectMediaResponse> resIterator = null;
   // Fine-grained options.
   private GoogleCloudStorageReadOptions readOptions;
 
-  private GoogleCloudStorageGrpcReadChannel(StorageBlockingStub gcsGrpcBlockingStub,
-      String bucketName, String objectName, long objectGeneration, long objectSize,
+  private GoogleCloudStorageGrpcReadChannel(
+      StorageBlockingStub gcsGrpcBlockingStub,
+      String bucketName,
+      String objectName,
+      long objectGeneration,
+      long objectSize,
       GoogleCloudStorageReadOptions readOptions) {
     this.stub = gcsGrpcBlockingStub;
     this.bucketName = bucketName;
@@ -81,8 +82,11 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     this.readOptions = readOptions;
   }
 
-  public static GoogleCloudStorageGrpcReadChannel open(StorageBlockingStub stub,
-      String bucketName, String objectName, GoogleCloudStorageReadOptions readOptions)
+  public static GoogleCloudStorageGrpcReadChannel open(
+      StorageBlockingStub stub,
+      String bucketName,
+      String objectName,
+      GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     // The gRPC API's GetObjectMedia call does not provide a generation number, so to ensure
     // consistent reads, we need to begin by checking the current generation number with a separate
@@ -93,8 +97,9 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     //      implement footer prefetch.
     com.google.google.storage.v1.Object getObjectResult;
     try {
-      getObjectResult = stub.getObject(
-          GetObjectRequest.newBuilder().setBucket(bucketName).setObject(objectName).build());
+      getObjectResult =
+          stub.getObject(
+              GetObjectRequest.newBuilder().setBucket(bucketName).setObject(objectName).build());
     } catch (StatusRuntimeException e) {
       throw convertError(e, bucketName, objectName);
     }
@@ -107,16 +112,21 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
           "Can't read GZIP encoded files - content encoding support is disabled.");
     }
 
-    return new GoogleCloudStorageGrpcReadChannel(stub,
-        bucketName, objectName, getObjectResult.getGeneration(), getObjectResult.getSize(),
+    return new GoogleCloudStorageGrpcReadChannel(
+        stub,
+        bucketName,
+        objectName,
+        getObjectResult.getGeneration(),
+        getObjectResult.getSize(),
         readOptions);
   }
 
-  private static IOException convertError(StatusRuntimeException error, String bucketName,
-      String objectName) {
+  private static IOException convertError(
+      StatusRuntimeException error, String bucketName, String objectName) {
     Status.Code statusCode = Status.fromThrowable(error).getCode();
-    String msg = String.format("Error reading '%s'",
-        StorageResourceId.createReadableString(bucketName, objectName));
+    String msg =
+        String.format(
+            "Error reading '%s'", StorageResourceId.createReadableString(bucketName, objectName));
     if (statusCode == Status.Code.NOT_FOUND) {
       return GoogleCloudStorageExceptions.createFileNotFoundException(
           bucketName, objectName, new IOException(msg, error));
@@ -152,7 +162,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   @Override
   public int read(ByteBuffer byteBuffer) throws IOException {
-    logger.atFine().log("GCS gRPC read request for up to %d bytes, from object at offset %d",
+    logger.atFine().log(
+        "GCS gRPC read request for up to %d bytes, from object at offset %d",
         byteBuffer.remaining(), position());
 
     if (!isOpen()) {
@@ -174,11 +185,12 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       return bytesRead > 0 ? bytesRead : -1;
     }
     if (resIterator == null) {
-      GetObjectMediaRequest.Builder requestBuilder = GetObjectMediaRequest.newBuilder()
-          .setBucket(bucketName)
-          .setObject(objectName)
-          .setGeneration(objectGeneration)
-          .setReadOffset(position);
+      GetObjectMediaRequest.Builder requestBuilder =
+          GetObjectMediaRequest.newBuilder()
+              .setBucket(bucketName)
+              .setObject(objectName)
+              .setGeneration(objectGeneration)
+              .setReadOffset(position);
       if (readOptions.getFadvise() == Fadvise.RANDOM) {
         requestBuilder.setReadLimit(byteBuffer.remaining());
       }
@@ -285,10 +297,12 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     if (!isOpen()) {
       throw new ClosedChannelException();
     }
-    Preconditions.checkArgument(newPosition >= 0, "Read position must be non-negative, but was %s",
-        newPosition);
-    Preconditions.checkArgument(newPosition < size(),
-        "Read position must be before end of file (%s), but was %s", size(), newPosition);
+    Preconditions.checkArgument(
+        newPosition >= 0, "Read position must be non-negative, but was %s", newPosition);
+    Preconditions.checkArgument(
+        newPosition < size(),
+        "Read position must be before end of file (%s), but was %s",
+        size(), newPosition);
     if (newPosition == position) {
       return this;
     }
