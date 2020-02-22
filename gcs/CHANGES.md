@@ -28,6 +28,8 @@
 1.  Always set `generation` parameter for read requests and remove
     `fs.gs.generation.read.consistency` property.
 
+1.  Use Slf4j backend by default for Google Flogger.
+
 ### 2.0.1 - 2020-02-13
 
 1.  Cooperative Locking FSCK tool: fix recovery of operations that failed before
