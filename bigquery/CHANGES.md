@@ -8,10 +8,12 @@
 
 1.  Remove Log4j backend for Google Flogger.
 
-1.  Add properties to override Google Cloud API endpoints: 
+1.  Add properties to override Google Cloud API endpoints:
 
         mapred.bq.bigquery.root.url
         mapred.bq.token.server.url
+
+1.  Use Slf4j backend by default for Google Flogger.
 
 ### 1.0.1 - 2020-02-13
 
