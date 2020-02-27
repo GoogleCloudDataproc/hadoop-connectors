@@ -8,7 +8,7 @@
 
 1.  Remove Log4j backend for Google Flogger.
 
-1.  Add properties to override Google Cloud API endpoints: 
+1.  Add properties to override Google Cloud API endpoints:
 
         fs.gs.storage.root.url
         fs.gs.token.server.url
@@ -27,6 +27,10 @@
 
 1.  Always set `generation` parameter for read requests and remove
     `fs.gs.generation.read.consistency` property.
+
+1.  Always use URI path encoding and remove `fs.gs.path.encoding` property.
+
+1.  Use Slf4j backend by default for Google Flogger.
 
 ### 2.0.1 - 2020-02-13
 
