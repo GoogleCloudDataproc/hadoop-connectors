@@ -1349,6 +1349,45 @@ public class GoogleCloudStorageTest {
   }
 
   @Test
+  public void testOverwriteExistingObject() throws IOException {
+    String bucketName = getSharedBucketName();
+
+    StorageResourceId objectToOverwrite =
+        new StorageResourceId(bucketName, "testOverwriteExistingObject_Object");
+    writeObject(rawStorage, objectToOverwrite, /* objectSize= */ 128);
+
+    byte[] overwriteBytesToWrite =
+        writeObject(rawStorage, objectToOverwrite, /* objectSize= */ 256);
+
+    assertObjectContent(rawStorage, objectToOverwrite, overwriteBytesToWrite);
+  }
+
+  @Test
+  public void testMoveSingleItem() throws IOException {
+    String bucketName = getSharedBucketName();
+
+    StorageResourceId srcObjectToMove =
+        new StorageResourceId(bucketName, "testMoveSingleItem_SourceObject");
+    byte[] objectBytes = writeObject(rawStorage, srcObjectToMove, /* objectSize= */ 4096);
+
+    StorageResourceId dstObjectToMove =
+        new StorageResourceId(bucketName, "testMoveSingleItem_DestinationObject");
+    rawStorage.copy(
+        bucketName, ImmutableList.of(srcObjectToMove.getObjectName()),
+        bucketName, ImmutableList.of(dstObjectToMove.getObjectName()));
+
+    assertObjectContent(rawStorage, dstObjectToMove, objectBytes);
+
+    GoogleCloudStorageItemInfo info = rawStorage.getItemInfo(srcObjectToMove);
+    assertThat(info.exists()).isTrue();
+
+    rawStorage.deleteObjects(ImmutableList.of(srcObjectToMove));
+
+    GoogleCloudStorageItemInfo deletedInfo = rawStorage.getItemInfo(srcObjectToMove);
+    assertThat(deletedInfo.exists()).isFalse();
+  }
+
+  @Test
   public void testCompose() throws Exception {
     String bucketName = getSharedBucketName();
 
