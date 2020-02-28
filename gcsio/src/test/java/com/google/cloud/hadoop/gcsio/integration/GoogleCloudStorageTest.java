@@ -1248,6 +1248,107 @@ public class GoogleCloudStorageTest {
   }
 
   @Test
+  public void testGetBeforeAndAfterCreateObject() throws IOException {
+    String bucketName = getSharedBucketName();
+
+    // Verify the bucket exist by creating an object
+    StorageResourceId objectToCreate =
+        new StorageResourceId(bucketName, "testGetCreateGetObject_Object");
+    GoogleCloudStorageItemInfo itemInfo = rawStorage.getItemInfo(objectToCreate);
+    assertThat(itemInfo.exists()).isFalse();
+
+    byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
+    assertObjectContent(rawStorage, objectToCreate, objectBytes);
+
+    itemInfo = rawStorage.getItemInfo(objectToCreate);
+    assertThat(itemInfo.exists()).isTrue();
+    assertThat(itemInfo.getSize()).isEqualTo(512);
+  }
+
+  @Test
+  public void testGetMultipleBeforeAndAfterCreateObject() throws IOException {
+    String bucketName = getSharedBucketName();
+
+    List<StorageResourceId> objectsCreated = new ArrayList<>();
+
+    for (int i = 0; i < 3; i++) {
+      StorageResourceId objectToCreate =
+          new StorageResourceId(bucketName, "testGetMultipleBNACreate_Object" + i);
+      objectsCreated.add(objectToCreate);
+    }
+
+    List<GoogleCloudStorageItemInfo> allInfo = rawStorage.getItemInfos(objectsCreated);
+    for (GoogleCloudStorageItemInfo itemInfo : allInfo) {
+      assertThat(itemInfo.exists()).isFalse();
+    }
+
+    for (StorageResourceId objectToCreate : objectsCreated) {
+      rawStorage.createEmptyObject(objectToCreate);
+    }
+
+    allInfo = rawStorage.getItemInfos(objectsCreated);
+    for (int i = 0; i < objectsCreated.size(); i++) {
+      StorageResourceId resourceId = objectsCreated.get(i);
+      GoogleCloudStorageItemInfo info = allInfo.get(i);
+
+      assertThat(info.getResourceId()).isEqualTo(resourceId);
+      assertThat(info.getSize()).isEqualTo(0);
+      assertWithMessage("Item should exist").that(info.exists()).isTrue();
+      assertThat(info.getCreationTime()).isNotEqualTo(0);
+      assertThat(info.isBucket()).isFalse();
+    }
+  }
+
+  @Test
+  public void testListObjectInfoBeforeAndAfterCreate() throws IOException {
+    String bucketName = getSharedBucketName();
+    String ObjectName = "testListObjectInfoLimitedBNACreate_";
+    List<StorageResourceId> objectsToCreate = new ArrayList<>();
+
+    String[] names = {"x", "y", "z"};
+    for (String name : names) {
+      StorageResourceId objectToCreate = new StorageResourceId(bucketName, ObjectName + name);
+      objectsToCreate.add(objectToCreate);
+    }
+
+    List<GoogleCloudStorageItemInfo> info =
+        rawStorage.listObjectInfo(bucketName, ObjectName, "/", 2);
+    assertThat(info).hasSize(0);
+
+    for (StorageResourceId objectToCreate : objectsToCreate) {
+      rawStorage.createEmptyObject(objectToCreate);
+    }
+    info = rawStorage.listObjectInfo(bucketName, ObjectName, "/", 2);
+    assertThat(info).hasSize(2);
+  }
+
+  @Test
+  public void testlistObjectInfoPageBeforeAndAfterCreate() throws IOException {
+    String bucketName = getSharedBucketName();
+
+    StorageResourceId objectToCreate =
+        new StorageResourceId(bucketName, "testListObjectInfoPageBNACreate_Object");
+
+    ListPage<GoogleCloudStorageItemInfo> listedObjectsPage =
+        rawStorage.listObjectInfoPage(
+            bucketName, "testListObjectInfoPageBNACreate_Object", "/", "");
+
+    assertThat(listedObjectsPage.getNextPageToken()).isNull();
+    assertThat(listedObjectsPage.getItems()).hasSize(0);
+
+    writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
+
+    listedObjectsPage =
+        rawStorage.listObjectInfoPage(
+            bucketName, "testListObjectInfoPageBNACreate_Object", "/", "");
+
+    assertThat(listedObjectsPage.getNextPageToken()).isNull();
+    assertThat(listedObjectsPage.getItems()).hasSize(1);
+    assertThat(listedObjectsPage.getItems().get(0).getObjectName())
+        .isEqualTo(objectToCreate.getObjectName());
+  }
+
+  @Test
   public void testCompose() throws Exception {
     String bucketName = getSharedBucketName();
 
