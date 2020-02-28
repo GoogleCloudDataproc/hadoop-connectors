@@ -33,13 +33,16 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.util.Iterator;
+import java.util.OptionalInt;
 import javax.annotation.Nullable;
 
 public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   // Context of the request that returned resIterator.
-  @Nullable CancellableContext requestContext;
+  @Nullable
+  CancellableContext requestContext;
+  Fadvise readStrategy;
   // GCS gRPC stub.
   private StorageBlockingStub stub;
   // Name of the bucket containing the object being read.
@@ -60,10 +63,12 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   private long bytesToSkipBeforeReading = 0;
   // The user may have read less data than we received from the server. If that's the case, we keep
   // the most recently received content and a reference to how much of it we've returned so far.
-  @Nullable private ByteString bufferedContent = null;
+  @Nullable
+  private ByteString bufferedContent = null;
   private int bufferedContentReadOffset = 0;
   // The streaming read operation. If null, there is not an in-flight read in progress.
-  @Nullable private Iterator<GetObjectMediaResponse> resIterator = null;
+  @Nullable
+  private Iterator<GetObjectMediaResponse> resIterator = null;
   // Fine-grained options.
   private GoogleCloudStorageReadOptions readOptions;
 
@@ -80,6 +85,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     this.objectGeneration = objectGeneration;
     this.objectSize = objectSize;
     this.readOptions = readOptions;
+    this.readStrategy = readOptions.getFadvise();
   }
 
   public static GoogleCloudStorageGrpcReadChannel open(
@@ -185,29 +191,13 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       return bytesRead > 0 ? bytesRead : -1;
     }
     if (resIterator == null) {
-      GetObjectMediaRequest.Builder requestBuilder =
-          GetObjectMediaRequest.newBuilder()
-              .setBucket(bucketName)
-              .setObject(objectName)
-              .setGeneration(objectGeneration)
-              .setReadOffset(position);
-      if (readOptions.getFadvise() == Fadvise.RANDOM) {
-        requestBuilder.setReadLimit(byteBuffer.remaining());
+      OptionalInt bytesToRead;
+      if (readStrategy == Fadvise.RANDOM) {
+        bytesToRead = OptionalInt.of(byteBuffer.remaining());
+      } else {
+        bytesToRead = OptionalInt.empty();
       }
-      GetObjectMediaRequest request = requestBuilder.build();
-      try {
-        // TODO: Validate that it's legal to detach a context and then read from the response
-        //   stream afterward.
-        CancellableContext requestContext = Context.current().withCancellation();
-        Context toReattach = requestContext.attach();
-        try {
-          resIterator = stub.getObjectMedia(request);
-        } finally {
-          requestContext.detach(toReattach);
-        }
-      } catch (StatusRuntimeException e) {
-        throw convertError(e, bucketName, objectName);
-      }
+      requestObjectMedia(bytesToRead);
     }
     while (moreServerContent()) {
       GetObjectMediaResponse res = resIterator.next();
@@ -258,6 +248,42 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     return bytesRead;
   }
 
+  private void requestObjectMedia(OptionalInt bytesToRead) throws IOException {
+    GetObjectMediaRequest.Builder requestBuilder =
+        GetObjectMediaRequest.newBuilder()
+            .setBucket(bucketName)
+            .setObject(objectName)
+            .setGeneration(objectGeneration)
+            .setReadOffset(position);
+    if (bytesToRead.isPresent()) {
+      requestBuilder.setReadLimit(bytesToRead.getAsInt());
+    }
+    GetObjectMediaRequest request = requestBuilder.build();
+    try {
+      // TODO: Validate that it's legal to detach a context and then read from the response
+      //   stream afterward.
+      requestContext = Context.current().withCancellation();
+      Context toReattach = requestContext.attach();
+      try {
+        resIterator = stub.getObjectMedia(request);
+      } finally {
+        requestContext.detach(toReattach);
+      }
+    } catch (StatusRuntimeException e) {
+      throw convertError(e, bucketName, objectName);
+    }
+  }
+
+  private void cancelCurrentRequest() {
+    if (requestContext != null) {
+      requestContext.close();
+      requestContext = null;
+    }
+    if (resIterator != null) {
+      resIterator = null;
+    }
+  }
+
   /**
    * Waits until more data is available from the server, or returns false if read is done.
    *
@@ -268,7 +294,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     try {
       return resIterator.hasNext();
     } catch (StatusRuntimeException e) {
-      resIterator = null; // We'll want to start a fresh request next time.
+      cancelCurrentRequest();
       throw convertError(e, bucketName, objectName);
     }
   }
@@ -308,17 +334,25 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     }
 
     long seekDistance = newPosition - position;
+
+    if (readStrategy == Fadvise.AUTO) {
+      if (seekDistance < 0 || seekDistance > readOptions.getInplaceSeekLimit()) {
+        readStrategy = Fadvise.RANDOM;
+      }
+    }
+
     if (seekDistance > 0 && seekDistance < readOptions.getInplaceSeekLimit()) {
       bytesToSkipBeforeReading = seekDistance;
       return this;
     }
 
-    this.position = newPosition;
-    // Reset any ongoing reads.
+    // Reset any ongoing read operations or local data caches.
+    cancelCurrentRequest();
     this.bufferedContent = null;
     this.bufferedContentReadOffset = 0;
     this.bytesToSkipBeforeReading = 0;
-    this.resIterator = null;
+
+    this.position = newPosition;
     return this;
   }
 
@@ -347,16 +381,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   @Override
   public void close() throws IOException {
-    if (requestContext != null) {
-      requestContext.close();
-      requestContext = null;
-    }
-    if (resIterator != null) {
-      while (resIterator.hasNext()) {
-        resIterator.next();
-      }
-      resIterator = null;
-    }
+    cancelCurrentRequest();
     channelIsOpen = false;
   }
 }
