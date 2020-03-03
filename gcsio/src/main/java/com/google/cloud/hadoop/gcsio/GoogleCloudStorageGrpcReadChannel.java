@@ -260,8 +260,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     }
     GetObjectMediaRequest request = requestBuilder.build();
     try {
-      // TODO: Validate that it's legal to detach a context and then read from the response
-      //   stream afterward.
       requestContext = Context.current().withCancellation();
       Context toReattach = requestContext.attach();
       try {
