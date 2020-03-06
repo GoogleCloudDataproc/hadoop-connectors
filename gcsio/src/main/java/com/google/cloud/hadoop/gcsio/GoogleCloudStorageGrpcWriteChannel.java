@@ -57,10 +57,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
     extends BaseAbstractGoogleAsyncWriteChannel<Object>
     implements GoogleCloudStorageItemInfo.Provider {
   // Default GCS upload granularity.
-  public static final int GCS_MINIMUM_CHUNK_SIZE = 256 * 1024;
+  static final int GCS_MINIMUM_CHUNK_SIZE = 256 * 1024;
 
   // Chunk size to use.
-  protected volatile int uploadChunkSize = UPLOAD_CHUNK_SIZE_DEFAULT;
+  private volatile int uploadChunkSize = UPLOAD_CHUNK_SIZE_DEFAULT;
 
   private final Object object;
   private final ObjectWriteConditions writeConditions;
@@ -106,7 +106,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
   @Override
   public void setUploadChunkSize(int chunkSize) {
-    Preconditions.checkArgument(chunkSize > 0, "Upload chunk size must be great than 0.");
+    Preconditions.checkArgument(chunkSize > 0, "Upload chunk size must be greater than 0.");
     Preconditions.checkArgument(
         chunkSize % GCS_MINIMUM_CHUNK_SIZE == 0,
         "Upload chunk size must be a multiple of GCS_MINIMUM_CHUNK_SIZE");
@@ -159,7 +159,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
   }
 
   @Override
-  public void startUpload(PipedInputStream pipeSource) throws IOException {
+  public void startUpload(PipedInputStream pipeSource) {
     // Given that the two ends of the pipe must operate asynchronous relative
     // to each other, we need to start the upload operation on a separate thread.
     uploadOperation = threadPool.submit(new UploadOperation(pipeSource));
@@ -169,7 +169,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     // Read end of the pipe.
     private final BufferedInputStream pipeSource;
 
-    public UploadOperation(InputStream pipeSource) {
+    UploadOperation(InputStream pipeSource) {
       // Buffer the input stream by 1 byte so we can peek ahead for the end of the stream.
       this.pipeSource = new BufferedInputStream(pipeSource, 1);
     }
@@ -185,13 +185,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
     private Object doResumableUpload() throws IOException, InterruptedException {
       // Send the initial StartResumableWrite request to get an uploadId.
-      String uploadId = getUploadId();
-      // Protect against chunkSize changing mid RPC.
+      String uploadId = startResumableUpload();
+      // Protect against chunkSize changing mid-RPC.
       int chunkSize = uploadChunkSize;
       InsertChunkResponseObserver responseObserver;
-      // This ByteString holds all the data for the current streaming RPC that hasn't
-      // yet been confirmed committed. This should never be larger than `chunkSize`
-      // defined above.
       ByteString chunkData = ByteString.EMPTY;
       long writeOffset = 0;
       Hasher objectHasher = Hashing.crc32c().newHasher();
@@ -202,25 +199,21 @@ public final class GoogleCloudStorageGrpcWriteChannel
         stub.insertObject(responseObserver);
         responseObserver.done.await();
 
-        chunkData = responseObserver.getChunkData();
-        // We can assume all bytes were written on a successful final request.
-        long bytesCommitted =
-            responseObserver.isFinished()
-                ? writeOffset + chunkData.size()
-                : getCommittedWriteSize(uploadId);
-
-        // This should never fail since uploadChunkSize is an int.
-        int chunkBytesCommitted = Math.toIntExact(bytesCommitted - writeOffset);
         if (checksumsEnabled && !responseObserver.isFinished()) {
-          for (ByteBuffer buffer : chunkData.asReadOnlyByteBufferList()) {
+          for (ByteBuffer buffer : responseObserver.getChunkData().asReadOnlyByteBufferList()) {
+            // TODO(b/7502351): Switch to "concatenating" the chunk-level crc32c values if/when the
+            // hashing library supports that, to avoid re-scanning all data bytes when computing the
+            // object-level crc32c.
             objectHasher.putBytes(buffer);
           }
         }
-        chunkData = chunkData.substring(chunkBytesCommitted);
-        writeOffset = bytesCommitted;
+        chunkData = chunkData.substring(chunkData.size());
+        writeOffset += chunkData.size();
       } while (!responseObserver.isFinished());
 
       if (responseObserver.hasError()) {
+        // TODO(b/150892988): Hold on to some amount (possibly flag-controlled) of sent buffers and
+        // attempt to resume the upload after a transient error.
         logger.atSevere().withCause(responseObserver.getError()).log("Error:");
         throw new IOException("Insert failed", responseObserver.getError());
       }
@@ -291,12 +284,12 @@ public final class GoogleCloudStorageGrpcWriteChannel
                   ChecksummedData.Builder requestDataBuilder =
                       ChecksummedData.newBuilder().setContent(data);
                   if (checksumsEnabled) {
-                    Hasher hasher = Hashing.crc32c().newHasher();
+                    Hasher chunkHasher = Hashing.crc32c().newHasher();
                     for (ByteBuffer buffer : data.asReadOnlyByteBufferList()) {
-                      hasher.putBytes(buffer);
+                      chunkHasher.putBytes(buffer);
                     }
-                    int checksum = hasher.hash().asInt();
-                    requestDataBuilder.setCrc32C(UInt32Value.newBuilder().setValue(checksum));
+                    requestDataBuilder.setCrc32C(UInt32Value.newBuilder().setValue(
+                        chunkHasher.hash().asInt()));
                   }
                   requestBuilder.setChecksummedData(requestDataBuilder);
                   chunkBytesWritten += data.size();
@@ -308,6 +301,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
                     // For the final request, we need to update the hash now so we can add the
                     // final object checksum to the request.
                     for (ByteBuffer buffer : data.asReadOnlyByteBufferList()) {
+                      // TODO(b/7502351): Switch to "concatenating" the chunk-level crc32c values
+                      //  if/when the hashing library supports that, to avoid re-scanning all data
+                      //  bytes when computing the object-level crc32c.
                       objectHasher.putBytes(buffer);
                     }
                     requestBuilder.setObjectChecksums(
@@ -333,6 +329,13 @@ public final class GoogleCloudStorageGrpcWriteChannel
                     Math.min(Math.max(chunkSize - chunkData.size(), 0), maxBytesToRead);
                 int bytesRead = readChunkData(bytesToRead);
 
+                if (chunkData.size() > MAX_BYTES_PER_REQUEST) {
+                  throw new IOException(String.format(
+                      "getRequestData built too large of a buffer: initialBytes=%d, "
+                      + "maxBytesToRead=%d, bytesToRead=%d, bytesRead=%d, chunkData.size()=%d, "
+                      + "MAX_BYTES_PER_REQUEST=%d", initialBytes, maxBytesToRead, bytesToRead,
+                      bytesRead, chunkData.size(), MAX_BYTES_PER_REQUEST));
+                }
                 return chunkData.substring(
                     chunkBytesWritten, chunkBytesWritten + initialBytes + bytesRead);
               }
@@ -374,7 +377,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
         return response;
       }
 
-      public boolean hasError() {
+      boolean hasError() {
         return error != null;
       }
 
@@ -385,11 +388,11 @@ public final class GoogleCloudStorageGrpcWriteChannel
         return error;
       }
 
-      public boolean isFinished() {
+      boolean isFinished() {
         return objectFinalized || hasError();
       }
 
-      public ByteString getChunkData() {
+      ByteString getChunkData() {
         return chunkData;
       }
 
@@ -411,7 +414,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     }
 
     /** Send a StartResumableWriteRequest and return the uploadId of the resumable write. */
-    private String getUploadId() throws InterruptedException, IOException {
+    private String startResumableUpload() throws InterruptedException, IOException {
       InsertObjectSpec.Builder insertObjectSpecBuilder =
           InsertObjectSpec.newBuilder().setResource(object);
       if (writeConditions.hasContentGenerationMatch()) {
@@ -443,6 +446,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       return responseObserver.getResponse().getUploadId();
     }
 
+    // TODO(b/150892988): Call this to find resume point after a transient error.
     private long getCommittedWriteSize(String uploadId) throws InterruptedException, IOException {
       QueryWriteStatusRequest request =
           QueryWriteStatusRequest.newBuilder().setUploadId(uploadId).build();
@@ -482,7 +486,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
         return response;
       }
 
-      public boolean hasError() {
+      boolean hasError() {
         return error != null;
       }
 
