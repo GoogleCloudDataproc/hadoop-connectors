@@ -193,7 +193,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
         //     committed offset (per call to getCommittedWriteSize); (b) remove chunks from the list
         //     that have been persisted.
         //  3. Limit the list size to some number (possibly flag-controlled) of sent chunks.
-        logger.atSevere().withCause(responseObserver.getError()).log("Error:");
         throw new IOException("Insert failed", responseObserver.getError());
       }
 
