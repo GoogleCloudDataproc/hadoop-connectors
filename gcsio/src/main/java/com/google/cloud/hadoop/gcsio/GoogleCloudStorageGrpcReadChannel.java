@@ -40,8 +40,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   // Context of the request that returned resIterator.
-  @Nullable
-  CancellableContext requestContext;
+  @Nullable CancellableContext requestContext;
   Fadvise readStrategy;
   // GCS gRPC stub.
   private StorageBlockingStub stub;
@@ -63,12 +62,10 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   private long bytesToSkipBeforeReading = 0;
   // The user may have read less data than we received from the server. If that's the case, we keep
   // the most recently received content and a reference to how much of it we've returned so far.
-  @Nullable
-  private ByteString bufferedContent = null;
+  @Nullable private ByteString bufferedContent = null;
   private int bufferedContentReadOffset = 0;
   // The streaming read operation. If null, there is not an in-flight read in progress.
-  @Nullable
-  private Iterator<GetObjectMediaResponse> resIterator = null;
+  @Nullable private Iterator<GetObjectMediaResponse> resIterator = null;
   // Fine-grained options.
   private GoogleCloudStorageReadOptions readOptions;
 
