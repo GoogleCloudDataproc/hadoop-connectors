@@ -93,9 +93,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
   @Override
   public void setDirectUploadEnabled(boolean enableDirectUpload) {
-    if (enableDirectUpload) {
-      throw new UnsupportedOperationException("Direct upload not supported.");
-    }
+    // Currently a no-op.
+    // TODO(b/150978433): Make this option switch the implementation to use non-resumable uploads,
+    // which can reduce latency for customers whose objects are of modest size.
+
   }
 
   @Override
