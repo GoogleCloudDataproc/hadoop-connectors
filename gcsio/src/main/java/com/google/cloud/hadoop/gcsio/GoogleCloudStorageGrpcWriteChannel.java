@@ -59,8 +59,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
   // Default GCS upload granularity.
   public static final int GCS_MINIMUM_CHUNK_SIZE = 256 * 1024;
 
-  // Chunk size to use.
-  protected volatile int uploadChunkSize = UPLOAD_CHUNK_SIZE_DEFAULT;
 
   private final Object object;
   private final ObjectWriteConditions writeConditions;
@@ -96,9 +94,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
   @Override
   public void setDirectUploadEnabled(boolean enableDirectUpload) {
-    // TODO(b/135137933): Figure out if we need to support non-resumable uploads.
-    // It doesn't look as if the connector uses it at all, but there's code
-    // to support it, so maybe I'm missing something.
     if (enableDirectUpload) {
       throw new UnsupportedOperationException("Direct upload not supported.");
     }
@@ -106,16 +101,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
   @Override
   public void setUploadChunkSize(int chunkSize) {
-    Preconditions.checkArgument(chunkSize > 0, "Upload chunk size must be great than 0.");
-    Preconditions.checkArgument(
-        chunkSize % GCS_MINIMUM_CHUNK_SIZE == 0,
-        "Upload chunk size must be a multiple of GCS_MINIMUM_CHUNK_SIZE");
-    if ((chunkSize > GCS_UPLOAD_GRANULARITY) && (chunkSize % GCS_UPLOAD_GRANULARITY != 0)) {
-      logger.atWarning().log(
-          "Upload chunk size should be a multiple of %s for best performance, got %s",
-          GCS_UPLOAD_GRANULARITY, chunkSize);
-    }
-    uploadChunkSize = chunkSize;
+    // No-op for GCS gRPC - we always upload using a stream of MAX_WRITE_CHUNK_BYTES sized messages.
+    Preconditions.checkArgument(chunkSize > 0, "Upload chunk size must be greater than 0.");
   }
 
   @Override
@@ -186,41 +173,27 @@ public final class GoogleCloudStorageGrpcWriteChannel
     private Object doResumableUpload() throws IOException, InterruptedException {
       // Send the initial StartResumableWrite request to get an uploadId.
       String uploadId = getUploadId();
-      // Protect against chunkSize changing mid RPC.
-      int chunkSize = uploadChunkSize;
       InsertChunkResponseObserver responseObserver;
-      // This ByteString holds all the data for the current streaming RPC that hasn't
-      // yet been confirmed committed. This should never be larger than `chunkSize`
-      // defined above.
-      ByteString chunkData = ByteString.EMPTY;
+
       long writeOffset = 0;
       Hasher objectHasher = Hashing.crc32c().newHasher();
       do {
+        ByteString chunkData = ByteString.EMPTY;
         responseObserver =
-            new InsertChunkResponseObserver(
-                uploadId, chunkData, chunkSize, writeOffset, objectHasher);
+            new InsertChunkResponseObserver(uploadId, chunkData, writeOffset, objectHasher);
         stub.insertObject(responseObserver);
         responseObserver.done.await();
-
-        chunkData = responseObserver.getChunkData();
-        // We can assume all bytes were written on a successful final request.
-        long bytesCommitted =
-            responseObserver.isFinished()
-                ? writeOffset + chunkData.size()
-                : getCommittedWriteSize(uploadId);
-
-        // This should never fail since uploadChunkSize is an int.
-        int chunkBytesCommitted = Math.toIntExact(bytesCommitted - writeOffset);
-        if (checksumsEnabled && !responseObserver.isFinished()) {
-          for (ByteBuffer buffer : chunkData.asReadOnlyByteBufferList()) {
-            objectHasher.putBytes(buffer);
-          }
-        }
-        chunkData = chunkData.substring(chunkBytesCommitted);
-        writeOffset = bytesCommitted;
+        writeOffset += responseObserver.bytesWritten();
       } while (!responseObserver.isFinished());
 
       if (responseObserver.hasError()) {
+        // TODO(b/150892988): Support resuming an upload after a transient error as follows:
+        //  1. Build a wrapper class around the ByteString (or subclass it), and keep track of the
+        //     start offset of each chunk.
+        //  2. Build a list of chunks, and (a) use it for rewinding when restarting at last
+        //     committed offset (per call to getCommittedWriteSize); (b) remove chunks from the list
+        //     that have been persisted.
+        //  3. Limit the list size to some number (possibly flag-controlled) of sent chunks.
         logger.atSevere().withCause(responseObserver.getError()).log("Error:");
         throw new IOException("Insert failed", responseObserver.getError());
       }
@@ -231,10 +204,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
     /** Handler for responses from the Insert streaming RPC. */
     private class InsertChunkResponseObserver
         implements ClientResponseObserver<InsertObjectRequest, Object> {
-      private final int MAX_BYTES_PER_REQUEST = MAX_WRITE_CHUNK_BYTES.getNumber();
 
-      private final long chunkStart;
-      private final int chunkSize;
+      private final int MAX_BYTES_PER_MESSAGE = MAX_WRITE_CHUNK_BYTES.getNumber();
+
+      private final long writeOffset;
       private final String uploadId;
       private volatile boolean objectFinalized = false;
       // The last error to occur during the streaming RPC. Present only on error.
@@ -243,8 +216,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
       private Object response;
       private ByteString chunkData;
       private Hasher objectHasher;
-      // The number of bytes written in this streaming RPC.
-      private int chunkBytesWritten = 0;
 
       // CountDownLatch tracking completion of the streaming RPC. Set on error, or once the request
       // stream is closed.
@@ -253,14 +224,12 @@ public final class GoogleCloudStorageGrpcWriteChannel
       InsertChunkResponseObserver(
           String uploadId,
           ByteString chunkData,
-          int chunkSize,
-          long chunkStart,
+          long writeOffset,
           Hasher objectHasher) {
         this.uploadId = uploadId;
-        this.chunkSize = chunkSize;
-        this.chunkStart = chunkStart;
-        this.objectHasher = objectHasher;
         this.chunkData = chunkData;
+        this.writeOffset = writeOffset;
+        this.objectHasher = objectHasher;
       }
 
       @Override
@@ -269,14 +238,13 @@ public final class GoogleCloudStorageGrpcWriteChannel
             new Runnable() {
               @Override
               public void run() {
-                if (chunkFinished()) {
+                if (objectFinalized) {
                   // onReadyHandler may be called after we've closed the request half of the stream.
                   return;
                 }
 
-                ByteString data;
                 try {
-                  data = getRequestData();
+                  chunkData = readRequestData();
                 } catch (IOException e) {
                   error = e;
                   return;
@@ -285,31 +253,31 @@ public final class GoogleCloudStorageGrpcWriteChannel
                 InsertObjectRequest.Builder requestBuilder =
                     InsertObjectRequest.newBuilder()
                         .setUploadId(uploadId)
-                        .setWriteOffset(chunkStart + chunkBytesWritten);
+                        .setWriteOffset(writeOffset);
 
-                if (data.size() > 0) {
+                if (chunkData.size() > 0) {
                   ChecksummedData.Builder requestDataBuilder =
-                      ChecksummedData.newBuilder().setContent(data);
+                      ChecksummedData.newBuilder().setContent(chunkData);
                   if (checksumsEnabled) {
-                    Hasher hasher = Hashing.crc32c().newHasher();
-                    for (ByteBuffer buffer : data.asReadOnlyByteBufferList()) {
-                      hasher.putBytes(buffer);
+                    Hasher chunkHasher = Hashing.crc32c().newHasher();
+                    for (ByteBuffer buffer : chunkData.asReadOnlyByteBufferList()) {
+                      chunkHasher.putBytes(buffer);
                     }
-                    int checksum = hasher.hash().asInt();
-                    requestDataBuilder.setCrc32C(UInt32Value.newBuilder().setValue(checksum));
+                    for (ByteBuffer buffer : chunkData.asReadOnlyByteBufferList()) {
+                      // TODO(b/7502351): Switch to "concatenating" the chunk-level crc32c values
+                      //  if/when the hashing library supports that, to avoid re-scanning all data
+                      //  bytes when computing the object-level crc32c.
+                      objectHasher.putBytes(buffer);
+                    }
+                    requestDataBuilder.setCrc32C(UInt32Value.newBuilder().setValue(
+                        chunkHasher.hash().asInt()));
                   }
                   requestBuilder.setChecksummedData(requestDataBuilder);
-                  chunkBytesWritten += data.size();
                 }
 
                 if (objectFinalized) {
-                  requestBuilder.setFinishWrite(objectFinalized);
+                  requestBuilder.setFinishWrite(true);
                   if (checksumsEnabled) {
-                    // For the final request, we need to update the hash now so we can add the
-                    // final object checksum to the request.
-                    for (ByteBuffer buffer : data.asReadOnlyByteBufferList()) {
-                      objectHasher.putBytes(buffer);
-                    }
                     requestBuilder.setObjectChecksums(
                         ObjectChecksums.newBuilder()
                             .setCrc32C(
@@ -318,53 +286,25 @@ public final class GoogleCloudStorageGrpcWriteChannel
                 }
                 requestObserver.onNext(requestBuilder.build());
 
-                if (chunkFinished()) {
+                if (objectFinalized) {
                   // Close the request half of the streaming RPC.
                   requestObserver.onCompleted();
                 }
               }
 
-              private ByteString getRequestData() throws IOException {
-                // Read into chunkData until it has MAX_BYTES_PER_REQUEST or the InputStream is
-                // finished.
-                int initialBytes = Math.max(chunkData.size() - chunkBytesWritten, 0);
-                int maxBytesToRead = Math.max(MAX_BYTES_PER_REQUEST - initialBytes, 0);
-                int bytesToRead =
-                    Math.min(Math.max(chunkSize - chunkData.size(), 0), maxBytesToRead);
-                int bytesRead = readChunkData(bytesToRead);
-
-                return chunkData.substring(
-                    chunkBytesWritten, chunkBytesWritten + initialBytes + bytesRead);
-              }
-
-              private int readChunkData(int bytesToRead) throws IOException {
-                InputStream limitedStream = ByteStreams.limit(pipeSource, bytesToRead);
-                ByteString newData = ByteString.readFrom(limitedStream);
-                int bytesRead = newData.size();
-                chunkData = chunkData.concat(newData);
-
-                // Verify that chunkData never gets larger than the amount of data we're sending in
-                // the current RPC (so we don't have a memory leak).
-                Preconditions.checkState(chunkData.size() <= chunkSize);
+              private ByteString readRequestData() throws IOException {
+                ByteString data = ByteString.readFrom(
+                    ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE));
 
                 // Set objectFinalized if there is no more data, looking ahead 1 byte in the buffer
-                // if neccessary. This lets us avoid sending an extra request with no data just to
+                // if necessary. This lets us avoid sending an extra request with no data just to
                 // set the finish_write flag.
                 pipeSource.mark(1);
-                objectFinalized = bytesRead < bytesToRead || pipeSource.read() == -1;
+                objectFinalized = data.size() < MAX_BYTES_PER_MESSAGE || pipeSource.read() == -1;
                 pipeSource.reset();
-
-                return bytesRead;
-              }
-
-              private boolean chunkFinished() {
-                return objectFinalized || chunkData.size() == chunkSize;
+                return data;
               }
             });
-      }
-
-      public boolean hasResponse() {
-        return response != null;
       }
 
       public Object getResponse() {
@@ -378,6 +318,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
         return error != null;
       }
 
+      int bytesWritten() {
+        return chunkData.size();
+      }
+
       public Throwable getError() {
         if (error == null) {
           throw new IllegalStateException("Error not present.");
@@ -387,10 +331,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       public boolean isFinished() {
         return objectFinalized || hasError();
-      }
-
-      public ByteString getChunkData() {
-        return chunkData;
       }
 
       @Override
@@ -443,6 +383,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       return responseObserver.getResponse().getUploadId();
     }
 
+    // TODO(b/150892988): Call this to find resume point after a transient error.
     private long getCommittedWriteSize(String uploadId) throws InterruptedException, IOException {
       QueryWriteStatusRequest request =
           QueryWriteStatusRequest.newBuilder().setUploadId(uploadId).build();
@@ -470,10 +411,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       // CountDownLatch tracking completion of the RPC.
       final CountDownLatch done = new CountDownLatch(1);
-
-      public boolean hasResponse() {
-        return response != null;
-      }
 
       public T getResponse() {
         if (response == null) {
