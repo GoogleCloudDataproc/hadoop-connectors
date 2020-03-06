@@ -147,7 +147,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   @Test
   public void writeSendsMultipleInsertObjectRequests() throws Exception {
     GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
-    int chunkSize = writeChannel.GCS_MINIMUM_CHUNK_SIZE;
+    int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
                 QueryWriteStatusResponse.newBuilder().setCommittedSize(chunkSize).build(),
@@ -170,11 +170,11 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   @Test
   public void writeSendsMultipleInsertObjectRequestsWithChecksums() throws Exception {
     AsyncWriteChannelOptions options =
-        AsyncWriteChannelOptions.newBuilder().setGrpcChecksumsEnabled(true).build();
+        AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
     ObjectWriteConditions writeConditions = new ObjectWriteConditions();
     GoogleCloudStorageGrpcWriteChannel writeChannel =
         newWriteChannel(options, writeConditions, Optional.absent());
-    int chunkSize = writeChannel.GCS_MINIMUM_CHUNK_SIZE;
+    int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
                 QueryWriteStatusResponse.newBuilder().setCommittedSize(chunkSize).build(),
@@ -197,7 +197,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   @Test
   public void writeHandlesUncommittedData() throws Exception {
     GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
-    int chunkSize = writeChannel.GCS_MINIMUM_CHUNK_SIZE;
+    int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
                 QueryWriteStatusResponse.newBuilder().setCommittedSize(chunkSize * 3 / 4).build())
@@ -220,7 +220,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
 
   @Test
   public void writeUsesContentGenerationIfProvided() throws Exception {
-    AsyncWriteChannelOptions options = AsyncWriteChannelOptions.newBuilder().build();
+    AsyncWriteChannelOptions options = AsyncWriteChannelOptions.builder().build();
     ObjectWriteConditions writeConditions =
         new ObjectWriteConditions(Optional.of(1L), Optional.absent());
     GoogleCloudStorageGrpcWriteChannel writeChannel =
@@ -240,7 +240,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
 
   @Test
   public void writeUsesMetaGenerationIfProvided() throws Exception {
-    AsyncWriteChannelOptions options = AsyncWriteChannelOptions.newBuilder().build();
+    AsyncWriteChannelOptions options = AsyncWriteChannelOptions.builder().build();
     ObjectWriteConditions writeConditions =
         new ObjectWriteConditions(Optional.absent(), Optional.of(1L));
     GoogleCloudStorageGrpcWriteChannel writeChannel =
@@ -260,7 +260,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
 
   @Test
   public void writeUsesRequesterPaysProjectIfProvided() throws Exception {
-    AsyncWriteChannelOptions options = AsyncWriteChannelOptions.newBuilder().build();
+    AsyncWriteChannelOptions options = AsyncWriteChannelOptions.builder().build();
     ObjectWriteConditions writeConditions = new ObjectWriteConditions();
     GoogleCloudStorageGrpcWriteChannel writeChannel =
         newWriteChannel(options, writeConditions, Optional.of("project-id"));
@@ -300,7 +300,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   @Test
   public void writeHandlesErrorOnQueryWriteStatusRequest() throws Exception {
     GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
-    int chunkSize = writeChannel.GCS_MINIMUM_CHUNK_SIZE;
+    int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
     fakeService.setQueryWriteStatusException(new IOException("Error!"));
     ByteString data = createTestData(chunkSize * 2);
 
@@ -309,7 +309,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   }
 
   @Test
-  public void writeFailsBeforeInitialize() throws Exception {
+  public void writeFailsBeforeInitialize() {
     GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
 
     assertThrows(
@@ -330,14 +330,14 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   }
 
   @Test
-  public void setUploadChunkSizeFailsOnNegative() throws Exception {
+  public void setUploadChunkSizeFailsOnNegative() {
     GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
 
     assertThrows(IllegalArgumentException.class, () -> writeChannel.setUploadChunkSize(-1));
   }
 
   @Test
-  public void closeFailsBeforeInitilize() throws Exception {
+  public void closeFailsBeforeInitilize() {
     GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
 
     assertThrows(IllegalStateException.class, writeChannel::close);
@@ -403,7 +403,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   }
 
   @Test
-  public void isOpenReturnsFalseBeforeInitialize() throws Exception {
+  public void isOpenReturnsFalseBeforeInitialize() {
     GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
 
     assertFalse(writeChannel.isOpen());
@@ -443,7 +443,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   }
 
   private GoogleCloudStorageGrpcWriteChannel newWriteChannel() {
-    AsyncWriteChannelOptions options = AsyncWriteChannelOptions.newBuilder().build();
+    AsyncWriteChannelOptions options = AsyncWriteChannelOptions.builder().build();
     ObjectWriteConditions writeConditions = new ObjectWriteConditions();
 
     return newWriteChannel(options, writeConditions, Optional.absent());
@@ -521,19 +521,19 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
       this.insertRequestObserver.object = object;
     }
 
-    public void setQueryWriteStatusResponses(Iterator<QueryWriteStatusResponse> responses) {
+    void setQueryWriteStatusResponses(Iterator<QueryWriteStatusResponse> responses) {
       queryWriteStatusResponses = responses;
     }
 
-    public void setQueryWriteStatusException(Throwable t) {
+    void setQueryWriteStatusException(Throwable t) {
       queryWriteStatusException = t;
     }
 
-    public void setStartRequestException(Throwable t) {
+    void setStartRequestException(Throwable t) {
       startRequestException = t;
     }
 
-    public void setInsertRequestException(Throwable t) {
+    void setInsertRequestException(Throwable t) {
       insertRequestObserver.insertRequestException = t;
     }
 

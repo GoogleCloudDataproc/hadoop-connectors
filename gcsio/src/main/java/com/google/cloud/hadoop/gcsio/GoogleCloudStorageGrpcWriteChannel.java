@@ -57,8 +57,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     extends BaseAbstractGoogleAsyncWriteChannel<Object>
     implements GoogleCloudStorageItemInfo.Provider {
   // Default GCS upload granularity.
-  public static final int GCS_MINIMUM_CHUNK_SIZE = 256 * 1024;
-
+  static final int GCS_MINIMUM_CHUNK_SIZE = 256 * 1024;
 
   private final Object object;
   private final ObjectWriteConditions writeConditions;
@@ -68,7 +67,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
   private GoogleCloudStorageItemInfo completedItemInfo = null;
 
-  public GoogleCloudStorageGrpcWriteChannel(
+  GoogleCloudStorageGrpcWriteChannel(
       ExecutorService threadPool,
       StorageStub stub,
       String bucketName,
@@ -146,7 +145,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
   }
 
   @Override
-  public void startUpload(PipedInputStream pipeSource) throws IOException {
+  public void startUpload(PipedInputStream pipeSource) {
     // Given that the two ends of the pipe must operate asynchronous relative
     // to each other, we need to start the upload operation on a separate thread.
     uploadOperation = threadPool.submit(new UploadOperation(pipeSource));
@@ -156,7 +155,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     // Read end of the pipe.
     private final BufferedInputStream pipeSource;
 
-    public UploadOperation(InputStream pipeSource) {
+    UploadOperation(InputStream pipeSource) {
       // Buffer the input stream by 1 byte so we can peek ahead for the end of the stream.
       this.pipeSource = new BufferedInputStream(pipeSource, 1);
     }
@@ -172,7 +171,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
     private Object doResumableUpload() throws IOException, InterruptedException {
       // Send the initial StartResumableWrite request to get an uploadId.
-      String uploadId = getUploadId();
+      String uploadId = startResumableUpload();
       InsertChunkResponseObserver responseObserver;
 
       long writeOffset = 0;
@@ -314,7 +313,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
         return response;
       }
 
-      public boolean hasError() {
+      boolean hasError() {
         return error != null;
       }
 
@@ -329,7 +328,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
         return error;
       }
 
-      public boolean isFinished() {
+      boolean isFinished() {
         return objectFinalized || hasError();
       }
 
@@ -351,7 +350,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     }
 
     /** Send a StartResumableWriteRequest and return the uploadId of the resumable write. */
-    private String getUploadId() throws InterruptedException, IOException {
+    private String startResumableUpload() throws InterruptedException, IOException {
       InsertObjectSpec.Builder insertObjectSpecBuilder =
           InsertObjectSpec.newBuilder().setResource(object);
       if (writeConditions.hasContentGenerationMatch()) {
@@ -419,7 +418,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
         return response;
       }
 
-      public boolean hasError() {
+      boolean hasError() {
         return error != null;
       }
 
