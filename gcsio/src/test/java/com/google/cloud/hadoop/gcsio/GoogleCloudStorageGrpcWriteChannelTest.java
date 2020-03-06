@@ -104,7 +104,13 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     InsertObjectRequest expectedInsertRequest =
         InsertObjectRequest.newBuilder()
             .setUploadId(UPLOAD_ID)
-            .setChecksummedData(ChecksummedData.newBuilder().setContent(data))
+            .setChecksummedData(
+                ChecksummedData.newBuilder()
+                    .setContent(data)
+                    .setCrc32C(UInt32Value.newBuilder().setValue(uInt32Value(863614154))))
+            .setObjectChecksums(
+                ObjectChecksums.newBuilder()
+                    .setCrc32C(UInt32Value.newBuilder().setValue(uInt32Value(863614154))))
             .setFinishWrite(true)
             .build();
 
@@ -114,9 +120,9 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   }
 
   @Test
-  public void writeSendsSingleInsertObjectRequestWithChecksums() throws Exception {
+  public void writeSendsSingleInsertObjectRequestWithoutChecksums() throws Exception {
     AsyncWriteChannelOptions options =
-        AsyncWriteChannelOptions.newBuilder().setGrpcChecksumsEnabled(true).build();
+        AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(false).build();
     ObjectWriteConditions writeConditions = new ObjectWriteConditions();
     GoogleCloudStorageGrpcWriteChannel writeChannel =
         newWriteChannel(options, writeConditions, Optional.absent());
@@ -129,13 +135,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     InsertObjectRequest expectedInsertRequest =
         InsertObjectRequest.newBuilder()
             .setUploadId(UPLOAD_ID)
-            .setChecksummedData(
-                ChecksummedData.newBuilder()
-                    .setContent(data)
-                    .setCrc32C(UInt32Value.newBuilder().setValue(uInt32Value(863614154))))
-            .setObjectChecksums(
-                ObjectChecksums.newBuilder()
-                    .setCrc32C(UInt32Value.newBuilder().setValue(uInt32Value(863614154))))
+            .setChecksummedData(ChecksummedData.newBuilder().setContent(data))
             .setFinishWrite(true)
             .build();
 
