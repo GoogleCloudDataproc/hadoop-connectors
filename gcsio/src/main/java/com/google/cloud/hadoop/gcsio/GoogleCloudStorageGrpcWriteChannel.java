@@ -96,7 +96,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
     // Currently a no-op.
     // TODO(b/150978433): Make this option switch the implementation to use non-resumable uploads,
     // which can reduce latency for customers whose objects are of modest size.
-
   }
 
   @Override
@@ -221,10 +220,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       final CountDownLatch done = new CountDownLatch(1);
 
       InsertChunkResponseObserver(
-          String uploadId,
-          ByteString chunkData,
-          long writeOffset,
-          Hasher objectHasher) {
+          String uploadId, ByteString chunkData, long writeOffset, Hasher objectHasher) {
         this.uploadId = uploadId;
         this.chunkData = chunkData;
         this.writeOffset = writeOffset;
@@ -268,8 +264,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
                       //  bytes when computing the object-level crc32c.
                       objectHasher.putBytes(buffer);
                     }
-                    requestDataBuilder.setCrc32C(UInt32Value.newBuilder().setValue(
-                        chunkHasher.hash().asInt()));
+                    requestDataBuilder.setCrc32C(
+                        UInt32Value.newBuilder().setValue(chunkHasher.hash().asInt()));
                   }
                   requestBuilder.setChecksummedData(requestDataBuilder);
                 }
@@ -292,8 +288,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
               }
 
               private ByteString readRequestData() throws IOException {
-                ByteString data = ByteString.readFrom(
-                    ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE));
+                ByteString data =
+                    ByteString.readFrom(ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE));
 
                 // Set objectFinalized if there is no more data, looking ahead 1 byte in the buffer
                 // if necessary. This lets us avoid sending an extra request with no data just to
