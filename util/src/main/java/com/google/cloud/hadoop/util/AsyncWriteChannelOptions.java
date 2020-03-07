@@ -33,7 +33,7 @@ public abstract class AsyncWriteChannelOptions {
   public static final boolean DIRECT_UPLOAD_ENABLED_DEFAULT = false;
 
   /** Default of whether to enabled checksums for gRPC. */
-  public static final boolean GRPC_CHECKSUMS_ENABLED_DEFAULT = false;
+  public static final boolean GRPC_CHECKSUMS_ENABLED_DEFAULT = true;
 
   /** @deprecated use {@link #builder} */
   @Deprecated
@@ -78,6 +78,13 @@ public abstract class AsyncWriteChannelOptions {
 
     public abstract AsyncWriteChannelOptions build();
 
+    /**
+     * Enable gRPC checksumming. On by default. It is strongly recommended to leave this enabled, to
+     * protect against possible data corruption caused by software bugs.
+     *
+     * @param grpcChecksumsEnabled
+     * @return the Builder
+     */
     public abstract Builder setGrpcChecksumsEnabled(boolean grpcChecksumsEnabled);
   }
 }
