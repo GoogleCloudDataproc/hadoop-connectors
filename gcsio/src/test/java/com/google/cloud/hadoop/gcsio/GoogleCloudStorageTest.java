@@ -51,6 +51,8 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.googleapis.media.MediaHttpUploader;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpStatusCodes;
 import com.google.api.client.http.HttpTransport;
@@ -70,6 +72,7 @@ import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorRespons
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.primitives.Bytes;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
@@ -244,184 +247,266 @@ public class GoogleCloudStorageTest {
       assertThat(writtenData.toByteArray()).isEqualTo(testData);
     }
   }
-  /**
-   * Test whether resumable upload of small data less than upload cache size and chunk size makes
-   * retry on first PUT upload request failed.
-   */
+
   @Test
-  public void testResumableUploadWithRetryWithDataSizeLessThanUploadCacheSize() throws Exception {
-    int uploadCacheSize = 256 * 1024;
-    byte[] testData = generateTestData(10);
-    ByteArrayOutputStream expectedTestData = new ByteArrayOutputStream();
-    expectedTestData.write(testData);
-    expectedTestData.write(testData);
-
-    MockHttpTransport transport =
-        GoogleCloudStorageTestUtils.mockTransport(
-            emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
-            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
-            jsonErrorResponse(ErrorResponses.GONE),
-            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
-            jsonDataResponse(
-                newStorageObject(BUCKET_NAME, OBJECT_NAME)
-                    .setSize(BigInteger.valueOf(testData.length))));
-
-    Storage storage = new Storage(transport, JSON_FACTORY, trackingHttpRequestInitializer);
-    GoogleCloudStorage gcs =
-        new GoogleCloudStorageImpl(
-            GCS_OPTIONS
-                .toBuilder()
-                .setWriteChannelOptions(
-                    AsyncWriteChannelOptions.newBuilder()
-                        .setUploadChunkSize(uploadCacheSize)
-                        .setUploadCacheSize(uploadCacheSize)
-                        .build())
-                .build(),
-            storage);
-
-    try (WritableByteChannel writeChannel =
-        gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME))) {
-      assertThat(writeChannel.isOpen()).isTrue();
-      writeChannel.write(ByteBuffer.wrap(testData));
-      writeChannel.write(ByteBuffer.wrap(testData));
-    }
-
-    ImmutableList<HttpRequest> requests = trackingHttpRequestInitializer.getAllRequests();
-    assertThat(requests).hasSize(5);
-
-    HttpRequest writeRequest = requests.get(4);
-    assertThat(writeRequest.getContent().getLength()).isEqualTo(2 * testData.length);
-    try (ByteArrayOutputStream writtenData = new ByteArrayOutputStream(2 * testData.length)) {
-      writeRequest.getContent().writeTo(writtenData);
-      assertThat(writtenData.toByteArray()).isEqualTo(expectedTestData.toByteArray());
-    }
-  }
-  /**
-   * Test whether resumable upload of test data size equal to maximum upload cache size makes
-   * retry on first PUT upload request failed.
-   */
-  @Test
-  public void testResumableUploadWithRetryForDataSizeEqualToUploadCacheSize() throws Exception {
-    int uploadChunkSize = 256 * 1024;
-    byte[] testData = generateTestData(uploadChunkSize);
-
-    MockHttpTransport transport =
-        GoogleCloudStorageTestUtils.mockTransport(
-            emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
-            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
-            jsonErrorResponse(ErrorResponses.GONE),
-            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
-            jsonDataResponse(
-                    newStorageObject(BUCKET_NAME, OBJECT_NAME)
-                        .setSize(BigInteger.valueOf(testData.length)))
-                .setStatusCode(308),
-            jsonDataResponse(
-                newStorageObject(BUCKET_NAME, OBJECT_NAME)
-                    .setSize(BigInteger.valueOf(testData.length))));
-
-    Storage storage = new Storage(transport, JSON_FACTORY, trackingHttpRequestInitializer);
-    GoogleCloudStorage gcs =
-        new GoogleCloudStorageImpl(
-            GCS_OPTIONS
-                .toBuilder()
-                .setWriteChannelOptions(
-                    AsyncWriteChannelOptions.newBuilder()
-                        .setUploadChunkSize(uploadChunkSize)
-                            .setUploadCacheSize(uploadChunkSize)
-                        .build())
-                .build(),
-            storage);
-
-    try (WritableByteChannel writeChannel =
-        gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME))) {
-      assertThat(writeChannel.isOpen()).isTrue();
-      writeChannel.write(ByteBuffer.wrap(testData));
-      writeChannel.write(ByteBuffer.wrap(testData));
-    }
-
-    ImmutableList<HttpRequest> requests = trackingHttpRequestInitializer.getAllRequests();
-    assertThat(requests).hasSize(6);
-
-    HttpRequest writeRequest1 = requests.get(4);
-    HttpRequest writeRequest2 = requests.get(5);
-
-    assertThat(writeRequest1.getContent().getLength()).isEqualTo(testData.length);
-    assertThat(writeRequest2.getContent().getLength()).isEqualTo(testData.length);
-
-    try (ByteArrayOutputStream writtenData = new ByteArrayOutputStream(testData.length)) {
-      writeRequest1.getContent().writeTo(writtenData);
-      assertThat(writtenData.toByteArray()).isEqualTo(testData);
-    }
-    try (ByteArrayOutputStream writtenData = new ByteArrayOutputStream(testData.length)) {
-      writeRequest2.getContent().writeTo(writtenData);
-      assertThat(writtenData.toByteArray()).isEqualTo(testData);
-    }
-  }
-
-  /**
-   * Test it should be no retry when buffer size is not enough for making calls with bigger data.
-   */
-  @Test
-  public void testResumableUploadShouldNotRetryWithoutEnoughCacheSize() throws Exception {
-    int uploadChunkSize = 256 * 1024;
-    byte[] testData = generateTestData(512 * 1024 * 1024);
-
-    MockHttpTransport transport =
-            GoogleCloudStorageTestUtils.mockTransport(
-                    emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
-                    resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
-                    jsonErrorResponse(ErrorResponses.GONE)
-                    );
-
-    Storage storage = new Storage(transport, JSON_FACTORY, trackingHttpRequestInitializer);
-    GoogleCloudStorage gcs =
-        new GoogleCloudStorageImpl(
-            GCS_OPTIONS
-                .toBuilder()
-                .setWriteChannelOptions(
-                    AsyncWriteChannelOptions.newBuilder()
-                        .setUploadChunkSize(uploadChunkSize)
-                        .setUploadCacheSize(uploadChunkSize)
-                        .build())
-                .build(),
-            storage);
-    Throwable exception = null;
-    try (WritableByteChannel writeChannel =
-        gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME))) {
-      assertThat(writeChannel.isOpen()).isTrue();
-      writeChannel.write(ByteBuffer.wrap(testData));
-    } catch (IOException e) {
-      exception = e;
-    }
-    assert (exception.getSuppressed()[0].getCause().getMessage().contains("410"));
-  }
-
-  /**
-   * Test handling of various types of exceptions thrown during JSON API call for
-   * GoogleCloudStorage.create(2).
-   */
-  @Test
-  public void testCreateObjectApiIOException() throws IOException {
-    trackingHttpRequestInitializer = new TrackingHttpRequestInitializer();
+  public void reupload_success_singleWrite_singleUploadChunk() throws Exception {
+    byte[] testData = new byte[MediaHttpUploader.MINIMUM_CHUNK_SIZE];
+    new Random().nextBytes(testData);
+    int uploadChunkSize = testData.length * 2;
+    int uploadCacheSize = testData.length * 2;
 
     MockHttpTransport transport =
         mockTransport(
-            jsonDataResponse(newStorageObject(BUCKET_NAME, OBJECT_NAME)),
-            jsonErrorResponse(ErrorResponses.NOT_FOUND));
+            emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
+            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
+            jsonErrorResponse(ErrorResponses.GONE),
+            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
+            jsonDataResponse(
+                newStorageObject(BUCKET_NAME, OBJECT_NAME)
+                    .setSize(BigInteger.valueOf(testData.length))));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    AsyncWriteChannelOptions writeOptions =
+        AsyncWriteChannelOptions.builder()
+            .setUploadChunkSize(uploadChunkSize)
+            .setUploadCacheSize(uploadCacheSize)
+            .build();
 
-    WritableByteChannel writeChannel = gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
-    assertThat(writeChannel.isOpen()).isTrue();
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS.toBuilder().setWriteChannelOptions(writeOptions).build(), transport);
 
-    IOException thrown = assertThrows(IOException.class, writeChannel::close);
-    assertThat(thrown).hasMessageThat().isEqualTo("Upload failed");
+    try (WritableByteChannel writeChannel =
+        gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME))) {
+      writeChannel.write(ByteBuffer.wrap(testData));
+    }
+
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(
             getRequestString(BUCKET_NAME, OBJECT_NAME),
             resumableUploadRequestString(
-                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 1, /* replaceGenerationId= */ true))
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
+            resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 1),
+            resumableUploadRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
+            resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 2))
         .inOrder();
+
+    HttpRequest writeRequest = trackingHttpRequestInitializer.getAllRequests().get(4);
+    assertThat(writeRequest.getContent().getLength()).isEqualTo(testData.length);
+    try (ByteArrayOutputStream writtenData = new ByteArrayOutputStream(testData.length)) {
+      writeRequest.getContent().writeTo(writtenData);
+      assertThat(writtenData.toByteArray()).isEqualTo(testData);
+    }
+  }
+
+  @Test
+  public void reupload_success_singleWrite_multipleUploadChunks() throws Exception {
+    byte[] testData = new byte[2 * MediaHttpUploader.MINIMUM_CHUNK_SIZE];
+    new Random().nextBytes(testData);
+    int uploadChunkSize = testData.length / 2;
+    int uploadCacheSize = testData.length * 2;
+
+    MockHttpTransport transport =
+        mockTransport(
+            emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
+            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
+            // "308 Resume Incomplete" - successfully uploaded 1st chunk
+            emptyResponse(308).addHeader("Range", "bytes=0-" + (uploadChunkSize - 1)),
+            jsonErrorResponse(ErrorResponses.GONE),
+            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
+            // "308 Resume Incomplete" - successfully uploaded 1st chunk
+            emptyResponse(308).addHeader("Range", "bytes=0-" + (uploadChunkSize - 1)),
+            jsonDataResponse(
+                newStorageObject(BUCKET_NAME, OBJECT_NAME)
+                    .setSize(BigInteger.valueOf(testData.length))));
+
+    AsyncWriteChannelOptions writeOptions =
+        AsyncWriteChannelOptions.builder()
+            .setUploadChunkSize(uploadChunkSize)
+            .setUploadCacheSize(uploadCacheSize)
+            .build();
+
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS.toBuilder().setWriteChannelOptions(writeOptions).build(), transport);
+
+    try (WritableByteChannel writeChannel =
+        gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME))) {
+      writeChannel.write(ByteBuffer.wrap(testData));
+    }
+
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            resumableUploadRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
+            resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 1),
+            resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 2),
+            resumableUploadRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
+            resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 3),
+            resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 4))
+        .inOrder();
+
+    HttpRequest writeRequestChunk1 = trackingHttpRequestInitializer.getAllRequests().get(5);
+    assertThat(writeRequestChunk1.getContent().getLength()).isEqualTo(testData.length / 2);
+    HttpRequest writeRequestChunk2 = trackingHttpRequestInitializer.getAllRequests().get(6);
+    assertThat(writeRequestChunk2.getContent().getLength()).isEqualTo(testData.length / 2);
+    try (ByteArrayOutputStream writtenData = new ByteArrayOutputStream(testData.length)) {
+      writeRequestChunk1.getContent().writeTo(writtenData);
+      writeRequestChunk2.getContent().writeTo(writtenData);
+      assertThat(writtenData.toByteArray()).isEqualTo(testData);
+    }
+  }
+
+  @Test
+  public void reupload_success_multipleWrites_singleUploadChunk() throws Exception {
+    byte[] testData = new byte[MediaHttpUploader.MINIMUM_CHUNK_SIZE];
+    new Random().nextBytes(testData);
+    int uploadChunkSize = testData.length * 2;
+    int uploadCacheSize = testData.length * 2;
+
+    MockHttpTransport transport =
+        mockTransport(
+            emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
+            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
+            jsonErrorResponse(ErrorResponses.GONE),
+            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
+            jsonDataResponse(
+                newStorageObject(BUCKET_NAME, OBJECT_NAME)
+                    .setSize(BigInteger.valueOf(testData.length))));
+
+    AsyncWriteChannelOptions writeOptions =
+        AsyncWriteChannelOptions.builder()
+            .setUploadChunkSize(uploadChunkSize)
+            .setUploadCacheSize(uploadCacheSize)
+            .build();
+
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS.toBuilder().setWriteChannelOptions(writeOptions).build(), transport);
+
+    try (WritableByteChannel writeChannel =
+        gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME))) {
+      writeChannel.write(ByteBuffer.wrap(testData));
+      writeChannel.write(ByteBuffer.wrap(testData));
+    }
+
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            resumableUploadRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
+            resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 1),
+            resumableUploadRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
+            resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 2))
+        .inOrder();
+
+    HttpRequest writeRequest = trackingHttpRequestInitializer.getAllRequests().get(4);
+    assertThat(writeRequest.getContent().getLength()).isEqualTo(2 * testData.length);
+    try (ByteArrayOutputStream writtenData = new ByteArrayOutputStream(testData.length)) {
+      writeRequest.getContent().writeTo(writtenData);
+      assertThat(writtenData.toByteArray()).isEqualTo(Bytes.concat(testData, testData));
+    }
+  }
+
+  @Test
+  public void reupload_success_multipleWrites_multipleUploadChunks() throws Exception {
+    byte[] testData = new byte[2 * MediaHttpUploader.MINIMUM_CHUNK_SIZE];
+    new Random().nextBytes(testData);
+    int uploadChunkSize = testData.length / 2;
+    int uploadCacheSize = testData.length * 2;
+
+    MockHttpTransport transport =
+        mockTransport(
+            emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
+            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
+            // "308 Resume Incomplete" - successfully uploaded 1st chunk
+            emptyResponse(308).addHeader("Range", "bytes=0-" + (uploadChunkSize - 1)),
+            jsonErrorResponse(ErrorResponses.GONE),
+            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
+            // "308 Resume Incomplete" - successfully uploaded 3 chunks
+            emptyResponse(308).addHeader("Range", "bytes=0-" + (uploadChunkSize - 1)),
+            emptyResponse(308).addHeader("Range", "bytes=0-" + (2 * uploadChunkSize - 1)),
+            emptyResponse(308).addHeader("Range", "bytes=0-" + (3 * uploadChunkSize - 1)),
+            jsonDataResponse(
+                newStorageObject(BUCKET_NAME, OBJECT_NAME)
+                    .setSize(BigInteger.valueOf(2 * testData.length))));
+
+    AsyncWriteChannelOptions writeOptions =
+        AsyncWriteChannelOptions.builder()
+            .setUploadChunkSize(uploadChunkSize)
+            .setUploadCacheSize(uploadCacheSize)
+            .build();
+
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS.toBuilder().setWriteChannelOptions(writeOptions).build(), transport);
+
+    try (WritableByteChannel writeChannel =
+        gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME))) {
+      writeChannel.write(ByteBuffer.wrap(testData));
+      writeChannel.write(ByteBuffer.wrap(testData));
+    }
+
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            resumableUploadRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
+            resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 1),
+            resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 2),
+            resumableUploadRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
+            resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 3),
+            resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 4),
+            resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 5),
+            resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 6))
+        .inOrder();
+
+    HttpRequest writeRequestChunk1 = trackingHttpRequestInitializer.getAllRequests().get(5);
+    assertThat(writeRequestChunk1.getContent().getLength()).isEqualTo(testData.length / 2);
+    HttpRequest writeRequestChunk2 = trackingHttpRequestInitializer.getAllRequests().get(6);
+    assertThat(writeRequestChunk2.getContent().getLength()).isEqualTo(testData.length / 2);
+    HttpRequest writeRequestChunk3 = trackingHttpRequestInitializer.getAllRequests().get(7);
+    assertThat(writeRequestChunk3.getContent().getLength()).isEqualTo(testData.length / 2);
+    HttpRequest writeRequestChunk4 = trackingHttpRequestInitializer.getAllRequests().get(8);
+    assertThat(writeRequestChunk4.getContent().getLength()).isEqualTo(testData.length / 2);
+    try (ByteArrayOutputStream writtenData = new ByteArrayOutputStream(testData.length)) {
+      writeRequestChunk1.getContent().writeTo(writtenData);
+      writeRequestChunk2.getContent().writeTo(writtenData);
+      writeRequestChunk3.getContent().writeTo(writtenData);
+      writeRequestChunk4.getContent().writeTo(writtenData);
+      assertThat(writtenData.toByteArray()).isEqualTo(Bytes.concat(testData, testData));
+    }
+  }
+
+  @Test
+  public void reupload_failure_cacheTooSmall_singleWrite_singleChunk() throws Exception {
+    byte[] testData = new byte[MediaHttpUploader.MINIMUM_CHUNK_SIZE * 10];
+    new Random().nextBytes(testData);
+    int uploadChunkSize = testData.length / 10;
+    int uploadCacheSize = testData.length / 2;
+
+    MockHttpTransport transport =
+        mockTransport(
+            emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
+            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
+            jsonErrorResponse(ErrorResponses.GONE));
+
+    AsyncWriteChannelOptions writeOptions =
+        AsyncWriteChannelOptions.builder()
+            .setUploadChunkSize(uploadChunkSize)
+            .setUploadCacheSize(uploadCacheSize)
+            .build();
+
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS.toBuilder().setWriteChannelOptions(writeOptions).build(), transport);
+
+    WritableByteChannel writeChannel = gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
+    writeChannel.write(ByteBuffer.wrap(testData));
+
+    IOException writeException = assertThrows(IOException.class, writeChannel::close);
+
+    assertThat(writeException).hasCauseThat().isInstanceOf(GoogleJsonResponseException.class);
+    assertThat(writeException).hasCauseThat().hasMessageThat().startsWith("410");
   }
 
   /** Test successful operation of GoogleCloudStorage.createEmptyObject(1). */
