@@ -78,8 +78,7 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
   // When enabled, we get higher throughput for writing small files.
   private boolean directUploadEnabled = false;
 
-  // Cache for retrying first failed PUT request in resumable uploads.
-  private volatile ByteBuffer uploadCache = null;
+  private ByteBuffer uploadCache = null;
 
   /** Construct a new channel using the given ExecutorService to run background uploads. */
   public AbstractGoogleAsyncWriteChannel(
@@ -246,14 +245,14 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
 
     initialize();
 
-    // Set cache to null so it will not be recached during retry.
-    ByteBuffer data = uploadCache;
+    // Set cache to null so it will not be re-cached during retry.
+    ByteBuffer reuploadData = uploadCache;
     uploadCache = null;
 
-    data.flip();
+    reuploadData.flip();
 
     try {
-      write(data);
+      write(reuploadData);
     } finally {
       close();
     }
@@ -261,7 +260,7 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
 
   private void closeInternal() {
     pipeSinkChannel = null;
-    if (uploadOperation != null) {
+    if (uploadOperation != null && !uploadOperation.isDone()) {
       uploadOperation.cancel(/* mayInterruptIfRunning= */ true);
     }
     uploadOperation = null;
