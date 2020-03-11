@@ -34,6 +34,7 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.util.Iterator;
 import java.util.OptionalInt;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 
 public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
@@ -68,6 +69,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   @Nullable private Iterator<GetObjectMediaResponse> resIterator = null;
   // Fine-grained options.
   private GoogleCloudStorageReadOptions readOptions;
+  private static int readStreamTimeoutSecs = 20;
 
   private GoogleCloudStorageGrpcReadChannel(
       StorageBlockingStub gcsGrpcBlockingStub,
@@ -100,8 +102,9 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     //      implement footer prefetch.
     com.google.google.storage.v1.Object getObjectResult;
     try {
+      // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
       getObjectResult =
-          stub.getObject(
+          stub.withDeadlineAfter(readStreamTimeoutSecs, TimeUnit.SECONDS).getObject(
               GetObjectRequest.newBuilder().setBucket(bucketName).setObject(objectName).build());
     } catch (StatusRuntimeException e) {
       throw convertError(e, bucketName, objectName);

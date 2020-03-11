@@ -51,6 +51,7 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /** Implements WritableByteChannel to provide write access to GCS via gRPC. */
 public final class GoogleCloudStorageGrpcWriteChannel
@@ -58,6 +59,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
     implements GoogleCloudStorageItemInfo.Provider {
   // Default GCS upload granularity.
   static final int GCS_MINIMUM_CHUNK_SIZE = 256 * 1024;
+  private static int startResumableWriteTimeoutSecs = 10;
+  private static int queryWriteStatusTimeoutSecs = 10;
+  private static int writeStreamTimeoutSecs = 20;
 
   private final Object object;
   private final ObjectWriteConditions writeConditions;
@@ -180,7 +184,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
         ByteString chunkData = ByteString.EMPTY;
         responseObserver =
             new InsertChunkResponseObserver(uploadId, chunkData, writeOffset, objectHasher);
-        stub.insertObject(responseObserver);
+        // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
+        stub.withDeadlineAfter(writeStreamTimeoutSecs, TimeUnit.SECONDS)
+            .insertObject(responseObserver);
         responseObserver.done.await();
         writeOffset += responseObserver.bytesWritten();
       } while (!responseObserver.isFinished());
@@ -368,7 +374,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
       SimpleResponseObserver<StartResumableWriteResponse> responseObserver =
           new SimpleResponseObserver<>();
 
-      stub.startResumableWrite(request, responseObserver);
+      stub.withDeadlineAfter(startResumableWriteTimeoutSecs, TimeUnit.SECONDS)
+          .startResumableWrite(request, responseObserver);
       responseObserver.done.await();
 
       if (responseObserver.hasError()) {
@@ -386,7 +393,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
       SimpleResponseObserver<QueryWriteStatusResponse> responseObserver =
           new SimpleResponseObserver<>();
 
-      stub.queryWriteStatus(request, responseObserver);
+      stub.withDeadlineAfter(queryWriteStatusTimeoutSecs, TimeUnit.SECONDS)
+          .queryWriteStatus(request, responseObserver);
       responseObserver.done.await();
 
       if (responseObserver.hasError()) {
