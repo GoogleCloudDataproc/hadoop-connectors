@@ -480,9 +480,9 @@ public class GoogleCloudStorageTest {
 
   @Test
   public void reupload_failure_cacheTooSmall_singleWrite_singleChunk() throws Exception {
-    byte[] testData = new byte[MediaHttpUploader.MINIMUM_CHUNK_SIZE * 10];
+    byte[] testData = new byte[MediaHttpUploader.MINIMUM_CHUNK_SIZE];
     new Random().nextBytes(testData);
-    int uploadChunkSize = testData.length / 10;
+    int uploadChunkSize = testData.length;
     int uploadCacheSize = testData.length / 2;
 
     MockHttpTransport transport =
