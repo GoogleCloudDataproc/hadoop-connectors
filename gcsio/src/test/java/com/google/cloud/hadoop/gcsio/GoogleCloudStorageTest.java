@@ -248,6 +248,34 @@ public class GoogleCloudStorageTest {
     }
   }
 
+  /**
+   * Test handling of various types of exceptions thrown during JSON API call for
+   * GoogleCloudStorage.create(2).
+   */
+  @Test
+  public void testCreateObjectApiIOException() throws IOException {
+    trackingHttpRequestInitializer = new TrackingHttpRequestInitializer();
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(newStorageObject(BUCKET_NAME, OBJECT_NAME)),
+            jsonErrorResponse(ErrorResponses.NOT_FOUND));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    WritableByteChannel writeChannel = gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
+    assertThat(writeChannel.isOpen()).isTrue();
+
+    IOException thrown = assertThrows(IOException.class, writeChannel::close);
+    assertThat(thrown).hasMessageThat().isEqualTo("Upload failed");
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            resumableUploadRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 1, /* replaceGenerationId= */ true))
+        .inOrder();
+  }
+
   @Test
   public void reupload_success_singleWrite_singleUploadChunk() throws Exception {
     byte[] testData = new byte[MediaHttpUploader.MINIMUM_CHUNK_SIZE];

@@ -20,7 +20,6 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.GOOGLEAP
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import com.google.api.client.http.ByteArrayContent;
 import com.google.api.client.http.HttpExecuteInterceptor;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
@@ -125,8 +124,6 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     this.delegate = delegate;
     this.replaceRequestParams = replaceRequestParams;
   }
-
-  private final List<ByteArrayContent> contents = Collections.synchronizedList(new ArrayList<>());
 
   @Override
   public void initialize(HttpRequest request) throws IOException {
