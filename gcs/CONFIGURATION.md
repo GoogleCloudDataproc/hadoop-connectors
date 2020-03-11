@@ -269,7 +269,7 @@ is `false`.
 *   `fs.gs.outputstream.upload.cache.size` (default: `0`)
 
     The upload cache size in bytes used for high-level upload retries. To
-    disable this feature set this proeprty to zero or negative value. Retry will
+    disable this feature set this property to zero or negative value. Retry will
     be performed if total size of written/uploaded data to the object is less
     than or equal to the cache size. 
 
