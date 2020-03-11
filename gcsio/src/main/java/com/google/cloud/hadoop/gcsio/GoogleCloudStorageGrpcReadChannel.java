@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
+import java.time.Duration;
 import java.util.Iterator;
 import java.util.OptionalInt;
 import java.util.concurrent.TimeUnit;
@@ -40,6 +41,9 @@ import javax.annotation.Nullable;
 public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
+  private static final Duration READ_STREAM_TIMEOUT = Duration.ofSeconds(20);
+
   // Context of the request that returned resIterator.
   @Nullable CancellableContext requestContext;
   Fadvise readStrategy;
@@ -69,7 +73,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   @Nullable private Iterator<GetObjectMediaResponse> resIterator = null;
   // Fine-grained options.
   private GoogleCloudStorageReadOptions readOptions;
-  private static int readStreamTimeoutSecs = 20;
 
   private GoogleCloudStorageGrpcReadChannel(
       StorageBlockingStub gcsGrpcBlockingStub,
@@ -104,8 +107,12 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     try {
       // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
       getObjectResult =
-          stub.withDeadlineAfter(readStreamTimeoutSecs, TimeUnit.SECONDS).getObject(
-              GetObjectRequest.newBuilder().setBucket(bucketName).setObject(objectName).build());
+          stub.withDeadlineAfter(READ_STREAM_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
+              .getObject(
+                  GetObjectRequest.newBuilder()
+                      .setBucket(bucketName)
+                      .setObject(objectName)
+                      .build());
     } catch (StatusRuntimeException e) {
       throw convertError(e, bucketName, objectName);
     }
