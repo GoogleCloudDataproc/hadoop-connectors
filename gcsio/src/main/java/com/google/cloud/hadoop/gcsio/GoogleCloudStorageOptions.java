@@ -76,6 +76,9 @@ public abstract class GoogleCloudStorageOptions {
   /** Default setting for number of threads to execute GCS batch requests for copy operations. */
   public static final int COPY_BATCH_THREADS_DEFAULT = BATCH_THREADS_DEFAULT;
 
+  /** Default setting for enabling grpc reads/writes. */
+  public static final boolean ENABLE_GRPC_DEFAULT = false;
+
   /** Default setting for GCS HTTP request headers. */
   public static final ImmutableMap<String, String> HTTP_REQUEST_HEADERS_DEFAULT = ImmutableMap.of();
 
@@ -102,6 +105,7 @@ public abstract class GoogleCloudStorageOptions {
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
         .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
         .setCooperativeLockingOptions(CooperativeLockingOptions.DEFAULT)
+        .setGrpcEnabled(ENABLE_GRPC_DEFAULT);
         .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT);
   }
 
@@ -159,6 +163,8 @@ public abstract class GoogleCloudStorageOptions {
   public abstract RequesterPaysOptions getRequesterPaysOptions();
 
   public abstract CooperativeLockingOptions getCooperativeLockingOptions();
+
+  public abstract boolean isGrpcEnabled();
 
   public abstract ImmutableMap<String, String> getHttpRequestHeaders();
 
@@ -220,6 +226,8 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setCooperativeLockingOptions(
         CooperativeLockingOptions cooperativeLockingOptions);
+
+    public abstract Builder setGrpcEnabled(boolean grpcEnabled);
 
     public abstract Builder setHttpRequestHeaders(Map<String, String> httpRequestHeaders);
 
