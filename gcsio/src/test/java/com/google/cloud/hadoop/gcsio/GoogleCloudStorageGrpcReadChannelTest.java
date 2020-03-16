@@ -319,9 +319,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   @Test
   public void readFailsWithInvalidMessageChecksum() throws Exception {
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder()
-            .setGrpcChecksumsEnabled(true)
-            .build();
+        GoogleCloudStorageReadOptions.builder().setGrpcChecksumsEnabled(true).build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
     fakeService.setReturnIncorrectMessageChecksum();
@@ -334,9 +332,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   @Test
   public void readToBufferWithArrayOffsetSucceeds() throws Exception {
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder()
-            .setGrpcChecksumsEnabled(true)
-            .build();
+        GoogleCloudStorageReadOptions.builder().setGrpcChecksumsEnabled(true).build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
     byte[] array = new byte[OBJECT_SIZE + 100];
@@ -352,9 +348,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   public void readToBufferWithArrayOffsetFailsWithInvalidMessageChecksum() throws Exception {
     fakeService.setReturnIncorrectMessageChecksum();
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder()
-            .setGrpcChecksumsEnabled(true)
-            .build();
+        GoogleCloudStorageReadOptions.builder().setGrpcChecksumsEnabled(true).build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
     byte[] array = new byte[OBJECT_SIZE + 100];
@@ -482,9 +476,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   public void seekUnderInplaceSeekLimitReadsCorrectBufferedData() throws Exception {
     fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(100).build());
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder()
-            .setInplaceSeekLimit(10)
-            .build();
+        GoogleCloudStorageReadOptions.builder().setInplaceSeekLimit(10).build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
     ByteBuffer buffer = ByteBuffer.allocate(20);
@@ -502,9 +494,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   public void seekUnderInplaceSeekLimitReadsCorrectDataWithSomeBuffered() throws Exception {
     fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(FakeService.CHUNK_SIZE * 4).build());
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder()
-            .setInplaceSeekLimit(10)
-            .build();
+        GoogleCloudStorageReadOptions.builder().setInplaceSeekLimit(10).build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
     ByteBuffer buffer = ByteBuffer.allocate(20);
