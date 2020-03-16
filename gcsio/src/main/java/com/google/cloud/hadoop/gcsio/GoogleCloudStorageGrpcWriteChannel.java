@@ -198,8 +198,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
       Hasher objectHasher = Hashing.crc32c().newHasher();
       do {
         ByteString chunkData = ByteString.EMPTY;
-        responseObserver = new InsertChunkResponseObserver(googleCloudStorageGrpcWriteChannel,
-            uploadId, chunkData, writeOffset, objectHasher);
+        responseObserver =
+            new InsertChunkResponseObserver(uploadId, chunkData, writeOffset, objectHasher);
         // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
         stub.withDeadlineAfter(WRITE_STREAM_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
             .insertObject(responseObserver);
