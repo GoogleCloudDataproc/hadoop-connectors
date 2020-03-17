@@ -302,7 +302,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   public void writeHandlesErrorOnQueryWriteStatusRequest() throws Exception {
     GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
     int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
-    fakeService.setQueryWriteStatusException(new IOException("Error!"));
+    fakeService.setQueryWriteStatusException(new IOException("Test error!"));
     ByteString data = createTestData(chunkSize * 2);
 
     writeChannel.initialize();

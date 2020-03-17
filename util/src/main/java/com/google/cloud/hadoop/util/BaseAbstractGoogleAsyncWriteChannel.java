@@ -240,7 +240,8 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
       if (e.getCause() instanceof Error) {
         throw (Error) e.getCause();
       }
-      throw new IOException(String.format("Upload failed for '%s'", getResourceString()), e);
+      throw new IOException(
+          String.format("Upload failed for '%s'", getResourceString()), e.getCause());
     }
   }
 }
