@@ -96,6 +96,11 @@ public final class GoogleCloudStorageGrpcWriteChannel
   }
 
   @Override
+  protected String getResourceString() {
+    return resourceId.toString();
+  }
+
+  @Override
   public void setDirectUploadEnabled(boolean enableDirectUpload) {
     // Currently a no-op.
     // TODO(b/150978433): Make this option switch the implementation to use non-resumable uploads,
@@ -256,7 +261,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
                 try {
                   chunkData = readRequestData();
                 } catch (IOException e) {
-                  error = new IOException(String.format("Failed to for '%s'", resourceId), e);
+                  error =
+                      new IOException(
+                          String.format("Failed to read chunk for '%s'", resourceId), e);
                   return;
                 }
 

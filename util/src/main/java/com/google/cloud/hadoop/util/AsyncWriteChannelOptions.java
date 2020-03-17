@@ -62,10 +62,6 @@ public abstract class AsyncWriteChannelOptions {
 
   public abstract boolean isDirectUploadEnabled();
 
-  /**
-   * Enable gRPC checksumming. On by default. It is strongly recommended to leave this enabled, to
-   * protect against possible data corruption caused by software bugs.
-   */
   public abstract boolean isGrpcChecksumsEnabled();
 
   /** Mutable builder for the GoogleCloudStorageWriteChannelOptions class. */
@@ -82,6 +78,13 @@ public abstract class AsyncWriteChannelOptions {
 
     public abstract AsyncWriteChannelOptions build();
 
+    /**
+     * Enable gRPC checksumming. On by default. It is strongly recommended to leave this enabled, to
+     * protect against possible data corruption caused by software bugs.
+     *
+     * @param grpcChecksumsEnabled
+     * @return the Builder
+     */
     public abstract Builder setGrpcChecksumsEnabled(boolean grpcChecksumsEnabled);
   }
 }
