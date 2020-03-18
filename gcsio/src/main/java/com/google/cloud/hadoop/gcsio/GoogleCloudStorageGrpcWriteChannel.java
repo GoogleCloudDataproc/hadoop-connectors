@@ -112,6 +112,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
   @Override
   public void handleResponse(Object response) {
+    if (response.getBucket().isEmpty()) {
+      throw new RuntimeException(
+          "Got response from service with empty/missing bucketName: " + response.toString());
+    }
     Map<String, byte[]> metadata =
         Maps.transformValues(
             response.getMetadataMap(),
