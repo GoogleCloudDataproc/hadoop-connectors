@@ -50,7 +50,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.zip.GZIPOutputStream;
-
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -150,7 +149,7 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     List<String> listedObjects = gcs.listObjectNames(testBucket, testDir, PATH_DELIMITER, 3);
 
-    assertThat(listedObjects).containsExactly(testDir + "f1",testDir + "f2",testDir + "subdir1/");
+    assertThat(listedObjects).containsExactly(testDir + "f1", testDir + "f2", testDir + "subdir1/");
     // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
@@ -481,9 +480,7 @@ public class GoogleCloudStorageNewIntegrationTest {
                 testBucket1, testDir + "f2", testBucket2, testDir + "f5", "rewriteTo"));
 
     List<String> listedObjects = gcs.listObjectNames(testBucket2, testDir, PATH_DELIMITER);
-    assertThat(listedObjects)
-        .containsExactly(
-            testDir + "f4", testDir + "f5");
+    assertThat(listedObjects).containsExactly(testDir + "f4", testDir + "f5");
   }
 
   @Test
