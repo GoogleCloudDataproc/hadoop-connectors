@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.api.client.util.Preconditions.checkArgument;
 import static com.google.google.storage.v1.ServiceConstants.Values.MAX_WRITE_CHUNK_BYTES;
 
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
@@ -112,10 +113,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
   @Override
   public void handleResponse(Object response) {
-    if (response.getBucket().isEmpty()) {
-      throw new RuntimeException(
-          "Got response from service with empty/missing bucketName: " + response.toString());
-    }
+    checkArgument(!response.getBucket().isEmpty(),
+        "Got response from service with empty/missing bucketName: %s", response);
     Map<String, byte[]> metadata =
         Maps.transformValues(
             response.getMetadataMap(),
