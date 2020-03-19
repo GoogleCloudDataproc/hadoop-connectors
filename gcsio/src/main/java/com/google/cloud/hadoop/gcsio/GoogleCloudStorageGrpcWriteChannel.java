@@ -14,14 +14,15 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.api.client.util.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.google.storage.v1.ServiceConstants.Values.MAX_WRITE_CHUNK_BYTES;
+import static java.util.stream.Collectors.toMap;
 
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
 import com.google.common.io.BaseEncoding;
@@ -66,10 +67,11 @@ public final class GoogleCloudStorageGrpcWriteChannel
   private static final Duration QUERY_WRITE_STATUS_TIMEOUT = Duration.ofSeconds(10);
   private static final Duration WRITE_STREAM_TIMEOUT = Duration.ofSeconds(20);
 
-  private final Object object;
+  private final StorageStub stub;
+  private final StorageResourceId resourceId;
   private final ObjectWriteConditions writeConditions;
   private final Optional<String> requesterPaysProject;
-  private final StorageStub stub;
+  private final ImmutableMap<String, String> metadata;
   private final boolean checksumsEnabled;
 
   private GoogleCloudStorageItemInfo completedItemInfo = null;
@@ -77,25 +79,25 @@ public final class GoogleCloudStorageGrpcWriteChannel
   GoogleCloudStorageGrpcWriteChannel(
       ExecutorService threadPool,
       StorageStub stub,
-      String bucketName,
-      String objectName,
+      StorageResourceId resourceId,
       AsyncWriteChannelOptions options,
       ObjectWriteConditions writeConditions,
       Optional<String> requesterPaysProject,
-      Map<String, String> objectMetadata,
+      Map<String, String> metadata,
       String contentType) {
     super(threadPool, options);
     this.stub = stub;
+    this.resourceId = resourceId;
     this.writeConditions = writeConditions;
     this.requesterPaysProject = requesterPaysProject;
+    this.metadata = ImmutableMap.copyOf(metadata);
+    this.contentType = contentType;
     this.checksumsEnabled = options.isGrpcChecksumsEnabled();
-    this.object =
-        Object.newBuilder()
-            .setName(objectName)
-            .setBucket(bucketName)
-            .setContentType(contentType)
-            .putAllMetadata(objectMetadata)
-            .build();
+  }
+
+  @Override
+  protected String getResourceString() {
+    return resourceId.toString();
   }
 
   @Override
@@ -108,7 +110,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
   @Override
   public void setUploadChunkSize(int chunkSize) {
     // No-op for GCS gRPC - we always upload using a stream of MAX_WRITE_CHUNK_BYTES sized messages.
-    Preconditions.checkArgument(chunkSize > 0, "Upload chunk size must be greater than 0.");
+    checkArgument(chunkSize > 0, "Upload chunk size must be greater than 0.");
   }
 
   @Override
@@ -117,19 +119,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
         !response.getBucket().isEmpty(),
         "Got response from service with empty/missing bucketName: %s", response);
     Map<String, byte[]> metadata =
-        Maps.transformValues(
-            response.getMetadataMap(),
-            value -> {
-              try {
-                return BaseEncoding.base64().decode(value);
-              } catch (IllegalArgumentException iae) {
-                logger.atSevere().withCause(iae).log(
-                    "In: " + this + "Failed to parse base64 encoded attribute value %s - %s",
-                    value,
-                    iae);
-                return null;
-              }
-            });
+        response.getMetadataMap().entrySet().stream()
+            .collect(
+                toMap(Map.Entry::getKey, entry -> BaseEncoding.base64().decode(entry.getValue())));
 
     byte[] md5Hash =
         response.getMd5Hash().length() > 0
@@ -143,7 +135,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     completedItemInfo =
         new GoogleCloudStorageItemInfo(
             new StorageResourceId(response.getBucket(), response.getName()),
-            Timestamps.toMillis(response.getUpdated()),
+            Timestamps.toMillis(response.getTimeCreated()),
             Timestamps.toMillis(response.getUpdated()),
             response.getSize(),
             /* location= */ null,
@@ -163,21 +155,18 @@ public final class GoogleCloudStorageGrpcWriteChannel
     try {
       uploadOperation = threadPool.submit(new UploadOperation(this, pipeSource));
     } catch (Exception e) {
-      throw new RuntimeException(
-          "GoogleCloudStorageGrpcWriteChannel.startUpload Caught exception in: " + this, e);
+      throw new RuntimeException(String.format("Failed to start upload for '%s'", resourceId), e);
     }
   }
 
   private class UploadOperation implements Callable<Object> {
     // Read end of the pipe.
     private final BufferedInputStream pipeSource;
-    private final GoogleCloudStorageGrpcWriteChannel googleCloudStorageGrpcWriteChannel;
+    private final GoogleCloudStorageGrpcWriteChannel grpcWriteChannel;
 
-    UploadOperation(
-        GoogleCloudStorageGrpcWriteChannel googleCloudStorageGrpcWriteChannel,
-        InputStream pipeSource) {
+    UploadOperation(GoogleCloudStorageGrpcWriteChannel grpcWriteChannel, InputStream pipeSource) {
       // Buffer the input stream by 1 byte so we can peek ahead for the end of the stream.
-      this.googleCloudStorageGrpcWriteChannel = googleCloudStorageGrpcWriteChannel;
+      this.grpcWriteChannel = grpcWriteChannel;
       this.pipeSource = new BufferedInputStream(pipeSource, 1);
     }
 
@@ -188,11 +177,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
       try (InputStream uploadPipeSource = pipeSource) {
         return doResumableUpload();
       } catch (Exception e) {
-        throw new RuntimeException(
-            "UploadOperation.call Caught exception for: "
-                + googleCloudStorageGrpcWriteChannel
-                + " :",
-            e);
+        throw new IOException(
+            String.format("Caught exception during upload for '%s'", resourceId), e);
       }
     }
 
@@ -207,7 +193,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
         ByteString chunkData = ByteString.EMPTY;
         responseObserver =
             new InsertChunkResponseObserver(
-                googleCloudStorageGrpcWriteChannel, uploadId, chunkData, writeOffset, objectHasher);
+                grpcWriteChannel, uploadId, chunkData, writeOffset, objectHasher);
         // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
         stub.withDeadlineAfter(WRITE_STREAM_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
             .insertObject(responseObserver);
@@ -224,8 +210,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
         //     that have been persisted.
         //  3. Limit the list size to some number (possibly flag-controlled) of sent chunks.
         throw new IOException(
-            "Insert failed for: " + googleCloudStorageGrpcWriteChannel,
-            responseObserver.getError());
+            String.format("Insert failed for '%s'", resourceId), responseObserver.getError());
       }
 
       return responseObserver.getResponse();
@@ -238,7 +223,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       private final int MAX_BYTES_PER_MESSAGE = MAX_WRITE_CHUNK_BYTES.getNumber();
 
       private final long writeOffset;
-      private GoogleCloudStorageGrpcWriteChannel googleCloudStorageGrpcWriteChannel;
+      private GoogleCloudStorageGrpcWriteChannel grpcWriteChannel;
       private final String uploadId;
       private volatile boolean objectFinalized = false;
       // The last error to occur during the streaming RPC. Present only on error.
@@ -253,12 +238,12 @@ public final class GoogleCloudStorageGrpcWriteChannel
       final CountDownLatch done = new CountDownLatch(1);
 
       InsertChunkResponseObserver(
-          GoogleCloudStorageGrpcWriteChannel googleCloudStorageGrpcWriteChannel,
+          GoogleCloudStorageGrpcWriteChannel grpcWriteChannel,
           String uploadId,
           ByteString chunkData,
           long writeOffset,
           Hasher objectHasher) {
-        this.googleCloudStorageGrpcWriteChannel = googleCloudStorageGrpcWriteChannel;
+        this.grpcWriteChannel = grpcWriteChannel;
         this.uploadId = uploadId;
         this.chunkData = chunkData;
         this.writeOffset = writeOffset;
@@ -266,7 +251,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
 
       @Override
-      public void beforeStart(final ClientCallStreamObserver<InsertObjectRequest> requestObserver) {
+      public void beforeStart(ClientCallStreamObserver<InsertObjectRequest> requestObserver) {
         requestObserver.setOnReadyHandler(
             new Runnable() {
               @Override
@@ -280,11 +265,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
                   chunkData = readRequestData();
                 } catch (IOException e) {
                   error =
-                      new RuntimeException(
-                          "InsertChunkResponseObserver.beforeStart for "
-                              + googleCloudStorageGrpcWriteChannel
-                              + " caught ",
-                          e);
+                      new IOException(
+                          String.format("Failed to read chunk for '%s'", resourceId), e);
                   return;
                 }
 
@@ -346,11 +328,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
 
       public Object getResponse() {
-        if (response == null) {
-          throw new IllegalStateException(
-              "Response not present for: " + googleCloudStorageGrpcWriteChannel);
-        }
-        return response;
+        return checkNotNull(response, "Response not present for '%s'", resourceId);
       }
 
       boolean hasError() {
@@ -362,11 +340,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
 
       public Throwable getError() {
-        if (error == null) {
-          throw new IllegalStateException(
-              "Error not present: " + googleCloudStorageGrpcWriteChannel);
-        }
-        return error;
+        return checkNotNull(error, "Error not present for '%s'", resourceId);
       }
 
       boolean isFinished() {
@@ -380,8 +354,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       @Override
       public void onError(Throwable t) {
-        error =
-            new Throwable("Caught Throwable for " + googleCloudStorageGrpcWriteChannel + ": ", t);
+        error = new IOException(String.format("Caught exception for '%s'", resourceId), t);
         done.countDown();
       }
 
@@ -394,7 +367,14 @@ public final class GoogleCloudStorageGrpcWriteChannel
     /** Send a StartResumableWriteRequest and return the uploadId of the resumable write. */
     private String startResumableUpload() throws InterruptedException, IOException {
       InsertObjectSpec.Builder insertObjectSpecBuilder =
-          InsertObjectSpec.newBuilder().setResource(object);
+          InsertObjectSpec.newBuilder()
+              .setResource(
+                  Object.newBuilder()
+                      .setBucket(resourceId.getBucketName())
+                      .setName(resourceId.getObjectName())
+                      .setContentType(contentType)
+                      .putAllMetadata(metadata)
+                      .build());
       if (writeConditions.hasContentGenerationMatch()) {
         insertObjectSpecBuilder.setIfGenerationMatch(
             Int64Value.newBuilder().setValue(writeConditions.getContentGenerationMatch()));
@@ -420,7 +400,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       if (responseObserver.hasError()) {
         throw new IOException(
-            "StartResumableWriteRequest failed for: " + googleCloudStorageGrpcWriteChannel,
+            String.format("Failed to start resumable upload for '%s'", resourceId),
             responseObserver.getError());
       }
 
@@ -441,7 +421,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       if (responseObserver.hasError()) {
         throw new IOException(
-            "QueryWriteStatusRequest failed for: " + googleCloudStorageGrpcWriteChannel,
+            String.format("Failed to get committed write size '%s'", resourceId),
             responseObserver.getError());
       }
 
@@ -460,10 +440,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       final CountDownLatch done = new CountDownLatch(1);
 
       public T getResponse() {
-        if (response == null) {
-          throw new IllegalStateException("Response not present for: " + this);
-        }
-        return response;
+        return checkNotNull(response, "Response not present for '%s'", resourceId);
       }
 
       boolean hasError() {
@@ -471,10 +448,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
 
       public Throwable getError() {
-        if (error == null) {
-          throw new IllegalStateException("Error not present for: " + this);
-        }
-        return error;
+        return checkNotNull(error, "Error not present for '%s'", resourceId);
       }
 
       @Override
@@ -484,7 +458,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       @Override
       public void onError(Throwable t) {
-        error = t;
+        error = new IOException(String.format("Caught exception for '%s'", resourceId), t);
         done.countDown();
       }
 
@@ -493,16 +467,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
         done.countDown();
       }
     }
-  }
-
-  @Override
-  public String toString() {
-    return "GoogleCloudStorageGrpcWriteChannel for bucket: "
-        + object.getBucket()
-        + ", object: "
-        + object.getName()
-        + ", generation: "
-        + object.getGeneration();
   }
 
   /**
