@@ -354,7 +354,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       @Override
       public void onError(Throwable t) {
-        error = new IOException(String.format("Caught exception for '%s'", resourceId), t);
+        error =
+            new Throwable("Caught Throwable for " + grpcWriteChannel
+                          + ", while uploading to uploadId " + uploadId + " at writeOffset "
+                          + writeOffset, t);
         done.countDown();
       }
 
