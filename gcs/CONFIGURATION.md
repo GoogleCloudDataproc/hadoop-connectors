@@ -138,6 +138,19 @@
     fs.gs.storage.http.headers.another-custom-header=another_custom_value
     ```
 
+*   `fs.gs.encryption.algorithm` (not set by default)
+
+    The encryption algorithm to use. For [CSEK](https://cloud.google.com/storage/docs/encryption/customer-supplied-keys)
+    You must use the value AES256.
+
+*   `fs.gs.encryption.key` (not set by default)
+
+    An RFC 4648 Base64-encoded string of the source object's AES-256 encryption key.
+
+*   `fs.gs.encryption.key.hash` (not set by default)
+
+    An RFC 4648 Base64-encoded string of the SHA256 hash of the source object's encryption key.
+
 ### Authentication
 
 When one of the following two properties is set, it will precede all other

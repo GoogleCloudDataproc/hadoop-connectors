@@ -201,7 +201,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
     GoogleCloudStorageFileSystemOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
 
-    String encryptionAlgorithm = options.getCloudStorageOptions().getEncryptionAlgorithm();
     assertThat(options.getCloudStorageOptions().getHttpRequestHeaders())
         .containsExactly("test-header", "test-VAL", "key-in-header", "+G2Ap33m5NVOgmXznSGTEvG0I=");
   }

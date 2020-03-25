@@ -1,8 +1,10 @@
 ### 2.2.0 - 2020-XX-XX
 
-1. Delete deprecated methods.
+1.  Delete deprecated methods.
 
 1.  Update all dependencies to latest versions.
+
+1.  Support CSEK headers to encrypt and decrypt objects.
 
 ### 2.1.1 - 2020-03-11
 
