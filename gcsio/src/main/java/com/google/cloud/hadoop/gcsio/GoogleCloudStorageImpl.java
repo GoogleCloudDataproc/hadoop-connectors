@@ -378,7 +378,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           public Storage.Objects.Insert createRequest(InputStreamContent inputStream)
               throws IOException {
             Storage.Objects.Insert insertObject = super.createRequest(inputStream);
-            setEncryptionHeaders(insertObject);
             return configureRequest(insertObject, resourceId.getBucketName());
           }
         };
@@ -958,8 +957,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         configureRequest(
             gcs.objects().rewrite(srcBucketName, srcObjectName, dstBucketName, dstObjectName, null),
             srcBucketName);
-    setEncryptionHeaders(rewriteObject);
-    setDecryptionHeaders(rewriteObject);
     if (storageOptions.getMaxBytesRewrittenPerCall() > 0) {
       rewriteObject.setMaxBytesRewrittenPerCall(storageOptions.getMaxBytesRewrittenPerCall());
     }
@@ -1021,7 +1018,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         configureRequest(
             gcs.objects().copy(srcBucketName, srcObjectName, dstBucketName, dstObjectName, null),
             srcBucketName);
-    setEncryptionHeaders(copyObject);
     batchHelper.queue(
         copyObject,
         new JsonBatchCallback<StorageObject>() {
@@ -1906,7 +1902,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     String objectName = resourceId.getObjectName();
     Storage.Objects.Get getObject =
         configureRequest(gcs.objects().get(bucketName, objectName), bucketName);
-    setEncryptionHeaders(getObject);
     try {
       return getObject.execute();
     } catch (IOException e) {
@@ -2039,6 +2034,16 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   <RequestT extends StorageRequest<?>> RequestT configureRequest(
       RequestT request, String bucketName) {
     setRequesterPaysProject(request, bucketName);
+
+    if (request instanceof Storage.Objects.Get || request instanceof Storage.Objects.Insert) {
+      setEncryptionHeaders(request);
+    }
+
+    if (request instanceof Storage.Objects.Rewrite || request instanceof Storage.Objects.Copy) {
+      setEncryptionHeaders(request);
+      setDecryptionHeaders(request);
+    }
+
     return request;
   }
 

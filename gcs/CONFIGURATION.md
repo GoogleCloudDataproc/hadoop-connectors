@@ -138,6 +138,8 @@
     fs.gs.storage.http.headers.another-custom-header=another_custom_value
     ```
 
+### Encryption
+
 *   `fs.gs.encryption.algorithm` (not set by default)
 
     The encryption algorithm to use. For [CSEK](https://cloud.google.com/storage/docs/encryption/customer-supplied-keys)
