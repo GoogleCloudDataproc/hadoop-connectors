@@ -168,6 +168,15 @@ public abstract class GoogleCloudStorageOptions {
 
   public abstract ImmutableMap<String, String> getHttpRequestHeaders();
 
+  @Nullable
+  public abstract String getEncryptionAlgorithm();
+
+  @Nullable
+  public abstract String getEncryptionKey();
+
+  @Nullable
+  public abstract String getEncryptionKeyHash();
+
   public void throwIfNotValid() {
     checkArgument(!isNullOrEmpty(getAppName()), "appName must not be null or empty");
   }
@@ -230,6 +239,12 @@ public abstract class GoogleCloudStorageOptions {
         CooperativeLockingOptions cooperativeLockingOptions);
 
     public abstract Builder setHttpRequestHeaders(Map<String, String> httpRequestHeaders);
+
+    public abstract Builder setEncryptionAlgorithm(String encryptionAlgorithm);
+
+    public abstract Builder setEncryptionKey(String encryptionKey);
+
+    public abstract Builder setEncryptionKeyHash(String encryptionKeyHash);
 
     abstract GoogleCloudStorageOptions autoBuild();
 

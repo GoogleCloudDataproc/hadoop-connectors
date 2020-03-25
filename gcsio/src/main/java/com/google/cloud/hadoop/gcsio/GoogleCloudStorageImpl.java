@@ -377,7 +377,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           @Override
           public Storage.Objects.Insert createRequest(InputStreamContent inputStream)
               throws IOException {
-            return configureRequest(super.createRequest(inputStream), resourceId.getBucketName());
+            Storage.Objects.Insert insertObject = super.createRequest(inputStream);
+            setEncryptionHeaders(insertObject);
+            return configureRequest(insertObject, resourceId.getBucketName());
           }
         };
 
@@ -623,7 +625,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
       @Override
       protected Storage.Objects.Get createRequest() throws IOException {
-        return configureRequest(super.createRequest(), resourceId.getBucketName());
+        Storage.Objects.Get getObject = super.createRequest();
+        setEncryptionHeaders(getObject);
+        return configureRequest(getObject, resourceId.getBucketName());
       }
     };
   }
@@ -954,6 +958,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         configureRequest(
             gcs.objects().rewrite(srcBucketName, srcObjectName, dstBucketName, dstObjectName, null),
             srcBucketName);
+    setEncryptionHeaders(rewriteObject);
+    setDecryptionHeaders(rewriteObject);
     if (storageOptions.getMaxBytesRewrittenPerCall() > 0) {
       rewriteObject.setMaxBytesRewrittenPerCall(storageOptions.getMaxBytesRewrittenPerCall());
     }
@@ -1015,7 +1021,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         configureRequest(
             gcs.objects().copy(srcBucketName, srcObjectName, dstBucketName, dstObjectName, null),
             srcBucketName);
-
+    setEncryptionHeaders(copyObject);
     batchHelper.queue(
         copyObject,
         new JsonBatchCallback<StorageObject>() {
@@ -1900,6 +1906,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     String objectName = resourceId.getObjectName();
     Storage.Objects.Get getObject =
         configureRequest(gcs.objects().get(bucketName, objectName), bucketName);
+    setEncryptionHeaders(getObject);
     try {
       return getObject.execute();
     } catch (IOException e) {
@@ -2033,6 +2040,34 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       RequestT request, String bucketName) {
     setRequesterPaysProject(request, bucketName);
     return request;
+  }
+
+  private <RequestT extends StorageRequest<?>> void setEncryptionHeaders(RequestT request) {
+    HttpHeaders headers = request.getRequestHeaders();
+    if (storageOptions.getEncryptionAlgorithm() != null && storageOptions.getEncryptionKey() != null
+        && storageOptions.getEncryptionKeyHash() != null) {
+      headers.set("x-goog-encryption-algorithm", storageOptions.getEncryptionAlgorithm());
+      headers.set("x-goog-encryption-key", storageOptions.getEncryptionKey());
+      headers.set("x-goog-encryption-key-sha256", storageOptions.getEncryptionKeyHash());
+    } else {
+      return;
+    }
+
+    request.setRequestHeaders(headers);
+  }
+
+  private <RequestT extends StorageRequest<?>> void setDecryptionHeaders(RequestT request) {
+    HttpHeaders headers = request.getRequestHeaders();
+    if (storageOptions.getEncryptionAlgorithm() != null && storageOptions.getEncryptionKey() != null
+        && storageOptions.getEncryptionKeyHash() != null) {
+      headers.set("x-goog-copy-source-encryption-algorithm", storageOptions.getEncryptionAlgorithm());
+      headers.set("x-goog-copy-source-encryption-key", storageOptions.getEncryptionKey());
+      headers.set("x-goog-copy-source-encryption-key-sha256", storageOptions.getEncryptionKeyHash());
+    } else {
+      return;
+    }
+
+    request.setRequestHeaders(headers);
   }
 
   private <RequestT extends StorageRequest<?>> void setRequesterPaysProject(
