@@ -6,6 +6,10 @@
 
 1.  Support CSEK headers to encrypt and decrypt objects.
 
+        fs.gs.encryption.algorithm
+        fs.gs.encryption.key
+        fs.gs.encryption.key.hash
+
 ### 2.1.1 - 2020-03-11
 
 1.  Add upload cache to support high-level retries of failed uploads. Cache size

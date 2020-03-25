@@ -377,8 +377,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           @Override
           public Storage.Objects.Insert createRequest(InputStreamContent inputStream)
               throws IOException {
-            Storage.Objects.Insert insertObject = super.createRequest(inputStream);
-            return configureRequest(insertObject, resourceId.getBucketName());
+            return configureRequest(super.createRequest(inputStream), resourceId.getBucketName());
           }
         };
 
@@ -624,9 +623,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
       @Override
       protected Storage.Objects.Get createRequest() throws IOException {
-        Storage.Objects.Get getObject = super.createRequest();
-        setEncryptionHeaders(getObject);
-        return configureRequest(getObject, resourceId.getBucketName());
+        return configureRequest(super.createRequest(), resourceId.getBucketName());
       }
     };
   }
@@ -2048,31 +2045,29 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   private <RequestT extends StorageRequest<?>> void setEncryptionHeaders(RequestT request) {
-    HttpHeaders headers = request.getRequestHeaders();
-    if (storageOptions.getEncryptionAlgorithm() != null && storageOptions.getEncryptionKey() != null
+    if (storageOptions.getEncryptionAlgorithm() != null
+        && storageOptions.getEncryptionKey() != null
         && storageOptions.getEncryptionKeyHash() != null) {
+      HttpHeaders headers = request.getRequestHeaders();
       headers.set("x-goog-encryption-algorithm", storageOptions.getEncryptionAlgorithm());
       headers.set("x-goog-encryption-key", storageOptions.getEncryptionKey());
       headers.set("x-goog-encryption-key-sha256", storageOptions.getEncryptionKeyHash());
-    } else {
-      return;
+      request.setRequestHeaders(headers);
     }
-
-    request.setRequestHeaders(headers);
   }
 
   private <RequestT extends StorageRequest<?>> void setDecryptionHeaders(RequestT request) {
-    HttpHeaders headers = request.getRequestHeaders();
     if (storageOptions.getEncryptionAlgorithm() != null && storageOptions.getEncryptionKey() != null
         && storageOptions.getEncryptionKeyHash() != null) {
-      headers.set("x-goog-copy-source-encryption-algorithm", storageOptions.getEncryptionAlgorithm());
+      HttpHeaders headers = request.getRequestHeaders();
+      headers.set(
+          "x-goog-copy-source-encryption-algorithm", storageOptions.getEncryptionAlgorithm());
       headers.set("x-goog-copy-source-encryption-key", storageOptions.getEncryptionKey());
-      headers.set("x-goog-copy-source-encryption-key-sha256", storageOptions.getEncryptionKeyHash());
-    } else {
-      return;
-    }
+      headers.set(
+          "x-goog-copy-source-encryption-key-sha256", storageOptions.getEncryptionKeyHash());
 
-    request.setRequestHeaders(headers);
+      request.setRequestHeaders(headers);
+    }
   }
 
   private <RequestT extends StorageRequest<?>> void setRequesterPaysProject(

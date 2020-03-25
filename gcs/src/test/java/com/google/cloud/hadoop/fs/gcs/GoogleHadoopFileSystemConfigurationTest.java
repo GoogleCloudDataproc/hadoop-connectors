@@ -14,7 +14,12 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.*;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_ALGORITHM;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY_HASH;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_HTTP_HEADERS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ROOT_URL;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_ADDRESS_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_PASSWORD_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_USERNAME_SUFFIX;
@@ -215,8 +220,10 @@ public class GoogleHadoopFileSystemConfigurationTest {
     GoogleCloudStorageFileSystemOptions options =
             GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
     assertThat(options.getCloudStorageOptions().getEncryptionAlgorithm()).isEqualTo("AES256");
-    assertThat(options.getCloudStorageOptions().getEncryptionKey()).isEqualTo("+G2Ap33m5NVOgmXznSGTEvG0I=");
-    assertThat(options.getCloudStorageOptions().getEncryptionKeyHash()).isEqualTo("LpH4y6BkG/1B+n3FwORpdoyQ=");
+    assertThat(options.getCloudStorageOptions().getEncryptionKey())
+        .isEqualTo("+G2Ap33m5NVOgmXznSGTEvG0I=");
+    assertThat(options.getCloudStorageOptions().getEncryptionKeyHash())
+        .isEqualTo("LpH4y6BkG/1B+n3FwORpdoyQ=");
   }
 
   @Test
