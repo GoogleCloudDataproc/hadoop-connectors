@@ -210,62 +210,6 @@ public class GoogleCloudStorageImplTest {
   }
 
   @Test
-  public void testUploadAndGetObjectWithEncryptionKey() throws IOException {
-    GoogleCloudStorageImpl gcs =
-        makeStorage(
-            GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-                .setEncryptionAlgorithm("AES256")
-                .setEncryptionKey("CSX19s0epGWZP3h271Idu8xma2WhMuKT8ZisYfcjLM8=")
-                .setEncryptionKeyHash("LpH4y6Bki5zIhYrjGo1J4BuSt12G/1B+n3FwORpdoyQ=")
-                .build());
-
-    String bucketName = BUCKET_HELPER.getUniqueBucketName("encryption-bucket");
-    StorageResourceId resourceId = new StorageResourceId(bucketName, "obj");
-
-    gcs.create(bucketName);
-    gcs.createEmptyObject(
-        resourceId,
-        new CreateObjectOptions(true, "text/plain", CreateObjectOptions.EMPTY_METADATA));
-
-    assertThat(gcs.getItemInfo(resourceId).getContentType()).isEqualTo("text/plain");
-  }
-
-  @Test
-  public void testRewriteEncryptedObject() throws IOException {
-    GoogleCloudStorageImpl gcs =
-        makeStorage(
-            GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-                .setCopyWithRewriteEnabled(true)
-                .setMaxBytesRewrittenPerCall(512 * 1024 * 1024)
-                .setEncryptionAlgorithm("AES256")
-                .setEncryptionKey("CSX19s0epGWZP3h271Idu8xma2WhMuKT8ZisYfcjLM8=")
-                .setEncryptionKeyHash("LpH4y6Bki5zIhYrjGo1J4BuSt12G/1B+n3FwORpdoyQ=")
-                .build());
-
-    String srcBucketName = BUCKET_HELPER.getUniqueBucketName("rewrite-encryption-src");
-    gcs.create(srcBucketName);
-
-    String dstBucketName = BUCKET_HELPER.getUniqueBucketName("rewrite-encryption-dst");
-    // Create destination bucket with different location and storage class,
-    // because this is supported by rewrite but not copy requests
-    gcs.create(dstBucketName, CreateBucketOptions.builder().setStorageClass("coldline").build());
-
-    StorageResourceId resourceId =
-        new StorageResourceId(srcBucketName, "testRewriteEncryptedObject_SourceObject");
-    int partitionsCount = 32;
-    byte[] partition =
-        writeObject(gcs, resourceId, /* partitionSize= */ 64 * 1024 * 1024, partitionsCount);
-
-    StorageResourceId copiedResourceId =
-        new StorageResourceId(dstBucketName, "testRewriteEncryptedObject_DestinationObject");
-    gcs.copy(
-        srcBucketName, ImmutableList.of(resourceId.getObjectName()),
-        dstBucketName, ImmutableList.of(copiedResourceId.getObjectName()));
-
-    assertObjectContent(gcs, copiedResourceId, partition, partitionsCount);
-  }
-
-  @Test
   public void googleCloudStorageItemInfo_metadataEquals() throws IOException {
     GoogleCloudStorageImpl gcs =
         makeStorage(GoogleCloudStorageTestHelper.getStandardOptionBuilder().build());
