@@ -2046,26 +2046,38 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   private <RequestT extends StorageRequest<?>> void setEncryptionHeaders(RequestT request) {
-    if (storageOptions.getEncryptionAlgorithm() != null
-        && storageOptions.getEncryptionKey() != null
-        && storageOptions.getEncryptionKeyHash() != null) {
+    if (storageOptions.getEncryptionKey() != null) {
       HttpHeaders headers = request.getRequestHeaders();
-      headers.set("x-goog-encryption-algorithm", storageOptions.getEncryptionAlgorithm());
-      headers.set("x-goog-encryption-key", storageOptions.getEncryptionKey());
-      headers.set("x-goog-encryption-key-sha256", storageOptions.getEncryptionKeyHash());
+      headers.set(
+          "x-goog-encryption-algorithm",
+          checkNotNull(
+              storageOptions.getEncryptionAlgorithm(), "encryption algorithm must not be null"));
+      headers.set(
+          "x-goog-encryption-key",
+          checkNotNull(storageOptions.getEncryptionKey(), "encryption key must not be null"));
+      headers.set(
+          "x-goog-encryption-key-sha256",
+          checkNotNull(
+              storageOptions.getEncryptionKeyHash(), "encryption key hash must not be null"));
+
       request.setRequestHeaders(headers);
     }
   }
 
   private <RequestT extends StorageRequest<?>> void setDecryptionHeaders(RequestT request) {
-    if (storageOptions.getEncryptionAlgorithm() != null && storageOptions.getEncryptionKey() != null
-        && storageOptions.getEncryptionKeyHash() != null) {
+    if (storageOptions.getEncryptionKey() != null) {
       HttpHeaders headers = request.getRequestHeaders();
       headers.set(
-          "x-goog-copy-source-encryption-algorithm", storageOptions.getEncryptionAlgorithm());
-      headers.set("x-goog-copy-source-encryption-key", storageOptions.getEncryptionKey());
+          "x-goog-copy-source-encryption-algorithm",
+          checkNotNull(
+              storageOptions.getEncryptionAlgorithm(), "encryption algorithm must not be null"));
       headers.set(
-          "x-goog-copy-source-encryption-key-sha256", storageOptions.getEncryptionKeyHash());
+          "x-goog-copy-source-encryption-key",
+          checkNotNull(storageOptions.getEncryptionKey(), "encryption key must not be null"));
+      headers.set(
+          "x-goog-copy-source-encryption-key-sha256",
+          checkNotNull(
+              storageOptions.getEncryptionKeyHash(), "encryption key hash must not be null"));
 
       request.setRequestHeaders(headers);
     }
