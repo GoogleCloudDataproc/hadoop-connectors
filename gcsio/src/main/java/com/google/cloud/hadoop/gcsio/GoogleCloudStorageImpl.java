@@ -1015,6 +1015,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         configureRequest(
             gcs.objects().copy(srcBucketName, srcObjectName, dstBucketName, dstObjectName, null),
             srcBucketName);
+
     batchHelper.queue(
         copyObject,
         new JsonBatchCallback<StorageObject>() {
