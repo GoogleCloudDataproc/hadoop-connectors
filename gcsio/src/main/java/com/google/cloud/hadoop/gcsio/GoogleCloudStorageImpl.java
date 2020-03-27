@@ -170,8 +170,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // GCS access instance.
   private Storage gcs;
 
-  // GCS grpc stub.
-  private StorageStub gcsGrpcStub;
+  // Utility for building and caching storager channels and stubs.
   private StorageStubProvider storageStubProvider;
 
   // Thread-pool used for background tasks.
@@ -257,7 +256,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     if (storageOptions.isGrpcEnabled()) {
       this.storageStubProvider =
           new StorageStubProvider(options.getReadChannelOptions(), backgroundTasksThreadPool);
-      this.gcsGrpcStub = storageStubProvider.buildAsyncStub();
     }
   }
 
@@ -388,7 +386,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       GoogleCloudStorageGrpcWriteChannel channel =
           new GoogleCloudStorageGrpcWriteChannel(
               backgroundTasksThreadPool,
-              gcsGrpcStub,
+              storageStubProvider.getAsyncStub(),
               resourceId,
               storageOptions.getWriteChannelOptions(),
               writeConditions,
@@ -626,7 +624,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     if (storageOptions.isGrpcEnabled()) {
       return GoogleCloudStorageGrpcReadChannel.open(
-          storageStubProvider.buildBlockingStub(),
+          storageStubProvider.getBlockingStub(),
           resourceId.getBucketName(),
           resourceId.getObjectName(),
           readOptions);

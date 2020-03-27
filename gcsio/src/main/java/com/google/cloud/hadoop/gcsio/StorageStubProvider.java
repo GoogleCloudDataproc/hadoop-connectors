@@ -8,8 +8,11 @@ import com.google.google.storage.v1.StorageGrpc.StorageBlockingStub;
 import com.google.google.storage.v1.StorageGrpc.StorageStub;
 import com.google.google.storage.v1.StorageOuterClass;
 import com.google.protobuf.util.Durations;
+import io.grpc.ManagedChannel;
 import io.grpc.alts.ComputeEngineChannelBuilder;
 import io.grpc.alts.GoogleDefaultChannelBuilder;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 
@@ -18,6 +21,10 @@ public class StorageStubProvider {
 
   // The maximum number of times to automatically retry gRPC requests.
   private static final double GRPC_MAX_RETRY_ATTEMPTS = 10;
+
+  // The maximum number of media channels this provider will hand out. If more channels are
+  // requested, the provider will reuse existing ones.
+  private static final int MEDIA_CHANNEL_MAX_POOL_SIZE = 12;
 
   // The GCS gRPC server.
   private static final String GRPC_TARGET =
@@ -28,26 +35,45 @@ public class StorageStubProvider {
 
   private GoogleCloudStorageReadOptions readOptions;
   private ExecutorService backgroundTasksThreadPool;
+  private List<ManagedChannel> mediaChannelPool;
+  private int nextChannel = 0;
 
   public StorageStubProvider(
       GoogleCloudStorageReadOptions readOptions, ExecutorService backgroundTasksThreadPool) {
     this.readOptions = readOptions;
     this.backgroundTasksThreadPool = backgroundTasksThreadPool;
+
+    this.mediaChannelPool = new ArrayList<ManagedChannel>();
   }
 
-  public StorageBlockingStub buildBlockingStub() {
-    return StorageGrpc.newBlockingStub(
-        ComputeEngineChannelBuilder.forAddress("storage.googleapis.com", 443)
-            .defaultServiceConfig(getGrpcServiceConfig())
-            .build());
+  private ManagedChannel buildManagedChannel() {
+    return GoogleDefaultChannelBuilder.forTarget(GRPC_TARGET)
+        .defaultServiceConfig(getGrpcServiceConfig())
+        .build();
   }
 
-  public StorageStub buildAsyncStub() {
-    return StorageGrpc.newStub(
-            GoogleDefaultChannelBuilder.forTarget(GRPC_TARGET)
-                .defaultServiceConfig(getGrpcServiceConfig())
-                .build())
-        .withExecutor(backgroundTasksThreadPool);
+  public StorageBlockingStub getBlockingStub() {
+    ManagedChannel channel;
+    if(mediaChannelPool.size() < MEDIA_CHANNEL_MAX_POOL_SIZE) {
+      channel = buildManagedChannel();
+      mediaChannelPool.add(channel);
+    } else {
+      channel = mediaChannelPool.get(nextChannel);
+      nextChannel = (nextChannel + 1) % mediaChannelPool.size();
+    }
+    return StorageGrpc.newBlockingStub(channel);
+  }
+
+  public StorageStub getAsyncStub() {
+    ManagedChannel channel;
+    if(mediaChannelPool.size() < MEDIA_CHANNEL_MAX_POOL_SIZE) {
+      channel = buildManagedChannel();
+      mediaChannelPool.add(channel);
+    } else {
+      channel = mediaChannelPool.get(nextChannel);
+      nextChannel = (nextChannel + 1) % mediaChannelPool.size();
+    }
+    return StorageGrpc.newStub(channel).withExecutor(backgroundTasksThreadPool);
   }
 
   private Map<String, Object> getGrpcServiceConfig() {
