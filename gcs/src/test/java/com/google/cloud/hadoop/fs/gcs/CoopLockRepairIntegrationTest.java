@@ -16,19 +16,20 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.AUTHENTICATION_PREFIX;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_COOPERATIVE_LOCKING_EXPIRATION_TIMEOUT_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID;
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationType.DELETE;
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationType.RENAME;
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao.LOCK_DIRECTORY;
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao.LOCK_PATH;
-import static com.google.cloud.hadoop.util.EntriesCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
-import static com.google.cloud.hadoop.util.EntriesCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX;
-import static com.google.cloud.hadoop.util.EntriesCredentialConfiguration.SERVICE_ACCOUNT_KEYFILE_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_KEYFILE_SUFFIX;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth8.assertThat;
 import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.toList;
@@ -70,7 +71,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/** Integration tests for {@link GoogleCloudStorageFileSystem} class. */
+/** Integration tests for Cooperative Locking FSCK tool. */
 @RunWith(JUnit4.class)
 public class CoopLockRepairIntegrationTest {
 
@@ -101,7 +102,8 @@ public class CoopLockRepairIntegrationTest {
             gcsOptions.getAppName(),
             gcsOptions.getMaxHttpRequestRetries(),
             gcsOptions.getHttpRequestConnectTimeout(),
-            gcsOptions.getHttpRequestReadTimeout());
+            gcsOptions.getHttpRequestReadTimeout(),
+            gcsOptions.getHttpRequestHeaders());
 
     GoogleCloudStorageFileSystem gcsfs =
         new GoogleCloudStorageFileSystem(
@@ -216,7 +218,7 @@ public class CoopLockRepairIntegrationTest {
 
     GoogleCloudStorageFileSystemOptions gcsFsOptions = newGcsFsOptions();
 
-    failDeleteOperation(bucketName, gcsFsOptions, dirUri);
+    failDeleteOperation(gcsFsOptions, bucketName, dirUri);
 
     GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, httpRequestInitializer);
 
@@ -261,18 +263,15 @@ public class CoopLockRepairIntegrationTest {
 
     GoogleCloudStorageFileSystemOptions gcsFsOptions = newGcsFsOptions();
 
-    failDeleteOperation(bucketName, gcsFsOptions, dirUri);
+    failDeleteOperation(gcsFsOptions, bucketName, dirUri);
 
     GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, httpRequestInitializer);
 
     // delete operation lock file
     List<URI> lockFile =
         gcsFs.listFileInfo(bucketUri.resolve(LOCK_DIRECTORY)).stream()
-            .filter(
-                f ->
-                    !f.getPath().toString().endsWith("/all.lock")
-                        && f.getPath().toString().endsWith(".lock"))
             .map(FileInfo::getPath)
+            .filter(p -> !p.toString().endsWith("/all.lock") && p.toString().endsWith(".lock"))
             .collect(toImmutableList());
     gcsFs.delete(Iterables.getOnlyElement(lockFile), /* recursive */ false);
 
@@ -302,6 +301,53 @@ public class CoopLockRepairIntegrationTest {
   }
 
   @Test
+  public void failedDirectoryDelete_noLogFile_checkSucceeds() throws Exception {
+    String bucketName = gcsfsIHelper.createUniqueBucket("coop-delete-check-no-log-failed");
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String fileName = "file";
+    URI dirUri = bucketUri.resolve("delete_" + UUID.randomUUID() + "/");
+
+    // create file to delete
+    gcsfsIHelper.writeTextFile(bucketName, dirUri.resolve(fileName).getPath(), "file_content");
+
+    GoogleCloudStorageFileSystemOptions gcsFsOptions = newGcsFsOptions();
+
+    failDeleteOperation(gcsFsOptions, bucketName, dirUri);
+
+    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, httpRequestInitializer);
+
+    // delete operation log file
+    List<URI> logFile =
+        gcsFs.listFileInfo(bucketUri.resolve(LOCK_DIRECTORY)).stream()
+            .map(FileInfo::getPath)
+            .filter(p -> p.toString().endsWith(".log"))
+            .collect(toImmutableList());
+    gcsFs.delete(Iterables.getOnlyElement(logFile), /* recursive */ false);
+
+    assertThat(gcsFs.exists(dirUri)).isTrue();
+    assertThat(gcsFs.exists(dirUri.resolve(fileName))).isTrue();
+
+    CoopLockFsck fsck = new CoopLockFsck();
+    fsck.setConf(getTestConfiguration());
+
+    fsck.run(new String[] {"--check", "gs://" + bucketName});
+
+    assertThat(gcsFs.exists(dirUri)).isTrue();
+    assertThat(gcsFs.exists(dirUri.resolve(fileName))).isTrue();
+
+    // Validate lock files
+    List<URI> lockFiles =
+        gcsFs.listFileInfo(bucketUri.resolve(LOCK_DIRECTORY)).stream()
+            .map(FileInfo::getPath)
+            .collect(toList());
+
+    assertThat(lockFiles).hasSize(2);
+    assertThat(matchFile(lockFiles, "all\\.lock")).isNotNull();
+    String filenamePattern = String.format(OPERATION_FILENAME_PATTERN_FORMAT, DELETE);
+    assertThat(matchFile(lockFiles, filenamePattern + "\\.log")).isEmpty();
+  }
+
+  @Test
   public void failedDirectoryDelete_rollForward_withWrongId_fails() throws Exception {
     String bucketName = gcsfsIHelper.createUniqueBucket("coop-delete-fwd-fail-bad-id");
     URI bucketUri = new URI("gs://" + bucketName + "/");
@@ -313,7 +359,7 @@ public class CoopLockRepairIntegrationTest {
 
     GoogleCloudStorageFileSystemOptions gcsFsOptions = newGcsFsOptions();
 
-    failDeleteOperation(bucketName, gcsFsOptions, dirUri);
+    failDeleteOperation(gcsFsOptions, bucketName, dirUri);
 
     GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, httpRequestInitializer);
 
@@ -363,7 +409,7 @@ public class CoopLockRepairIntegrationTest {
 
     GoogleCloudStorageFileSystemOptions gcsFsOptions = newGcsFsOptions();
 
-    failDeleteOperation(bucketName, gcsFsOptions, dirUri);
+    failDeleteOperation(gcsFsOptions, bucketName, dirUri);
 
     GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, httpRequestInitializer);
 
@@ -449,6 +495,71 @@ public class CoopLockRepairIntegrationTest {
         .isEqualTo(new DeleteOperation().setLockExpiration(null).setResource(dirUri.toString()));
     assertThat(gcsfsIHelper.readTextFile(bucketName, logFileUri.getPath()))
         .isEqualTo(dirUri.resolve(fileName) + "\n" + dirUri + "\n");
+  }
+
+  @Test
+  public void failedDirectoryRename_noLogFile_successfullyRepaired() throws Exception {
+    String bucketName = gcsfsIHelper.createUniqueBucket("coop-rename-back-failed-copy-nolog");
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirName = "rename_" + UUID.randomUUID();
+    String fileName = "file";
+    URI srcDirUri = bucketUri.resolve(dirName + "_src/");
+    URI dstDirUri = bucketUri.resolve(dirName + "_dst/");
+
+    // create file to rename
+    gcsfsIHelper.writeTextFile(bucketName, srcDirUri.resolve(fileName).getPath(), "file_content");
+
+    GoogleCloudStorageFileSystemOptions gcsFsOptions = newGcsFsOptions();
+
+    // fail rename operation during log file creation
+    failRenameOperation(
+        srcDirUri,
+        dstDirUri,
+        gcsFsOptions,
+        r ->
+            "POST".equals(r.getRequestMethod())
+                && r.getUrl().toString().contains(".log")
+                && !r.getUrl().toString().contains("all.log"));
+
+    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, httpRequestInitializer);
+
+    assertThat(gcsFs.exists(srcDirUri)).isTrue();
+    assertThat(gcsFs.exists(srcDirUri.resolve(fileName))).isTrue();
+    assertThat(gcsFs.exists(dstDirUri)).isFalse();
+    assertThat(gcsFs.exists(dstDirUri.resolve(fileName))).isFalse();
+
+    CoopLockFsck fsck = new CoopLockFsck();
+    fsck.setConf(getTestConfiguration());
+
+    // Wait until lock will expire
+    sleepUninterruptibly(COOP_LOCK_TIMEOUT);
+
+    fsck.run(new String[] {"--rollBack", "gs://" + bucketName, "all"});
+
+    assertThat(gcsFs.exists(dstDirUri)).isFalse();
+    assertThat(gcsFs.exists(dstDirUri.resolve(fileName))).isFalse();
+    assertThat(gcsFs.exists(srcDirUri)).isTrue();
+    assertThat(gcsFs.exists(srcDirUri.resolve(fileName))).isTrue();
+
+    // Validate lock files
+    List<URI> lockFiles =
+        gcsFs.listFileInfo(bucketUri.resolve(LOCK_DIRECTORY)).stream()
+            .map(FileInfo::getPath)
+            .collect(toList());
+
+    assertThat(lockFiles).hasSize(1);
+    String filenameFormat = String.format(OPERATION_FILENAME_PATTERN_FORMAT, RENAME);
+    URI lockFileUri = matchFile(lockFiles, filenameFormat + "\\.lock").get();
+
+    String lockContent = gcsfsIHelper.readTextFile(bucketName, lockFileUri.getPath());
+    assertThat(GSON.fromJson(lockContent, RenameOperation.class).setLockExpiration(null))
+        .isEqualTo(
+            new RenameOperation()
+                .setLockExpiration(null)
+                .setSrcResource(srcDirUri.toString())
+                .setDstResource(dstDirUri.toString())
+                .setCopySucceeded(false));
+    assertThat(matchFile(lockFiles, filenameFormat + "\\.log")).isEmpty();
   }
 
   @Test
@@ -553,8 +664,7 @@ public class CoopLockRepairIntegrationTest {
     HttpRequestInitializer failingRequestInitializer = newFailingRequestInitializer(failPredicate);
     GoogleCloudStorageFileSystem failingGcsFs = newGcsFs(options, failingRequestInitializer);
 
-    IOException e =
-        assertThrows(IOException.class, () -> failingGcsFs.rename(srcDirUri, dstDirUri));
+    Exception e = assertThrows(Exception.class, () -> failingGcsFs.rename(srcDirUri, dstDirUri));
     assertThat(e).hasCauseThat().hasCauseThat().hasMessageThat().endsWith("Injected failure");
   }
 
@@ -581,7 +691,7 @@ public class CoopLockRepairIntegrationTest {
 
     GoogleCloudStorageFileSystemOptions gcsFsOptions = newGcsFsOptions();
 
-    failDeleteOperation(bucketName, gcsFsOptions, dirUri);
+    failDeleteOperation(gcsFsOptions, bucketName, dirUri);
 
     GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, httpRequestInitializer);
 
@@ -617,7 +727,7 @@ public class CoopLockRepairIntegrationTest {
   }
 
   private static void failDeleteOperation(
-      String bucketName, GoogleCloudStorageFileSystemOptions gcsFsOptions, URI dirUri)
+      GoogleCloudStorageFileSystemOptions gcsFsOptions, String bucketName, URI dirUri)
       throws Exception {
     HttpRequestInitializer failingRequestInitializer =
         newFailingRequestInitializer(
@@ -649,7 +759,7 @@ public class CoopLockRepairIntegrationTest {
   private static Configuration getTestConfiguration() {
     Configuration conf = new Configuration();
     conf.set("fs.gs.impl", GoogleHadoopFileSystem.class.getName());
-    conf.setBoolean(AUTHENTICATION_PREFIX + ENABLE_SERVICE_ACCOUNTS_SUFFIX, true);
+    conf.setBoolean(GCS_CONFIG_PREFIX + ENABLE_SERVICE_ACCOUNTS_SUFFIX.getKey(), true);
     conf.setLong(
         GCS_COOPERATIVE_LOCKING_EXPIRATION_TIMEOUT_MS.getKey(), COOP_LOCK_TIMEOUT.toMillis());
 
@@ -657,9 +767,11 @@ public class CoopLockRepairIntegrationTest {
     TestConfiguration testConf = TestConfiguration.getInstance();
     conf.set(GCS_PROJECT_ID.getKey(), testConf.getProjectId());
     if (testConf.getServiceAccount() != null && testConf.getPrivateKeyFile() != null) {
-      conf.set(AUTHENTICATION_PREFIX + SERVICE_ACCOUNT_EMAIL_SUFFIX, testConf.getServiceAccount());
       conf.set(
-          AUTHENTICATION_PREFIX + SERVICE_ACCOUNT_KEYFILE_SUFFIX, testConf.getPrivateKeyFile());
+          GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_EMAIL_SUFFIX.getKey(), testConf.getServiceAccount());
+      conf.set(
+          GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_KEYFILE_SUFFIX.getKey(),
+          testConf.getPrivateKeyFile());
     }
     return conf;
   }

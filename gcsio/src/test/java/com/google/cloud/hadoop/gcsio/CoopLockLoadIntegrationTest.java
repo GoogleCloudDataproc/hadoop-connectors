@@ -43,7 +43,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/** Integration tests for GoogleCloudStorageFileSystem class. */
+/** Load tests for Cooperative Locking feature. */
 @RunWith(JUnit4.class)
 public class CoopLockLoadIntegrationTest {
 
@@ -67,7 +67,8 @@ public class CoopLockLoadIntegrationTest {
             gcsOptions.getAppName(),
             gcsOptions.getMaxHttpRequestRetries(),
             gcsOptions.getHttpRequestConnectTimeout(),
-            gcsOptions.getHttpRequestReadTimeout());
+            gcsOptions.getHttpRequestReadTimeout(),
+            gcsOptions.getHttpRequestHeaders());
 
     GoogleCloudStorageFileSystem gcsfs =
         new GoogleCloudStorageFileSystem(

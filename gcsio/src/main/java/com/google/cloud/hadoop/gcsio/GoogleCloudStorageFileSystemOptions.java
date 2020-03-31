@@ -22,31 +22,24 @@ import javax.annotation.Nullable;
 @AutoValue
 public abstract class GoogleCloudStorageFileSystemOptions {
 
-  /** @deprecated use {@link #builder()} instead */
-  @Deprecated
-  public static Builder newBuilder() {
-    return builder();
-  }
-
   public static Builder builder() {
     return new AutoValue_GoogleCloudStorageFileSystemOptions.Builder()
         .setPerformanceCacheEnabled(false)
         .setPerformanceCacheOptions(PerformanceCachingGoogleCloudStorageOptions.DEFAULT)
         .setCloudStorageOptions(GoogleCloudStorageOptions.DEFAULT)
-        .setPathCodec(GoogleCloudStorageFileSystem.URI_ENCODED_PATH_CODEC)
         .setBucketDeleteEnabled(false)
         .setMarkerFilePattern((String) null)
         .setStatusParallelEnabled(false)
         .setCooperativeLockingEnabled(false);
   }
 
+  public abstract Builder toBuilder();
+
   public abstract boolean isPerformanceCacheEnabled();
 
   public abstract PerformanceCachingGoogleCloudStorageOptions getPerformanceCacheOptions();
 
   public abstract GoogleCloudStorageOptions getCloudStorageOptions();
-
-  public abstract PathCodec getPathCodec();
 
   public abstract boolean isBucketDeleteEnabled();
 
@@ -61,8 +54,6 @@ public abstract class GoogleCloudStorageFileSystemOptions {
     getCloudStorageOptions().throwIfNotValid();
   }
 
-  public abstract Builder toBuilder();
-
   /** Mutable builder for {@link GoogleCloudStorageFileSystemOptions}. */
   @AutoValue.Builder
   public abstract static class Builder {
@@ -73,8 +64,6 @@ public abstract class GoogleCloudStorageFileSystemOptions {
         PerformanceCachingGoogleCloudStorageOptions options);
 
     public abstract Builder setCloudStorageOptions(GoogleCloudStorageOptions options);
-
-    public abstract Builder setPathCodec(PathCodec pathCodec);
 
     public abstract Builder setBucketDeleteEnabled(boolean bucketDeleteEnabled);
 

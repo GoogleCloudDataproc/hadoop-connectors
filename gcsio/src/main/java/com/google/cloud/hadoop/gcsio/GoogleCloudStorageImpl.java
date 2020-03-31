@@ -40,6 +40,10 @@ import com.google.api.client.util.Sleeper;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.StorageRequest;
 import com.google.api.services.storage.model.Bucket;
+import com.google.api.services.storage.model.Bucket.Lifecycle;
+import com.google.api.services.storage.model.Bucket.Lifecycle.Rule;
+import com.google.api.services.storage.model.Bucket.Lifecycle.Rule.Action;
+import com.google.api.services.storage.model.Bucket.Lifecycle.Rule.Condition;
 import com.google.api.services.storage.model.Buckets;
 import com.google.api.services.storage.model.ComposeRequest;
 import com.google.api.services.storage.model.Objects;
@@ -99,12 +103,6 @@ import javax.annotation.Nullable;
  */
 public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
-  // Number of retries to make when waiting for a bucket to be empty.
-  public static final int BUCKET_EMPTY_MAX_RETRIES = 20;
-
-  // Duration of wait (in milliseconds) per retry for a bucket to be empty.
-  public static final int BUCKET_EMPTY_WAIT_TIME_MS = 500;
-
   // JSON factory used for formatting GCS JSON API payloads.
   private static final JsonFactory JSON_FACTORY = new JacksonFactory();
 
@@ -130,16 +128,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
   }
 
-  /**
-   * A factory for producing BackOff objects.
-   */
-  public static interface BackOffFactory {
-    public static final BackOffFactory DEFAULT = new BackOffFactory() {
-      @Override
-      public BackOff newBackOff() {
-        return new ExponentialBackOff();
-      }
-    };
+  /** A factory for producing BackOff objects. */
+  public interface BackOffFactory {
+    BackOffFactory DEFAULT = ExponentialBackOff::new;
 
     BackOff newBackOff();
   }
@@ -166,7 +157,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               });
 
   // GCS access instance.
-  private Storage gcs;
+  @VisibleForTesting Storage gcs;
 
   // Thread-pool used for background tasks.
   private ExecutorService backgroundTasksThreadPool =
@@ -220,7 +211,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             options.getAppName(),
             options.getMaxHttpRequestRetries(),
             options.getHttpRequestConnectTimeout(),
-            options.getHttpRequestReadTimeout()));
+            options.getHttpRequestReadTimeout(),
+            options.getHttpRequestHeaders()));
   }
 
   @VisibleForTesting
@@ -244,6 +236,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // Create GCS instance.
     this.gcs =
         new Storage.Builder(httpTransport, JSON_FACTORY, httpRequestInitializer)
+            .setRootUrl(options.getStorageRootUrl())
             .setApplicationName(options.getAppName())
             .build();
   }
@@ -428,6 +421,18 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             .setName(bucketName)
             .setLocation(options.getLocation())
             .setStorageClass(options.getStorageClass());
+    if (options.getTtl() != null) {
+      bucket.setLifecycle(
+          new Lifecycle()
+              .setRule(
+                  ImmutableList.of(
+                      new Rule()
+                          .setAction(new Action().setType("Delete"))
+                          .setCondition(
+                              new Condition()
+                                  .setAge(Math.toIntExact(options.getTtl().toDays()))))));
+    }
+
     Storage.Buckets.Insert insertBucket =
         configureRequest(gcs.buckets().insert(storageOptions.getProjectId(), bucket), bucketName);
     // TODO(user): To match the behavior of throwing FileNotFoundException for 404, we probably
@@ -608,12 +613,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
 
     return new GoogleCloudStorageReadChannel(
-        gcs,
-        resourceId.getBucketName(),
-        resourceId.getObjectName(),
-        errorExtractor,
-        clientRequestHelper,
-        readOptions) {
+        gcs, resourceId, errorExtractor, clientRequestHelper, readOptions) {
 
       @Override
       @Nullable
@@ -877,9 +877,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           "dstObjectName must not be null or empty");
       if (srcBucketName.equals(dstBucketName)
           && srcObjectNames.get(i).equals(dstObjectNames.get(i))) {
-        throw new IllegalArgumentException(String.format(
-            "Copy destination must be different from source for %s.",
-            StorageResourceId.createReadableString(srcBucketName, srcObjectNames.get(i))));
+        throw new IllegalArgumentException(
+            String.format(
+                "Copy destination must be different from source for %s.",
+                StringPaths.fromComponents(srcBucketName, srcObjectNames.get(i))));
       }
     }
   }
@@ -963,8 +964,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         new JsonBatchCallback<RewriteResponse>() {
           @Override
           public void onSuccess(RewriteResponse rewriteResponse, HttpHeaders responseHeaders) {
-            String srcString = StorageResourceId.createReadableString(srcBucketName, srcObjectName);
-            String dstString = StorageResourceId.createReadableString(dstBucketName, dstObjectName);
+            String srcString = StringPaths.fromComponents(srcBucketName, srcObjectName);
+            String dstString = StringPaths.fromComponents(dstBucketName, dstObjectName);
 
             if (rewriteResponse.getDone()) {
               logger.atFine().log("Successfully copied %s to %s", srcString, dstString);
@@ -1020,8 +1021,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         new JsonBatchCallback<StorageObject>() {
           @Override
           public void onSuccess(StorageObject copyResponse, HttpHeaders responseHeaders) {
-            String srcString = StorageResourceId.createReadableString(srcBucketName, srcObjectName);
-            String dstString = StorageResourceId.createReadableString(dstBucketName, dstObjectName);
+            String srcString = StringPaths.fromComponents(srcBucketName, srcObjectName);
+            String dstString = StringPaths.fromComponents(dstBucketName, dstObjectName);
             logger.atFine().log("Successfully copied %s to %s", srcString, dstString);
           }
 
@@ -1046,8 +1047,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             ? createFileNotFoundException(srcBucketName, srcObjectName, cause)
             : new IOException(
                 String.format(
-                    "Error copying '%s'",
-                    StorageResourceId.createReadableString(srcBucketName, srcObjectName)),
+                    "Error copying '%s'", StringPaths.fromComponents(srcBucketName, srcObjectName)),
                 cause));
   }
 
@@ -1229,8 +1229,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     try {
       items = listObject.execute();
     } catch (IOException e) {
-      String resource =
-          StorageResourceId.createReadableString(listObject.getBucket(), listObject.getPrefix());
+      String resource = StringPaths.fromComponents(listObject.getBucket(), listObject.getPrefix());
       if (errorExtractor.itemNotFound(e)) {
         logger.atFine().withCause(e).log(
             "listStorageObjectsAndPrefixesPage(%s, %d): item not found", resource, maxResults);
@@ -2033,7 +2032,57 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   <RequestT extends StorageRequest<?>> RequestT configureRequest(
       RequestT request, String bucketName) {
     setRequesterPaysProject(request, bucketName);
+
+    if (request instanceof Storage.Objects.Get || request instanceof Storage.Objects.Insert) {
+      setEncryptionHeaders(request);
+    }
+
+    if (request instanceof Storage.Objects.Rewrite || request instanceof Storage.Objects.Copy) {
+      setEncryptionHeaders(request);
+      setDecryptionHeaders(request);
+    }
+
     return request;
+  }
+
+  private <RequestT extends StorageRequest<?>> void setEncryptionHeaders(RequestT request) {
+    if (storageOptions.getEncryptionKey() == null) {
+      return;
+    }
+
+    request
+        .getRequestHeaders()
+        .set(
+            "x-goog-encryption-algorithm",
+            checkNotNull(
+                storageOptions.getEncryptionAlgorithm(), "encryption algorithm must not be null"))
+        .set(
+            "x-goog-encryption-key",
+            checkNotNull(storageOptions.getEncryptionKey(), "encryption key must not be null"))
+        .set(
+            "x-goog-encryption-key-sha256",
+            checkNotNull(
+                storageOptions.getEncryptionKeyHash(), "encryption key hash must not be null"));
+  }
+
+  private <RequestT extends StorageRequest<?>> void setDecryptionHeaders(RequestT request) {
+    if (storageOptions.getEncryptionKey() == null) {
+      return;
+    }
+
+    request
+        .getRequestHeaders()
+        .set(
+            "x-goog-copy-source-encryption-algorithm",
+            checkNotNull(
+                storageOptions.getEncryptionAlgorithm(), "encryption algorithm must not be null"))
+        .set(
+            "x-goog-copy-source-encryption-key",
+            checkNotNull(storageOptions.getEncryptionKey(), "encryption key must not be null"))
+        .set(
+            "x-goog-copy-source-encryption-key-sha256",
+            checkNotNull(
+                storageOptions.getEncryptionKeyHash(), "encryption key hash must not be null"));
   }
 
   private <RequestT extends StorageRequest<?>> void setRequesterPaysProject(

@@ -14,12 +14,13 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.AUTH_SERVICE_ACCOUNT_EMAIL;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.AUTH_SERVICE_ACCOUNT_KEY_FILE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCE_BUCKET_DELETE_ENABLE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_INFER_IMPLICIT_DIRECTORIES_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_KEYFILE_SUFFIX;
 import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
@@ -33,7 +34,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
-import com.google.common.base.Joiner;
 import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
@@ -55,8 +55,6 @@ import org.junit.Test;
  * visible at the GHFS level.
  */
 public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTestBase {
-
-  private static final Joiner COMMA_JOINER = Joiner.on(',');
 
   /**
    * Helper to load all the GHFS-specific config values from environment variables, such as those
@@ -80,8 +78,8 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     Configuration config = new Configuration();
     config.set(GCS_PROJECT_ID.getKey(), projectId);
     if (serviceAccount != null && privateKeyFile != null) {
-      config.set(AUTH_SERVICE_ACCOUNT_EMAIL.getKey(), serviceAccount);
-      config.set(AUTH_SERVICE_ACCOUNT_KEY_FILE.getKey(), privateKeyFile);
+      config.set(GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_EMAIL_SUFFIX.getKey(), serviceAccount);
+      config.set(GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_KEYFILE_SUFFIX.getKey(), privateKeyFile);
     }
     config.setBoolean(GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.getKey(), true);
     config.setBoolean(GCS_INFER_IMPLICIT_DIRECTORIES_ENABLE.getKey(), false);
@@ -220,7 +218,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     // neither the subdir nor gs://<bucket>/<generated-tempdir> exist yet.
     Path emptyObject = new Path(dirPath, "empty-object");
     URI objUri = myghfs.getGcsPath(emptyObject);
-    StorageResourceId resource = gcsfs.getPathCodec().validatePathAndGetId(objUri, false);
+    StorageResourceId resource = StorageResourceId.fromUriPath(objUri, false);
     gcs.createEmptyObject(resource);
 
     boolean inferImplicitDirectories =
@@ -258,7 +256,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     // neither the subdir nor gs://<bucket>/<generated-tempdir> exist yet.
     Path emptyObject = new Path(subDir, "empty-object");
     URI objUri = myghfs.getGcsPath(emptyObject);
-    StorageResourceId resource = gcsfs.getPathCodec().validatePathAndGetId(objUri, false);
+    StorageResourceId resource = StorageResourceId.fromUriPath(objUri, false);
     gcs.createEmptyObject(resource);
 
     boolean autoRepairImplicitDirectories =
@@ -289,7 +287,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     // neither the subdir nor gs://<bucket>/<generated-tempdir> exist yet.
     Path emptyObject = new Path(dirPath, "empty-object");
     URI objUri = myghfs.getGcsPath(emptyObject);
-    StorageResourceId resource = gcsfs.getPathCodec().validatePathAndGetId(objUri, false);
+    StorageResourceId resource = StorageResourceId.fromUriPath(objUri, false);
     gcs.createEmptyObject(resource);
 
     boolean inferImplicitDirectories =
@@ -328,7 +326,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     // neither the subdir nor gs://<bucket>/<generated-tempdir> exist yet.
     Path emptyObject = new Path(subDir, "empty-object");
     URI objUri = myghfs.getGcsPath(emptyObject);
-    StorageResourceId resource = gcsfs.getPathCodec().validatePathAndGetId(objUri, false);
+    StorageResourceId resource = StorageResourceId.fromUriPath(objUri, false);
     gcs.createEmptyObject(resource);
 
     boolean autoRepairImplicitDirectories =
@@ -392,7 +390,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     qualifiedPaths.put(fsRoot + "..foo/bar", fsRoot + "..foo/bar");
     qualifiedPaths.put("..foo/bar", workingDir + "/..foo/bar");
 
-    // GHFS specific behavior where root is it's own parent.
+    // GHFS specific behavior where root is its own parent.
     qualifiedPaths.put("/..", fsRoot);
     qualifiedPaths.put("/../../..", fsRoot);
     qualifiedPaths.put("/../foo/", fsRoot + "foo");
@@ -449,7 +447,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     qualifiedPaths.put(fsRoot + "..foo/bar", fsRoot + "..foo/bar");
     qualifiedPaths.put("..foo/bar", fsRoot + "..foo/bar");
 
-    // GHFS specific behavior where root is it's own parent.
+    // GHFS specific behavior where root is its own parent.
     qualifiedPaths.put("/..", fsRoot);
     qualifiedPaths.put("/../../..", fsRoot);
     qualifiedPaths.put("/../foo/", fsRoot + "foo");

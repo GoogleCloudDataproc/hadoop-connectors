@@ -13,6 +13,10 @@
  */
 package com.google.cloud.hadoop.io.bigquery.samples;
 
+import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.PROJECT_ID;
+import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.SELECTED_FIELDS;
+import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.SQL_FILTER;
+
 import com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration;
 import com.google.cloud.hadoop.io.bigquery.DirectBigQueryInputFormat;
 import java.io.IOException;
@@ -31,15 +35,12 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.GenericOptionsParser;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * An example Hadoop WordCount program that counts the number of times a word appears in a BigQuery
  * table column.
  */
 public class DirectBigQueryWordCount {
-  private static final Logger log = LoggerFactory.getLogger(DirectBigQueryWordCount.class);
 
   /** The mapper for our WordCount job. */
   public static class Map extends Mapper<NullWritable, GenericRecord, Text, LongWritable> {
@@ -107,14 +108,14 @@ public class DirectBigQueryWordCount {
     Configuration conf = job.getConfiguration();
 
     // Set the job-level projectId.
-    conf.set(BigQueryConfiguration.PROJECT_ID_KEY, projectId);
+    conf.set(PROJECT_ID.getKey(), projectId);
 
     // Configure input and output.
     BigQueryConfiguration.configureBigQueryInput(conf, inputQualifiedTableId);
 
     // Set column and predicate filters
-    conf.set(BigQueryConfiguration.SELECTED_FIELDS_KEY, "word,word_count");
-    conf.set(BigQueryConfiguration.SQL_FILTER_KEY, "word >= 'A' AND word <= 'zzz'");
+    conf.set(SELECTED_FIELDS.getKey(), "word,word_count");
+    conf.set(SQL_FILTER.getKey(), "word >= 'A' AND word <= 'zzz'");
     conf.set(MRJobConfig.NUM_MAPS, "999");
 
     // This helps Hadoop identify the Jar which contains the mapper and reducer by specifying a

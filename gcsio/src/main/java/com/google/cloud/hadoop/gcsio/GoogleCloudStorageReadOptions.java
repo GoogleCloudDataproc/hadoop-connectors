@@ -34,13 +34,6 @@ public abstract class GoogleCloudStorageReadOptions {
     SEQUENTIAL
   }
 
-  /** Options of read consistency on generations. */
-  public enum GenerationReadConsistency {
-    LATEST,
-    BEST_EFFORT,
-    STRICT
-  }
-
   public static final int DEFAULT_BACKOFF_INITIAL_INTERVAL_MILLIS = 200;
   public static final double DEFAULT_BACKOFF_RANDOMIZATION_FACTOR = 0.5;
   public static final double DEFAULT_BACKOFF_MULTIPLIER = 1.5;
@@ -52,8 +45,6 @@ public abstract class GoogleCloudStorageReadOptions {
   public static final long DEFAULT_INPLACE_SEEK_LIMIT = 0L;
   public static final Fadvise DEFAULT_FADVISE = Fadvise.SEQUENTIAL;
   public static final int DEFAULT_MIN_RANGE_REQUEST_SIZE = 512 * 1024;
-  public static final GenerationReadConsistency DEFAULT_GENERATION_READ_CONSISTENCY =
-      GenerationReadConsistency.LATEST;
 
   // Default builder should be initialized after default values,
   // otherwise it will access not initialized default values.
@@ -71,9 +62,10 @@ public abstract class GoogleCloudStorageReadOptions {
         .setBufferSize(DEFAULT_BUFFER_SIZE)
         .setInplaceSeekLimit(DEFAULT_INPLACE_SEEK_LIMIT)
         .setFadvise(DEFAULT_FADVISE)
-        .setMinRangeRequestSize(DEFAULT_MIN_RANGE_REQUEST_SIZE)
-        .setGenerationReadConsistency(DEFAULT_GENERATION_READ_CONSISTENCY);
+        .setMinRangeRequestSize(DEFAULT_MIN_RANGE_REQUEST_SIZE);
   }
+
+  public abstract Builder toBuilder();
 
   /** See {@link Builder#setBackoffInitialIntervalMillis}. */
   public abstract int getBackoffInitialIntervalMillis();
@@ -107,11 +99,6 @@ public abstract class GoogleCloudStorageReadOptions {
 
   /** See {@link Builder#setMinRangeRequestSize}. */
   public abstract int getMinRangeRequestSize();
-
-  /** See {@link Builder#setGenerationReadConsistency}. */
-  public abstract GenerationReadConsistency getGenerationReadConsistency();
-
-  public abstract Builder toBuilder();
 
   /** Mutable builder for GoogleCloudStorageReadOptions. */
   @AutoValue.Builder
@@ -200,22 +187,6 @@ public abstract class GoogleCloudStorageReadOptions {
      * new stream to read an object.
      */
     public abstract Builder setMinRangeRequestSize(int size);
-
-    /**
-     * Sets the generation read consistency model.
-     *
-     * <p>Supported modes:
-     *
-     * <ul>
-     *   <li>{@code LATEST}: always read the latest generation.
-     *   <li>{@code BEST_EFFORT}: will try to read a certain generation (when the read-channel was
-     *       opened), but when that generation is deleted/overwritten, fall back to the latest
-     *       generation.
-     *   <li>{@code STRICT}: will try to read a certain generation (when the read-channel was
-     *       opened), but when that generation is deleted/overwritten, throw an exception.
-     * </ul>
-     */
-    public abstract Builder setGenerationReadConsistency(GenerationReadConsistency consistency);
 
     abstract GoogleCloudStorageReadOptions autoBuild();
 

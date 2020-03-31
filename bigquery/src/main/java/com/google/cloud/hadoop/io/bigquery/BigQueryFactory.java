@@ -13,13 +13,16 @@
  */
 package com.google.cloud.hadoop.io.bigquery;
 
+import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.BIGQUERY_CONFIG_PREFIX;
+import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.BQ_ROOT_URL;
+
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.bigquery.Bigquery;
-import com.google.cloud.hadoop.util.AccessTokenProviderClassFromConfigFactory;
+import com.google.api.services.bigquery.BigqueryScopes;
 import com.google.cloud.hadoop.util.CredentialFromAccessTokenProviderClassFactory;
 import com.google.cloud.hadoop.util.HadoopCredentialConfiguration;
 import com.google.cloud.hadoop.util.PropertyUtil;
@@ -28,6 +31,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 
 /**
@@ -35,10 +39,9 @@ import org.apache.hadoop.conf.Configuration;
  */
 public class BigQueryFactory {
 
-  public static final String BIGQUERY_CONFIG_PREFIX = "mapred.bq";
   // BigQuery scopes for OAUTH.
-  public static final ImmutableList<String> BIGQUERY_OAUTH_SCOPES =
-      ImmutableList.of("https://www.googleapis.com/auth/bigquery");
+  public static final List<String> BIGQUERY_OAUTH_SCOPES =
+      ImmutableList.of(BigqueryScopes.BIGQUERY);
 
   // Service account environment variable name for BigQuery Authentication.
   public static final String BIGQUERY_SERVICE_ACCOUNT = "BIGQUERY_SERVICE_ACCOUNT";
@@ -70,7 +73,7 @@ public class BigQueryFactory {
   static {
     VERSION = PropertyUtil.getPropertyOrDefault(
         BigQueryFactory.class, PROPERTIES_FILE, VERSION_PROPERTY, UNKNOWN_VERSION);
-    logger.atInfo().log("Bigquery connector version %s", VERSION);
+    logger.atInfo().log("BigQuery connector version %s", VERSION);
     BQC_ID = String.format("Hadoop BigQuery Connector/%s", VERSION);
   }
 
@@ -87,17 +90,12 @@ public class BigQueryFactory {
       throws GeneralSecurityException, IOException {
     Credential credential =
         CredentialFromAccessTokenProviderClassFactory.credential(
-            new AccessTokenProviderClassFromConfigFactory().withOverridePrefix("mapred.bq"),
-            config,
-            BIGQUERY_OAUTH_SCOPES);
+            config, ImmutableList.of(BIGQUERY_CONFIG_PREFIX), BIGQUERY_OAUTH_SCOPES);
     if (credential != null) {
       return credential;
     }
 
-    return HadoopCredentialConfiguration.newBuilder()
-        .withConfiguration(config)
-        .withOverridePrefix(BIGQUERY_CONFIG_PREFIX)
-        .build()
+    return HadoopCredentialConfiguration.getCredentialFactory(config, BIGQUERY_CONFIG_PREFIX)
         .getCredential(BIGQUERY_OAUTH_SCOPES);
   }
 
@@ -120,13 +118,12 @@ public class BigQueryFactory {
     logger.atInfo().log("Creating BigQuery from default credential.");
     Credential credential = createBigQueryCredential(config);
     // Use the credential to create an authorized BigQuery client
-    return getBigQueryFromCredential(credential, BQC_ID);
+    return getBigQueryFromCredential(config, credential, BQC_ID);
   }
 
-  /**
-   * Constructs a BigQuery from a given Credential.
-   */
-  public Bigquery getBigQueryFromCredential(Credential credential, String appName) {
+  /** Constructs a BigQuery from a given Credential. */
+  public Bigquery getBigQueryFromCredential(
+      Configuration config, Credential credential, String appName) {
     logger.atInfo().log("Creating BigQuery from given credential.");
     // Use the credential to create an authorized BigQuery client
     if (credential != null) {
@@ -134,7 +131,9 @@ public class BigQueryFactory {
           .Builder(HTTP_TRANSPORT, JSON_FACTORY, new RetryHttpInitializer(credential, appName))
           .setApplicationName(appName).build();
     }
-    return new Bigquery.Builder(HTTP_TRANSPORT, JSON_FACTORY, null)
-        .setApplicationName(appName).build();
+    return new Bigquery.Builder(HTTP_TRANSPORT, JSON_FACTORY, /* httpRequestInitializer= */ null)
+        .setRootUrl(BQ_ROOT_URL.get(config, config::get))
+        .setApplicationName(appName)
+        .build();
   }
 }

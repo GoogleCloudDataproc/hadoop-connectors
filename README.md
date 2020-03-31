@@ -1,14 +1,14 @@
-# bigdata-interop
+# Apache Hadoop Connectors
 
-[![GitHub release](https://img.shields.io/github/release/GoogleCloudPlatform/bigdata-interop.svg)](https://github.com/GoogleCloudPlatform/bigdata-interop/releases/latest)
-[![GitHub release date](https://img.shields.io/github/release-date/GoogleCloudPlatform/bigdata-interop.svg)](https://github.com/GoogleCloudPlatform/bigdata-interop/releases/latest)
-[![Code Quality: Java](https://img.shields.io/lgtm/grade/java/g/GoogleCloudPlatform/bigdata-interop.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/GoogleCloudPlatform/bigdata-interop/context:java)
-[![codecov](https://codecov.io/gh/GoogleCloudPlatform/bigdata-interop/branch/master/graph/badge.svg)](https://codecov.io/gh/GoogleCloudPlatform/bigdata-interop)
+[![GitHub release](https://img.shields.io/github/release/GoogleCloudDataproc/hadoop-connectors.svg)](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/latest)
+[![GitHub release date](https://img.shields.io/github/release-date/GoogleCloudDataproc/hadoop-connectors.svg)](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/latest)
+[![Code Quality: Java](https://img.shields.io/lgtm/grade/java/g/GoogleCloudDataproc/hadoop-connectors.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/GoogleCloudDataproc/hadoop-connectors/context:java)
+[![codecov](https://codecov.io/gh/GoogleCloudDataproc/hadoop-connectors/branch/master/graph/badge.svg)](https://codecov.io/gh/GoogleCloudDataproc/hadoop-connectors)
 
 Libraries and tools for interoperability between Apache Hadoop related
 open-source software and Google Cloud Platform.
 
-## Google Cloud Storage connector for Apache Hadoop
+## Google Cloud Storage connector for Apache Hadoop (HCFS)
 
 [![Maven Central](https://img.shields.io/maven-central/v/com.google.cloud.bigdataoss/gcs-connector/hadoop1.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:com.google.cloud.bigdataoss%20AND%20a:gcs-connector%20AND%20v:hadoop1-*)
 [![Maven Central](https://img.shields.io/maven-central/v/com.google.cloud.bigdataoss/gcs-connector/hadoop2.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:com.google.cloud.bigdataoss%20AND%20a:gcs-connector%20AND%20v:hadoop2-*)
@@ -31,9 +31,8 @@ interfaces. For more details see
 
 ## Google Cloud Pub/Sub connector for Apache Spark Streaming
 
-The Google Cloud Pub/Sub connector for Spark Streaming enables running Spark
-Streaming Job on topics in Pub/Sub by implementing the InputDStream interface.
-For more details see [the README](pubsub/README.md)
+This connector is deprecated and was removed - it's recommended to use
+[Apache Bahir](https://bahir.apache.org/) instead.
 
 ## Building the Cloud Storage and BigQuery connectors
 
@@ -60,11 +59,6 @@ commands from the main directory:
 The Cloud Storage connector JAR can be found in `gcs/target/`. The BigQuery
 connector JAR can be found in `bigquery/target/`.
 
-### Building the Google Cloud Pub/Sub connector
-
-Building the Pub/Sub Connector is described in
-[its README](pubsub/README.md#building-and-testing).
-
 ## Adding the Cloud Storage and BigQuery connectors to your build
 
 Maven group ID is `com.google.cloud.bigdataoss` and artifact ID for Cloud
@@ -78,10 +72,10 @@ To add a dependency on one of the connectors using Maven, use the following:
   <groupId>com.google.cloud.bigdataoss</groupId>
   <!-- Cloud Storage: -->
   <artifactId>gcs-connector</artifactId>
-  <version>hadoop2-2.0.0</version>
+  <version>hadoop2-2.1.0</version>
   <!-- or, for BigQuery: -->
   <artifactId>bigquery-connector</artifactId>
-  <version>hadoop2-1.0.0</version>
+  <version>hadoop2-1.1.0</version>
 </dependency>
 ```
 

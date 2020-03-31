@@ -69,11 +69,6 @@
 
     Enables lazy initialization of `GoogleHadoopFileSystem` instances.
 
-*   `fs.gs.path.encoding` (default: `uri-path`)
-
-    Path codec used that used for decoding and encoding Cloud Storage object
-    paths. Valid path codecs are `legacy` and `uri-path`.
-
 *   `fs.gs.block.size` (default: `67108864`)
 
     The reported block size of the file system. This does not change any
@@ -131,6 +126,32 @@
 
     If set, files that match specified pattern are copied last during folder
     rename operation.
+
+*   `fs.gs.storage.http.headers.<HEADER>=<VALUE>` (not set by default)
+
+    Custom HTTP headers added to Cloud Storage API requests.
+
+    Example:
+
+    ```
+    fs.gs.storage.http.headers.some-custom-header=custom_value
+    fs.gs.storage.http.headers.another-custom-header=another_custom_value
+    ```
+
+### Encryption (CSEK)
+
+*   `fs.gs.encryption.algorithm` (not set by default)
+
+    The encryption algorithm to use. For [CSEK](https://cloud.google.com/storage/docs/encryption/customer-supplied-keys)
+    Only `AES256` value is supported.
+
+*   `fs.gs.encryption.key` (not set by default)
+
+    An RFC 4648 Base64-encoded string of the source object's AES-256 encryption key.
+
+*   `fs.gs.encryption.key.hash` (not set by default)
+
+    An RFC 4648 Base64-encoded string of the SHA256 hash of the source object's encryption key.
 
 ### Authentication
 
@@ -248,34 +269,6 @@ is `false`.
     [GZIP encoded](https://cloud.google.com/storage/docs/transcoding#decompressive_transcoding)
     files is inefficient and error-prone in Hadoop and Spark.
 
-*   `fs.gs.generation.read.consistency` (default: `LATEST`)
-
-    Determines read consistency across different generations of a Cloud Storage
-    object.
-
-    Supported modes:
-
-    *   `LATEST` - this is the default behavior. The connector will ignore
-        generation ID of the GCS objects and always try to read the live
-        version.
-
-    *   `BEST_EFFORT` - The connector will try to read the generation determined
-        when the `GoogleCloudStorageReadChannel` is first opened. However if
-        that generation cannot be found anymore, connector will fall back to
-        read the live version. This mode allows to improve performance by
-        requesting the same object generation. Using this mode connector can
-        read changing objects from GCS buckets with disabled object versioning
-        without failure.
-
-    *   `STRICT` - The connector will always try to read the generation
-        determined when the `GoogleCloudStorageReadChannel` is first opened, and
-        reports FileNotFound exception when that generation cannot be found
-        anymore.
-
-        Note that this property will only apply to new streams opened after
-        generation is determined. It won't affect read from any streams that are
-        already open, pre-fetched footer, or the metadata of the object.
-
 *   `fs.gs.outputstream.buffer.size` (default: `8388608`)
 
     Write buffer size.
@@ -287,6 +280,13 @@ is `false`.
 *   `fs.gs.outputstream.upload.chunk.size` (default: `67108864`)
 
     The number of bytes in one GCS upload request.
+
+*   `fs.gs.outputstream.upload.cache.size` (default: `0`)
+
+    The upload cache size in bytes used for high-level upload retries. To
+    disable this feature set this property to zero or negative value. Retry will
+    be performed if total size of written/uploaded data to the object is less
+    than or equal to the cache size. 
 
 *   `fs.gs.outputstream.direct.upload.enable` (default: `false`)
 
@@ -345,8 +345,18 @@ is `false`.
 
 *   `fs.gs.http.read-timeout` (default: `20000`)
 
-    Timeout in milliseconds to read from an established connection. Use 0 for an
-    infinite timeout.
+    Timeout in milliseconds to read from an established connection. Use `0` for
+    an infinite timeout.
+
+### API client configuration
+
+*   `fs.gs.storage.root.url`
+
+    Google Cloud Storage root URL.
+
+*   `fs.gs.token.server.url`
+
+    Google Token Server root URL.
 
 ### Fadvise feature configuration
 
@@ -405,10 +415,6 @@ is `false`.
 
     Maximum number of milliseconds to store a cached metadata in the performance
     cache before it's invalidated.
-
-*   `fs.gs.performance.cache.list.caching.enable` (default: `false`)
-
-    Enable caching of list request results in the performance cache.
 
 ### Cloud Storage [Requester Pays](https://cloud.google.com/storage/docs/requester-pays) feature configuration:
 

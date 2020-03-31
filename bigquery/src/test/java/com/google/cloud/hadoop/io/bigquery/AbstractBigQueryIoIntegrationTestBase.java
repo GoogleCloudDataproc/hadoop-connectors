@@ -13,12 +13,11 @@
  */
 package com.google.cloud.hadoop.io.bigquery;
 
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.AUTH_SERVICE_ACCOUNT_EMAIL;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.AUTH_SERVICE_ACCOUNT_KEY_FILE;
-import static com.google.cloud.hadoop.io.bigquery.BigQueryFactory.BIGQUERY_CONFIG_PREFIX;
-import static com.google.cloud.hadoop.util.EntriesCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
-import static com.google.cloud.hadoop.util.EntriesCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX;
-import static com.google.cloud.hadoop.util.EntriesCredentialConfiguration.SERVICE_ACCOUNT_KEYFILE_SUFFIX;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
+import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.BIGQUERY_CONFIG_PREFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_KEYFILE_SUFFIX;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.when;
@@ -131,8 +130,7 @@ public abstract class AbstractBigQueryIoIntegrationTestBase<T> {
    * Helper method for grabbing service-account email and private keyfile name based on settings
    * intended for BigQueryFactory and adding them as GCS-equivalent credential settings.
    */
-  public static Configuration getConfigForGcsFromBigquerySettings(
-      String projectIdValue, String testBucket) {
+  public static Configuration getConfigForGcsFromBigquerySettings(String projectIdValue) {
     TestConfiguration testConf = TestConfiguration.getInstance();
     String serviceAccount = testConf.getServiceAccount();
     if (Strings.isNullOrEmpty(serviceAccount)) {
@@ -148,18 +146,18 @@ public abstract class AbstractBigQueryIoIntegrationTestBase<T> {
     config.set(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(), projectIdValue);
 
     if (serviceAccount != null && privateKeyFile != null) {
-      config.setBoolean(BIGQUERY_CONFIG_PREFIX + ENABLE_SERVICE_ACCOUNTS_SUFFIX, true);
-      config.set(BIGQUERY_CONFIG_PREFIX + SERVICE_ACCOUNT_EMAIL_SUFFIX, serviceAccount);
-      config.set(BIGQUERY_CONFIG_PREFIX + SERVICE_ACCOUNT_KEYFILE_SUFFIX, privateKeyFile);
-      config.set(AUTH_SERVICE_ACCOUNT_EMAIL.getKey(), serviceAccount);
-      config.set(AUTH_SERVICE_ACCOUNT_KEY_FILE.getKey(), privateKeyFile);
+      config.setBoolean(BIGQUERY_CONFIG_PREFIX + ENABLE_SERVICE_ACCOUNTS_SUFFIX.getKey(), true);
+      config.set(BIGQUERY_CONFIG_PREFIX + SERVICE_ACCOUNT_EMAIL_SUFFIX.getKey(), serviceAccount);
+      config.set(BIGQUERY_CONFIG_PREFIX + SERVICE_ACCOUNT_KEYFILE_SUFFIX.getKey(), privateKeyFile);
+      config.set(GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_EMAIL_SUFFIX.getKey(), serviceAccount);
+      config.set(GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_KEYFILE_SUFFIX.getKey(), privateKeyFile);
     }
 
     return config;
   }
 
   private void setConfigForGcsFromBigquerySettings() {
-    Configuration conf = getConfigForGcsFromBigquerySettings(projectIdValue, testBucket);
+    Configuration conf = getConfigForGcsFromBigquerySettings(projectIdValue);
     for (Entry<String, String> entry : conf) {
       config.set(entry.getKey(), entry.getValue());
     }
@@ -196,7 +194,7 @@ public abstract class AbstractBigQueryIoIntegrationTestBase<T> {
     datasetReference.setProjectId(projectIdValue);
     datasetReference.setDatasetId(testDataset);
 
-    config = getConfigForGcsFromBigquerySettings(projectIdValue, testBucket);
+    config = getConfigForGcsFromBigquerySettings(projectIdValue);
     BigQueryFactory factory = new BigQueryFactory();
     bigqueryInstance = factory.getBigQuery(config);
 
@@ -309,7 +307,7 @@ public abstract class AbstractBigQueryIoIntegrationTestBase<T> {
     config.clear();
     setConfigForGcsFromBigquerySettings();
     BigQueryConfiguration.configureBigQueryInput(config, projectIdValue, testDataset, testTable);
-    config.set(BigQueryConfiguration.GCS_BUCKET_KEY, testBucket);
+    config.set(BigQueryConfiguration.GCS_BUCKET.getKey(), testBucket);
 
     // Invoke the export/read flow by calling getSplits and createRecordReader.
     List<InputSplit> splits = inputFormat.getSplits(mockJobContext);

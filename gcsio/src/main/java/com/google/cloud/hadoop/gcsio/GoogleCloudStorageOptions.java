@@ -17,16 +17,25 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
+import com.google.api.services.storage.Storage;
 import com.google.auto.value.AutoValue;
 import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import javax.annotation.Nullable;
 
 /** Configuration options for the GoogleCloudStorage class. */
 @AutoValue
 public abstract class GoogleCloudStorageOptions {
+
+  /** Default setting for enabling use of GCS gRPC API. */
+  public static final boolean ENABLE_GRPC_DEFAULT = false;
+
+  /** Default root URL for Cloud Storage API endpoint. */
+  public static final String STORAGE_ROOT_URL_DEFAULT = Storage.DEFAULT_ROOT_URL;
 
   /** Default setting for enabling auto-repair of implicit directories. */
   public static final boolean AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT = true;
@@ -70,16 +79,15 @@ public abstract class GoogleCloudStorageOptions {
   /** Default setting for number of threads to execute GCS batch requests for copy operations. */
   public static final int COPY_BATCH_THREADS_DEFAULT = BATCH_THREADS_DEFAULT;
 
-  public static final GoogleCloudStorageOptions DEFAULT = builder().build();
+  /** Default setting for GCS HTTP request headers. */
+  public static final ImmutableMap<String, String> HTTP_REQUEST_HEADERS_DEFAULT = ImmutableMap.of();
 
-  /** @deprecated use {@link #builder()} instead */
-  @Deprecated
-  public static Builder newBuilder() {
-    return builder();
-  }
+  public static final GoogleCloudStorageOptions DEFAULT = builder().build();
 
   public static Builder builder() {
     return new AutoValue_GoogleCloudStorageOptions.Builder()
+        .setGrpcEnabled(ENABLE_GRPC_DEFAULT)
+        .setStorageRootUrl(STORAGE_ROOT_URL_DEFAULT)
         .setAutoRepairImplicitDirectoriesEnabled(AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT)
         .setInferImplicitDirectoriesEnabled(INFER_IMPLICIT_DIRECTORIES_DEFAULT)
         .setMaxWaitMillisForEmptyObjectCreation(MAX_WAIT_MILLIS_FOR_EMPTY_OBJECT_CREATION)
@@ -97,8 +105,15 @@ public abstract class GoogleCloudStorageOptions {
         .setReadChannelOptions(GoogleCloudStorageReadOptions.DEFAULT)
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
         .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
-        .setCooperativeLockingOptions(CooperativeLockingOptions.DEFAULT);
+        .setCooperativeLockingOptions(CooperativeLockingOptions.DEFAULT)
+        .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT);
   }
+
+  public abstract Builder toBuilder();
+
+  public abstract boolean isGrpcEnabled();
+
+  public abstract String getStorageRootUrl();
 
   @Nullable
   public abstract String getProjectId();
@@ -151,7 +166,16 @@ public abstract class GoogleCloudStorageOptions {
 
   public abstract CooperativeLockingOptions getCooperativeLockingOptions();
 
-  public abstract Builder toBuilder();
+  public abstract ImmutableMap<String, String> getHttpRequestHeaders();
+
+  @Nullable
+  public abstract String getEncryptionAlgorithm();
+
+  @Nullable
+  public abstract String getEncryptionKey();
+
+  @Nullable
+  public abstract String getEncryptionKeyHash();
 
   public void throwIfNotValid() {
     checkArgument(!isNullOrEmpty(getAppName()), "appName must not be null or empty");
@@ -160,6 +184,10 @@ public abstract class GoogleCloudStorageOptions {
   /** Mutable builder for the {@link GoogleCloudStorageOptions} class. */
   @AutoValue.Builder
   public abstract static class Builder {
+
+    public abstract Builder setGrpcEnabled(boolean grpcEnabled);
+
+    public abstract Builder setStorageRootUrl(String rootUrl);
 
     public abstract Builder setProjectId(String projectId);
 
@@ -210,6 +238,14 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setCooperativeLockingOptions(
         CooperativeLockingOptions cooperativeLockingOptions);
 
+    public abstract Builder setHttpRequestHeaders(Map<String, String> httpRequestHeaders);
+
+    public abstract Builder setEncryptionAlgorithm(String encryptionAlgorithm);
+
+    public abstract Builder setEncryptionKey(String encryptionKey);
+
+    public abstract Builder setEncryptionKeyHash(String encryptionKeyHash);
+
     abstract GoogleCloudStorageOptions autoBuild();
 
     public GoogleCloudStorageOptions build() {
@@ -226,7 +262,20 @@ public abstract class GoogleCloudStorageOptions {
       checkArgument(
           (instance.getProxyUsername() == null) == (instance.getProxyPassword() == null),
           "both proxyUsername and proxyPassword should be null or not null together");
+      checkArgument(
+          isAllEncryptionOptionsSetOrUnset(instance),
+          "encryptionAlgorithm, encryptionKey and encryptionKeyHash should be null or not null"
+              + " together");
       return instance;
+    }
+
+    private boolean isAllEncryptionOptionsSetOrUnset(GoogleCloudStorageOptions instance) {
+      return (instance.getEncryptionAlgorithm() != null
+              && instance.getEncryptionKey() != null
+              && instance.getEncryptionKeyHash() != null)
+          || (instance.getEncryptionAlgorithm() == null
+              && instance.getEncryptionKey() == null
+              && instance.getEncryptionKeyHash() == null);
     }
   }
 }

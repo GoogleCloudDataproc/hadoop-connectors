@@ -1,4 +1,67 @@
-### 2.1.0 - 2019-XX-XX
+### 2.2.0 - 2020-XX-XX
+
+1.  Delete deprecated methods.
+
+1.  Update all dependencies to latest versions.
+
+1.  Add support for Cloud Storage objects CSEK encryption:
+
+        fs.gs.encryption.algorithm (not set by default)
+        fs.gs.encryption.key (not set by default)
+        fs.gs.encryption.key.hash (not set by default)
+
+### 2.1.1 - 2020-03-11
+
+1.  Add upload cache to support high-level retries of failed uploads. Cache size
+    configured via property and disabled by default (zero or negative value):
+
+        fs.gs.outputstream.upload.cache.size (deafult: 0)
+
+### 2.1.0 - 2020-03-09
+
+1.  Update all dependencies to latest versions.
+
+1.  Use `storage.googleapis.com` API endpoint.
+
+1.  Fix proxy authentication when using `JAVA_NET` transport.
+
+1.  Remove Log4j backend for Google Flogger.
+
+1.  Add properties to override Google Cloud API endpoints:
+
+        fs.gs.storage.root.url
+        fs.gs.token.server.url
+
+1.  Support adding custom HTTP headers to Cloud Storage API requests:
+
+        fs.gs.storage.http.headers.<HEADER>=<VALUE> (not set by default)
+
+    Example:
+
+    ```
+    fs.gs.storage.http.headers.some-custom-header=custom_value
+    fs.gs.storage.http.headers.another-custom-header=another_custom_value
+    ```
+
+1.  Always set `generation` parameter for read requests and remove
+    `fs.gs.generation.read.consistency` property.
+
+1.  Always use URI path encoding and remove `fs.gs.path.encoding` property.
+
+1.  Use Slf4j backend by default for Google Flogger.
+
+1.  Remove list requests caching in the `PerformanceCachingGoogleCloudStorage`
+    and `fs.gs.performance.cache.list.caching.enable` property.
+
+1.  Stop caching non-existent (not found) items in performance cache.
+
+### 2.0.1 - 2020-02-13
+
+1.  Cooperative Locking FSCK tool: fix recovery of operations that failed before
+    creating an operation log file.
+
+1.  Change Gson dependency scope from `provided` to `compile` in `gcsio`
+    library.
 
 ### 2.0.0 - 2019-08-23
 
@@ -746,7 +809,7 @@
     `rateLimitExceeded (429)` errors by fetching the fresh underlying info and
     ignoring the error if the object already exists with the intended metadata
     and size. This fixes an
-    [issue](https://github.com/GoogleCloudPlatform/bigdata-interop/issues/10)
+    [issue](https://github.com/GoogleCloudDataproc/hadoop-connectors/issues/10)
     which mostly affects Spark.
 
 1.  Added logging in `GoogleCloudStorageReadChannel` for high-level retries.
@@ -787,7 +850,7 @@
     with different locations and storage classes.
 
 1.  Fixed
-    [issue](https://github.com/GoogleCloudPlatform/bigdata-interop/issues/5)
+    [issue](https://github.com/GoogleCloudDataproc/hadoop-connectors/issues/5)
     where stale cache entries caused stuck phantom directories if the
     directories were deleted using non-Hadoop-based GCS clients.
 

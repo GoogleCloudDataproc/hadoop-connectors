@@ -244,7 +244,7 @@ public abstract class GoogleCloudStorageIntegrationHelper {
 
   /** Opens the given object for writing. */
   protected WritableByteChannel create(String bucketName, String objectName) throws IOException {
-    return create(bucketName, objectName, CreateFileOptions.DEFAULT);
+    return create(bucketName, objectName, CreateFileOptions.DEFAULT_OVERWRITE);
   }
 
   /** Opens the given object for writing. */
@@ -288,16 +288,6 @@ public abstract class GoogleCloudStorageIntegrationHelper {
       return objectName.getBytes(UTF_8).length;
     }
     return -1;
-  }
-
-  /**
-   * Indicates whether the given object name looks like a directory path.
-   *
-   * @param objectName name of the object to inspect
-   * @return whether the given object name looks like a directory path
-   */
-  public static boolean objectHasDirectoryPath(String objectName) {
-    return FileInfo.objectHasDirectoryPath(objectName);
   }
 
   /**

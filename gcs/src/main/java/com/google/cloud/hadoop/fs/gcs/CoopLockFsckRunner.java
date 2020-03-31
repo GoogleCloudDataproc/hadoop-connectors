@@ -31,6 +31,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.UriPaths;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationDao;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecord;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao;
@@ -99,7 +100,7 @@ class CoopLockFsckRunner {
     this.gcs = (GoogleCloudStorageImpl) gcsFs.getGcs();
     this.options = gcs.getOptions().getCooperativeLockingOptions();
     this.lockRecordsDao = new CoopLockRecordsDao(gcs);
-    this.lockOperationDao = new CoopLockOperationDao(gcs, gcsFs.getPathCodec());
+    this.lockOperationDao = new CoopLockOperationDao(gcs);
   }
 
   public int run() throws IOException {
@@ -111,9 +112,10 @@ class CoopLockFsckRunner {
 
     Map<FileStatus, CoopLockRecord> expiredOperations =
         lockedOperations.stream()
-            .map(this::getOperationLockIfExpiredUnchecked)
+            .map(this::getOperationLockIfExpired)
             .filter(Optional::isPresent)
             .map(Optional::get)
+            .filter(this::checkLogExistsAndUnlockOtherwise)
             .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
 
     // If this is a check command then return after operations status was printed.
@@ -193,7 +195,7 @@ class CoopLockFsckRunner {
       deleteResource(operation.getResource(), loggedResources);
       lockRecordsDao.unlockPaths(
           operationRecord.getOperationId(),
-          StorageResourceId.fromObjectName(operation.getResource()));
+          StorageResourceId.fromStringPath(operation.getResource()));
     } finally {
       lockUpdateFuture.cancel(/* mayInterruptIfRunning= */ false);
     }
@@ -257,8 +259,8 @@ class CoopLockFsckRunner {
       }
       lockRecordsDao.unlockPaths(
           operationRecord.getOperationId(),
-          StorageResourceId.fromObjectName(operation.getSrcResource()),
-          StorageResourceId.fromObjectName(operation.getDstResource()));
+          StorageResourceId.fromStringPath(operation.getSrcResource()),
+          StorageResourceId.fromStringPath(operation.getDstResource()));
     } finally {
       lockUpdateFuture.cancel(/* mayInterruptIfRunning= */ false);
     }
@@ -301,56 +303,39 @@ class CoopLockFsckRunner {
 
   private static List<String> toNames(List<String> resources) {
     return resources.stream()
-        .map(r -> StorageResourceId.fromObjectName(r).getObjectName())
+        .map(r -> StorageResourceId.fromStringPath(r).getObjectName())
         .collect(toList());
   }
 
-  private Optional<Map.Entry<FileStatus, CoopLockRecord>> getOperationLockIfExpiredUnchecked(
+  private Optional<Map.Entry<FileStatus, CoopLockRecord>> getOperationLockIfExpired(
       CoopLockRecord operation) {
     try {
-      return getOperationLockIfExpired(bucketName, operation);
+      return getOperationLockIfExpiredChecked(operation);
     } catch (IOException e) {
       throw new RuntimeException(
           String.format("Failed to check if %s operation expired", operation), e);
     }
   }
 
-  private Optional<Map.Entry<FileStatus, CoopLockRecord>> getOperationLockIfExpired(
-      String bucketName, CoopLockRecord operationRecord) throws IOException {
+  private Optional<Map.Entry<FileStatus, CoopLockRecord>> getOperationLockIfExpiredChecked(
+      CoopLockRecord operationRecord) throws IOException {
     String globPath =
         CoopLockRecordsDao.LOCK_DIRECTORY + "*" + operationRecord.getOperationId() + "*.lock";
     URI globUri =
-        gcsFs.getPathCodec().getPath(bucketName, globPath, /* allowEmptyObjectName= */ false);
-    FileStatus[] operationLocks = ghfs.globStatus(new Path(globUri));
+        UriPaths.fromStringPathComponents(bucketName, globPath, /* allowEmptyObjectName= */ false);
+    FileStatus[] operationLock = ghfs.globStatus(new Path(globUri));
     checkState(
-        operationLocks.length < 2,
+        operationLock.length < 2,
         "operation %s should not have more than one lock file",
         operationRecord.getOperationId());
 
-    // Lock file not created - nothing to repair
-    if (operationLocks.length == 0) {
-      // Release lock if this is not a "check" command
-      // and if it processes this specific operation or "all" operations
-      if (!COMMAND_CHECK.equals(command)
-          && (ARGUMENT_ALL_OPERATIONS.equals(fsckOperationId)
-              || fsckOperationId.equals(operationRecord.getOperationId()))) {
-        logger.atInfo().log(
-            "Operation %s for %s resources doesn't have lock file, unlocking",
-            operationRecord.getOperationId(), operationRecord.getResources());
-        StorageResourceId[] lockedResources =
-            operationRecord.getResources().stream()
-                .map(resource -> new StorageResourceId(bucketName, resource))
-                .toArray(StorageResourceId[]::new);
-        lockRecordsDao.unlockPaths(operationRecord.getOperationId(), lockedResources);
-      } else {
-        logger.atInfo().log(
-            "Operation %s for %s resources doesn't have lock file, skipping",
-            operationRecord.getOperationId(), operationRecord.getResources());
-      }
+    // <operation>.lock file not created - nothing to repair
+    if (operationLock.length == 0) {
+      unlockOperationIfNecessary(operationRecord, "lock");
       return Optional.empty();
     }
 
-    FileStatus operationStatus = operationLocks[0];
+    FileStatus operationStatus = operationLock[0];
 
     if (operationRecord.getLockExpiration().isBefore(operationExpirationInstant)
         && getRenewedLockExpiration(operationStatus, operationRecord)
@@ -363,6 +348,64 @@ class CoopLockFsckRunner {
     return Optional.empty();
   }
 
+  /**
+   * Returns {@code true} if operation log exists and {@code false} if it does not exist. As a
+   * sideffect releases operation lock if operation log does not exist.
+   */
+  private boolean checkLogExistsAndUnlockOtherwise(
+      Map.Entry<FileStatus, CoopLockRecord> operation) {
+    try {
+      return checkLogExistsAndUnlockOtherwiseChecked(operation);
+    } catch (IOException e) {
+      throw new RuntimeException(
+          String.format("Failed to check if %s operation expired", operation.getValue()), e);
+    }
+  }
+
+  private boolean checkLogExistsAndUnlockOtherwiseChecked(
+      Map.Entry<FileStatus, CoopLockRecord> operation) throws IOException {
+    CoopLockRecord operationRecord = operation.getValue();
+    String globPath =
+        CoopLockRecordsDao.LOCK_DIRECTORY + "*" + operationRecord.getOperationId() + "*.log";
+    URI globUri =
+        UriPaths.fromStringPathComponents(bucketName, globPath, /* allowEmptyObjectName= */ false);
+    FileStatus[] operationLog = ghfs.globStatus(new Path(globUri));
+    checkState(
+        operationLog.length < 2,
+        "operation %s should not have more than one log file",
+        operationRecord.getOperationId());
+
+    // <operation>.log file not created - nothing to repair
+    if (operationLog.length == 0) {
+      unlockOperationIfNecessary(operationRecord, "log");
+      return false;
+    }
+
+    return true;
+  }
+
+  private void unlockOperationIfNecessary(CoopLockRecord operationRecord, String fileType)
+      throws IOException {
+    // Release lock if this is not a "check" command
+    // and if it processes this specific operation or "all" operations
+    if (!COMMAND_CHECK.equals(command)
+        && (ARGUMENT_ALL_OPERATIONS.equals(fsckOperationId)
+            || fsckOperationId.equals(operationRecord.getOperationId()))) {
+      logger.atInfo().log(
+          "Operation %s for %s resources doesn't have %s file, unlocking",
+          operationRecord.getOperationId(), operationRecord.getResources(), fileType);
+      StorageResourceId[] lockedResources =
+          operationRecord.getResources().stream()
+              .map(resource -> new StorageResourceId(bucketName, resource))
+              .toArray(StorageResourceId[]::new);
+      lockRecordsDao.unlockPaths(operationRecord.getOperationId(), lockedResources);
+    } else {
+      logger.atInfo().log(
+          "Operation %s for %s resources doesn't have %s file, skipping",
+          operationRecord.getOperationId(), operationRecord.getResources(), fileType);
+    }
+  }
+
   private void deleteResource(String resource, Collection<String> loggedResources)
       throws IOException {
     Path lockedResource = new Path(resource);
@@ -373,7 +416,7 @@ class CoopLockFsckRunner {
     List<StorageResourceId> objectsToDelete = new ArrayList<>(loggedResources.size());
     for (String loggedObject : loggedResources) {
       if (allObjects.contains(loggedObject)) {
-        objectsToDelete.add(StorageResourceId.fromObjectName(loggedObject));
+        objectsToDelete.add(StorageResourceId.fromStringPath(loggedObject));
       }
     }
     GoogleCloudStorage gcs = ghfs.getGcsFs().getGcs();

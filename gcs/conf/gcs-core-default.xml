@@ -217,6 +217,11 @@
     <description>The number of bytes in one GCS upload request.</description>
   </property>
   <property>
+    <name>fs.gs.outputstream.upload.cache.size</name>
+    <value>0</value>
+    <description>The number of bytes in upload cache that used for high-level retries.</description>
+  </property>
+  <property>
     <name>fs.gs.marker.file.pattern</name>
     <value></value>
     <description>
@@ -328,12 +333,6 @@
   </property>
 
   <property>
-    <name>fs.gs.performance.cache.list.caching.enable</name>
-    <value>false</value>
-    <description>Enable caching of list request results in the performance cache.</description>
-  </property>
-
-  <property>
     <name>fs.gs.status.parallel.enable</name>
     <value>false</value>
     <description>
@@ -346,15 +345,6 @@
     <name>fs.gs.lazy.init.enable</name>
     <value>false</value>
     <description>Enables lazy initialization of GoogleHadoopFileSystem instances.</description>
-  </property>
-
-  <property>
-    <name>fs.gs.path.encoding</name>
-    <value>uri-path</value>
-    <description>
-      Path codec used that used for decoding and encoding Cloud Storage object paths.
-      Valid path codecs are 'legacy' and 'uri-path'.
-    </description>
   </property>
 
   <property>
@@ -507,30 +497,6 @@
   </property>
 
   <property>
-    <name>fs.gs.generation.read.consistency</name>
-    <value>LATEST</value>
-    <description>
-      Determine read consistency across different generations of a Cloud Storage object.
-
-      Supported modes:
-      - LATEST - this is the default behavior. The connector will ignore generation ID of the GCS
-      objects and always try to read the live version.
-      - BEST_EFFORT - The connector will try to read the generation determined when the
-      GoogleCloudStorageReadChannel is first opened. However if that generation cannot be found
-      anymore, connector will fall back to read the live version. This mode allows to improve
-      performance by requesting the same object generation. Using this mode connector can read
-      changing objects from GCS buckets with disabled object versioning without failure.
-      - STRICT - The connector will always try to read the generation determined when the
-      GoogleCloudStorageReadChannel is first opened, and reports FileNotFound exception when that
-      generation cannot be found anymore.
-
-      Note that this property will only apply to new streams opened after generation is determined.
-      It won't affect read from any streams that are already open, pre-fetched footer, or the
-      metadata of the object.
-    </description>
-  </property>
-
-  <property>
     <name>fs.gs.inputstream.fast.fail.on.not.found.enable</name>
     <value>true</value>
     <description>
@@ -560,6 +526,18 @@
       If forward seeks are within this many bytes of the current position, seeks are performed by
       reading and discarding bytes in-place rather than opening a new underlying stream.
     </description>
+  </property>
+
+  <property>
+    <name>fs.gs.storage.root.url</name>
+    <value></value>
+    <description>Google Cloud Storage root URL.</description>
+  </property>
+
+  <property>
+    <name>fs.gs.token.server.url</name>
+    <value></value>
+    <description>Google Token Server root URL.</description>
   </property>
 
   <property>
