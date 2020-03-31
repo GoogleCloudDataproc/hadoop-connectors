@@ -4,11 +4,11 @@
 
 1.  Update all dependencies to latest versions.
 
-1.  Support CSEK headers to encrypt and decrypt objects.
+1.  Add support for Cloud Storage objects CSEK encryption:
 
-        fs.gs.encryption.algorithm
-        fs.gs.encryption.key
-        fs.gs.encryption.key.hash
+        fs.gs.encryption.algorithm (not set by default)
+        fs.gs.encryption.key (not set by default)
+        fs.gs.encryption.key.hash (not set by default)
 
 ### 2.1.1 - 2020-03-11
 

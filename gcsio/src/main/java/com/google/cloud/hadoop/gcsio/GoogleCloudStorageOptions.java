@@ -263,15 +263,19 @@ public abstract class GoogleCloudStorageOptions {
           (instance.getProxyUsername() == null) == (instance.getProxyPassword() == null),
           "both proxyUsername and proxyPassword should be null or not null together");
       checkArgument(
-          (instance.getEncryptionAlgorithm() != null
-                  && instance.getEncryptionKey() != null
-                  && instance.getEncryptionKeyHash() != null)
-              || (instance.getEncryptionAlgorithm() == null
-                  && instance.getEncryptionKey() == null
-                  && instance.getEncryptionKeyHash() == null),
+          isAllEncryptionOptionsSetOrUnset(instance),
           "encryptionAlgorithm, encryptionKey and encryptionKeyHash should be null or not null"
               + " together");
       return instance;
+    }
+
+    private boolean isAllEncryptionOptionsSetOrUnset(GoogleCloudStorageOptions instance) {
+      return (instance.getEncryptionAlgorithm() != null
+              && instance.getEncryptionKey() != null
+              && instance.getEncryptionKeyHash() != null)
+          || (instance.getEncryptionAlgorithm() == null
+              && instance.getEncryptionKey() == null
+              && instance.getEncryptionKeyHash() == null);
     }
   }
 }

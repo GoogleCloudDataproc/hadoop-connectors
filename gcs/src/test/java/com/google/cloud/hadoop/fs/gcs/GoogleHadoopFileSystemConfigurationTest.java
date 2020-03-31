@@ -218,7 +218,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
     config.set(GCS_ENCRYPTION_KEY_HASH.getKey(), "LpH4y6BkG/1B+n3FwORpdoyQ=");
 
     GoogleCloudStorageFileSystemOptions options =
-            GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
+        GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
     assertThat(options.getCloudStorageOptions().getEncryptionAlgorithm()).isEqualTo("AES256");
     assertThat(options.getCloudStorageOptions().getEncryptionKey())
         .isEqualTo("+G2Ap33m5NVOgmXznSGTEvG0I=");

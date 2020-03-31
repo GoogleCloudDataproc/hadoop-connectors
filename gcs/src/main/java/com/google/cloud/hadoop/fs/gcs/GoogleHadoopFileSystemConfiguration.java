@@ -370,15 +370,15 @@ public class GoogleHadoopFileSystemConfiguration {
 
   /** Configuration key for the CSEK encryption algorithm. */
   public static final HadoopConfigurationProperty<String> GCS_ENCRYPTION_ALGORITHM =
-          new HadoopConfigurationProperty<>("fs.gs.encryption.algorithm");
+      new HadoopConfigurationProperty<>("fs.gs.encryption.algorithm");
 
   /** Configuration key for the CSEK encryption key. */
   public static final HadoopConfigurationProperty<String> GCS_ENCRYPTION_KEY =
-          new HadoopConfigurationProperty<>("fs.gs.encryption.key");
+      new HadoopConfigurationProperty<>("fs.gs.encryption.key");
 
   /** Configuration key for sha256 hash of the CSEK encryption key. */
   public static final HadoopConfigurationProperty<String> GCS_ENCRYPTION_KEY_HASH =
-          new HadoopConfigurationProperty<>("fs.gs.encryption.key.hash");
+      new HadoopConfigurationProperty<>("fs.gs.encryption.key.hash");
 
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
