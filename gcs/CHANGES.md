@@ -1,5 +1,11 @@
 ### 2.1.3 - 2020-XX-XX
 
+1.  Add support for Cloud Storage objects CSEK encryption:
+
+        fs.gs.encryption.algorithm (not set by default)
+        fs.gs.encryption.key (not set by default)
+        fs.gs.encryption.key.hash (not set by default)
+
 ### 2.1.2 - 2020-04-02
 
 1.  Update all dependencies to latest versions.
