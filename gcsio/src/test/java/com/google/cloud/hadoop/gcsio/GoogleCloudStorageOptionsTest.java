@@ -97,4 +97,17 @@ public class GoogleCloudStorageOptionsTest {
         .hasMessageThat()
         .isEqualTo("both proxyUsername and proxyPassword should be null or not null together");
   }
+
+  @Test
+  public void encryptionKey_hide_whenSetEncryptionKey() {
+    GoogleCloudStorageOptions.Builder builder =
+        GoogleCloudStorageOptions.builder()
+            .setEncryptionAlgorithm("AES256")
+            .setEncryptionKey("test-key")
+            .setEncryptionKeyHash("test-key-hash");
+    GoogleCloudStorageOptions options = builder.build();
+
+    assertThat(options.toString().contains("encryptionKey: <provided, but not displayed>")).isTrue();
+    assertThat(options.toString().contains("encryptionKeyHash: <provided, but not displayed>")).isTrue();
+  }
 }

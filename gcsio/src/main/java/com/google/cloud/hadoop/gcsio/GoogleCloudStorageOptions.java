@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.util.HttpTransportFactory.toSecretString;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
@@ -180,6 +181,41 @@ public abstract class GoogleCloudStorageOptions {
 
   public void throwIfNotValid() {
     checkArgument(!isNullOrEmpty(getAppName()), "appName must not be null or empty");
+  }
+
+  @Override
+  public String toString() {
+    return "CredentialOptions{\n"
+        + ("grpcEnabled: " + isGrpcEnabled() + '\n')
+        + ("rootUrl: " + getStorageRootUrl() + '\n')
+        + ("projectId: " + getProjectId() + '\n')
+        + ("appName: " + getAppName() + '\n')
+        + ("autoRepair: " + isAutoRepairImplicitDirectoriesEnabled() + '\n')
+        + ("inferImplicitDirectories: " + isInferImplicitDirectoriesEnabled() + '\n')
+        + ("durationMillis: " + getMaxWaitMillisForEmptyObjectCreation() + '\n')
+        + ("maxListItemsPerCall: " + getMaxListItemsPerCall() + '\n')
+        + ("maxRequestsPerBatch: " + getMaxRequestsPerBatch() + '\n')
+        + ("batchThreads: " + getBatchThreads() + '\n')
+        + ("maxHttpRequestRetries: " + getMaxHttpRequestRetries() + '\n')
+        + ("httpRequestConnectTimeout: " + getHttpRequestConnectTimeout() + '\n')
+        + ("httpRequestReadTimeout: " + getHttpRequestReadTimeout() + '\n')
+        + ("transportType: " + getTransportType() + '\n')
+        + ("proxyAddress: " + getProxyAddress() + '\n')
+        + ("proxyUsername: " + toSecretString(getProxyUsername()) + '\n')
+        + ("proxyPassword: " + toSecretString(getProxyPassword()) + '\n')
+        + ("copyWithRewrite: " + isCopyWithRewriteEnabled() + '\n')
+        + ("bytes: " + getMaxBytesRewrittenPerCall() + '\n')
+        + ("copyMaxRequestsPerBatch: " + getCopyMaxRequestsPerBatch() + '\n')
+        + ("copyBatchThreads: " + getCopyBatchThreads() + '\n')
+        + ("readChannelOptions: " + getReadChannelOptions() + '\n')
+        + ("writeChannelOptions: " + getWriteChannelOptions() + '\n')
+        + ("requesterPaysOptions: " + getRequesterPaysOptions() + '\n')
+        + ("cooperativeLockingOptions: " + getCooperativeLockingOptions() + '\n')
+        + ("httpRequestHeaders: " + getHttpRequestHeaders() + '\n')
+        + ("encryptionAlgorithm: " + getEncryptionAlgorithm() + '\n')
+        + ("encryptionKey: " + toSecretString(getEncryptionKey()) + '\n')
+        + ("encryptionKeyHash: " + toSecretString(getEncryptionKeyHash()) + '\n')
+        + "}";
   }
 
   /** Mutable builder for the {@link GoogleCloudStorageOptions} class. */
