@@ -65,7 +65,6 @@ import com.google.common.collect.Maps;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.google.storage.v1.StorageGrpc.StorageStub;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Field;

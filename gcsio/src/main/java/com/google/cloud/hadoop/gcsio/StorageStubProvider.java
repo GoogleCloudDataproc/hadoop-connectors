@@ -9,7 +9,6 @@ import com.google.google.storage.v1.StorageGrpc.StorageStub;
 import com.google.google.storage.v1.StorageOuterClass;
 import com.google.protobuf.util.Durations;
 import io.grpc.ManagedChannel;
-import io.grpc.alts.ComputeEngineChannelBuilder;
 import io.grpc.alts.GoogleDefaultChannelBuilder;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,17 +32,17 @@ public class StorageStubProvider {
           .getOptions()
           .getExtension(ClientProto.defaultHost);
 
-  private GoogleCloudStorageReadOptions readOptions;
-  private ExecutorService backgroundTasksThreadPool;
-  private List<ManagedChannel> mediaChannelPool;
+  private final GoogleCloudStorageReadOptions readOptions;
+  private final ExecutorService backgroundTasksThreadPool;
+  private final List<ManagedChannel> mediaChannelPool;
+
   private int nextChannel = 0;
 
   public StorageStubProvider(
       GoogleCloudStorageReadOptions readOptions, ExecutorService backgroundTasksThreadPool) {
     this.readOptions = readOptions;
     this.backgroundTasksThreadPool = backgroundTasksThreadPool;
-
-    this.mediaChannelPool = new ArrayList<ManagedChannel>();
+    this.mediaChannelPool = new ArrayList<>();
   }
 
   private ManagedChannel buildManagedChannel() {
@@ -54,7 +53,7 @@ public class StorageStubProvider {
 
   public StorageBlockingStub getBlockingStub() {
     ManagedChannel channel;
-    if(mediaChannelPool.size() < MEDIA_CHANNEL_MAX_POOL_SIZE) {
+    if (mediaChannelPool.size() < MEDIA_CHANNEL_MAX_POOL_SIZE) {
       channel = buildManagedChannel();
       mediaChannelPool.add(channel);
     } else {
@@ -66,7 +65,7 @@ public class StorageStubProvider {
 
   public StorageStub getAsyncStub() {
     ManagedChannel channel;
-    if(mediaChannelPool.size() < MEDIA_CHANNEL_MAX_POOL_SIZE) {
+    if (mediaChannelPool.size() < MEDIA_CHANNEL_MAX_POOL_SIZE) {
       channel = buildManagedChannel();
       mediaChannelPool.add(channel);
     } else {
