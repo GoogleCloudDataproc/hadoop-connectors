@@ -31,9 +31,6 @@ import javax.annotation.Nullable;
 @AutoValue
 public abstract class GoogleCloudStorageOptions {
 
-  /** Default setting for enabling use of GCS gRPC API. */
-  public static final boolean ENABLE_GRPC_DEFAULT = false;
-
   /** Default root URL for Cloud Storage API endpoint. */
   public static final String STORAGE_ROOT_URL_DEFAULT = Storage.DEFAULT_ROOT_URL;
 
@@ -84,6 +81,9 @@ public abstract class GoogleCloudStorageOptions {
 
   public static final GoogleCloudStorageOptions DEFAULT = builder().build();
 
+  /** Default setting for enabling grpc reads/writes. */
+  public static final boolean ENABLE_GRPC_DEFAULT = false;
+
   /** @deprecated use {@link #builder()} instead */
   @Deprecated
   public static Builder newBuilder() {
@@ -112,10 +112,9 @@ public abstract class GoogleCloudStorageOptions {
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
         .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
         .setCooperativeLockingOptions(CooperativeLockingOptions.DEFAULT)
-        .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT);
+        .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT)
+        .setGrpcEnabled(ENABLE_GRPC_DEFAULT);
   }
-
-  public abstract boolean isGrpcEnabled();
 
   public abstract String getStorageRootUrl();
 
@@ -172,6 +171,8 @@ public abstract class GoogleCloudStorageOptions {
 
   public abstract ImmutableMap<String, String> getHttpRequestHeaders();
 
+  public abstract boolean isGrpcEnabled();
+
   public abstract Builder toBuilder();
 
   public void throwIfNotValid() {
@@ -181,8 +182,6 @@ public abstract class GoogleCloudStorageOptions {
   /** Mutable builder for the {@link GoogleCloudStorageOptions} class. */
   @AutoValue.Builder
   public abstract static class Builder {
-
-    public abstract Builder setGrpcEnabled(boolean grpcEnabled);
 
     public abstract Builder setStorageRootUrl(String rootUrl);
 
@@ -236,6 +235,8 @@ public abstract class GoogleCloudStorageOptions {
         CooperativeLockingOptions cooperativeLockingOptions);
 
     public abstract Builder setHttpRequestHeaders(Map<String, String> httpRequestHeaders);
+
+    public abstract Builder setGrpcEnabled(boolean grpcEnabled);
 
     abstract GoogleCloudStorageOptions autoBuild();
 

@@ -17,13 +17,8 @@ package com.google.cloud.hadoop.util;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.google.api.client.googleapis.media.MediaHttpUploader;
-import com.google.api.client.googleapis.services.AbstractGoogleClientRequest;
-import com.google.api.client.http.InputStreamContent;
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
@@ -32,15 +27,19 @@ import java.nio.channels.Channels;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.WritableByteChannel;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
-public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleClientRequest<S>, S>
-    implements WritableByteChannel {
+/**
+ * Skeletal implementation of a WritableByteChannel that executes an asynchronous upload operation
+ * and optionally handles the result.
+ *
+ * @param <T> The type of the result of the completed upload operation.
+ */
+public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements WritableByteChannel {
 
-  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+  protected static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Default GCS upload granularity.
   public static final int GCS_UPLOAD_GRANULARITY = 8 * 1024 * 1024;
@@ -51,63 +50,47 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
           ? GCS_UPLOAD_GRANULARITY
           : 8 * GCS_UPLOAD_GRANULARITY;
 
-  private String contentType;
+  // Default size of upload buffer.
+  @Deprecated
+  public static final int UPLOAD_PIPE_BUFFER_SIZE_DEFAULT =
+      AsyncWriteChannelOptions.PIPE_BUFFER_SIZE_DEFAULT;
 
-  // ClientRequestHelper to be used instead of calling final methods in client requests.
-  private ClientRequestHelper<S> clientRequestHelper = new ClientRequestHelper<>();
+  protected String contentType;
 
   // A pipe that connects write channel used by caller to the input stream used by GCS uploader.
   // The uploader reads from input stream, which blocks till a caller writes some data to the
   // write channel (pipeSinkChannel below). The pipe is formed by connecting pipeSink to pipeSource
-  private final ExecutorService threadPool;
+  protected final ExecutorService threadPool;
 
-  private boolean initialized = false;
+  private boolean isInitialized = false;
 
   // Size of buffer used by upload pipe.
   private final int pipeBufferSize;
 
   // Chunk size to use.
-  private int uploadChunkSize = UPLOAD_CHUNK_SIZE_DEFAULT;
+  protected int uploadChunkSize = UPLOAD_CHUNK_SIZE_DEFAULT;
 
   // A channel wrapper over pipeSink.
   private WritableByteChannel pipeSinkChannel;
 
   // Upload operation that takes place on a separate thread.
-  private Future<S> uploadOperation;
+  protected Future<T> uploadOperation;
 
   // When enabled, we get higher throughput for writing small files.
   private boolean directUploadEnabled = false;
 
-  private ByteBuffer uploadCache = null;
-
   /** Construct a new channel using the given ExecutorService to run background uploads. */
-  public AbstractGoogleAsyncWriteChannel(
+  public BaseAbstractGoogleAsyncWriteChannel(
       ExecutorService threadPool, AsyncWriteChannelOptions options) {
     this.threadPool = threadPool;
     this.pipeBufferSize = options.getPipeBufferSize();
-    if (options.getUploadCacheSize() > 0) {
-      this.uploadCache = ByteBuffer.allocate(options.getUploadCacheSize());
-    }
     setUploadChunkSize(options.getUploadChunkSize());
     setDirectUploadEnabled(options.isDirectUploadEnabled());
     setContentType("application/octet-stream");
   }
 
-  /**
-   * Sets the ClientRequestHelper to be used instead of calling final methods in client requests.
-   */
-  @VisibleForTesting
-  public void setClientRequestHelper(ClientRequestHelper<S> helper) {
-    clientRequestHelper = helper;
-  }
-
-  /**
-   * Create an API request to upload the given InputStreamContent.
-   *
-   * @return An initialized request.
-   * @throws IOException
-   */
-  public abstract T createRequest(InputStreamContent inputStream) throws IOException;
+  /** Create a new thread which handles the upload. */
+  public abstract void startUpload(PipedInputStream pipeSource) throws IOException;
 
   /**
    * Handle the API response.
@@ -117,7 +100,7 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
    *
    * @param response The API response object.
    */
-  public void handleResponse(S response) throws IOException {}
+  public void handleResponse(T response) throws IOException {}
 
   /**
    * Derived classes may optionally intercept an IOException thrown from the execute() method of a
@@ -128,7 +111,7 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
    * may override this method to return the expected "identifier" response. Return null to let the
    * exception propagate through correctly.
    */
-  public S createResponseFromException(IOException ioe) {
+  public T createResponseFromException(IOException ioe) {
     return null;
   }
 
@@ -138,18 +121,7 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
   }
 
   /** Sets size of upload buffer used. */
-  public void setUploadChunkSize(int chunkSize) {
-    Preconditions.checkArgument(chunkSize > 0, "Upload chunk size must be great than 0.");
-    Preconditions.checkArgument(
-        chunkSize % MediaHttpUploader.MINIMUM_CHUNK_SIZE == 0,
-        "Upload chunk size must be a multiple of MediaHttpUploader.MINIMUM_CHUNK_SIZE");
-    if ((chunkSize > GCS_UPLOAD_GRANULARITY) && (chunkSize % GCS_UPLOAD_GRANULARITY != 0)) {
-      logger.atWarning().log(
-          "Upload chunk size should be a multiple of %s for best performance, got %s",
-          GCS_UPLOAD_GRANULARITY, chunkSize);
-    }
-    uploadChunkSize = chunkSize;
-  }
+  public abstract void setUploadChunkSize(int chunkSize);
 
   /**
    * Enables or disables direct uploads.
@@ -180,7 +152,7 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
    */
   @Override
   public synchronized int write(ByteBuffer buffer) throws IOException {
-    checkState(initialized, "initialize() must be invoked before use.");
+    checkState(isInitialized, "initialize() must be invoked before use.");
     if (!isOpen()) {
       throw new ClosedChannelException();
     }
@@ -188,14 +160,6 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
     // No point in writing further if upload failed on another thread.
     if (uploadOperation.isDone()) {
       waitForCompletionAndThrowIfUploadFailed();
-    }
-
-    if (uploadCache != null && uploadCache.remaining() >= buffer.remaining()) {
-      int position = buffer.position();
-      uploadCache.put(buffer);
-      buffer.position(position);
-    } else {
-      uploadCache = null;
     }
 
     return pipeSinkChannel.write(buffer);
@@ -221,49 +185,16 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
    */
   @Override
   public void close() throws IOException {
-    checkState(initialized, "initialize() must be invoked before use.");
-    if (!isOpen()) {
-      return;
-    }
-    try {
-      pipeSinkChannel.close();
-      handleResponse(waitForCompletionAndThrowIfUploadFailed());
-    } catch (IOException e) {
-      if (uploadCache == null) {
-        throw e;
+    checkState(isInitialized, "initialize() must be invoked before use.");
+    if (isOpen()) {
+      try {
+        pipeSinkChannel.close();
+        handleResponse(waitForCompletionAndThrowIfUploadFailed());
+      } finally {
+        pipeSinkChannel = null;
+        uploadOperation = null;
       }
-      logger.atWarning().withCause(e).log("Reuploading using cached data");
-      reuploadFromCache();
-    } finally {
-      closeInternal();
     }
-  }
-
-  private void reuploadFromCache() throws IOException {
-    closeInternal();
-    initialized = false;
-
-    initialize();
-
-    // Set cache to null so it will not be re-cached during retry.
-    ByteBuffer reuploadData = uploadCache;
-    uploadCache = null;
-
-    reuploadData.flip();
-
-    try {
-      write(reuploadData);
-    } finally {
-      close();
-    }
-  }
-
-  private void closeInternal() {
-    pipeSinkChannel = null;
-    if (uploadOperation != null && !uploadOperation.isDone()) {
-      uploadOperation.cancel(/* mayInterruptIfRunning= */ true);
-    }
-    uploadOperation = null;
   }
 
   /**
@@ -278,54 +209,9 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
     OutputStream pipeSink = new PipedOutputStream(pipeSource);
     pipeSinkChannel = Channels.newChannel(pipeSink);
 
-    // Connect pipe-source to the stream used by uploader.
-    InputStreamContent objectContentStream = new InputStreamContent(contentType, pipeSource);
-    // Indicate that we do not know length of file in advance.
-    objectContentStream.setLength(-1);
-    objectContentStream.setCloseInputStream(false);
+    startUpload(pipeSource);
 
-    T request = createRequest(objectContentStream);
-    request.setDisableGZipContent(true);
-
-    // Change chunk size from default value (10MB) to one that yields higher performance.
-    clientRequestHelper.setChunkSize(request, uploadChunkSize);
-
-    // Given that the two ends of the pipe must operate asynchronous relative
-    // to each other, we need to start the upload operation on a separate thread.
-    uploadOperation = threadPool.submit(new UploadOperation(request, pipeSource));
-
-    initialized = true;
-  }
-
-  class UploadOperation implements Callable<S> {
-    // Object to be uploaded. This object declared final for safe object publishing.
-    private final T uploadObject;
-
-    // Read end of the pipe. This object declared final for safe object publishing.
-    private final InputStream pipeSource;
-
-    /** Constructs an instance of UploadOperation. */
-    public UploadOperation(T uploadObject, InputStream pipeSource) {
-      this.uploadObject = uploadObject;
-      this.pipeSource = pipeSource;
-    }
-
-    @Override
-    public S call() throws Exception {
-      // Try-with-resource will close this end of the pipe so that
-      // the writer at the other end will not hang indefinitely.
-      try (InputStream uploadPipeSource = pipeSource) {
-        return uploadObject.execute();
-      } catch (IOException ioe) {
-        S response = createResponseFromException(ioe);
-        if (response != null) {
-          logger.atWarning().withCause(ioe).log(
-              "Received IOException, but successfully converted to response '%s'.", response);
-          return response;
-        }
-        throw ioe;
-      }
-    }
+    isInitialized = true;
   }
 
   /** Sets the contentType. This must be called before {@link #initialize()} for any effect. */
@@ -333,12 +219,14 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
     this.contentType = contentType;
   }
 
+  protected abstract String getResourceString();
+
   /**
    * Throws if upload operation failed. Propagates any errors.
    *
    * @throws IOException on IO error
    */
-  private S waitForCompletionAndThrowIfUploadFailed() throws IOException {
+  private T waitForCompletionAndThrowIfUploadFailed() throws IOException {
     try {
       return uploadOperation.get();
     } catch (InterruptedException e) {
@@ -352,7 +240,8 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
       if (e.getCause() instanceof Error) {
         throw (Error) e.getCause();
       }
-      throw new IOException("Upload failed", e.getCause());
+      throw new IOException(
+          String.format("Upload failed for '%s'", getResourceString()), e.getCause());
     }
   }
 }

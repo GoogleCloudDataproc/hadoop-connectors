@@ -339,6 +339,15 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.inputstream.min.range.request.size",
           GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE);
 
+  /** Configuration key for enabling use of the gRPC API for read/write. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.grpc.enable", false);
+
+  /** Configuration key for enabling checksum validation for the gRPC API. */
+  public static final HadoopConfigurationProperty<Boolean>
+      GCS_GRPC_CHECKSUMS_ENABLE =
+          new HadoopConfigurationProperty<>("fs.gs.grpc.checksums.enable", false);
+
   /** Override configuration file path. This file must be a valid Hadoop configuration file. */
   public static final HadoopConfigurationProperty<String> GCS_CONFIG_OVERRIDE_FILE =
       new HadoopConfigurationProperty<>("fs.gs.config.override.file", null);
@@ -418,7 +427,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setWriteChannelOptions(getWriteChannelOptions(config))
         .setRequesterPaysOptions(getRequesterPaysOptions(config, projectId))
         .setCooperativeLockingOptions(getCooperativeLockingOptions(config))
-        .setHttpRequestHeaders(GCS_HTTP_HEADERS.getPropsWithPrefix(config));
+        .setHttpRequestHeaders(GCS_HTTP_HEADERS.getPropsWithPrefix(config))
+        .setGrpcEnabled(GCS_GRPC_ENABLE.get(config, config::getBoolean));
   }
 
   private static PerformanceCachingGoogleCloudStorageOptions getPerformanceCachingOptions(
@@ -446,6 +456,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setBufferSize(GCS_INPUT_STREAM_BUFFER_SIZE.get(config, config::getInt))
         .setFadvise(GCS_INPUT_STREAM_FADVISE.get(config, config::getEnum))
         .setMinRangeRequestSize(GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getInt))
+        .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
         .build();
   }
 
@@ -454,9 +465,9 @@ public class GoogleHadoopFileSystemConfiguration {
         .setBufferSize(GCS_OUTPUT_STREAM_BUFFER_SIZE.get(config, config::getInt))
         .setPipeBufferSize(GCS_OUTPUT_STREAM_PIPE_BUFFER_SIZE.get(config, config::getInt))
         .setUploadChunkSize(GCS_OUTPUT_STREAM_UPLOAD_CHUNK_SIZE.get(config, config::getInt))
-        .setUploadCacheSize(GCS_OUTPUT_STREAM_UPLOAD_CACHE_SIZE.get(config, config::getInt))
         .setDirectUploadEnabled(
             GCS_OUTPUT_STREAM_DIRECT_UPLOAD_ENABLE.get(config, config::getBoolean))
+        .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
         .build();
   }
 

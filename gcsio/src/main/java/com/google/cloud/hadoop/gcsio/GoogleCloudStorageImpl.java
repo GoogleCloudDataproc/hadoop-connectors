@@ -52,8 +52,6 @@ import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
-import com.google.cloud.hadoop.util.RequesterPaysOptions;
-import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
@@ -113,6 +111,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   private static final String USER_PROJECT_FIELD_NAME = "userProject";
 
+  // The maximum number of times to automatically retry gRPC requests.
+  private static final double GRPC_MAX_RETRY_ATTEMPTS = 10;
+
   // A function to encode metadata map values
   private static String encodeMetadataValues(byte[] bytes) {
     return bytes == null ? Data.NULL_STRING : BaseEncoding.base64().encode(bytes);
@@ -158,6 +159,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   // GCS access instance.
   @VisibleForTesting Storage gcs;
+
+  // Utility for building and caching storager channels and stubs.
+  private StorageStubProvider storageStubProvider;
 
   // Thread-pool used for background tasks.
   private ExecutorService backgroundTasksThreadPool =
@@ -239,6 +243,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             .setRootUrl(options.getStorageRootUrl())
             .setApplicationName(options.getAppName())
             .build();
+
+    // Create the gRPC stub if necessary;
+    if (storageOptions.isGrpcEnabled()) {
+      this.storageStubProvider =
+          new StorageStubProvider(options.getReadChannelOptions(), backgroundTasksThreadPool);
+    }
   }
 
   /**
@@ -359,6 +369,25 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         new ObjectWriteConditions(overwriteGeneration, Optional.<Long>absent());
 
     Map<String, String> rewrittenMetadata = encodeMetadata(options.getMetadata());
+
+    if (storageOptions.isGrpcEnabled()) {
+      Optional<String> requesterPaysProject =
+          requesterShouldPay(resourceId.getBucketName())
+              ? Optional.of(storageOptions.getRequesterPaysOptions().getProjectId())
+              : Optional.absent();
+      GoogleCloudStorageGrpcWriteChannel channel =
+          new GoogleCloudStorageGrpcWriteChannel(
+              backgroundTasksThreadPool,
+              storageStubProvider.getAsyncStub(),
+              resourceId,
+              storageOptions.getWriteChannelOptions(),
+              writeConditions,
+              requesterPaysProject,
+              rewrittenMetadata,
+              options.getContentType());
+      channel.initialize();
+      return channel;
+    }
 
     GoogleCloudStorageWriteChannel channel =
         new GoogleCloudStorageWriteChannel(
@@ -596,6 +625,14 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     logger.atFine().log("open(%s, %s)", resourceId, readOptions);
     Preconditions.checkArgument(
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
+
+    if (storageOptions.isGrpcEnabled()) {
+      return GoogleCloudStorageGrpcReadChannel.open(
+          storageStubProvider.getBlockingStub(),
+          resourceId.getBucketName(),
+          resourceId.getObjectName(),
+          readOptions);
+    }
 
     // The underlying channel doesn't initially read data, which means that we won't see a
     // FileNotFoundException until read is called. As a result, in order to find out if the object
@@ -2037,17 +2074,25 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   private <RequestT extends StorageRequest<?>> void setRequesterPaysProject(
       RequestT request, String bucketName) {
-    RequesterPaysOptions requesterPaysOptions = storageOptions.getRequesterPaysOptions();
-    if (bucketName == null || requesterPaysOptions.getMode() == RequesterPaysMode.DISABLED) {
-      return;
+    if (requesterShouldPay(bucketName)) {
+      setUserProject(request, storageOptions.getRequesterPaysOptions().getProjectId());
+    }
+  }
+
+  private boolean requesterShouldPay(String bucketName) {
+    if (bucketName == null) {
+      return false;
     }
 
-    if (requesterPaysOptions.getMode() == RequesterPaysMode.ENABLED
-        || (requesterPaysOptions.getMode() == RequesterPaysMode.CUSTOM
-            && requesterPaysOptions.getBuckets().contains(bucketName))
-        || (requesterPaysOptions.getMode() == RequesterPaysMode.AUTO
-            && autoBuckets.getUnchecked(bucketName))) {
-      setUserProject(request, requesterPaysOptions.getProjectId());
+    switch (storageOptions.getRequesterPaysOptions().getMode()) {
+      case ENABLED:
+        return true;
+      case CUSTOM:
+        return storageOptions.getRequesterPaysOptions().getBuckets().contains(bucketName);
+      case AUTO:
+        return autoBuckets.getUnchecked(bucketName);
+      default:
+        return false;
     }
   }
 
