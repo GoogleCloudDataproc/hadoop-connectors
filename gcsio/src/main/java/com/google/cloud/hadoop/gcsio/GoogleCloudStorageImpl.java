@@ -1870,6 +1870,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     try {
       backgroundTasksThreadPool.shutdown();
       manualBatchingThreadPool.shutdown();
+      storageStubProvider.shutdown();
     } finally {
       backgroundTasksThreadPool = null;
       manualBatchingThreadPool = null;

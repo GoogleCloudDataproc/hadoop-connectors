@@ -8,12 +8,27 @@ import com.google.google.storage.v1.StorageGrpc.StorageBlockingStub;
 import com.google.google.storage.v1.StorageGrpc.StorageStub;
 import com.google.google.storage.v1.StorageOuterClass;
 import com.google.protobuf.util.Durations;
+import io.grpc.CallOptions;
+import io.grpc.Channel;
+import io.grpc.ClientCall;
+import io.grpc.ClientInterceptor;
+import io.grpc.Context;
+import io.grpc.Context.CancellationListener;
+import io.grpc.ForwardingClientCall.SimpleForwardingClientCall;
+import io.grpc.ForwardingClientCallListener.SimpleForwardingClientCallListener;
 import io.grpc.ManagedChannel;
+import io.grpc.Metadata;
+import io.grpc.MethodDescriptor;
+import io.grpc.Status;
 import io.grpc.alts.GoogleDefaultChannelBuilder;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import javax.annotation.Nullable;
 
 /** Provides gRPC stubs for accessing the Storage gRPC API. */
 public class StorageStubProvider {
@@ -22,7 +37,8 @@ public class StorageStubProvider {
   private static final double GRPC_MAX_RETRY_ATTEMPTS = 10;
 
   // The maximum number of media channels this provider will hand out. If more channels are
-  // requested, the provider will reuse existing ones.
+  // requested, the provider will reuse existing ones, favoring the one with the fewest ongoing
+  // requests.
   private static final int MEDIA_CHANNEL_MAX_POOL_SIZE = 12;
 
   // The GCS gRPC server.
@@ -34,9 +50,82 @@ public class StorageStubProvider {
 
   private final GoogleCloudStorageReadOptions readOptions;
   private final ExecutorService backgroundTasksThreadPool;
-  private final List<ManagedChannel> mediaChannelPool;
+  private final List<ChannelAndRequestCounter> mediaChannelPool;
 
-  private int nextChannel = 0;
+  // An interceptor that can be added around a gRPC channel which keeps a count of the number
+  // of requests that are active at any given moment.
+  final class ActiveRequestCounter implements ClientInterceptor {
+
+    // A count of the number of RPCs currently underway for one gRPC channel channel.
+    private AtomicInteger ongoingRequestCount;
+
+    public ActiveRequestCounter() {
+      ongoingRequestCount = new AtomicInteger(0);
+    }
+
+    @Override
+    public <ReqT, RespT> ClientCall<ReqT, RespT> interceptCall(
+        MethodDescriptor<ReqT, RespT> methodDescriptor, CallOptions callOptions, Channel channel) {
+      ClientCall<ReqT, RespT> newCall = channel.newCall(methodDescriptor, callOptions);
+      final AtomicBoolean countedCancel = new AtomicBoolean(false);
+
+      // A streaming call might be terminated in one of several possible ways:
+      // * The call completes normally -> onClose() will be invoked.
+      // * The context is cancelled -> CancellationListener.cancelled() will be called.
+      // * The call itself is cancelled (doesn't currently happen) -> ClientCall.cancel() called.
+      //
+      // It's possible more than one of these could happen, so we use countedCancel to make sure we
+      // don't double count a decrement.
+      Context.current().addListener(new CancellationListener() {
+        @Override
+        public void cancelled(Context context) {
+          if(countedCancel.compareAndSet(false, true)) {
+            ongoingRequestCount.decrementAndGet();
+          }
+        }
+      }, backgroundTasksThreadPool);
+
+      return new SimpleForwardingClientCall(newCall) {
+
+        @Override
+        public void cancel(@Nullable String message, @Nullable Throwable cause) {
+          if(countedCancel.compareAndSet(false, true)) {
+            ongoingRequestCount.decrementAndGet();
+          }
+          super.cancel(message, cause);
+        }
+
+        @Override
+        public void start(Listener responseListener, Metadata headers) {
+          ongoingRequestCount.incrementAndGet();
+          this.delegate().start(
+              new SimpleForwardingClientCallListener(responseListener) {
+                @Override
+                public void onClose(Status status, Metadata trailers) {
+                  if(countedCancel.compareAndSet(false, true)) {
+                    ongoingRequestCount.decrementAndGet();
+                  }
+                  super.onClose(status, trailers);
+                }
+              }, headers);
+        }
+      };
+    }
+  }
+
+  class ChannelAndRequestCounter {
+    private final ManagedChannel channel;
+    private final ActiveRequestCounter counter;
+
+    public ChannelAndRequestCounter(ManagedChannel channel, ActiveRequestCounter counter) {
+      this.channel = channel;
+      this.counter = counter;
+    }
+
+    public int activeRequests() {
+      return counter.ongoingRequestCount.get();
+    }
+  }
 
   public StorageStubProvider(
       GoogleCloudStorageReadOptions readOptions, ExecutorService backgroundTasksThreadPool) {
@@ -45,37 +134,41 @@ public class StorageStubProvider {
     this.mediaChannelPool = new ArrayList<>();
   }
 
-  private ManagedChannel buildManagedChannel() {
+  private ChannelAndRequestCounter buildManagedChannel() {
     if (readOptions.getGrpcServerAddress() != GoogleCloudStorageReadOptions.GRPC_SERVER_ADDRESS) {
       GRPC_TARGET = readOptions.getGrpcServerAddress();
     }
-    return GoogleDefaultChannelBuilder.forTarget(GRPC_TARGET)
-        .defaultServiceConfig(getGrpcServiceConfig())
-        .build();
+    ActiveRequestCounter counter = new ActiveRequestCounter();
+      ManagedChannel channel =  GoogleDefaultChannelBuilder
+          .forTarget(GRPC_TARGET)
+          .defaultServiceConfig(getGrpcServiceConfig())
+          .intercept(counter)
+          .build();
+      return new ChannelAndRequestCounter(channel, counter);
   }
 
-  public StorageBlockingStub getBlockingStub() {
-    ManagedChannel channel;
+  synchronized public StorageBlockingStub getBlockingStub() {
+    ChannelAndRequestCounter channel;
     if (mediaChannelPool.size() < MEDIA_CHANNEL_MAX_POOL_SIZE) {
       channel = buildManagedChannel();
       mediaChannelPool.add(channel);
     } else {
-      channel = mediaChannelPool.get(nextChannel);
-      nextChannel = (nextChannel + 1) % mediaChannelPool.size();
+      channel = mediaChannelPool.stream().min(
+          Comparator.comparingInt(ChannelAndRequestCounter::activeRequests)).get();
     }
-    return StorageGrpc.newBlockingStub(channel);
+    return StorageGrpc.newBlockingStub(channel.channel);
   }
 
-  public StorageStub getAsyncStub() {
-    ManagedChannel channel;
+  synchronized public StorageStub getAsyncStub() {
+    ChannelAndRequestCounter channel;
     if (mediaChannelPool.size() < MEDIA_CHANNEL_MAX_POOL_SIZE) {
       channel = buildManagedChannel();
       mediaChannelPool.add(channel);
     } else {
-      channel = mediaChannelPool.get(nextChannel);
-      nextChannel = (nextChannel + 1) % mediaChannelPool.size();
+      channel = mediaChannelPool.stream().min(
+          Comparator.comparingInt(ChannelAndRequestCounter::activeRequests)).get();
     }
-    return StorageGrpc.newStub(channel).withExecutor(backgroundTasksThreadPool);
+    return StorageGrpc.newStub(channel.channel).withExecutor(backgroundTasksThreadPool);
   }
 
   private Map<String, Object> getGrpcServiceConfig() {
@@ -113,5 +206,11 @@ public class StorageStubProvider {
     return ImmutableMap.of(
         "methodConfig", ImmutableList.of(methodConfig),
         "loadBalancingConfig", ImmutableList.of(grpcLbPolicy));
+  }
+
+  public void shutdown() {
+    for(ChannelAndRequestCounter channel : mediaChannelPool) {
+      channel.channel.shutdownNow();
+    }
   }
 }
