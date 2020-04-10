@@ -158,16 +158,16 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     bytesToSkipBeforeReading -= bufferSkip;
     int remainingBufferedBytes = bufferedContent.size() - bufferedContentReadOffset;
 
-    Boolean isRemainingBufferedContentLargerThanByteBuffer =
+    boolean remainingBufferedContentLargerThanByteBuffer =
         remainingBufferedBytes > byteBuffer.remaining();
     int bytesToWrite =
-        isRemainingBufferedContentLargerThanByteBuffer
+        remainingBufferedContentLargerThanByteBuffer
             ? byteBuffer.remaining()
             : remainingBufferedBytes;
     byteBuffer.put(bufferedContent.toByteArray(), bufferedContentReadOffset, bytesToWrite);
     position += bytesToWrite;
 
-    if (isRemainingBufferedContentLargerThanByteBuffer) {
+    if (remainingBufferedContentLargerThanByteBuffer) {
       bufferedContentReadOffset += bytesToWrite;
     } else {
       bufferedContent = null;
@@ -236,14 +236,14 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         }
       }
 
-      Boolean isResponseSizeLargerThanRemainingBuffer = content.size() > byteBuffer.remaining();
+      boolean responseSizeLargerThanRemainingBuffer = content.size() > byteBuffer.remaining();
       int bytesToWrite =
-          isResponseSizeLargerThanRemainingBuffer ? byteBuffer.remaining() : content.size();
+          responseSizeLargerThanRemainingBuffer ? byteBuffer.remaining() : content.size();
       byteBuffer.put(content.toByteArray(), 0, bytesToWrite);
       bytesRead += bytesToWrite;
       position += bytesToWrite;
 
-      if (isResponseSizeLargerThanRemainingBuffer) {
+      if (responseSizeLargerThanRemainingBuffer) {
         bufferedContent = content;
         bufferedContentReadOffset = bytesToWrite;
       }
