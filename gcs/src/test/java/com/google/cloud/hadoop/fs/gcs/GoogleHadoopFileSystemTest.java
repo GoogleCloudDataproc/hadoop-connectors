@@ -102,7 +102,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     assertThat(exception)
         .hasCauseThat()
         .hasMessageThat()
-        .isEqualTo("non-existent.json (No such file or directory)");
+            .isAnyOf("non-existent.json (No such file or directory)", "non-existent.json (The system cannot find the file specified)");
 
     lazyFs.close();
   }
@@ -123,7 +123,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
 
     assertThat(exception)
         .hasMessageThat()
-        .isEqualTo("non-existent.json (No such file or directory)");
+        .isAnyOf("non-existent.json (No such file or directory)", "non-existent.json (The system cannot find the file specified)");
   }
 
   // -----------------------------------------------------------------
