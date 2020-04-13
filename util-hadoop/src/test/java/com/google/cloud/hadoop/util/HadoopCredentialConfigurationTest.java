@@ -251,9 +251,9 @@ public class HadoopCredentialConfigurationTest {
 
   private static Path getPath(String resource) throws Exception {
     String filePath = Resources.getResource(resource).getFile();
-    return (System.getProperty("os.name").toLowerCase().contains("win")
-            && filePath.charAt(0) == '/')
-        ? Paths.get(filePath.substring(1))
-        : Paths.get(filePath);
+    return Paths.get(
+        System.getProperty("os.name").toLowerCase().contains("win") && filePath.startsWith("/")
+            ? filePath.substring(1)
+            : filePath);
   }
 }
