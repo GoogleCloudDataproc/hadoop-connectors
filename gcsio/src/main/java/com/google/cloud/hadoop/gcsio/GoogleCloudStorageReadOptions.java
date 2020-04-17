@@ -19,7 +19,6 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.google.auto.value.AutoValue;
-import com.google.google.storage.v1.StorageGrpc;
 
 /**
  * Advanced options for reading GoogleCloudStorage objects. Immutable; callers must use the inner
@@ -47,7 +46,7 @@ public abstract class GoogleCloudStorageReadOptions {
   public static final Fadvise DEFAULT_FADVISE = Fadvise.SEQUENTIAL;
   public static final int DEFAULT_MIN_RANGE_REQUEST_SIZE = 512 * 1024;
   public static final boolean GRPC_CHECKSUMS_ENABLED_DEFAULT = false;
-  public static final String GRPC_SERVICE_NAME = StorageGrpc.SERVICE_NAME;
+  public static final String GRPC_HOSTNAME = "storage.googleapis.com";
 
   // Default builder should be initialized after default values,
   // otherwise it will access not initialized default values.
@@ -67,7 +66,7 @@ public abstract class GoogleCloudStorageReadOptions {
         .setFadvise(DEFAULT_FADVISE)
         .setMinRangeRequestSize(DEFAULT_MIN_RANGE_REQUEST_SIZE)
         .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT)
-        .setGrpcServiceName(GRPC_SERVICE_NAME);
+        .setGrpcHostname(GRPC_HOSTNAME);
   }
 
   /** See {@link Builder#setBackoffInitialIntervalMillis}. */
@@ -106,8 +105,8 @@ public abstract class GoogleCloudStorageReadOptions {
   /** See {@link Builder#setGrpcChecksumsEnabled}. */
   public abstract boolean getGrpcChecksumsEnabled();
 
-  /** See {@link Builder#setGrpcServiceName}. */
-  public abstract String getGrpcServiceName();
+  /** See {@link Builder#setGrpcHostname}. */
+  public abstract String getGrpcHostname();
 
   public abstract Builder toBuilder();
 
@@ -208,8 +207,8 @@ public abstract class GoogleCloudStorageReadOptions {
      */
     public abstract Builder setGrpcChecksumsEnabled(boolean grpcChecksumsEnabled);
 
-    /** Sets the property to override the default GCS gRPC service name. */
-    public abstract Builder setGrpcServiceName(String grpcServiceName);
+    /** Sets the property to override the default GCS gRPC hostname. */
+    public abstract Builder setGrpcHostname(String grpcHostname);
 
     abstract GoogleCloudStorageReadOptions autoBuild();
 

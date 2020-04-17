@@ -347,10 +347,9 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_CHECKSUMS_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.grpc.checksums.enable", false);
 
-  /** Configuration key for the Cloud Storage gRPC service name. */
-  public static final HadoopConfigurationProperty<String> GCS_GRPC_SERVICE_NAME =
-      new HadoopConfigurationProperty<>(
-          "fs.gs.grpc.service.name", GoogleCloudStorageReadOptions.GRPC_SERVICE_NAME);
+  /** Configuration key for the Cloud Storage gRPC hostname. */
+  public static final HadoopConfigurationProperty<String> GCS_GRPC_HOSTNAME =
+      new HadoopConfigurationProperty<>("fs.gs.grpc.hostname", "storage.googleapis.com");
 
   /** Override configuration file path. This file must be a valid Hadoop configuration file. */
   public static final HadoopConfigurationProperty<String> GCS_CONFIG_OVERRIDE_FILE =
@@ -461,7 +460,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setFadvise(GCS_INPUT_STREAM_FADVISE.get(config, config::getEnum))
         .setMinRangeRequestSize(GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getInt))
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
-        .setGrpcServiceName(GCS_GRPC_SERVICE_NAME.get(config, config::get))
+        .setGrpcHostname(GCS_GRPC_HOSTNAME.get(config, config::get))
         .build();
   }
 
