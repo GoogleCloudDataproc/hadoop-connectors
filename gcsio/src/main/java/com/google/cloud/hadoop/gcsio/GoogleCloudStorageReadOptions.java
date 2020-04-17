@@ -47,6 +47,7 @@ public abstract class GoogleCloudStorageReadOptions {
   public static final int DEFAULT_MIN_RANGE_REQUEST_SIZE = 512 * 1024;
   public static final boolean GRPC_CHECKSUMS_ENABLED_DEFAULT = false;
   public static final String GRPC_HOSTNAME = "storage.googleapis.com";
+  public static final int GRPC_PORT = 443;
 
   // Default builder should be initialized after default values,
   // otherwise it will access not initialized default values.
@@ -66,7 +67,8 @@ public abstract class GoogleCloudStorageReadOptions {
         .setFadvise(DEFAULT_FADVISE)
         .setMinRangeRequestSize(DEFAULT_MIN_RANGE_REQUEST_SIZE)
         .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT)
-        .setGrpcHostname(GRPC_HOSTNAME);
+        .setGrpcHostname(GRPC_HOSTNAME)
+        .setGrpcPort(GRPC_PORT);
   }
 
   /** See {@link Builder#setBackoffInitialIntervalMillis}. */
@@ -107,6 +109,9 @@ public abstract class GoogleCloudStorageReadOptions {
 
   /** See {@link Builder#setGrpcHostname}. */
   public abstract String getGrpcHostname();
+
+  /** See {@link Builder#setGrpcPort}. */
+  public abstract int getGrpcPort();
 
   public abstract Builder toBuilder();
 
@@ -209,6 +214,9 @@ public abstract class GoogleCloudStorageReadOptions {
 
     /** Sets the property to override the default GCS gRPC hostname. */
     public abstract Builder setGrpcHostname(String grpcHostname);
+
+    /** Sets the property to override the default GCS gRPC port. */
+    public abstract Builder setGrpcPort(int grpcPort);
 
     abstract GoogleCloudStorageReadOptions autoBuild();
 

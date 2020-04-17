@@ -351,6 +351,10 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<String> GCS_GRPC_HOSTNAME =
       new HadoopConfigurationProperty<>("fs.gs.grpc.hostname", "storage.googleapis.com");
 
+  /** Configuration key for the Cloud Storage gRPC port. */
+  public static final HadoopConfigurationProperty<Integer> GCS_GRPC_PORT =
+      new HadoopConfigurationProperty<>("fs.gs.grpc.port", 443);
+
   /** Override configuration file path. This file must be a valid Hadoop configuration file. */
   public static final HadoopConfigurationProperty<String> GCS_CONFIG_OVERRIDE_FILE =
       new HadoopConfigurationProperty<>("fs.gs.config.override.file", null);
@@ -461,6 +465,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setMinRangeRequestSize(GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getInt))
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
         .setGrpcHostname(GCS_GRPC_HOSTNAME.get(config, config::get))
+        .setGrpcPort(GCS_GRPC_PORT.get(config, config::getInt))
         .build();
   }
 

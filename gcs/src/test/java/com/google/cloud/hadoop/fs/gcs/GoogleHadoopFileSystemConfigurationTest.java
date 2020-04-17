@@ -101,6 +101,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.grpc.enable", false);
           put("fs.gs.grpc.checksums.enable", false);
           put("fs.gs.grpc.hostname", "storage.googleapis.com");
+          put("fs.gs.grpc.port", 443);
         }
       };
 
