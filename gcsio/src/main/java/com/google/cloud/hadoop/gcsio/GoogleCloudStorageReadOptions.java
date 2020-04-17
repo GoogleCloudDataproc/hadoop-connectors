@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.google.auto.value.AutoValue;
+import com.google.google.storage.v1.StorageGrpc;
 
 /**
  * Advanced options for reading GoogleCloudStorage objects. Immutable; callers must use the inner
@@ -46,6 +47,7 @@ public abstract class GoogleCloudStorageReadOptions {
   public static final Fadvise DEFAULT_FADVISE = Fadvise.SEQUENTIAL;
   public static final int DEFAULT_MIN_RANGE_REQUEST_SIZE = 512 * 1024;
   public static final boolean GRPC_CHECKSUMS_ENABLED_DEFAULT = false;
+  public static final String GRPC_SERVICE_NAME = StorageGrpc.SERVICE_NAME;
 
   // Default builder should be initialized after default values,
   // otherwise it will access not initialized default values.
@@ -64,7 +66,8 @@ public abstract class GoogleCloudStorageReadOptions {
         .setInplaceSeekLimit(DEFAULT_INPLACE_SEEK_LIMIT)
         .setFadvise(DEFAULT_FADVISE)
         .setMinRangeRequestSize(DEFAULT_MIN_RANGE_REQUEST_SIZE)
-        .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT);
+        .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT)
+        .setGrpcServiceName(GRPC_SERVICE_NAME);
   }
 
   /** See {@link Builder#setBackoffInitialIntervalMillis}. */
@@ -102,6 +105,9 @@ public abstract class GoogleCloudStorageReadOptions {
 
   /** See {@link Builder#setGrpcChecksumsEnabled}. */
   public abstract boolean getGrpcChecksumsEnabled();
+
+  /** See {@link Builder#setGrpcServiceName}. */
+  public abstract String getGrpcServiceName();
 
   public abstract Builder toBuilder();
 
@@ -201,6 +207,9 @@ public abstract class GoogleCloudStorageReadOptions {
      * them and we're validating them.
      */
     public abstract Builder setGrpcChecksumsEnabled(boolean grpcChecksumsEnabled);
+
+    /** Sets the property to override the default GCS gRPC service name. */
+    public abstract Builder setGrpcServiceName(String grpcServiceName);
 
     abstract GoogleCloudStorageReadOptions autoBuild();
 

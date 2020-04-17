@@ -51,7 +51,7 @@ public class StorageStubProvider {
   }
 
   private Map<String, Object> getGrpcServiceConfig() {
-    Map<String, Object> name = ImmutableMap.of("service", "google.storage.v1.Storage");
+    Map<String, Object> name = ImmutableMap.of("service", readOptions.getGrpcServiceName());
 
     Map<String, Object> retryPolicy =
         ImmutableMap.<String, Object>builder()
