@@ -46,6 +46,7 @@ public abstract class GoogleCloudStorageReadOptions {
   public static final Fadvise DEFAULT_FADVISE = Fadvise.SEQUENTIAL;
   public static final int DEFAULT_MIN_RANGE_REQUEST_SIZE = 512 * 1024;
   public static final boolean GRPC_CHECKSUMS_ENABLED_DEFAULT = false;
+  public static final String GRPC_SERVER_ADDRESS = "storage.googleapis.com:443";
 
   // Default builder should be initialized after default values,
   // otherwise it will access not initialized default values.
@@ -64,7 +65,8 @@ public abstract class GoogleCloudStorageReadOptions {
         .setInplaceSeekLimit(DEFAULT_INPLACE_SEEK_LIMIT)
         .setFadvise(DEFAULT_FADVISE)
         .setMinRangeRequestSize(DEFAULT_MIN_RANGE_REQUEST_SIZE)
-        .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT);
+        .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT)
+        .setGrpcServerAddress(GRPC_SERVER_ADDRESS);
   }
 
   /** See {@link Builder#setBackoffInitialIntervalMillis}. */
@@ -102,6 +104,9 @@ public abstract class GoogleCloudStorageReadOptions {
 
   /** See {@link Builder#setGrpcChecksumsEnabled}. */
   public abstract boolean getGrpcChecksumsEnabled();
+
+  /** See {@link Builder#setGrpcServerAddress}. */
+  public abstract String getGrpcServerAddress();
 
   public abstract Builder toBuilder();
 
@@ -201,6 +206,9 @@ public abstract class GoogleCloudStorageReadOptions {
      * them and we're validating them.
      */
     public abstract Builder setGrpcChecksumsEnabled(boolean grpcChecksumsEnabled);
+
+    /** Sets the property to override the default GCS gRPC server address. */
+    public abstract Builder setGrpcServerAddress(String grpcServerAddress);
 
     abstract GoogleCloudStorageReadOptions autoBuild();
 
