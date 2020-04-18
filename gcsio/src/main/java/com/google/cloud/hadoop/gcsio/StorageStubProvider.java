@@ -37,7 +37,7 @@ public class StorageStubProvider {
 
   public StorageBlockingStub buildBlockingStub() {
     return StorageGrpc.newBlockingStub(
-        ComputeEngineChannelBuilder.forAddress(readOptions.getGrpcHostname(), readOptions.getGrpcPort())
+        ComputeEngineChannelBuilder.forTarget(readOptions.getGrpcServerAddress())
             .defaultServiceConfig(getGrpcServiceConfig())
             .build());
   }
