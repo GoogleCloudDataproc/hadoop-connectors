@@ -100,6 +100,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.storage.http.headers.", ImmutableMap.of());
           put("fs.gs.grpc.enable", false);
           put("fs.gs.grpc.checksums.enable", false);
+          put("fs.gs.grpc.server.address", "storage.googleapis.com:443");
         }
       };
 
