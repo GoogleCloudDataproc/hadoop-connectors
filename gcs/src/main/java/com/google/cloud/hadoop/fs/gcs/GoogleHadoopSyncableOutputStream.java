@@ -245,9 +245,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
    */
   @Override
   public void hflush() throws IOException {
-    logger.atWarning().log(
-        "hflush() is a no-op; readers will *not* yet see flushed data for %s", finalGcsPath);
-    throwIfNotOpen();
+    hsync();
   }
 
   @Override
