@@ -14,8 +14,6 @@
 
 package com.google.cloud.hadoop.util;
 
-import static com.google.cloud.hadoop.util.HttpTransportFactory.toSecretString;
-
 import com.google.api.client.googleapis.auth.oauth2.GoogleOAuthConstants;
 import com.google.auto.value.AutoValue;
 import com.google.cloud.hadoop.util.HttpTransportFactory.HttpTransportType;
@@ -47,10 +45,10 @@ public abstract class CredentialOptions {
   // The following 2 parameters are used for credentials set directly via Hadoop Configuration
 
   @Nullable
-  public abstract String getServiceAccountPrivateKeyId();
+  public abstract RedactedString getServiceAccountPrivateKeyId();
 
   @Nullable
-  public abstract String getServiceAccountPrivateKey();
+  public abstract RedactedString getServiceAccountPrivateKey();
 
   // The following 2 parameters are used for ServiceAccount P12 KeyFiles
 
@@ -68,10 +66,10 @@ public abstract class CredentialOptions {
   // The following 3 parameters are used for client authentication
 
   @Nullable
-  public abstract String getClientId();
+  public abstract RedactedString getClientId();
 
   @Nullable
-  public abstract String getClientSecret();
+  public abstract RedactedString getClientSecret();
 
   @Nullable
   public abstract String getOAuthCredentialFile();
@@ -86,33 +84,12 @@ public abstract class CredentialOptions {
   public abstract String getProxyAddress();
 
   @Nullable
-  public abstract String getProxyUsername();
+  public abstract RedactedString getProxyUsername();
 
   @Nullable
-  public abstract String getProxyPassword();
+  public abstract RedactedString getProxyPassword();
 
   public abstract Builder toBuilder();
-
-  @Override
-  public final String toString() {
-    return "CredentialOptions{\n"
-        + ("serviceAccountEnabled: " + isServiceAccountEnabled() + '\n')
-        + ("serviceAccountPrivateKeyId: " + toSecretString(getServiceAccountPrivateKeyId()) + '\n')
-        + ("serviceAccountPrivateKey: " + toSecretString(getServiceAccountPrivateKey()) + '\n')
-        + ("serviceAccountEmail: " + getServiceAccountEmail() + '\n')
-        + ("serviceAccountKeyfile: " + getServiceAccountKeyFile() + '\n')
-        + ("serviceAccountJsonKeyFile: " + getServiceAccountJsonKeyFile() + '\n')
-        + ("clientId: " + toSecretString(getClientId()) + '\n')
-        + ("clientSecret: " + toSecretString(getClientSecret()) + '\n')
-        + ("oAuthCredentialFile: " + getOAuthCredentialFile() + '\n')
-        + ("nullCredentialEnabled: " + isNullCredentialEnabled() + '\n')
-        + ("transportType: " + getTransportType() + '\n')
-        + ("tokenServerUrl: " + getTokenServerUrl() + '\n')
-        + ("proxyAddress: " + getProxyAddress() + '\n')
-        + ("proxyUsername: " + toSecretString(getProxyUsername()) + '\n')
-        + ("proxyPassword: " + toSecretString(getProxyPassword()) + '\n')
-        + "}";
-  }
 
   /** Builder for {@link CredentialOptions} */
   @AutoValue.Builder
@@ -120,9 +97,10 @@ public abstract class CredentialOptions {
 
     public abstract Builder setServiceAccountEnabled(boolean value);
 
-    public abstract Builder setServiceAccountPrivateKeyId(String serviceAccountPrivateKeyId);
+    public abstract Builder setServiceAccountPrivateKeyId(
+        RedactedString serviceAccountPrivateKeyId);
 
-    public abstract Builder setServiceAccountPrivateKey(String serviceAccountPrivateKey);
+    public abstract Builder setServiceAccountPrivateKey(RedactedString serviceAccountPrivateKey);
 
     public abstract Builder setServiceAccountEmail(String serviceAccountEmail);
 
@@ -130,9 +108,9 @@ public abstract class CredentialOptions {
 
     public abstract Builder setServiceAccountJsonKeyFile(String serviceAccountJsonKeyFile);
 
-    public abstract Builder setClientId(String clientId);
+    public abstract Builder setClientId(RedactedString clientId);
 
-    public abstract Builder setClientSecret(String clientSecret);
+    public abstract Builder setClientSecret(RedactedString clientSecret);
 
     public abstract Builder setOAuthCredentialFile(String oAuthCredentialFile);
 
@@ -144,9 +122,9 @@ public abstract class CredentialOptions {
 
     public abstract Builder setProxyAddress(String proxyAddress);
 
-    public abstract Builder setProxyUsername(String proxyUsername);
+    public abstract Builder setProxyUsername(RedactedString proxyUsername);
 
-    public abstract Builder setProxyPassword(String proxyPassword);
+    public abstract Builder setProxyPassword(RedactedString proxyPassword);
 
     public abstract CredentialOptions build();
   }

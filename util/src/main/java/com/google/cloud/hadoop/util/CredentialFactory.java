@@ -307,8 +307,8 @@ public class CredentialFactory {
   }
 
   private static Credential getCredentialsFromSAParameters(
-      String privateKeyId,
-      String privateKeyPem,
+      RedactedString privateKeyId,
+      RedactedString privateKeyPem,
       String serviceAccountEmail,
       List<String> scopes,
       HttpTransport transport,
@@ -321,15 +321,14 @@ public class CredentialFactory {
           "Error reading service account credential from stream, "
               + "expecting, 'client_email', 'private_key' and 'private_key_id'.");
     }
-    PrivateKey privateKey = privateKeyFromPkcs8(privateKeyPem);
     GoogleCredential.Builder builder =
         new GoogleCredential.Builder()
             .setTransport(transport)
             .setJsonFactory(JSON_FACTORY)
             .setServiceAccountId(serviceAccountEmail)
             .setServiceAccountScopes(scopes)
-            .setServiceAccountPrivateKey(privateKey)
-            .setServiceAccountPrivateKeyId(privateKeyId);
+            .setServiceAccountPrivateKey(privateKeyFromPkcs8(privateKeyPem))
+            .setServiceAccountPrivateKeyId(privateKeyId.value());
     return new GoogleCredentialWithRetry(builder, tokenServerUrl);
   }
 
@@ -350,8 +349,8 @@ public class CredentialFactory {
    */
   @Deprecated
   public static Credential getCredentialFromFileCredentialStoreForInstalledApp(
-      String clientId,
-      String clientSecret,
+      RedactedString clientId,
+      RedactedString clientSecret,
       String filePath,
       List<String> scopes,
       HttpTransport transport,
@@ -360,14 +359,16 @@ public class CredentialFactory {
     logger.atFine().log(
         "getCredentialFromFileCredentialStoreForInstalledApp(%s, %s, %s, %s)",
         clientId, clientSecret, filePath, scopes);
-    checkArgument(!isNullOrEmpty(clientId), "clientId must not be null or empty");
-    checkArgument(!isNullOrEmpty(clientSecret), "clientSecret must not be null or empty");
+    checkArgument(clientId != null, "clientId must not be null or empty");
+    checkArgument(clientSecret != null, "clientSecret must not be null or empty");
     checkArgument(!isNullOrEmpty(filePath), "filePath must not be null or empty");
     checkNotNull(scopes, "scopes must not be null");
 
     // Initialize client secrets.
     GoogleClientSecrets.Details details =
-        new GoogleClientSecrets.Details().setClientId(clientId).setClientSecret(clientSecret);
+        new GoogleClientSecrets.Details()
+            .setClientId(clientId.value())
+            .setClientSecret(clientSecret.value());
     GoogleClientSecrets clientSecrets = new GoogleClientSecrets().setInstalled(details);
 
     // Set up file credential store.
@@ -412,8 +413,8 @@ public class CredentialFactory {
   }
 
   // TODO: Copied (mostly) over from Google Credential since it has private scope
-  private static PrivateKey privateKeyFromPkcs8(String privateKeyPem) throws IOException {
-    Reader reader = new StringReader(privateKeyPem);
+  private static PrivateKey privateKeyFromPkcs8(RedactedString privateKeyPem) throws IOException {
+    Reader reader = new StringReader(privateKeyPem.value());
     Section section = PemReader.readFirstSectionAndClose(reader, "PRIVATE KEY");
     if (section == null) {
       throw new IOException("Invalid PKCS8 data.");
@@ -462,10 +463,10 @@ public class CredentialFactory {
         return getCredentialFromMetadataServiceAccount();
       }
 
-      if (!isNullOrEmpty(options.getServiceAccountPrivateKeyId())) {
+      if (options.getServiceAccountPrivateKeyId() != null) {
         logger.atFine().log("Attempting to get credentials from Configuration");
         checkState(
-            !isNullOrEmpty(options.getServiceAccountPrivateKey()),
+            options.getServiceAccountPrivateKey() != null,
             "privateKeyId must be set if using credentials configured directly in configuration");
         checkState(
             !isNullOrEmpty(options.getServiceAccountEmail()),
@@ -551,7 +552,7 @@ public class CredentialFactory {
   private boolean shouldUseMetadataService() {
     return isNullOrEmpty(options.getServiceAccountKeyFile())
         && isNullOrEmpty(options.getServiceAccountJsonKeyFile())
-        && isNullOrEmpty(options.getServiceAccountPrivateKey())
+        && options.getServiceAccountPrivateKey() == null
         && !shouldUseApplicationDefaultCredentials();
   }
 

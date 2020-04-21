@@ -74,7 +74,9 @@ public class CsekEncryptionIntegrationTest {
     String dstBucketName = BUCKET_HELPER.getUniqueBucketName("rewrite-dst");
     // Create destination bucket with different location and storage class,
     // because this is supported by rewrite but not copy requests
-    gcs.create(dstBucketName, CreateBucketOptions.builder().setStorageClass("coldline").build());
+    gcs.create(
+        dstBucketName,
+        new CreateBucketOptions(/* location= */ null, /* storageClass= */ "coldline"));
 
     StorageResourceId srcResourceId = new StorageResourceId(srcBucketName, "encryptedObject");
     int partitionsCount = 32;
