@@ -44,10 +44,10 @@ import com.google.protobuf.util.Timestamps;
 import io.grpc.stub.ClientCallStreamObserver;
 import io.grpc.stub.ClientResponseObserver;
 import io.grpc.stub.StreamObserver;
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PipedInputStream;
-import java.io.PushbackInputStream;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.Map;
@@ -164,25 +164,21 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
   private class UploadOperation implements Callable<Object> {
     // Read end of the pipe.
-    private final InputStream pipeSource;
-    private PushbackInputStream pushbackPipeSource;
+    private final BufferedInputStream bufferedPipeSource;
     private final GoogleCloudStorageGrpcWriteChannel grpcWriteChannel;
     private final int MAX_BYTES_PER_MESSAGE = MAX_WRITE_CHUNK_BYTES.getNumber();
-    // Byte array to hold the unread data.
-    private byte[] pushbackBuffer;
 
     UploadOperation(
         GoogleCloudStorageGrpcWriteChannel grpcWriteChannel, PipedInputStream pipeSource) {
       this.grpcWriteChannel = grpcWriteChannel;
-      this.pipeSource = pipeSource;
-      this.pushbackPipeSource = new PushbackInputStream(pipeSource, MAX_BYTES_PER_MESSAGE);
+      this.bufferedPipeSource = new BufferedInputStream(pipeSource, MAX_BYTES_PER_MESSAGE);
     }
 
     @Override
     public Object call() throws IOException, InterruptedException {
       // Try-with-resource will close this end of the pipe so that
       // the writer at the other end will not hang indefinitely.
-      try (InputStream uploadPipeSource = pipeSource) {
+      try (InputStream uploadPipeSource = bufferedPipeSource) {
         return doResumableUpload();
       } catch (Exception e) {
         throw new IOException(
@@ -209,20 +205,15 @@ public final class GoogleCloudStorageGrpcWriteChannel
         responseObserver.done.await();
 
         if (responseObserver.hasError()) {
-          // If error happens, wrap the source input stream with PushbackInputStream so that
-          // latest read data chunk can be re-read and insert during the next insert call.
-          this.pushbackPipeSource = new PushbackInputStream(pipeSource, MAX_BYTES_PER_MESSAGE);
           long commitedSize = getCommittedWriteSize(uploadId);
-          // If the last upload completely failed then entire buffer needs to be pushed back.
-          // Otherwise, missed chunk size needs to be calculated from last insert and only re-read
-          // failed part of data chunk for the next upload.
-          if (commitedSize <= writeOffset) {
-            pushbackPipeSource.unread(pushbackBuffer, 0, pushbackBuffer.length);
-          } else {
-            int missedChunkLength = (int) (pushbackBuffer.length - (commitedSize - writeOffset));
-            pushbackPipeSource.unread(
-                pushbackBuffer, pushbackBuffer.length - missedChunkLength, missedChunkLength);
-            writeOffset += commitedSize - writeOffset;
+          // If the last upload completely failed then reset to where it's marked before last
+          // insert. Otherwise, uploaded data chunk needs to be skipped before reading from buffered
+          // input stream.
+          bufferedPipeSource.reset();
+          if (commitedSize > writeOffset) {
+            int uploadedDataChunkLength = (int) (commitedSize - writeOffset);
+            bufferedPipeSource.skip(uploadedDataChunkLength);
+            writeOffset += uploadedDataChunkLength;
           }
           ++retriesAttempted;
         } else {
@@ -331,12 +322,15 @@ public final class GoogleCloudStorageGrpcWriteChannel
               }
 
               private ByteString readRequestData() throws IOException {
+                // Mark the input stream in case this request fails so that read can be recovered
+                // from where it's marked.
+                bufferedPipeSource.mark(MAX_BYTES_PER_MESSAGE);
                 ByteString data =
                     ByteString.readFrom(
-                        ByteStreams.limit(pushbackPipeSource, MAX_BYTES_PER_MESSAGE));
-                pushbackBuffer = data.toByteArray();
+                        ByteStreams.limit(bufferedPipeSource, MAX_BYTES_PER_MESSAGE));
 
-                objectFinalized = data.size() < MAX_BYTES_PER_MESSAGE || pipeSource.available() > 0;
+                objectFinalized =
+                    data.size() < MAX_BYTES_PER_MESSAGE || bufferedPipeSource.available() > 0;
                 return data;
               }
             });
