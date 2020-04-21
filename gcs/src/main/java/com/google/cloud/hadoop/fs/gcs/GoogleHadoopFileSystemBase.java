@@ -148,8 +148,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   public enum OutputStreamType {
     BASIC,
-    SYNCABLE_COMPOSITE,
-    FLUSHABLE_COMPOSITE
+    FLUSHABLE_COMPOSITE,
+    SYNCABLE_COMPOSITE
   }
 
   /**
@@ -675,8 +675,12 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
             new GoogleHadoopOutputStream(
                 this, gcsPath, statistics, new CreateFileOptions(overwrite));
         break;
-      case SYNCABLE_COMPOSITE:
       case FLUSHABLE_COMPOSITE:
+        out =
+            new GoogleHadoopSyncableOutputStream(
+                this, gcsPath, statistics, new CreateFileOptions(overwrite), false, true);
+        break;
+      case SYNCABLE_COMPOSITE:
         out =
             new GoogleHadoopSyncableOutputStream(
                 this, gcsPath, statistics, new CreateFileOptions(overwrite));

@@ -132,6 +132,11 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
   // StorageResourceId.UNKNOWN_GENERATION_ID if unknown.
   private long curDestGenerationId;
 
+  // Whether perform a hsync() when calling hflush().
+  // When false, hflush() will be no-op.
+  // When true, hflush() simply calls hsync().
+  private boolean syncOnFlush;
+
   /**
    * Creates a new GoogleHadoopSyncableOutputStream with initial stream initialized and expected to
    * begin at file-offset 0. This constructor is not suitable for "appending" to already existing
@@ -149,7 +154,8 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
         statistics,
         createFileOptions,
         TEMPFILE_CLEANUP_THREADPOOL,
-        /* appendMode= */ false);
+        /* appendMode= */ false,
+        /* syncOnFlush= */ false);
   }
 
   /** Creates a new GoogleHadoopSyncableOutputStream suitable for appending to existing files. */
@@ -160,7 +166,34 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
       CreateFileOptions createFileOptions,
       boolean appendMode)
       throws IOException {
-    this(ghfs, gcsPath, statistics, createFileOptions, TEMPFILE_CLEANUP_THREADPOOL, appendMode);
+    this(
+        ghfs,
+        gcsPath,
+        statistics,
+        createFileOptions,
+        TEMPFILE_CLEANUP_THREADPOOL,
+        appendMode,
+        /* syncOnFlush= */ false);
+  }
+
+  /** Creates a new GoogleHadoopSyncableOutputStream suitable for appending to existing files,
+   * as well as enabling using hsync() for hflush(). */
+  public GoogleHadoopSyncableOutputStream(
+      GoogleHadoopFileSystemBase ghfs,
+      URI gcsPath,
+      FileSystem.Statistics statistics,
+      CreateFileOptions createFileOptions,
+      boolean appendMode,
+      boolean syncOnFlush)
+      throws IOException {
+    this(
+        ghfs,
+        gcsPath,
+        statistics,
+        createFileOptions,
+        TEMPFILE_CLEANUP_THREADPOOL,
+        /* appendMode= */ appendMode,
+        /* syncOnFlush= */ syncOnFlush);
   }
 
   GoogleHadoopSyncableOutputStream(
@@ -169,7 +202,8 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
       FileSystem.Statistics statistics,
       CreateFileOptions createFileOptions,
       ExecutorService cleanupThreadpool,
-      boolean appendMode)
+      boolean appendMode,
+      boolean syncOnFlush)
       throws IOException {
     logger.atFine().log(
         "GoogleHadoopSyncableOutputStream(gcsPath: %s, createFileOptions:  %s)",
@@ -180,6 +214,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
     this.fileOptions = createFileOptions;
     this.deletionFutures = new ArrayList<>();
     this.cleanupThreadpool = cleanupThreadpool;
+    this.syncOnFlush = syncOnFlush;
 
     if (appendMode) {
       // When appending first component has to go to new temporary file.
