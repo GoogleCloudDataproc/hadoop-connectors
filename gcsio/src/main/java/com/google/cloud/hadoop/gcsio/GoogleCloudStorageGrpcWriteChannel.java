@@ -44,10 +44,10 @@ import com.google.protobuf.util.Timestamps;
 import io.grpc.stub.ClientCallStreamObserver;
 import io.grpc.stub.ClientResponseObserver;
 import io.grpc.stub.StreamObserver;
-import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PipedInputStream;
+import java.io.PushbackInputStream;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.Map;
@@ -73,6 +73,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
   private final Optional<String> requesterPaysProject;
   private final ImmutableMap<String, String> metadata;
   private final boolean checksumsEnabled;
+  // Maximum number of automatic retries for each data chunk when writing to underlying channel
+  // raises error.
+  private int maxRetries = 10;
 
   private GoogleCloudStorageItemInfo completedItemInfo = null;
 
@@ -161,13 +164,18 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
   private class UploadOperation implements Callable<Object> {
     // Read end of the pipe.
-    private final BufferedInputStream pipeSource;
+    private final InputStream pipeSource;
+    private PushbackInputStream pushbackPipeSource;
     private final GoogleCloudStorageGrpcWriteChannel grpcWriteChannel;
+    private final int MAX_BYTES_PER_MESSAGE = MAX_WRITE_CHUNK_BYTES.getNumber();
+    // Byte array to hold the unread data.
+    private byte[] pushbackBuffer;
 
-    UploadOperation(GoogleCloudStorageGrpcWriteChannel grpcWriteChannel, InputStream pipeSource) {
-      // Buffer the input stream by 1 byte so we can peek ahead for the end of the stream.
+    UploadOperation(
+        GoogleCloudStorageGrpcWriteChannel grpcWriteChannel, PipedInputStream pipeSource) {
       this.grpcWriteChannel = grpcWriteChannel;
-      this.pipeSource = new BufferedInputStream(pipeSource, 1);
+      this.pipeSource = pipeSource;
+      this.pushbackPipeSource = new PushbackInputStream(pipeSource, MAX_BYTES_PER_MESSAGE);
     }
 
     @Override
@@ -188,6 +196,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       InsertChunkResponseObserver responseObserver;
 
       long writeOffset = 0;
+      int retriesAttempted = 0;
       Hasher objectHasher = Hashing.crc32c().newHasher();
       do {
         ByteString chunkData = ByteString.EMPTY;
@@ -198,20 +207,34 @@ public final class GoogleCloudStorageGrpcWriteChannel
         stub.withDeadlineAfter(WRITE_STREAM_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
             .insertObject(responseObserver);
         responseObserver.done.await();
-        writeOffset += responseObserver.bytesWritten();
-      } while (!responseObserver.isFinished());
 
-      if (responseObserver.hasError()) {
-        // TODO(b/150892988): Support resuming an upload after a transient error as follows:
-        //  1. Build a wrapper class around the ByteString (or subclass it), and keep track of the
-        //     start offset of each chunk.
-        //  2. Build a list of chunks, and (a) use it for rewinding when restarting at last
-        //     committed offset (per call to getCommittedWriteSize); (b) remove chunks from the list
-        //     that have been persisted.
-        //  3. Limit the list size to some number (possibly flag-controlled) of sent chunks.
-        throw new IOException(
-            String.format("Insert failed for '%s'", resourceId), responseObserver.getError());
-      }
+        if (responseObserver.hasError()) {
+          // If error happens, wrap the source input stream with PushbackInputStream so that
+          // latest read data chunk can be re-read and insert during the next insert call.
+          this.pushbackPipeSource = new PushbackInputStream(pipeSource, MAX_BYTES_PER_MESSAGE);
+          long commitedSize = getCommittedWriteSize(uploadId);
+          // If the last upload completely failed then entire buffer needs to be pushed back.
+          // Otherwise, missed chunk size needs to be calculated from last insert and only re-read
+          // failed part of data chunk for the next upload.
+          if (commitedSize <= writeOffset) {
+            pushbackPipeSource.unread(pushbackBuffer, 0, pushbackBuffer.length);
+          } else {
+            int missedChunkLength = (int) (pushbackBuffer.length - (commitedSize - writeOffset));
+            pushbackPipeSource.unread(
+                pushbackBuffer, pushbackBuffer.length - missedChunkLength, missedChunkLength);
+            writeOffset += commitedSize - writeOffset;
+          }
+          ++retriesAttempted;
+        } else {
+          writeOffset += responseObserver.bytesWritten();
+          retriesAttempted = 0;
+        }
+
+        if (retriesAttempted == maxRetries) {
+          throw new IOException(
+              String.format("Insert failed for '%s'", resourceId), responseObserver.getError());
+        }
+      } while (!responseObserver.isFinished());
 
       return responseObserver.getResponse();
     }
@@ -219,9 +242,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
     /** Handler for responses from the Insert streaming RPC. */
     private class InsertChunkResponseObserver
         implements ClientResponseObserver<InsertObjectRequest, Object> {
-
-      private final int MAX_BYTES_PER_MESSAGE = MAX_WRITE_CHUNK_BYTES.getNumber();
-
       private final long writeOffset;
       private GoogleCloudStorageGrpcWriteChannel grpcWriteChannel;
       private final String uploadId;
@@ -281,13 +301,11 @@ public final class GoogleCloudStorageGrpcWriteChannel
                   if (checksumsEnabled) {
                     Hasher chunkHasher = Hashing.crc32c().newHasher();
                     for (ByteBuffer buffer : chunkData.asReadOnlyByteBufferList()) {
-                      chunkHasher.putBytes(buffer);
-                    }
-                    for (ByteBuffer buffer : chunkData.asReadOnlyByteBufferList()) {
+                      chunkHasher.putBytes(buffer.duplicate());
                       // TODO(b/7502351): Switch to "concatenating" the chunk-level crc32c values
                       //  if/when the hashing library supports that, to avoid re-scanning all data
                       //  bytes when computing the object-level crc32c.
-                      objectHasher.putBytes(buffer);
+                      objectHasher.putBytes(buffer.duplicate());
                     }
                     requestDataBuilder.setCrc32C(
                         UInt32Value.newBuilder().setValue(chunkHasher.hash().asInt()));
@@ -314,14 +332,11 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
               private ByteString readRequestData() throws IOException {
                 ByteString data =
-                    ByteString.readFrom(ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE));
+                    ByteString.readFrom(
+                        ByteStreams.limit(pushbackPipeSource, MAX_BYTES_PER_MESSAGE));
+                pushbackBuffer = data.toByteArray();
 
-                // Set objectFinalized if there is no more data, looking ahead 1 byte in the buffer
-                // if necessary. This lets us avoid sending an extra request with no data just to
-                // set the finish_write flag.
-                pipeSource.mark(1);
-                objectFinalized = data.size() < MAX_BYTES_PER_MESSAGE || pipeSource.read() == -1;
-                pipeSource.reset();
+                objectFinalized = data.size() < MAX_BYTES_PER_MESSAGE || pipeSource.available() > 0;
                 return data;
               }
             });
