@@ -15,6 +15,9 @@
  */
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_TYPE;
+
+import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
@@ -241,11 +244,27 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
 
   /**
    * There is no way to flush data to become available for readers without a full-fledged hsync(),
-   * so this method is a no-op.
+   * If the output stream is only syncable, this method is a no-op.
+   * If the output stream is also flushable, this method will simply call hsync().
    */
   @Override
   public void hflush() throws IOException {
-    hsync();
+    OutputStreamType type = GCS_OUTPUT_STREAM_TYPE.get(ghfs.getConf(), ghfs.getConf()::getEnum);
+    switch (type) {
+      case SYNCABLE_COMPOSITE:
+        logger.atWarning().log(
+            "hflush() is a no-op; readers will *not* yet see flushed data for %s", finalGcsPath);
+        throwIfNotOpen();
+        break;
+      case FLUSHABLE_COMPOSITE:
+        hsync();
+        break;
+      default:
+        throw new IllegalStateException(
+            String.format(
+                "Illegal output stream type given for key '%s': '%s'",
+                GCS_OUTPUT_STREAM_TYPE.getKey(), type));
+    }
   }
 
   @Override
