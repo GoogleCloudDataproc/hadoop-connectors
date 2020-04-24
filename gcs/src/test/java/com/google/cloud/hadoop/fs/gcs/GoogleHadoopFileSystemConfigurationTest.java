@@ -105,7 +105,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.encryption.key.hash", null);
           put("fs.gs.grpc.enable", false);
           put("fs.gs.grpc.checksums.enable", false);
-          put("fs.gs.grpc.server.address", "storage.googleapis.com:443");
+          put("fs.gs.grpc.server.address", null);
         }
       };
 
