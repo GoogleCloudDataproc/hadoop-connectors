@@ -1,5 +1,7 @@
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.common.base.Strings.isNullOrEmpty;
+
 import com.google.api.ClientProto;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -13,7 +15,6 @@ import io.grpc.Channel;
 import io.grpc.ClientCall;
 import io.grpc.ClientInterceptor;
 import io.grpc.Context;
-import io.grpc.Context.CancellationListener;
 import io.grpc.ForwardingClientCall.SimpleForwardingClientCall;
 import io.grpc.ForwardingClientCallListener.SimpleForwardingClientCallListener;
 import io.grpc.ManagedChannel;
@@ -41,8 +42,8 @@ public class StorageStubProvider {
   // requests.
   private static final int MEDIA_CHANNEL_MAX_POOL_SIZE = 12;
 
-  // The GCS gRPC server.
-  private static String GRPC_TARGET =
+  // The GCS gRPC server address.
+  private static final String DEFAULT_GCS_GRPC_SERVER_ADDRESS =
       StorageOuterClass.getDescriptor()
           .findServiceByName("Storage")
           .getOptions()
@@ -57,7 +58,7 @@ public class StorageStubProvider {
   final class ActiveRequestCounter implements ClientInterceptor {
 
     // A count of the number of RPCs currently underway for one gRPC channel channel.
-    private AtomicInteger ongoingRequestCount;
+    private final AtomicInteger ongoingRequestCount;
 
     public ActiveRequestCounter() {
       ongoingRequestCount = new AtomicInteger(0);
@@ -76,20 +77,19 @@ public class StorageStubProvider {
       //
       // It's possible more than one of these could happen, so we use countedCancel to make sure we
       // don't double count a decrement.
-      Context.current().addListener(new CancellationListener() {
-        @Override
-        public void cancelled(Context context) {
-          if(countedCancel.compareAndSet(false, true)) {
-            ongoingRequestCount.decrementAndGet();
-          }
-        }
-      }, backgroundTasksThreadPool);
+      Context.current()
+          .addListener(
+              context -> {
+                if (countedCancel.compareAndSet(false, true)) {
+                  ongoingRequestCount.decrementAndGet();
+                }
+              },
+              backgroundTasksThreadPool);
 
       return new SimpleForwardingClientCall(newCall) {
-
         @Override
         public void cancel(@Nullable String message, @Nullable Throwable cause) {
-          if(countedCancel.compareAndSet(false, true)) {
+          if (countedCancel.compareAndSet(false, true)) {
             ongoingRequestCount.decrementAndGet();
           }
           super.cancel(message, cause);
@@ -98,16 +98,18 @@ public class StorageStubProvider {
         @Override
         public void start(Listener responseListener, Metadata headers) {
           ongoingRequestCount.incrementAndGet();
-          this.delegate().start(
-              new SimpleForwardingClientCallListener(responseListener) {
-                @Override
-                public void onClose(Status status, Metadata trailers) {
-                  if(countedCancel.compareAndSet(false, true)) {
-                    ongoingRequestCount.decrementAndGet();
-                  }
-                  super.onClose(status, trailers);
-                }
-              }, headers);
+          this.delegate()
+              .start(
+                  new SimpleForwardingClientCallListener(responseListener) {
+                    @Override
+                    public void onClose(Status status, Metadata trailers) {
+                      if (countedCancel.compareAndSet(false, true)) {
+                        ongoingRequestCount.decrementAndGet();
+                      }
+                      super.onClose(status, trailers);
+                    }
+                  },
+                  headers);
         }
       };
     }
@@ -135,38 +137,42 @@ public class StorageStubProvider {
   }
 
   private ChannelAndRequestCounter buildManagedChannel() {
-    if (readOptions.getGrpcServerAddress() != GoogleCloudStorageReadOptions.GRPC_SERVER_ADDRESS) {
-      GRPC_TARGET = readOptions.getGrpcServerAddress();
-    }
     ActiveRequestCounter counter = new ActiveRequestCounter();
-      ManagedChannel channel =  GoogleDefaultChannelBuilder
-          .forTarget(GRPC_TARGET)
-          .defaultServiceConfig(getGrpcServiceConfig())
-          .intercept(counter)
-          .build();
-      return new ChannelAndRequestCounter(channel, counter);
+    ManagedChannel channel =
+        GoogleDefaultChannelBuilder.forTarget(
+                isNullOrEmpty(readOptions.getGrpcServerAddress())
+                    ? DEFAULT_GCS_GRPC_SERVER_ADDRESS
+                    : readOptions.getGrpcServerAddress())
+            .defaultServiceConfig(getGrpcServiceConfig())
+            .intercept(counter)
+            .build();
+    return new ChannelAndRequestCounter(channel, counter);
   }
 
-  synchronized public StorageBlockingStub getBlockingStub() {
+  public synchronized StorageBlockingStub getBlockingStub() {
     ChannelAndRequestCounter channel;
     if (mediaChannelPool.size() < MEDIA_CHANNEL_MAX_POOL_SIZE) {
       channel = buildManagedChannel();
       mediaChannelPool.add(channel);
     } else {
-      channel = mediaChannelPool.stream().min(
-          Comparator.comparingInt(ChannelAndRequestCounter::activeRequests)).get();
+      channel =
+          mediaChannelPool.stream()
+              .min(Comparator.comparingInt(ChannelAndRequestCounter::activeRequests))
+              .get();
     }
     return StorageGrpc.newBlockingStub(channel.channel);
   }
 
-  synchronized public StorageStub getAsyncStub() {
+  public synchronized StorageStub getAsyncStub() {
     ChannelAndRequestCounter channel;
     if (mediaChannelPool.size() < MEDIA_CHANNEL_MAX_POOL_SIZE) {
       channel = buildManagedChannel();
       mediaChannelPool.add(channel);
     } else {
-      channel = mediaChannelPool.stream().min(
-          Comparator.comparingInt(ChannelAndRequestCounter::activeRequests)).get();
+      channel =
+          mediaChannelPool.stream()
+              .min(Comparator.comparingInt(ChannelAndRequestCounter::activeRequests))
+              .get();
     }
     return StorageGrpc.newStub(channel.channel).withExecutor(backgroundTasksThreadPool);
   }
@@ -209,8 +215,6 @@ public class StorageStubProvider {
   }
 
   public void shutdown() {
-    for(ChannelAndRequestCounter channel : mediaChannelPool) {
-      channel.channel.shutdownNow();
-    }
+    mediaChannelPool.parallelStream().forEach(c -> c.channel.shutdownNow());
   }
 }
