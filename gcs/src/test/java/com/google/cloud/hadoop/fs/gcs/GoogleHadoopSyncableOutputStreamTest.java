@@ -127,7 +127,8 @@ public class GoogleHadoopSyncableOutputStreamTest {
             CreateFileOptions.DEFAULT_OVERWRITE,
             mockExecutorService,
             /* appendMode= */ false,
-            /* flushOnSync= */ false);
+            /* flushOnSync= */ false,
+            0);
 
     IOException fakeIoException = new IOException("fake io exception");
     when(mockExecutorService.submit(any(Callable.class)))

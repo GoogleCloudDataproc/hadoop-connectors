@@ -311,6 +311,16 @@ is `false`.
         creating discrete temporary GCS objects which are composed onto the
         destination object.
 
+    *   `FLUSHABLE_COMPOSITE` - Stream behaves similarly to SYNCABLE_COMPOSITE,
+         except `hflush()` is also supported. It will use the same
+         implementation of `hsync()`.
+
+*   `fs.gs.outputstream.sync.min.interval.ms` (default: 0)
+
+    Syncable Outputstream configuration that controls the minimum time interval
+    (milliseconds) between consecutive syncs. This is to avoid getting
+    rate-limited by GCS. Default is 0 - no wait between syncs.
+
 ### HTTP transport configuration
 
 *   `fs.gs.http.transport.type` (default: `JAVA_NET`)

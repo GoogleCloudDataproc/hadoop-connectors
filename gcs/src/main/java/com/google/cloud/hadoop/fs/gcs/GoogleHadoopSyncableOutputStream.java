@@ -15,9 +15,6 @@
  */
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_TYPE;
-
-import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
@@ -137,6 +134,12 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
   // When true, hflush() simply calls hsync().
   private boolean syncOnFlush;
 
+  // Minimum time interval (ns) between consecutive sync/hsync/hflush calls.
+  private long minSyncTimeIntervalNs;
+
+  // The timestamp where last time a sync is performed.
+  private long lastSyncTimestamp;
+
   /**
    * Creates a new GoogleHadoopSyncableOutputStream with initial stream initialized and expected to
    * begin at file-offset 0. This constructor is not suitable for "appending" to already existing
@@ -146,7 +149,8 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
       GoogleHadoopFileSystemBase ghfs,
       URI gcsPath,
       FileSystem.Statistics statistics,
-      CreateFileOptions createFileOptions)
+      CreateFileOptions createFileOptions,
+      int minSyncTimeIntervalMs)
       throws IOException {
     this(
         ghfs,
@@ -155,7 +159,8 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
         createFileOptions,
         TEMPFILE_CLEANUP_THREADPOOL,
         /* appendMode= */ false,
-        /* syncOnFlush= */ false);
+        /* syncOnFlush= */ false,
+        minSyncTimeIntervalMs);
   }
 
   /** Creates a new GoogleHadoopSyncableOutputStream suitable for appending to existing files. */
@@ -164,7 +169,8 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
       URI gcsPath,
       FileSystem.Statistics statistics,
       CreateFileOptions createFileOptions,
-      boolean appendMode)
+      boolean appendMode,
+      int minSyncTimeIntervalMs)
       throws IOException {
     this(
         ghfs,
@@ -173,7 +179,8 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
         createFileOptions,
         TEMPFILE_CLEANUP_THREADPOOL,
         appendMode,
-        /* syncOnFlush= */ false);
+        /* syncOnFlush= */ false,
+        minSyncTimeIntervalMs);
   }
 
   /** Creates a new GoogleHadoopSyncableOutputStream suitable for appending to existing files,
@@ -184,7 +191,8 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
       FileSystem.Statistics statistics,
       CreateFileOptions createFileOptions,
       boolean appendMode,
-      boolean syncOnFlush)
+      boolean syncOnFlush,
+      int minSyncTimeIntervalMs)
       throws IOException {
     this(
         ghfs,
@@ -193,7 +201,8 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
         createFileOptions,
         TEMPFILE_CLEANUP_THREADPOOL,
         /* appendMode= */ appendMode,
-        /* syncOnFlush= */ syncOnFlush);
+        /* syncOnFlush= */ syncOnFlush,
+        minSyncTimeIntervalMs);
   }
 
   GoogleHadoopSyncableOutputStream(
@@ -203,7 +212,8 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
       CreateFileOptions createFileOptions,
       ExecutorService cleanupThreadpool,
       boolean appendMode,
-      boolean syncOnFlush)
+      boolean syncOnFlush,
+      int minSyncTimeIntervalMs)
       throws IOException {
     logger.atFine().log(
         "GoogleHadoopSyncableOutputStream(gcsPath: %s, createFileOptions:  %s)",
@@ -215,6 +225,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
     this.deletionFutures = new ArrayList<>();
     this.cleanupThreadpool = cleanupThreadpool;
     this.syncOnFlush = syncOnFlush;
+    this.minSyncTimeIntervalNs = minSyncTimeIntervalMs * 1_000_000l;
 
     if (appendMode) {
       // When appending first component has to go to new temporary file.
@@ -230,6 +241,8 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
 
     this.curDelegate = new GoogleHadoopOutputStream(ghfs, curGcsPath, statistics, fileOptions);
     this.curDestGenerationId = StorageResourceId.UNKNOWN_GENERATION_ID;
+
+    this.lastSyncTimestamp = -1;
   }
 
   @Override
@@ -284,30 +297,30 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
    */
   @Override
   public void hflush() throws IOException {
-    OutputStreamType type = GCS_OUTPUT_STREAM_TYPE.get(ghfs.getConf(), ghfs.getConf()::getEnum);
-    switch (type) {
-      case SYNCABLE_COMPOSITE:
-        logger.atWarning().log(
-            "hflush() is a no-op; readers will *not* yet see flushed data for %s", finalGcsPath);
-        throwIfNotOpen();
-        break;
-      case FLUSHABLE_COMPOSITE:
-        hsync();
-        break;
-      default:
-        throw new IllegalStateException(
-            String.format(
-                "Illegal output stream type given for key '%s': '%s'",
-                GCS_OUTPUT_STREAM_TYPE.getKey(), type));
+    if(syncOnFlush) {
+      logger.atFine().log("hflush() uses hsync()");
+      hsync();
+    } else {
+      logger.atWarning().log(
+          "hflush() is a no-op; readers will *not* yet see flushed data for %s", finalGcsPath);
+      throwIfNotOpen();
     }
   }
 
   @Override
   public void hsync() throws IOException {
+    long startTime = System.nanoTime();
+    if (startTime - lastSyncTimestamp < minSyncTimeIntervalNs) {
+      logger.atFine().log(
+          "hsync(): Last call was less than %d nano seconds ago. (currentTime=%d, "
+              + "lastSyncTimestamp=%d) Not doing anything this time.",
+          minSyncTimeIntervalNs, startTime, lastSyncTimestamp);
+      return;
+    }
+
     logger.atFine().log(
         "hsync(): Committing tail file %s to final destination %s", curGcsPath, finalGcsPath);
     throwIfNotOpen();
-    long startTime = System.nanoTime();
 
     commitCurrentFile();
 
@@ -321,8 +334,9 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
         curGcsPath, curComponentIndex);
     curDelegate =
         new GoogleHadoopOutputStream(ghfs, curGcsPath, statistics, TEMPFILE_CREATE_OPTIONS);
-    long endTime = System.nanoTime();
-    logger.atFine().log("Took %d ns to hsync()", endTime - startTime);
+    lastSyncTimestamp = System.nanoTime();
+
+    logger.atFine().log("Took %d ns to hsync()", lastSyncTimestamp - startTime);
   }
 
   private void commitCurrentFile() throws IOException {
