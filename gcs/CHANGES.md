@@ -6,6 +6,8 @@
         fs.gs.encryption.key (not set by default)
         fs.gs.encryption.key.hash (not set by default)
 
+1.  Update all dependencies to latest versions.
+
 ### 2.1.2 - 2020-04-02
 
 1.  Update all dependencies to latest versions.
