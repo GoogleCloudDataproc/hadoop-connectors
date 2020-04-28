@@ -101,6 +101,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.cooperative.locking.max.concurrent.operations", 20);
           put("fs.gs.storage.http.headers.", ImmutableMap.of());
           put("fs.gs.grpc.enable", false);
+          put("fs.gs.grpc.auto.window.enable", false);
           put("fs.gs.grpc.checksums.enable", false);
           put("fs.gs.grpc.server.address", null);
         }
