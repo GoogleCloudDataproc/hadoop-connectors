@@ -295,9 +295,9 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_OUTPUT_STREAM_DIRECT_UPLOAD_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.outputstream.direct.upload.enable", false);
 
-  /** Configuration key for the minimal time interval between consecutive sync/hsync/hflush
-   * calls.
-   * */
+  /**
+   * Configuration key for the minimal time interval between consecutive sync/hsync/hflush calls.
+   */
   public static final HadoopConfigurationProperty<Integer> GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS =
       new HadoopConfigurationProperty<>("fs.gs.outputstream.sync.min.interval.ms", 0);
 

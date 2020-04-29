@@ -19,8 +19,11 @@ import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.SyncableOutputStreamOptions;
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -129,48 +132,35 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
   // StorageResourceId.UNKNOWN_GENERATION_ID if unknown.
   private long curDestGenerationId;
 
-  // Whether perform a hsync() when calling hflush().
-  // When false, hflush() will be no-op.
-  // When true, hflush() simply calls hsync().
-  private boolean syncOnFlush;
+  // Syncable output stream options
+  private SyncableOutputStreamOptions syncableOutputStreamOptions;
 
-  // Minimum time interval (ns) between consecutive sync/hsync/hflush calls.
-  private long minSyncTimeIntervalNs;
+  // The rate limiter for syncs. Default: no rate limit.
+  private Optional<RateLimiter> rateLimiter = Optional.absent();
 
-  // The timestamp where last time a sync is performed.
-  private long lastSyncTimestamp;
-
-  /**
-   * Creates a new GoogleHadoopSyncableOutputStream with initial stream initialized and expected to
-   * begin at file-offset 0. This constructor is not suitable for "appending" to already existing
-   * files.
-   */
+  /** Creates a new GoogleHadoopSyncableOutputStream, with default SyncableOutputStreamOptions. */
   public GoogleHadoopSyncableOutputStream(
       GoogleHadoopFileSystemBase ghfs,
       URI gcsPath,
       FileSystem.Statistics statistics,
       CreateFileOptions createFileOptions,
-      int minSyncTimeIntervalMs)
+      ExecutorService cleanupThreadpool)
       throws IOException {
     this(
         ghfs,
         gcsPath,
         statistics,
         createFileOptions,
-        TEMPFILE_CLEANUP_THREADPOOL,
-        /* appendMode= */ false,
-        /* syncOnFlush= */ false,
-        minSyncTimeIntervalMs);
+        cleanupThreadpool,
+        SyncableOutputStreamOptions.DEFAULT);
   }
-
-  /** Creates a new GoogleHadoopSyncableOutputStream suitable for appending to existing files. */
+  /** Creates a new GoogleHadoopSyncableOutputStream. */
   public GoogleHadoopSyncableOutputStream(
       GoogleHadoopFileSystemBase ghfs,
       URI gcsPath,
       FileSystem.Statistics statistics,
       CreateFileOptions createFileOptions,
-      boolean appendMode,
-      int minSyncTimeIntervalMs)
+      SyncableOutputStreamOptions syncableOutputStreamOptions)
       throws IOException {
     this(
         ghfs,
@@ -178,31 +168,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
         statistics,
         createFileOptions,
         TEMPFILE_CLEANUP_THREADPOOL,
-        appendMode,
-        /* syncOnFlush= */ false,
-        minSyncTimeIntervalMs);
-  }
-
-  /** Creates a new GoogleHadoopSyncableOutputStream suitable for appending to existing files,
-   * as well as enabling using hsync() for hflush(). */
-  public GoogleHadoopSyncableOutputStream(
-      GoogleHadoopFileSystemBase ghfs,
-      URI gcsPath,
-      FileSystem.Statistics statistics,
-      CreateFileOptions createFileOptions,
-      boolean appendMode,
-      boolean syncOnFlush,
-      int minSyncTimeIntervalMs)
-      throws IOException {
-    this(
-        ghfs,
-        gcsPath,
-        statistics,
-        createFileOptions,
-        TEMPFILE_CLEANUP_THREADPOOL,
-        /* appendMode= */ appendMode,
-        /* syncOnFlush= */ syncOnFlush,
-        minSyncTimeIntervalMs);
+        syncableOutputStreamOptions);
   }
 
   GoogleHadoopSyncableOutputStream(
@@ -211,9 +177,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
       FileSystem.Statistics statistics,
       CreateFileOptions createFileOptions,
       ExecutorService cleanupThreadpool,
-      boolean appendMode,
-      boolean syncOnFlush,
-      int minSyncTimeIntervalMs)
+      SyncableOutputStreamOptions syncableOutputStreamOptions)
       throws IOException {
     logger.atFine().log(
         "GoogleHadoopSyncableOutputStream(gcsPath: %s, createFileOptions:  %s)",
@@ -224,10 +188,9 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
     this.fileOptions = createFileOptions;
     this.deletionFutures = new ArrayList<>();
     this.cleanupThreadpool = cleanupThreadpool;
-    this.syncOnFlush = syncOnFlush;
-    this.minSyncTimeIntervalNs = minSyncTimeIntervalMs * 1_000_000l;
+    this.syncableOutputStreamOptions = syncableOutputStreamOptions;
 
-    if (appendMode) {
+    if (syncableOutputStreamOptions.getAppendEnabled()) {
       // When appending first component has to go to new temporary file.
       this.curGcsPath = getNextTemporaryPath();
       this.curComponentIndex = 1;
@@ -242,7 +205,11 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
     this.curDelegate = new GoogleHadoopOutputStream(ghfs, curGcsPath, statistics, fileOptions);
     this.curDestGenerationId = StorageResourceId.UNKNOWN_GENERATION_ID;
 
-    this.lastSyncTimestamp = -1;
+    int minSyncTimeIntervalMs = syncableOutputStreamOptions.getMinSyncTimeIntervalMs();
+    if (minSyncTimeIntervalMs > 0) {
+      double permitsPerSecond = 1000.0 / minSyncTimeIntervalMs;
+      rateLimiter = Optional.of(RateLimiter.create(permitsPerSecond));
+    }
   }
 
   @Override
@@ -292,12 +259,12 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
 
   /**
    * There is no way to flush data to become available for readers without a full-fledged hsync(),
-   * If the output stream is only syncable, this method is a no-op.
-   * If the output stream is also flushable, this method will simply call hsync().
+   * If the output stream is only syncable, this method is a no-op. If the output stream is also
+   * flushable, this method will simply call hsync().
    */
   @Override
   public void hflush() throws IOException {
-    if(syncOnFlush) {
+    if (syncableOutputStreamOptions.getSyncOnFlushEnabled()) {
       logger.atFine().log("hflush() uses hsync()");
       hsync();
     } else {
@@ -309,15 +276,16 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
 
   @Override
   public void hsync() throws IOException {
-    long startTime = System.nanoTime();
-    if (startTime - lastSyncTimestamp < minSyncTimeIntervalNs) {
+    // If we are doing rate limiting and getting rate limited (cannot acquire permits)
+    if (rateLimiter.isPresent() && !rateLimiter.get().tryAcquire()) {
       logger.atFine().log(
-          "hsync(): Last call was less than %d nano seconds ago. (currentTime=%d, "
-              + "lastSyncTimestamp=%d) Not doing anything this time.",
-          minSyncTimeIntervalNs, startTime, lastSyncTimestamp);
+          "hsync(): Rate limited. Minimum interval between consecutive calls is %d milliseconds."
+              + " Doing nothing this time.",
+          syncableOutputStreamOptions.getMinSyncTimeIntervalMs());
       return;
     }
 
+    long startTime = System.nanoTime();
     logger.atFine().log(
         "hsync(): Committing tail file %s to final destination %s", curGcsPath, finalGcsPath);
     throwIfNotOpen();
@@ -334,9 +302,9 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
         curGcsPath, curComponentIndex);
     curDelegate =
         new GoogleHadoopOutputStream(ghfs, curGcsPath, statistics, TEMPFILE_CREATE_OPTIONS);
-    lastSyncTimestamp = System.nanoTime();
+    long finishTime = System.nanoTime();
 
-    logger.atFine().log("Took %d ns to hsync()", lastSyncTimestamp - startTime);
+    logger.atFine().log("Took %d ns to hsync()", finishTime - startTime);
   }
 
   private void commitCurrentFile() throws IOException {
