@@ -237,6 +237,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     this.gcs =
         new Storage.Builder(httpTransport, JSON_FACTORY, httpRequestInitializer)
             .setRootUrl(options.getStorageRootUrl())
+            .setServicePath(options.getStorageServicePath())
             .setApplicationName(options.getAppName())
             .build();
   }
@@ -2058,11 +2059,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                 storageOptions.getEncryptionAlgorithm(), "encryption algorithm must not be null"))
         .set(
             "x-goog-encryption-key",
-            checkNotNull(storageOptions.getEncryptionKey(), "encryption key must not be null"))
+            checkNotNull(storageOptions.getEncryptionKey(), "encryption key must not be null")
+                .value())
         .set(
             "x-goog-encryption-key-sha256",
             checkNotNull(
-                storageOptions.getEncryptionKeyHash(), "encryption key hash must not be null"));
+                    storageOptions.getEncryptionKeyHash(), "encryption key hash must not be null")
+                .value());
   }
 
   private <RequestT extends StorageRequest<?>> void setDecryptionHeaders(RequestT request) {
@@ -2078,11 +2081,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                 storageOptions.getEncryptionAlgorithm(), "encryption algorithm must not be null"))
         .set(
             "x-goog-copy-source-encryption-key",
-            checkNotNull(storageOptions.getEncryptionKey(), "encryption key must not be null"))
+            checkNotNull(storageOptions.getEncryptionKey(), "encryption key must not be null")
+                .value())
         .set(
             "x-goog-copy-source-encryption-key-sha256",
             checkNotNull(
-                storageOptions.getEncryptionKeyHash(), "encryption key hash must not be null"));
+                    storageOptions.getEncryptionKeyHash(), "encryption key hash must not be null")
+                .value());
   }
 
   private <RequestT extends StorageRequest<?>> void setRequesterPaysProject(
