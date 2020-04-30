@@ -22,6 +22,7 @@ import com.google.auto.value.AutoValue;
 import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
+import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
@@ -36,6 +37,9 @@ public abstract class GoogleCloudStorageOptions {
 
   /** Default root URL for Cloud Storage API endpoint. */
   public static final String STORAGE_ROOT_URL_DEFAULT = Storage.DEFAULT_ROOT_URL;
+
+  /** Default service Path for Cloud Storage API endpoint. */
+  public static final String STORAGE_SERVICE_PATH_DEFAULT = Storage.DEFAULT_SERVICE_PATH;
 
   /** Default setting for enabling auto-repair of implicit directories. */
   public static final boolean AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT = true;
@@ -88,6 +92,7 @@ public abstract class GoogleCloudStorageOptions {
     return new AutoValue_GoogleCloudStorageOptions.Builder()
         .setGrpcEnabled(ENABLE_GRPC_DEFAULT)
         .setStorageRootUrl(STORAGE_ROOT_URL_DEFAULT)
+        .setStorageServicePath(STORAGE_SERVICE_PATH_DEFAULT)
         .setAutoRepairImplicitDirectoriesEnabled(AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT)
         .setInferImplicitDirectoriesEnabled(INFER_IMPLICIT_DIRECTORIES_DEFAULT)
         .setMaxWaitMillisForEmptyObjectCreation(MAX_WAIT_MILLIS_FOR_EMPTY_OBJECT_CREATION)
@@ -114,6 +119,8 @@ public abstract class GoogleCloudStorageOptions {
   public abstract boolean isGrpcEnabled();
 
   public abstract String getStorageRootUrl();
+
+  public abstract String getStorageServicePath();
 
   @Nullable
   public abstract String getProjectId();
@@ -149,10 +156,10 @@ public abstract class GoogleCloudStorageOptions {
   public abstract String getProxyAddress();
 
   @Nullable
-  public abstract String getProxyUsername();
+  public abstract RedactedString getProxyUsername();
 
   @Nullable
-  public abstract String getProxyPassword();
+  public abstract RedactedString getProxyPassword();
 
   public abstract boolean isCopyWithRewriteEnabled();
 
@@ -172,10 +179,10 @@ public abstract class GoogleCloudStorageOptions {
   public abstract String getEncryptionAlgorithm();
 
   @Nullable
-  public abstract String getEncryptionKey();
+  public abstract RedactedString getEncryptionKey();
 
   @Nullable
-  public abstract String getEncryptionKeyHash();
+  public abstract RedactedString getEncryptionKeyHash();
 
   public void throwIfNotValid() {
     checkArgument(!isNullOrEmpty(getAppName()), "appName must not be null or empty");
@@ -188,6 +195,8 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setGrpcEnabled(boolean grpcEnabled);
 
     public abstract Builder setStorageRootUrl(String rootUrl);
+
+    public abstract Builder setStorageServicePath(String servicePath);
 
     public abstract Builder setProjectId(String projectId);
 
@@ -217,9 +226,9 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setProxyAddress(String proxyAddress);
 
-    public abstract Builder setProxyUsername(String proxyUsername);
+    public abstract Builder setProxyUsername(RedactedString proxyUsername);
 
-    public abstract Builder setProxyPassword(String proxyPassword);
+    public abstract Builder setProxyPassword(RedactedString proxyPassword);
 
     public abstract Builder setCopyWithRewriteEnabled(boolean copyWithRewrite);
 
@@ -242,9 +251,9 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setEncryptionAlgorithm(String encryptionAlgorithm);
 
-    public abstract Builder setEncryptionKey(String encryptionKey);
+    public abstract Builder setEncryptionKey(RedactedString encryptionKey);
 
-    public abstract Builder setEncryptionKeyHash(String encryptionKeyHash);
+    public abstract Builder setEncryptionKeyHash(RedactedString encryptionKeyHash);
 
     abstract GoogleCloudStorageOptions autoBuild();
 

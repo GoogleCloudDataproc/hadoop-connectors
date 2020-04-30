@@ -32,6 +32,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
 import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.common.annotations.VisibleForTesting;
@@ -61,6 +62,11 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<String> GCS_ROOT_URL =
       new HadoopConfigurationProperty<>(
           "fs.gs.storage.root.url", GoogleCloudStorageOptions.STORAGE_ROOT_URL_DEFAULT);
+
+  /** Configuration key for the Cloud Storage API endpoint service path. */
+  public static final HadoopConfigurationProperty<String> GCS_SERVICE_PATH =
+      new HadoopConfigurationProperty<>(
+          "fs.gs.storage.service.path", GoogleCloudStorageOptions.STORAGE_SERVICE_PATH_DEFAULT);
 
   /**
    * Key for the permissions that we report a file or directory to have. Can either be octal or
@@ -382,11 +388,11 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>("fs.gs.encryption.algorithm");
 
   /** Configuration key for the CSEK encryption key. */
-  public static final HadoopConfigurationProperty<String> GCS_ENCRYPTION_KEY =
+  public static final HadoopConfigurationProperty<RedactedString> GCS_ENCRYPTION_KEY =
       new HadoopConfigurationProperty<>("fs.gs.encryption.key");
 
   /** Configuration key for sha256 hash of the CSEK encryption key. */
-  public static final HadoopConfigurationProperty<String> GCS_ENCRYPTION_KEY_HASH =
+  public static final HadoopConfigurationProperty<RedactedString> GCS_ENCRYPTION_KEY_HASH =
       new HadoopConfigurationProperty<>("fs.gs.encryption.key.hash");
 
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
@@ -409,6 +415,7 @@ public class GoogleHadoopFileSystemConfiguration {
     String projectId = GCS_PROJECT_ID.get(config, config::get);
     return GoogleCloudStorageOptions.builder()
         .setStorageRootUrl(GCS_ROOT_URL.get(config, config::get))
+        .setStorageServicePath(GCS_SERVICE_PATH.get(config, config::get))
         .setAutoRepairImplicitDirectoriesEnabled(
             GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.get(config, config::getBoolean))
         .setInferImplicitDirectoriesEnabled(
@@ -422,9 +429,11 @@ public class GoogleHadoopFileSystemConfiguration {
         .setProxyAddress(
             PROXY_ADDRESS_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::get))
         .setProxyUsername(
-            PROXY_USERNAME_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config))
+            RedactedString.create(
+                PROXY_USERNAME_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config)))
         .setProxyPassword(
-            PROXY_PASSWORD_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config))
+            RedactedString.create(
+                PROXY_PASSWORD_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config)))
         .setProjectId(projectId)
         .setMaxListItemsPerCall(GCS_MAX_LIST_ITEMS_PER_CALL.get(config, config::getLong))
         .setMaxRequestsPerBatch(GCS_MAX_REQUESTS_PER_BATCH.get(config, config::getLong))
@@ -441,8 +450,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setCooperativeLockingOptions(getCooperativeLockingOptions(config))
         .setHttpRequestHeaders(GCS_HTTP_HEADERS.getPropsWithPrefix(config))
         .setEncryptionAlgorithm(GCS_ENCRYPTION_ALGORITHM.get(config, config::get))
-        .setEncryptionKey(GCS_ENCRYPTION_KEY.get(config, config::get))
-        .setEncryptionKeyHash(GCS_ENCRYPTION_KEY_HASH.get(config, config::get));
+        .setEncryptionKey(RedactedString.create(GCS_ENCRYPTION_KEY.getPassword(config)))
+        .setEncryptionKeyHash(RedactedString.create(GCS_ENCRYPTION_KEY_HASH.getPassword(config)));
   }
 
   private static PerformanceCachingGoogleCloudStorageOptions getPerformanceCachingOptions(
