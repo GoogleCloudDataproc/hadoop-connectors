@@ -9,6 +9,7 @@
         fs.gs.encryption.algorithm (not set by default)
         fs.gs.encryption.key (not set by default)
         fs.gs.encryption.key.hash (not set by default)
+
 1.  Added a new output stream type which can be used by setting:
 
         fs.gs.outputstream.type=FLUSHABLE_COMPOSITE
@@ -17,13 +18,15 @@
     `SYNCABLE_COMPOSITE` type, except it also supports `hflush()`, which uses
     the same implementation with `hsync()` in the `SYNCABLE_COMPOSITE` output
     stream type.
+
 1.  Added a new output stream parameter
 
         fs.gs.outputstream.sync.min.interval.ms (default: 0)
 
     to configure the minimum time interval (milliseconds) between consecutive
     syncs. This is to avoid getting rate limited by GCS. Default is 0 - no wait
-    between syncs.
+    between syncs. `hsync()` when rate limited will block on waiting for the
+    permits, but `hflush()` will simply perform nothing and return.
 
 ### 2.1.1 - 2020-03-11
 

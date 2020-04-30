@@ -1,6 +1,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import com.google.auto.value.AutoValue;
+import java.time.Duration;
 
 @AutoValue
 public abstract class SyncableOutputStreamOptions {
@@ -10,19 +11,19 @@ public abstract class SyncableOutputStreamOptions {
     return new AutoValue_SyncableOutputStreamOptions.Builder()
         .setAppendEnabled(false)
         .setSyncOnFlushEnabled(false)
-        .setMinSyncTimeIntervalMs(0);
+        .setMinSyncTimeInterval(Duration.ZERO);
   }
 
   public abstract Builder toBuilder();
 
   /** See {@link Builder#setAppendEnabled} * */
-  public abstract boolean getAppendEnabled();
+  public abstract boolean isAppendEnabled();
 
   /** See {@link Builder#setSyncOnFlushEnabled} * */
-  public abstract boolean getSyncOnFlushEnabled();
+  public abstract boolean isSyncOnFlushEnabled();
 
-  /** See {@link Builder#setMinSyncTimeIntervalMs} * */
-  public abstract int getMinSyncTimeIntervalMs();
+  /** See {@link Builder#setMinSyncTimeInterval} * */
+  public abstract Duration getMinSyncTimeInterval();
 
   /** Mutable builder for the SyncableOutputStreamOptions. */
   @AutoValue.Builder
@@ -34,17 +35,9 @@ public abstract class SyncableOutputStreamOptions {
     /** Whether to implement flush using the sync implementation. */
     public abstract Builder setSyncOnFlushEnabled(boolean syncOnFlushEnabled);
 
-    /**
-     * The minimal time interval (in milliseconds) between two consecutive sync()/hsync()/hflush()
-     * calls.
-     */
-    public abstract Builder setMinSyncTimeIntervalMs(int minSyncTimeIntervalMs);
+    /** The minimal time interval between two consecutive sync()/hsync()/hflush() calls. */
+    public abstract Builder setMinSyncTimeInterval(Duration minSyncTimeInterval);
 
-    abstract SyncableOutputStreamOptions autoBuild();
-
-    public SyncableOutputStreamOptions build() {
-      SyncableOutputStreamOptions options = autoBuild();
-      return options;
-    }
+    public abstract SyncableOutputStreamOptions build();
   }
 }

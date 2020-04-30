@@ -76,6 +76,7 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.nio.file.DirectoryNotEmptyException;
 import java.security.GeneralSecurityException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -684,7 +685,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         SyncableOutputStreamOptions flushableOutputStreamOptions =
             SyncableOutputStreamOptions.builder()
                 .setSyncOnFlushEnabled(true)
-                .setMinSyncTimeIntervalMs(minSyncTimeIntervalMs)
+                .setMinSyncTimeInterval(Duration.ofMillis(minSyncTimeIntervalMs))
                 .build();
         out =
             new GoogleHadoopSyncableOutputStream(
@@ -699,7 +700,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
             GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt);
         SyncableOutputStreamOptions syncableOutputStreamOptions =
             SyncableOutputStreamOptions.builder()
-                .setMinSyncTimeIntervalMs(minSyncTimeIntervalMs)
+                .setMinSyncTimeInterval(Duration.ofMillis(minSyncTimeIntervalMs))
                 .build();
         out =
             new GoogleHadoopSyncableOutputStream(
@@ -776,7 +777,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     SyncableOutputStreamOptions syncableOutputStreamOptions =
         SyncableOutputStreamOptions.builder()
             .setAppendEnabled(true)
-            .setMinSyncTimeIntervalMs(minSyncTimeIntervalMs)
+            .setMinSyncTimeInterval(Duration.ofMillis(minSyncTimeIntervalMs))
             .build();
     FSDataOutputStream appendStream =
         new FSDataOutputStream(

@@ -30,6 +30,7 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.WritableByteChannel;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -190,7 +191,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
     this.cleanupThreadpool = cleanupThreadpool;
     this.syncableOutputStreamOptions = syncableOutputStreamOptions;
 
-    if (syncableOutputStreamOptions.getAppendEnabled()) {
+    if (syncableOutputStreamOptions.isAppendEnabled()) {
       // When appending first component has to go to new temporary file.
       this.curGcsPath = getNextTemporaryPath();
       this.curComponentIndex = 1;
@@ -205,9 +206,9 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
     this.curDelegate = new GoogleHadoopOutputStream(ghfs, curGcsPath, statistics, fileOptions);
     this.curDestGenerationId = StorageResourceId.UNKNOWN_GENERATION_ID;
 
-    int minSyncTimeIntervalMs = syncableOutputStreamOptions.getMinSyncTimeIntervalMs();
-    if (minSyncTimeIntervalMs > 0) {
-      double permitsPerSecond = 1000.0 / minSyncTimeIntervalMs;
+    Duration minSyncTimeInterval = syncableOutputStreamOptions.getMinSyncTimeInterval();
+    if (minSyncTimeInterval.compareTo(Duration.ZERO) > 0) {
+      double permitsPerSecond = 1000.0 / minSyncTimeInterval.toMillis();
       rateLimiter = Optional.of(RateLimiter.create(permitsPerSecond));
     }
   }
@@ -253,38 +254,8 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
     }
   }
 
-  public void sync() throws IOException {
-    hsync();
-  }
-
-  /**
-   * There is no way to flush data to become available for readers without a full-fledged hsync(),
-   * If the output stream is only syncable, this method is a no-op. If the output stream is also
-   * flushable, this method will simply call hsync().
-   */
-  @Override
-  public void hflush() throws IOException {
-    if (syncableOutputStreamOptions.getSyncOnFlushEnabled()) {
-      logger.atFine().log("hflush() uses hsync()");
-      hsync();
-    } else {
-      logger.atWarning().log(
-          "hflush() is a no-op; readers will *not* yet see flushed data for %s", finalGcsPath);
-      throwIfNotOpen();
-    }
-  }
-
-  @Override
-  public void hsync() throws IOException {
-    // If we are doing rate limiting and getting rate limited (cannot acquire permits)
-    if (rateLimiter.isPresent() && !rateLimiter.get().tryAcquire()) {
-      logger.atFine().log(
-          "hsync(): Rate limited. Minimum interval between consecutive calls is %d milliseconds."
-              + " Doing nothing this time.",
-          syncableOutputStreamOptions.getMinSyncTimeIntervalMs());
-      return;
-    }
-
+  /** Internal implementation of hsync, can be reused by hflush() as well. */
+  private void hsyncInternal() throws IOException {
     long startTime = System.nanoTime();
     logger.atFine().log(
         "hsync(): Committing tail file %s to final destination %s", curGcsPath, finalGcsPath);
@@ -304,7 +275,50 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
         new GoogleHadoopOutputStream(ghfs, curGcsPath, statistics, TEMPFILE_CREATE_OPTIONS);
     long finishTime = System.nanoTime();
 
-    logger.atFine().log("Took %d ns to hsync()", finishTime - startTime);
+    logger.atFine().log("Took %d ns to %hsync()", finishTime - startTime);
+  }
+
+  public void sync() throws IOException {
+    hsync();
+  }
+
+  /**
+   * There is no way to flush data to become available for readers without a full-fledged hsync(),
+   * If the output stream is only syncable, this method is a no-op. If the output stream is also
+   * flushable, this method will simply use the same implementation of hsync().
+   *
+   * <p>If it is rate limited, unlike hsync(), which will try to acquire the permits and block, it
+   * will do nothing.
+   */
+  @Override
+  public void hflush() throws IOException {
+    if (syncableOutputStreamOptions.isSyncOnFlushEnabled()) {
+      if (rateLimiter.isPresent() && !rateLimiter.get().tryAcquire()) {
+        logger.atWarning().log(
+            "hflush(): Rate limited. Minimum interval between consecutive calls is %d milliseconds."
+                + " Doing nothing this time.",
+            syncableOutputStreamOptions.getMinSyncTimeInterval().toMillis());
+        return;
+      }
+      logger.atFine().log("hflush() uses hsync()");
+      hsyncInternal();
+    } else {
+      logger.atWarning().log(
+          "hflush() is a no-op; readers will *not* yet see flushed data for %s", finalGcsPath);
+      throwIfNotOpen();
+    }
+  }
+
+  @Override
+  public void hsync() throws IOException {
+    if (rateLimiter.isPresent()) {
+      logger.atFine().log(
+          "hsync(): Rate limited. Minimum interval between consecutive calls is %d milliseconds."
+              + " Trying (blocking) to acquire permits",
+          syncableOutputStreamOptions.getMinSyncTimeInterval().toMillis());
+      rateLimiter.get().acquire();
+    }
+    hsyncInternal();
   }
 
   private void commitCurrentFile() throws IOException {
