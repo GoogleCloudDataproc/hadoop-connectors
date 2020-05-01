@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType.FLUSHABLE_COMPOSITE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONCURRENT_GLOB_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_OVERRIDE_FILE;
@@ -46,7 +47,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
-import com.google.cloud.hadoop.gcsio.SyncableOutputStreamOptions;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
 import com.google.cloud.hadoop.gcsio.UriPaths;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
@@ -672,7 +672,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     OutputStreamType type = GCS_OUTPUT_STREAM_TYPE.get(getConf(), getConf()::getEnum);
     OutputStream out;
-    int minSyncIntervalMs;
     switch (type) {
       case BASIC:
         out =
@@ -680,12 +679,12 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 this, gcsPath, statistics, new CreateFileOptions(overwrite));
         break;
       case FLUSHABLE_COMPOSITE:
-        minSyncIntervalMs =
-            GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt);
         SyncableOutputStreamOptions flushableOutputStreamOptions =
             SyncableOutputStreamOptions.builder()
+                .setMinSyncInterval(
+                    Duration.ofMillis(
+                        GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)))
                 .setSyncOnFlushEnabled(true)
-                .setMinSyncInterval(Duration.ofMillis(minSyncIntervalMs))
                 .build();
         out =
             new GoogleHadoopSyncableOutputStream(
@@ -696,11 +695,11 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 flushableOutputStreamOptions);
         break;
       case SYNCABLE_COMPOSITE:
-        minSyncIntervalMs =
-            GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt);
         SyncableOutputStreamOptions syncableOutputStreamOptions =
             SyncableOutputStreamOptions.builder()
-                .setMinSyncInterval(Duration.ofMillis(minSyncIntervalMs))
+                .setMinSyncInterval(
+                    Duration.ofMillis(
+                        GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)))
                 .build();
         out =
             new GoogleHadoopSyncableOutputStream(
@@ -772,12 +771,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         "append(hadoopPath: %s, bufferSize: %d [ignored])", hadoopPath, bufferSize);
 
     URI filePath = getGcsPath(hadoopPath);
-    int minSyncIntervalMs =
-        GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt);
     SyncableOutputStreamOptions syncableOutputStreamOptions =
         SyncableOutputStreamOptions.builder()
             .setAppendEnabled(true)
-            .setMinSyncInterval(Duration.ofMillis(minSyncIntervalMs))
+            .setMinSyncInterval(
+                Duration.ofMillis(
+                    GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)))
+            .setSyncOnFlushEnabled(
+                GCS_OUTPUT_STREAM_TYPE.get(getConf(), getConf()::getEnum) == FLUSHABLE_COMPOSITE)
             .build();
     FSDataOutputStream appendStream =
         new FSDataOutputStream(

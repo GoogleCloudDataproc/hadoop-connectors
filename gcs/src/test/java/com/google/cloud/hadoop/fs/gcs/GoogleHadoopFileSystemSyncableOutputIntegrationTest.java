@@ -23,6 +23,8 @@ import static org.junit.Assert.assertThrows;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
 import java.util.Arrays;
@@ -152,36 +154,74 @@ public class GoogleHadoopFileSystemSyncableOutputIntegrationTest
   }
 
   @Test
-  public void testHflush_rateLimited() throws Exception {
+  public void hflush_syncsEverything() throws Exception {
     ghfs.getConf()
         .set(GCS_OUTPUT_STREAM_TYPE.getKey(), OutputStreamType.FLUSHABLE_COMPOSITE.name());
-    ghfs.getConf()
-        .set(
-            GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.getKey(),
-            String.valueOf(Duration.ofDays(1).toMillis())); // 1 day.
 
     URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
 
-    byte[] testData = {0x01, 0x03, 0x05, 0x07, 0x09};
+    byte[] testData = new byte[10];
+    new Random().nextBytes(testData);
 
-    try (FSDataOutputStream fout = ghfs.create(hadoopPath)) {
-      for (int i = 0; i < testData.length; ++i) {
-        fout.write(testData, i, 1);
-        fout.hflush();
-        // validate partly composed data always just contain the first byte
-        // because all subsequent hflush should all be rate limited.
-        FileStatus status = ghfs.getFileStatus(hadoopPath);
-        assertThat(status.getLen()).isEqualTo(1);
+    try (FSDataOutputStream out = ghfs.create(hadoopPath)) {
+      for (int i = 0; i < testData.length; i++) {
+        out.write(testData[i]);
+        out.hflush();
 
-        byte[] readBuffer = new byte[i + 1];
-        int read = 0;
-        try (FSDataInputStream fin = ghfs.open(hadoopPath)) {
-          read = fin.read(0, readBuffer, 0, i + 1);
-        }
-        assertThat(read).isEqualTo(1);
-        assertThat(readBuffer[0]).isEqualTo(0x01);
+        // Validate partly composed data always just contain the first byte because only the
+        // first hflush() succeeds and all subsequent hflush() calls should be rate limited.
+        assertThat(ghfs.getFileStatus(hadoopPath).getLen()).isEqualTo(i + 1);
+        assertThat(readFile(hadoopPath)).isEqualTo(Arrays.copyOfRange(testData, 0, i + 1));
       }
     }
+
+    // Assert that data was fully written after close
+    assertThat(ghfs.getFileStatus(hadoopPath).getLen()).isEqualTo(testData.length);
+    assertThat(readFile(hadoopPath)).isEqualTo(testData);
+  }
+
+  @Test
+  public void hflush_rateLimited_writesEverything() throws Exception {
+    ghfs.getConf()
+        .set(GCS_OUTPUT_STREAM_TYPE.getKey(), OutputStreamType.FLUSHABLE_COMPOSITE.name());
+    ghfs.getConf()
+        .setLong(GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.getKey(), Duration.ofDays(1).toMillis());
+
+    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
+
+    byte[] testData = new byte[10];
+    new Random().nextBytes(testData);
+
+    try (FSDataOutputStream out = ghfs.create(hadoopPath)) {
+      for (byte testDataByte : testData) {
+        out.write(testDataByte);
+        out.hflush();
+
+        // Validate partly composed data always just contain the first byte because only the
+        // first hflush() succeeds and all subsequent hflush() calls should be rate limited.
+        assertThat(ghfs.getFileStatus(hadoopPath).getLen()).isEqualTo(1);
+        assertThat(readFile(hadoopPath)).isEqualTo(new byte[] {testData[0]});
+      }
+    }
+
+    // Assert that data was fully written after close
+    assertThat(ghfs.getFileStatus(hadoopPath).getLen()).isEqualTo(testData.length);
+    assertThat(readFile(hadoopPath)).isEqualTo(testData);
+  }
+
+  private byte[] readFile(Path objectPath) throws IOException {
+    FileStatus status = ghfs.getFileStatus(objectPath);
+    ByteArrayOutputStream allReadBytes =
+        new ByteArrayOutputStream(Math.toIntExact(status.getLen()));
+    byte[] readBuffer = new byte[1024 * 1024];
+    try (FSDataInputStream in = ghfs.open(objectPath)) {
+      int readBytes;
+      while ((readBytes = in.read(readBuffer)) > 0) {
+        allReadBytes.write(readBuffer, 0, readBytes);
+      }
+    }
+    return allReadBytes.toByteArray();
   }
 }

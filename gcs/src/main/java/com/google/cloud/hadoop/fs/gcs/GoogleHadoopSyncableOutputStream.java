@@ -19,7 +19,7 @@ import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
-import com.google.cloud.hadoop.gcsio.SyncableOutputStreamOptions;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.RateLimiter;
@@ -114,6 +114,10 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
   // List of file-deletion futures accrued during the lifetime of this output stream.
   private final List<Future<Void>> deletionFutures;
 
+  private final SyncableOutputStreamOptions options;
+
+  private final RateLimiter syncRateLimiter;
+
   private final ExecutorService cleanupThreadpool;
 
   // Current GCS path pointing at the "tail" file which will be appended to the destination
@@ -132,65 +136,39 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
   // StorageResourceId.UNKNOWN_GENERATION_ID if unknown.
   private long curDestGenerationId;
 
-  // Syncable output stream options
-  private SyncableOutputStreamOptions syncableOutputStreamOptions;
-
-  // The rate limiter for syncs. Default: no rate limit.
-  private RateLimiter rateLimiter;
-
-  /** Creates a new GoogleHadoopSyncableOutputStream, with default SyncableOutputStreamOptions. */
-  public GoogleHadoopSyncableOutputStream(
-      GoogleHadoopFileSystemBase ghfs,
-      URI gcsPath,
-      FileSystem.Statistics statistics,
-      CreateFileOptions createFileOptions,
-      ExecutorService cleanupThreadpool)
-      throws IOException {
-    this(
-        ghfs,
-        gcsPath,
-        statistics,
-        createFileOptions,
-        cleanupThreadpool,
-        SyncableOutputStreamOptions.DEFAULT);
-  }
   /** Creates a new GoogleHadoopSyncableOutputStream. */
   public GoogleHadoopSyncableOutputStream(
       GoogleHadoopFileSystemBase ghfs,
       URI gcsPath,
       FileSystem.Statistics statistics,
       CreateFileOptions createFileOptions,
-      SyncableOutputStreamOptions syncableOutputStreamOptions)
+      SyncableOutputStreamOptions options)
       throws IOException {
-    this(
-        ghfs,
-        gcsPath,
-        statistics,
-        createFileOptions,
-        TEMPFILE_CLEANUP_THREADPOOL,
-        syncableOutputStreamOptions);
+    this(ghfs, gcsPath, statistics, createFileOptions, options, TEMPFILE_CLEANUP_THREADPOOL);
   }
 
+  @VisibleForTesting
   public GoogleHadoopSyncableOutputStream(
       GoogleHadoopFileSystemBase ghfs,
       URI gcsPath,
       FileSystem.Statistics statistics,
       CreateFileOptions createFileOptions,
-      ExecutorService cleanupThreadpool,
-      SyncableOutputStreamOptions syncableOutputStreamOptions)
+      SyncableOutputStreamOptions options,
+      ExecutorService cleanupThreadpool)
       throws IOException {
     logger.atFine().log(
-        "GoogleHadoopSyncableOutputStream(gcsPath: %s, createFileOptions:  %s)",
-        gcsPath, createFileOptions);
+        "GoogleHadoopSyncableOutputStream(gcsPath: %s, createFileOptions:  %s, options: %s)",
+        gcsPath, createFileOptions, options);
     this.ghfs = ghfs;
     this.finalGcsPath = gcsPath;
     this.statistics = statistics;
     this.fileOptions = createFileOptions;
     this.deletionFutures = new ArrayList<>();
     this.cleanupThreadpool = cleanupThreadpool;
-    this.syncableOutputStreamOptions = syncableOutputStreamOptions;
+    this.options = options;
+    this.syncRateLimiter = createRateLimiter(options.getMinSyncInterval());
 
-    if (syncableOutputStreamOptions.isAppendEnabled()) {
+    if (options.isAppendEnabled()) {
       // When appending first component has to go to new temporary file.
       this.curGcsPath = getNextTemporaryPath();
       this.curComponentIndex = 1;
@@ -204,12 +182,14 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
 
     this.curDelegate = new GoogleHadoopOutputStream(ghfs, curGcsPath, statistics, fileOptions);
     this.curDestGenerationId = StorageResourceId.UNKNOWN_GENERATION_ID;
+  }
 
-    Duration minSyncInterval = syncableOutputStreamOptions.getMinSyncInterval();
-    if (minSyncInterval.compareTo(Duration.ZERO) > 0) {
-      double permitsPerSecond = 1000.0 / minSyncInterval.toMillis();
-      rateLimiter = RateLimiter.create(permitsPerSecond);
+  private static RateLimiter createRateLimiter(Duration minSyncInterval) {
+    if (minSyncInterval.isNegative() || minSyncInterval.isZero()) {
+      return null;
     }
+    double permitsPerSecond = 1000.0 / minSyncInterval.toMillis();
+    return RateLimiter.create(permitsPerSecond);
   }
 
   @Override
@@ -253,9 +233,53 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
     }
   }
 
-  /** Internal implementation of hsync, can be reused by hflush() as well. */
-  private void hsyncInternal() throws IOException {
+  public void sync() throws IOException {
+    hsync();
+  }
+
+  /**
+   * There is no way to flush data to become available for readers without a full-fledged hsync(),
+   * If the output stream is only syncable, this method is a no-op. If the output stream is also
+   * flushable, this method will simply use the same implementation of hsync().
+   *
+   * <p>If it is rate limited, unlike hsync(), which will try to acquire the permits and block, it
+   * will do nothing.
+   */
+  @Override
+  public void hflush() throws IOException {
     long startTimeNs = System.nanoTime();
+    if (!options.isSyncOnFlushEnabled()) {
+      logger.atWarning().log(
+          "hflush(): No-op: readers will *not* yet see flushed data for %s", finalGcsPath);
+      throwIfNotOpen();
+      return;
+    }
+    // If rate limit not set or permit acquired than use hsync()
+    if (syncRateLimiter == null || syncRateLimiter.tryAcquire()) {
+      logger.atFine().log("hflush() uses hsync() for %s", finalGcsPath);
+      hsyncInternal(startTimeNs);
+      return;
+    }
+    logger.atWarning().log(
+        "hflush(): No-op due to rate limit (%s): readers will *not* yet see flushed data for %s",
+        syncRateLimiter, finalGcsPath);
+    throwIfNotOpen();
+  }
+
+  @Override
+  public void hsync() throws IOException {
+    long startTimeNs = System.nanoTime();
+    if (syncRateLimiter != null) {
+      logger.atFine().log(
+          "hsync(): Rate limited (%s) with blocking permit acquisition for %s",
+          syncRateLimiter, finalGcsPath);
+      syncRateLimiter.acquire();
+    }
+    hsyncInternal(startTimeNs);
+  }
+
+  /** Internal implementation of hsync, can be reused by hflush() as well. */
+  private void hsyncInternal(long startTimeNs) throws IOException {
     logger.atFine().log(
         "hsync(): Committing tail file %s to final destination %s", curGcsPath, finalGcsPath);
     throwIfNotOpen();
@@ -272,52 +296,9 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
         curGcsPath, curComponentIndex);
     curDelegate =
         new GoogleHadoopOutputStream(ghfs, curGcsPath, statistics, TEMPFILE_CREATE_OPTIONS);
+
     long finishTimeNs = System.nanoTime();
-
     logger.atFine().log("Took %d ns to sync() for %s", finishTimeNs - startTimeNs, finalGcsPath);
-  }
-
-  public void sync() throws IOException {
-    hsync();
-  }
-
-  /**
-   * There is no way to flush data to become available for readers without a full-fledged hsync(),
-   * If the output stream is only syncable, this method is a no-op. If the output stream is also
-   * flushable, this method will simply use the same implementation of hsync().
-   *
-   * <p>If it is rate limited, unlike hsync(), which will try to acquire the permits and block, it
-   * will do nothing.
-   */
-  @Override
-  public void hflush() throws IOException {
-    if (syncableOutputStreamOptions.isSyncOnFlushEnabled()) {
-      if (rateLimiter != null && !rateLimiter.tryAcquire()) {
-        logger.atWarning().log(
-            "hflush(): Rate limited. Minimum interval between consecutive calls is %d milliseconds."
-                + " Doing nothing this time.",
-            syncableOutputStreamOptions.getMinSyncInterval().toMillis());
-        return;
-      }
-      logger.atFine().log("hflush() uses hsync()");
-      hsyncInternal();
-    } else {
-      logger.atWarning().log(
-          "hflush() is a no-op; readers will *not* yet see flushed data for %s", finalGcsPath);
-      throwIfNotOpen();
-    }
-  }
-
-  @Override
-  public void hsync() throws IOException {
-    if (rateLimiter != null) {
-      logger.atFine().log(
-          "hsync(): Rate limited. Minimum interval between consecutive calls is %d milliseconds."
-              + " Trying (blocking) to acquire permits",
-          syncableOutputStreamOptions.getMinSyncInterval().toMillis());
-      rateLimiter.acquire();
-    }
-    hsyncInternal();
   }
 
   private void commitCurrentFile() throws IOException {

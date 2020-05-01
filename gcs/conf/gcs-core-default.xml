@@ -225,8 +225,9 @@
     <name>fs.gs.outputstream.sync.min.interval.ms</name>
     <value>0</value>
     <description>
-      Minimum time interval between consecutive sync/hsync/hflush calls. When the functions
-      are called too closely with each other the second one will be a no-op.
+      Minimum time interval between consecutive hsync/hflush calls. When the functions are called
+      too closely with each other the second one call will be a no-op for hflush call and blocking
+      for hsync call.
     </description>
   </property>
   <property>
