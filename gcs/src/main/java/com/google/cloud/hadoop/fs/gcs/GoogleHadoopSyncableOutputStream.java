@@ -20,7 +20,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.SyncableOutputStreamOptions;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.RateLimiter;
@@ -137,7 +136,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
   private SyncableOutputStreamOptions syncableOutputStreamOptions;
 
   // The rate limiter for syncs. Default: no rate limit.
-  private Optional<RateLimiter> rateLimiter = Optional.absent();
+  private RateLimiter rateLimiter;
 
   /** Creates a new GoogleHadoopSyncableOutputStream, with default SyncableOutputStreamOptions. */
   public GoogleHadoopSyncableOutputStream(
@@ -172,7 +171,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
         syncableOutputStreamOptions);
   }
 
-  GoogleHadoopSyncableOutputStream(
+  public GoogleHadoopSyncableOutputStream(
       GoogleHadoopFileSystemBase ghfs,
       URI gcsPath,
       FileSystem.Statistics statistics,
@@ -206,10 +205,10 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
     this.curDelegate = new GoogleHadoopOutputStream(ghfs, curGcsPath, statistics, fileOptions);
     this.curDestGenerationId = StorageResourceId.UNKNOWN_GENERATION_ID;
 
-    Duration minSyncTimeInterval = syncableOutputStreamOptions.getMinSyncTimeInterval();
-    if (minSyncTimeInterval.compareTo(Duration.ZERO) > 0) {
-      double permitsPerSecond = 1000.0 / minSyncTimeInterval.toMillis();
-      rateLimiter = Optional.of(RateLimiter.create(permitsPerSecond));
+    Duration minSyncInterval = syncableOutputStreamOptions.getMinSyncInterval();
+    if (minSyncInterval.compareTo(Duration.ZERO) > 0) {
+      double permitsPerSecond = 1000.0 / minSyncInterval.toMillis();
+      rateLimiter = RateLimiter.create(permitsPerSecond);
     }
   }
 
@@ -256,7 +255,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
 
   /** Internal implementation of hsync, can be reused by hflush() as well. */
   private void hsyncInternal() throws IOException {
-    long startTime = System.nanoTime();
+    long startTimeNs = System.nanoTime();
     logger.atFine().log(
         "hsync(): Committing tail file %s to final destination %s", curGcsPath, finalGcsPath);
     throwIfNotOpen();
@@ -273,9 +272,9 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
         curGcsPath, curComponentIndex);
     curDelegate =
         new GoogleHadoopOutputStream(ghfs, curGcsPath, statistics, TEMPFILE_CREATE_OPTIONS);
-    long finishTime = System.nanoTime();
+    long finishTimeNs = System.nanoTime();
 
-    logger.atFine().log("Took %d ns to %hsync()", finishTime - startTime);
+    logger.atFine().log("Took %d ns to sync() for %s", finishTimeNs - startTimeNs, finalGcsPath);
   }
 
   public void sync() throws IOException {
@@ -293,11 +292,11 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
   @Override
   public void hflush() throws IOException {
     if (syncableOutputStreamOptions.isSyncOnFlushEnabled()) {
-      if (rateLimiter.isPresent() && !rateLimiter.get().tryAcquire()) {
+      if (rateLimiter != null && !rateLimiter.tryAcquire()) {
         logger.atWarning().log(
             "hflush(): Rate limited. Minimum interval between consecutive calls is %d milliseconds."
                 + " Doing nothing this time.",
-            syncableOutputStreamOptions.getMinSyncTimeInterval().toMillis());
+            syncableOutputStreamOptions.getMinSyncInterval().toMillis());
         return;
       }
       logger.atFine().log("hflush() uses hsync()");
@@ -311,12 +310,12 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
 
   @Override
   public void hsync() throws IOException {
-    if (rateLimiter.isPresent()) {
+    if (rateLimiter != null) {
       logger.atFine().log(
           "hsync(): Rate limited. Minimum interval between consecutive calls is %d milliseconds."
               + " Trying (blocking) to acquire permits",
-          syncableOutputStreamOptions.getMinSyncTimeInterval().toMillis());
-      rateLimiter.get().acquire();
+          syncableOutputStreamOptions.getMinSyncInterval().toMillis());
+      rateLimiter.acquire();
     }
     hsyncInternal();
   }

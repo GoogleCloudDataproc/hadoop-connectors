@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_TYPE;
 import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -23,6 +24,7 @@ import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest;
 import java.net.URI;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Random;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -147,5 +149,39 @@ public class GoogleHadoopFileSystemSyncableOutputIntegrationTest
 
     // Validate that file wasn't created
     assertThat(ghfs.exists(hadoopPath)).isFalse();
+  }
+
+  @Test
+  public void testHflush_rateLimited() throws Exception {
+    ghfs.getConf()
+        .set(GCS_OUTPUT_STREAM_TYPE.getKey(), OutputStreamType.FLUSHABLE_COMPOSITE.name());
+    ghfs.getConf()
+        .set(
+            GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.getKey(),
+            String.valueOf(Duration.ofDays(1).toMillis())); // 1 day.
+
+    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
+
+    byte[] testData = {0x01, 0x03, 0x05, 0x07, 0x09};
+
+    try (FSDataOutputStream fout = ghfs.create(hadoopPath)) {
+      for (int i = 0; i < testData.length; ++i) {
+        fout.write(testData, i, 1);
+        fout.hflush();
+        // validate partly composed data always just contain the first byte
+        // because all subsequent hflush should all be rate limited.
+        FileStatus status = ghfs.getFileStatus(hadoopPath);
+        assertThat(status.getLen()).isEqualTo(1);
+
+        byte[] readBuffer = new byte[i + 1];
+        int read = 0;
+        try (FSDataInputStream fin = ghfs.open(hadoopPath)) {
+          read = fin.read(0, readBuffer, 0, i + 1);
+        }
+        assertThat(read).isEqualTo(1);
+        assertThat(readBuffer[0]).isEqualTo(0x01);
+      }
+    }
   }
 }

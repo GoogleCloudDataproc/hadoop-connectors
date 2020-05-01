@@ -11,7 +11,7 @@ public abstract class SyncableOutputStreamOptions {
     return new AutoValue_SyncableOutputStreamOptions.Builder()
         .setAppendEnabled(false)
         .setSyncOnFlushEnabled(false)
-        .setMinSyncTimeInterval(Duration.ZERO);
+        .setMinSyncInterval(Duration.ZERO);
   }
 
   public abstract Builder toBuilder();
@@ -22,8 +22,8 @@ public abstract class SyncableOutputStreamOptions {
   /** See {@link Builder#setSyncOnFlushEnabled} * */
   public abstract boolean isSyncOnFlushEnabled();
 
-  /** See {@link Builder#setMinSyncTimeInterval} * */
-  public abstract Duration getMinSyncTimeInterval();
+  /** See {@link Builder#setMinSyncInterval} * */
+  public abstract Duration getMinSyncInterval();
 
   /** Mutable builder for the SyncableOutputStreamOptions. */
   @AutoValue.Builder
@@ -35,8 +35,8 @@ public abstract class SyncableOutputStreamOptions {
     /** Whether to implement flush using the sync implementation. */
     public abstract Builder setSyncOnFlushEnabled(boolean syncOnFlushEnabled);
 
-    /** The minimal time interval between two consecutive sync()/hsync()/hflush() calls. */
-    public abstract Builder setMinSyncTimeInterval(Duration minSyncTimeInterval);
+    /** The minimal interval between two consecutive sync()/hsync()/hflush() calls. */
+    public abstract Builder setMinSyncInterval(Duration minSyncInterval);
 
     public abstract SyncableOutputStreamOptions build();
   }

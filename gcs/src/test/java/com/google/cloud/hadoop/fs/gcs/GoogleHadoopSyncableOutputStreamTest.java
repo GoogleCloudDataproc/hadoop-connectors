@@ -26,6 +26,7 @@ import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.common.util.concurrent.Futures;
 import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
+import java.time.Duration;
 import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -204,5 +205,44 @@ public class GoogleHadoopSyncableOutputStreamTest {
     }
 
     assertThat(actual).isEqualTo(expected);
+  }
+
+  @Test
+  public void testFlushComposite_rateLimited_stillGetsAll() throws Exception {
+    ghfs.getConf()
+        .set(
+            GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_TYPE.getKey(),
+            GoogleHadoopFileSystemBase.OutputStreamType.FLUSHABLE_COMPOSITE.toString());
+    ghfs.getConf()
+        .set(
+            GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.getKey(),
+            String.valueOf(Duration.ofDays(1).toMillis())); // 1 day, so extra long
+
+    Path objectPath = new Path(ghfs.getFileSystemRoot(), "dir/object.txt");
+
+    // number of compose components should be greater than 1024 (previous limit for GCS compose API)
+    byte[] testData = new byte[1536];
+    new Random().nextBytes(testData);
+
+    try (FSDataOutputStream fout = ghfs.create(objectPath)) {
+      for (int i = 0; i < testData.length; ++i) {
+        fout.write(testData, i, 1);
+        fout.hflush();
+
+        byte[] partialReadBuffer = new byte[i + 1];
+        int read;
+        try (FSDataInputStream fin = ghfs.open(objectPath)) {
+          read = fin.read(partialReadBuffer);
+        }
+        assertThat(read).isEqualTo(1);
+        assertThat(partialReadBuffer[0]).isEqualTo(testData[0]);
+      }
+    }
+
+    byte[] readBuffer = new byte[testData.length];
+    try (FSDataInputStream fin = ghfs.open(objectPath)) {
+      fin.read(readBuffer);
+    }
+    assertThat(readBuffer).isEqualTo(testData);
   }
 }

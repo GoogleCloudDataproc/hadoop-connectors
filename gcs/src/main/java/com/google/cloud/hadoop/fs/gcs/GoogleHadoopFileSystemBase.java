@@ -672,7 +672,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     OutputStreamType type = GCS_OUTPUT_STREAM_TYPE.get(getConf(), getConf()::getEnum);
     OutputStream out;
-    int minSyncTimeIntervalMs;
+    int minSyncIntervalMs;
     switch (type) {
       case BASIC:
         out =
@@ -680,12 +680,12 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 this, gcsPath, statistics, new CreateFileOptions(overwrite));
         break;
       case FLUSHABLE_COMPOSITE:
-        minSyncTimeIntervalMs =
+        minSyncIntervalMs =
             GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt);
         SyncableOutputStreamOptions flushableOutputStreamOptions =
             SyncableOutputStreamOptions.builder()
                 .setSyncOnFlushEnabled(true)
-                .setMinSyncTimeInterval(Duration.ofMillis(minSyncTimeIntervalMs))
+                .setMinSyncInterval(Duration.ofMillis(minSyncIntervalMs))
                 .build();
         out =
             new GoogleHadoopSyncableOutputStream(
@@ -696,11 +696,11 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 flushableOutputStreamOptions);
         break;
       case SYNCABLE_COMPOSITE:
-        minSyncTimeIntervalMs =
+        minSyncIntervalMs =
             GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt);
         SyncableOutputStreamOptions syncableOutputStreamOptions =
             SyncableOutputStreamOptions.builder()
-                .setMinSyncTimeInterval(Duration.ofMillis(minSyncTimeIntervalMs))
+                .setMinSyncInterval(Duration.ofMillis(minSyncIntervalMs))
                 .build();
         out =
             new GoogleHadoopSyncableOutputStream(
@@ -772,12 +772,12 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         "append(hadoopPath: %s, bufferSize: %d [ignored])", hadoopPath, bufferSize);
 
     URI filePath = getGcsPath(hadoopPath);
-    int minSyncTimeIntervalMs =
+    int minSyncIntervalMs =
         GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt);
     SyncableOutputStreamOptions syncableOutputStreamOptions =
         SyncableOutputStreamOptions.builder()
             .setAppendEnabled(true)
-            .setMinSyncTimeInterval(Duration.ofMillis(minSyncTimeIntervalMs))
+            .setMinSyncInterval(Duration.ofMillis(minSyncIntervalMs))
             .build();
     FSDataOutputStream appendStream =
         new FSDataOutputStream(
