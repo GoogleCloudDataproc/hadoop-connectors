@@ -8,10 +8,6 @@
 
 1.  Update all dependencies to latest versions.
 
-### 2.1.2 - 2020-04-02
-
-1.  Update all dependencies to latest versions.
-
 1.  Added a new output stream type which can be used by setting:
 
         fs.gs.outputstream.type=FLUSHABLE_COMPOSITE
@@ -29,6 +25,10 @@
     syncs. This is to avoid getting rate limited by GCS. Default is `0` - no
     wait between syncs. `hsync()` when rate limited will block on waiting for
     the permits, but `hflush()` will simply perform nothing and return.
+
+### 2.1.2 - 2020-04-02
+
+1.  Update all dependencies to latest versions.
 
 ### 2.1.1 - 2020-03-11
 
