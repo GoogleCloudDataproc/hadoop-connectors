@@ -129,7 +129,9 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
           case HTTP_SC_TOO_MANY_REQUESTS:
             logger.atInfo().atMostEvery(10, SECONDS).log(
                 LOG_MESSAGE_FORMAT,
-                httpResponse.getStatusCode(), httpRequest.getRequestMethod(), httpRequest.getUrl());
+                httpResponse.getStatusCode(),
+                httpRequest.getRequestMethod(),
+                httpRequest.getUrl());
             break;
           default:
             logger.atInfo().atMostEvery(10, SECONDS).log(
@@ -140,7 +142,9 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
       } else if (responseCodesToLog.contains(httpResponse.getStatusCode())) {
         logger.atInfo().log(
             LOG_MESSAGE_FORMAT,
-            httpResponse.getStatusCode(), httpRequest.getRequestMethod(), httpRequest.getUrl());
+            httpResponse.getStatusCode(),
+            httpRequest.getRequestMethod(),
+            httpRequest.getUrl());
       }
 
       return delegateResponseHandler.handleResponse(httpRequest, httpResponse, supportsRetry);
