@@ -333,7 +333,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
 
       boolean hasError() {
-        return error != null;
+        return error != null || response == null;
       }
 
       int bytesWritten() {
@@ -451,7 +451,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
 
       boolean hasError() {
-        return error != null;
+        return error != null || response == null;
       }
 
       public Throwable getError() {
