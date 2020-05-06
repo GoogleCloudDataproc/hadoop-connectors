@@ -89,10 +89,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
   // Determine if a given IOException is due to rate-limiting.
   private RetryDeterminer<IOException> rateLimitedRetryDeterminer =
       RetryDeterminer.createRateLimitedRetryDeterminer(errorExtractor);
-  // Object to use to perform sleep operations
-  private Sleeper sleeper = Sleeper.DEFAULT;
-  // BackOff objects are per-request, use this to make new ones.
-  private BackOffFactory backOffFactory = BackOffFactory.DEFAULT;
 
   private GoogleCloudStorageItemInfo completedItemInfo = null;
 
@@ -401,13 +397,14 @@ public final class GoogleCloudStorageGrpcWriteChannel
           new SimpleResponseObserver<>();
       GrpcStartResumableWriteRequestExecutor requestExecutor =
           new GrpcStartResumableWriteRequestExecutor<>(request, responseObserver);
+
       try {
         ResilientOperation.retry(
             requestExecutor,
-            backOffFactory.newBackOff(),
+            BackOffFactory.DEFAULT.newBackOff(),
             rateLimitedRetryDeterminer,
             IOException.class,
-            sleeper);
+            Sleeper.DEFAULT);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         throw new IOException("Failed to get upload id.", e);
@@ -428,10 +425,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
       try {
         ResilientOperation.retry(
             requestExecutor,
-            backOffFactory.newBackOff(),
+            BackOffFactory.DEFAULT.newBackOff(),
             rateLimitedRetryDeterminer,
             IOException.class,
-            sleeper);
+            Sleeper.DEFAULT);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         throw new IOException("Failed to get committed write size.", e);
