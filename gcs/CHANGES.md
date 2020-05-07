@@ -4,6 +4,8 @@
 
 1.  Add support for downscoped tokens in `AccessTokenProvider`.
 
+1.  Restore compatibility with pre-2.8 Hadoop versions.
+
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.
