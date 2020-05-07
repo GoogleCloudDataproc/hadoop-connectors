@@ -17,6 +17,7 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.google.storage.v1.ServiceConstants.Values.MAX_WRITE_CHUNK_BYTES;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.stream.Collectors.toMap;
 
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
@@ -56,7 +57,6 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 
 /** Implements WritableByteChannel to provide write access to GCS via gRPC. */
 public final class GoogleCloudStorageGrpcWriteChannel
@@ -66,9 +66,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
   // Default GCS upload granularity.
   static final int GCS_MINIMUM_CHUNK_SIZE = 256 * 1024;
 
-  private static final Duration START_RESUMABLE_WRITE_TIMEOUT = Duration.ofSeconds(10);
-  private static final Duration QUERY_WRITE_STATUS_TIMEOUT = Duration.ofSeconds(10);
-  private static final Duration WRITE_STREAM_TIMEOUT = Duration.ofSeconds(20);
+  private static final Duration START_RESUMABLE_WRITE_TIMEOUT = Duration.ofMinutes(10);
+  private static final Duration QUERY_WRITE_STATUS_TIMEOUT = Duration.ofMinutes(10);
+  private static final Duration WRITE_STREAM_TIMEOUT = Duration.ofMinutes(20);
   // Maximum number of automatic retries for each data chunk
   // when writing to underlying channel raises error.
   private static final int UPLOAD_RETRIES = 10;
@@ -186,7 +186,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       do {
         responseObserver = new InsertChunkResponseObserver(uploadId, writeOffset, objectHasher);
         // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
-        stub.withDeadlineAfter(WRITE_STREAM_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
+        stub.withDeadlineAfter(WRITE_STREAM_TIMEOUT.toMillis(), MILLISECONDS)
             .insertObject(responseObserver);
         responseObserver.done.await();
 
