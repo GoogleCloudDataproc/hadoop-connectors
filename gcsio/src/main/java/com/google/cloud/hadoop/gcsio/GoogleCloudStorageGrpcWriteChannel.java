@@ -411,7 +411,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
           new SimpleResponseObserver<>();
       runWithRetries(
           () -> {
-            stub.withDeadlineAfter(START_RESUMABLE_WRITE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
+            stub.withDeadlineAfter(START_RESUMABLE_WRITE_TIMEOUT.toMillis(), MILLISECONDS)
                 .startResumableWrite(request, responseObserver);
             try {
               responseObserver.done.await();
@@ -434,7 +434,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
           new SimpleResponseObserver<>();
       runWithRetries(
           () -> {
-            stub.withDeadlineAfter(QUERY_WRITE_STATUS_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
+            stub.withDeadlineAfter(QUERY_WRITE_STATUS_TIMEOUT.toMillis(), MILLISECONDS)
                 .queryWriteStatus(request, responseObserver);
             try {
               responseObserver.done.await();
