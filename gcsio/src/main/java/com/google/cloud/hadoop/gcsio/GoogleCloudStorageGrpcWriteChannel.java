@@ -19,13 +19,9 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.google.storage.v1.ServiceConstants.Values.MAX_WRITE_CHUNK_BYTES;
 import static java.util.stream.Collectors.toMap;
 
-import com.google.api.client.util.Sleeper;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.BackOffFactory;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
-import com.google.cloud.hadoop.util.ResilientOperation;
-import com.google.cloud.hadoop.util.ResilientOperation.CheckedCallable;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
@@ -83,12 +79,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
   private final Optional<String> requesterPaysProject;
   private final ImmutableMap<String, String> metadata;
   private final boolean checksumsEnabled;
-
-  // Helper delegate for turning IOExceptions from API calls into higher-level semantics.
-  private ApiErrorExtractor errorExtractor = ApiErrorExtractor.INSTANCE;
-  // Determine if a given IOException is due to rate-limiting.
-  private RetryDeterminer<IOException> rateLimitedRetryDeterminer =
-      RetryDeterminer.createRateLimitedRetryDeterminer(errorExtractor);
 
   private GoogleCloudStorageItemInfo completedItemInfo = null;
 
@@ -366,6 +356,19 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
     }
 
+    private void runWithRetries(Runnable block, SimpleResponseObserver responseObserver)
+        throws IOException {
+      for (int attemptedRetries = 0; attemptedRetries < UPLOAD_RETRIES; attemptedRetries++) {
+        block.run();
+        if (!responseObserver.hasError()) {
+          return;
+        }
+      }
+      throw new IOException(
+          String.format("Failed to start resumable upload for '%s'", resourceId),
+          responseObserver.getError());
+    }
+
     /** Send a StartResumableWriteRequest and return the uploadId of the resumable write. */
     private String startResumableUpload() throws InterruptedException, IOException {
       InsertObjectSpec.Builder insertObjectSpecBuilder =
@@ -395,20 +398,18 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       SimpleResponseObserver<StartResumableWriteResponse> responseObserver =
           new SimpleResponseObserver<>();
-      GrpcStartResumableWriteRequestExecutor requestExecutor =
-          new GrpcStartResumableWriteRequestExecutor<>(request, responseObserver);
-
-      try {
-        ResilientOperation.retry(
-            requestExecutor,
-            BackOffFactory.DEFAULT.newBackOff(),
-            rateLimitedRetryDeterminer,
-            IOException.class,
-            Sleeper.DEFAULT);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new IOException("Failed to get upload id.", e);
-      }
+      runWithRetries(
+          () -> {
+            stub.withDeadlineAfter(START_RESUMABLE_WRITE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
+                .startResumableWrite(request, responseObserver);
+            try {
+              responseObserver.done.await();
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              throw new RuntimeException("Failed to start resumable upload.", e);
+            }
+          },
+          responseObserver);
 
       return responseObserver.getResponse().getUploadId();
     }
@@ -420,65 +421,20 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       SimpleResponseObserver<QueryWriteStatusResponse> responseObserver =
           new SimpleResponseObserver<>();
-      GrpcQueryWriteStatusRequestExecutor requestExecutor =
-          new GrpcQueryWriteStatusRequestExecutor<>(request, responseObserver);
-      try {
-        ResilientOperation.retry(
-            requestExecutor,
-            BackOffFactory.DEFAULT.newBackOff(),
-            rateLimitedRetryDeterminer,
-            IOException.class,
-            Sleeper.DEFAULT);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new IOException("Failed to get committed write size.", e);
-      }
+      runWithRetries(
+          () -> {
+            stub.withDeadlineAfter(QUERY_WRITE_STATUS_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
+                .queryWriteStatus(request, responseObserver);
+            try {
+              responseObserver.done.await();
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              throw new RuntimeException("Failed to get committed write size.", e);
+            }
+          },
+          responseObserver);
 
       return responseObserver.getResponse().getCommittedSize();
-    }
-
-    /** Simple class to create a {@link CheckedCallable} from a {@link QueryWriteStatusRequest}. */
-    private class GrpcQueryWriteStatusRequestExecutor<T>
-        implements CheckedCallable<T, InterruptedException> {
-      private final SimpleResponseObserver responseObserver;
-      private final QueryWriteStatusRequest request;
-
-      private GrpcQueryWriteStatusRequestExecutor(
-          QueryWriteStatusRequest request, SimpleResponseObserver responseObserver) {
-        this.request = request;
-        this.responseObserver = responseObserver;
-      }
-
-      @Override
-      public T call() throws InterruptedException {
-        stub.withDeadlineAfter(QUERY_WRITE_STATUS_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
-            .queryWriteStatus(request, responseObserver);
-        responseObserver.done.await();
-        return null;
-      }
-    }
-
-    /**
-     * Simple class to create a {@link CheckedCallable} from a {@link StartResumableWriteRequest}.
-     */
-    private class GrpcStartResumableWriteRequestExecutor<T>
-        implements CheckedCallable<T, InterruptedException> {
-      private final SimpleResponseObserver responseObserver;
-      private final StartResumableWriteRequest request;
-
-      private GrpcStartResumableWriteRequestExecutor(
-          StartResumableWriteRequest request, SimpleResponseObserver responseObserver) {
-        this.request = request;
-        this.responseObserver = responseObserver;
-      }
-
-      @Override
-      public T call() throws InterruptedException {
-        stub.withDeadlineAfter(START_RESUMABLE_WRITE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
-            .startResumableWrite(request, responseObserver);
-        responseObserver.done.await();
-        return null;
-      }
     }
 
     /** Stream observer for single response RPCs. */
