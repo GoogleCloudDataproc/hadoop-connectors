@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
@@ -103,11 +104,24 @@ public class HadoopConfigurationProperty<T> {
   public Map<String, String> getPropsWithPrefix(Configuration config) {
     checkState(defaultValue instanceof Map, "Not a map property");
     String lookupKey =
-        getLookupKey(config, key, deprecatedKeys, (c, k) -> !c.getPropsWithPrefix(k).isEmpty());
-    Map<String, String> propsWithPrefix = config.getPropsWithPrefix(lookupKey);
+        getLookupKey(config, key, deprecatedKeys, (c, k) -> !getPropsWithPrefix(c, k).isEmpty());
+    Map<String, String> propsWithPrefix = getPropsWithPrefix(config, lookupKey);
     return logProperty(
         lookupKey,
         propsWithPrefix.isEmpty() ? (Map<String, String>) defaultValue : propsWithPrefix);
+  }
+
+  private Map<String, String> getPropsWithPrefix(Configuration config, String confPrefix) {
+    Map<String, String> configMap = new HashMap<>();
+    for (Map.Entry<String, String> property : config) {
+      String name = property.getKey();
+      if (name.startsWith(confPrefix)) {
+        String value = property.getValue();
+        String keyName = name.substring(confPrefix.length());
+        configMap.put(keyName, value);
+      }
+    }
+    return configMap;
   }
 
   private String getLookupKey(

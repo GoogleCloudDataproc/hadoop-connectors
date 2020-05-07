@@ -26,6 +26,8 @@
     wait between syncs. `hsync()` when rate limited will block on waiting for
     the permits, but `hflush()` will simply perform nothing and return.
 
+1.  Restore compatibility with pre-2.8 Hadoop versions.
+
 ### 2.1.2 - 2020-04-02
 
 1.  Update all dependencies to latest versions.
