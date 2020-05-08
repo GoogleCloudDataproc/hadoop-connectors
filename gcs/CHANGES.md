@@ -1,4 +1,6 @@
-### 2.1.3 - 2020-XX-XX
+### 2.1.4 - 2020-XX-XX
+
+### 2.1.3 - 2020-05-08
 
 1.  Add support for Cloud Storage objects CSEK encryption:
 
