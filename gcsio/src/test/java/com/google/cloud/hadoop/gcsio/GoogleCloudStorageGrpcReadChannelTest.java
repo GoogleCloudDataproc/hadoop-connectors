@@ -496,6 +496,27 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   }
 
   @Test
+  public void seekBeyondInplaceSeekLimitReadsNoBufferedData() throws Exception {
+    fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(100).build());
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder()
+            .setInplaceSeekLimit(10)
+            .setFadvise(Fadvise.AUTO)
+            .build();
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
+
+    ByteBuffer buffer = ByteBuffer.allocate(20);
+    readChannel.read(buffer);
+    readChannel.position(35);
+    buffer.clear();
+    readChannel.read(buffer);
+
+    verify(fakeService, times(1)).getObject(eq(GET_OBJECT_REQUEST), any());
+    verify(fakeService, times(1)).getObjectMedia(eq(GET_OBJECT_MEDIA_REQUEST), any());
+    assertArrayEquals(fakeService.data.substring(35, 55).toByteArray(), buffer.array());
+  }
+
+  @Test
   public void seekFailsOnNegative() throws Exception {
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel();
 
