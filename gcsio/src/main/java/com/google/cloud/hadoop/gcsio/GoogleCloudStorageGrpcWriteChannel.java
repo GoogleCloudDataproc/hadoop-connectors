@@ -225,7 +225,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
           throw new IOException(
               String.format("Insert failed for '%s'", resourceId), responseObserver.getError());
         }
-      } while (!responseObserver.isFinished());
+      } while (!responseObserver.hasFinalized());
 
       return responseObserver.getResponse();
     }
@@ -347,8 +347,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
         return checkNotNull(error, "Error not present for '%s'", resourceId);
       }
 
-      boolean isFinished() {
-        return objectFinalized || hasError();
+      boolean hasFinalized() {
+        return objectFinalized;
       }
 
       @Override
