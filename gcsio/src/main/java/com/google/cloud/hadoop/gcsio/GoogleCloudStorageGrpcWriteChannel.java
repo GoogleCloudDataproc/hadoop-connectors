@@ -181,11 +181,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
       // the writer at the other end will not hang indefinitely.
       try (InputStream toClose = pipeSource) {
         return doResumableUpload();
-      } catch (IOException e) {
-        throw e;
-      } catch (Exception e) {
-        throw new IOException(
-            String.format("Caught exception during upload for '%s'", resourceId), e);
       }
     }
 
