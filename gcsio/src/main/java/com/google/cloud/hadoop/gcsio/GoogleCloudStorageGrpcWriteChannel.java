@@ -44,6 +44,7 @@ import com.google.protobuf.UInt32Value;
 import com.google.protobuf.util.Timestamps;
 import io.grpc.stub.ClientCallStreamObserver;
 import io.grpc.stub.ClientResponseObserver;
+import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -180,6 +181,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
       // the writer at the other end will not hang indefinitely.
       try (InputStream toClose = pipeSource) {
         return doResumableUpload();
+      } catch (IOException|InterruptedException e) {
+        throw e;
       } catch (Exception e) {
         throw new IOException(
             String.format("Caught exception during upload for '%s'", resourceId), e);
@@ -235,7 +238,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       private final String uploadId;
       private volatile boolean objectFinalized = false;
       // The last error to occur during the streaming RPC. Present only on error.
-      private Throwable error;
+      private IOException error;
       // The response from the server, populated at the end of a successful streaming RPC.
       private Object response;
       private ByteString chunkData;
@@ -325,7 +328,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
             });
       }
 
-      public Object getResponse() {
+      public Object getResponse() throws IOException {
+	if (hasError()) {
+          throw getError();
+	}
         return checkNotNull(response, "Response not present for '%s'", resourceId);
       }
 
@@ -337,7 +343,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
         return chunkData.size();
       }
 
-      public Throwable getError() {
+      public IOException getError() {
         return checkNotNull(error, "Error not present for '%s'", resourceId);
       }
 
@@ -352,11 +358,16 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       @Override
       public void onError(Throwable t) {
+	String statusDesc = "";
+	Status s = Status.fromThrowable(t);
+	if (s!=null) {
+	 statusDesc = s.getDescription();
+	}
         error =
             new IOException(
                 String.format(
-                    "Caught exception for '%s', while uploading to uploadId %s at writeOffset %d",
-                    resourceId, uploadId, writeOffset),
+                    "Caught exception for '%s', while uploading to uploadId %s at writeOffset %d. %s",
+                    resourceId, uploadId, writeOffset, statusDesc),
                 t);
         done.countDown();
       }
