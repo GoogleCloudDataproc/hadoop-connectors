@@ -365,7 +365,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
             new IOException(
                 String.format(
                     "Caught exception for '%s', while uploading to uploadId %s at writeOffset %d."
-                        + "Status: %s",
+                        + " Status: %s",
                     resourceId, uploadId, writeOffset, statusDesc),
                 t);
         done.countDown();
