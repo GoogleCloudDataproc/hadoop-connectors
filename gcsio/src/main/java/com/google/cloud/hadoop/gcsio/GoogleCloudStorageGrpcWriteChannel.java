@@ -24,6 +24,7 @@ import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
 import com.google.common.io.BaseEncoding;
@@ -43,6 +44,9 @@ import com.google.protobuf.Int64Value;
 import com.google.protobuf.UInt32Value;
 import com.google.protobuf.util.Timestamps;
 import io.grpc.Status;
+import io.grpc.Status.Code;
+import io.grpc.StatusException;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.ClientCallStreamObserver;
 import io.grpc.stub.ClientResponseObserver;
 import io.grpc.stub.StreamObserver;
@@ -51,6 +55,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -70,6 +76,14 @@ public final class GoogleCloudStorageGrpcWriteChannel
   // Maximum number of automatic retries for each data chunk
   // when writing to underlying channel raises error.
   private static final int UPLOAD_RETRIES = 10;
+
+  // Number of insert requests to retain, in case we need to rewind and resume an upload. Using too
+  // small of a number could risk being unable to resume the write if the resume point is an
+  // 'already-discarded buffer; and setting the value too high wastes RAM. Note: We could have a
+  // more complex implementation that periodically queries the service to find out the last
+  // committed offset, to determine what's safe to discard, but that would also impose a performance
+  // penalty.
+  private static int numberOfRequestsToRetain = 5;
 
   private final StorageStub stub;
   private final StorageResourceId resourceId;
@@ -179,7 +193,11 @@ public final class GoogleCloudStorageGrpcWriteChannel
       int retriesAttempted = 0;
       Hasher objectHasher = Hashing.crc32c().newHasher();
       do {
-        responseObserver = new InsertChunkResponseObserver(uploadId, writeOffset, objectHasher);
+        // Holds list of most recent number of numberOfRequestsToRetain requests, so upload can be
+        // rewound and re-sent upon non-transient errors.
+        List<InsertObjectRequest.Builder> requestList = new ArrayList<>();
+        responseObserver =
+            new InsertChunkResponseObserver(uploadId, writeOffset, objectHasher, requestList);
         // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
         stub.withDeadlineAfter(WRITE_STREAM_TIMEOUT.toMillis(), MILLISECONDS)
             .insertObject(responseObserver);
@@ -191,30 +209,14 @@ public final class GoogleCloudStorageGrpcWriteChannel
               String.format("Resumable upload failed for '%s'", getResourceString()), e);
         }
 
-        if (responseObserver.hasError()) {
-          long committedSize = getCommittedWriteSize(uploadId);
-          // If the last upload completely failed then reset to where it's marked before last
-          // insert. Otherwise, uploaded data chunk needs to be skipped before reading from buffered
-          // input stream.
-          pipeSource.reset();
-          if (committedSize > writeOffset) {
-            long uploadedDataChunkSize = committedSize - writeOffset;
-            pipeSource.skip(uploadedDataChunkSize);
-            writeOffset += uploadedDataChunkSize;
-          }
-          ++retriesAttempted;
+        if (responseObserver.hasTransientError()) {
+          writeOffset = getCommittedWriteSize(uploadId);
         } else {
           writeOffset += responseObserver.bytesWritten();
-          retriesAttempted = 0;
         }
+      } while (!responseObserver.hasFinalized());
 
-        if (retriesAttempted >= UPLOAD_RETRIES) {
-          throw new IOException(
-              String.format("Insert failed for '%s'", resourceId), responseObserver.getError());
-        }
-      } while (!responseObserver.hasFinalized() || responseObserver.hasError());
-
-      return responseObserver.getResponse();
+      return responseObserver.getResponseOrThrow();
     }
 
     /** Handler for responses from the Insert streaming RPC. */
@@ -223,46 +225,88 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       private final long writeOffset;
       private final String uploadId;
+      private final List<InsertObjectRequest.Builder> requestList;
       private volatile boolean objectFinalized = false;
+      // The last transient error to occur during the streaming RPC.
+      private Throwable transientError = null;
+      // The last non-transient error to occur during the streaming RPC.
+      private Throwable nonTransientError = null;
       // The last error to occur during the streaming RPC. Present only on error.
       private IOException error;
       // The response from the server, populated at the end of a successful streaming RPC.
       private Object response;
       private ByteString chunkData;
       private Hasher objectHasher;
+      private boolean isReadyHandleExecuted = false;
 
       // CountDownLatch tracking completion of the streaming RPC. Set on error, or once the request
       // stream is closed.
       final CountDownLatch done = new CountDownLatch(1);
 
-      InsertChunkResponseObserver(String uploadId, long writeOffset, Hasher objectHasher) {
+      InsertChunkResponseObserver(
+          String uploadId,
+          long writeOffset,
+          Hasher objectHasher,
+          List<InsertObjectRequest.Builder> requestList) {
         this.uploadId = uploadId;
         this.chunkData = ByteString.EMPTY;
         this.writeOffset = writeOffset;
         this.objectHasher = objectHasher;
+        this.requestList = requestList;
       }
 
       @Override
-      public void beforeStart(ClientCallStreamObserver<InsertObjectRequest> requestObserver) {
+      public void beforeStart(final ClientCallStreamObserver<InsertObjectRequest> requestObserver) {
         requestObserver.setOnReadyHandler(
             new Runnable() {
               @Override
               public void run() {
-                if (objectFinalized) {
+                if (objectFinalized || isReadyHandleExecuted) {
                   // onReadyHandler may be called after we've closed the request half of the stream.
                   return;
                 }
 
+                isReadyHandleExecuted = true;
+
+                InsertObjectRequest.Builder requestBuilder = null;
+                // Create new request builder if the writeOffset grows over inserts. Otherwise
+                // something went wrong and resume write from a cached request builder.
+                if (requestList.size() > 0
+                    && Iterables.getLast(requestList).getWriteOffset() >= writeOffset) {
+                  requestBuilder = getSavedRequestBuilder(requestBuilder);
+                  if (requestBuilder == null) {
+                    return;
+                  }
+                } else {
+                  requestBuilder = buildRequestFromPipeData();
+                  if (requestBuilder == null) {
+                    return;
+                  }
+                }
+
+                requestObserver.onNext(requestBuilder.build());
+                if (objectFinalized) {
+                  // Close the request half of the streaming RPC.
+                  requestObserver.onCompleted();
+                }
+              }
+
+              // Handles the case where we're not resuming a write, and instead we need to read data
+              // from the input pipe.
+              private InsertObjectRequest.Builder buildRequestFromPipeData() {
+                InsertObjectRequest.Builder requestBuilder;
                 try {
                   chunkData = readRequestData();
                 } catch (IOException e) {
-                  error =
-                      new IOException(
-                          String.format("Failed to read chunk for '%s'", resourceId), e);
-                  return;
+                  nonTransientError =
+                      new RuntimeException(
+                          String.format(
+                              "InsertChunkResponseObserver.beforeStart for uploadId %s caught %s",
+                              uploadId, e));
+                  return null;
                 }
 
-                InsertObjectRequest.Builder requestBuilder =
+                requestBuilder =
                     InsertObjectRequest.newBuilder()
                         .setUploadId(uploadId)
                         .setWriteOffset(writeOffset);
@@ -294,49 +338,86 @@ public final class GoogleCloudStorageGrpcWriteChannel
                                 UInt32Value.newBuilder().setValue(objectHasher.hash().asInt())));
                   }
                 }
-                requestObserver.onNext(requestBuilder.build());
-
-                if (objectFinalized) {
-                  // Close the request half of the streaming RPC.
-                  requestObserver.onCompleted();
+                if (requestList.size() == numberOfRequestsToRetain) {
+                  requestList.remove(0);
                 }
+                requestList.add(requestBuilder);
+                return requestBuilder;
               }
 
               private ByteString readRequestData() throws IOException {
-                // Mark the input stream in case this request fails so that read can be recovered
-                // from where it's marked.
-                pipeSource.mark(MAX_BYTES_PER_MESSAGE);
                 ByteString data =
                     ByteString.readFrom(ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE));
 
                 objectFinalized =
-                    data.size() < MAX_BYTES_PER_MESSAGE || pipeSource.available() <= 0;
+                    data.size() < MAX_BYTES_PER_MESSAGE;
                 return data;
               }
             });
       }
 
-      public Object getResponse() throws IOException {
-        if (hasError()) {
-          throw getError();
+      // Handles the case when a writeOffset of data read previously is being processed. This
+      // happens if a transient failure happens while uploading, and can be resumed by querying the
+      // current committed offset.
+      private InsertObjectRequest.Builder getSavedRequestBuilder(
+          InsertObjectRequest.Builder requestBuilder) {
+        // Resume will only work if the first request builder in the cache carries a offset not
+        // greater than the current writeOffset.
+        if (requestList.get(0).getWriteOffset() <= writeOffset) {
+          for (int i = 0; i < requestList.size(); i++) {
+            // Take current request builder if the writerOffset of it is equal to the current
+            // writeOffset. Take the previous one if it's greater than current writeOffset. This
+            // will work as server will allow to re-upload a previously uploaded part of the object
+            // and ignore the bytes preceding the last committed offset.
+            InsertObjectRequest.Builder currentRequestBuilder = requestList.get(i);
+            if (currentRequestBuilder.getWriteOffset() == writeOffset) {
+              requestBuilder = currentRequestBuilder;
+              break;
+            } else if (currentRequestBuilder.getWriteOffset() > writeOffset && i > 0) {
+              requestBuilder = requestList.get(i - 1);
+              break;
+            }
+          }
+        }
+        if (requestBuilder == null) {
+          nonTransientError =
+              new RuntimeException(
+                  String.format(
+                      "Didn't have enough data buffered for attempt to resume upload for uploadID"
+                          + " %s: last committed offset=%s, earliest buffered offset=%s.",
+                      uploadId, writeOffset, requestList.get(0).getWriteOffset()));
+          return null;
+        }
+        return requestBuilder;
+      }
+
+      public Object getResponseOrThrow() throws IOException {
+        if (hasNonTransientError()) {
+          throw new IOException(
+              String.format("Resumable upload failed for '%s'", getResourceString()),
+              nonTransientError);
         }
         return checkNotNull(response, "Response not present for '%s'", resourceId);
       }
 
-      boolean hasError() {
-        return error != null || response == null;
+      boolean hasTransientError() {
+        return transientError != null || response == null;
+      }
+
+      boolean hasNonTransientError() {
+        return nonTransientError != null;
+      }
+
+      Throwable getNonTransientError() {
+        return nonTransientError;
       }
 
       int bytesWritten() {
         return chunkData.size();
       }
 
-      public IOException getError() {
-        return checkNotNull(error, "Error not present for '%s'", resourceId);
-      }
-
       boolean hasFinalized() {
-        return objectFinalized;
+        return objectFinalized || hasNonTransientError();
       }
 
       @Override
@@ -348,13 +429,28 @@ public final class GoogleCloudStorageGrpcWriteChannel
       public void onError(Throwable t) {
         Status s = Status.fromThrowable(t);
         String statusDesc = s == null ? "" : s.getDescription();
-        error =
-            new IOException(
-                String.format(
-                    "Caught exception for '%s', while uploading to uploadId %s at writeOffset %d."
-                        + " Status: %s",
-                    resourceId, uploadId, writeOffset, statusDesc),
-                t);
+
+        if (t.getClass() == StatusException.class || t.getClass() == StatusRuntimeException.class) {
+          Code code =
+              t.getClass() == StatusException.class
+                  ? ((StatusException) t).getStatus().getCode()
+                  : ((StatusRuntimeException) t).getStatus().getCode();
+          if (code == Code.DEADLINE_EXCEEDED
+              || code == Code.RESOURCE_EXHAUSTED
+              || code == Code.INTERNAL
+              || code == Code.UNAVAILABLE) {
+            transientError = t;
+          }
+        }
+        if (transientError == null) {
+          nonTransientError =
+              new Throwable(
+                  String.format(
+                      "Caught exception for '%s', while uploading to uploadId %s at writeOffset %d."
+                          + " Status: %s",
+                      resourceId, uploadId, writeOffset, statusDesc),
+                  t);
+        }
         done.countDown();
       }
 
