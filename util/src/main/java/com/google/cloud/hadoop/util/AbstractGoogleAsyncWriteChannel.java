@@ -60,7 +60,7 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
     request.setDisableGZipContent(true);
 
     // Change chunk size from default value (10MB) to one that yields higher performance.
-    clientRequestHelper.setChunkSize(request, uploadChunkSize);
+    clientRequestHelper.setChunkSize(request, options.getUploadChunkSize());
 
     // Given that the two ends of the pipe must operate asynchronous relative
     // to each other, we need to start the upload operation on a separate thread.
@@ -84,7 +84,7 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
     public S call() throws Exception {
       // Try-with-resource will close this end of the pipe so that
       // the writer at the other end will not hang indefinitely.
-      try (InputStream uploadPipeSource = pipeSource) {
+      try (InputStream ignore = pipeSource) {
         return uploadObject.execute();
       } catch (IOException ioe) {
         S response = createResponseFromException(ioe);

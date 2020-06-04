@@ -165,7 +165,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     public Object call() throws IOException {
       // Try-with-resource will close this end of the pipe so that
       // the writer at the other end will not hang indefinitely.
-      try (InputStream toClose = pipeSource) {
+      try (InputStream ignore = pipeSource) {
         return doResumableUpload();
       }
     }

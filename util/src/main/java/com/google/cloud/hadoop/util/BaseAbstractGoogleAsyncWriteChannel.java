@@ -20,6 +20,8 @@ import com.google.common.flogger.GoogleLogger;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.ClosedByInterruptException;
@@ -47,21 +49,14 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
   // write channel (pipeSinkChannel below). The pipe is formed by connecting pipeSink to pipeSource
   protected final ExecutorService threadPool;
 
-  private boolean initialized = false;
-
-  // Size of buffer used by upload pipe.
-  private final int pipeBufferSize;
-
-  // Chunk size to use.
-  protected final int uploadChunkSize;
-
-  private WritableByteChannel pipeSink;
+  protected final AsyncWriteChannelOptions options;
 
   // Upload operation that takes place on a separate thread.
   protected Future<T> uploadOperation;
 
-  // When enabled, we get higher throughput for writing small files.
-  private final boolean directUploadEnabled;
+  private boolean initialized = false;
+
+  private WritableByteChannel pipeSink;
 
   private ByteBuffer uploadCache = null;
 
@@ -69,12 +64,10 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
   public BaseAbstractGoogleAsyncWriteChannel(
       ExecutorService threadPool, AsyncWriteChannelOptions options) {
     this.threadPool = threadPool;
-    this.pipeBufferSize = options.getPipeBufferSize();
+    this.options = options;
     if (options.getUploadCacheSize() > 0) {
       this.uploadCache = ByteBuffer.allocate(options.getUploadCacheSize());
     }
-    this.uploadChunkSize = options.getUploadChunkSize();
-    this.directUploadEnabled = options.isDirectUploadEnabled();
     setContentType("application/octet-stream");
   }
 
@@ -103,7 +96,7 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
 
   /** Returns true if direct media uploads are enabled. */
   public boolean isDirectUploadEnabled() {
-    return directUploadEnabled;
+    return options.isDirectUploadEnabled();
   }
 
   /**
@@ -216,17 +209,29 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
 
   /** Initialize this channel object for writing. */
   public void initialize() throws IOException {
-    // Create a pipe such that its one end is connected to the input stream used by
-    // the uploader and the other end is the write channel used by the caller.
-    Pipe pipe = Pipe.open();
-    pipeSink = pipe.sink();
-    InputStream pipeSource = Channels.newInputStream(pipe.source());
-    InputStream bufferedPipeSource =
-        pipeBufferSize > 0 ? new BufferedInputStream(pipeSource, pipeBufferSize) : pipeSource;
-
-    startUpload(bufferedPipeSource);
-
+    InputStream pipeSource = initializeUploadPipe();
+    startUpload(pipeSource);
     initialized = true;
+  }
+
+  // Create a pipe such that its one end is connected to the input stream used by
+  // the uploader and the other end is the write channel used by the caller.
+  private InputStream initializeUploadPipe() throws IOException {
+    switch (options.getPipeType()) {
+      case NIO_CHANNEL_PIPE:
+        Pipe pipe = Pipe.open();
+        pipeSink = pipe.sink();
+        InputStream pipeSource = Channels.newInputStream(pipe.source());
+        return options.getPipeBufferSize() > 0
+            ? new BufferedInputStream(pipeSource, options.getPipeBufferSize())
+            : pipeSource;
+      case IO_STREAM_PIPE:
+        PipedInputStream internalPipeSource = new PipedInputStream(options.getPipeBufferSize());
+        PipedOutputStream internalPipeSink = new PipedOutputStream(internalPipeSource);
+        pipeSink = Channels.newChannel(internalPipeSink);
+        return internalPipeSource;
+    }
+    throw new IllegalStateException("Unknown PipeType: " + options.getPipeType());
   }
 
   /** Create a new thread which handles the upload. */
