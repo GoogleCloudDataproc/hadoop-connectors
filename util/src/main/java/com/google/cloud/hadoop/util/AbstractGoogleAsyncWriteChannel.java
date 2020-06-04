@@ -18,8 +18,7 @@ import com.google.api.client.googleapis.services.AbstractGoogleClientRequest;
 import com.google.api.client.http.InputStreamContent;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
-import java.nio.channels.Channels;
-import java.nio.channels.ReadableByteChannel;
+import java.io.InputStream;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 
@@ -50,10 +49,9 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
   public abstract T createRequest(InputStreamContent inputStream) throws IOException;
 
   @Override
-  public void startUpload(ReadableByteChannel pipeSource) throws IOException {
+  public void startUpload(InputStream pipeSource) throws IOException {
     // Connect pipe-source to the stream used by uploader.
-    InputStreamContent objectContentStream =
-        new InputStreamContent(contentType, Channels.newInputStream(pipeSource));
+    InputStreamContent objectContentStream = new InputStreamContent(contentType, pipeSource);
     // Indicate that we do not know length of file in advance.
     objectContentStream.setLength(-1);
     objectContentStream.setCloseInputStream(false);
@@ -74,10 +72,10 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
     private final T uploadObject;
 
     // Read end of the pipe. This object declared final for safe object publishing.
-    private final ReadableByteChannel pipeSource;
+    private final InputStream pipeSource;
 
     /** Constructs an instance of UploadOperation. */
-    public UploadOperation(T uploadObject, ReadableByteChannel pipeSource) {
+    public UploadOperation(T uploadObject, InputStream pipeSource) {
       this.uploadObject = uploadObject;
       this.pipeSource = pipeSource;
     }
@@ -86,7 +84,7 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
     public S call() throws Exception {
       // Try-with-resource will close this end of the pipe so that
       // the writer at the other end will not hang indefinitely.
-      try (ReadableByteChannel uploadPipeSource = pipeSource) {
+      try (InputStream uploadPipeSource = pipeSource) {
         return uploadObject.execute();
       } catch (IOException ioe) {
         S response = createResponseFromException(ioe);

@@ -50,8 +50,6 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
-import java.nio.channels.ReadableByteChannel;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -143,7 +141,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
   }
 
   @Override
-  public void startUpload(ReadableByteChannel pipeSource) {
+  public void startUpload(InputStream pipeSource) {
     // Given that the two ends of the pipe must operate asynchronous relative
     // to each other, we need to start the upload operation on a separate thread.
     try {
@@ -159,9 +157,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
     private final BufferedInputStream pipeSource;
     private final int MAX_BYTES_PER_MESSAGE = MAX_WRITE_CHUNK_BYTES.getNumber();
 
-    UploadOperation(ReadableByteChannel pipeSource) {
-      this.pipeSource =
-          new BufferedInputStream(Channels.newInputStream(pipeSource), MAX_BYTES_PER_MESSAGE);
+    UploadOperation(InputStream pipeSource) {
+      this.pipeSource = new BufferedInputStream(pipeSource, MAX_BYTES_PER_MESSAGE);
     }
 
     @Override

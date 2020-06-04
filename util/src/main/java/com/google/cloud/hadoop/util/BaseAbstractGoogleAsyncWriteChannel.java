@@ -17,12 +17,14 @@ package com.google.cloud.hadoop.util;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.google.common.flogger.GoogleLogger;
+import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.Pipe;
-import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -218,7 +220,8 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
     // the uploader and the other end is the write channel used by the caller.
     Pipe pipe = Pipe.open();
     pipeSink = pipe.sink();
-    ReadableByteChannel pipeSource = pipe.source();
+    InputStream pipeSource =
+        new BufferedInputStream(Channels.newInputStream(pipe.source()), pipeBufferSize);
 
     startUpload(pipeSource);
 
@@ -226,7 +229,7 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
   }
 
   /** Create a new thread which handles the upload. */
-  public abstract void startUpload(ReadableByteChannel pipeSource) throws IOException;
+  public abstract void startUpload(InputStream pipeSource) throws IOException;
 
   /** Sets the contentType. This must be called before {@link #initialize()} for any effect. */
   protected void setContentType(String contentType) {
