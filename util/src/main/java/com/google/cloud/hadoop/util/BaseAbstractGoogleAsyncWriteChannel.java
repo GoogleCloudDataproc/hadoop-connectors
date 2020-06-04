@@ -18,13 +18,11 @@ import static com.google.common.base.Preconditions.checkState;
 
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
+import java.nio.channels.Pipe;
+import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -55,8 +53,7 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
   // Chunk size to use.
   protected final int uploadChunkSize;
 
-  // A channel wrapper over pipeSink.
-  private WritableByteChannel pipeSinkChannel;
+  private WritableByteChannel pipeSink;
 
   // Upload operation that takes place on a separate thread.
   protected Future<T> uploadOperation;
@@ -141,7 +138,7 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
     }
 
     try {
-      return pipeSinkChannel.write(buffer);
+      return pipeSink.write(buffer);
     } catch (IOException e) {
       throw new IOException(
           String.format(
@@ -157,7 +154,7 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
    */
   @Override
   public boolean isOpen() {
-    return (pipeSinkChannel != null) && pipeSinkChannel.isOpen();
+    return (pipeSink != null) && pipeSink.isOpen();
   }
 
   /**
@@ -175,7 +172,7 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
       return;
     }
     try {
-      pipeSinkChannel.close();
+      pipeSink.close();
       handleResponse(waitForCompletionAndThrowIfUploadFailed());
     } catch (IOException e) {
       if (uploadCache == null) {
@@ -208,7 +205,7 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
   }
 
   private void closeInternal() {
-    pipeSinkChannel = null;
+    pipeSink = null;
     if (uploadOperation != null && !uploadOperation.isDone()) {
       uploadOperation.cancel(/* mayInterruptIfRunning= */ true);
     }
@@ -219,9 +216,9 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
   public void initialize() throws IOException {
     // Create a pipe such that its one end is connected to the input stream used by
     // the uploader and the other end is the write channel used by the caller.
-    PipedInputStream pipeSource = new PipedInputStream(pipeBufferSize);
-    OutputStream pipeSink = new PipedOutputStream(pipeSource);
-    pipeSinkChannel = Channels.newChannel(pipeSink);
+    Pipe pipe = Pipe.open();
+    pipeSink = pipe.sink();
+    ReadableByteChannel pipeSource = pipe.source();
 
     startUpload(pipeSource);
 
@@ -229,7 +226,7 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
   }
 
   /** Create a new thread which handles the upload. */
-  public abstract void startUpload(PipedInputStream pipeSource) throws IOException;
+  public abstract void startUpload(ReadableByteChannel pipeSource) throws IOException;
 
   /** Sets the contentType. This must be called before {@link #initialize()} for any effect. */
   protected void setContentType(String contentType) {
