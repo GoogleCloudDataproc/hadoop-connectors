@@ -220,10 +220,11 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
     // the uploader and the other end is the write channel used by the caller.
     Pipe pipe = Pipe.open();
     pipeSink = pipe.sink();
-    InputStream pipeSource =
-        new BufferedInputStream(Channels.newInputStream(pipe.source()), pipeBufferSize);
+    InputStream pipeSource = Channels.newInputStream(pipe.source());
+    InputStream bufferedPipeSource =
+        pipeBufferSize > 0 ? new BufferedInputStream(pipeSource, pipeBufferSize) : pipeSource;
 
-    startUpload(pipeSource);
+    startUpload(bufferedPipeSource);
 
     initialized = true;
   }
