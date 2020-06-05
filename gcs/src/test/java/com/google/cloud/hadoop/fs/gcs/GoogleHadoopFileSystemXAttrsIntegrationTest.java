@@ -1,3 +1,17 @@
+/*
+ * Copyright 2019 Google LLC. All Rights Reserved.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software distributed under the
+ * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.common.truth.Truth.assertThat;
@@ -13,6 +27,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.net.URI;
 import java.util.AbstractMap;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
@@ -61,6 +76,20 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
   }
 
   @Test
+  public void getXAttr_returnEmptyMapOnEmptyNames() throws Exception {
+    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
+    ghfsHelper.writeFile(filePath, "obj-test-get-xattr", 1, /* overwrite= */ false);
+
+    Map<String, byte[]> xAttrs = ghfs.getXAttrs(filePath, new ArrayList<>());
+
+    assertThat(xAttrs).isEmpty();
+
+    // Cleanup.
+    assertThat(ghfs.delete(filePath, true)).isTrue();
+  }
+
+  @Test
   public void getXAttr_nonGhfsMetadata() throws Exception {
     GoogleCloudStorageFileSystem gcsFs = ((GoogleHadoopFileSystem) ghfs).getGcsFs();
     URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
@@ -70,7 +99,7 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
 
     UpdatableItemInfo updateInfo =
         new UpdatableItemInfo(
-            StorageResourceId.fromObjectName(filePath.toString()),
+            StorageResourceId.fromStringPath(filePath.toString()),
             ImmutableMap.of("non-ghfs-xattr-key", "non-ghfs-xattr-value".getBytes(UTF_8)));
     gcsFs.getGcs().updateItems(ImmutableList.of(updateInfo));
 
@@ -120,6 +149,29 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
 
     // Cleanup.
     assertThat(ghfs.delete(filePath, true)).isTrue();
+  }
+
+  @Test
+  public void setXAttr_throwsExceptionOnNullFlags() {
+    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
+    Throwable exception =
+        assertThrows(
+            java.lang.IllegalArgumentException.class,
+            () -> ghfs.setXAttr(filePath, "test-key", "val".getBytes(UTF_8), /* flag= */ null));
+    assertThat(exception).hasMessageThat().isEqualTo("flags should not be null or empty");
+  }
+
+  @Test
+  public void setXAttr_throwsExceptionOnEmptyFlags() {
+    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
+    EnumSet<XAttrSetFlag> emptyFlags = EnumSet.noneOf(XAttrSetFlag.class);
+    Throwable exception =
+        assertThrows(
+            java.lang.IllegalArgumentException.class,
+            () -> ghfs.setXAttr(filePath, "test-key", "val".getBytes(UTF_8), emptyFlags));
+    assertThat(exception).hasMessageThat().isEqualTo("flags should not be null or empty");
   }
 
   @Test
@@ -176,6 +228,22 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest {
                 ghfs.setXAttr(
                     filePath, "test-key", "new".getBytes(UTF_8), EnumSet.of(XAttrSetFlag.CREATE)));
     assertThat(e).hasMessageThat().startsWith("REPLACE flag must be set to update XAttr");
+
+    // Cleanup.
+    assertThat(ghfs.delete(filePath, true)).isTrue();
+  }
+
+  @Test
+  public void setXAttr_throwsExceptionOnFlagsNull() throws Exception {
+    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
+    ghfsHelper.writeFile(filePath, "obj-test-set-xattr-create-fail", 1, /* overwrite= */ false);
+    Throwable e =
+        assertThrows(
+            java.lang.IllegalArgumentException.class,
+            () -> ghfs.setXAttr(filePath, "test-key", "val".getBytes(UTF_8), null));
+
+    assertThat(e).hasMessageThat().startsWith("flags should not be null or empty");
 
     // Cleanup.
     assertThat(ghfs.delete(filePath, true)).isTrue();

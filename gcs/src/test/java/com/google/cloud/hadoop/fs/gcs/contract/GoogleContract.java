@@ -14,10 +14,11 @@
 
 package com.google.cloud.hadoop.fs.gcs.contract;
 
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.AUTH_SERVICE_ACCOUNT_EMAIL;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.AUTH_SERVICE_ACCOUNT_ENABLE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.AUTH_SERVICE_ACCOUNT_KEY_FILE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_KEYFILE_SUFFIX;
 
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
@@ -35,13 +36,20 @@ public class GoogleContract extends AbstractBondedFSContract {
     super(conf);
     addConfResource(CONTRACT_XML);
     conf.set("fs.contract.test.fs.gs", "gs://" + bucketHelper.getUniqueBucketPrefix());
+    // TODO: remove when GCS fixes non-retriable "410 Gone" responses
+    conf.setInt("fs.gs.outputstream.upload.cache.size", 1024 * 1024);
 
     TestConfiguration testConf = TestConfiguration.getInstance();
     if (testConf.getProjectId() != null) {
-      conf.setBoolean(AUTH_SERVICE_ACCOUNT_ENABLE.getKey(), true);
       conf.set(GCS_PROJECT_ID.getKey(), testConf.getProjectId());
-      conf.set(AUTH_SERVICE_ACCOUNT_EMAIL.getKey(), testConf.getServiceAccount());
-      conf.set(AUTH_SERVICE_ACCOUNT_KEY_FILE.getKey(), testConf.getPrivateKeyFile());
+    }
+    if (testConf.getServiceAccount() != null && testConf.getPrivateKeyFile() != null) {
+      conf.setBoolean(GCS_CONFIG_PREFIX + ENABLE_SERVICE_ACCOUNTS_SUFFIX.getKey(), true);
+      conf.set(
+          GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_EMAIL_SUFFIX.getKey(), testConf.getServiceAccount());
+      conf.set(
+          GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_KEYFILE_SUFFIX.getKey(),
+          testConf.getPrivateKeyFile());
     }
   }
 

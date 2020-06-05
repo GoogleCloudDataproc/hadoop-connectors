@@ -55,8 +55,8 @@ Once you have the JSON key file, you need to configure following properties in
   <value>true</value>
   <description>
     Whether to use a service account for GCS authorization.
-    If set to `false` then GCE VM metadata service will be used for
-    authorization.
+    Setting this property to `false` will disable use of service accounts for
+    authentication.
   </description>
 </property>
 <property>
@@ -74,8 +74,7 @@ You can alternatively set the environment variable
 
 Additional properties can be specified for the Cloud Storage connector,
 including alternative authentication options. For more information, see the
-values documented in the [gcs-core-default.xml](/gcs/conf/gcs-core-default.xml)
-file inside the `conf` directory.
+documentation in the [CONFIGURATION.md](/gcs/CONFIGURATION.md).
 
 ## Configure Spark
 

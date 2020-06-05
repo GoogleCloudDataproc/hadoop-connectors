@@ -13,6 +13,7 @@
  */
 package com.google.cloud.hadoop.io.bigquery;
 
+import static com.google.cloud.hadoop.io.bigquery.AbstractBigQueryInputFormat.INPUT_FORMAT_CLASS;
 import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertThrows;
@@ -31,7 +32,7 @@ import com.google.api.services.bigquery.model.JobStatus;
 import com.google.api.services.bigquery.model.Table;
 import com.google.api.services.bigquery.model.TableReference;
 import com.google.cloud.hadoop.fs.gcs.InMemoryGoogleHadoopFileSystem;
-import com.google.cloud.hadoop.testing.CredentialConfigurationUtil;
+import com.google.cloud.hadoop.util.testing.CredentialConfigurationUtil;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.LoggerConfig;
 import java.io.IOException;
@@ -119,15 +120,16 @@ public class GsonBigQueryInputFormatTest {
 
     // Set the Hadoop job configuration.
     config = new JobConf(InMemoryGoogleHadoopFileSystem.getSampleConfiguration());
-    config.set(BigQueryConfiguration.PROJECT_ID_KEY, jobProjectId);
-    config.set(BigQueryConfiguration.INPUT_PROJECT_ID_KEY, dataProjectId);
-    config.set(BigQueryConfiguration.INPUT_DATASET_ID_KEY, intermediateDataset);
-    config.set(BigQueryConfiguration.INPUT_TABLE_ID_KEY, intermediateTable);
-    config.set(BigQueryConfiguration.TEMP_GCS_PATH_KEY, "gs://test_bucket/other_path");
-    config.set(
-        AbstractBigQueryInputFormat.INPUT_FORMAT_CLASS_KEY,
-        GsonBigQueryInputFormat.class.getCanonicalName());
-    config.setBoolean(BigQueryConfiguration.DELETE_EXPORT_FILES_FROM_GCS_KEY, true);
+    config.set(BigQueryConfiguration.PROJECT_ID.getKey(), jobProjectId);
+    config.set(BigQueryConfiguration.INPUT_PROJECT_ID.getKey(), dataProjectId);
+    config.set(BigQueryConfiguration.INPUT_DATASET_ID.getKey(), intermediateDataset);
+    config.set(BigQueryConfiguration.INPUT_TABLE_ID.getKey(), intermediateTable);
+    config.set(BigQueryConfiguration.TEMP_GCS_PATH.getKey(), "gs://test_bucket/other_path");
+    config.setClass(
+        INPUT_FORMAT_CLASS.getKey(),
+        GsonBigQueryInputFormat.class,
+        AbstractBigQueryInputFormat.class);
+    config.setBoolean(BigQueryConfiguration.DELETE_EXPORT_FILES_FROM_GCS.getKey(), true);
 
     CredentialConfigurationUtil.addTestConfigurationSettings(config);
 
@@ -201,17 +203,14 @@ public class GsonBigQueryInputFormatTest {
   @After
   public void tearDown()
       throws IOException {
-    Path tmpPath = new Path(config.get(BigQueryConfiguration.TEMP_GCS_PATH_KEY));
+    Path tmpPath = new Path(BigQueryConfiguration.TEMP_GCS_PATH.get(config, config::get));
     tmpPath.getFileSystem(config).delete(tmpPath, true);
     verifyNoMoreInteractions(mockBigQueryHelper);
   }
 
-  /**
-   * Tests createRecordReader method of GsonBigQueryInputFormat.
-   */
+  /** Tests createRecordReader method of GsonBigQueryInputFormat. */
   @Test
-  public void testCreateRecordReader()
-      throws IOException, InterruptedException {
+  public void testCreateRecordReader() throws Exception {
 
     when(mockTaskAttemptContext.getConfiguration()).thenReturn(config);
     when(mockTaskAttemptContext.getJobID()).thenReturn(new JobID());
@@ -235,12 +234,9 @@ public class GsonBigQueryInputFormatTest {
     assertThat(recordReader.nextKeyValue()).isFalse();
   }
 
-  /**
-   * Tests getSplits method of GsonBigQueryInputFormat in unsharded-export mode.
-   */
+  /** Tests getSplits method of GsonBigQueryInputFormat in unsharded-export mode. */
   @Test
-  public void testGetSplitsUnshardedBlocking()
-      throws IOException, InterruptedException {
+  public void testGetSplitsUnshardedBlocking() throws Exception {
     JobContext jobContext = new JobContextImpl(config, new JobID());
     when(mockInputFormat.getSplits(eq(jobContext)))
         .thenReturn(ImmutableList.of(new FileSplit(new Path("file1"), 0, 100, new String[0])));
@@ -251,13 +247,13 @@ public class GsonBigQueryInputFormatTest {
     List<InputSplit> splits = gsonBigQueryInputFormat.getSplits(jobContext);
 
     // The base export path should've gotten created.
-    Path baseExportPath = new Path(config.get(BigQueryConfiguration.TEMP_GCS_PATH_KEY));
+    Path baseExportPath = new Path(BigQueryConfiguration.TEMP_GCS_PATH.get(config, config::get));
     FileStatus baseStatus = baseExportPath.getFileSystem(config).getFileStatus(baseExportPath);
     assertThat(baseStatus.isDir()).isTrue();
 
     assertThat(((FileSplit) splits.get(0)).getPath().getName()).isEqualTo("file1");
     assertThat(config.get("mapreduce.input.fileinputformat.inputdir"))
-        .isEqualTo(config.get(BigQueryConfiguration.TEMP_GCS_PATH_KEY));
+        .isEqualTo(BigQueryConfiguration.TEMP_GCS_PATH.get(config, config::get));
 
     // Verify correct calls to BigQuery are made.
     verify(mockBigQueryHelper)
@@ -268,12 +264,9 @@ public class GsonBigQueryInputFormatTest {
     verify(mockBigQueryHelper).getRawBigquery();
   }
 
-  /**
-   * Tests getSplits method of GsonBigQueryInputFormat with federated data.
-   */
+  /** Tests getSplits method of GsonBigQueryInputFormat with federated data. */
   @Test
-  public void testGetSplitsFederated()
-      throws IOException, InterruptedException {
+  public void testGetSplitsFederated() throws Exception {
     JobContext jobContext = new JobContextImpl(config, new JobID());
 
     table.setType("EXTERNAL")
@@ -299,12 +292,9 @@ public class GsonBigQueryInputFormatTest {
     verifyNoMoreInteractions(mockBigquery);
   }
 
-  /**
-   * Tests getSplits method of GsonBigQueryInputFormat when Bigquery connection error is thrown.
-   */
+  /** Tests getSplits method of GsonBigQueryInputFormat when Bigquery connection error is thrown. */
   @Test
-  public void testGetSplitsSecurityException()
-      throws IOException, InterruptedException {
+  public void testGetSplitsSecurityException() throws IOException {
     when(mockBigquery.tables()).thenReturn(mockBigqueryTables);
 
     // Write values to file.
@@ -327,9 +317,9 @@ public class GsonBigQueryInputFormatTest {
   @Test
   public void testCleanupJobWithIntermediateDeleteAndGcsDelete()
       throws IOException {
-    config.setBoolean(BigQueryConfiguration.DELETE_EXPORT_FILES_FROM_GCS_KEY, true);
+    config.setBoolean(BigQueryConfiguration.DELETE_EXPORT_FILES_FROM_GCS.getKey(), true);
 
-    Path tempPath = new Path(config.get(BigQueryConfiguration.TEMP_GCS_PATH_KEY));
+    Path tempPath = new Path(BigQueryConfiguration.TEMP_GCS_PATH.get(config, config::get));
     FileSystem fs = tempPath.getFileSystem(config);
     fs.mkdirs(tempPath);
     Path dataFile = new Path(tempPath.toString() + "/data-00000.json");
@@ -354,9 +344,9 @@ public class GsonBigQueryInputFormatTest {
   @Test
   public void testCleanupJobWithIntermediateDeleteNoGcsDelete()
       throws IOException {
-    config.setBoolean(BigQueryConfiguration.DELETE_EXPORT_FILES_FROM_GCS_KEY, false);
+    config.setBoolean(BigQueryConfiguration.DELETE_EXPORT_FILES_FROM_GCS.getKey(), false);
 
-    Path tempPath = new Path(config.get(BigQueryConfiguration.TEMP_GCS_PATH_KEY));
+    Path tempPath = new Path(BigQueryConfiguration.TEMP_GCS_PATH.get(config, config::get));
     FileSystem fs = tempPath.getFileSystem(config);
     fs.mkdirs(tempPath);
     Path dataFile = new Path(tempPath.toString() + "/data-00000.json");
@@ -381,12 +371,12 @@ public class GsonBigQueryInputFormatTest {
   @Test
   public void testCleanupJobWithNoIntermediateDelete()
       throws IOException {
-    config.setBoolean(BigQueryConfiguration.DELETE_EXPORT_FILES_FROM_GCS_KEY, true);
+    config.setBoolean(BigQueryConfiguration.DELETE_EXPORT_FILES_FROM_GCS.getKey(), true);
 
     when(mockBigQueryHelper.getTable(any(TableReference.class)))
         .thenReturn(new Table());
 
-    Path tempPath = new Path(config.get(BigQueryConfiguration.TEMP_GCS_PATH_KEY));
+    Path tempPath = new Path(BigQueryConfiguration.TEMP_GCS_PATH.get(config, config::get));
     FileSystem fs = tempPath.getFileSystem(config);
     fs.mkdirs(tempPath);
     Path dataFile = new Path(tempPath.toString() + "/data-00000.json");
@@ -412,10 +402,10 @@ public class GsonBigQueryInputFormatTest {
   @Test
   public void testCleanupJobWithIntermediateDeleteNoShardedExport()
       throws IOException {
-    config.setBoolean(BigQueryConfiguration.DELETE_EXPORT_FILES_FROM_GCS_KEY, true);
+    config.setBoolean(BigQueryConfiguration.DELETE_EXPORT_FILES_FROM_GCS.getKey(), true);
 
     // GCS cleanup should still happen.
-    Path tempPath = new Path(config.get(BigQueryConfiguration.TEMP_GCS_PATH_KEY));
+    Path tempPath = new Path(BigQueryConfiguration.TEMP_GCS_PATH.get(config, config::get));
     FileSystem fs = tempPath.getFileSystem(config);
     fs.mkdirs(tempPath);
     Path dataFile = new Path(tempPath.toString() + "/data-00000.json");

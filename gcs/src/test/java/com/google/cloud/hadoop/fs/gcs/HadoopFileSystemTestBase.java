@@ -20,12 +20,11 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageIntegrationHelper;
+import com.google.cloud.hadoop.gcsio.StringPaths;
 import com.google.common.base.Strings;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -121,8 +120,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
       }
 
       boolean expectedToBeDir =
-          Strings.isNullOrEmpty(objectName)
-              || GoogleCloudStorageIntegrationHelper.objectHasDirectoryPath(objectName);
+          Strings.isNullOrEmpty(objectName) || StringPaths.isDirectoryPath(objectName);
       assertWithMessage("%s", fileStatus.getPath())
           .that(fileStatus.isDir())
           .isEqualTo(expectedToBeDir);
@@ -214,10 +212,11 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     // Get list of actual paths.
     URI path = ghfsHelper.getPath(bucketName, objectNamePrefix, true);
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
-    FileStatus[] fileStatus = null;
+    FileStatus[] fileStatus;
     try {
       fileStatus = ghfsHelper.listStatus(hadoopPath);
     } catch (FileNotFoundException fnfe) {
+      fileStatus = null;
       assertWithMessage("Hadoop path %s expected to exist", hadoopPath)
           .that(pathExpectedToExist)
           .isFalse();
@@ -231,7 +230,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
       // LocalFileSystem -> ChecksumFileSystem will return an empty array instead of null for
       // nonexistent paths.
       if (!pathExpectedToExist && fileStatus != null) {
-        assertThat(fileStatus.length).isEqualTo(0);
+        assertThat(fileStatus).isEmpty();
       }
     }
 
@@ -324,30 +323,24 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     assertWithMessage("testWrite1Byte: write-read mismatch").that(readText).isEqualTo(text);
   }
 
-  /**
-   * Validates delete().
-   */
-  @Test @Override
-  public void testDelete()
-      throws IOException {
+  /** Validates delete(). */
+  @Test
+  @Override
+  public void testDelete() throws Exception {
     deleteHelper(new HdfsBehavior());
   }
 
-  /**
-   * Validates mkdirs().
-   */
-  @Test @Override
-  public void testMkdirs()
-      throws IOException, URISyntaxException {
+  /** Validates mkdirs(). */
+  @Test
+  @Override
+  public void testMkdirs() throws Exception {
     mkdirsHelper(new HdfsBehavior());
   }
 
-  /**
-   * Validates rename().
-   */
-  @Test @Override
-  public void testRename()
-      throws IOException {
+  /** Validates rename(). */
+  @Test
+  @Override
+  public void testRename() throws Exception {
     renameHelper(new HdfsBehavior());
   }
 
@@ -373,21 +366,19 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
         IOException.class, () -> ghfsHelper.writeFile(hadoopPath, text, 1, /* overwrite= */ false));
   }
 
-  /**
-   * Validates append().
-   */
+  /** Validates append(). */
   @Test
-  public void testAppend()
-      throws IOException {
+  public void testAppend() throws IOException {
     URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
-    assertThrows(
-        IOException.class,
-        () ->
-            ghfs.append(
-                hadoopPath,
-                GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE.getDefault(),
-                null));
+
+    ghfsHelper.writeTextFile(path.getAuthority(), path.getPath(), "content");
+
+    try (FSDataOutputStream fsos = ghfs.append(hadoopPath)) {
+      fsos.write("_appended".getBytes(UTF_8));
+    }
+
+    assertThat(ghfsHelper.readTextFile(hadoopPath)).isEqualTo("content_appended");
   }
 
   /**
@@ -660,11 +651,10 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   }
 
   /**
-   * Helper for creating the necessary objects for testing working directory settings, returns
-   * a list of WorkingDirData where each element represents a different test condition.
+   * Helper for creating the necessary objects for testing working directory settings, returns a
+   * list of WorkingDirData where each element represents a different test condition.
    */
-  protected List<WorkingDirData> setUpWorkingDirectoryTest()
-      throws IOException {
+  protected List<WorkingDirData> setUpWorkingDirectoryTest() throws Exception {
     // Objects created for this test.
     String[] objectNames = {
       "f1",
@@ -703,12 +693,9 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     return wddList;
   }
 
-  /**
-   * Validates setWorkingDirectory() and getWorkingDirectory().
-   */
+  /** Validates setWorkingDirectory() and getWorkingDirectory(). */
   @Test
-  public void testWorkingDirectory()
-      throws IOException {
+  public void testWorkingDirectory() throws Exception {
     List<WorkingDirData> wddList = setUpWorkingDirectoryTest();
 
     // -------------------------------------------------------
@@ -725,11 +712,6 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
         assertThat(newWorkingDir).isEqualTo(currentWorkingDir);
       }
     }
-  }
-
-  @Test
-  public void testHsync() throws Exception {
-    internalTestHsync();
   }
 
   @Test
@@ -755,52 +737,6 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     }
   }
 
-  protected void internalTestHsync() throws Exception {
-    String line1 = "hello\n";
-    byte[] line1Bytes = line1.getBytes(UTF_8);
-    String line2 = "world\n";
-    byte[] line2Bytes = line2.getBytes(UTF_8);
-    String line3 = "foobar\n";
-    byte[] line3Bytes = line3.getBytes(UTF_8);
-
-    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
-    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
-    FSDataOutputStream writeStream = ghfs.create(hadoopPath);
-
-    StringBuilder expected = new StringBuilder();
-
-    // Write first line one byte at a time.
-    for (byte b : line1Bytes) {
-      writeStream.write(b);
-    }
-    expected.append(line1);
-
-    writeStream.hsync();
-
-    String readText = ghfsHelper.readTextFile(hadoopPath);
-    assertWithMessage("Expected line1 after first sync()")
-        .that(readText)
-        .isEqualTo(expected.toString());
-
-    // Write second line, sync() again.
-    writeStream.write(line2Bytes, 0, line2Bytes.length);
-    expected.append(line2);
-    writeStream.hsync();
-    readText = ghfsHelper.readTextFile(hadoopPath);
-    assertWithMessage("Expected line1 + line2 after second sync()")
-        .that(readText)
-        .isEqualTo(expected.toString());
-
-    // Write third line, close() without sync().
-    writeStream.write(line3Bytes, 0, line3Bytes.length);
-    expected.append(line3);
-    writeStream.close();
-    readText = ghfsHelper.readTextFile(hadoopPath);
-    assertWithMessage("Expected line1 + line2 + line3 after close()")
-        .that(readText)
-        .isEqualTo(expected.toString());
-  }
-
   // -----------------------------------------------------------------
   // Inherited tests that we suppress because they do not make sense
   // in the context of this layer.
@@ -813,29 +749,11 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   public void testFileCreationSetsAttributes() {}
 
   @Override
-  public void testFileCreationUpdatesParentDirectoryModificationTimestamp() {}
-
-  @Override
-  public void testMkdirsUpdatesParentDirectoryModificationTimestamp() {}
-
-  @Override
-  public void testDeleteUpdatesDirectoryModificationTimestamps() {}
-
-  @Override
   public void renameDirectoryShouldCopyMarkerFilesLast() {}
 
   @Override
-  public void testRenameUpdatesParentDirectoryModificationTimestamps() {}
+  public void testComposeSuccess() {}
 
   @Override
-  public void testPredicateIsConsultedForModificationTimestamps() {}
-
-  @Override
-  public void testComposeSuccess() throws IOException {}
-
-  @Override
-  public void testReadGenerationBestEffort() throws IOException {}
-
-  @Override
-  public void testReadGenerationStrict() throws IOException {}
+  public void read_failure_ifObjectWasModifiedDuringRead() {}
 }

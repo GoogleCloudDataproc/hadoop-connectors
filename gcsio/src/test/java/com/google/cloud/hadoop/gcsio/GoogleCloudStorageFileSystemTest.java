@@ -21,8 +21,7 @@ import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
-import com.google.common.flogger.LoggerConfig;
-import com.google.common.util.concurrent.MoreExecutors;
+import com.google.cloud.hadoop.util.RequesterPaysOptions;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -30,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -50,17 +50,17 @@ public class GoogleCloudStorageFileSystemTest
         @Override
         public void before() throws IOException {
           // Disable logging.
-          LoggerConfig.getConfig("").setLevel(Level.OFF);
+          // Normally you would need to keep a strong reference to any logger used for
+          // configuration, but the "root" logger is always present.
+          Logger.getLogger("").setLevel(Level.OFF);
 
           if (gcsfs == null) {
             gcsfs =
                 new GoogleCloudStorageFileSystem(
                     new InMemoryGoogleCloudStorage(),
-                    GoogleCloudStorageFileSystemOptions.newBuilder()
-                        .setShouldIncludeInTimestampUpdatesPredicate(INCLUDE_SUBSTRINGS_PREDICATE)
+                    GoogleCloudStorageFileSystemOptions.builder()
                         .setMarkerFilePattern("_(FAILURE|SUCCESS)")
                         .build());
-            gcsfs.setUpdateTimestampsExecutor(MoreExecutors.newDirectExecutorService());
             gcs = gcsfs.getGcs();
             GoogleCloudStorageFileSystemIntegrationTest.postCreateInit();
           }
@@ -78,14 +78,15 @@ public class GoogleCloudStorageFileSystemTest
    */
   private static void setDefaultValidOptions(
       GoogleCloudStorageFileSystemOptions.Builder optionsBuilder) {
-    optionsBuilder
-        .getCloudStorageOptionsBuilder()
-        .setAppName("appName")
-        .setProjectId("projectId")
-        .setWriteChannelOptions(
-            AsyncWriteChannelOptions.newBuilder()
-                .setUploadChunkSize(UPLOAD_CHUNK_SIZE_DEFAULT)
-                .build());
+    optionsBuilder.setCloudStorageOptions(
+        GoogleCloudStorageOptions.builder()
+            .setAppName("appName")
+            .setProjectId("projectId")
+            .setWriteChannelOptions(
+                AsyncWriteChannelOptions.builder()
+                    .setUploadChunkSize(UPLOAD_CHUNK_SIZE_DEFAULT)
+                    .build())
+            .build());
   }
 
   /**
@@ -95,32 +96,43 @@ public class GoogleCloudStorageFileSystemTest
   public void testConstructor() throws IOException {
     GoogleCredential cred = new GoogleCredential();
     GoogleCloudStorageFileSystemOptions.Builder optionsBuilder =
-        GoogleCloudStorageFileSystemOptions.newBuilder();
+        GoogleCloudStorageFileSystemOptions.builder();
 
     setDefaultValidOptions(optionsBuilder);
 
+    GoogleCloudStorageFileSystemOptions options = optionsBuilder.build();
+
     // Verify that projectId == null or empty does not throw.
-    optionsBuilder.getCloudStorageOptionsBuilder().setProjectId(null);
+    optionsBuilder.setCloudStorageOptions(
+        options.getCloudStorageOptions().toBuilder().setProjectId(null).build());
     new GoogleCloudStorageFileSystem(cred, optionsBuilder.build());
 
-    optionsBuilder.getCloudStorageOptionsBuilder().setProjectId("");
+    optionsBuilder.setCloudStorageOptions(
+        options.getCloudStorageOptions().toBuilder().setProjectId("").build());
     new GoogleCloudStorageFileSystem(cred, optionsBuilder.build());
 
-    optionsBuilder.getCloudStorageOptionsBuilder().setProjectId("projectId");
+    optionsBuilder.setCloudStorageOptions(
+        options.getCloudStorageOptions().toBuilder()
+            .setProjectId("projectId")
+            .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
+            .build());
 
     // Verify that appName == null or empty throws IllegalArgumentException.
 
-    optionsBuilder.getCloudStorageOptionsBuilder().setAppName(null);
+    optionsBuilder.setCloudStorageOptions(
+        options.getCloudStorageOptions().toBuilder().setAppName(null).build());
     assertThrows(
         IllegalArgumentException.class,
         () -> new GoogleCloudStorageFileSystem(cred, optionsBuilder.build()));
 
-    optionsBuilder.getCloudStorageOptionsBuilder().setAppName("");
+    optionsBuilder.setCloudStorageOptions(
+        options.getCloudStorageOptions().toBuilder().setAppName("").build());
     assertThrows(
         IllegalArgumentException.class,
         () -> new GoogleCloudStorageFileSystem(cred, optionsBuilder.build()));
 
-    optionsBuilder.getCloudStorageOptionsBuilder().setAppName("appName");
+    optionsBuilder.setCloudStorageOptions(
+        options.getCloudStorageOptions().toBuilder().setAppName("appName").build());
 
     // Verify that credential == null throws IllegalArgumentException.
     assertThrows(
@@ -135,6 +147,8 @@ public class GoogleCloudStorageFileSystemTest
 
     // White-box testing; check a few internal outcomes of our options.
     assertThat(tmpGcsFs.getGcs()).isInstanceOf(GoogleCloudStorageImpl.class);
+    assertThat(gcsfs.getOptions().getCloudStorageOptions().getRequesterPaysOptions())
+        .isEqualTo(RequesterPaysOptions.DEFAULT);
   }
 
   /** Verify that PATH_COMPARATOR produces correct sorting order. */
@@ -210,7 +224,7 @@ public class GoogleCloudStorageFileSystemTest
     for (String invalidPath : invalidPaths) {
       assertThrows(
           IllegalArgumentException.class,
-          () -> gcsfs.getPathCodec().validatePathAndGetId(new URI(invalidPath), false));
+          () -> StorageResourceId.fromUriPath(new URI(invalidPath), false));
     }
 
     String[] validPaths = {
@@ -221,13 +235,13 @@ public class GoogleCloudStorageFileSystemTest
     };
 
     for (String validPath : validPaths) {
-      gcsfs.getPathCodec().validatePathAndGetId(new URI(validPath), false);
+      StorageResourceId.fromUriPath(new URI(validPath), false);
     }
 
     String invalidBucketName = "bucket-name-has-invalid-char^";
     assertThrows(
         IllegalArgumentException.class,
-        () -> gcsfs.getPathCodec().getPath(invalidBucketName, null, true));
+        () -> UriPaths.fromStringPathComponents(invalidBucketName, null, true));
   }
 
   /**
@@ -293,7 +307,7 @@ public class GoogleCloudStorageFileSystemTest
 
     List<URI> actualPaths = new ArrayList<>();
     for (URI inputPath : inputPaths) {
-      actualPaths.add(gcsfs.getParentPath(inputPath));
+      actualPaths.add(UriPaths.getParentPath(inputPath));
     }
     assertThat(actualPaths.toArray(new URI[0])).isEqualTo(expectedPaths);
   }
@@ -314,8 +328,7 @@ public class GoogleCloudStorageFileSystemTest
 
     for (String bucketName : invalidBucketNames) {
       assertThrows(
-          IllegalArgumentException.class,
-          () -> GoogleCloudStorageFileSystem.validateBucketName(bucketName));
+          IllegalArgumentException.class, () -> StringPaths.validateBucketName(bucketName));
     }
 
     String[] validBucketNames = {
@@ -324,7 +337,7 @@ public class GoogleCloudStorageFileSystemTest
     };
 
     for (String bucketName : validBucketNames) {
-      GoogleCloudStorageFileSystem.validateBucketName(bucketName);
+      StringPaths.validateBucketName(bucketName);
     }
   }
 
@@ -351,13 +364,12 @@ public class GoogleCloudStorageFileSystemTest
 
     for (String objectName : invalidObjectNames) {
       assertThrows(
-          IllegalArgumentException.class,
-          () -> GoogleCloudStorageFileSystem.validateObjectName(objectName, false));
+          IllegalArgumentException.class, () -> StringPaths.validateObjectName(objectName, false));
     }
 
     // Verify that an empty object name is allowed when explicitly allowed.
-    GoogleCloudStorageFileSystem.validateObjectName(null, true);
-    GoogleCloudStorageFileSystem.validateObjectName("", true);
+    StringPaths.validateObjectName(null, true);
+    StringPaths.validateObjectName("", true);
 
     String[] validObjectNames = {
       "foo",
@@ -366,7 +378,7 @@ public class GoogleCloudStorageFileSystemTest
     };
 
     for (String objectName : validObjectNames) {
-      GoogleCloudStorageFileSystem.validateObjectName(objectName, false);
+      StringPaths.validateObjectName(objectName, false);
     }
   }
 
@@ -464,11 +476,6 @@ public class GoogleCloudStorageFileSystemTest
    * TODO(user): add support of generations in InMemoryGoogleCloudStorage so
    * we can run the following tests in this class.
    */
-  @Test
   @Override
-  public void testReadGenerationBestEffort() throws IOException {}
-
-  @Test
-  @Override
-  public void testReadGenerationStrict() throws IOException {}
+  public void read_failure_ifObjectWasModifiedDuringRead() {}
 }

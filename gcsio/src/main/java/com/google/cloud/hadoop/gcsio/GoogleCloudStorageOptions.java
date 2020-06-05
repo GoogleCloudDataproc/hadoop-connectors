@@ -17,24 +17,35 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
+import com.google.api.services.storage.Storage;
 import com.google.auto.value.AutoValue;
+import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
+import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import javax.annotation.Nullable;
 
 /** Configuration options for the GoogleCloudStorage class. */
 @AutoValue
 public abstract class GoogleCloudStorageOptions {
 
+  /** Default setting for enabling use of GCS gRPC API. */
+  public static final boolean ENABLE_GRPC_DEFAULT = false;
+
+  /** Default root URL for Cloud Storage API endpoint. */
+  public static final String STORAGE_ROOT_URL_DEFAULT = Storage.DEFAULT_ROOT_URL;
+
+  /** Default service Path for Cloud Storage API endpoint. */
+  public static final String STORAGE_SERVICE_PATH_DEFAULT = Storage.DEFAULT_SERVICE_PATH;
+
   /** Default setting for enabling auto-repair of implicit directories. */
   public static final boolean AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT = true;
 
   /** Default setting for enabling inferring of implicit directories. */
   public static final boolean INFER_IMPLICIT_DIRECTORIES_DEFAULT = true;
-
-  /** Default setting for whether or not to create a marker file when beginning file creation. */
-  public static final boolean CREATE_EMPTY_MARKER_OBJECT_DEFAULT = false;
 
   /**
    * Default setting for the length of time to wait for empty objects to appear if we believe we are
@@ -72,20 +83,16 @@ public abstract class GoogleCloudStorageOptions {
   /** Default setting for number of threads to execute GCS batch requests for copy operations. */
   public static final int COPY_BATCH_THREADS_DEFAULT = BATCH_THREADS_DEFAULT;
 
-  /** Default setting for read write channel. */
-  public static final GoogleCloudStorageReadOptions READ_CHANNEL_OPTIONS_DEFAULT =
-      GoogleCloudStorageReadOptions.DEFAULT;
+  /** Default setting for GCS HTTP request headers. */
+  public static final ImmutableMap<String, String> HTTP_REQUEST_HEADERS_DEFAULT = ImmutableMap.of();
 
-  /** Default setting for async write channel. */
-  public static final AsyncWriteChannelOptions ASYNC_WRITE_CHANNEL_OPTIONS_DEFAULT =
-      AsyncWriteChannelOptions.newBuilder().build();
+  public static final GoogleCloudStorageOptions DEFAULT = builder().build();
 
-  /** Default setting for requester pays feature. */
-  public static final RequesterPaysOptions REQUESTER_PAYS_OPTIONS_DEFAULT =
-      RequesterPaysOptions.DEFAULT;
-
-  public static Builder newBuilder() {
+  public static Builder builder() {
     return new AutoValue_GoogleCloudStorageOptions.Builder()
+        .setGrpcEnabled(ENABLE_GRPC_DEFAULT)
+        .setStorageRootUrl(STORAGE_ROOT_URL_DEFAULT)
+        .setStorageServicePath(STORAGE_SERVICE_PATH_DEFAULT)
         .setAutoRepairImplicitDirectoriesEnabled(AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT)
         .setInferImplicitDirectoriesEnabled(INFER_IMPLICIT_DIRECTORIES_DEFAULT)
         .setMaxWaitMillisForEmptyObjectCreation(MAX_WAIT_MILLIS_FOR_EMPTY_OBJECT_CREATION)
@@ -100,10 +107,20 @@ public abstract class GoogleCloudStorageOptions {
         .setMaxBytesRewrittenPerCall(MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT)
         .setCopyMaxRequestsPerBatch(COPY_MAX_REQUESTS_PER_BATCH_DEFAULT)
         .setCopyBatchThreads(COPY_BATCH_THREADS_DEFAULT)
-        .setReadChannelOptions(READ_CHANNEL_OPTIONS_DEFAULT)
-        .setWriteChannelOptions(ASYNC_WRITE_CHANNEL_OPTIONS_DEFAULT)
-        .setRequesterPaysOptions(REQUESTER_PAYS_OPTIONS_DEFAULT);
+        .setReadChannelOptions(GoogleCloudStorageReadOptions.DEFAULT)
+        .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
+        .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
+        .setCooperativeLockingOptions(CooperativeLockingOptions.DEFAULT)
+        .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT);
   }
+
+  public abstract Builder toBuilder();
+
+  public abstract boolean isGrpcEnabled();
+
+  public abstract String getStorageRootUrl();
+
+  public abstract String getStorageServicePath();
 
   @Nullable
   public abstract String getProjectId();
@@ -139,10 +156,10 @@ public abstract class GoogleCloudStorageOptions {
   public abstract String getProxyAddress();
 
   @Nullable
-  public abstract String getProxyUsername();
+  public abstract RedactedString getProxyUsername();
 
   @Nullable
-  public abstract String getProxyPassword();
+  public abstract RedactedString getProxyPassword();
 
   public abstract boolean isCopyWithRewriteEnabled();
 
@@ -154,7 +171,18 @@ public abstract class GoogleCloudStorageOptions {
 
   public abstract RequesterPaysOptions getRequesterPaysOptions();
 
-  public abstract Builder toBuilder();
+  public abstract CooperativeLockingOptions getCooperativeLockingOptions();
+
+  public abstract ImmutableMap<String, String> getHttpRequestHeaders();
+
+  @Nullable
+  public abstract String getEncryptionAlgorithm();
+
+  @Nullable
+  public abstract RedactedString getEncryptionKey();
+
+  @Nullable
+  public abstract RedactedString getEncryptionKeyHash();
 
   public void throwIfNotValid() {
     checkArgument(!isNullOrEmpty(getAppName()), "appName must not be null or empty");
@@ -163,6 +191,12 @@ public abstract class GoogleCloudStorageOptions {
   /** Mutable builder for the {@link GoogleCloudStorageOptions} class. */
   @AutoValue.Builder
   public abstract static class Builder {
+
+    public abstract Builder setGrpcEnabled(boolean grpcEnabled);
+
+    public abstract Builder setStorageRootUrl(String rootUrl);
+
+    public abstract Builder setStorageServicePath(String servicePath);
 
     public abstract Builder setProjectId(String projectId);
 
@@ -192,9 +226,9 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setProxyAddress(String proxyAddress);
 
-    public abstract Builder setProxyUsername(String proxyUsername);
+    public abstract Builder setProxyUsername(RedactedString proxyUsername);
 
-    public abstract Builder setProxyPassword(String proxyPassword);
+    public abstract Builder setProxyPassword(RedactedString proxyPassword);
 
     public abstract Builder setCopyWithRewriteEnabled(boolean copyWithRewrite);
 
@@ -208,31 +242,22 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setWriteChannelOptions(AsyncWriteChannelOptions writeChannelOptions);
 
-    @Deprecated private AsyncWriteChannelOptions.Builder writeChannelOptionsBuilder;
-
-    /** @deprecated use {@link #setWriteChannelOptions} instead */
-    @Deprecated
-    public Builder setWriteChannelOptionsBuilder(AsyncWriteChannelOptions.Builder builder) {
-      writeChannelOptionsBuilder = builder;
-      return this;
-    }
-
-    /** @deprecated use {@link #setWriteChannelOptions} instead */
-    @Deprecated
-    public AsyncWriteChannelOptions.Builder getWriteChannelOptionsBuilder() {
-      return writeChannelOptionsBuilder == null
-          ? writeChannelOptionsBuilder = AsyncWriteChannelOptions.newBuilder()
-          : writeChannelOptionsBuilder;
-    }
-
     public abstract Builder setRequesterPaysOptions(RequesterPaysOptions requesterPaysOptions);
+
+    public abstract Builder setCooperativeLockingOptions(
+        CooperativeLockingOptions cooperativeLockingOptions);
+
+    public abstract Builder setHttpRequestHeaders(Map<String, String> httpRequestHeaders);
+
+    public abstract Builder setEncryptionAlgorithm(String encryptionAlgorithm);
+
+    public abstract Builder setEncryptionKey(RedactedString encryptionKey);
+
+    public abstract Builder setEncryptionKeyHash(RedactedString encryptionKeyHash);
 
     abstract GoogleCloudStorageOptions autoBuild();
 
     public GoogleCloudStorageOptions build() {
-      if (writeChannelOptionsBuilder != null) {
-        setWriteChannelOptions(writeChannelOptionsBuilder.build());
-      }
       GoogleCloudStorageOptions instance = autoBuild();
       checkArgument(
           instance.getMaxBytesRewrittenPerCall() <= 0
@@ -246,7 +271,20 @@ public abstract class GoogleCloudStorageOptions {
       checkArgument(
           (instance.getProxyUsername() == null) == (instance.getProxyPassword() == null),
           "both proxyUsername and proxyPassword should be null or not null together");
+      checkArgument(
+          isAllEncryptionOptionsSetOrUnset(instance),
+          "encryptionAlgorithm, encryptionKey and encryptionKeyHash should be null or not null"
+              + " together");
       return instance;
+    }
+
+    private boolean isAllEncryptionOptionsSetOrUnset(GoogleCloudStorageOptions instance) {
+      return (instance.getEncryptionAlgorithm() != null
+              && instance.getEncryptionKey() != null
+              && instance.getEncryptionKeyHash() != null)
+          || (instance.getEncryptionAlgorithm() == null
+              && instance.getEncryptionKey() == null
+              && instance.getEncryptionKeyHash() == null);
     }
   }
 }

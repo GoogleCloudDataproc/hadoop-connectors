@@ -18,11 +18,9 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.assertThrows;
 
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest;
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -105,30 +103,24 @@ public class WebHdfsIntegrationTest extends HadoopFileSystemTestBase {
   // Tests that exercise behavior defined in HdfsBehavior.
   // -----------------------------------------------------------------
 
-  /**
-   * Validates delete().
-   */
-  @Test @Override
-  public void testDelete()
-      throws IOException {
+  /** Validates delete(). */
+  @Test
+  @Override
+  public void testDelete() throws Exception {
     deleteHelper(new HdfsBehavior());
   }
 
-  /**
-   * Validates mkdirs().
-   */
-  @Test @Override
-  public void testMkdirs()
-      throws IOException, URISyntaxException {
+  /** Validates mkdirs(). */
+  @Test
+  @Override
+  public void testMkdirs() throws Exception {
     mkdirsHelper(new HdfsBehavior());
   }
 
-  /**
-   * Validates rename().
-   */
-  @Test @Override
-  public void testRename()
-      throws IOException {
+  /** Validates rename(). */
+  @Test
+  @Override
+  public void testRename() throws Exception {
     renameHelper(new HdfsBehavior() {
         @Override
         public MethodOutcome renameRootOutcome() {
@@ -140,23 +132,6 @@ public class WebHdfsIntegrationTest extends HadoopFileSystemTestBase {
   }
 
   // -----------------------------------------------------------------
-
-  /**
-   * Validates append().
-   */
-  @Test @Override
-  public void testAppend()
-      throws IOException {
-    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
-    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
-    // For now, verify that append does not throw. We are not interested in
-    // verifying that append() actually appends correctly. We will do that
-    // once GHFS also starts supporting appends.
-    ghfs.append(
-        hadoopPath,
-        GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE.getDefault(),
-        null);
-  }
 
   /**
    * Validates getDefaultReplication().

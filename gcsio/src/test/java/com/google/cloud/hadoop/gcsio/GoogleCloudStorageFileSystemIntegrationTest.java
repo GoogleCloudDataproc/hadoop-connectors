@@ -22,22 +22,18 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.GenerationReadConsistency;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
-import com.google.common.base.Predicate;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
-import com.google.common.util.concurrent.MoreExecutors;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
@@ -102,25 +98,6 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   // GCS instance used for cleanup
   protected static GoogleCloudStorage gcs;
 
-  // My sister was once bitten by a moose, let's not update those paths
-  protected static final String EXCLUDED_TIMESTAMP_SUBSTRING = "moose/";
-
-  // I like turtles, let's always update those paths
-  protected static final String INCLUDED_TIMESTAMP_SUBSTRING = "turtles/";
-
-  protected static final Predicate<String> INCLUDE_SUBSTRINGS_PREDICATE =
-      path -> {
-        if (path.contains(INCLUDED_TIMESTAMP_SUBSTRING)) {
-          return true; // Don't ignore
-        }
-
-        if (path.contains(EXCLUDED_TIMESTAMP_SUBSTRING)) {
-          return false; // Ignore
-        }
-
-        return true; // Include everything else
-      };
-
   protected static GoogleCloudStorageFileSystemIntegrationHelper gcsiHelper;
 
   // Time when test started. Used for determining which objects got
@@ -148,23 +125,22 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
             assertThat(projectId).isNotNull();
 
             GoogleCloudStorageFileSystemOptions.Builder optionsBuilder =
-                GoogleCloudStorageFileSystemOptions.newBuilder()
+                GoogleCloudStorageFileSystemOptions.builder()
                     .setMarkerFilePattern("_(FAILURE|SUCCESS)");
 
             optionsBuilder
-                .setEnableBucketDelete(true)
-                .setShouldIncludeInTimestampUpdatesPredicate(INCLUDE_SUBSTRINGS_PREDICATE)
-                .getCloudStorageOptionsBuilder()
-                .setAppName(appName)
-                .setProjectId(projectId)
-                .setWriteChannelOptions(
-                    AsyncWriteChannelOptions.newBuilder()
-                        .setUploadChunkSize(UPLOAD_CHUNK_SIZE_DEFAULT)
+                .setBucketDeleteEnabled(true)
+                .setCloudStorageOptions(
+                    GoogleCloudStorageOptions.builder()
+                        .setAppName(appName)
+                        .setProjectId(projectId)
+                        .setWriteChannelOptions(
+                            AsyncWriteChannelOptions.builder()
+                                .setUploadChunkSize(UPLOAD_CHUNK_SIZE_DEFAULT)
+                                .build())
                         .build());
 
             gcsfs = new GoogleCloudStorageFileSystem(credential, optionsBuilder.build());
-
-            gcsfs.setUpdateTimestampsExecutor(MoreExecutors.newDirectExecutorService());
 
             gcs = gcsfs.getGcs();
 
@@ -223,8 +199,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
       assertThat(fileInfo.getSize()).isEqualTo(expectedSize);
     }
 
-    boolean expectedDirectory =
-        (objectName == null) || FileInfo.objectHasDirectoryPath(objectName);
+    boolean expectedDirectory = (objectName == null) || StringPaths.isDirectoryPath(objectName);
     assertWithMessage("isDirectory for bucketName '%s' objectName '%s'", bucketName, objectName)
         .that(fileInfo.isDirectory())
         .isEqualTo(expectedDirectory);
@@ -412,12 +387,9 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     }
   }
 
-  /**
-   * Validates delete().
-   */
+  /** Validates delete(). */
   @Test
-  public void testDelete()
-      throws IOException {
+  public void testDelete() throws Exception {
     deleteHelper(new DeletionBehavior() {
       @Override
       public MethodOutcome nonEmptyDeleteOutcome() {
@@ -438,12 +410,11 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   /**
    * Tests listObjectNames() and getItemInfo().
    *
-   * The data required for the 2 tests is expensive to create therefore
-   * we combine the tests into one.
+   * <p>The data required for the 2 tests is expensive to create therefore we combine the tests into
+   * one.
    */
   @Test
-  public void testListObjectNamesAndGetItemInfo()
-      throws IOException {
+  public void testListObjectNamesAndGetItemInfo() throws Exception {
 
     // Objects created for this test.
     String[] objectNames = {
@@ -586,78 +557,35 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     assertWithMessage("partial read mismatch").that(message2).isEqualTo(message.substring(offset));
   }
 
-  /** Validates that read operations by default always read the latest generation. */
   @Test
-  public void testReadGenerationBestEffort() throws IOException {
-    String bucketName = sharedBucketName1;
-    String object = "generation-best-effort-" + UUID.randomUUID();
-    String message1 = "Hello world!\n";
-    String message2 = "Sayonara world!\n";
-    gcsiHelper.writeTextFile(bucketName, object, message1);
-    int offset = 5;
-    int footerLength = 1;
-    String footer = message1.substring(message1.length() - footerLength);
-    // These read options force the readChannel to open stream again on second read.
-    // Also, we will prefetch footer content (with length 1).
-    GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder()
-            .setGenerationReadConsistency(GenerationReadConsistency.BEST_EFFORT)
-            .setFadvise(Fadvise.RANDOM)
-            .setMinRangeRequestSize(footerLength)
-            .build();
-    try (SeekableByteChannel readChannel = gcsiHelper.open(bucketName, object, readOptions)) {
-      String read1 = gcsiHelper.readText(readChannel, 0, offset, false);
-      // Force lazy footer caching
-      String readFooter =
-          gcsiHelper.readText(readChannel, message1.length() - 1, footerLength, true);
-      gcsiHelper.writeTextFileOverwriting(bucketName, object, message2);
-      String read2 = gcsiHelper.readText(readChannel, offset, message1.length() - offset, true);
-      assertWithMessage("file beginning read mismatch")
-          .that(read1)
-          .isEqualTo(message1.substring(0, offset));
-      assertWithMessage("footer read mismatch").that(readFooter).isEqualTo(footer);
-      // The readChannel will still just try to read the remaining 8 characters, but this time from
-      // the live version ("Sayonara, world!\n"), also, since the last character is already
-      // pre-fetched, this second read will only read 7 characters, and concatenate the footer
-      // (in this test case, the '\n' character). Thus, instead of reading " world!\n", it actually
-      // reads "ara wor\n".
-      assertWithMessage("file ending read mismatch")
-          .that(read2)
-          .isEqualTo(message2.substring(offset, message1.length()));
-    }
-  }
-
-  /**
-   * Validates that generation-read-consistency "STRICT" will error if intended generation is
-   * deleted/overwritten.
-   */
-  @Test
-  public void testReadGenerationStrict() throws IOException {
-    String bucketName = sharedBucketName1;
-    String object = "generation-strict-" + UUID.randomUUID();
+  public void read_failure_ifObjectWasModifiedDuringRead() throws IOException {
+    URI testObject = gcsiHelper.getUniqueObjectUri("generation-strict");
     String message1 = "Hello world!\n";
     String message2 = "Sayonara world!\n";
 
-    gcsiHelper.writeTextFile(bucketName, object, message1);
+    gcsiHelper.writeTextFile(testObject, message1);
     int offset = 5;
     // These read options force the readChannel to open stream again on second read.
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder()
-            .setGenerationReadConsistency(GenerationReadConsistency.STRICT)
             .setFadvise(Fadvise.RANDOM)
             .setMinRangeRequestSize(0)
             .build();
-    try (SeekableByteChannel readChannel = gcsiHelper.open(bucketName, object, readOptions)) {
+    try (SeekableByteChannel readChannel = gcsiHelper.open(testObject, readOptions)) {
       String read1 = gcsiHelper.readText(readChannel, 0, offset, false);
       assertWithMessage("partial read mismatch")
           .that(read1)
           .isEqualTo(message1.substring(0, offset));
-      gcsiHelper.writeTextFileOverwriting(bucketName, object, message2);
+      gcsiHelper.writeTextFileOverwriting(testObject, message2);
       FileNotFoundException expected =
           assertThrows(
               FileNotFoundException.class,
               () -> gcsiHelper.readText(readChannel, offset, message1.length() - offset, true));
-      assertThat(expected).hasMessageThat().contains("generation");
+      assertThat(expected)
+          .hasMessageThat()
+          .contains(
+              "Note, it is possible that the live version is still available"
+                  + " but the requested generation is deleted.");
     }
   }
 
@@ -673,11 +601,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
         () -> gcsiHelper.readTextFile(bucketName, objectName, 0, 100, true));
   }
 
-  /**
-   * Validates delete().
-   */
-  public void deleteHelper(DeletionBehavior behavior)
-      throws IOException {
+  /** Validates delete(). */
+  public void deleteHelper(DeletionBehavior behavior) throws Exception {
     String bucketName = sharedBucketName1;
 
     // Objects created for this test.
@@ -833,12 +758,9 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     gcsiHelper.delete(bucketName, uniqueDirName);
   }
 
-  /**
-   * Validates mkdirs().
-   */
+  /** Validates mkdirs(). */
   @Test
-  public void testMkdirs()
-      throws IOException, URISyntaxException {
+  public void testMkdirs() throws Exception {
     mkdirsHelper(new MkdirsBehavior() {
       @Override
       public MethodOutcome mkdirsRootOutcome() {
@@ -852,11 +774,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     });
   }
 
-  /**
-   * Validates mkdirs().
-   */
-  public void mkdirsHelper(MkdirsBehavior behavior)
-      throws IOException, URISyntaxException {
+  /** Validates mkdirs(). */
+  public void mkdirsHelper(MkdirsBehavior behavior) throws Exception {
     String bucketName = sharedBucketName1;
 
     // Objects created for this test.
@@ -954,12 +873,9 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     }
   }
 
-  /**
-   * Validates getFileInfos().
-   */
+  /** Validates getFileInfos(). */
   @Test
-  public void testGetFileInfos()
-      throws IOException, URISyntaxException {
+  public void testGetFileInfos() throws Exception {
     String bucketName = sharedBucketName1;
     // Objects created for this test.
     String[] objectNames = {
@@ -1068,12 +984,9 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     }
   }
 
-  /**
-   * Validates rename().
-   */
+  /** Validates rename(). */
   @Test
-  public void testRename()
-      throws IOException {
+  public void testRename() throws Exception {
     renameHelper(new RenameBehavior() {
       @Override
       public MethodOutcome renameFileIntoRootOutcome() {
@@ -1126,11 +1039,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     });
   }
 
-  /**
-   * Validates rename().
-   */
-  protected void renameHelper(RenameBehavior behavior)
-      throws IOException {
+  /** Validates rename(). */
+  protected void renameHelper(RenameBehavior behavior) throws Exception {
     String bucketName = sharedBucketName1;
     String otherBucketName = sharedBucketName2;
 
@@ -1403,11 +1313,9 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
                   }
                 });
       }
-      try {
-        checkStartCounter.await();
-      } catch (InterruptedException ie) {
-        throw new IOException("Interrupted while awaiting counter!", ie);
-      }
+
+      checkStartCounter.await();
+
       if (!errorList.isEmpty()) {
         AssertionError error = new AssertionError();
         for (Throwable t : errorList) {
@@ -1467,11 +1375,9 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
                   }
                 });
       }
-      try {
-        renameCounter.await();
-      } catch (InterruptedException ie) {
-        throw new IOException("Interrupted while awaiting counter!", ie);
-      }
+
+      renameCounter.await();
+
       if (!errorList.isEmpty()) {
         AssertionError error = new AssertionError();
         for (Throwable t : errorList) {
@@ -1518,11 +1424,9 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
                   }
                 });
       }
-      try {
+
         checkDestCounter.await();
-      } catch (InterruptedException ie) {
-        throw new IOException("Interrupted while awaiting counter!", ie);
-      }
+
       if (!errorList.isEmpty()) {
         AssertionError error = new AssertionError();
         for (Throwable t : errorList) {
@@ -1532,21 +1436,15 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
       }
     } finally {
       threadPool.shutdown();
-      try {
-        if (!threadPool.awaitTermination(10L, TimeUnit.SECONDS)) {
-          logger.atSevere().log("Failed to awaitTermination! Forcing executor shutdown.");
-          threadPool.shutdownNow();
-        }
-      } catch (InterruptedException ie) {
-        logger.atSevere().withCause(ie).log("Interrupted while shutting down threadpool!");
+      if (!threadPool.awaitTermination(10L, TimeUnit.SECONDS)) {
+        logger.atSevere().log("Failed to awaitTermination! Forcing executor shutdown.");
         threadPool.shutdownNow();
       }
     }
   }
 
   @Test
-  public void testRenameWithContentChecking()
-      throws IOException {
+  public void testRenameWithContentChecking() throws Exception {
     String bucketName = sharedBucketName1;
     // TODO(user): Split out separate test cases, extract a suitable variant of RenameData to
     // follow same pattern of iterating over subcases.
@@ -1642,222 +1540,6 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   }
 
   @Test
-  public void testFileCreationUpdatesParentDirectoryModificationTimestamp()
-      throws IOException, InterruptedException {
-    URI directory =
-        gcsiHelper.getPath(sharedBucketName1, "test-modification-timestamps/create-dir/");
-
-    gcsfs.mkdirs(directory);
-
-    FileInfo directoryInfo = gcsfs.getFileInfo(directory);
-
-    assertThat(directoryInfo.isDirectory()).isTrue();
-    assertThat(directoryInfo.exists()).isTrue();
-    Thread.sleep(100);
-
-    URI childFile = directory.resolve("file.txt");
-
-    try (WritableByteChannel channel = gcsfs.create(childFile)) {
-      assertThat(channel).isNotNull();
-    }
-
-    FileInfo newDirectoryInfo = gcsfs.getFileInfo(directory);
-
-    assertWithMessage("Modification times should not be equal")
-        .that(newDirectoryInfo.getModificationTime())
-        .isNotEqualTo(directoryInfo.getModificationTime());
-
-    // This is prone to flake. Creation time is set by GCS while modification time is set
-    // client side. We'll only assert that A) creation time is different from modification time and
-    // B) that they are within 10 minutes of each other.
-    long timeDelta = directoryInfo.getCreationTime() - newDirectoryInfo.getModificationTime();
-    assertThat(Math.abs(timeDelta)).isLessThan(TimeUnit.MINUTES.toMillis(10));
-  }
-
-  @Test
-  public void testPredicateIsConsultedForModificationTimestamps()
-      throws IOException, InterruptedException {
-    URI directory =
-        gcsiHelper.getPath(sharedBucketName1, "test-modification-predicates/mkdirs-dir/");
-    URI directoryToUpdate = directory.resolve("subdirectory-1/");
-    URI directoryToIncludeAlways = directory.resolve(INCLUDED_TIMESTAMP_SUBSTRING);
-    URI directoryToExcludeAlways = directory.resolve(EXCLUDED_TIMESTAMP_SUBSTRING);
-
-    gcsfs.mkdirs(directoryToUpdate);
-    gcsfs.mkdirs(directoryToIncludeAlways);
-    gcsfs.mkdirs(directoryToExcludeAlways);
-
-    FileInfo directoryInfo = gcsfs.getFileInfo(directory);
-    FileInfo directoryToUpdateInfo = gcsfs.getFileInfo(directoryToUpdate);
-    FileInfo includeAlwaysInfo = gcsfs.getFileInfo(directoryToIncludeAlways);
-    FileInfo excludeAlwaysInfo = gcsfs.getFileInfo(directoryToExcludeAlways);
-
-    assertThat(directoryInfo.isDirectory() && directoryToUpdateInfo.isDirectory()).isTrue();
-    assertThat(directoryToUpdateInfo.isDirectory() && directoryToUpdateInfo.exists()).isTrue();
-    assertThat(includeAlwaysInfo.isDirectory() && includeAlwaysInfo.exists()).isTrue();
-    assertThat(excludeAlwaysInfo.isDirectory() && excludeAlwaysInfo.exists()).isTrue();
-
-    Thread.sleep(100);
-
-    for (URI parentDirectory : new URI[]{directoryToExcludeAlways, directoryToIncludeAlways}) {
-      URI sourceFile = parentDirectory.resolve("child-file");
-      try (WritableByteChannel channel = gcsfs.create(sourceFile)) {
-        assertThat(channel).isNotNull();
-      }
-    }
-
-    FileInfo updatedIncludeAlways = gcsfs.getFileInfo(directoryToIncludeAlways);
-    FileInfo updatedExcludeAlwaysInfo = gcsfs.getFileInfo(directoryToExcludeAlways);
-
-    long updatedTimeDelta =
-        includeAlwaysInfo.getCreationTime() - updatedIncludeAlways.getModificationTime();
-    assertThat(Math.abs(updatedTimeDelta)).isLessThan(TimeUnit.MINUTES.toMillis(10));
-
-    // Despite having a new file, modification time should not be updated.
-    assertThat(excludeAlwaysInfo.getModificationTime())
-        .isEqualTo(updatedExcludeAlwaysInfo.getModificationTime());
-  }
-
-  @Test
-  public void testMkdirsUpdatesParentDirectoryModificationTimestamp()
-      throws IOException, InterruptedException {
-    URI directory =
-        gcsiHelper.getPath(sharedBucketName1, "test-modification-timestamps/mkdirs-dir/");
-    URI directoryToUpdate = directory.resolve("subdirectory-1/");
-
-    gcsfs.mkdirs(directoryToUpdate);
-
-    FileInfo directoryInfo = gcsfs.getFileInfo(directory);
-    FileInfo directoryToUpdateInfo = gcsfs.getFileInfo(directoryToUpdate);
-
-    assertThat(directoryInfo.isDirectory() && directoryToUpdateInfo.isDirectory()).isTrue();
-    assertThat(directoryToUpdateInfo.isDirectory() && directoryToUpdateInfo.exists()).isTrue();
-
-    Thread.sleep(100);
-
-    URI childDirectory = directoryToUpdate.resolve("subdirectory-2/subdirectory-3/");
-
-    gcsfs.mkdirs(childDirectory);
-
-    FileInfo newDirectoryToUpdateInfo = gcsfs.getFileInfo(directoryToUpdate);
-
-    assertWithMessage("Modification times should not be equal")
-        .that(newDirectoryToUpdateInfo.getModificationTime())
-        .isNotEqualTo(directoryToUpdateInfo.getModificationTime());
-
-    // This is prone to flake. Creation time is set by GCS while modification time is set
-    // client side. We'll only assert that A) creation time is different from modification time and
-    // B) that they are within 10 minutes of each other.
-    long timeDelta =
-        directoryToUpdateInfo.getCreationTime() - newDirectoryToUpdateInfo.getModificationTime();
-    assertThat(Math.abs(timeDelta)).isLessThan(TimeUnit.MINUTES.toMillis(10));
-
-    // The root (/test-modification-timestamps/mkdirs-dir/) should *not* have had its timestamp
-    // updated, only subdirectory-1 should have:
-    FileInfo nonUpdatedDirectoryInfo = gcsfs.getFileInfo(directory);
-    assertThat(nonUpdatedDirectoryInfo.getModificationTime())
-        .isEqualTo(directoryInfo.getModificationTime());
-  }
-
-  @Test
-  public void testDeleteUpdatesDirectoryModificationTimestamps()
-      throws IOException, InterruptedException {
-    URI directory =
-        gcsiHelper.getPath(sharedBucketName1, "test-modification-timestamps/delete-dir/");
-
-    gcsfs.mkdirs(directory);
-
-    URI sourceFile = directory.resolve("child-file");
-    // Create a test object in our source directory:
-    try (WritableByteChannel channel = gcsfs.create(sourceFile)) {
-      assertThat(channel).isNotNull();
-    }
-
-    FileInfo directoryInfo = gcsfs.getFileInfo(directory);
-    FileInfo sourceFileInfo = gcsfs.getFileInfo(sourceFile);
-
-    assertThat(directoryInfo.isDirectory()).isTrue();
-    assertThat(directoryInfo.exists() && sourceFileInfo.exists()).isTrue();
-
-    Thread.sleep(100);
-
-    gcsfs.delete(sourceFile, false);
-
-    FileInfo updatedDirectoryInfo = gcsfs.getFileInfo(directory);
-    assertWithMessage("Modification times should not be equal")
-        .that(updatedDirectoryInfo.getModificationTime())
-        .isNotEqualTo(directoryInfo.getModificationTime());
-
-    // This is prone to flake. Creation time is set by GCS while modification time is set
-    // client side. We'll only assert that A) creation time is different from modification time and
-    // B) that they are within 10 minutes of eachother.
-    long timeDelta =
-        directoryInfo.getCreationTime() - updatedDirectoryInfo.getModificationTime();
-    assertThat(Math.abs(timeDelta)).isLessThan(TimeUnit.MINUTES.toMillis(10));
-  }
-
-  @Test
-  public void testRenameUpdatesParentDirectoryModificationTimestamps() throws Exception {
-    URI directory =
-        gcsiHelper.getPath(sharedBucketName1, "test-modification-timestamps/rename-dir/");
-    URI sourceDirectory = directory.resolve("src-directory/");
-    URI destinationDirectory = directory.resolve("destination-directory/");
-    gcsfs.mkdirs(sourceDirectory);
-    gcsfs.mkdirs(destinationDirectory);
-
-    URI sourceFile = sourceDirectory.resolve("child-file");
-    // Create a test object in our source directory:
-    try (WritableByteChannel channel = gcsfs.create(sourceFile)) {
-      assertThat(channel).isNotNull();
-    }
-
-    FileInfo directoryInfo = gcsfs.getFileInfo(directory);
-    FileInfo sourceDirectoryInfo = gcsfs.getFileInfo(sourceDirectory);
-    FileInfo destinationDirectoryInfo = gcsfs.getFileInfo(destinationDirectory);
-    FileInfo sourceFileInfo = gcsfs.getFileInfo(sourceFile);
-
-    assertThat(
-            directoryInfo.isDirectory()
-                && destinationDirectoryInfo.isDirectory()
-                && sourceDirectoryInfo.isDirectory())
-        .isTrue();
-    assertThat(
-            directoryInfo.exists()
-                && destinationDirectoryInfo.exists()
-                && sourceDirectoryInfo.exists()
-                && sourceFileInfo.exists())
-        .isTrue();
-
-    Thread.sleep(100);
-
-    gcsfs.rename(sourceFile, destinationDirectory);
-
-    // The root (/test-modification-timestamps/rename-dir/) directory's time stamp shouldn't change:
-    FileInfo updatedDirectoryInfo = gcsfs.getFileInfo(directory);
-    assertWithMessage("Modification time should NOT have changed")
-        .that(updatedDirectoryInfo.getModificationTime())
-        .isEqualTo(directoryInfo.getModificationTime());
-
-    // Timestamps for both source and destination *should* change:
-    FileInfo updatedSourceDirectoryInfo = gcsfs.getFileInfo(sourceDirectory);
-    FileInfo updatedDestinationDirectoryInfo = gcsfs.getFileInfo(destinationDirectory);
-    // This is prone to flake. Creation time is set by GCS while modification time is set
-    // client side. We'll only assert that A) creation time is different from modification time and
-    // B) that they are within 10 minutes of eachother.
-    long sourceTimeDelta =
-        sourceDirectoryInfo.getCreationTime() - updatedSourceDirectoryInfo.getModificationTime();
-    assertThat(Math.abs(sourceTimeDelta)).isLessThan(TimeUnit.MINUTES.toMillis(10));
-
-    // This is prone to flake. Creation time is set by GCS while modification time is set
-    // client side. We'll only assert that A) creation time is different from modification time and
-    // B) that they are within 10 minutes of eachother.
-    long destinationTimeDelta =
-        destinationDirectoryInfo.getCreationTime()
-            - updatedDestinationDirectoryInfo.getModificationTime();
-    assertThat(Math.abs(destinationTimeDelta)).isLessThan(TimeUnit.MINUTES.toMillis(10));
-  }
-
-  @Test
   public void renameDirectoryShouldCopyMarkerFilesLast() throws Exception {
     URI dir = gcsiHelper.getPath(sharedBucketName1, "test-marker-files/rename-dir/");
 
@@ -1936,15 +1618,14 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
   /**
    * Returns intermediate sub-paths for the given path.
-   * <p>
-   * For example,
-   * getSubDirPaths(gs://foo/bar/zoo) returns: (gs://foo/, gs://foo/bar/)
+   *
+   * <p>For example, getSubDirPaths(gs://foo/bar/zoo) returns: (gs://foo/, gs://foo/bar/)
    *
    * @param path Path to get sub-paths of.
    * @return List of sub-directory paths.
    */
   private List<URI> getSubDirPaths(URI path) {
-    StorageResourceId resourceId = gcsiHelper.validatePathAndGetId(path, true);
+    StorageResourceId resourceId = StorageResourceId.fromUriPath(path, true);
 
     List<String> subdirs = GoogleCloudStorageFileSystem.getSubDirs(resourceId.getObjectName());
     List<URI> subDirPaths = new ArrayList<>(subdirs.size());

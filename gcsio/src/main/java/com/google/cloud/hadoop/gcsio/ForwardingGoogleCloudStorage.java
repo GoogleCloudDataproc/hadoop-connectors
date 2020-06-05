@@ -225,12 +225,6 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public void waitForBucketEmpty(String bucketName) throws IOException {
-    logger.atFine().log("%s.waitForBucketEmpty(%s)", delegateClassName, bucketName);
-    delegate.waitForBucketEmpty(bucketName);
-  }
-
-  @Override
   public void compose(
       String bucketName, List<String> sources, String destination, String contentType)
       throws IOException {
@@ -254,7 +248,7 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
    *
    * @return the {@link GoogleCloudStorage} objected wrapped by this class.
    */
-  protected GoogleCloudStorage getDelegate() {
+  public GoogleCloudStorage getDelegate() {
     return delegate;
   }
 }

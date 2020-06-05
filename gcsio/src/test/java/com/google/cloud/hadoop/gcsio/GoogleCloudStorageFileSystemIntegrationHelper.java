@@ -37,7 +37,7 @@ public class GoogleCloudStorageFileSystemIntegrationHelper
   public static GoogleCloudStorageFileSystem createGcsFs(String projectId, String appName)
       throws IOException {
     GoogleCloudStorageOptions gcsOptions =
-        GoogleCloudStorageOptions.newBuilder()
+        GoogleCloudStorageOptions.builder()
             .setAppName(appName)
             .setProjectId(projectId)
             .setCopyWithRewriteEnabled(true)
@@ -45,14 +45,18 @@ public class GoogleCloudStorageFileSystemIntegrationHelper
 
     return new GoogleCloudStorageFileSystem(
         GoogleCloudStorageTestHelper.getCredential(),
-        GoogleCloudStorageFileSystemOptions.newBuilder()
-            .setEnableBucketDelete(true)
-            .setCloudStorageOptionsBuilder(gcsOptions.toBuilder())
+        GoogleCloudStorageFileSystemOptions.builder()
+            .setBucketDeleteEnabled(true)
+            .setCloudStorageOptions(gcsOptions)
             .build());
   }
 
+  static GoogleCloudStorageFileSystemIntegrationHelper create() throws IOException {
+    return create(GoogleCloudStorageIntegrationHelper.APP_NAME);
+  }
+
   public static GoogleCloudStorageFileSystemIntegrationHelper create(String appName)
-      throws Exception {
+      throws IOException {
     String projectId =
         checkNotNull(TestConfiguration.getInstance().getProjectId(), "projectId can not be null");
     GoogleCloudStorageFileSystem gcsFs = createGcsFs(projectId, appName);
@@ -61,13 +65,11 @@ public class GoogleCloudStorageFileSystemIntegrationHelper
 
   /** Opens the given object for writing. */
   @Override
-  protected WritableByteChannel create(
-      String bucketName, String objectName, CreateFileOptions options) throws IOException {
-    URI path = getPath(bucketName, objectName);
+  protected WritableByteChannel create(URI path, CreateFileOptions options) throws IOException {
     return gcsfs.create(path, options);
   }
 
-  protected GoogleCloudStorageFileSystem gcsfs;
+  public final GoogleCloudStorageFileSystem gcsfs;
 
   public GoogleCloudStorageFileSystemIntegrationHelper(GoogleCloudStorageFileSystem gcsfs) {
     super(gcsfs.getGcs());
@@ -81,12 +83,25 @@ public class GoogleCloudStorageFileSystemIntegrationHelper
     return gcsfs.open(path);
   }
 
+  /** Opens the given object for reading. */
+  @Override
+  protected SeekableByteChannel open(URI path) throws IOException {
+    return gcsfs.open(path);
+  }
+
   /** Opens the given object for reading, with the specified read options. */
   @Override
   protected SeekableByteChannel open(
       String bucketName, String objectName, GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     URI path = getPath(bucketName, objectName);
+    return open(path, readOptions);
+  }
+
+  /** Opens the given object for reading, with the specified read options. */
+  @Override
+  protected SeekableByteChannel open(URI path, GoogleCloudStorageReadOptions readOptions)
+      throws IOException {
     return gcsfs.open(path, readOptions);
   }
 
@@ -170,11 +185,8 @@ public class GoogleCloudStorageFileSystemIntegrationHelper
 
   /** Helper to construct a path. */
   protected URI getPath(String bucketName, String objectName) {
-    return gcsfs.getPathCodec().getPath(bucketName, objectName, /* allowEmptyObjectName= */ true);
-  }
-
-  public StorageResourceId validatePathAndGetId(URI path, boolean allowEmpty) {
-    return gcsfs.getPathCodec().validatePathAndGetId(path, allowEmpty);
+    return UriPaths.fromStringPathComponents(
+        bucketName, objectName, /* allowEmptyObjectName= */ true);
   }
 
   public String getItemName(URI src) {

@@ -59,8 +59,9 @@ public class IndirectBigQueryOutputCommitter extends ForwardingBigQueryFileOutpu
     // Get the destination configuration information.
     Configuration conf = context.getConfiguration();
     TableReference destTable = BigQueryOutputConfiguration.getTableReference(conf);
-    String destProjectId = BigQueryOutputConfiguration.getProjectId(conf);
+    String jobProjectId = BigQueryOutputConfiguration.getJobProjectId(conf);
     String writeDisposition = BigQueryOutputConfiguration.getWriteDisposition(conf);
+    String createDisposition = BigQueryOutputConfiguration.getCreateDisposition(conf);
     Optional<BigQueryTableSchema> destSchema = BigQueryOutputConfiguration.getTableSchema(conf);
     Optional<BigQueryTimePartitioning> timePartitioning =
         BigQueryOutputConfiguration.getTablePartitioning(conf);
@@ -71,16 +72,18 @@ public class IndirectBigQueryOutputCommitter extends ForwardingBigQueryFileOutpu
     try {
       getBigQueryHelper()
           .importFromGcs(
-              destProjectId,
+              jobProjectId,
               destTable,
               destSchema.isPresent() ? destSchema.get().get() : null,
               timePartitioning.isPresent() ? timePartitioning.get().get() : null,
               kmsKeyName,
               outputFileFormat,
+              createDisposition,
               writeDisposition,
               sourceUris,
               true);
     } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
       throw new IOException("Failed to import GCS into BigQuery", e);
     }
 

@@ -28,8 +28,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.CredentialFactory;
-import com.google.cloud.hadoop.util.HttpTransportFactory;
-import com.google.cloud.hadoop.util.HttpTransportFactory.HttpTransportType;
+import com.google.cloud.hadoop.util.CredentialOptions;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
@@ -57,25 +56,22 @@ public class GoogleCloudStorageTestHelper {
   private static final int BUFFER_SIZE_MAX_BYTES = 32 * 1024 * 1024;
 
   public static Credential getCredential() throws IOException {
-    String serviceAccount = TestConfiguration.getInstance().getServiceAccount();
-    String privateKeyfile = TestConfiguration.getInstance().getPrivateKeyFile();
+    CredentialOptions credentialOptions =
+        CredentialOptions.builder()
+            .setServiceAccountEmail(TestConfiguration.getInstance().getServiceAccount())
+            .setServiceAccountKeyFile(TestConfiguration.getInstance().getPrivateKeyFile())
+            .build();
+    CredentialFactory credentialFactory = new CredentialFactory(credentialOptions);
 
-    assertWithMessage("privateKeyfile must not be null").that(privateKeyfile).isNotNull();
-    assertWithMessage("serviceAccount must not be null").that(serviceAccount).isNotNull();
     try {
-      CredentialFactory credentialFactory = new CredentialFactory();
-      return credentialFactory.getCredentialFromPrivateKeyServiceAccount(
-          serviceAccount,
-          privateKeyfile,
-          CredentialFactory.GCS_SCOPES,
-          HttpTransportFactory.createHttpTransport(HttpTransportType.JAVA_NET));
-    } catch (GeneralSecurityException gse) {
-      throw new IOException(gse);
+      return credentialFactory.getCredential(CredentialFactory.GCS_SCOPES);
+    } catch (GeneralSecurityException e) {
+      throw new IOException("Failed to create test credentials", e);
     }
   }
 
   public static GoogleCloudStorageOptions.Builder getStandardOptionBuilder() {
-    return GoogleCloudStorageOptions.newBuilder()
+    return GoogleCloudStorageOptions.builder()
         .setAppName(GoogleCloudStorageTestHelper.APP_NAME)
         .setProjectId(checkNotNull(TestConfiguration.getInstance().getProjectId()))
         .setMaxListItemsPerCall(50)
@@ -83,6 +79,7 @@ public class GoogleCloudStorageTestHelper {
   }
 
   /** More efficient version of checking byte arrays than using Assert.assertArrayEquals. */
+  @SuppressWarnings("ArrayToString")
   public static void assertByteArrayEquals(byte[] expected, byte[] actual) {
     if ((expected == null) ^ (actual == null)) {
       // Don't use a fancy toString(), just display which is null,

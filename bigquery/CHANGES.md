@@ -1,14 +1,45 @@
-### 1.0.0 - 2019-XX-XX
+### 1.2.0 - 2020-XX-XX
 
-1.  POM updates for GCS connector 2.0.0.
+1.  Update all dependencies to latest versions.
+
+### 1.1.1 - 2020-03-11
+
+1.  Fix shaded jar - add back missing relocated dependencies.
+
+### 1.1.0 - 2020-03-09
+
+1.  Update all dependencies to latest versions.
+
+1.  Use `bigquery.googleapis.com` API endpoint.
+
+1.  Fix proxy authentication when using `JAVA_NET` transport.
+
+1.  Remove Log4j backend for Google Flogger.
+
+1.  Add properties to override Google Cloud API endpoints:
+
+    ```
+    mapred.bq.bigquery.root.url (default: https://bigquery.googleapis.com/)
+    mapred.bq.token.server.url (default: https://oauth2.googleapis.com/token)
+    ```
+
+1.  Use Slf4j backend by default for Google Flogger.
+
+### 1.0.1 - 2020-02-13
+
+1.  Fix shaded jar - add back missing relocated dependencies.
+
+### 1.0.0 - 2019-08-23
 
 1.  Remove Hadoop 1.x support.
 
 1.  Remove deprecated features and associated properties:
 
-        mapred.bq.input.query
-        mapred.bq.query.results.table.delete
-        mapred.bq.input.sharded.export.enable
+    ```
+    mapred.bq.input.query
+    mapred.bq.query.results.table.delete
+    mapred.bq.input.sharded.export.enable
+    ```
 
 1.  Remove obsolete `mapred.bq.output.async.write.enabled` property.
 
@@ -18,7 +49,35 @@
 
 1.  Add a property to specify BigQuery tables partitioning definition:
 
-        mapred.bq.output.table.partitioning
+    ```
+    mapred.bq.output.table.partitioning
+    ```
+
+1.  Add a new `DirectBigQueryInputFormat` for processing data through
+    [BigQuery Storage API](https://cloud.google.com/bigquery/docs/reference/storage/).
+
+    This input format is configurable via properties:
+
+    ```
+    mapred.bq.input.sql.filter
+    mapred.bq.input.selected.fields
+    mapred.bq.input.skew.limit
+    ```
+
+1.  Update all dependencies to latest versions.
+
+1.  Add a property to control max number of attempts when polling for next file.
+    By default max number of attempts is unlimited (`-1` value):
+
+    ```
+    mapred.bq.dynamic.file.list.record.reader.poll.max.attempts (default: -1)
+    ```
+
+1.  Add a property to specify output table create disposition:
+
+    ```
+    mapred.bq.output.table.createdisposition (default: CREATE_IF_NEEDED)
+    ```
 
 ### 0.13.14 - 2019-02-13
 
@@ -72,7 +131,9 @@
 
     For example:
 
-        java -Dflogger.backend_factory=com.google.common.flogger.backend.log4j.Log4jBackendFactory#getInstance ...
+    ```
+    java -Dflogger.backend_factory=com.google.common.flogger.backend.log4j.Log4jBackendFactory#getInstance ...
+    ```
 
 1.  Poll BQ jobs in their correct locations.
 
@@ -349,8 +410,10 @@
     connector. Extra cleanup is not necessary if only using the output connector
     in hadoop-streaming. The new top-level classes:
 
-        com.google.cloud.hadoop.io.bigquery.mapred.BigQueryMapredInputFormat
-        com.google.cloud.hadoop.io.bigquery.mapred.BigQueryMapredOutputFormat
+    ```
+    com.google.cloud.hadoop.io.bigquery.mapred.BigQueryMapredInputFormat
+    com.google.cloud.hadoop.io.bigquery.mapred.BigQueryMapredOutputFormat
+    ```
 
     See the javadocs for the associated `RecordReader/Writer`, `InputSplit`, and
     `OutputCommitter` classes.

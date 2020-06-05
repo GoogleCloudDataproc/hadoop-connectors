@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.google.auto.value.AutoValue;
+import javax.annotation.Nullable;
 
 /**
  * Advanced options for reading GoogleCloudStorage objects. Immutable; callers must use the inner
@@ -28,17 +29,10 @@ import com.google.auto.value.AutoValue;
 public abstract class GoogleCloudStorageReadOptions {
 
   /** Operational modes of fadvise feature. */
-  public static enum Fadvise {
+  public enum Fadvise {
     AUTO,
     RANDOM,
     SEQUENTIAL
-  }
-
-  /** Options of read consistency on generations. */
-  public enum GenerationReadConsistency {
-    LATEST,
-    BEST_EFFORT,
-    STRICT
   }
 
   public static final int DEFAULT_BACKOFF_INITIAL_INTERVAL_MILLIS = 200;
@@ -47,12 +41,12 @@ public abstract class GoogleCloudStorageReadOptions {
   public static final int DEFAULT_BACKOFF_MAX_INTERVAL_MILLIS = 10 * 1000;
   public static final int DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS = 2 * 60 * 1000;
   public static final boolean DEFAULT_FAST_FAIL_ON_NOT_FOUND = true;
+  public static final boolean DEFAULT_SUPPORT_GZIP_ENCODING = true;
   public static final int DEFAULT_BUFFER_SIZE = 0;
   public static final long DEFAULT_INPLACE_SEEK_LIMIT = 0L;
   public static final Fadvise DEFAULT_FADVISE = Fadvise.SEQUENTIAL;
   public static final int DEFAULT_MIN_RANGE_REQUEST_SIZE = 512 * 1024;
-  public static final GenerationReadConsistency DEFAULT_GENERATION_READ_CONSISTENCY =
-      GenerationReadConsistency.LATEST;
+  public static final boolean GRPC_CHECKSUMS_ENABLED_DEFAULT = false;
 
   // Default builder should be initialized after default values,
   // otherwise it will access not initialized default values.
@@ -66,12 +60,15 @@ public abstract class GoogleCloudStorageReadOptions {
         .setBackoffMaxIntervalMillis(DEFAULT_BACKOFF_MAX_INTERVAL_MILLIS)
         .setBackoffMaxElapsedTimeMillis(DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS)
         .setFastFailOnNotFound(DEFAULT_FAST_FAIL_ON_NOT_FOUND)
+        .setSupportGzipEncoding(DEFAULT_SUPPORT_GZIP_ENCODING)
         .setBufferSize(DEFAULT_BUFFER_SIZE)
         .setInplaceSeekLimit(DEFAULT_INPLACE_SEEK_LIMIT)
         .setFadvise(DEFAULT_FADVISE)
         .setMinRangeRequestSize(DEFAULT_MIN_RANGE_REQUEST_SIZE)
-        .setGenerationReadConsistency(DEFAULT_GENERATION_READ_CONSISTENCY);
+        .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT);
   }
+
+  public abstract Builder toBuilder();
 
   /** See {@link Builder#setBackoffInitialIntervalMillis}. */
   public abstract int getBackoffInitialIntervalMillis();
@@ -91,6 +88,9 @@ public abstract class GoogleCloudStorageReadOptions {
   /** See {@link Builder#setFastFailOnNotFound}. */
   public abstract boolean getFastFailOnNotFound();
 
+  /** See {@link Builder#setSupportGzipEncoding}. */
+  public abstract boolean getSupportGzipEncoding();
+
   /** See {@link Builder#setBufferSize}. */
   public abstract int getBufferSize();
 
@@ -103,10 +103,12 @@ public abstract class GoogleCloudStorageReadOptions {
   /** See {@link Builder#setMinRangeRequestSize}. */
   public abstract int getMinRangeRequestSize();
 
-  /** See {@link Builder#setGenerationReadConsistency}. */
-  public abstract GenerationReadConsistency getGenerationReadConsistency();
+  /** See {@link Builder#setGrpcChecksumsEnabled}. */
+  public abstract boolean isGrpcChecksumsEnabled();
 
-  public abstract Builder toBuilder();
+  /** See {@link Builder#setGrpcServerAddress}. */
+  @Nullable
+  public abstract String getGrpcServerAddress();
 
   /** Mutable builder for GoogleCloudStorageReadOptions. */
   @AutoValue.Builder
@@ -154,6 +156,13 @@ public abstract class GoogleCloudStorageReadOptions {
     public abstract Builder setFastFailOnNotFound(boolean fastFailOnNotFound);
 
     /**
+     * If false then reading a file with GZIP content encoding (HTTP header "Content-Encoding:
+     * gzip") will result in failure (IOException is thrown). If true then GZIP-encoded files will
+     * be read successfully.
+     */
+    public abstract Builder setSupportGzipEncoding(boolean supportGzipEncoding);
+
+    /**
      * If set to a positive value, low-level streams will be wrapped inside a BufferedInputStream of
      * this size. Otherwise no buffer will be created to wrap the low-level streams. Note that the
      * low-level streams may or may not have their own additional buffering layers independent of
@@ -190,20 +199,16 @@ public abstract class GoogleCloudStorageReadOptions {
     public abstract Builder setMinRangeRequestSize(int size);
 
     /**
-     * Sets the generation read consistency model.
+     * Sets whether to validate checksums when doing gRPC reads. If enabled, for sequential reads of
+     * a whole object, the object checksums will be validated.
      *
-     * <p>Supported modes:
-     *
-     * <ul>
-     *   <li>{@code LATEST}: always read the latest generation.
-     *   <li>{@code BEST_EFFORT}: will try to read a certain generation (when the read-channel was
-     *       opened), but when that generation is deleted/overwritten, fall back to the latest
-     *       generation.
-     *   <li>{@code STRICT}: will try to read a certain generation (when the read-channel was
-     *       opened), but when that generation is deleted/overwritten, throw an exception.
-     * </ul>
+     * <p>TODO(b/134521856): Update this to discuss per-request checksums once the server supplies
+     * them and we're validating them.
      */
-    public abstract Builder setGenerationReadConsistency(GenerationReadConsistency consistency);
+    public abstract Builder setGrpcChecksumsEnabled(boolean grpcChecksumsEnabled);
+
+    /** Sets the property to override the default GCS gRPC server address. */
+    public abstract Builder setGrpcServerAddress(String grpcServerAddress);
 
     abstract GoogleCloudStorageReadOptions autoBuild();
 
@@ -211,7 +216,8 @@ public abstract class GoogleCloudStorageReadOptions {
       GoogleCloudStorageReadOptions options = autoBuild();
       checkState(
           options.getInplaceSeekLimit() >= 0,
-          "inplaceSeekLimit must be non-negative! Got %s", options.getInplaceSeekLimit());
+          "inplaceSeekLimit must be non-negative! Got %s",
+          options.getInplaceSeekLimit());
       return options;
     }
   }

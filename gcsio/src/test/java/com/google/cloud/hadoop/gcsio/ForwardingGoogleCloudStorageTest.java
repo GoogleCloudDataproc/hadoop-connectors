@@ -14,6 +14,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -58,7 +59,7 @@ public class ForwardingGoogleCloudStorageTest {
 
   /** Sample create bucket options. */
   private static final CreateBucketOptions TEST_BUCKET_OPTIONS =
-      new CreateBucketOptions(TEST_STRING, TEST_STRING);
+      CreateBucketOptions.builder().setLocation(TEST_STRING).setStorageClass(TEST_STRING).build();
 
   /** Sample create object options. */
   private static final GoogleCloudStorageReadOptions TEST_READ_OPTIONS =
@@ -257,13 +258,6 @@ public class ForwardingGoogleCloudStorageTest {
   }
 
   @Test
-  public void testWaitForBucketEmpty() throws IOException {
-    gcs.waitForBucketEmpty(TEST_STRING);
-
-    verify(mockGcsDelegate).waitForBucketEmpty(eq(TEST_STRING));
-  }
-
-  @Test
   public void testCompose() throws IOException {
     gcs.compose(TEST_STRING, TEST_STRINGS, TEST_STRING, TEST_STRING);
 
@@ -285,5 +279,12 @@ public class ForwardingGoogleCloudStorageTest {
     GoogleCloudStorage delegate = gcs.getDelegate();
 
     assertThat(delegate).isEqualTo(mockGcsDelegate);
+  }
+
+  @Test
+  public void delegate_throwsExceptionWhenNull() {
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, () -> new ForwardingGoogleCloudStorage(null));
+    assertThat(exception).hasMessageThat().startsWith("delegate must not be null");
   }
 }

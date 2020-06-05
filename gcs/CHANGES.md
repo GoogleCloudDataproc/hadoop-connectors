@@ -1,4 +1,121 @@
-### 2.0.0 - 2019-XX-XX
+### 2.2.0 - 2020-XX-XX
+
+1.  Delete deprecated methods.
+
+1.  Update all dependencies to latest versions.
+
+1.  Add support for Cloud Storage objects CSEK encryption:
+
+    ```
+    fs.gs.encryption.algorithm (not set by default)
+    fs.gs.encryption.key (not set by default)
+    fs.gs.encryption.key.hash (not set by default)
+    ```
+
+1.  Add a property to override storage service path:
+
+    ```
+    fs.gs.storage.service.path (default: `storage/v1/`)
+    ```
+
+1.  Added a new output stream type which can be used by setting:
+
+    ```
+    fs.gs.outputstream.type=FLUSHABLE_COMPOSITE
+    ```
+
+    The `FLUSHABLE_COMPOSITE` output stream type behaves similarly to the
+    `SYNCABLE_COMPOSITE` type, except it also supports `hflush()`, which uses
+    the same implementation with `hsync()` in the `SYNCABLE_COMPOSITE` output
+    stream type.
+
+1.  Added a new output stream parameter
+
+    ```
+    fs.gs.outputstream.sync.min.interval.ms (default: 0)
+    ```
+
+    to configure the minimum time interval (milliseconds) between consecutive
+    syncs. This is to avoid getting rate limited by GCS. Default is `0` - no
+    wait between syncs. `hsync()` when rate limited will block on waiting for
+    the permits, but `hflush()` will simply perform nothing and return.
+
+1.  Added a new parameter to configure output stream pipe type:
+
+    ```
+    fs.gs.outputstream.pipe.type (default: IO_STREAM_PIPE)
+    ```
+
+    Valid values are `NIO_CHANNEL_PIPE` and `IO_STREAM_PIPE`.
+
+    Output stream now supports (when property value set to `NIO_CHANNEL_PIPE`)
+    [Java NIO Pipe](https://docs.oracle.com/javase/8/docs/api/java/nio/channels/Pipe.html)
+    that allows to reliably write in the output stream from multiple threads
+    without *"Pipe broken"* exceptions.
+
+    Note that when using `NIO_CHANNEL_PIPE` option maximum upload throughput can
+    decrease by 10%.
+
+### 2.1.1 - 2020-03-11
+
+1.  Add upload cache to support high-level retries of failed uploads. Cache size
+    configured via property and disabled by default (zero or negative value):
+
+    ```
+    fs.gs.outputstream.upload.cache.size (deafult: 0)
+    ```
+
+### 2.1.0 - 2020-03-09
+
+1.  Update all dependencies to latest versions.
+
+1.  Use `storage.googleapis.com` API endpoint.
+
+1.  Fix proxy authentication when using `JAVA_NET` transport.
+
+1.  Remove Log4j backend for Google Flogger.
+
+1.  Add properties to override Google Cloud API endpoints:
+
+    ```
+    fs.gs.storage.root.url (default: https://storage.googleapis.com/)
+    fs.gs.token.server.url (default: https://oauth2.googleapis.com/token)
+    ```
+
+1.  Support adding custom HTTP headers to Cloud Storage API requests:
+
+    ```
+    fs.gs.storage.http.headers.<HEADER>=<VALUE> (not set by default)
+    ```
+
+    Example:
+
+    ```
+    fs.gs.storage.http.headers.some-custom-header=custom_value
+    fs.gs.storage.http.headers.another-custom-header=another_custom_value
+    ```
+
+1.  Always set `generation` parameter for read requests and remove
+    `fs.gs.generation.read.consistency` property.
+
+1.  Always use URI path encoding and remove `fs.gs.path.encoding` property.
+
+1.  Use Slf4j backend by default for Google Flogger.
+
+1.  Remove list requests caching in the `PerformanceCachingGoogleCloudStorage`
+    and `fs.gs.performance.cache.list.caching.enable` property.
+
+1.  Stop caching non-existent (not found) items in performance cache.
+
+### 2.0.1 - 2020-02-13
+
+1.  Cooperative Locking FSCK tool: fix recovery of operations that failed before
+    creating an operation log file.
+
+1.  Change Gson dependency scope from `provided` to `compile` in `gcsio`
+    library.
+
+### 2.0.0 - 2019-08-23
 
 1.  Remove Hadoop 1.x support.
 
@@ -28,8 +145,10 @@
 
 1.  Remove system bucket feature and related properties:
 
-        fs.gs.system.bucket
-        fs.gs.system.bucket.create
+    ```
+    fs.gs.system.bucket
+    fs.gs.system.bucket.create
+    ```
 
 1.  Remove obsolete `fs.gs.performance.cache.dir.metadata.prefetch.limit`
     property.
@@ -37,11 +156,63 @@
 1.  Add a property to parallelize GCS requests in `getFileStatus` and
     `listStatus` methods to reduce latency:
 
-        fs.gs.status.parallel.enable (default: false)
+    ```
+    fs.gs.status.parallel.enable (default: false)
+    ```
 
     Setting this property to `true` will cause GCS connector to send more GCS
     requests which will decrease latency but also increase cost of
     `getFileStatus` and `listStatus` method calls.
+
+1.  Add a property to enable GCS direct upload:
+
+    ```
+    fs.gs.outputstream.direct.upload.enable (default: false)
+    ```
+
+1.  Update all dependencies to latest versions.
+
+1.  Support Cooperative Locking for directory operations:
+
+    ```
+    fs.gs.cooperative.locking.enable (default: false)
+    fs.gs.cooperative.locking.expiration.timeout.ms (default: 120,000)
+    fs.gs.cooperative.locking.max.concurrent.operations (default: 20)
+    ```
+
+1.  Add FSCK tool for recovery of failed Cooperative Locking for directory
+    operations:
+
+    ```
+    hadoop jar /usr/lib/hadoop/lib/gcs-connector.jar \
+        com.google.cloud.hadoop.fs.gcs.CoopLockFsck \
+        --{check,rollBack,rollForward} gs://<bucket_name> [all|<operation_id>]
+    ```
+
+1.  Implement Hadoop File System `append` method using GCS compose API.
+
+1.  Disable support for reading GZIP encoded files (HTTP header
+    `Content-Encoding: gzip`) because processing of
+    [GZIP encoded](https://cloud.google.com/storage/docs/transcoding#decompressive_transcoding)
+    files is inefficient and error-prone in Hadoop and Spark.
+
+    This feature is configurable with the property:
+
+    ```
+    fs.gs.inputstream.support.gzip.encoding.enable (default: false)
+    ```
+
+1.  Remove parent directory timestamp update feature and related properties:
+
+    ```
+    fs.gs.parent.timestamp.update.enable
+    fs.gs.parent.timestamp.update.substrings.excludes
+    fs.gs.parent.timestamp.update.substrings.includes
+    ```
+
+    This feature was enabled by default only for job history files, but it's not
+    necessary anymore for Job History Server to work properly after
+    [MAPREDUCE-7101](https://issues.apache.org/jira/browse/MAPREDUCE-7101).
 
 ### 1.9.14 - 2019-02-13
 
@@ -81,11 +252,15 @@
 
 1.  Add an option to lazily initialize `GoogleHadoopFileSystem` instances:
 
-        fs.gs.lazy.init.enable (default: false)
+    ```
+    fs.gs.lazy.init.enable (default: false)
+    ```
 
 1.  Add ability to unset `fs.gs.system.bucket` with an empty string value:
 
-        fs.gs.system.bucket=
+    ```
+    fs.gs.system.bucket=
+    ```
 
 1.  Set default value for `fs.gs.working.dir` property to `/`.
 
@@ -101,14 +276,18 @@
 1.  Add an option for running flat and regular glob search algorithms in
     parallel:
 
-        fs.gs.glob.concurrent.enable (default: true)
+    ```
+    fs.gs.glob.concurrent.enable (default: true)
+    ```
 
     Returns a result of an algorithm that finishes first and cancels the other
     algorithm.
 
 1.  Add an option to provide path for configuration override file:
 
-        fs.gs.config.override.file (default: null)
+    ```
+    fs.gs.config.override.file (default: null)
+    ```
 
     Connector overrides its configuration with values provided in this file.
     This file should be in XML format that follows the same schema as Hadoop
@@ -118,7 +297,9 @@
 
 1.  Expose `FileChecksum` in `GoogleHadoopFileSystem` via property:
 
-        fs.gs.checksum.type (default: NONE)
+    ```
+    fs.gs.checksum.type (default: NONE)
+    ```
 
     Valid property values: `NONE`, `CRC32C`, `MD5`.
 
@@ -130,8 +311,10 @@
 
     Proxy authentication is configurable with properties:
 
-        fs.gs.proxy.username (default: null)
-        fs.gs.proxy.password (default: null)
+    ```
+    fs.gs.proxy.username (default: null)
+    fs.gs.proxy.password (default: null)
+    ```
 
 1.  Update Apache HttpClient to the latest version.
 
@@ -141,13 +324,17 @@
     without having to place a file on every node, or associating service
     accounts with GCE VMs:
 
-        fs.gs.auth.service.account.private.key.id
-        fs.gs.auth.service.account.private.key
+    ```
+    fs.gs.auth.service.account.private.key.id
+    fs.gs.auth.service.account.private.key
+    ```
 
 1.  Add an option to specify max bytes rewritten per rewrite request when
     `fs.gs.copy.with.rewrite.enable` is set to `true`:
 
-        fs.gs.rewrite.max.bytes.per.call (default: 536870912)
+    ```
+    fs.gs.rewrite.max.bytes.per.call (default: 536870912)
+    ```
 
     Even though GCS does not require this parameter for rewrite requests,
     rewrite requests are flaky without it.
@@ -157,10 +344,12 @@
 1.  Change default values for GCS batch/directory operations properties to
     improve performance:
 
-        fs.gs.copy.max.requests.per.batch (default: 1 -> 15)
-        fs.gs.copy.batch.threads (default: 50 -> 15)
-        fs.gs.max.requests.per.batch (default: 25 -> 15)
-        fs.gs.batch.threads (default: 25 -> 15)
+    ```
+    fs.gs.copy.max.requests.per.batch (default: 1 -> 15)
+    fs.gs.copy.batch.threads (default: 50 -> 15)
+    fs.gs.max.requests.per.batch (default: 25 -> 15)
+    fs.gs.batch.threads (default: 25 -> 15)
+    ```
 
 1.  Migrate logging to Google Flogger.
 
@@ -172,31 +361,43 @@
 
     For example:
 
-        java -Dflogger.backend_factory=com.google.common.flogger.backend.log4j.Log4jBackendFactory#getInstance ...
+    ```
+    java -Dflogger.backend_factory=com.google.common.flogger.backend.log4j.Log4jBackendFactory#getInstance ...
+    ```
 
 1.  Delete read buffer in `GoogleHadoopFSInputStream` class and remove property
     that enables it:
 
-        fs.gs.inputstream.internalbuffer.enable (default: false)
+    ```
+    fs.gs.inputstream.internalbuffer.enable (default: false)
+    ```
 
 1.  Disable read buffer in `GoogleCloudStorageReadChannel` by default because it
     does not provide significant performance benefits:
 
-        fs.gs.io.buffersize (default: 8388608 -> 0)
+    ```
+    fs.gs.io.buffersize (default: 8388608 -> 0)
+    ```
 
 1.  Add configuration properties for buffers in `GoogleHadoopOutputStream`:
 
-        fs.gs.outputstream.buffer.size (default: 8388608)
-        fs.gs.outputstream.pipe.buffer.size (default: 1048576)
+    ```
+    fs.gs.outputstream.buffer.size (default: 8388608)
+    fs.gs.outputstream.pipe.buffer.size (default: 1048576)
+    ```
 
 1.  Deprecate and replace properties with new one:
 
-        fs.gs.io.buffersize -> fs.gs.inputstream.buffer.size (default: 0)
-        fs.gs.io.buffersize.write -> fs.gs.outputstream.upload.chunk.size (default: 67108864)
+    ```
+    fs.gs.io.buffersize -> fs.gs.inputstream.buffer.size (default: 0)
+    fs.gs.io.buffersize.write -> fs.gs.outputstream.upload.chunk.size (default: 67108864)
+    ```
 
 1.  Enable fadvise `AUTO` mode by default:
 
-        fs.gs.inputstream.fadvise (default: SEQUENTIAL -> AUTO)
+    ```
+    fs.gs.inputstream.fadvise (default: SEQUENTIAL -> AUTO)
+    ```
 
 1.  Update all dependencies to latest versions.
 
@@ -212,7 +413,7 @@
 1.  Do not send batch request when performing operations (rename, delete, copy)
     on 1 object.
 
-1.  Add `fs.gs.performance.cache.dir.metadata.prefetch.limit` (default=`1000`)
+1.  Add `fs.gs.performance.cache.dir.metadata.prefetch.limit` (default: `1000`)
     configuration property to control number of prefetched metadata objects in
     the same directory by `PerformanceCachingGoogleCloudStorage`.
 
@@ -223,23 +424,27 @@
 1.  Add configuration properties to control batching of copy operations
     separately from other operations:
 
-        fs.gs.copy.max.requests.per.batch (default: 30)
-        fs.gs.copy.batch.threads (default: 0)
+    ```
+    fs.gs.copy.max.requests.per.batch (default: 30)
+    fs.gs.copy.batch.threads (default: 0)
+    ```
 
 1.  Fix `RejectedExecutionException` during parallel execution of GCS batch
     requests.
 
 1.  Change default values for GCS batch/directory operations properties:
 
-        fs.gs.copy.with.rewrite.enable (default: false -> true)
-        fs.gs.copy.max.requests.per.batch (default: 30 -> 1)
-        fs.gs.copy.batch.threads (default: 0 -> 50)
-        fs.gs.max.requests.per.batch (default: 30 -> 25)
-        fs.gs.batch.threads (default: 0 -> 25)
+    ```
+    fs.gs.copy.with.rewrite.enable (default: false -> true)
+    fs.gs.copy.max.requests.per.batch (default: 30 -> 1)
+    fs.gs.copy.batch.threads (default: 0 -> 50)
+    fs.gs.max.requests.per.batch (default: 30 -> 25)
+    fs.gs.batch.threads (default: 0 -> 25)
+    ```
 
 ### 1.9.4 - 2018-08-07
 
-1.  Add `fs.gs.generation.read.consistency (default : LATEST)` property to
+1.  Add `fs.gs.generation.read.consistency (default: LATEST)` property to
     determine read consistency across different generations of a GCS object.
 
     Three modes are supported:
@@ -269,7 +474,9 @@
 
     Number of threads to execute batch requests configurable via property:
 
-        fs.gs.batch.threads (default: 0)
+    ```
+    fs.gs.batch.threads (default: 0)
+    ```
 
     If `fs.gs.batch.threads` value is set to 0 then batch requests will be
     executed sequentially by caller thread.
@@ -281,7 +488,9 @@
     `GoogleCloudStorageImpl#open` method (costs additional GCS metadata
     request):
 
-        fs.gs.inputstream.fast.fail.on.not.found.enable (default: true)
+    ```
+    fs.gs.inputstream.fast.fail.on.not.found.enable (default: true)
+    ```
 
 1.  Lazily initialize `GoogleCloudStorageReadChannel` metadata after first read
     operation.
@@ -329,13 +538,17 @@
 
     To activate this behavior set the property:
 
-        fs.gs.inputstream.fadvise=AUTO (default: SEQUENTIAL)
+    ```
+    fs.gs.inputstream.fadvise=AUTO (default: SEQUENTIAL)
+    ```
 
 1.  Add an option to prefetch footer when creating
     `GoogleCloudStorageReadChannel` in `AUTO` and `RANDOM` fadvise mode.
     Prefetch size is configured via property:
 
-        fs.gs.inputstream.footer.prefetch.size (default: 0)
+    ```
+    fs.gs.inputstream.footer.prefetch.size (default: 0)
+    ```
 
     This optimization is helpful when reading objects in format that stores
     metadata at the end of the file in footer, like Parquet and ORC.
@@ -350,9 +563,11 @@
 
 1.  Change default values of properties:
 
-        fs.gs.inputstream.min.range.request.size (default: 1048576 -> 524288)
-        fs.gs.performance.cache.max.entry.age.ms (default: 3000 -> 5000)
-        fs.gs.performance.cache.list.caching.enable (default: true -> false)
+    ```
+    fs.gs.inputstream.min.range.request.size (default: 1048576 -> 524288)
+    fs.gs.performance.cache.max.entry.age.ms (default: 3000 -> 5000)
+    fs.gs.performance.cache.list.caching.enable (default: true -> false)
+    ```
 
 1.  Change default OAuth 2.0 token server URL to
     `https://oauth2.googleapis.com/token`.
@@ -360,7 +575,9 @@
     Default OAuth 2.0 token server URL could be changed via environment
     variable:
 
-        GOOGLE_OAUTH_TOKEN_SERVER_URL
+    ```
+    GOOGLE_OAUTH_TOKEN_SERVER_URL
+    ```
 
 ### 1.9.1 - 2018-07-11
 
@@ -372,7 +589,9 @@
 1.  Always fail-fast when creating `GoogleCloudStorageReadChannel` instance for
     non-existing GCS object. Remove property that disables this:
 
-        fs.gs.inputstream.fast.fail.on.not.found.enable
+    ```
+    fs.gs.inputstream.fast.fail.on.not.found.enable
+    ```
 
 1.  For gzip-encoded objects always return `Long.MAX_VALUE` size in
     `GoogleCloudStorageReadChannel.size()` method, until object will be fully
@@ -394,11 +613,15 @@
     range request size is limited to 1 MiB by default. To override this limit
     and set minimum range request size to different value, use property:
 
-        fs.gs.inputstream.min.range.request.size (default: 1048576)
+    ```
+    fs.gs.inputstream.min.range.request.size (default: 1048576)
+    ```
 
     To enable fadvise random mode set property:
 
-        fs.gs.inputstream.fadvise=RANDOM (default: SEQUENTIAL)
+    ```
+    fs.gs.inputstream.fadvise=RANDOM (default: SEQUENTIAL)
+    ```
 
 1.  Do not close GCS read channel when calling
     `GoogleCloudStorageReadChannel.position(long)` method.
@@ -406,7 +629,9 @@
 1.  Remove property that disables use of `includeTrailingDelimiter` GCS
     parameter after it was verified in production for a while:
 
-        fs.gs.list.directory.objects.enable
+    ```
+    fs.gs.list.directory.objects.enable
+    ```
 
 ### 1.9.0 - 2018-06-15
 
@@ -415,17 +640,21 @@
 1.  Delete metadata cache functionality because Cloud Storage has strong native
     list operation consistency already. Deleted properties:
 
-        fs.gs.metadata.cache.enable
-        fs.gs.metadata.cache.type
-        fs.gs.metadata.cache.directory
-        fs.gs.metadata.cache.max.age.info.ms
-        fs.gs.metadata.cache.max.age.entry.ms
+    ```
+    fs.gs.metadata.cache.enable
+    fs.gs.metadata.cache.type
+    fs.gs.metadata.cache.directory
+    fs.gs.metadata.cache.max.age.info.ms
+    fs.gs.metadata.cache.max.age.entry.ms
+    ```
 
 1.  Decrease default value for max requests per batch from 1,000 to 30.
 
 1.  Make max requests per batch value configurable with property:
 
-        fs.gs.max.requests.per.batch (default: 30)
+    ```
+    fs.gs.max.requests.per.batch (default: 30)
+    ```
 
 1.  Support Hadoop 3.
 
@@ -457,7 +686,9 @@
 
 1.  Add support for using Cloud Storage Rewrite requests for copy operation:
 
-        fs.gs.copy.with.rewrite.enable (default: false)
+    ```
+    fs.gs.copy.with.rewrite.enable (default: false)
+    ```
 
     This allows to copy files between different locations and storage classes.
 
@@ -466,16 +697,20 @@
 1.  Support GCS Requester Pays feature that could be configured with new
     properties:
 
-        fs.gs.requester.pays.mode (default=DISABLED)
-        fs.gs.requester.pays.project.id (no default value)
-        fs.gs.requester.pays.buckets (no default value)
+    ```
+    fs.gs.requester.pays.mode (default: DISABLED)
+    fs.gs.requester.pays.project.id (not set by default)
+    fs.gs.requester.pays.buckets (not set by default)
+    ```
 
 1.  Change relocation package in shaded jar to be connector-specific.
 
 1.  Add support for specifying marker files pattern that should be copied last
     during folder rename operation. Pattern is configured with property:
 
-        fs.gs.marker.file.pattern
+    ```
+    fs.gs.marker.file.pattern
+    ```
 
 1.  Min required Java version now is Java 8.
 
@@ -518,7 +753,9 @@
     occurs or when a 500-level error occurs. The maximum can be configured by
     the following setting:
 
-        fs.gs.max.wait.for.empty.object.creation.ms
+    ```
+    fs.gs.max.wait.for.empty.object.creation.ms
+    ```
 
     Any positive value for this setting will be interpreted to mean "poll for up
     to this many milliseconds before making a final determination". The default
@@ -534,14 +771,18 @@
     in-memory cache to enhance performance of some workloads. By default this
     feature is disabled, and can be controlled with the config settings:
 
-        fs.gs.performance.cache.enable=true (default=false)
-        fs.gs.performance.cache.list.caching.enable=true (default=false)
+    ```
+    fs.gs.performance.cache.enable=true (default: false)
+    fs.gs.performance.cache.list.caching.enable=true (default: false)
+    ```
 
     The first option enables the cache to serve `getFileStatus` requests, while
     the second option additionally enables serving `listStatus`. The duration of
     cache entries can be controlled with:
 
-        fs.gs.performance.cache.max.entry.age.ms (default=3000)
+    ```
+    fs.gs.performance.cache.max.entry.age.ms (default: 3000)
+    ```
 
     It is not recommended to always run with this feature enabled; it should be
     used specifically to address cases where frameworks perform redundant
@@ -624,7 +865,9 @@
 
 1.  Added a new output stream type which can be used by setting:
 
-        fs.gs.outputstream.type=SYNCABLE_COMPOSITE
+    ```
+    fs.gs.outputstream.type=SYNCABLE_COMPOSITE
+    ```
 
     With the `SYNCABLE_COMPOSITE` have (limited) support for Hadoop's Syncable
     interface, where calling `hsync()` will commit the data written so far into
@@ -646,20 +889,26 @@
         reads without noticeable impact on large reads. Old behavior can be
         specified by setting:
 
-            fs.gs.inputstream.internalbuffer.enable=true (default=false)
+        ```
+        fs.gs.inputstream.internalbuffer.enable=true (default: false)
+        ```
 
     *   Added option to save an extra metadata GET on first read of a channel if
         objects are known not to use the 'Content-Encoding' header. To use this
         optimization set:
 
-            fs.gs.inputstream.support.content.encoding.enable=false (default=true)
+        ```
+        fs.gs.inputstream.support.content.encoding.enable=false (default: true)
+        ```
 
     *   Added option to save an extra metadata `GET` on `FileSystem.open(Path)`
         if objects are known to exist already, or the caller is resilient to
         delayed errors for nonexistent objects which occur at read time, rather
         than immediately on open(). To use this optimization set:
 
-            fs.gs.inputstream.fast.fail.on.not.found.enable=false (default=true)
+        ```
+        fs.gs.inputstream.fast.fail.on.not.found.enable=false (default: true)
+        ```
 
     *   Added support for "in-place" small seeks by defining a byte limit where
         forward seeks smaller than the limit will be done by reading/discarding
@@ -669,7 +918,9 @@
         in-place. Disable by setting the value to 0, or adjust to other
         thresholds:
 
-            fs.gs.inputstream.inplace.seek.limit=0 (default=8388608)
+        ```
+        fs.gs.inputstream.inplace.seek.limit=0 (default: 8388608)
+        ```
 
 ### 1.4.5 - 2016-03-24
 
@@ -689,7 +940,9 @@
 
 1.  Add support for JSON keyfiles via a new configuration key:
 
-        google.cloud.auth.service.account.json.keyfile
+    ```
+    google.cloud.auth.service.account.json.keyfile
+    ```
 
     This key should point to a file that is available locally to jobs to
     clusters.
@@ -704,7 +957,7 @@
     `rateLimitExceeded (429)` errors by fetching the fresh underlying info and
     ignoring the error if the object already exists with the intended metadata
     and size. This fixes an
-    [issue](https://github.com/GoogleCloudPlatform/bigdata-interop/issues/10)
+    [issue](https://github.com/GoogleCloudDataproc/hadoop-connectors/issues/10)
     which mostly affects Spark.
 
 1.  Added logging in `GoogleCloudStorageReadChannel` for high-level retries.
@@ -713,7 +966,9 @@
     `FileSystem` layer; the permissions are still fixed per `FileSystem`
     instance and aren't actually enforced, but can now be set with:
 
-        fs.gs.reported.permissions [default = "700"]
+    ```
+    fs.gs.reported.permissions [default = "700"]
+    ```
 
     This allows working around some clients like Hive-related daemons and tools
     which pre-emptively check for certain assumptions about permissions.
@@ -745,7 +1000,7 @@
     with different locations and storage classes.
 
 1.  Fixed
-    [issue](https://github.com/GoogleCloudPlatform/bigdata-interop/issues/5)
+    [issue](https://github.com/GoogleCloudDataproc/hadoop-connectors/issues/5)
     where stale cache entries caused stuck phantom directories if the
     directories were deleted using non-Hadoop-based GCS clients.
 
@@ -797,8 +1052,10 @@
 1.  Increased default `DirectoryListCache` TTL to 4 hours, wired out TTL
     settings as top-level config params:
 
-        fs.gs.metadata.cache.max.age.entry.ms
-        fs.gs.metadata.cache.max.age.info.ms
+    ```
+    fs.gs.metadata.cache.max.age.entry.ms
+    fs.gs.metadata.cache.max.age.info.ms
+    ```
 
 ### 1.3.3 - 2015-02-26
 
@@ -871,9 +1128,11 @@
     strongly recommended to configure clusters with an NFS directory for
     cluster-wide strong consistency. Relevant configuration settings:
 
-        fs.gs.metadata.cache.enable [default: true]
-        fs.gs.metadata.cache.type [IN_MEMORY (default) | FILESYSTEM_BACKED]
-        fs.gs.metadata.cache.directory [default: /tmp/gcs_connector_metadata_cache]
+    ```
+    fs.gs.metadata.cache.enable [default: true]
+    fs.gs.metadata.cache.type [IN_MEMORY (default) | FILESYSTEM_BACKED]
+    fs.gs.metadata.cache.directory [default: /tmp/gcs_connector_metadata_cache]
+    ```
 
 1.  Optimized seeks in GoogleHadoopFSDataInputStream which fit within the
     pre-fetched memory buffer by simply repositioning the buffer in-place

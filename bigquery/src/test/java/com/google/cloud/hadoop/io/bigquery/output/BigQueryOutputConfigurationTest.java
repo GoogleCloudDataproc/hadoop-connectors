@@ -20,6 +20,7 @@ import com.google.api.services.bigquery.model.TableReference;
 import com.google.cloud.hadoop.fs.gcs.InMemoryGoogleHadoopFileSystem;
 import com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration;
 import com.google.cloud.hadoop.io.bigquery.BigQueryFileFormat;
+import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.Optional;
@@ -42,6 +43,9 @@ public class BigQueryOutputConfigurationTest {
 
   /** Sample projectId for the configuration. */
   private static final String TEST_PROJECT_ID = "domain:project";
+
+  /** Sample projectId for configuration that is dedicated to the load job. */
+  private static final String TEST_LOAD_PROJECT_ID = "domain:load-project";
 
   /** Sample datasetId for the configuration. */
   private static final String TEST_DATASET_ID = "dataset";
@@ -119,14 +123,16 @@ public class BigQueryOutputConfigurationTest {
         TEST_FILE_FORMAT,
         TEST_OUTPUT_CLASS);
 
-    assertThat(conf.get(BigQueryConfiguration.OUTPUT_PROJECT_ID_KEY)).isEqualTo(TEST_PROJECT_ID);
-    assertThat(conf.get(BigQueryConfiguration.OUTPUT_DATASET_ID_KEY)).isEqualTo(TEST_DATASET_ID);
-    assertThat(conf.get(BigQueryConfiguration.OUTPUT_TABLE_ID_KEY)).isEqualTo(TEST_TABLE_ID);
-    assertThat(conf.get(BigQueryConfiguration.OUTPUT_FILE_FORMAT_KEY))
+    assertThat(BigQueryConfiguration.OUTPUT_PROJECT_ID.get(conf, conf::get))
+        .isEqualTo(TEST_PROJECT_ID);
+    assertThat(BigQueryConfiguration.OUTPUT_DATASET_ID.get(conf, conf::get))
+        .isEqualTo(TEST_DATASET_ID);
+    assertThat(BigQueryConfiguration.OUTPUT_TABLE_ID.get(conf, conf::get)).isEqualTo(TEST_TABLE_ID);
+    assertThat(BigQueryConfiguration.OUTPUT_FILE_FORMAT.get(conf, conf::get))
         .isEqualTo(TEST_FILE_FORMAT.name());
-    assertThat(conf.get(BigQueryConfiguration.OUTPUT_FORMAT_CLASS_KEY))
-        .isEqualTo(TEST_OUTPUT_CLASS.getName());
-    assertThat(conf.get(BigQueryConfiguration.OUTPUT_TABLE_SCHEMA_KEY))
+    assertThat(BigQueryConfiguration.OUTPUT_FORMAT_CLASS.get(conf, conf::getClass))
+        .isEqualTo(TEST_OUTPUT_CLASS);
+    assertThat(BigQueryConfiguration.OUTPUT_TABLE_SCHEMA.get(conf, conf::get))
         .isEqualTo(TEST_TABLE_SCHEMA_STRING);
     assertThat(BigQueryOutputConfiguration.getGcsOutputPath(conf).toString())
         .isEqualTo(TEST_OUTPUT_PATH_STRING);
@@ -135,7 +141,7 @@ public class BigQueryOutputConfigurationTest {
   /** Test the configure function correctly sets the configuration keys. */
   @Test
   public void testConfigureWithDefaultProject() throws IOException {
-    conf.set(BigQueryConfiguration.PROJECT_ID_KEY, DEFAULT_PROJECT_ID);
+    conf.set(BigQueryConfiguration.PROJECT_ID.getKey(), DEFAULT_PROJECT_ID);
     BigQueryOutputConfiguration.configure(
         conf,
         QUALIFIED_TABLE_ID_WITHOUT_PROJECT,
@@ -144,14 +150,16 @@ public class BigQueryOutputConfigurationTest {
         TEST_FILE_FORMAT,
         TEST_OUTPUT_CLASS);
 
-    assertThat(conf.get(BigQueryConfiguration.OUTPUT_PROJECT_ID_KEY)).isEqualTo(DEFAULT_PROJECT_ID);
-    assertThat(conf.get(BigQueryConfiguration.OUTPUT_DATASET_ID_KEY)).isEqualTo(TEST_DATASET_ID);
-    assertThat(conf.get(BigQueryConfiguration.OUTPUT_TABLE_ID_KEY)).isEqualTo(TEST_TABLE_ID);
-    assertThat(conf.get(BigQueryConfiguration.OUTPUT_FILE_FORMAT_KEY))
+    assertThat(BigQueryConfiguration.OUTPUT_PROJECT_ID.get(conf, conf::get))
+        .isEqualTo(DEFAULT_PROJECT_ID);
+    assertThat(BigQueryConfiguration.OUTPUT_DATASET_ID.get(conf, conf::get))
+        .isEqualTo(TEST_DATASET_ID);
+    assertThat(BigQueryConfiguration.OUTPUT_TABLE_ID.get(conf, conf::get)).isEqualTo(TEST_TABLE_ID);
+    assertThat(BigQueryConfiguration.OUTPUT_FILE_FORMAT.get(conf, conf::get))
         .isEqualTo(TEST_FILE_FORMAT.name());
-    assertThat(conf.get(BigQueryConfiguration.OUTPUT_FORMAT_CLASS_KEY))
-        .isEqualTo(TEST_OUTPUT_CLASS.getName());
-    assertThat(conf.get(BigQueryConfiguration.OUTPUT_TABLE_SCHEMA_KEY))
+    assertThat(BigQueryConfiguration.OUTPUT_FORMAT_CLASS.get(conf, conf::getClass))
+        .isEqualTo(TEST_OUTPUT_CLASS);
+    assertThat(BigQueryConfiguration.OUTPUT_TABLE_SCHEMA.get(conf, conf::get))
         .isEqualTo(TEST_TABLE_SCHEMA_STRING);
     assertThat(BigQueryOutputConfiguration.getGcsOutputPath(conf).toString())
         .isEqualTo(TEST_OUTPUT_PATH_STRING);
@@ -163,14 +171,16 @@ public class BigQueryOutputConfigurationTest {
     BigQueryOutputConfiguration.configureWithAutoSchema(
         conf, QUALIFIED_TABLE_ID, TEST_OUTPUT_PATH_STRING, TEST_FILE_FORMAT, TEST_OUTPUT_CLASS);
 
-    assertThat(conf.get(BigQueryConfiguration.OUTPUT_PROJECT_ID_KEY)).isEqualTo(TEST_PROJECT_ID);
-    assertThat(conf.get(BigQueryConfiguration.OUTPUT_DATASET_ID_KEY)).isEqualTo(TEST_DATASET_ID);
-    assertThat(conf.get(BigQueryConfiguration.OUTPUT_TABLE_ID_KEY)).isEqualTo(TEST_TABLE_ID);
-    assertThat(conf.get(BigQueryConfiguration.OUTPUT_FILE_FORMAT_KEY))
+    assertThat(BigQueryConfiguration.OUTPUT_PROJECT_ID.get(conf, conf::get))
+        .isEqualTo(TEST_PROJECT_ID);
+    assertThat(BigQueryConfiguration.OUTPUT_DATASET_ID.get(conf, conf::get))
+        .isEqualTo(TEST_DATASET_ID);
+    assertThat(BigQueryConfiguration.OUTPUT_TABLE_ID.get(conf, conf::get)).isEqualTo(TEST_TABLE_ID);
+    assertThat(BigQueryConfiguration.OUTPUT_FILE_FORMAT.get(conf, conf::get))
         .isEqualTo(TEST_FILE_FORMAT.name());
-    assertThat(conf.get(BigQueryConfiguration.OUTPUT_FORMAT_CLASS_KEY))
-        .isEqualTo(TEST_OUTPUT_CLASS.getName());
-    assertThat(conf.get(BigQueryConfiguration.OUTPUT_TABLE_SCHEMA_KEY)).isNull();
+    assertThat(BigQueryConfiguration.OUTPUT_FORMAT_CLASS.get(conf, conf::getClass))
+        .isEqualTo(TEST_OUTPUT_CLASS);
+    assertThat(BigQueryConfiguration.OUTPUT_TABLE_SCHEMA.get(conf, conf::get)).isNull();
     assertThat(BigQueryOutputConfiguration.getGcsOutputPath(conf).toString())
         .isEqualTo(TEST_OUTPUT_PATH_STRING);
   }
@@ -215,7 +225,7 @@ public class BigQueryOutputConfigurationTest {
         TEST_OUTPUT_PATH_STRING,
         TEST_FILE_FORMAT,
         TEST_OUTPUT_CLASS);
-    conf.unset(BigQueryConfiguration.OUTPUT_PROJECT_ID_KEY);
+    conf.unset(BigQueryConfiguration.OUTPUT_PROJECT_ID.getKey());
 
     assertThrows(IOException.class, () -> BigQueryOutputConfiguration.validateConfiguration(conf));
   }
@@ -230,7 +240,7 @@ public class BigQueryOutputConfigurationTest {
         TEST_OUTPUT_PATH_STRING,
         TEST_FILE_FORMAT,
         TEST_OUTPUT_CLASS);
-    conf.set(BigQueryConfiguration.OUTPUT_TABLE_SCHEMA_KEY, TEST_BAD_TABLE_SCHEMA_STRING);
+    conf.set(BigQueryConfiguration.OUTPUT_TABLE_SCHEMA.getKey(), TEST_BAD_TABLE_SCHEMA_STRING);
 
     assertThrows(IOException.class, () -> BigQueryOutputConfiguration.validateConfiguration(conf));
   }
@@ -245,7 +255,7 @@ public class BigQueryOutputConfigurationTest {
         TEST_OUTPUT_PATH_STRING,
         TEST_FILE_FORMAT,
         TEST_OUTPUT_CLASS);
-    conf.unset(BigQueryConfiguration.OUTPUT_FILE_FORMAT_KEY);
+    conf.unset(BigQueryConfiguration.OUTPUT_FILE_FORMAT.getKey());
 
     assertThrows(IOException.class, () -> BigQueryOutputConfiguration.validateConfiguration(conf));
   }
@@ -260,7 +270,7 @@ public class BigQueryOutputConfigurationTest {
         TEST_OUTPUT_PATH_STRING,
         TEST_FILE_FORMAT,
         TEST_OUTPUT_CLASS);
-    conf.unset(BigQueryConfiguration.OUTPUT_FORMAT_CLASS_KEY);
+    conf.unset(BigQueryConfiguration.OUTPUT_FORMAT_CLASS.getKey());
 
     assertThrows(IOException.class, () -> BigQueryOutputConfiguration.validateConfiguration(conf));
   }
@@ -268,7 +278,7 @@ public class BigQueryOutputConfigurationTest {
   /** Test the getProjectId returns the correct data. */
   @Test
   public void testGetProjectId() throws IOException {
-    conf.set(BigQueryConfiguration.OUTPUT_PROJECT_ID_KEY, TEST_PROJECT_ID);
+    conf.set(BigQueryConfiguration.OUTPUT_PROJECT_ID.getKey(), TEST_PROJECT_ID);
 
     String result = BigQueryOutputConfiguration.getProjectId(conf);
 
@@ -278,7 +288,18 @@ public class BigQueryOutputConfigurationTest {
   /** Test the getProjectId returns the correct data. */
   @Test
   public void testGetProjectIdBackup() throws IOException {
-    conf.set(BigQueryConfiguration.PROJECT_ID_KEY, TEST_PROJECT_ID);
+    conf.set(BigQueryConfiguration.PROJECT_ID.getKey(), TEST_PROJECT_ID);
+
+    String result = BigQueryOutputConfiguration.getProjectId(conf);
+
+    assertThat(result).isEqualTo(TEST_PROJECT_ID);
+  }
+
+  /** Test the getProjectId returns the correct data. */
+  @Test
+  public void testGetProjectIdPrecedence() throws IOException {
+    conf.set(BigQueryConfiguration.OUTPUT_PROJECT_ID.getKey(), TEST_PROJECT_ID);
+    conf.set(BigQueryConfiguration.PROJECT_ID.getKey(), TEST_LOAD_PROJECT_ID);
 
     String result = BigQueryOutputConfiguration.getProjectId(conf);
 
@@ -291,12 +312,49 @@ public class BigQueryOutputConfigurationTest {
     assertThrows(IOException.class, () -> BigQueryOutputConfiguration.getProjectId(conf));
   }
 
+  /** Test the getJobProjectId returns the correct data. */
+  @Test
+  public void testGetJobProjectId() throws IOException {
+    conf.set(BigQueryConfiguration.PROJECT_ID.getKey(), TEST_PROJECT_ID);
+
+    String result = BigQueryOutputConfiguration.getJobProjectId(conf);
+
+    assertThat(result).isEqualTo(TEST_PROJECT_ID);
+  }
+
+  /** Test the getJobProjectId returns the correct data. */
+  @Test
+  public void testGetJobProjectIdBackup() throws IOException {
+    conf.set(BigQueryConfiguration.OUTPUT_PROJECT_ID.getKey(), TEST_PROJECT_ID);
+
+    String result = BigQueryOutputConfiguration.getJobProjectId(conf);
+
+    assertThat(result).isEqualTo(TEST_PROJECT_ID);
+  }
+
+  /** Test the getJobProjectId returns the correct data. */
+  @Test
+  public void testGetJobProjectIdPrecedence() throws IOException {
+    conf.set(BigQueryConfiguration.OUTPUT_PROJECT_ID.getKey(), TEST_PROJECT_ID);
+    conf.set(BigQueryConfiguration.PROJECT_ID.getKey(), TEST_LOAD_PROJECT_ID);
+
+    String result = BigQueryOutputConfiguration.getJobProjectId(conf);
+
+    assertThat(result).isEqualTo(TEST_LOAD_PROJECT_ID);
+  }
+
+  /** Test the getJobProjectId errors on missing data. */
+  @Test
+  public void testGetJobProjectIdMissing() throws IOException {
+    assertThrows(IOException.class, () -> BigQueryOutputConfiguration.getJobProjectId(conf));
+  }
+
   /** Test the getTable returns the correct data. */
   @Test
   public void testGetTableReference() throws IOException {
-    conf.set(BigQueryConfiguration.OUTPUT_PROJECT_ID_KEY, TEST_PROJECT_ID);
-    conf.set(BigQueryConfiguration.OUTPUT_DATASET_ID_KEY, TEST_DATASET_ID);
-    conf.set(BigQueryConfiguration.OUTPUT_TABLE_ID_KEY, TEST_TABLE_ID);
+    conf.set(BigQueryConfiguration.OUTPUT_PROJECT_ID.getKey(), TEST_PROJECT_ID);
+    conf.set(BigQueryConfiguration.OUTPUT_DATASET_ID.getKey(), TEST_DATASET_ID);
+    conf.set(BigQueryConfiguration.OUTPUT_TABLE_ID.getKey(), TEST_TABLE_ID);
 
     TableReference result = BigQueryOutputConfiguration.getTableReference(conf);
 
@@ -306,8 +364,8 @@ public class BigQueryOutputConfigurationTest {
   /** Test the getTable throws an exception when a key is missing. */
   @Test
   public void testGetTableReferenceMissingKey() throws IOException {
-    conf.set(BigQueryConfiguration.OUTPUT_PROJECT_ID_KEY, TEST_PROJECT_ID);
-    conf.set(BigQueryConfiguration.OUTPUT_DATASET_ID_KEY, TEST_DATASET_ID);
+    conf.set(BigQueryConfiguration.OUTPUT_PROJECT_ID.getKey(), TEST_PROJECT_ID);
+    conf.set(BigQueryConfiguration.OUTPUT_DATASET_ID.getKey(), TEST_DATASET_ID);
     // Missing TABLE_ID
 
     assertThrows(IOException.class, () -> BigQueryOutputConfiguration.getTableReference(conf));
@@ -316,9 +374,9 @@ public class BigQueryOutputConfigurationTest {
   /** Test the getTable does not throw an exception when a backup project id is found. */
   @Test
   public void testGetTableReferenceBackupProjectId() throws IOException {
-    conf.set(BigQueryConfiguration.PROJECT_ID_KEY, TEST_PROJECT_ID);
-    conf.set(BigQueryConfiguration.OUTPUT_DATASET_ID_KEY, TEST_DATASET_ID);
-    conf.set(BigQueryConfiguration.OUTPUT_TABLE_ID_KEY, TEST_PROJECT_ID);
+    conf.set(BigQueryConfiguration.PROJECT_ID.getKey(), TEST_PROJECT_ID);
+    conf.set(BigQueryConfiguration.OUTPUT_DATASET_ID.getKey(), TEST_DATASET_ID);
+    conf.set(BigQueryConfiguration.OUTPUT_TABLE_ID.getKey(), TEST_PROJECT_ID);
 
     BigQueryOutputConfiguration.getTableReference(conf);
   }
@@ -326,7 +384,7 @@ public class BigQueryOutputConfigurationTest {
   /** Test the getTableSchema returns the correct data. */
   @Test
   public void testGetTableReferenceSchema() throws IOException {
-    conf.set(BigQueryConfiguration.OUTPUT_TABLE_SCHEMA_KEY, TEST_TABLE_SCHEMA_STRING);
+    conf.set(BigQueryConfiguration.OUTPUT_TABLE_SCHEMA.getKey(), TEST_TABLE_SCHEMA_STRING);
 
     Optional<BigQueryTableSchema> result = BigQueryOutputConfiguration.getTableSchema(conf);
 
@@ -336,7 +394,7 @@ public class BigQueryOutputConfigurationTest {
   /** Test the getTableSchema throws an exception when the schema is malformed. */
   @Test
   public void testGetTableReferenceSchemaBadSchema() throws IOException {
-    conf.set(BigQueryConfiguration.OUTPUT_TABLE_SCHEMA_KEY, TEST_BAD_TABLE_SCHEMA_STRING);
+    conf.set(BigQueryConfiguration.OUTPUT_TABLE_SCHEMA.getKey(), TEST_BAD_TABLE_SCHEMA_STRING);
 
     assertThrows(IOException.class, () -> BigQueryOutputConfiguration.getTableSchema(conf));
   }
@@ -344,7 +402,7 @@ public class BigQueryOutputConfigurationTest {
   /** Test the getFileFormat returns the correct data. */
   @Test
   public void testGetFileFormat() throws IOException {
-    conf.set(BigQueryConfiguration.OUTPUT_FILE_FORMAT_KEY, TEST_FILE_FORMAT.name());
+    conf.set(BigQueryConfiguration.OUTPUT_FILE_FORMAT.getKey(), TEST_FILE_FORMAT.name());
 
     BigQueryFileFormat result = BigQueryOutputConfiguration.getFileFormat(conf);
 
@@ -360,7 +418,9 @@ public class BigQueryOutputConfigurationTest {
   /** Test the getFileFormat errors when it's malformed. */
   @Test
   public void testGetFileFormatMalformed() throws IOException {
-    conf.set(BigQueryConfiguration.OUTPUT_FILE_FORMAT_KEY, TEST_FILE_FORMAT.name().toLowerCase());
+    conf.set(
+        BigQueryConfiguration.OUTPUT_FILE_FORMAT.getKey(),
+        Ascii.toLowerCase(TEST_FILE_FORMAT.name()));
 
     assertThrows(
         IllegalArgumentException.class, () -> BigQueryOutputConfiguration.getFileFormat(conf));

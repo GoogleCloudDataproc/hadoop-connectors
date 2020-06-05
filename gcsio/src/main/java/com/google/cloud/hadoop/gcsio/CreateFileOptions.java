@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
@@ -26,7 +27,11 @@ import java.util.Map;
 public class CreateFileOptions {
   public static final ImmutableMap<String, byte[]> EMPTY_ATTRIBUTES = ImmutableMap.of();
   public static final String DEFAULT_CONTENT_TYPE = "application/octet-stream";
-  public static final CreateFileOptions DEFAULT =
+
+  public static final CreateFileOptions DEFAULT_OVERWRITE =
+      new CreateFileOptions(/* overwriteExisting= */ true, DEFAULT_CONTENT_TYPE, EMPTY_ATTRIBUTES);
+
+  public static final CreateFileOptions DEFAULT_NO_OVERWRITE =
       new CreateFileOptions(/* overwriteExisting= */ true, DEFAULT_CONTENT_TYPE, EMPTY_ATTRIBUTES);
 
   private final boolean overwriteExisting;
@@ -167,5 +172,17 @@ public class CreateFileOptions {
    */
   public long getExistingGenerationId() {
     return existingGenerationId;
+  }
+
+  @Override
+  public String toString() {
+    return MoreObjects.toStringHelper(this)
+        .add("overwriteExisting", overwriteExisting)
+        .add("contentType", contentType)
+        .add("attributes", attributes)
+        .add("checkNoDirectoryConflict", checkNoDirectoryConflict)
+        .add("ensureParentDirectoriesExist", ensureParentDirectoriesExist)
+        .add("resources", existingGenerationId)
+        .toString();
   }
 }

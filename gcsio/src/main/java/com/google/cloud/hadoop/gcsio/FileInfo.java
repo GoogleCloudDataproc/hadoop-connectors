@@ -16,11 +16,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import com.google.api.client.util.Clock;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
-import com.google.common.flogger.GoogleLogger;
-import com.google.common.primitives.Longs;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Date;
@@ -37,15 +33,9 @@ import java.util.Map;
  */
 public class FileInfo {
 
-  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-
   // Info about the root path.
-  public static final FileInfo ROOT_INFO = new FileInfo(
-      GoogleCloudStorageFileSystem.GCS_ROOT, GoogleCloudStorageItemInfo.ROOT_INFO);
-
-  // The metadata key used for storing a custom modification time.
-  // The name and value of this attribute count towards storage pricing.
-  public static final String FILE_MODIFICATION_TIMESTAMP_KEY = "system.gcsfs_mts";
+  public static final FileInfo ROOT_INFO =
+      new FileInfo(GoogleCloudStorageFileSystem.GCS_ROOT, GoogleCloudStorageItemInfo.ROOT_INFO);
 
   // Path of this file or directory.
   private final URI path;
@@ -82,17 +72,7 @@ public class FileInfo {
    * Indicates whether this item is a directory.
    */
   public boolean isDirectory() {
-    return isDirectory(itemInfo);
-  }
-
-  /**
-   * Indicates whether {@code itemInfo} is a directory; static version of {@link #isDirectory()}
-   * to avoid having to create a FileInfo object just to use this logic.
-   */
-  static boolean isDirectory(GoogleCloudStorageItemInfo itemInfo) {
-    return isGlobalRoot(itemInfo)
-        || itemInfo.isBucket()
-        || objectHasDirectoryPath(itemInfo.getObjectName());
+    return itemInfo.isDirectory();
   }
 
   /**
@@ -100,16 +80,7 @@ public class FileInfo {
    * underlying storage system.
    */
   public boolean isGlobalRoot() {
-    return isGlobalRoot(itemInfo);
-  }
-
-  /**
-   * Static version of {@link #isGlobalRoot()} to allow sharing this logic without creating
-   * unnecessary FileInfo instances.
-   */
-  static boolean isGlobalRoot(GoogleCloudStorageItemInfo itemInfo) {
-    return itemInfo.isRoot()
-        && itemInfo.exists();
+    return itemInfo.isGlobalRoot();
   }
 
   /**
@@ -139,17 +110,7 @@ public class FileInfo {
    * Time is expressed as milliseconds since January 1, 1970 UTC.
    */
   public long getModificationTime() {
-    if (attributes.containsKey(FILE_MODIFICATION_TIMESTAMP_KEY)
-        && attributes.get(FILE_MODIFICATION_TIMESTAMP_KEY) != null) {
-      try {
-        return Longs.fromByteArray(attributes.get(FILE_MODIFICATION_TIMESTAMP_KEY));
-      } catch (IllegalArgumentException iae) {
-        logger.atFine().log(
-            "Failed to parse modification time '%s' millis for object %s",
-            attributes.get(FILE_MODIFICATION_TIMESTAMP_KEY), itemInfo.getObjectName());
-      }
-    }
-    return getCreationTime();
+    return itemInfo.getModificationTime();
   }
 
   /**
@@ -171,10 +132,7 @@ public class FileInfo {
    * Gets string representation of this instance.
    */
   public String toString() {
-    if (exists()) {
-      return getPath() + ": created on: " + new Date(getCreationTime());
-    }
-    return getPath() + ": exists: no";
+    return getPath() + (exists() ? ": created on: " + new Date(getCreationTime()) : ": exists: no");
   }
 
   /**
@@ -182,29 +140,6 @@ public class FileInfo {
    */
   public GoogleCloudStorageItemInfo getItemInfo() {
     return itemInfo;
-  }
-
-  /**
-   * Indicates whether the given object name looks like a directory path.
-   *
-   * @param objectName Name of the object to inspect.
-   * @return Whether the given object name looks like a directory path.
-   */
-  static boolean objectHasDirectoryPath(String objectName) {
-    return StorageResourceId.objectHasDirectoryPath(objectName);
-  }
-
-  /**
-   * Converts the given object name to look like a directory path. If the object name already looks
-   * like a directory path then this call is a no-op.
-   *
-   * <p>If the object name is null or empty, it is returned as-is.
-   *
-   * @param objectName Name of the object to inspect.
-   * @return Directory path for the given path.
-   */
-  static String convertToDirectoryPath(String objectName) {
-    return StorageResourceId.convertToDirectoryPath(objectName);
   }
 
   /**
@@ -216,10 +151,11 @@ public class FileInfo {
    */
   public static StorageResourceId convertToDirectoryPath(StorageResourceId resourceId) {
     if (resourceId.isStorageObject()) {
-      if (!objectHasDirectoryPath(resourceId.getObjectName())) {
+      if (!StringPaths.isDirectoryPath(resourceId.getObjectName())) {
         resourceId =
             new StorageResourceId(
-                resourceId.getBucketName(), convertToDirectoryPath(resourceId.getObjectName()));
+                resourceId.getBucketName(),
+                StringPaths.toDirectoryPath(resourceId.getObjectName()));
       }
     }
     return resourceId;
@@ -232,61 +168,28 @@ public class FileInfo {
    * @param path Path to convert.
    * @return Directory path for the given path.
    */
-  public static URI convertToDirectoryPath(PathCodec pathCodec, URI path) {
-    StorageResourceId resourceId = pathCodec.validatePathAndGetId(path, true);
+  public static URI convertToDirectoryPath(URI path) {
+    StorageResourceId resourceId =
+        StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true);
 
     if (resourceId.isStorageObject()) {
-      if (!objectHasDirectoryPath(resourceId.getObjectName())) {
+      if (!StringPaths.isDirectoryPath(resourceId.getObjectName())) {
         resourceId = convertToDirectoryPath(resourceId);
-        path =
-            pathCodec.getPath(
-                resourceId.getBucketName(),
-                resourceId.getObjectName(),
-                false /* allow empty name */);
+        path = UriPaths.fromResourceId(resourceId, /* allowEmptyObjectName= */ false);
       }
     }
     return path;
   }
 
   /**
-   * Add a key and value representing the current time, as determined by the passed clock, to the
-   * passed attributes dictionary.
-   *
-   * @param attributes The file attributes map to update
-   * @param clock The clock to retrieve the current time from
-   */
-  public static void addModificationTimeToAttributes(Map<String, byte[]> attributes, Clock clock) {
-    attributes.put(FILE_MODIFICATION_TIMESTAMP_KEY, Longs.toByteArray(clock.currentTimeMillis()));
-  }
-
-  /**
-   * Converts the given object name to look like a file path.
-   * If the object name already looks like a file path then
-   * this call is a no-op.
-   *
-   * If the object name is null or empty, it is returned as-is.
-   *
-   * @param objectName Name of the object to inspect.
-   * @return File path for the given path.
-   */
-  public static String convertToFilePath(String objectName) {
-    if (!Strings.isNullOrEmpty(objectName)) {
-      if (objectHasDirectoryPath(objectName)) {
-        objectName = objectName.substring(0, objectName.length() - 1);
-      }
-    }
-    return objectName;
-  }
-
-  /**
    * Handy factory method for constructing a FileInfo from a GoogleCloudStorageItemInfo while
    * potentially returning a singleton instead of really constructing an object for cases like ROOT.
    */
-  public static FileInfo fromItemInfo(PathCodec pathCodec, GoogleCloudStorageItemInfo itemInfo) {
+  public static FileInfo fromItemInfo(GoogleCloudStorageItemInfo itemInfo) {
     if (itemInfo.isRoot()) {
       return ROOT_INFO;
     }
-    URI path = pathCodec.getPath(itemInfo.getBucketName(), itemInfo.getObjectName(), true);
+    URI path = UriPaths.fromResourceId(itemInfo.getResourceId(), /* allowEmptyObjectName= */ true);
     return new FileInfo(path, itemInfo);
   }
 
@@ -294,11 +197,10 @@ public class FileInfo {
    * Handy factory method for constructing a list of FileInfo from a list of
    * GoogleCloudStorageItemInfo.
    */
-  public static List<FileInfo> fromItemInfos(
-      PathCodec pathCodec, List<GoogleCloudStorageItemInfo> itemInfos) {
+  public static List<FileInfo> fromItemInfos(List<GoogleCloudStorageItemInfo> itemInfos) {
     List<FileInfo> fileInfos = new ArrayList<>(itemInfos.size());
     for (GoogleCloudStorageItemInfo itemInfo : itemInfos) {
-      fileInfos.add(fromItemInfo(pathCodec, itemInfo));
+      fileInfos.add(fromItemInfo(itemInfo));
     }
     return fileInfos;
   }

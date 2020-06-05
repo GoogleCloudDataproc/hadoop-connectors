@@ -22,7 +22,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.cloud.hadoop.fs.gcs.InMemoryGoogleHadoopFileSystem;
 import com.google.cloud.hadoop.io.bigquery.BigQueryFileFormat;
-import com.google.cloud.hadoop.testing.CredentialConfigurationUtil;
+import com.google.cloud.hadoop.util.testing.CredentialConfigurationUtil;
 import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -98,7 +98,7 @@ public class ForwardingBigQueryFileOutputFormatTest {
   /** Verify exceptions are being thrown. */
   /** Sets up common objects for testing before each test. */
   @Before
-  public void setUp() throws IOException, InterruptedException {
+  public void setUp() throws Exception {
     // Generate Mocks.
     MockitoAnnotations.initMocks(this);
 
@@ -186,7 +186,7 @@ public class ForwardingBigQueryFileOutputFormatTest {
 
   /** Test getRecordWriter is returning the mock RecordWriter. */
   @Test
-  public void testGetRecordWriter() throws IOException, InterruptedException {
+  public void testGetRecordWriter() throws Exception {
     RecordWriter<Text, Text> recordWriter = outputFormat.getRecordWriter(mockTaskAttemptContext);
 
     // Verify the delegate is being called and the mock RecordWriter is returned.

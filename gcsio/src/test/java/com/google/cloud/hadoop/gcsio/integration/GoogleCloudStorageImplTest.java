@@ -30,10 +30,13 @@ import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import org.junit.AfterClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -61,7 +64,7 @@ public class GoogleCloudStorageImplTest {
     GoogleCloudStorageOptions.Builder builder =
         GoogleCloudStorageTestHelper.getStandardOptionBuilder()
             .setWriteChannelOptions(
-                AsyncWriteChannelOptions.newBuilder().setUploadChunkSize(bufferSize).build());
+                AsyncWriteChannelOptions.builder().setUploadChunkSize(bufferSize).build());
 
     return makeStorage(builder.build());
   }
@@ -189,7 +192,7 @@ public class GoogleCloudStorageImplTest {
     String dstBucketName = BUCKET_HELPER.getUniqueBucketName("copy-with-rewrite-dst");
     // Create destination bucket with different location and storage class,
     // because this is supported by rewrite but not copy requests
-    gcs.create(dstBucketName, new CreateBucketOptions(null, "coldline"));
+    gcs.create(dstBucketName, CreateBucketOptions.builder().setStorageClass("coldline").build());
 
     StorageResourceId resourceId =
         new StorageResourceId(srcBucketName, "testCopySingleItemWithRewrite_SourceObject");
@@ -204,5 +207,33 @@ public class GoogleCloudStorageImplTest {
         dstBucketName, ImmutableList.of(copiedResourceId.getObjectName()));
 
     assertObjectContent(gcs, copiedResourceId, partition, partitionsCount);
+  }
+
+  @Test
+  public void googleCloudStorageItemInfo_metadataEquals() throws IOException {
+    GoogleCloudStorageImpl gcs =
+        makeStorage(GoogleCloudStorageTestHelper.getStandardOptionBuilder().build());
+
+    String bucketName = BUCKET_HELPER.getUniqueBucketName("metadata-equals");
+    gcs.create(bucketName);
+
+    StorageResourceId object = new StorageResourceId(bucketName, "testMetadataEquals_Object");
+
+    Map<String, byte[]> metadata1 =
+        ImmutableMap.of(
+            "key1", "value1".getBytes(StandardCharsets.UTF_8),
+            "key2", "value2".getBytes(StandardCharsets.UTF_8));
+    Map<String, byte[]> metadata2 =
+        ImmutableMap.of(
+            "key3", "value3".getBytes(StandardCharsets.UTF_8),
+            "key4", "value4".getBytes(StandardCharsets.UTF_8));
+
+    gcs.createEmptyObject(object, new CreateObjectOptions(true, "text/plain", metadata1));
+
+    GoogleCloudStorageItemInfo itemInfo1 = gcs.getItemInfo(object);
+
+    assertThat(itemInfo1.metadataEquals(metadata1)).isTrue();
+    assertThat(itemInfo1.metadataEquals(itemInfo1.getMetadata())).isTrue();
+    assertThat(itemInfo1.metadataEquals(metadata2)).isFalse();
   }
 }

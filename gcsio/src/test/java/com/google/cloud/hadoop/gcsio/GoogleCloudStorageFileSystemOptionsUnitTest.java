@@ -21,7 +21,6 @@ import com.google.api.client.util.Clock;
 import com.google.cloud.hadoop.gcsio.LaggedGoogleCloudStorage.ListVisibilityCalculator;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.MoreExecutors;
 import java.io.IOException;
 import java.util.Collection;
 import org.junit.BeforeClass;
@@ -89,78 +88,22 @@ public class GoogleCloudStorageFileSystemOptionsUnitTest
     // in order to ensure we have the right value for
     // isInferImplicitDirectoriesEnabled in gcsfs.
     GoogleCloudStorageFileSystemOptions.Builder fsOptionsBuilder =
-        GoogleCloudStorageFileSystemOptions.newBuilder();
-            //.setShouldIncludeInTimestampUpdatesPredicate(
-                //INCLUDE_SUBSTRINGS_PREDICATE)
-    GoogleCloudStorageOptions.Builder gcsOptionsBuilder =
-        fsOptionsBuilder.getCloudStorageOptionsBuilder();
-    GoogleCloudStorageOptions gcsOptions = gcsOptionsBuilder
-        .setInferImplicitDirectoriesEnabled(inferDirectories)
-        .build();
+        GoogleCloudStorageFileSystemOptions.builder();
+    GoogleCloudStorageOptions gcsOptions =
+        GoogleCloudStorageOptions.builder()
+            .setInferImplicitDirectoriesEnabled(inferDirectories)
+            .build();
     GoogleCloudStorage gcs = this.gcsCreator.createGcs(gcsOptions);
-    GoogleCloudStorageFileSystem gcsfs =
-        new GoogleCloudStorageFileSystem(gcs, fsOptionsBuilder.build());
-    gcsfs.setUpdateTimestampsExecutor(MoreExecutors.newDirectExecutorService());
-    return gcsfs;
-  }
-
-  @Test
-  public void testLazyEvaluationOfGoogleCloudStorageOptionsBuilder() {
-    GoogleCloudStorageOptions.Builder innerBuilder = GoogleCloudStorageOptions.newBuilder()
-        .setProjectId("foo-project");
-    GoogleCloudStorageFileSystemOptions.Builder builder =
-        GoogleCloudStorageFileSystemOptions.newBuilder()
-            .setCloudStorageOptionsBuilder(innerBuilder);
-    innerBuilder.setProjectId("bar-project");
-    assertThat(builder.build().getCloudStorageOptions().getProjectId()).isEqualTo("bar-project");
-  }
-
-  @Test
-  public void testOverrideInnerBuilderWithImmutableOptions() {
-    GoogleCloudStorageOptions.Builder innerBuilder = GoogleCloudStorageOptions.newBuilder()
-        .setProjectId("foo-project");
-    GoogleCloudStorageFileSystemOptions.Builder builder =
-        GoogleCloudStorageFileSystemOptions.newBuilder()
-            .setCloudStorageOptionsBuilder(innerBuilder)
-            .setImmutableCloudStorageOptions(GoogleCloudStorageOptions.newBuilder()
-                .setProjectId("bar-project")
-                .build());
-    assertThat(builder.build().getCloudStorageOptions().getProjectId()).isEqualTo("bar-project");
-  }
-
-  @Test
-  public void testOverrideImmutableOptionsWithInnerBuilder() {
-    GoogleCloudStorageOptions.Builder innerBuilder = GoogleCloudStorageOptions.newBuilder()
-        .setProjectId("foo-project");
-    GoogleCloudStorageFileSystemOptions.Builder builder =
-        GoogleCloudStorageFileSystemOptions.newBuilder()
-            .setImmutableCloudStorageOptions(GoogleCloudStorageOptions.newBuilder()
-                .setProjectId("bar-project")
-                .build())
-            .setCloudStorageOptionsBuilder(innerBuilder);
-    assertThat(builder.build().getCloudStorageOptions().getProjectId()).isEqualTo("foo-project");
-  }
-
-  @Test
-  public void testUnsetImmutableOptionsBuilderRevertsToDefaults() {
-    GoogleCloudStorageOptions.Builder innerBuilder = GoogleCloudStorageOptions.newBuilder()
-        .setProjectId("foo-project");
-    GoogleCloudStorageFileSystemOptions.Builder builder =
-        GoogleCloudStorageFileSystemOptions.newBuilder()
-            .setImmutableCloudStorageOptions(GoogleCloudStorageOptions.newBuilder()
-                .setProjectId("bar-project")
-                .build())
-            .setCloudStorageOptionsBuilder(innerBuilder)
-            .setImmutableCloudStorageOptions(null);
-    assertThat(builder.build().getCloudStorageOptions().getProjectId()).isNull();
+    return new GoogleCloudStorageFileSystem(gcs, fsOptionsBuilder.build());
   }
 
   @Test
   public void testGcsFsInheritsGcsOptions() throws IOException {
-    GoogleCloudStorageOptions gcsOptions = GoogleCloudStorageOptions.newBuilder()
-        .setProjectId("foo-project")
-        .setAppName("foo-app")
-        .build();
+    GoogleCloudStorageOptions gcsOptions =
+        GoogleCloudStorageOptions.builder()
+            .setProjectId("foo-project")
+            .setAppName("foo-app")
+            .build();
     GoogleCloudStorage gcs = this.gcsCreator.createGcs(gcsOptions);
     GoogleCloudStorageFileSystem gcsfs = new GoogleCloudStorageFileSystem(gcs);
     assertThat(gcsfs.getOptions().getCloudStorageOptions().getProjectId()).isEqualTo("foo-project");

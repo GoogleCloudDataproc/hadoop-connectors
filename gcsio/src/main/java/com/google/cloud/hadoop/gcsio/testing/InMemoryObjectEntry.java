@@ -32,8 +32,8 @@ import java.nio.channels.Channels;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.time.Duration;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 
 /**
@@ -107,7 +107,9 @@ public class InMemoryObjectEntry {
       String bucketName,
       String objectName,
       long createTimeMillis,
+      long modificationTimeMillis,
       String contentType,
+      String contentEncoding,
       Map<String, byte[]> metadata) {
     // Override close() to commit its completed byte array into completedContents to reflect
     // the behavior that any readable contents are only well-defined if the writeStream is closed.
@@ -125,6 +127,7 @@ public class InMemoryObjectEntry {
                   new GoogleCloudStorageItemInfo(
                       info.getResourceId(),
                       info.getCreationTime(),
+                      info.getModificationTime(),
                       /* size= */ completedContents.length,
                       /* location= */ null,
                       /* storageClass= */ null,
@@ -151,11 +154,12 @@ public class InMemoryObjectEntry {
         new GoogleCloudStorageItemInfo(
             new StorageResourceId(bucketName, objectName),
             createTimeMillis,
+            modificationTimeMillis,
             /* size= */ 0,
             /* location= */ null,
             /* storageClass= */ null,
             contentType,
-            /* contentEncoding= */ null,
+            contentEncoding,
             ImmutableMap.copyOf(metadata),
             /* contentGeneration= */ 0,
             /* metaGeneration= */ 0);
@@ -205,11 +209,12 @@ public class InMemoryObjectEntry {
 
     // because currentTimeMillis() is not very precise
     // we need to sleep to allow it to change between calls
-    sleepUninterruptibly(10, TimeUnit.MILLISECONDS);
+    sleepUninterruptibly(Duration.ofMillis(10));
 
     copy.info =
         new GoogleCloudStorageItemInfo(
             new StorageResourceId(bucketName, objectName),
+            System.currentTimeMillis(),
             System.currentTimeMillis(),
             info.getSize(),
             /* location= */ null,
@@ -239,8 +244,9 @@ public class InMemoryObjectEntry {
    * writer must have already closed the associated WritableByteChannel to commit the byte contents
    * and make them available for reading.
    */
-  public synchronized SeekableByteChannel getReadChannel() throws IOException {
-    return getReadChannel(GoogleCloudStorageReadOptions.DEFAULT);
+  public synchronized SeekableByteChannel getReadChannel(String bucketName, String objectName)
+      throws IOException {
+    return getReadChannel(bucketName, objectName, GoogleCloudStorageReadOptions.DEFAULT);
   }
 
   /**
@@ -248,7 +254,8 @@ public class InMemoryObjectEntry {
    * writer must have already closed the associated WritableByteChannel to commit the byte contents
    * and make them available for reading.
    */
-  public synchronized SeekableByteChannel getReadChannel(GoogleCloudStorageReadOptions readOptions)
+  public synchronized SeekableByteChannel getReadChannel(
+      String bucketName, String objectName, GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     if (!isCompleted()) {
       throw new IOException(
@@ -256,7 +263,7 @@ public class InMemoryObjectEntry {
               "Cannot getReadChannel() before writes have been committed! Object = %s",
               this.getObjectName()));
     }
-    return new InMemoryObjectReadChannel(completedContents, readOptions) {
+    return new InMemoryObjectReadChannel(bucketName, objectName, completedContents, readOptions) {
       @Nullable
       @Override
       protected GoogleCloudStorageItemInfo getInitialMetadata() throws IOException {
@@ -302,6 +309,7 @@ public class InMemoryObjectEntry {
         new GoogleCloudStorageItemInfo(
             info.getResourceId(),
             info.getCreationTime(),
+            info.getModificationTime(),
             /* size= */ completedContents.length,
             /* location= */ null,
             /* storageClass= */ null,

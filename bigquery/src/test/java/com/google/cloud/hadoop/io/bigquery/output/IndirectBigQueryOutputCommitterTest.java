@@ -31,7 +31,7 @@ import com.google.cloud.hadoop.fs.gcs.InMemoryGoogleHadoopFileSystem;
 import com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration;
 import com.google.cloud.hadoop.io.bigquery.BigQueryFileFormat;
 import com.google.cloud.hadoop.io.bigquery.BigQueryHelper;
-import com.google.cloud.hadoop.testing.CredentialConfigurationUtil;
+import com.google.cloud.hadoop.util.testing.CredentialConfigurationUtil;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.List;
@@ -80,7 +80,11 @@ public class IndirectBigQueryOutputCommitterTest {
 
   /** Sample write disposition. */
   private static final String TEST_WRITE_DISPOSITION =
-      BigQueryConfiguration.OUTPUT_TABLE_WRITE_DISPOSITION_DEFAULT;
+      BigQueryConfiguration.OUTPUT_TABLE_WRITE_DISPOSITION.getDefault();
+
+  /** Sample create disposition. */
+  private static final String TEST_CREATE_DISPOSITION =
+      BigQueryConfiguration.OUTPUT_TABLE_CREATE_DISPOSITION.getDefault();
 
   /** Sample output format class for the configuration. */
   @SuppressWarnings("rawtypes")
@@ -157,7 +161,8 @@ public class IndirectBigQueryOutputCommitterTest {
         TEST_OUTPUT_CLASS);
     BigQueryOutputConfiguration.setKmsKeyName(conf, TEST_KMS_KEY_NAME);
     conf.set(
-        BigQueryConfiguration.OUTPUT_TABLE_PARTITIONING_KEY, TEST_TIME_PARTITIONING.getAsJson());
+        BigQueryConfiguration.OUTPUT_TABLE_PARTITIONING.getKey(),
+        TEST_TIME_PARTITIONING.getAsJson());
 
     // Setup sample data.
     outputTableRef = BigQueryOutputConfiguration.getTableReference(conf);
@@ -193,7 +198,7 @@ public class IndirectBigQueryOutputCommitterTest {
    * Test that a BigQuery import request is made with the correct files under normal circumstances.
    */
   @Test
-  public void testCommitJob() throws IOException, InterruptedException {
+  public void testCommitJob() throws Exception {
     // Setup the sample directory.
     generateSampleFiles();
 
@@ -214,6 +219,7 @@ public class IndirectBigQueryOutputCommitterTest {
             eq(TEST_TIME_PARTITIONING.get()),
             eq(TEST_KMS_KEY_NAME),
             eq(TEST_FILE_FORMAT),
+            eq(TEST_CREATE_DISPOSITION),
             eq(TEST_WRITE_DISPOSITION),
             gcsOutputFileCaptor.capture(),
             eq(true));
@@ -228,7 +234,7 @@ public class IndirectBigQueryOutputCommitterTest {
   /** Test to make sure an IOException is thrown on interrupt of the BigQuery import call. */
   @SuppressWarnings("unchecked")
   @Test
-  public void testCommitJobInterrupt() throws IOException, InterruptedException {
+  public void testCommitJobInterrupt() throws Exception {
     // Setup the sample directory.
     generateSampleFiles();
 
@@ -246,6 +252,7 @@ public class IndirectBigQueryOutputCommitterTest {
             anyString(),
             any(BigQueryFileFormat.class),
             any(String.class),
+            any(String.class),
             any(List.class),
             eq(true));
 
@@ -261,6 +268,7 @@ public class IndirectBigQueryOutputCommitterTest {
             eq(TEST_TIME_PARTITIONING.get()),
             eq(TEST_KMS_KEY_NAME),
             eq(TEST_FILE_FORMAT),
+            eq(TEST_CREATE_DISPOSITION),
             eq(TEST_WRITE_DISPOSITION),
             any(List.class), // Tested, no need to capture
             eq(true));

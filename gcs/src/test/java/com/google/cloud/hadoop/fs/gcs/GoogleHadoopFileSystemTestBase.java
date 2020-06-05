@@ -14,6 +14,13 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCE_BUCKET_DELETE_ENABLE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_INFER_IMPLICIT_DIRECTORIES_ENABLE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_KEYFILE_SUFFIX;
 import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
@@ -23,12 +30,10 @@ import static org.junit.Assume.assumeTrue;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.TimestampUpdatePredicate;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
-import com.google.cloud.hadoop.testing.TestingAccessTokenProvider;
-import com.google.common.base.Joiner;
+import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
@@ -51,20 +56,14 @@ import org.junit.Test;
  */
 public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTestBase {
 
-  private static final Joiner COMMA_JOINER = Joiner.on(',');
-
   /**
    * Helper to load all the GHFS-specific config values from environment variables, such as those
    * needed for setting up the credentials of a real GoogleCloudStorage.
    */
   protected static Configuration loadConfig() {
-    TestConfiguration testConfiguration = TestConfiguration.getInstance();
-
-    String projectId = testConfiguration.getProjectId();
-    String privateKeyFile = testConfiguration.getPrivateKeyFile();
-    String serviceAccount = testConfiguration.getServiceAccount();
-
-    return loadConfig(projectId, serviceAccount, privateKeyFile);
+    TestConfiguration testConf = TestConfiguration.getInstance();
+    return loadConfig(
+        testConf.getProjectId(), testConf.getServiceAccount(), testConf.getPrivateKeyFile());
   }
 
   /**
@@ -76,24 +75,16 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     assertWithMessage("Expected value for env var %s", TestConfiguration.GCS_TEST_PROJECT_ID)
         .that(projectId)
         .isNotNull();
-    assertWithMessage("Expected value for env var %s", TestConfiguration.GCS_TEST_SERVICE_ACCOUNT)
-        .that(serviceAccount)
-        .isNotNull();
-    assertWithMessage("Expected value for env var %s", TestConfiguration.GCS_TEST_PRIVATE_KEYFILE)
-        .that(privateKeyFile)
-        .isNotNull();
     Configuration config = new Configuration();
-    config.set(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(), projectId);
-    config.set(
-        GoogleHadoopFileSystemConfiguration.AUTH_SERVICE_ACCOUNT_EMAIL.getKey(), serviceAccount);
-    config.set(
-        GoogleHadoopFileSystemConfiguration.AUTH_SERVICE_ACCOUNT_KEY_FILE.getKey(), privateKeyFile);
-    config.setBoolean(
-        GoogleHadoopFileSystemConfiguration.GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.getKey(), true);
-    config.setBoolean(
-        GoogleHadoopFileSystemConfiguration.GCS_INFER_IMPLICIT_DIRECTORIES_ENABLE.getKey(), false);
+    config.set(GCS_PROJECT_ID.getKey(), projectId);
+    if (serviceAccount != null && privateKeyFile != null) {
+      config.set(GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_EMAIL_SUFFIX.getKey(), serviceAccount);
+      config.set(GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_KEYFILE_SUFFIX.getKey(), privateKeyFile);
+    }
+    config.setBoolean(GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.getKey(), true);
+    config.setBoolean(GCS_INFER_IMPLICIT_DIRECTORIES_ENABLE.getKey(), false);
     // Allow buckets to be deleted in test cleanup:
-    config.setBoolean(GoogleHadoopFileSystemConfiguration.GCE_BUCKET_DELETE_ENABLE.getKey(), true);
+    config.setBoolean(GCE_BUCKET_DELETE_ENABLE.getKey(), true);
     return config;
   }
 
@@ -128,8 +119,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
       throws IOException, URISyntaxException;
 
   @Test
-  public abstract void testInitializeWithWorkingDirectory()
-      throws IOException, URISyntaxException;
+  public abstract void testInitializeWithWorkingDirectory() throws Exception;
 
   @Test
   public abstract void testConfigureBucketsSuccess()
@@ -145,11 +135,6 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
   // -----------------------------------------------------------------------------------------
   // Tests that aren't supported by all configurations of GHFS.
   // -----------------------------------------------------------------------------------------
-
-  @Test @Override
-  public void testHsync() throws Exception {
-    // hsync() is not supported in the default setup.
-  }
 
   /** Tests getGcsPath(). */
   @Test
@@ -228,7 +213,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     // neither the subdir nor gs://<bucket>/<generated-tempdir> exist yet.
     Path emptyObject = new Path(dirPath, "empty-object");
     URI objUri = myghfs.getGcsPath(emptyObject);
-    StorageResourceId resource = gcsfs.getPathCodec().validatePathAndGetId(objUri, false);
+    StorageResourceId resource = StorageResourceId.fromUriPath(objUri, false);
     gcs.createEmptyObject(resource);
 
     boolean inferImplicitDirectories =
@@ -266,7 +251,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     // neither the subdir nor gs://<bucket>/<generated-tempdir> exist yet.
     Path emptyObject = new Path(subDir, "empty-object");
     URI objUri = myghfs.getGcsPath(emptyObject);
-    StorageResourceId resource = gcsfs.getPathCodec().validatePathAndGetId(objUri, false);
+    StorageResourceId resource = StorageResourceId.fromUriPath(objUri, false);
     gcs.createEmptyObject(resource);
 
     boolean autoRepairImplicitDirectories =
@@ -297,7 +282,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     // neither the subdir nor gs://<bucket>/<generated-tempdir> exist yet.
     Path emptyObject = new Path(dirPath, "empty-object");
     URI objUri = myghfs.getGcsPath(emptyObject);
-    StorageResourceId resource = gcsfs.getPathCodec().validatePathAndGetId(objUri, false);
+    StorageResourceId resource = StorageResourceId.fromUriPath(objUri, false);
     gcs.createEmptyObject(resource);
 
     boolean inferImplicitDirectories =
@@ -336,7 +321,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     // neither the subdir nor gs://<bucket>/<generated-tempdir> exist yet.
     Path emptyObject = new Path(subDir, "empty-object");
     URI objUri = myghfs.getGcsPath(emptyObject);
-    StorageResourceId resource = gcsfs.getPathCodec().validatePathAndGetId(objUri, false);
+    StorageResourceId resource = StorageResourceId.fromUriPath(objUri, false);
     gcs.createEmptyObject(resource);
 
     boolean autoRepairImplicitDirectories =
@@ -400,7 +385,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     qualifiedPaths.put(fsRoot + "..foo/bar", fsRoot + "..foo/bar");
     qualifiedPaths.put("..foo/bar", workingDir + "/..foo/bar");
 
-    // GHFS specific behavior where root is it's own parent.
+    // GHFS specific behavior where root is its own parent.
     qualifiedPaths.put("/..", fsRoot);
     qualifiedPaths.put("/../../..", fsRoot);
     qualifiedPaths.put("/../foo/", fsRoot + "foo");
@@ -457,7 +442,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     qualifiedPaths.put(fsRoot + "..foo/bar", fsRoot + "..foo/bar");
     qualifiedPaths.put("..foo/bar", fsRoot + "..foo/bar");
 
-    // GHFS specific behavior where root is it's own parent.
+    // GHFS specific behavior where root is its own parent.
     qualifiedPaths.put("/..", fsRoot);
     qualifiedPaths.put("/../../..", fsRoot);
     qualifiedPaths.put("/../foo/", fsRoot + "foo");
@@ -560,151 +545,6 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
         localTempFile.delete();
       }
     }
-  }
-
-  @Test
-  public void testIncludedParentPathPredicates() throws URISyntaxException {
-    Configuration configuration = new Configuration();
-    // 1 Disable all updates and then try to include all paths
-    configuration.setBoolean(
-        GoogleHadoopFileSystemConfiguration.GCS_PARENT_TIMESTAMP_UPDATE_ENABLE.getKey(), false);
-    configuration.set(
-        GoogleHadoopFileSystemConfiguration.GCS_PARENT_TIMESTAMP_UPDATE_INCLUDES.getKey(), "/");
-    configuration.set(
-        GoogleHadoopFileSystemConfiguration.GCS_PARENT_TIMESTAMP_UPDATE_EXCLUDES.getKey(), "");
-
-    TimestampUpdatePredicate predicate =
-        GoogleHadoopFileSystemBase.ParentTimestampUpdateIncludePredicate.create(configuration);
-
-    assertWithMessage("Should be ignored")
-        .that(predicate.shouldUpdateTimestamp(new URI("/foobar")))
-        .isFalse();
-    assertWithMessage("Should be ignored")
-        .that(predicate.shouldUpdateTimestamp(new URI("")))
-        .isFalse();
-
-    // 2 Enable updates, set include to everything and exclude to everything
-    configuration.setBoolean(
-        GoogleHadoopFileSystemConfiguration.GCS_PARENT_TIMESTAMP_UPDATE_ENABLE.getKey(), true);
-    configuration.set(
-        GoogleHadoopFileSystemConfiguration.GCS_PARENT_TIMESTAMP_UPDATE_INCLUDES.getKey(), "/");
-    configuration.set(
-        GoogleHadoopFileSystemConfiguration.GCS_PARENT_TIMESTAMP_UPDATE_EXCLUDES.getKey(), "/");
-
-    predicate = GoogleHadoopFileSystemBase.ParentTimestampUpdateIncludePredicate
-        .create(configuration);
-
-    assertWithMessage("Should be included")
-        .that(predicate.shouldUpdateTimestamp(new URI("/foobar")))
-        .isTrue();
-    assertWithMessage("Should be included")
-        .that(predicate.shouldUpdateTimestamp(new URI("")))
-        .isTrue();
-
-    // 3 Enable specific paths, exclude everything:
-    configuration.set(
-        GoogleHadoopFileSystemConfiguration.GCS_PARENT_TIMESTAMP_UPDATE_INCLUDES.getKey(),
-        "/foobar,/baz");
-    configuration.set(
-        GoogleHadoopFileSystemConfiguration.GCS_PARENT_TIMESTAMP_UPDATE_EXCLUDES.getKey(), "/");
-
-    predicate = GoogleHadoopFileSystemBase.ParentTimestampUpdateIncludePredicate
-        .create(configuration);
-
-    assertWithMessage("Should be included")
-        .that(predicate.shouldUpdateTimestamp(new URI("asdf/foobar")))
-        .isTrue();
-    assertWithMessage("Should be included")
-        .that(predicate.shouldUpdateTimestamp(new URI("asdf/baz")))
-        .isTrue();
-    assertWithMessage("Should be ignored")
-        .that(predicate.shouldUpdateTimestamp(new URI("/anythingElse")))
-        .isFalse();
-    assertWithMessage("Should be ignored")
-        .that(predicate.shouldUpdateTimestamp(new URI("/")))
-        .isFalse();
-
-    // 4 set to defaults, set job history paths
-    configuration.set(
-        GoogleHadoopFileSystemConfiguration.GCS_PARENT_TIMESTAMP_UPDATE_INCLUDES.getKey(),
-        COMMA_JOINER.join(
-            GoogleHadoopFileSystemConfiguration.GCS_PARENT_TIMESTAMP_UPDATE_INCLUDES.getDefault()));
-    configuration.set(
-        GoogleHadoopFileSystemConfiguration.GCS_PARENT_TIMESTAMP_UPDATE_EXCLUDES.getKey(),
-        COMMA_JOINER.join(
-            GoogleHadoopFileSystemConfiguration.GCS_PARENT_TIMESTAMP_UPDATE_EXCLUDES.getDefault()));
-    configuration.set(
-        GoogleHadoopFileSystemConfiguration.MR_JOB_HISTORY_DONE_DIR_KEY, "/tmp/hadoop-yarn/done");
-    configuration.set(
-        GoogleHadoopFileSystemConfiguration.MR_JOB_HISTORY_INTERMEDIATE_DONE_DIR_KEY,
-        "/tmp/hadoop-yarn/staging/done");
-
-    predicate =
-        GoogleHadoopFileSystemBase.ParentTimestampUpdateIncludePredicate.create(configuration);
-
-    assertThat(
-            configuration.get(
-                GoogleHadoopFileSystemConfiguration.GCS_PARENT_TIMESTAMP_UPDATE_INCLUDES.getKey()))
-        .isEqualTo("/tmp/hadoop-yarn/staging/done,/tmp/hadoop-yarn/done");
-
-    assertWithMessage("Should be included")
-        .that(predicate.shouldUpdateTimestamp(new URI("gs://bucket/tmp/hadoop-yarn/staging/done/")))
-        .isTrue();
-    assertWithMessage("Should be included")
-        .that(predicate.shouldUpdateTimestamp(new URI("gs://bucket/tmp/hadoop-yarn/done/")))
-        .isTrue();
-    assertWithMessage("Should be ignored")
-        .that(predicate.shouldUpdateTimestamp(new URI("asdf/baz")))
-        .isFalse();
-    assertWithMessage("Should be ignored")
-        .that(predicate.shouldUpdateTimestamp(new URI("/anythingElse")))
-        .isFalse();
-    assertWithMessage("Should be ignored")
-        .that(predicate.shouldUpdateTimestamp(new URI("/")))
-        .isFalse();
-
-    // 5 set to defaults, set job history paths with gs:// scheme
-    configuration.set(
-        GoogleHadoopFileSystemConfiguration.GCS_PARENT_TIMESTAMP_UPDATE_INCLUDES.getKey(),
-        COMMA_JOINER.join(
-            GoogleHadoopFileSystemConfiguration.GCS_PARENT_TIMESTAMP_UPDATE_INCLUDES.getDefault()));
-    configuration.set(
-        GoogleHadoopFileSystemConfiguration.GCS_PARENT_TIMESTAMP_UPDATE_EXCLUDES.getKey(),
-        COMMA_JOINER.join(
-            GoogleHadoopFileSystemConfiguration.GCS_PARENT_TIMESTAMP_UPDATE_EXCLUDES.getDefault()));
-    configuration.set(
-        GoogleHadoopFileSystemConfiguration.MR_JOB_HISTORY_DONE_DIR_KEY,
-        "gs://foo-bucket/tmp/hadoop-yarn/done");
-    configuration.set(
-        GoogleHadoopFileSystemConfiguration.MR_JOB_HISTORY_INTERMEDIATE_DONE_DIR_KEY,
-        "gs://foo-bucket/tmp/hadoop-yarn/staging/done");
-
-    predicate =
-        GoogleHadoopFileSystemBase.ParentTimestampUpdateIncludePredicate.create(configuration);
-
-    assertThat(
-            configuration.get(
-                GoogleHadoopFileSystemConfiguration.GCS_PARENT_TIMESTAMP_UPDATE_INCLUDES.getKey()))
-        .isEqualTo(
-            "gs://foo-bucket/tmp/hadoop-yarn/staging/done,gs://foo-bucket/tmp/hadoop-yarn/done");
-
-    assertWithMessage("Should be included")
-        .that(
-            predicate.shouldUpdateTimestamp(
-                new URI("gs://foo-bucket/tmp/hadoop-yarn/staging/done/")))
-        .isTrue();
-    assertWithMessage("Should be included")
-        .that(predicate.shouldUpdateTimestamp(new URI("gs://foo-bucket/tmp/hadoop-yarn/done/")))
-        .isTrue();
-    assertWithMessage("Should be ignored")
-        .that(predicate.shouldUpdateTimestamp(new URI("asdf/baz")))
-        .isFalse();
-    assertWithMessage("Should be ignored")
-        .that(predicate.shouldUpdateTimestamp(new URI("/anythingElse")))
-        .isFalse();
-    assertWithMessage("Should be ignored")
-        .that(predicate.shouldUpdateTimestamp(new URI("/")))
-        .isFalse();
   }
 
   @Test

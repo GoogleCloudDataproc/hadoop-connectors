@@ -13,6 +13,9 @@
  */
 package com.google.cloud.hadoop.io.bigquery;
 
+import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.DYNAMIC_FILE_LIST_RECORD_READER_POLL_INTERVAL_MS;
+import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.DYNAMIC_FILE_LIST_RECORD_READER_POLL_MAX_ATTEMPTS;
+
 import com.google.api.client.util.Sleeper;
 import com.google.cloud.hadoop.util.HadoopToStringUtil;
 import com.google.common.annotations.VisibleForTesting;
@@ -25,6 +28,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -52,6 +56,9 @@ public class DynamicFileListRecordReader<K, V>
 
   // The estimated number of records we will read in total.
   private long estimatedNumRecords;
+
+  // maximum number of poll attempts to wait for next file
+  private int maxPollAttempts;
 
   // The interval we will poll listStatus/globStatus inside nextKeyValue() if we don't already
   // have a file ready for reading.
@@ -98,14 +105,11 @@ public class DynamicFileListRecordReader<K, V>
   }
 
   @Override
-  public void initialize(InputSplit genericSplit, TaskAttemptContext context) throws IOException {
-    try {
+  public void initialize(InputSplit genericSplit, TaskAttemptContext context)
+      throws IOException, InterruptedException {
       logger.atInfo().log(
           "Initializing DynamicFileListRecordReader with split '%s', task context '%s'",
           HadoopToStringUtil.toString(genericSplit), HadoopToStringUtil.toString(context));
-    } catch (InterruptedException ie) {
-      logger.atWarning().withCause(ie).log("InterruptedException when logging InputSplit.");
-    }
     Preconditions.checkArgument(genericSplit instanceof ShardedInputSplit,
         "InputSplit genericSplit should be an instance of ShardedInputSplit.");
 
@@ -121,12 +125,14 @@ public class DynamicFileListRecordReader<K, V>
       estimatedNumRecords = 1;
     }
 
-    // Grab pollIntervalMs out of the config.
-    pollIntervalMs = context.getConfiguration().getInt(
-        BigQueryConfiguration.DYNAMIC_FILE_LIST_RECORD_READER_POLL_INTERVAL_MS_KEY,
-        BigQueryConfiguration.DYNAMIC_FILE_LIST_RECORD_READER_POLL_INTERVAL_MS_DEFAULT);
+    Configuration conf = context.getConfiguration();
 
-    fileSystem = inputDirectoryAndPattern.getFileSystem(context.getConfiguration());
+    // Grab pollIntervalMs out of the config.
+    pollIntervalMs = DYNAMIC_FILE_LIST_RECORD_READER_POLL_INTERVAL_MS.get(conf, conf::getInt);
+    // max number of attempts to wait for next file
+    maxPollAttempts = DYNAMIC_FILE_LIST_RECORD_READER_POLL_MAX_ATTEMPTS.get(conf, conf::getInt);
+
+    fileSystem = inputDirectoryAndPattern.getFileSystem(conf);
 
     // TODO(user): Make the base export pattern configurable.
     String exportPatternRegex = inputDirectoryAndPattern.getName().replace("*", "(\\d+)");
@@ -136,15 +142,14 @@ public class DynamicFileListRecordReader<K, V>
   }
 
   /**
-   * Reads the next key, value pair. Gets next line and parses Json object. May hang for a long
-   * time waiting for more files to appear in this reader's directory.
+   * Reads the next key, value pair. Gets next line and parses Json object. May hang for a long time
+   * waiting for more files to appear in this reader's directory.
    *
    * @return true if a key/value pair was read.
    * @throws IOException on IO Error.
    */
   @Override
-  public boolean nextKeyValue()
-      throws IOException, InterruptedException {
+  public boolean nextKeyValue() throws IOException, InterruptedException {
     currentValue = null;
 
     // Check if we already have a reader in-progress.
@@ -159,19 +164,29 @@ public class DynamicFileListRecordReader<K, V>
     }
 
     boolean needRefresh = !isNextFileReady() && shouldExpectMoreFiles();
-    while (needRefresh) {
-      logger.atFine().log("No files available, but more are expected; refreshing...");
+    int pollAttempt = 0;
+    while (needRefresh && (maxPollAttempts < 0 || pollAttempt < maxPollAttempts)) {
+      logger.atFine().log(
+          "No files available after %d attempt(s), but more are expected; refreshing ...",
+          pollAttempt + 1);
       refreshFileList();
       needRefresh = !isNextFileReady() && shouldExpectMoreFiles();
       if (needRefresh) {
         logger.atFine().log("No new files found, sleeping before trying again...");
-        try {
-          sleeper.sleep(pollIntervalMs);
-          context.progress();
-        } catch (InterruptedException ie) {
-          logger.atWarning().withCause(ie).log("Interrupted while sleeping.");
-        }
+        sleeper.sleep(pollIntervalMs);
+        context.progress();
+        pollAttempt++;
       }
+    }
+
+    if (needRefresh) {
+      throw new IllegalStateException(
+          String.format(
+              "Couldn't obtain any files after %d attempt(s). This could happen if in the first"
+                  + " failed task attempt BigQuery returned 0 records, but didn't create 0-record"
+                  + " file, in this case the second task attempt record reader will wait"
+                  + " indefinitely, but no files will appear.",
+              pollAttempt));
     }
 
     if (isNextFileReady()) {

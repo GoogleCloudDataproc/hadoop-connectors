@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.gcsio.testing;
 
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.api.client.util.Clock;
@@ -56,7 +57,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   private final Clock clock;
 
   public InMemoryGoogleCloudStorage() {
-    storageOptions = GoogleCloudStorageOptions.newBuilder().setAppName("in-memory").build();
+    storageOptions = GoogleCloudStorageOptions.builder().setAppName("GHFS/in-memory").build();
     clock = Clock.SYSTEM;
   }
 
@@ -113,7 +114,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
   @Override
   public synchronized WritableByteChannel create(
-      StorageResourceId resourceId, final CreateObjectOptions options) throws IOException {
+      StorageResourceId resourceId, CreateObjectOptions options) throws IOException {
     if (!bucketLookup.containsKey(resourceId.getBucketName())) {
       throw new IOException(
           String.format(
@@ -142,7 +143,9 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
             resourceId.getBucketName(),
             resourceId.getObjectName(),
             clock.currentTimeMillis(),
+            clock.currentTimeMillis(),
             options.getContentType(),
+            options.getContentEncoding(),
             options.getMetadata());
     bucketLookup.get(resourceId.getBucketName()).add(entry);
     return entry.getWriteChannel();
@@ -161,7 +164,9 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     }
     if (!bucketLookup.containsKey(bucketName)) {
       bucketLookup.put(
-          bucketName, new InMemoryBucketEntry(bucketName, clock.currentTimeMillis(), options));
+          bucketName,
+          new InMemoryBucketEntry(
+              bucketName, clock.currentTimeMillis(), clock.currentTimeMillis(), options));
     } else {
       throw new IOException("Bucket '" + bucketName + "'already exists");
     }
@@ -206,9 +211,9 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   public SeekableByteChannel open(
       StorageResourceId resourceId, GoogleCloudStorageReadOptions readOptions) throws IOException {
     if (!getItemInfo(resourceId).exists()) {
-      final IOException notFoundException =
-          GoogleCloudStorageExceptions.getFileNotFoundException(
-              resourceId.getBucketName(), resourceId.getObjectName());
+      IOException notFoundException =
+          createFileNotFoundException(
+              resourceId.getBucketName(), resourceId.getObjectName(), /* cause= */ null);
       if (readOptions.getFastFailOnNotFound()) {
         throw notFoundException;
       } else {
@@ -264,7 +269,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     return bucketLookup
         .get(resourceId.getBucketName())
         .get(resourceId.getObjectName())
-        .getReadChannel(readOptions);
+        .getReadChannel(resourceId.getBucketName(), resourceId.getObjectName(), readOptions);
   }
 
   @Override
@@ -332,8 +337,8 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
       // contents; the write-once constraint means this behavior is indistinguishable from a deep
       // copy, but the behavior might have to become complicated if GCS ever supports appends.
       if (!getItemInfo(new StorageResourceId(srcBucketName, srcObjectNames.get(i))).exists()) {
-        innerExceptions.add(GoogleCloudStorageExceptions.getFileNotFoundException(
-            srcBucketName, srcObjectNames.get(i)));
+        innerExceptions.add(
+            createFileNotFoundException(srcBucketName, srcObjectNames.get(i), /* cause= */ null));
         continue;
       }
 
@@ -366,17 +371,14 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
   @Override
   public synchronized List<String> listObjectNames(
-      String bucketName, String objectNamePrefix, String delimiter)
-      throws IOException {
+      String bucketName, String objectNamePrefix, String delimiter) {
     return listObjectNames(bucketName, objectNamePrefix, delimiter,
         GoogleCloudStorage.MAX_RESULTS_UNLIMITED);
   }
 
   @Override
   public synchronized List<String> listObjectNames(
-      String bucketName, String objectNamePrefix, String delimiter,
-      long maxResults)
-      throws IOException {
+      String bucketName, String objectNamePrefix, String delimiter, long maxResults) {
     InMemoryBucketEntry bucketEntry = bucketLookup.get(bucketName);
     if (bucketEntry == null) {
       return new ArrayList<>();
@@ -405,16 +407,14 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
   @Override
   public synchronized List<GoogleCloudStorageItemInfo> listObjectInfo(
-      final String bucketName, String objectNamePrefix, String delimiter)
-      throws IOException {
+      String bucketName, String objectNamePrefix, String delimiter) throws IOException {
     return listObjectInfo(bucketName, objectNamePrefix, delimiter,
         GoogleCloudStorage.MAX_RESULTS_UNLIMITED);
   }
 
   @Override
   public synchronized List<GoogleCloudStorageItemInfo> listObjectInfo(
-      final String bucketName, String objectNamePrefix, String delimiter,
-      long maxResults)
+      String bucketName, String objectNamePrefix, String delimiter, long maxResults)
       throws IOException {
     // Since we're just in memory, we can do the naive implementation of just listing names and
     // then calling getItemInfo for each.
@@ -461,15 +461,19 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
             .getInfo();
       }
     }
-    GoogleCloudStorageItemInfo notFoundItemInfo =
-        new GoogleCloudStorageItemInfo(resourceId, 0, -1, null, null);
-    return notFoundItemInfo;
+    // return not found item
+    return new GoogleCloudStorageItemInfo(
+        resourceId,
+        /* creationTime= */ 0,
+        /* modificationTime= */ 0,
+        /* size= */ -1,
+        /* location= */ null,
+        /* storageClass= */ null);
   }
 
   @Override
   public synchronized List<GoogleCloudStorageItemInfo> getItemInfos(
-      List<StorageResourceId> resourceIds)
-      throws IOException {
+      List<StorageResourceId> resourceIds) throws IOException {
     List<GoogleCloudStorageItemInfo> itemInfos = new ArrayList<>();
     for (StorageResourceId resourceId : resourceIds) {
       try {
@@ -512,13 +516,8 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public void waitForBucketEmpty(String bucketName)
-      throws IOException {
-  }
-
-  @Override
   public void compose(
-      final String bucketName, List<String> sources, String destination, String contentType)
+      String bucketName, List<String> sources, String destination, String contentType)
       throws IOException {
     List<StorageResourceId> sourceResourcesIds =
         Lists.transform(sources, s -> new StorageResourceId(bucketName, s));
@@ -530,9 +529,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
   @Override
   public GoogleCloudStorageItemInfo composeObjects(
-      List<StorageResourceId> sources,
-      final StorageResourceId destination,
-      CreateObjectOptions options)
+      List<StorageResourceId> sources, StorageResourceId destination, CreateObjectOptions options)
       throws IOException {
     checkArgument(
         sources.size() <= MAX_COMPOSE_OBJECTS,
