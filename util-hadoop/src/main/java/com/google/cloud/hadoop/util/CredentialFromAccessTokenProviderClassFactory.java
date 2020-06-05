@@ -14,20 +14,19 @@
 
 package com.google.cloud.hadoop.util;
 
-
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.auth.oauth2.TokenResponse;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
-import com.google.api.client.http.HttpRequestInitializer;
-import com.google.api.client.http.HttpTransport;
 import com.google.api.client.util.Clock;
 import com.google.cloud.hadoop.util.AccessTokenProvider.AccessToken;
+import com.google.cloud.hadoop.util.CredentialFactory.CredentialHttpRetryInitializer;
 import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.apache.hadoop.conf.Configuration;
 
 /**
@@ -122,28 +121,26 @@ public final class CredentialFromAccessTokenProviderClassFactory {
    * Generate a {@link Credential} from the internal access token provider based on the service
    * account to impersonate.
    */
-  public static Credential credentialFromImpersonationServiceAccount(
-      Configuration config,
-      String keyPrefix,
-      HttpRequestInitializer initializer,
-      HttpTransport transport)
+  public static Optional<Credential> credentialFromImpersonationServiceAccount(
+      Configuration config, String keyPrefix, Credential credential)
       throws IOException, GeneralSecurityException {
     String impersonationServiceAccount =
         HadoopCredentialConfiguration.getImpersonationServiceAccount(config, keyPrefix);
+
     if (impersonationServiceAccount != null) {
       GoogleCloudStorageAccessTokenProvider internalAccessTokenProvider =
           new GoogleCloudStorageAccessTokenProvider(
               impersonationServiceAccount,
-              initializer,
-              transport,
+              new CredentialHttpRetryInitializer(credential),
+              CredentialFactory.getStaticHttpTransport(),
               CredentialFactory.CLOUD_PLATFORM_SCOPES);
       internalAccessTokenProvider.setConf(config);
-      Credential credential =
+      Credential credentialFromAccessTokenProvider =
           getCredentialFromAccessTokenProvider(
               internalAccessTokenProvider, CredentialFactory.GCS_SCOPES);
-      return credential;
+      return Optional.of(credentialFromAccessTokenProvider);
     }
-    return null;
+    return Optional.empty();
   }
 
   /** Creates a {@link Credential} based on information from the access token provider. */

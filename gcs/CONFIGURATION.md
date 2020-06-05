@@ -249,8 +249,8 @@ is `false`.
 
 If the following property is set, the service account specified will be
 impersonated by generating a short-lived credential when accessing GCS.
-Existing authentications will be used to authenticate the request to generate
-this short-lived credential.
+Configured authentication method authentications will be used to authenticate
+the request to generate this short-lived credential.
 
 *    `fs.gs.auth.impersonation.service account` (not set by default)
 

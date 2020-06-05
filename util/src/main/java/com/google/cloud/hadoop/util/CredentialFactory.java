@@ -75,8 +75,21 @@ public class CredentialFactory {
    */
   public static class CredentialHttpRetryInitializer implements HttpRequestInitializer {
 
+    private final Credential credential;
+
+    public CredentialHttpRetryInitializer(Credential credential) {
+      this.credential = credential;
+    }
+
+    public CredentialHttpRetryInitializer() {
+      this(null);
+    }
+
     @Override
     public void initialize(HttpRequest httpRequest) throws IOException {
+      if (credential != null) {
+        httpRequest.setInterceptor(credential);
+      }
       httpRequest.setIOExceptionHandler(
           new HttpBackOffIOExceptionHandler(new ExponentialBackOff()));
       httpRequest.setUnsuccessfulResponseHandler(
@@ -206,7 +219,7 @@ public class CredentialFactory {
    * Returns shared staticHttpTransport instance; initializes staticHttpTransport if it hasn't
    * already been initialized.
    */
-  private static synchronized HttpTransport getStaticHttpTransport()
+  public static synchronized HttpTransport getStaticHttpTransport()
       throws IOException, GeneralSecurityException {
     if (staticHttpTransport == null) {
       staticHttpTransport = HttpTransportFactory.createHttpTransport(HttpTransportType.JAVA_NET);
