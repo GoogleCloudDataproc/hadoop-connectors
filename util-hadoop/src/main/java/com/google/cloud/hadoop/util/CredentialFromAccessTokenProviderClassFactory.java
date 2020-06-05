@@ -14,9 +14,12 @@
 
 package com.google.cloud.hadoop.util;
 
+
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.auth.oauth2.TokenResponse;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
+import com.google.api.client.http.HttpRequestInitializer;
+import com.google.api.client.http.HttpTransport;
 import com.google.api.client.util.Clock;
 import com.google.cloud.hadoop.util.AccessTokenProvider.AccessToken;
 import com.google.common.base.Preconditions;
@@ -115,8 +118,36 @@ public final class CredentialFromAccessTokenProviderClassFactory {
     return null;
   }
 
+  /**
+   * Generate a {@link Credential} from the internal access token provider based on the service
+   * account to impersonate.
+   */
+  public static Credential credentialFromImpersonationServiceAccount(
+      Configuration config,
+      String keyPrefix,
+      HttpRequestInitializer initializer,
+      HttpTransport transport)
+      throws IOException, GeneralSecurityException {
+    String impersonationServiceAccount =
+        HadoopCredentialConfiguration.getImpersonationServiceAccount(config, keyPrefix);
+    if (impersonationServiceAccount != null) {
+      GoogleCloudStorageAccessTokenProvider internalAccessTokenProvider =
+          new GoogleCloudStorageAccessTokenProvider(
+              impersonationServiceAccount,
+              initializer,
+              transport,
+              CredentialFactory.CLOUD_PLATFORM_SCOPES);
+      internalAccessTokenProvider.setConf(config);
+      Credential credential =
+          getCredentialFromAccessTokenProvider(
+              internalAccessTokenProvider, CredentialFactory.GCS_SCOPES);
+      return credential;
+    }
+    return null;
+  }
+
   /** Creates a {@link Credential} based on information from the access token provider. */
-  public static Credential getCredentialFromAccessTokenProvider(
+  private static Credential getCredentialFromAccessTokenProvider(
       AccessTokenProvider accessTokenProvider, Collection<String> scopes)
       throws IOException, GeneralSecurityException {
     Preconditions.checkArgument(

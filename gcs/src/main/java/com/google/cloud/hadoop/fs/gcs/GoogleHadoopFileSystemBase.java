@@ -56,7 +56,6 @@ import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.CredentialFactory;
 import com.google.cloud.hadoop.util.CredentialFromAccessTokenProviderClassFactory;
-import com.google.cloud.hadoop.util.GoogleCloudStorageAccessTokenProvider;
 import com.google.cloud.hadoop.util.HadoopCredentialConfiguration;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.PropertyUtil;
@@ -1491,37 +1490,25 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     // If impersonation service account exists, then use current credential to request access token
     // for the impersonating service account.
-    String impersonationServiceAccount =
-        HadoopCredentialConfiguration.getImpersonationServiceAccount(config, GCS_CONFIG_PREFIX);
-    if (impersonationServiceAccount != null) {
       GoogleCloudStorageOptions options =
           GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config)
               .build()
               .getCloudStorageOptions();
-      HttpRequestInitializer initializer =
-          new RetryHttpInitializer(
-              checkNotNull(credential, "credential must not be null"),
-              options.getAppName(),
-              options.getMaxHttpRequestRetries(),
-              options.getHttpRequestConnectTimeout(),
-              options.getHttpRequestReadTimeout(),
-              options.getHttpRequestHeaders());
+    HttpRequestInitializer initializer =
+        new RetryHttpInitializer(
+            checkNotNull(credential, "credential must not be null"),
+            options.toRetryHttpInitializerOptions());
       HttpTransport httpTransport =
           HttpTransportFactory.createHttpTransport(
               options.getTransportType(),
               options.getProxyAddress(),
               options.getProxyUsername(),
               options.getProxyPassword());
-      GoogleCloudStorageAccessTokenProvider internalAccessTokenProvider =
-          new GoogleCloudStorageAccessTokenProvider(
-              impersonationServiceAccount,
-              initializer,
-              httpTransport,
-              CredentialFactory.CLOUD_PLATFORM_SCOPES);
-      internalAccessTokenProvider.setConf(config);
-      credential =
-          CredentialFromAccessTokenProviderClassFactory.getCredentialFromAccessTokenProvider(
-              internalAccessTokenProvider, CredentialFactory.GCS_SCOPES);
+    Credential credentialFromImpersonation =
+        CredentialFromAccessTokenProviderClassFactory.credentialFromImpersonationServiceAccount(
+            config, GCS_CONFIG_PREFIX, initializer, httpTransport);
+    if (credentialFromImpersonation != null) {
+      return credentialFromImpersonation;
     }
 
     return credential;

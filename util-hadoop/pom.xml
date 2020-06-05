@@ -75,7 +75,6 @@
     <dependency>
       <groupId>com.google.apis</groupId>
       <artifactId>google-api-services-iamcredentials</artifactId>
-      <version>v1-rev20200515-1.30.9</version>
     </dependency>
     <dependency>
       <groupId>com.google.apis</groupId>
