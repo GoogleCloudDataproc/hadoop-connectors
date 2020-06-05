@@ -1,5 +1,21 @@
 ### 2.1.4 - 2020-XX-XX
 
+1.  Added a new parameter to configure output stream pipe type:
+
+    ```
+    fs.gs.outputstream.pipe.type (default: IO_STREAM_PIPE)
+    ```
+
+    Valid values are `NIO_CHANNEL_PIPE` and `IO_STREAM_PIPE`.
+
+    Output stream now supports (when property value set to `NIO_CHANNEL_PIPE`)
+    [Java NIO Pipe](https://docs.oracle.com/javase/8/docs/api/java/nio/channels/Pipe.html)
+    that allows to reliably write in the output stream from multiple threads
+    without *"Pipe broken"* exceptions.
+
+    Note that when using `NIO_CHANNEL_PIPE` option maximum upload throughput can
+    decrease by 10%.
+
 ### 2.1.3 - 2020-05-08
 
 1.  Add support for Cloud Storage objects CSEK encryption:

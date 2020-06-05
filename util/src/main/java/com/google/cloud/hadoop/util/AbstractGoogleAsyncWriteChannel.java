@@ -21,7 +21,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.PipedInputStream;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 
@@ -68,7 +67,7 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
   }
 
   @Override
-  public void startUpload(PipedInputStream pipeSource) throws IOException {
+  public void startUpload(InputStream pipeSource) throws IOException {
     // Connect pipe-source to the stream used by uploader.
     InputStreamContent objectContentStream = new InputStreamContent(contentType, pipeSource);
     // Indicate that we do not know length of file in advance.
@@ -103,7 +102,7 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
     public S call() throws Exception {
       // Try-with-resource will close this end of the pipe so that
       // the writer at the other end will not hang indefinitely.
-      try (InputStream uploadPipeSource = pipeSource) {
+      try (InputStream ignore = pipeSource) {
         return uploadObject.execute();
       } catch (IOException ioe) {
         S response = createResponseFromException(ioe);
