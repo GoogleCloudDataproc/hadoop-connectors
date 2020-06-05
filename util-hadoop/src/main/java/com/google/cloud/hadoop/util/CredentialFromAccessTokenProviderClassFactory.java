@@ -116,7 +116,7 @@ public final class CredentialFromAccessTokenProviderClassFactory {
   }
 
   /** Creates a {@link Credential} based on information from the access token provider. */
-  private static Credential getCredentialFromAccessTokenProvider(
+  public static Credential getCredentialFromAccessTokenProvider(
       AccessTokenProvider accessTokenProvider, Collection<String> scopes)
       throws IOException, GeneralSecurityException {
     Preconditions.checkArgument(
