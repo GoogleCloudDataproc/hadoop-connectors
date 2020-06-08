@@ -121,24 +121,19 @@ public final class CredentialFromAccessTokenProviderClassFactory {
    * Generate a {@link Credential} from the internal access token provider based on the service
    * account to impersonate.
    */
-  public static Optional<Credential> credentialFromImpersonationServiceAccount(
+  public static Optional<Credential> credential(
       Configuration config, String keyPrefix, Credential credential)
       throws IOException, GeneralSecurityException {
     String impersonationServiceAccount =
         HadoopCredentialConfiguration.getImpersonationServiceAccount(config, keyPrefix);
 
     if (impersonationServiceAccount != null) {
-      GoogleCloudStorageAccessTokenProvider internalAccessTokenProvider =
-          new GoogleCloudStorageAccessTokenProvider(
+      GoogleCredential credentialWithIamAccessToken =
+          new GoogleCredentialWithIamAccessToken(
               impersonationServiceAccount,
               new CredentialHttpRetryInitializer(credential),
-              CredentialFactory.getStaticHttpTransport(),
-              CredentialFactory.CLOUD_PLATFORM_SCOPES);
-      internalAccessTokenProvider.setConf(config);
-      Credential credentialFromAccessTokenProvider =
-          getCredentialFromAccessTokenProvider(
-              internalAccessTokenProvider, CredentialFactory.GCS_SCOPES);
-      return Optional.of(credentialFromAccessTokenProvider);
+              Clock.SYSTEM);
+      return Optional.of(credentialWithIamAccessToken.createScoped(CredentialFactory.GCS_SCOPES));
     }
     return Optional.empty();
   }

@@ -1487,7 +1487,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     // If impersonation service account exists, then use current credential to request access token
     // for the impersonating service account.
     Optional<Credential> credentialFromImpersonation =
-        CredentialFromAccessTokenProviderClassFactory.credentialFromImpersonationServiceAccount(
+        CredentialFromAccessTokenProviderClassFactory.credential(
             config, GCS_CONFIG_PREFIX, credential);
     if (credentialFromImpersonation.isPresent()) {
       return credentialFromImpersonation.get();

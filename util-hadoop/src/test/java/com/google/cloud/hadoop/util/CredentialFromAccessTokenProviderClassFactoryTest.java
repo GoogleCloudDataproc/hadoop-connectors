@@ -82,21 +82,18 @@ public class CredentialFromAccessTokenProviderClassFactoryTest {
   }
 
   @Test
-  public void testCreateCredentialFromGoogleCloudStorageAccessTokenProvider() throws IOException {
+  public void testCreateCredentialFromGoogleCloudStorageAccessTokenProvider()
+      throws IOException, GeneralSecurityException {
     GenerateAccessTokenResponse accessTokenRes = new GenerateAccessTokenResponse();
     accessTokenRes.setAccessToken(TestingAccessTokenProvider.FAKE_ACCESS_TOKEN);
     // 1970-01-01T00:00:02Z is equal to 2000 milliseconds since Epoch time.
     accessTokenRes.setExpireTime("1970-01-01T00:00:02Z");
     MockHttpTransport transport = mockTransport(jsonDataResponse(accessTokenRes));
+    CredentialFactory.setStaticHttpTransport(transport);
     List<HttpRequest> requests = new ArrayList<>();
-    AccessTokenProvider accessTokenProvider =
-        new GoogleCloudStorageAccessTokenProvider(
-            "test-service-account",
-            requests::add,
-            transport,
-            CredentialFactory.CLOUD_PLATFORM_SCOPES);
+
     GoogleCredential credential =
-        GoogleCredentialWithAccessTokenProvider.fromAccessTokenProvider(clock, accessTokenProvider);
+        new GoogleCredentialWithIamAccessToken("test-service-account", requests::add, Clock.SYSTEM);
 
     assertThat(credential.getAccessToken()).isEqualTo(TestingAccessTokenProvider.FAKE_ACCESS_TOKEN);
     assertThat(credential.getExpirationTimeMilliseconds())
