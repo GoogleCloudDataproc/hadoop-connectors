@@ -1493,44 +1493,39 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     // If impersonation service account exists, then use current credential to request access token
     // for the impersonating service account.
-    Optional<Credential> credentialFromImpersonation =
-        credential(config, GCS_CONFIG_PREFIX, credential);
-    if (credentialFromImpersonation.isPresent()) {
-      return credentialFromImpersonation.get();
-    }
-
-    return credential;
+    return getImpersonationCredential(config, GCS_CONFIG_PREFIX, credential).orElse(credential);
   }
 
   /**
    * Generate a {@link Credential} from the internal access token provider based on the service
    * account to impersonate.
    */
-  private static Optional<Credential> credential(
+  private static Optional<Credential> getImpersonationCredential(
       Configuration config, String keyPrefix, Credential credential) throws IOException {
     String impersonationServiceAccount =
         HadoopCredentialConfiguration.getImpersonationServiceAccount(config, keyPrefix);
 
-    if (impersonationServiceAccount != null) {
-      GoogleCloudStorageOptions options =
-          GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config)
-              .build()
-              .getCloudStorageOptions();
-      HttpTransport httpTransport =
-          HttpTransportFactory.createHttpTransport(
-              options.getTransportType(),
-              options.getProxyAddress(),
-              options.getProxyUsername(),
-              options.getProxyPassword());
-      GoogleCredential credentialWithIamAccessToken =
-          new GoogleCredentialWithIamAccessToken(
-              impersonationServiceAccount,
-              new CredentialHttpRetryInitializer(credential),
-              httpTransport,
-              Clock.SYSTEM);
-      return Optional.of(credentialWithIamAccessToken.createScoped(CredentialFactory.GCS_SCOPES));
+    if (Strings.isNullOrEmpty(impersonationServiceAccount)) {
+      return Optional.empty();
     }
-    return Optional.empty();
+
+    GoogleCloudStorageOptions options =
+        GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config)
+            .build()
+            .getCloudStorageOptions();
+    HttpTransport httpTransport =
+        HttpTransportFactory.createHttpTransport(
+            options.getTransportType(),
+            options.getProxyAddress(),
+            options.getProxyUsername(),
+            options.getProxyPassword());
+    GoogleCredential credentialWithIamAccessToken =
+        new GoogleCredentialWithIamAccessToken(
+            impersonationServiceAccount,
+            new CredentialHttpRetryInitializer(credential),
+            httpTransport,
+            Clock.SYSTEM);
+    return Optional.of(credentialWithIamAccessToken.createScoped(CredentialFactory.GCS_SCOPES));
   }
 
   /**

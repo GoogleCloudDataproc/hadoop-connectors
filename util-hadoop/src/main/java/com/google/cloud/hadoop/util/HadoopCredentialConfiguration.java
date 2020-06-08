@@ -163,8 +163,7 @@ public class HadoopCredentialConfiguration {
    * access token.
    */
   public static final HadoopConfigurationProperty<String> IMPERSONATION_SERVICE_ACCOUNT_SUFFIX =
-      new HadoopConfigurationProperty<>(
-          ".auth.impersonation.service.account", /* defaultValue= */ null);
+      new HadoopConfigurationProperty<>(".auth.impersonation.service.account");
 
   public static CredentialFactory getCredentialFactory(
       Configuration config, String... keyPrefixesVararg) {
