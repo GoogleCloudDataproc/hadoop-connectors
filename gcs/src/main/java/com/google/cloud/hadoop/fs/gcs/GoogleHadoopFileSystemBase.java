@@ -1507,8 +1507,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * account to impersonate.
    */
   private static Optional<Credential> credential(
-      Configuration config, String keyPrefix, Credential credential)
-      throws IOException, GeneralSecurityException {
+      Configuration config, String keyPrefix, Credential credential) throws IOException {
     String impersonationServiceAccount =
         HadoopCredentialConfiguration.getImpersonationServiceAccount(config, keyPrefix);
 

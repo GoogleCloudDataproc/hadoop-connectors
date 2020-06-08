@@ -3,6 +3,7 @@ package com.google.cloud.hadoop.util;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonDataResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.http.HttpRequest;
@@ -10,7 +11,6 @@ import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.util.Clock;
 import com.google.api.services.iamcredentials.v1.model.GenerateAccessTokenResponse;
 import java.io.IOException;
-import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.Before;
@@ -31,8 +31,7 @@ public class GoogleCredentialWithIamAccessTokenTest {
   }
 
   @Test
-  public void testCreateCredentialFromGoogleCloudStorageAccessTokenProvider()
-      throws IOException, GeneralSecurityException {
+  public void testCreateCredentialFromIamAccessToken() throws IOException {
     GenerateAccessTokenResponse accessTokenRes = new GenerateAccessTokenResponse();
     accessTokenRes.setAccessToken(TEST_ACCESS_TOKEN);
     // 1970-01-01T00:00:02Z is equal to 2000 milliseconds since Epoch time.
@@ -46,5 +45,22 @@ public class GoogleCredentialWithIamAccessTokenTest {
 
     assertThat(credential.getAccessToken()).isEqualTo(TEST_ACCESS_TOKEN);
     assertThat(credential.getExpirationTimeMilliseconds()).isEqualTo(TEST_TIME_MILLISECONDS);
+  }
+
+  @Test
+  public void testCreateCredentialFromIamAccessTokenThrowsExceptionForNullToken()
+      throws IOException {
+    GenerateAccessTokenResponse accessTokenRes = new GenerateAccessTokenResponse();
+    // 1970-01-01T00:00:02Z is equal to 2000 milliseconds since Epoch time.
+    accessTokenRes.setExpireTime("1970-01-01T00:00:02Z");
+    accessTokenRes.setAccessToken(null);
+    MockHttpTransport transport = mockTransport(jsonDataResponse(accessTokenRes));
+    List<HttpRequest> requests = new ArrayList<>();
+
+    assertThrows(
+        NullPointerException.class,
+        () ->
+            new GoogleCredentialWithIamAccessToken(
+                "test-service-account", requests::add, transport, Clock.SYSTEM));
   }
 }
