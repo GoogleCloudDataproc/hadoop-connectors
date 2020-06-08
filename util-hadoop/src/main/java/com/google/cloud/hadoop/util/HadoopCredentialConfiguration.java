@@ -229,11 +229,9 @@ public class HadoopCredentialConfiguration {
   }
 
   public static String getImpersonationServiceAccount(Configuration config, String... keyPrefixes) {
-    String impersonationServiceAccount =
-        IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
-            .withPrefixes(getConfigKeyPrefixes(keyPrefixes))
-            .get(config, config::get);
-    return impersonationServiceAccount;
+    return IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
+        .withPrefixes(getConfigKeyPrefixes(keyPrefixes))
+        .get(config, config::get);
   }
 
   /**

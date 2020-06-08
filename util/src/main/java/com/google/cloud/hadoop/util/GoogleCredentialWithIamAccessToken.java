@@ -1,31 +1,38 @@
 package com.google.cloud.hadoop.util;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.google.api.client.auth.oauth2.TokenResponse;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.http.HttpRequestInitializer;
+import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.client.util.Clock;
 import com.google.api.services.iamcredentials.v1.IAMCredentials;
 import com.google.api.services.iamcredentials.v1.model.GenerateAccessTokenRequest;
 import com.google.api.services.iamcredentials.v1.model.GenerateAccessTokenResponse;
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Instant;
 
 public class GoogleCredentialWithIamAccessToken extends GoogleCredential {
   private final String serviceAccountName;
-  private final Clock clock;
   private final HttpRequestInitializer initializer;
+  private final HttpTransport transport;
+  private final Clock clock;
 
   private static final String DEFAULT_ACCESS_TOKEN_LIFETIME = "3600s";
   private static final String DEFAULT_SERVICE_ACCOUNT_NAME_PREFIX = "projects/-/serviceAccounts/";
 
   public GoogleCredentialWithIamAccessToken(
-      String serviceAccountName, HttpRequestInitializer initializer, Clock clock)
+      String serviceAccountName,
+      HttpRequestInitializer initializer,
+      HttpTransport transport,
+      Clock clock)
       throws IOException, GeneralSecurityException {
     this.serviceAccountName = serviceAccountName;
     this.initializer = initializer;
+    this.transport = transport;
     this.clock = clock;
     initialize();
   }
@@ -46,8 +53,7 @@ public class GoogleCredentialWithIamAccessToken extends GoogleCredential {
       throw new RuntimeException("Failed to get access token", e);
     }
     String accessToken =
-        Preconditions.checkNotNull(
-            accessTokenResponse.getAccessToken(), "Access Token cannot be null!");
+        checkNotNull(accessTokenResponse.getAccessToken(), "Access Token cannot be null!");
     Instant expirationTimeInInstant = Instant.parse(accessTokenResponse.getExpireTime());
     Long expirationTimeMilliSeconds = expirationTimeInInstant.toEpochMilli();
     return new TokenResponse()
@@ -61,8 +67,7 @@ public class GoogleCredentialWithIamAccessToken extends GoogleCredential {
   private GenerateAccessTokenResponse generateAccessToken()
       throws IOException, GeneralSecurityException {
     IAMCredentials IAMCredentials =
-        new IAMCredentials(
-            CredentialFactory.getStaticHttpTransport(), new JacksonFactory(), initializer);
+        new IAMCredentials(transport, new JacksonFactory(), initializer);
     GenerateAccessTokenRequest content = new GenerateAccessTokenRequest();
     content.setScope(CredentialFactory.GCS_SCOPES);
     content.setLifetime(DEFAULT_ACCESS_TOKEN_LIFETIME);

@@ -59,7 +59,7 @@
 1.  Add a property to impersonate a service account:
 
     ```
-    fs.gs.auth.impersonation.service account (not set by default)
+    fs.gs.auth.impersonation.service.account (not set by default)
     ```
 
     If this property is set, an access token will be generated for this service

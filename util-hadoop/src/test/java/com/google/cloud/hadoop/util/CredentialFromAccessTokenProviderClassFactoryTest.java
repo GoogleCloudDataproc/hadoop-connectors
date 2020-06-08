@@ -15,23 +15,16 @@
 package com.google.cloud.hadoop.util;
 
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX;
-import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonDataResponse;
-import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
-import com.google.api.client.http.HttpRequest;
-import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.util.Clock;
-import com.google.api.services.iamcredentials.v1.model.GenerateAccessTokenResponse;
 import com.google.cloud.hadoop.util.CredentialFromAccessTokenProviderClassFactory.GoogleCredentialWithAccessTokenProvider;
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
-import java.util.ArrayList;
-import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.Before;
 import org.junit.Test;
@@ -75,25 +68,6 @@ public class CredentialFromAccessTokenProviderClassFactoryTest {
     AccessTokenProvider accessTokenProvider = new TestingAccessTokenProvider();
     GoogleCredential credential =
         GoogleCredentialWithAccessTokenProvider.fromAccessTokenProvider(clock, accessTokenProvider);
-
-    assertThat(credential.getAccessToken()).isEqualTo(TestingAccessTokenProvider.FAKE_ACCESS_TOKEN);
-    assertThat(credential.getExpirationTimeMilliseconds())
-        .isEqualTo(TestingAccessTokenProvider.EXPIRATION_TIME_MILLISECONDS);
-  }
-
-  @Test
-  public void testCreateCredentialFromGoogleCloudStorageAccessTokenProvider()
-      throws IOException, GeneralSecurityException {
-    GenerateAccessTokenResponse accessTokenRes = new GenerateAccessTokenResponse();
-    accessTokenRes.setAccessToken(TestingAccessTokenProvider.FAKE_ACCESS_TOKEN);
-    // 1970-01-01T00:00:02Z is equal to 2000 milliseconds since Epoch time.
-    accessTokenRes.setExpireTime("1970-01-01T00:00:02Z");
-    MockHttpTransport transport = mockTransport(jsonDataResponse(accessTokenRes));
-    CredentialFactory.setStaticHttpTransport(transport);
-    List<HttpRequest> requests = new ArrayList<>();
-
-    GoogleCredential credential =
-        new GoogleCredentialWithIamAccessToken("test-service-account", requests::add, Clock.SYSTEM);
 
     assertThat(credential.getAccessToken()).isEqualTo(TestingAccessTokenProvider.FAKE_ACCESS_TOKEN);
     assertThat(credential.getExpirationTimeMilliseconds())

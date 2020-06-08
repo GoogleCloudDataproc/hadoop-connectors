@@ -77,12 +77,12 @@ public class CredentialFactory {
 
     private final Credential credential;
 
-    public CredentialHttpRetryInitializer(Credential credential) {
-      this.credential = credential;
-    }
-
     public CredentialHttpRetryInitializer() {
       this(null);
+    }
+
+    public CredentialHttpRetryInitializer(Credential credential) {
+      this.credential = credential;
     }
 
     @Override
@@ -202,10 +202,6 @@ public class CredentialFactory {
   public static final ImmutableList<String> GCS_SCOPES =
       ImmutableList.of(StorageScopes.DEVSTORAGE_FULL_CONTROL);
 
-  // List of cloud platform scopes to specify when obtaining a credential.
-  public static final ImmutableList<String> CLOUD_PLATFORM_SCOPES =
-      ImmutableList.of(StorageScopes.CLOUD_PLATFORM);
-
   // JSON factory used for formatting credential-handling payloads.
   private static final JsonFactory JSON_FACTORY = new JacksonFactory();
 
@@ -219,7 +215,7 @@ public class CredentialFactory {
    * Returns shared staticHttpTransport instance; initializes staticHttpTransport if it hasn't
    * already been initialized.
    */
-  public static synchronized HttpTransport getStaticHttpTransport()
+  private static synchronized HttpTransport getStaticHttpTransport()
       throws IOException, GeneralSecurityException {
     if (staticHttpTransport == null) {
       staticHttpTransport = HttpTransportFactory.createHttpTransport(HttpTransportType.JAVA_NET);

@@ -37,6 +37,9 @@ import static com.google.common.flogger.LazyArgs.lazy;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
+import com.google.api.client.http.HttpTransport;
+import com.google.api.client.util.Clock;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.FileInfo;
@@ -45,6 +48,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
@@ -52,8 +56,11 @@ import com.google.cloud.hadoop.gcsio.UriPaths;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.CredentialFactory;
+import com.google.cloud.hadoop.util.CredentialFactory.CredentialHttpRetryInitializer;
 import com.google.cloud.hadoop.util.CredentialFromAccessTokenProviderClassFactory;
+import com.google.cloud.hadoop.util.GoogleCredentialWithIamAccessToken;
 import com.google.cloud.hadoop.util.HadoopCredentialConfiguration;
+import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.PropertyUtil;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -1487,13 +1494,44 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     // If impersonation service account exists, then use current credential to request access token
     // for the impersonating service account.
     Optional<Credential> credentialFromImpersonation =
-        CredentialFromAccessTokenProviderClassFactory.credential(
-            config, GCS_CONFIG_PREFIX, credential);
+        credential(config, GCS_CONFIG_PREFIX, credential);
     if (credentialFromImpersonation.isPresent()) {
       return credentialFromImpersonation.get();
     }
 
     return credential;
+  }
+
+  /**
+   * Generate a {@link Credential} from the internal access token provider based on the service
+   * account to impersonate.
+   */
+  private static Optional<Credential> credential(
+      Configuration config, String keyPrefix, Credential credential)
+      throws IOException, GeneralSecurityException {
+    String impersonationServiceAccount =
+        HadoopCredentialConfiguration.getImpersonationServiceAccount(config, keyPrefix);
+
+    if (impersonationServiceAccount != null) {
+      GoogleCloudStorageOptions options =
+          GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config)
+              .build()
+              .getCloudStorageOptions();
+      HttpTransport httpTransport =
+          HttpTransportFactory.createHttpTransport(
+              options.getTransportType(),
+              options.getProxyAddress(),
+              options.getProxyUsername(),
+              options.getProxyPassword());
+      GoogleCredential credentialWithIamAccessToken =
+          new GoogleCredentialWithIamAccessToken(
+              impersonationServiceAccount,
+              new CredentialHttpRetryInitializer(credential),
+              httpTransport,
+              Clock.SYSTEM);
+      return Optional.of(credentialWithIamAccessToken.createScoped(CredentialFactory.GCS_SCOPES));
+    }
+    return Optional.empty();
   }
 
   /**
