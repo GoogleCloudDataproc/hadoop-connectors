@@ -29,7 +29,7 @@ import org.apache.hadoop.conf.Configuration;
 
 /**
  * Given an {@link HadoopCredentialConfiguration#getAccessTokenProviderImplClass(Configuration,
- * List)} and a Hadoop {@link Configuration}, generate a {@link Credential}.
+ * String...)} and a Hadoop {@link Configuration}, generate a {@link Credential}.
  */
 public final class CredentialFromAccessTokenProviderClassFactory {
 
@@ -49,17 +49,14 @@ public final class CredentialFromAccessTokenProviderClassFactory {
 
     static GoogleCredential fromAccessTokenProvider(
         Clock clock, AccessTokenProvider accessTokenProvider) {
-      GoogleCredentialWithAccessTokenProvider withProvider =
-          new GoogleCredentialWithAccessTokenProvider(clock, accessTokenProvider);
       AccessToken accessToken =
           Preconditions.checkNotNull(
               accessTokenProvider.getAccessToken(), "Access Token cannot be null!");
 
-      withProvider
+      // TODO: This should be setting the refresh token as well.
+      return new GoogleCredentialWithAccessTokenProvider(clock, accessTokenProvider)
           .setAccessToken(accessToken.getToken())
           .setExpirationTimeMilliseconds(accessToken.getExpirationTimeMilliSeconds());
-      // TODO: This should be setting the refresh token as well.
-      return withProvider;
     }
 
     @Override
