@@ -10,6 +10,8 @@ import com.google.api.client.http.HttpRequest;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.util.Clock;
 import com.google.api.services.iamcredentials.v1.model.GenerateAccessTokenResponse;
+import com.google.api.services.storage.StorageScopes;
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,10 +44,32 @@ public class GoogleCredentialWithIamAccessTokenTest {
 
     GoogleCredential credential =
         new GoogleCredentialWithIamAccessToken(
-            "test-service-account", requests::add, transport, Clock.SYSTEM);
+            "test-service-account",
+            requests::add,
+            transport,
+            ImmutableList.of(StorageScopes.CLOUD_PLATFORM),
+            Clock.SYSTEM);
 
     assertThat(credential.getAccessToken()).isEqualTo(TEST_ACCESS_TOKEN);
     assertThat(credential.getExpirationTimeMilliseconds()).isEqualTo(TEST_TIME_MILLISECONDS);
+  }
+
+  @Test
+  public void testCreateCredentialFromIamAccessTokenWithoutExpirationTime() throws IOException {
+    GenerateAccessTokenResponse accessTokenRes = new GenerateAccessTokenResponse();
+    accessTokenRes.setAccessToken(TEST_ACCESS_TOKEN);
+    MockHttpTransport transport = mockTransport(jsonDataResponse(accessTokenRes));
+    List<HttpRequest> requests = new ArrayList<>();
+
+    GoogleCredential credential =
+        new GoogleCredentialWithIamAccessToken(
+            "test-service-account",
+            requests::add,
+            transport,
+            ImmutableList.of(StorageScopes.CLOUD_PLATFORM),
+            Clock.SYSTEM);
+
+    assertThat(credential.getAccessToken()).isEqualTo(TEST_ACCESS_TOKEN);
   }
 
   @Test
@@ -62,6 +86,10 @@ public class GoogleCredentialWithIamAccessTokenTest {
         NullPointerException.class,
         () ->
             new GoogleCredentialWithIamAccessToken(
-                "test-service-account", requests::add, transport, Clock.SYSTEM));
+                "test-service-account",
+                requests::add,
+                transport,
+                ImmutableList.of(StorageScopes.CLOUD_PLATFORM),
+                Clock.SYSTEM));
   }
 }

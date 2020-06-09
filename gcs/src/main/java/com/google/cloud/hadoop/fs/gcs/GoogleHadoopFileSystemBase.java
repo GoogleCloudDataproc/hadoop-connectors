@@ -43,6 +43,7 @@ import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.util.Clock;
+import com.google.api.services.storage.StorageScopes;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.FileInfo;
@@ -1528,6 +1529,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
             impersonationServiceAccount,
             new CredentialHttpRetryInitializer(credential),
             httpTransport,
+            ImmutableList.of(StorageScopes.CLOUD_PLATFORM),
             Clock.SYSTEM);
     return Optional.of(credentialWithIamAccessToken.createScoped(CredentialFactory.GCS_SCOPES));
   }
