@@ -82,6 +82,7 @@ public class HadoopCredentialConfigurationTest {
           put(".proxy.address", null);
           put(".proxy.password", null);
           put(".proxy.username", null);
+          put(".auth.impersonation.service.account", null);
         }
       };
 

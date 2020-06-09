@@ -54,6 +54,18 @@
 
 1.  Update all dependencies to latest versions.
 
+1.  Add a property to impersonate a service account:
+
+    ```
+    fs.gs.auth.impersonation.service.account (not set by default)
+    ```
+
+    If this property is set, an access token will be generated for this service
+    account to access GCS. The caller who issues a request for the access token
+    must have been granted the Service Account Token Creator role
+    (`roles/iam.serviceAccountTokenCreator`) on the service account to
+    impersonate.
+
 ### 2.1.1 - 2020-03-11
 
 1.  Add upload cache to support high-level retries of failed uploads. Cache size
