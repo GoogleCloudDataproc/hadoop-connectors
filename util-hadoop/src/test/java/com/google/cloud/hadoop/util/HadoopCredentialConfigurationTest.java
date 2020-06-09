@@ -19,7 +19,6 @@ import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.CLIENT_
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.CLIENT_SECRET_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_NULL_CREDENTIAL_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.OAUTH_CLIENT_FILE_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;

@@ -65,7 +65,7 @@
     If this property is set, an access token will be generated for this service
     account to access GCS. The caller who issues a request for the access token
     must have been granted the Service Account Token Creator role
-    (roles/iam.serviceAccountTokenCreator) on the service account to
+    (`roles/iam.serviceAccountTokenCreator`) on the service account to
     impersonate.
 
 ### 2.1.1 - 2020-03-11

@@ -42,8 +42,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.http.HttpTransport;
-import com.google.api.client.util.Clock;
-import com.google.api.services.storage.StorageScopes;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.FileInfo;
@@ -1496,21 +1494,21 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     // If impersonation service account exists, then use current credential to request access token
     // for the impersonating service account.
-    return getImpersonationCredential(config, credential).orElse(credential);
+    return getImpersonatedCredential(config, credential).orElse(credential);
   }
 
   /**
    * Generate a {@link Credential} from the internal access token provider based on the service
    * account to impersonate.
    */
-  private static Optional<Credential> getImpersonationCredential(
+  private static Optional<Credential> getImpersonatedCredential(
       Configuration config, Credential credential) throws IOException {
-    String impersonationServiceAccount =
+    String serviceAccountToImpersonate =
         IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
             .withPrefixes(CONFIG_KEY_PREFIXES)
             .get(config, config::get);
 
-    if (isNullOrEmpty(impersonationServiceAccount)) {
+    if (isNullOrEmpty(serviceAccountToImpersonate)) {
       return Optional.empty();
     }
 
@@ -1524,14 +1522,13 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
             options.getProxyAddress(),
             options.getProxyUsername(),
             options.getProxyPassword());
-    GoogleCredential credentialWithIamAccessToken =
+    GoogleCredential impersonatedCredential =
         new GoogleCredentialWithIamAccessToken(
-            impersonationServiceAccount,
-            new CredentialHttpRetryInitializer(credential),
             httpTransport,
-            ImmutableList.of(StorageScopes.CLOUD_PLATFORM),
-            Clock.SYSTEM);
-    return Optional.of(credentialWithIamAccessToken.createScoped(CredentialFactory.GCS_SCOPES));
+            new CredentialHttpRetryInitializer(credential),
+            serviceAccountToImpersonate,
+            CredentialFactory.GCS_SCOPES);
+    return Optional.of(impersonatedCredential.createScoped(CredentialFactory.GCS_SCOPES));
   }
 
   /**

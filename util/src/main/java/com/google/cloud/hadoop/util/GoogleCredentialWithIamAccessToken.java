@@ -14,6 +14,7 @@ import com.google.api.services.iamcredentials.v1.IAMCredentials;
 import com.google.api.services.iamcredentials.v1.IAMCredentials.Projects.ServiceAccounts.GenerateAccessToken;
 import com.google.api.services.iamcredentials.v1.model.GenerateAccessTokenRequest;
 import com.google.api.services.iamcredentials.v1.model.GenerateAccessTokenResponse;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.time.Instant;
@@ -21,24 +22,35 @@ import java.time.Instant;
 /** A {@code Credential} to generate or refresh IAM access token. */
 public class GoogleCredentialWithIamAccessToken extends GoogleCredential {
 
-  private static final String DEFAULT_ACCESS_TOKEN_LIFETIME = "3600s";
-  private static final String DEFAULT_SERVICE_ACCOUNT_NAME_PREFIX = "projects/-/serviceAccounts/";
   private static final JsonFactory JSON_FACTORY = new JacksonFactory();
 
-  private final String fullServiceAccountName;
+  private static final String DEFAULT_ACCESS_TOKEN_LIFETIME = "3600s";
+  private static final String DEFAULT_SERVICE_ACCOUNT_NAME_PREFIX = "projects/-/serviceAccounts/";
+
   private final HttpRequestInitializer initializer;
   private final HttpTransport transport;
+  private final String serviceAccountResource;
   private final ImmutableList<String> scopes;
   private final Clock clock;
 
   public GoogleCredentialWithIamAccessToken(
-      String serviceAccountName,
-      HttpRequestInitializer initializer,
       HttpTransport transport,
+      HttpRequestInitializer initializer,
+      String serviceAccountName,
+      ImmutableList<String> scopes)
+      throws IOException {
+    this(transport, initializer, serviceAccountName, scopes, Clock.SYSTEM);
+  }
+
+  @VisibleForTesting
+  public GoogleCredentialWithIamAccessToken(
+      HttpTransport transport,
+      HttpRequestInitializer initializer,
+      String serviceAccountName,
       ImmutableList<String> scopes,
       Clock clock)
       throws IOException {
-    this.fullServiceAccountName = DEFAULT_SERVICE_ACCOUNT_NAME_PREFIX + serviceAccountName;
+    this.serviceAccountResource = DEFAULT_SERVICE_ACCOUNT_NAME_PREFIX + serviceAccountName;
     this.initializer = initializer;
     this.transport = transport;
     this.scopes = scopes;
@@ -49,8 +61,8 @@ public class GoogleCredentialWithIamAccessToken extends GoogleCredential {
   private void initialize() throws IOException {
     GenerateAccessTokenResponse accessTokenResponse = generateAccessToken();
     if (!isNullOrEmpty(accessTokenResponse.getExpireTime())) {
-      Instant expirationTimeInInstant = Instant.parse(accessTokenResponse.getExpireTime());
-      setExpirationTimeMilliseconds(expirationTimeInInstant.toEpochMilli());
+      Instant expireTimeInstant = Instant.parse(accessTokenResponse.getExpireTime());
+      setExpirationTimeMilliseconds(expireTimeInstant.toEpochMilli());
     }
     setAccessToken(accessTokenResponse.getAccessToken());
   }
@@ -66,21 +78,22 @@ public class GoogleCredentialWithIamAccessToken extends GoogleCredential {
     }
 
     Instant expirationTimeInInstant = Instant.parse(accessTokenResponse.getExpireTime());
-    Long expirationTimeMilliSeconds = expirationTimeInInstant.toEpochMilli();
+    long expirationTimeMilliSeconds = expirationTimeInInstant.getEpochSecond();
     return tokenResponse.setExpiresInSeconds(
         expirationTimeMilliSeconds - clock.currentTimeMillis() / 1000);
   }
 
   private GenerateAccessTokenResponse generateAccessToken() throws IOException {
-    IAMCredentials IAMCredentials = new IAMCredentials(transport, JSON_FACTORY, initializer);
-    GenerateAccessTokenRequest content = new GenerateAccessTokenRequest();
-    content.setScope(scopes);
-    content.setLifetime(DEFAULT_ACCESS_TOKEN_LIFETIME);
-    GenerateAccessToken generateAccessTokenReq =
-        IAMCredentials.projects()
+    GenerateAccessTokenRequest requestContent =
+        new GenerateAccessTokenRequest()
+            .setScope(scopes)
+            .setLifetime(DEFAULT_ACCESS_TOKEN_LIFETIME);
+    GenerateAccessToken request =
+        new IAMCredentials(transport, JSON_FACTORY, initializer)
+            .projects()
             .serviceAccounts()
-            .generateAccessToken(fullServiceAccountName, content);
-    GenerateAccessTokenResponse response = generateAccessTokenReq.execute();
+            .generateAccessToken(serviceAccountResource, requestContent);
+    GenerateAccessTokenResponse response = request.execute();
     checkNotNull(response.getAccessToken(), "Access Token cannot be null!");
     return response;
   }
