@@ -205,12 +205,12 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     URI gsUri = new URI("gs://foobar/");
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
 
-    assertThrows(
-        "401 Unauthorized",
+    Exception exception = assertThrows(
         GoogleJsonResponseException.class,
         () -> {
           ghfs.initialize(gsUri, config);
         });
+    assertThat(exception).hasMessageThat().startsWith("401 Unauthorized");
   }
 
   // -----------------------------------------------------------------
