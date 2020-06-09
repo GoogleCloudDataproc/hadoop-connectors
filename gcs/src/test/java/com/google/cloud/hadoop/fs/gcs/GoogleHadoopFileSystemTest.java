@@ -16,10 +16,12 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_LAZY_INITIALIZATION_ENABLE;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import java.io.FileNotFoundException;
@@ -187,6 +189,19 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     ghfs.initialize(gsUri, config);
 
     assertThat(ghfs.getDefaultPort()).isEqualTo(-1);
+  }
+
+  @Test
+  public void testImpsersonationServiceAccountUsed() throws Exception {
+    Configuration config = new Configuration();
+    config.set("fs.gs.auth.access.token.provider.impl", TestingAccessTokenProvider.class.getName());
+    config.set(
+        GCS_CONFIG_PREFIX + IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey(), "test-service-account");
+
+    URI gsUri = new URI("gs://foobar/");
+    GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+
+    assertThrows(GoogleJsonResponseException.class, () -> {ghfs.initialize(gsUri, config);});
   }
 
   // -----------------------------------------------------------------
