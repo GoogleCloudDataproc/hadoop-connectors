@@ -30,6 +30,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT;
 import static com.google.cloud.hadoop.gcsio.CreateFileOptions.DEFAULT_NO_OVERWRITE;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -1504,7 +1505,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   private static Optional<Credential> getImpersonationCredential(
       Configuration config, Credential credential) throws IOException {
     String impersonationServiceAccount =
-        HadoopCredentialConfiguration.getImpersonationServiceAccount(config, CONFIG_KEY_PREFIXES);
+        IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
+            .withPrefixes(CONFIG_KEY_PREFIXES)
+            .get(config, config::get);
 
     if (isNullOrEmpty(impersonationServiceAccount)) {
       return Optional.empty();

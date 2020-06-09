@@ -242,17 +242,6 @@ public class HadoopCredentialConfigurationTest {
   }
 
   @Test
-  public void impersonationServiceAccount() throws Exception {
-    configuration.set(
-        getConfigKey(IMPERSONATION_SERVICE_ACCOUNT_SUFFIX), "test-SA@gserviceaccount.com");
-
-    String serviceAccount =
-        HadoopCredentialConfiguration.getImpersonationServiceAccount(
-            configuration, getConfigKey(IMPERSONATION_SERVICE_ACCOUNT_SUFFIX));
-    assertThat(serviceAccount).isEqualTo("test-SA@gserviceaccount.com");
-  }
-
-  @Test
   public void defaultPropertiesValues() {
     assertThat(getDefaultProperties(HadoopCredentialConfiguration.class))
         .containsExactlyEntriesIn(expectedDefaultConfiguration);
