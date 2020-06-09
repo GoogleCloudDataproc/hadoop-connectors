@@ -23,6 +23,7 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
+import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -194,14 +195,22 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   @Test
   public void testImpsersonationServiceAccountUsed() throws Exception {
     Configuration config = new Configuration();
-    config.set("fs.gs.auth.access.token.provider.impl", TestingAccessTokenProvider.class.getName());
+    config.setClass(
+        "fs.gs.auth.access.token.provider.impl",
+        TestingAccessTokenProvider.class,
+        AccessTokenProvider.class);
     config.set(
         GCS_CONFIG_PREFIX + IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey(), "test-service-account");
 
     URI gsUri = new URI("gs://foobar/");
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
 
-    assertThrows(GoogleJsonResponseException.class, () -> {ghfs.initialize(gsUri, config);});
+    assertThrows(
+        "401 Unauthorized",
+        GoogleJsonResponseException.class,
+        () -> {
+          ghfs.initialize(gsUri, config);
+        });
   }
 
   // -----------------------------------------------------------------
