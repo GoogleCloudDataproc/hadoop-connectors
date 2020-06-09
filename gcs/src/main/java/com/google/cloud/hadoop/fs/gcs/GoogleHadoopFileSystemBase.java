@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType.FLUSHABLE_COMPOSITE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.CONFIG_KEY_PREFIXES;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONCURRENT_GLOB_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_OVERRIDE_FILE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
@@ -32,6 +33,7 @@ import static com.google.cloud.hadoop.gcsio.CreateFileOptions.DEFAULT_NO_OVERWRI
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.flogger.LazyArgs.lazy;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -64,7 +66,6 @@ import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.PropertyUtil;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -1132,7 +1133,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     }
 
     // To use a flat glob, there must be an authority defined.
-    if (Strings.isNullOrEmpty(fixedPath.toUri().getAuthority())) {
+    if (isNullOrEmpty(fixedPath.toUri().getAuthority())) {
       logger.atFinest().log(
           "Flat glob is on, but Path '%s' has a empty authority, using default behavior.",
           fixedPath);
@@ -1493,7 +1494,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     // If impersonation service account exists, then use current credential to request access token
     // for the impersonating service account.
-    return getImpersonationCredential(config, GCS_CONFIG_PREFIX, credential).orElse(credential);
+    return getImpersonationCredential(config, credential).orElse(credential);
   }
 
   /**
@@ -1501,11 +1502,11 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * account to impersonate.
    */
   private static Optional<Credential> getImpersonationCredential(
-      Configuration config, String keyPrefix, Credential credential) throws IOException {
+      Configuration config, Credential credential) throws IOException {
     String impersonationServiceAccount =
-        HadoopCredentialConfiguration.getImpersonationServiceAccount(config, keyPrefix);
+        HadoopCredentialConfiguration.getImpersonationServiceAccount(config, CONFIG_KEY_PREFIXES);
 
-    if (Strings.isNullOrEmpty(impersonationServiceAccount)) {
+    if (isNullOrEmpty(impersonationServiceAccount)) {
       return Optional.empty();
     }
 
@@ -1616,7 +1617,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     Path newWorkingDirectory;
     String configWorkingDirectory = GCS_WORKING_DIRECTORY.get(config, config::get);
-    if (Strings.isNullOrEmpty(configWorkingDirectory)) {
+    if (isNullOrEmpty(configWorkingDirectory)) {
       newWorkingDirectory = getDefaultWorkingDirectory();
       logger.atWarning().log(
           "No working directory configured, using default: '%s'", newWorkingDirectory);

@@ -227,9 +227,10 @@ public class HadoopCredentialConfiguration {
         .get(config, (k, d) -> config.getClass(k, d, AccessTokenProvider.class));
   }
 
-  public static String getImpersonationServiceAccount(Configuration config, String... keyPrefixes) {
+  public static String getImpersonationServiceAccount(
+      Configuration config, List<String> keyPrefixes) {
     return IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
-        .withPrefixes(getConfigKeyPrefixes(keyPrefixes))
+        .withPrefixes(getConfigKeyPrefixes(keyPrefixes.toArray(new String[0])))
         .get(config, config::get);
   }
 

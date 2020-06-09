@@ -19,11 +19,12 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.MockitoAnnotations;
 
+/** Unit tests for {@link GoogleCredentialWithIamAccessToken}. */
 @RunWith(JUnit4.class)
 public class GoogleCredentialWithIamAccessTokenTest {
 
   private static final String TEST_ACCESS_TOKEN = "test.token";
-  public static final Long TEST_TIME_MILLISECONDS = 2000L;
+  public static final long TEST_TIME_MILLISECONDS = 2000L;
 
   @Before
   public void setUp() {
