@@ -99,6 +99,7 @@ class GoogleHadoopOutputStream extends OutputStream {
   /** Writes the specified byte to this output stream. */
   @Override
   public void write(int b) throws IOException {
+    throwIfNotOpen();
     long startTime = System.nanoTime();
     out.write(b);
     statistics.incrementBytesWritten(1);
@@ -112,6 +113,7 @@ class GoogleHadoopOutputStream extends OutputStream {
    */
   @Override
   public void write(byte[] b, int offset, int len) throws IOException {
+    throwIfNotOpen();
     long startTime = System.nanoTime();
     out.write(b, offset, len);
     statistics.incrementBytesWritten(len);
