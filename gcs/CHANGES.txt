@@ -2,6 +2,10 @@
 
   1. Fix complex patterns globbing.
 
+  1. Throw `ClosedChannelException` in `GoogleHadoopOutputStream.write` methods
+     if stream already closed. This fixes Spark Streaming jobs checkpointing to
+     Cloud Storage.
+
 1.9.17 - 2019-05-15
 
   1. Add a property to parallelize GCS requests in `getFileStatus` and
