@@ -16,6 +16,10 @@
     Note that when using `NIO_CHANNEL_PIPE` option maximum upload throughput can
     decrease by 10%.
 
+1.  Throw `ClosedChannelException` in `GoogleHadoopOutputStream.write` methods
+    if stream already closed. This fixes Spark Streaming jobs checkpointing to
+    Cloud Storage.
+
 ### 2.1.3 - 2020-05-08
 
 1.  Add support for Cloud Storage objects CSEK encryption:
