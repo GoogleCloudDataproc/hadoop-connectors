@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
 import java.nio.channels.Channels;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.WritableByteChannel;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileSystem;
@@ -138,6 +139,16 @@ class GoogleHadoopOutputStream extends OutputStream {
         channel = null;
       }
     }
+  }
+
+  private boolean isOpen() {
+     return out != null;
+  }
+
+  private void throwIfNotOpen() throws IOException {
+     if (!isOpen()) {
+        throw new ClosedChannelException();
+     }
   }
 
   WritableByteChannel getInternalChannel() {
