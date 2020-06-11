@@ -56,7 +56,12 @@ check_required_params
 
 # When tests run, they run in the root of the module directory. Anything
 # relative to our current directory won't work properly
-GCS_TEST_PRIVATE_KEYFILE=$(readlink -f "${GCS_TEST_PRIVATE_KEYFILE}")
+if [[ $(uname -s) == Darwin ]]; then
+  # On MacOS `readlink` does not support `-e` parameter
+  GCS_TEST_PRIVATE_KEYFILE=$(readlink -n "${GCS_TEST_PRIVATE_KEYFILE}")
+else
+  GCS_TEST_PRIVATE_KEYFILE=$(readlink -e "${GCS_TEST_PRIVATE_KEYFILE}")
+fi
 export GCS_TEST_PRIVATE_KEYFILE
 export RUN_INTEGRATION_TESTS=true
 
