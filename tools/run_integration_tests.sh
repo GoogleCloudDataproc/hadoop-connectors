@@ -60,7 +60,7 @@ if [[ $(uname -s) == Darwin ]]; then
   # On MacOS `readlink` does not support `-e` parameter
   GCS_TEST_PRIVATE_KEYFILE=$(readlink -n "${GCS_TEST_PRIVATE_KEYFILE}")
 else
-  GCS_TEST_PRIVATE_KEYFILE=$(readlink -e "${GCS_TEST_PRIVATE_KEYFILE}")
+  GCS_TEST_PRIVATE_KEYFILE=$(readlink -n -e "${GCS_TEST_PRIVATE_KEYFILE}")
 fi
 export GCS_TEST_PRIVATE_KEYFILE
 export RUN_INTEGRATION_TESTS=true
