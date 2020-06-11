@@ -119,8 +119,7 @@ public abstract class GoogleCloudStorageOptions {
         .setCooperativeLockingOptions(CooperativeLockingOptions.DEFAULT)
         .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT)
         .setUserImpersonationServiceAccounts(IMPERSONATION_SERVICE_ACCOUNTS)
-        .setGroupImpersonationServiceAccounts(IMPERSONATION_SERVICE_ACCOUNTS)
-        .setPrefixImpersonationServiceAccounts(IMPERSONATION_SERVICE_ACCOUNTS);
+        .setGroupImpersonationServiceAccounts(IMPERSONATION_SERVICE_ACCOUNTS);
   }
 
   public abstract Builder toBuilder();
@@ -198,9 +197,6 @@ public abstract class GoogleCloudStorageOptions {
 
   @Nullable
   public abstract Map<String, String> getGroupImpersonationServiceAccounts();
-
-  @Nullable
-  public abstract Map<String, String> getPrefixImpersonationServiceAccounts();
 
   public RetryHttpInitializerOptions toRetryHttpInitializerOptions() {
     return RetryHttpInitializerOptions.builder()
@@ -288,9 +284,6 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setGroupImpersonationServiceAccounts(
         Map<String, String> groupImpersonationServiceAccounts);
-
-    public abstract Builder setPrefixImpersonationServiceAccounts(
-        Map<String, String> prefixImpersonationServiceAccounts);
 
     abstract GoogleCloudStorageOptions autoBuild();
 

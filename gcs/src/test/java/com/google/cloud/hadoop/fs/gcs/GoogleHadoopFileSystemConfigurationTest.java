@@ -22,7 +22,6 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ROOT_URL;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_SERVICE_PATH;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.GROUP_IMPERSONATION_IDENTIFIER_PREFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.OBJECT_PREFIX_IMPERSONATION_IDENTIFIER_PREFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_ADDRESS_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_PASSWORD_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_USERNAME_SUFFIX;
@@ -280,9 +279,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
     config.set(
         GCS_CONFIG_PREFIX + GROUP_IMPERSONATION_IDENTIFIER_PREFIX.getKey() + "test-grp",
         "test-service-account2");
-    config.set(
-        GCS_CONFIG_PREFIX + OBJECT_PREFIX_IMPERSONATION_IDENTIFIER_PREFIX.getKey() + "gs://foo/bar",
-        "test-service-account3");
 
     GoogleCloudStorageFileSystemOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
@@ -291,7 +287,5 @@ public class GoogleHadoopFileSystemConfigurationTest {
         .containsExactly("test-user", "test-service-account1");
     assertThat(options.getCloudStorageOptions().getGroupImpersonationServiceAccounts())
         .containsExactly("test-grp", "test-service-account2");
-    assertThat(options.getCloudStorageOptions().getPrefixImpersonationServiceAccounts())
-        .containsExactly("gs://foo/bar", "test-service-account3");
   }
 }

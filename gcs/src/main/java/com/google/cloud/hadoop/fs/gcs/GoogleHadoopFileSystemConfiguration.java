@@ -18,7 +18,6 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.GROUP_IMPERSONATION_IDENTIFIER_PREFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.HTTP_TRANSPORT_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.OBJECT_PREFIX_IMPERSONATION_IDENTIFIER_PREFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_ADDRESS_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_PASSWORD_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_USERNAME_SUFFIX;
@@ -479,10 +478,6 @@ public class GoogleHadoopFileSystemConfiguration {
                 .getPropsWithPrefix(config))
         .setGroupImpersonationServiceAccounts(
             GROUP_IMPERSONATION_IDENTIFIER_PREFIX
-                .withPrefixes(CONFIG_KEY_PREFIXES)
-                .getPropsWithPrefix(config))
-        .setPrefixImpersonationServiceAccounts(
-            OBJECT_PREFIX_IMPERSONATION_IDENTIFIER_PREFIX
                 .withPrefixes(CONFIG_KEY_PREFIXES)
                 .getPropsWithPrefix(config));
   }

@@ -183,14 +183,6 @@ public class HadoopCredentialConfiguration {
       GROUP_IMPERSONATION_IDENTIFIER_PREFIX =
           new HadoopConfigurationProperty<>(".auth.group.impersonation.", ImmutableMap.of());
 
-  /**
-   * Key prefix for the prefix associated with the service account to impersonate when accessing
-   * GCS.
-   */
-  public static final HadoopConfigurationProperty<Map<String, String>>
-      OBJECT_PREFIX_IMPERSONATION_IDENTIFIER_PREFIX =
-          new HadoopConfigurationProperty<>(".auth.prefix.impersonation.", ImmutableMap.of());
-
   public static CredentialFactory getCredentialFactory(
       Configuration config, String... keyPrefixesVararg) {
     List<String> keyPrefixes = getConfigKeyPrefixes(keyPrefixesVararg);
