@@ -21,6 +21,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_HTTP_HEADERS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ROOT_URL;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_SERVICE_PATH;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.IMPERSONATION_IDENTIFIER_PREFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_ADDRESS_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_PASSWORD_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_USERNAME_SUFFIX;
@@ -266,5 +267,45 @@ public class GoogleHadoopFileSystemConfigurationTest {
 
     assertThat(options.getStorageRootUrl()).isEqualTo("https://unit-test-storage.googleapis.com/");
     assertThat(options.getStorageServicePath()).isEqualTo("storage/dev_v1/");
+  }
+
+  @Test
+  public void testSingleImpersonationIdentifier() {
+    Configuration config = new Configuration();
+    config.set(
+        GCS_CONFIG_PREFIX + IMPERSONATION_IDENTIFIER_PREFIX.getKey() + "test-user",
+        "test-service-account");
+
+    GoogleCloudStorageFileSystemOptions options =
+        GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
+
+    assertThat(options.getCloudStorageOptions().getImpersonationServiceAccounts())
+        .containsExactly("test-user", "test-service-account");
+  }
+
+  @Test
+  public void testMultipleImpersonationIdentifier() {
+    Configuration config = new Configuration();
+    config.set(
+        GCS_CONFIG_PREFIX + IMPERSONATION_IDENTIFIER_PREFIX.getKey() + "test-user",
+        "test-service-account1");
+    config.set(
+        GCS_CONFIG_PREFIX + IMPERSONATION_IDENTIFIER_PREFIX.getKey() + "test-grp",
+        "test-service-account2");
+    config.set(
+        GCS_CONFIG_PREFIX + IMPERSONATION_IDENTIFIER_PREFIX.getKey() + "gs://foo/bar",
+        "test-service-account3");
+
+    GoogleCloudStorageFileSystemOptions options =
+        GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
+
+    assertThat(options.getCloudStorageOptions().getImpersonationServiceAccounts())
+        .containsExactly(
+            "test-user",
+            "test-service-account1",
+            "test-grp",
+            "test-service-account2",
+            "gs://foo/bar",
+            "test-service-account3");
   }
 }

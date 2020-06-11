@@ -2343,6 +2343,34 @@ public class GoogleCloudStorageTest {
   }
 
   /**
+   * Test GoogleCloudStorage.getItemInfo(StorageResourceId) when arguments represent an object in a
+   * bucket with non-matching service accounts to impersonate.
+   */
+  @Test
+  public void testGetItemInfoObjectWithNonMatchingServiceAccounts() throws IOException {
+    StorageObject storageObject = newStorageObject(BUCKET_NAME, OBJECT_NAME);
+    MockHttpTransport transport = mockTransport(jsonDataResponse(storageObject));
+    GoogleCloudStorage gcs =
+        mockedGcs(
+            GCS_OPTIONS.toBuilder()
+                .setImpersonationServiceAccounts(
+                    ImmutableMap.of("invalid-prefix", "test-service-account"))
+                .build(),
+            transport);
+
+    GoogleCloudStorageItemInfo info =
+        gcs.getItemInfo(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
+
+    GoogleCloudStorageItemInfo expected =
+        GoogleCloudStorageImpl.createItemInfoForStorageObject(
+            new StorageResourceId(BUCKET_NAME, OBJECT_NAME), storageObject);
+    assertThat(info).isEqualTo(expected);
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(getRequestString(BUCKET_NAME, OBJECT_NAME))
+        .inOrder();
+  }
+
+  /**
    * Test handling of mismatch in StorageObject.getBucket() and StorageObject.getName() vs
    * respective values in the queried StorageResourceId.
    */

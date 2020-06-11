@@ -1406,7 +1406,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
 
     String matchedPrefix = getMatchedObjectNamePrefix(serviceAccounts, objectNamePrefix);
-    if(matchedPrefix == null) {
+    if (matchedPrefix == null) {
       return;
     }
 
