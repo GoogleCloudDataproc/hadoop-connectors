@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.HTTP_TRANSPORT_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.IMPERSONATION_IDENTIFIER_PREFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_ADDRESS_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_PASSWORD_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_USERNAME_SUFFIX;
@@ -469,7 +470,11 @@ public class GoogleHadoopFileSystemConfiguration {
         .setEncryptionAlgorithm(GCS_ENCRYPTION_ALGORITHM.get(config, config::get))
         .setEncryptionKey(RedactedString.create(GCS_ENCRYPTION_KEY.getPassword(config)))
         .setEncryptionKeyHash(RedactedString.create(GCS_ENCRYPTION_KEY_HASH.getPassword(config)))
-        .setGrpcEnabled(GCS_GRPC_ENABLE.get(config, config::getBoolean));
+        .setGrpcEnabled(GCS_GRPC_ENABLE.get(config, config::getBoolean))
+        .setImpersonationServiceAccounts(
+            IMPERSONATION_IDENTIFIER_PREFIX
+                .withPrefixes(CONFIG_KEY_PREFIXES)
+                .getPropsWithPrefix(config));
   }
 
   private static PerformanceCachingGoogleCloudStorageOptions getPerformanceCachingOptions(
