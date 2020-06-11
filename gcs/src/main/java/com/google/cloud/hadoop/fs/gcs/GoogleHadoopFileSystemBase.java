@@ -30,7 +30,6 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT;
 import static com.google.cloud.hadoop.gcsio.CreateFileOptions.DEFAULT_NO_OVERWRITE;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.IMPERSONATION_IDENTIFIER_PREFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -1509,27 +1508,22 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
             .withPrefixes(CONFIG_KEY_PREFIXES)
             .get(config, config::get);
 
+    GoogleCloudStorageOptions options =
+        GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config)
+            .build()
+            .getCloudStorageOptions();
     if (isNullOrEmpty(serviceAccountToImpersonate)) {
-      Map<String, String> serviceAccountMapping =
-          IMPERSONATION_IDENTIFIER_PREFIX
-              .withPrefixes(CONFIG_KEY_PREFIXES)
-              .getPropsWithPrefix(config);
-      for (Map.Entry<String, String> entry : serviceAccountMapping.entrySet()) {
-        if (matchedUserOrGroup(entry.getKey())) {
-          serviceAccountToImpersonate = entry.getValue();
-          break;
-        }
-      }
+      serviceAccountToImpersonate = getMatchedServiceAccountToImpersonateFromUser(options);
+    }
+
+    if (isNullOrEmpty(serviceAccountToImpersonate)) {
+      serviceAccountToImpersonate = getMatchedServiceAccountToImpersonateFromGroup(options);
     }
 
     if (isNullOrEmpty(serviceAccountToImpersonate)) {
       return Optional.empty();
     }
 
-    GoogleCloudStorageOptions options =
-        GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config)
-            .build()
-            .getCloudStorageOptions();
     HttpTransport httpTransport =
         HttpTransportFactory.createHttpTransport(
             options.getTransportType(),
@@ -1545,19 +1539,28 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     return Optional.of(impersonatedCredential.createScoped(CredentialFactory.GCS_SCOPES));
   }
 
-  /**
-   * @param name login user name or group name
-   * @return true if name matches with currently login user or any group.
-   */
-  private static boolean matchedUserOrGroup(String name) throws IOException {
+  private static String getMatchedServiceAccountToImpersonateFromUser(
+      GoogleCloudStorageOptions options) throws IOException {
+    Map<String, String> serviceAccountMapping = options.getUserImpersonationServiceAccounts();
     String userName = UserGroupInformation.getCurrentUser().getShortUserName();
-    String[] groupNames = UserGroupInformation.getCurrentUser().getGroupNames();
-
-    if (userName.equals(name) || Arrays.asList(groupNames).contains(name)) {
-      return true;
+    for (Map.Entry<String, String> entry : serviceAccountMapping.entrySet()) {
+      if (userName.equals(entry.getKey())) {
+        return entry.getValue();
+      }
     }
+    return null;
+  }
 
-    return false;
+  private static String getMatchedServiceAccountToImpersonateFromGroup(
+      GoogleCloudStorageOptions options) throws IOException {
+    Map<String, String> serviceAccountMapping = options.getGroupImpersonationServiceAccounts();
+    List<String> groupNames = Arrays.asList(UserGroupInformation.getCurrentUser().getGroupNames());
+    for (Map.Entry<String, String> entry : serviceAccountMapping.entrySet()) {
+      if (groupNames.contains(entry.getKey())) {
+        return entry.getValue();
+      }
+    }
+    return null;
   }
 
   /**

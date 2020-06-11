@@ -61,7 +61,6 @@ import com.google.api.client.util.BackOff;
 import com.google.api.client.util.DateTime;
 import com.google.api.client.util.NanoClock;
 import com.google.api.client.util.Sleeper;
-import com.google.api.services.iamcredentials.v1.model.GenerateAccessTokenResponse;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.Bucket;
 import com.google.api.services.storage.model.Buckets;
@@ -1954,37 +1953,6 @@ public class GoogleCloudStorageTest {
   }
 
   /**
-   * Test successful operation of GoogleCloudStorage.listObjectNames() with service accounts to
-   * impersonate.
-   */
-  @Test
-  public void testListObjectNamesPrefixWithServiceAccountsToImpersonate() throws IOException {
-    String prefix = "foo/bar/baz/";
-
-    GenerateAccessTokenResponse accessTokenRes = new GenerateAccessTokenResponse();
-    accessTokenRes.setAccessToken("test-token");
-    MockHttpTransport transport =
-        mockTransport(
-            jsonDataResponse(accessTokenRes),
-            jsonDataResponse(
-                new Objects()
-                    .setPrefixes(ImmutableList.of("foo/bar/baz/dir0/", "foo/bar/baz/dir1/"))
-                    .setNextPageToken(null)));
-
-    GoogleCloudStorage gcs =
-        mockedGcs(
-            GCS_OPTIONS.toBuilder()
-                .setImpersonationServiceAccounts(
-                    ImmutableMap.of("foo/bar/", "test-service-account"))
-                .build(),
-            transport);
-
-    List<String> objectNames = gcs.listObjectNames(BUCKET_NAME, prefix, PATH_DELIMITER);
-
-    assertThat(objectNames).containsExactly("foo/bar/baz/dir0/", "foo/bar/baz/dir1/").inOrder();
-  }
-
-  /**
    * Test handling of various types of exceptions thrown during JSON API call for
    * GoogleCloudStorage.listObjectNames(3).
    */
@@ -2304,66 +2272,6 @@ public class GoogleCloudStorageTest {
         GoogleCloudStorageImpl.createItemInfoForStorageObject(
             new StorageResourceId(BUCKET_NAME, OBJECT_NAME), storageObject);
 
-    assertThat(info).isEqualTo(expected);
-    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
-        .containsExactly(getRequestString(BUCKET_NAME, OBJECT_NAME))
-        .inOrder();
-  }
-
-  /**
-   * Test GoogleCloudStorage.getItemInfo(StorageResourceId) when arguments represent an object in a
-   * bucket with service accounts to impersonate.
-   */
-  @Test
-  public void testGetItemInfoObjectWithServiceAccountsToImpersonate() throws IOException {
-    StorageObject storageObject = newStorageObject(BUCKET_NAME, OBJECT_NAME);
-
-    GenerateAccessTokenResponse accessTokenRes = new GenerateAccessTokenResponse();
-    accessTokenRes.setAccessToken("test-token");
-    MockHttpTransport transport =
-        mockTransport(jsonDataResponse(accessTokenRes), jsonDataResponse(storageObject));
-
-    GoogleCloudStorage gcs =
-        mockedGcs(
-            GCS_OPTIONS.toBuilder()
-                .setImpersonationServiceAccounts(
-                    ImmutableMap.of(
-                        new StorageResourceId(BUCKET_NAME, OBJECT_NAME).toString(),
-                        "test-service-account"))
-                .build(),
-            transport);
-
-    GoogleCloudStorageItemInfo info =
-        gcs.getItemInfo(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
-
-    GoogleCloudStorageItemInfo expected =
-        GoogleCloudStorageImpl.createItemInfoForStorageObject(
-            new StorageResourceId(BUCKET_NAME, OBJECT_NAME), storageObject);
-    assertThat(info).isEqualTo(expected);
-  }
-
-  /**
-   * Test GoogleCloudStorage.getItemInfo(StorageResourceId) when arguments represent an object in a
-   * bucket with non-matching service accounts to impersonate.
-   */
-  @Test
-  public void testGetItemInfoObjectWithNonMatchingServiceAccounts() throws IOException {
-    StorageObject storageObject = newStorageObject(BUCKET_NAME, OBJECT_NAME);
-    MockHttpTransport transport = mockTransport(jsonDataResponse(storageObject));
-    GoogleCloudStorage gcs =
-        mockedGcs(
-            GCS_OPTIONS.toBuilder()
-                .setImpersonationServiceAccounts(
-                    ImmutableMap.of("invalid-prefix", "test-service-account"))
-                .build(),
-            transport);
-
-    GoogleCloudStorageItemInfo info =
-        gcs.getItemInfo(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
-
-    GoogleCloudStorageItemInfo expected =
-        GoogleCloudStorageImpl.createItemInfoForStorageObject(
-            new StorageResourceId(BUCKET_NAME, OBJECT_NAME), storageObject);
     assertThat(info).isEqualTo(expected);
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(getRequestString(BUCKET_NAME, OBJECT_NAME))

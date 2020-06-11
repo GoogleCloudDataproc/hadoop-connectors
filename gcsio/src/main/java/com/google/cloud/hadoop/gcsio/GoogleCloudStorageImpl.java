@@ -23,7 +23,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Sets.newConcurrentHashSet;
 
 import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.batch.json.JsonBatchCallback;
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
@@ -52,8 +51,6 @@ import com.google.api.services.storage.model.RewriteResponse;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
-import com.google.cloud.hadoop.util.CredentialFactory;
-import com.google.cloud.hadoop.util.GoogleCredentialWithIamAccessToken;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
@@ -190,9 +187,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // Request initializer to use for batch and non-batch requests.
   private HttpRequestInitializer httpRequestInitializer;
 
-  // HTTP transport to use for batch and non-batch requests.
-  private HttpTransport httpTransport;
-
   // Configuration values for this instance
   private final GoogleCloudStorageOptions storageOptions;
 
@@ -232,7 +226,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     this.httpRequestInitializer = httpRequestInitializer;
 
-    this.httpTransport =
+    HttpTransport httpTransport =
         HttpTransportFactory.createHttpTransport(
             options.getTransportType(),
             options.getProxyAddress(),
@@ -274,7 +268,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     if (gcs.getRequestFactory() != null) {
       this.httpRequestInitializer = gcs.getRequestFactory().getInitializer();
-      this.httpTransport = gcs.getRequestFactory().getTransport();
     }
   }
 
@@ -1378,58 +1371,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   /**
-   * TODO(hgong): Maybe a pre-filter can be done to filter out only the keys that match certain
-   * object name prefix pattern.
-   */
-  private String getMatchedObjectNamePrefix(Map<String, String> prefixes, String targetPrefix) {
-    if (prefixes.isEmpty()) {
-      return null;
-    }
-
-    String matchedPrefix = null;
-    for (Map.Entry<String, String> entry : prefixes.entrySet()) {
-      String currentPrefix = entry.getKey();
-      if (targetPrefix.startsWith(currentPrefix)
-          && (matchedPrefix == null || currentPrefix.length() > matchedPrefix.length())) {
-        matchedPrefix = currentPrefix;
-      }
-    }
-
-    return matchedPrefix;
-  }
-
-  private void impersonateOnObjectNamePrefixIfNecessary(String objectNamePrefix)
-      throws IOException {
-    Map<String, String> serviceAccounts = storageOptions.getImpersonationServiceAccounts();
-    if (serviceAccounts.isEmpty()) {
-      return;
-    }
-
-    String matchedPrefix = getMatchedObjectNamePrefix(serviceAccounts, objectNamePrefix);
-    if (matchedPrefix == null) {
-      return;
-    }
-
-    String serviceAccountToImpersonate = serviceAccounts.get(matchedPrefix);
-    GoogleCredential impersonatedCredential =
-        new GoogleCredentialWithIamAccessToken(
-            httpTransport,
-            httpRequestInitializer,
-            serviceAccountToImpersonate,
-            CredentialFactory.GCS_SCOPES);
-    HttpRequestInitializer newHttpRequestInitializer =
-        new RetryHttpInitializer(
-            checkNotNull(impersonatedCredential, "credential must not be null"),
-            storageOptions.toRetryHttpInitializerOptions());
-    this.gcs =
-        new Storage.Builder(httpTransport, JSON_FACTORY, newHttpRequestInitializer)
-            .setRootUrl(storageOptions.getStorageRootUrl())
-            .setServicePath(storageOptions.getStorageServicePath())
-            .setApplicationName(storageOptions.getAppName())
-            .build();
-  }
-
-  /**
    * See {@link GoogleCloudStorage#listObjectNames(String, String, String)}
    * for details about expected behavior.
    */
@@ -1437,7 +1378,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   public List<String> listObjectNames(
       String bucketName, String objectNamePrefix, String delimiter)
       throws IOException {
-    impersonateOnObjectNamePrefixIfNecessary(objectNamePrefix);
     return listObjectNames(
         bucketName, objectNamePrefix, delimiter, GoogleCloudStorage.MAX_RESULTS_UNLIMITED);
   }
@@ -1884,7 +1824,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   public GoogleCloudStorageItemInfo getItemInfo(StorageResourceId resourceId)
       throws IOException {
     logger.atFine().log("getItemInfo(%s)", resourceId);
-    impersonateOnObjectNamePrefixIfNecessary(resourceId.toString());
+
     // Handle ROOT case first.
     if (resourceId.isRoot()) {
       return GoogleCloudStorageItemInfo.ROOT_INFO;

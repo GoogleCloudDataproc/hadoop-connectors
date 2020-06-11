@@ -16,9 +16,10 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_LAZY_INITIALIZATION_ENABLE;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.IMPERSONATION_IDENTIFIER_PREFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.GROUP_IMPERSONATION_IDENTIFIER_PREFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.USER_IMPERSONATION_IDENTIFIER_PREFIX;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
@@ -225,7 +226,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
         AccessTokenProvider.class);
     config.set(
         GCS_CONFIG_PREFIX
-            + IMPERSONATION_IDENTIFIER_PREFIX.getKey()
+            + USER_IMPERSONATION_IDENTIFIER_PREFIX.getKey()
             + UserGroupInformation.getCurrentUser().getShortUserName(),
         "test-service-account");
 
@@ -250,9 +251,39 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
         AccessTokenProvider.class);
     config.set(
         GCS_CONFIG_PREFIX
-            + IMPERSONATION_IDENTIFIER_PREFIX.getKey()
+            + GROUP_IMPERSONATION_IDENTIFIER_PREFIX.getKey()
             + UserGroupInformation.getCurrentUser().getGroupNames()[0],
         "test-service-account");
+
+    URI gsUri = new URI("gs://foobar/");
+    GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+
+    Exception exception =
+        assertThrows(
+            GoogleJsonResponseException.class,
+            () -> {
+              ghfs.initialize(gsUri, config);
+            });
+    assertThat(exception).hasMessageThat().startsWith("401 Unauthorized");
+  }
+
+  @Test
+  public void testImpsersonationUserAndGroupNameIdentifiersUsed() throws Exception {
+    Configuration config = new Configuration();
+    config.setClass(
+        "fs.gs.auth.access.token.provider.impl",
+        TestingAccessTokenProvider.class,
+        AccessTokenProvider.class);
+    config.set(
+        GCS_CONFIG_PREFIX
+            + USER_IMPERSONATION_IDENTIFIER_PREFIX.getKey()
+            + UserGroupInformation.getCurrentUser().getShortUserName(),
+        "test-service-account1");
+    config.set(
+        GCS_CONFIG_PREFIX
+            + GROUP_IMPERSONATION_IDENTIFIER_PREFIX.getKey()
+            + UserGroupInformation.getCurrentUser().getGroupNames()[0],
+        "test-service-account2");
 
     URI gsUri = new URI("gs://foobar/");
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
@@ -274,7 +305,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
     config.set(
-        GCS_CONFIG_PREFIX + IMPERSONATION_IDENTIFIER_PREFIX.getKey() + "invalid-user",
+        GCS_CONFIG_PREFIX + USER_IMPERSONATION_IDENTIFIER_PREFIX.getKey() + "invalid-user",
         "test-service-account");
 
     URI gsUri = new URI("gs://foobar/");
