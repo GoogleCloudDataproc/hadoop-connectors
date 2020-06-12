@@ -83,8 +83,8 @@ public class HadoopCredentialConfigurationTest {
           put(".proxy.password", null);
           put(".proxy.username", null);
           put(".auth.impersonation.service.account", null);
-          put(".auth.impersonation.service.account.user.", ImmutableMap.of());
-          put(".auth.impersonation.service.account.group.", ImmutableMap.of());
+          put(".auth.impersonation.service.account.for.user.", ImmutableMap.of());
+          put(".auth.impersonation.service.account.for.group.", ImmutableMap.of());
         }
       };
 

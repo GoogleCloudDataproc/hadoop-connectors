@@ -1508,21 +1508,21 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
             .build()
             .getCloudStorageOptions();
 
-    String serviceAccountFromUserOrGroup =
-        getMatchedServiceAccountToImpersonateFromGroup(
-                options.getUserImpersonationServiceAccounts(),
-                ImmutableList.of(UserGroupInformation.getCurrentUser().getShortUserName()))
-            .orElse(
-                getMatchedServiceAccountToImpersonateFromGroup(
-                        options.getGroupImpersonationServiceAccounts(),
-                        ImmutableList.copyOf(UserGroupInformation.getCurrentUser().getGroupNames()))
-                    .orElse(null));
-
     String serviceAccountToImpersonate =
         IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
             .withPrefixes(CONFIG_KEY_PREFIXES)
             .get(config, config::get);
     if (isNullOrEmpty(serviceAccountToImpersonate)) {
+      String serviceAccountFromUserOrGroup =
+          getMatchedServiceAccountToImpersonateFromGroup(
+                  options.getUserImpersonationServiceAccounts(),
+                  ImmutableList.of(UserGroupInformation.getCurrentUser().getShortUserName()))
+              .orElse(
+                  getMatchedServiceAccountToImpersonateFromGroup(
+                          options.getGroupImpersonationServiceAccounts(),
+                          ImmutableList.copyOf(
+                              UserGroupInformation.getCurrentUser().getGroupNames()))
+                      .orElse(null));
       serviceAccountToImpersonate = serviceAccountFromUserOrGroup;
     }
 
