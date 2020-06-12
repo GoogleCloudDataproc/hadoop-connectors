@@ -1503,17 +1503,12 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   private static Optional<Credential> getImpersonatedCredential(
       Configuration config, Credential credential) throws IOException {
-    String serviceAccountToImpersonate =
-        IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
-            .withPrefixes(CONFIG_KEY_PREFIXES)
-            .get(config, config::get);
-
     GoogleCloudStorageOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config)
             .build()
             .getCloudStorageOptions();
 
-    serviceAccountToImpersonate =
+    String serviceAccountFromUserOrGroup =
         getMatchedServiceAccountToImpersonateFromGroup(
                 options.getUserImpersonationServiceAccounts(),
                 ImmutableList.of(UserGroupInformation.getCurrentUser().getShortUserName()))
@@ -1521,7 +1516,15 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 getMatchedServiceAccountToImpersonateFromGroup(
                         options.getGroupImpersonationServiceAccounts(),
                         ImmutableList.copyOf(UserGroupInformation.getCurrentUser().getGroupNames()))
-                    .orElse(serviceAccountToImpersonate));
+                    .orElse(null));
+
+    String serviceAccountToImpersonate =
+        IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
+            .withPrefixes(CONFIG_KEY_PREFIXES)
+            .get(config, config::get);
+    if (isNullOrEmpty(serviceAccountToImpersonate)) {
+      serviceAccountToImpersonate = serviceAccountFromUserOrGroup;
+    }
 
     if (isNullOrEmpty(serviceAccountToImpersonate)) {
       return Optional.empty();

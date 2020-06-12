@@ -298,6 +298,38 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   }
 
   @Test
+  public void testImpsersonationServiceAccountAndUserAndGroupNameIdentifierUsed() throws Exception {
+    Configuration config = new Configuration();
+    config.setClass(
+        "fs.gs.auth.access.token.provider.impl",
+        TestingAccessTokenProvider.class,
+        AccessTokenProvider.class);
+    config.set(
+        GCS_CONFIG_PREFIX + IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey(), "test-service-account1");
+    config.set(
+        GCS_CONFIG_PREFIX
+            + USER_IMPERSONATION_IDENTIFIER_PREFIX.getKey()
+            + UserGroupInformation.getCurrentUser().getShortUserName(),
+        "test-service-account2");
+    config.set(
+        GCS_CONFIG_PREFIX
+            + GROUP_IMPERSONATION_IDENTIFIER_PREFIX.getKey()
+            + UserGroupInformation.getCurrentUser().getGroupNames()[0],
+        "test-service-account3");
+
+    URI gsUri = new URI("gs://foobar/");
+    GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+
+    Exception exception =
+        assertThrows(
+            GoogleJsonResponseException.class,
+            () -> {
+              ghfs.initialize(gsUri, config);
+            });
+    assertThat(exception).hasMessageThat().startsWith("401 Unauthorized");
+  }
+
+  @Test
   public void testImpsersonationInvalidUserNameIdentifierUsed() throws Exception {
     Configuration config = new Configuration();
     config.setClass(
