@@ -271,7 +271,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
   }
 
   @Test
-  public void testSingleImpersonationIdentifier() {
+  public void testImpersonationIdentifier() {
     Configuration config = new Configuration();
     config.set(
         GCS_CONFIG_PREFIX + USER_IMPERSONATION_IDENTIFIER_PREFIX.getKey() + "test-user",

@@ -75,8 +75,8 @@
 1.  Add properties to impersonate a service account through user or group name:
 
     ```
-    fs.gs.auth.user.impersonation.<USER_NAME> (not set by default)
-    fs.gs.auth.group.impersonation.<GROUP_NAME> (not set by default)
+    fs.gs.auth.impersonation.service.account.user.<USER_NAME> (not set by default)
+    fs.gs.auth.impersonation.service.account.group.<GROUP_NAME> (not set by default)
     ```
 
     If any of these properties is set, an access token will be generated for

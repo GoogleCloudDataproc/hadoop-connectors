@@ -1512,13 +1512,16 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config)
             .build()
             .getCloudStorageOptions();
-    if (isNullOrEmpty(serviceAccountToImpersonate)) {
-      serviceAccountToImpersonate = getMatchedServiceAccountToImpersonateFromUser(options);
-    }
 
-    if (isNullOrEmpty(serviceAccountToImpersonate)) {
-      serviceAccountToImpersonate = getMatchedServiceAccountToImpersonateFromGroup(options);
-    }
+    serviceAccountToImpersonate =
+        getMatchedServiceAccountToImpersonateFromGroup(
+                options.getUserImpersonationServiceAccounts(),
+                ImmutableList.of(UserGroupInformation.getCurrentUser().getShortUserName()))
+            .orElse(
+                getMatchedServiceAccountToImpersonateFromGroup(
+                        options.getGroupImpersonationServiceAccounts(),
+                        ImmutableList.copyOf(UserGroupInformation.getCurrentUser().getGroupNames()))
+                    .orElse(serviceAccountToImpersonate));
 
     if (isNullOrEmpty(serviceAccountToImpersonate)) {
       return Optional.empty();
@@ -1539,28 +1542,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     return Optional.of(impersonatedCredential.createScoped(CredentialFactory.GCS_SCOPES));
   }
 
-  private static String getMatchedServiceAccountToImpersonateFromUser(
-      GoogleCloudStorageOptions options) throws IOException {
-    Map<String, String> serviceAccountMapping = options.getUserImpersonationServiceAccounts();
-    String userName = UserGroupInformation.getCurrentUser().getShortUserName();
+  private static Optional<String> getMatchedServiceAccountToImpersonateFromGroup(
+      Map<String, String> serviceAccountMapping, List<String> userGroups) {
     for (Map.Entry<String, String> entry : serviceAccountMapping.entrySet()) {
-      if (userName.equals(entry.getKey())) {
-        return entry.getValue();
+      if (userGroups.contains(entry.getKey())) {
+        return Optional.of(entry.getValue());
       }
     }
-    return null;
-  }
-
-  private static String getMatchedServiceAccountToImpersonateFromGroup(
-      GoogleCloudStorageOptions options) throws IOException {
-    Map<String, String> serviceAccountMapping = options.getGroupImpersonationServiceAccounts();
-    List<String> groupNames = Arrays.asList(UserGroupInformation.getCurrentUser().getGroupNames());
-    for (Map.Entry<String, String> entry : serviceAccountMapping.entrySet()) {
-      if (groupNames.contains(entry.getKey())) {
-        return entry.getValue();
-      }
-    }
-    return null;
+    return Optional.empty();
   }
 
   /**

@@ -260,8 +260,8 @@ current user or group name matches with specified user or group name.
 If both are set, then the service account associated with the user name will
 take precedence over the service account associated with the group name.
 
-*   `fs.gs.auth.user.impersonation.<USER_NAME>` (not set by default)
-*   `fs.gs.auth.group.impersonation.<GROUP_NAME>` (not set by default)
+*   `fs.gs.auth.impersonation.service.account.user.<USER_NAME>` (not set by default)
+*   `fs.gs.auth.impersonation.service.account.group.<GROUP_NAME>` (not set by default)
 
 ### IO configuration
 
