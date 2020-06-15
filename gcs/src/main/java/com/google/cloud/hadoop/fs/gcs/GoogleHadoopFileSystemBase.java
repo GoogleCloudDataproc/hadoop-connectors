@@ -1513,17 +1513,17 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
             .withPrefixes(CONFIG_KEY_PREFIXES)
             .get(config, config::get);
     if (isNullOrEmpty(serviceAccountToImpersonate)) {
-      String serviceAccountFromUserOrGroup =
+      Optional<String> serviceAccountToImpersonateFromUser =
           getMatchedServiceAccountToImpersonateFromGroup(
-                  options.getUserImpersonationServiceAccounts(),
-                  ImmutableList.of(UserGroupInformation.getCurrentUser().getShortUserName()))
-              .orElse(
-                  getMatchedServiceAccountToImpersonateFromGroup(
-                          options.getGroupImpersonationServiceAccounts(),
-                          ImmutableList.copyOf(
-                              UserGroupInformation.getCurrentUser().getGroupNames()))
-                      .orElse(null));
-      serviceAccountToImpersonate = serviceAccountFromUserOrGroup;
+              options.getUserImpersonationServiceAccounts(),
+              ImmutableList.of(UserGroupInformation.getCurrentUser().getShortUserName()));
+      Optional<String> serviceAccountToImpersonateFromGroup =
+          getMatchedServiceAccountToImpersonateFromGroup(
+              options.getGroupImpersonationServiceAccounts(),
+              ImmutableList.copyOf(UserGroupInformation.getCurrentUser().getGroupNames()));
+      serviceAccountToImpersonate =
+          serviceAccountToImpersonateFromUser.orElse(
+              serviceAccountToImpersonateFromGroup.orElse(null));
     }
 
     if (isNullOrEmpty(serviceAccountToImpersonate)) {
