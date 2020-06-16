@@ -20,6 +20,33 @@
     if stream already closed. This fixes Spark Streaming jobs checkpointing to
     Cloud Storage.
 
+1.  Add a property to impersonate a service account:
+
+    ```
+    fs.gs.auth.impersonation.service.account (not set by default)
+    ```
+
+    If this property is set, an access token will be generated for this service
+    account to access GCS. The caller who issues a request for the access token
+    must have been granted the Service Account Token Creator role
+    (`roles/iam.serviceAccountTokenCreator`) on the service account to
+    impersonate.
+
+
+1.  Add properties to impersonate a service account through user or group name:
+
+    ```
+    fs.gs.auth.impersonation.service.account.for.user.<USER_NAME> (not set by default)
+    fs.gs.auth.impersonation.service.account.for.group.<GROUP_NAME> (not set by default)
+    ```
+
+    If any of these properties is set, an access token will be generated for
+    the service account associated with specified user name or group name in
+    order to access GCS. The caller who issues a request for the access token
+    must have been granted the Service Account Token Creator role
+    (`roles/iam.serviceAccountTokenCreator`) on the service account to
+    impersonate.
+
 ### 2.1.3 - 2020-05-08
 
 1.  Add support for Cloud Storage objects CSEK encryption:
@@ -53,18 +80,6 @@
 ### 2.1.2 - 2020-04-02
 
 1.  Update all dependencies to latest versions.
-
-1.  Add a property to impersonate a service account:
-
-    ```
-    fs.gs.auth.impersonation.service.account (not set by default)
-    ```
-
-    If this property is set, an access token will be generated for this service
-    account to access GCS. The caller who issues a request for the access token
-    must have been granted the Service Account Token Creator role
-    (`roles/iam.serviceAccountTokenCreator`) on the service account to
-    impersonate.
 
 ### 2.1.1 - 2020-03-11
 

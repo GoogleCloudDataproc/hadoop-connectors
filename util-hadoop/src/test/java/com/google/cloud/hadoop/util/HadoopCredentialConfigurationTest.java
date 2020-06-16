@@ -41,6 +41,7 @@ import com.google.api.client.http.HttpTransport;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.cloud.hadoop.util.CredentialFactory.GoogleCredentialWithRetry;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Resources;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -83,6 +84,8 @@ public class HadoopCredentialConfigurationTest {
           put(".proxy.password", null);
           put(".proxy.username", null);
           put(".auth.impersonation.service.account", null);
+          put(".auth.impersonation.service.account.for.user.", ImmutableMap.of());
+          put(".auth.impersonation.service.account.for.group.", ImmutableMap.of());
         }
       };
 
