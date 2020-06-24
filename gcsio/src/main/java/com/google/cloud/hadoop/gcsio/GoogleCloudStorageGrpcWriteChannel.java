@@ -78,7 +78,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
   // Number of insert requests to retain, in case we need to rewind and resume an upload. Using too
   // small of a number could risk being unable to resume the write if the resume point is an
-  // 'already-discarded buffer; and setting the value too high wastes RAM. Note: We could have a
+  // already-discarded buffer; and setting the value too high wastes RAM. Note: We could have a
   // more complex implementation that periodically queries the service to find out the last
   // committed offset, to determine what's safe to discard, but that would also impose a performance
   // penalty.
@@ -237,7 +237,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
       private Object response;
       private ByteString chunkData;
       private Hasher objectHasher;
-      private boolean isReadyHandleExecuted = false;
 
       // CountDownLatch tracking completion of the streaming RPC. Set on error, or once the request
       // stream is closed.
@@ -261,12 +260,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
             new Runnable() {
               @Override
               public void run() {
-                if (objectFinalized || isReadyHandleExecuted) {
+                if (objectFinalized) {
                   // onReadyHandler may be called after we've closed the request half of the stream.
                   return;
                 }
-
-                isReadyHandleExecuted = true;
 
                 InsertObjectRequest.Builder requestBuilder = null;
                 // Create new request builder if the writeOffset grows over inserts. Otherwise
@@ -353,7 +350,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
               // querying the current committed offset.
               private InsertObjectRequest.Builder buildRequestFromCachedDataChunk(
                   TreeMap<Long, ByteString> dataChunkMap) {
-                // Resume will only work if the first request builder in the cache carries a offset
+                // Resume will only work if the first request builder in the cache carries an offset
                 // not greater than the current writeOffset.
                 InsertObjectRequest.Builder requestBuilder = null;
                 if (dataChunkMap.size() > 0 && dataChunkMap.firstKey() <= writeOffset) {
@@ -405,7 +402,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
                           String.format(
                               "Didn't have enough data buffered for attempt to resume upload for"
                                   + " uploadID %s: last committed offset=%s, earliest buffered"
-                                  + " offset=%s.",
+                                  + " offset=%s. Upload must be restarted from the beginning.",
                               uploadId, writeOffset, dataChunkMap.firstKey()));
                   return null;
                 }
