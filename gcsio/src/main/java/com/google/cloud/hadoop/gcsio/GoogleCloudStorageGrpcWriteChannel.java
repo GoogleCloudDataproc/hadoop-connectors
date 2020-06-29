@@ -169,6 +169,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     // Read end of the pipe.
     private final BufferedInputStream pipeSource;
     private final int MAX_BYTES_PER_MESSAGE = MAX_WRITE_CHUNK_BYTES.getNumber();
+    // A map mapping from write offset to retries that have been made to the corresponding offset.
     private final Map<Long, Integer> retryMap = new HashMap<>();
 
     UploadOperation(InputStream pipeSource) {
@@ -225,6 +226,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       private final long writeOffset;
       private final String uploadId;
+      // A map holding cached data chunks, keyed by the offset to start writing each data chunk.
       private final TreeMap<Long, ByteString> dataChunkMap;
       private volatile boolean objectFinalized = false;
       // The last transient error to occur during the streaming RPC.
