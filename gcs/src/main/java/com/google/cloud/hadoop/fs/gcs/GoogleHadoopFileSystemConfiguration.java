@@ -36,6 +36,7 @@ import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
 import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
 import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
+import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -412,6 +413,17 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<RedactedString> GCS_ENCRYPTION_KEY_HASH =
       new HadoopConfigurationProperty<>("fs.gs.encryption.key.hash");
 
+  /** Configuration for authorization handler. */
+  public static final HadoopConfigurationProperty<Class<? extends AuthorizationHandler>>
+      GCS_AUTHORIZATION_HANDLER_CLASS_IMPL =
+          new HadoopConfigurationProperty<>("fs.gs.authorization.handler.impl");
+
+  /** Configuration prefix for custom authorization hook properties. */
+  public static final HadoopConfigurationProperty<Map<String, String>>
+      GCS_AUTHORIZATION_HANDLER_PROPERTIES_PREFIX =
+          new HadoopConfigurationProperty<>(
+              "fs.gs.authorization.handler.properties.", ImmutableMap.of());
+
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
   // @VisibleForTesting
@@ -469,7 +481,14 @@ public class GoogleHadoopFileSystemConfiguration {
         .setEncryptionAlgorithm(GCS_ENCRYPTION_ALGORITHM.get(config, config::get))
         .setEncryptionKey(RedactedString.create(GCS_ENCRYPTION_KEY.getPassword(config)))
         .setEncryptionKeyHash(RedactedString.create(GCS_ENCRYPTION_KEY_HASH.getPassword(config)))
-        .setGrpcEnabled(GCS_GRPC_ENABLE.get(config, config::getBoolean));
+        .setGrpcEnabled(GCS_GRPC_ENABLE.get(config, config::getBoolean))
+        .setAuthorizationHandlerClass(
+            GCS_AUTHORIZATION_HANDLER_CLASS_IMPL.get(
+                config,
+                (lookupKey, defaultValue) ->
+                    config.getClass(lookupKey, defaultValue, AuthorizationHandler.class)))
+        .setAuthorizationHandlerProperties(
+            GCS_AUTHORIZATION_HANDLER_PROPERTIES_PREFIX.getPropsWithPrefix(config));
   }
 
   private static PerformanceCachingGoogleCloudStorageOptions getPerformanceCachingOptions(
