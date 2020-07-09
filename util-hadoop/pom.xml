@@ -118,7 +118,7 @@
     </dependency>
     <dependency>
       <groupId>com.github.stefanbirkner</groupId>
-      <artifactId>system-rules</artifactId>
+      <artifactId>system-lambda</artifactId>
     </dependency>
   </dependencies>
 </project>
