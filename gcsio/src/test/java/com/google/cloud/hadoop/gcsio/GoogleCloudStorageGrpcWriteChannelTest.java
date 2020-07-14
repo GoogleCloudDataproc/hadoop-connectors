@@ -677,7 +677,6 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
       private Object object = DEFAULT_OBJECT;
       Throwable insertRequestException;
       boolean resumeFromInsertException = false;
-      boolean hasOnNextBeenCalled = false;
 
       @Override
       public void onNext(InsertObjectRequest request) {
