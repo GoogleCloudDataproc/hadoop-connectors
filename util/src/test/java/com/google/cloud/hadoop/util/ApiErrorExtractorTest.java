@@ -87,7 +87,7 @@ public class ApiErrorExtractorTest {
     rateLimited = googleJsonResponseException(POSSIBLE_RATE_LIMIT, errorInfo, "");
     errorInfo.setDomain(ApiErrorExtractor.GLOBAL_DOMAIN);
     bigqueryRateLimited = googleJsonResponseException(POSSIBLE_RATE_LIMIT, errorInfo, "");
-    errorInfo.setReason(ApiErrorExtractor.QUOTA_EXCEEDED);
+    errorInfo.setReason(ApiErrorExtractor.QUOTA_EXCEEDED_REASON);
     quotaExceeded = googleJsonResponseException(POSSIBLE_RATE_LIMIT, errorInfo, "");
   }
 
