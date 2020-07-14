@@ -89,8 +89,8 @@
 
     <apache.httpclient.version>4.5.12</apache.httpclient.version>
     <apache.httpcore.version>4.4.13</apache.httpcore.version>
-    <google.api.gax.version>1.57.0</google.api.gax.version>
-    <google.api.grpc.proto-google-bigquerystorage-v1beta1.version>0.99.0</google.api.grpc.proto-google-bigquerystorage-v1beta1.version>
+    <google.api.gax.version>1.57.1</google.api.gax.version>
+    <google.api.grpc.proto-google-bigquerystorage-v1beta1.version>0.101.1</google.api.grpc.proto-google-bigquerystorage-v1beta1.version>
     <google.api.grpc.proto-google-common-protos.version>1.18.0</google.api.grpc.proto-google-common-protos.version>
     <google.api.grpc.proto-google-iam-v1.version>0.13.0</google.api.grpc.proto-google-iam-v1.version>
     <google.api-client.version>1.30.10</google.api-client.version>
