@@ -290,6 +290,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
                         : buildRequestFromPipeData();
 
                 if (requestBuilder == null) {
+                  requestObserver.onError(nonTransientError);
                   return;
                 }
 
@@ -413,6 +414,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
                 }
 
                 if (dataChunk.size() < MAX_BYTES_PER_MESSAGE) {
+                  objectFinalized = true;
                   requestBuilder.setFinishWrite(true);
                   if (checksumsEnabled) {
                     requestBuilder.setObjectChecksums(
@@ -449,7 +451,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
 
       boolean hasFinalized() {
-        return objectFinalized || hasNonTransientError();
+        return objectFinalized;
       }
 
       @Override
@@ -469,6 +471,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
                   : ((StatusRuntimeException) t).getStatus().getCode();
           if (TRANSIENT_ERRORS.contains(code)) {
             transientError = t;
+            objectFinalized = false;
           }
         }
         if (transientError == null) {
@@ -479,6 +482,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
                           + " Status: %s",
                       resourceId, uploadId, writeOffset, statusDesc),
                   t);
+          objectFinalized = true;
         }
         done.countDown();
       }
