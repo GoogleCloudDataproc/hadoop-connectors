@@ -213,10 +213,7 @@ public class ApiErrorExtractor {
    */
   public boolean quotaExceeded(IOException e) {
     ErrorInfo errorInfo = getErrorInfo(e);
-    if (errorInfo != null) {
-      return QUOTA_EXCEEDED_REASON.equals(errorInfo.getReason());
-    }
-    return false;
+    return errorInfo != null && QUOTA_EXCEEDED_REASON.equals(errorInfo.getReason());
   }
 
   /**
