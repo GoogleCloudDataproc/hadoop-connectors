@@ -60,9 +60,9 @@ if [[ $(uname -s) == Darwin ]]; then
   abs_path() {    
    echo "$(cd $(dirname "$1"); pwd)/$(basename "$1")"
   }
-  GCS_TEST_PRIVATE_KEYFILE=$(abs_path "$GCS_TEST_PRIVATE_KEYFILE")
+  GCS_TEST_PRIVATE_KEYFILE=$(abs_path "${GCS_TEST_PRIVATE_KEYFILE}")
   while [[ -L $GCS_TEST_PRIVATE_KEYFILE ]]; do
-    GCS_TEST_PRIVATE_KEYFILE=$(readlink -n "$GCS_TEST_PRIVATE_KEYFILE")
+    GCS_TEST_PRIVATE_KEYFILE=$(readlink -n "${GCS_TEST_PRIVATE_KEYFILE}")
   done
 else
   GCS_TEST_PRIVATE_KEYFILE=$(readlink -n -f "${GCS_TEST_PRIVATE_KEYFILE}")
