@@ -624,16 +624,6 @@
                 <requireMavenVersion>
                   <version>[3.3.9,)</version>
                 </requireMavenVersion>
-                <requireSameVersions>
-                  <dependencies>
-                    <dependency>io.grpc</dependency>
-                  </dependencies>
-                </requireSameVersions>
-                <requireSameVersions>
-                  <dependencies>
-                    <dependency>com.google.protobuf</dependency>
-                  </dependencies>
-                </requireSameVersions>
               </rules>
             </configuration>
           </execution>
