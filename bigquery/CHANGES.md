@@ -1,4 +1,6 @@
-### 1.1.4 - 2020-XX-XX
+### 1.1.5 - 2020-XX-XX
+
+### 1.1.4 - 2020-07-15
 
 1.  Update all dependencies to latest versions.
 
