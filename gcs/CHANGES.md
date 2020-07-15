@@ -47,6 +47,8 @@
     (`roles/iam.serviceAccountTokenCreator`) on the service account to
     impersonate.
 
+1.  Update all dependencies to latest versions.
+
 ### 2.1.3 - 2020-05-08
 
 1.  Add support for Cloud Storage objects CSEK encryption:
