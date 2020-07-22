@@ -360,7 +360,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     Optional<Long> overwriteGeneration =
         resourceId.hasGenerationId()
             ? Optional.of(resourceId.getGenerationId())
-            : Optional.of(getWriteGeneration(resourceId, options.overwriteExisting()));
+            : getWriteGeneration(resourceId, options.overwriteExisting());
 
     ObjectWriteConditions writeConditions =
         new ObjectWriteConditions(overwriteGeneration, Optional.<Long>absent());
@@ -1912,17 +1912,17 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @return the generation of the object
    * @throws IOException if the object already exists and cannot be overwritten
    */
-  private long getWriteGeneration(StorageResourceId resourceId, boolean overwritable)
+  private Optional<Long> getWriteGeneration(StorageResourceId resourceId, boolean overwritable)
       throws IOException {
     logger.atFine().log("getWriteGeneration(%s, %s)", resourceId, overwritable);
     GoogleCloudStorageItemInfo info = getItemInfo(resourceId);
     if (!info.exists()) {
-      return 0L;
+      return overwritable ? Optional.absent() : Optional.of(0L);
     }
     if (info.exists() && overwritable) {
       long generation = info.getContentGeneration();
       Preconditions.checkState(generation != 0, "Generation should not be 0 for an existing item");
-      return generation;
+      return Optional.of(generation);
     }
     throw new FileAlreadyExistsException(String.format("Object %s already exists.", resourceId));
   }
@@ -2063,7 +2063,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     compose.setIfGenerationMatch(
         destination.hasGenerationId()
             ? destination.getGenerationId()
-            : getWriteGeneration(destination, true));
+            : getWriteGeneration(destination, true).get());
 
     logger.atFine().log("composeObjects.execute()");
     GoogleCloudStorageItemInfo compositeInfo =
