@@ -42,6 +42,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.ClassRule;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -375,7 +376,10 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     assertThat(readText).isEqualTo(text);
   }
 
+  // TODO: Re-enable this for unit test after updating local ImMemoryGoogleCloudStorage to mirror
+  // prod GCS behavior for concurrent overwrite.
   @Test
+  @Ignore
   public void testConcurrentCreationWithoutOverwrite_onlyOneSucceeds() throws IOException {
     // Get a temp path and ensure that it does not already exist.
     URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();

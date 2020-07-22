@@ -200,7 +200,10 @@ public class GoogleCloudStorageTest {
         .containsExactly(
             getRequestString(BUCKET_NAME, OBJECT_NAME),
             resumableUploadRequestString(
-                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
+                BUCKET_NAME,
+                OBJECT_NAME,
+                /* generationId= */ null,
+                /* replaceGenerationId= */ false),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 1))
         .inOrder();
 
@@ -311,10 +314,16 @@ public class GoogleCloudStorageTest {
         .containsExactly(
             getRequestString(BUCKET_NAME, OBJECT_NAME),
             resumableUploadRequestString(
-                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
+                BUCKET_NAME,
+                OBJECT_NAME,
+                /* generationId= */ null,
+                /* replaceGenerationId= */ false),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 1),
             resumableUploadRequestString(
-                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
+                BUCKET_NAME,
+                OBJECT_NAME,
+                /* generationId= */ null,
+                /* replaceGenerationId= */ false),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 2))
         .inOrder();
 
@@ -365,11 +374,17 @@ public class GoogleCloudStorageTest {
         .containsExactly(
             getRequestString(BUCKET_NAME, OBJECT_NAME),
             resumableUploadRequestString(
-                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
+                BUCKET_NAME,
+                OBJECT_NAME,
+                /* generationId= */ null,
+                /* replaceGenerationId= */ false),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 1),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 2),
             resumableUploadRequestString(
-                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
+                BUCKET_NAME,
+                OBJECT_NAME,
+                /* generationId= */ null,
+                /* replaceGenerationId= */ false),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 3),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 4))
         .inOrder();
@@ -421,10 +436,16 @@ public class GoogleCloudStorageTest {
         .containsExactly(
             getRequestString(BUCKET_NAME, OBJECT_NAME),
             resumableUploadRequestString(
-                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
+                BUCKET_NAME,
+                OBJECT_NAME,
+                /* generationId= */ null,
+                /* replaceGenerationId= */ false),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 1),
             resumableUploadRequestString(
-                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
+                BUCKET_NAME,
+                OBJECT_NAME,
+                /* generationId= */ null,
+                /* replaceGenerationId= */ false),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 2))
         .inOrder();
 
@@ -478,11 +499,17 @@ public class GoogleCloudStorageTest {
         .containsExactly(
             getRequestString(BUCKET_NAME, OBJECT_NAME),
             resumableUploadRequestString(
-                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
+                BUCKET_NAME,
+                OBJECT_NAME,
+                /* generationId= */ null,
+                /* replaceGenerationId= */ false),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 1),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 2),
             resumableUploadRequestString(
-                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
+                BUCKET_NAME,
+                OBJECT_NAME,
+                /* generationId= */ null,
+                /* replaceGenerationId= */ false),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 3),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 4),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 5),

@@ -263,7 +263,6 @@ public class GoogleCloudStorageMockitoTest {
     verify(mockStorageObjectsInsert).setName(eq(OBJECT_NAME));
     verify(mockStorageObjectsInsert).setDisableGZipContent(eq(true));
     verify(mockClientRequestHelper).setChunkSize(any(Storage.Objects.Insert.class), anyInt());
-    verify(mockStorageObjectsInsert).setIfGenerationMatch(eq(0L));
     verify(mockStorageObjects).get(eq(BUCKET_NAME), eq(OBJECT_NAME));
     verify(mockStorageObjectsGet).execute();
     verify(mockErrorExtractor).itemNotFound(any(IOException.class));
@@ -304,7 +303,6 @@ public class GoogleCloudStorageMockitoTest {
     verify(mockStorageObjectsInsert).setDisableGZipContent(eq(true));
     verify(mockStorageObjects).get(anyString(), anyString());
     verify(mockClientRequestHelper).setChunkSize(any(Storage.Objects.Insert.class), anyInt());
-    verify(mockStorageObjectsInsert).setIfGenerationMatch(anyLong());
   }
 
   /**
@@ -337,7 +335,6 @@ public class GoogleCloudStorageMockitoTest {
     verify(mockStorageObjectsGet).execute();
     verify(mockStorageObjectsInsert).setName(eq(OBJECT_NAME));
     verify(mockStorageObjectsInsert).setDisableGZipContent(eq(true));
-    verify(mockStorageObjectsInsert).setIfGenerationMatch(eq(0L));
     verify(mockErrorExtractor).itemNotFound(any(IOException.class));
     verify(mockClientRequestHelper).setChunkSize(any(Storage.Objects.Insert.class), anyInt());
     verify(mockStorageObjectsInsert).execute();
