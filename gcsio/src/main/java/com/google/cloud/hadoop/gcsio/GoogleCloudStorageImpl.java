@@ -1919,7 +1919,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     if (!info.exists()) {
       return overwritable ? Optional.absent() : Optional.of(0L);
     }
-    if (info.exists() && overwritable) {
+    if (overwritable) {
       long generation = info.getContentGeneration();
       Preconditions.checkState(generation != 0, "Generation should not be 0 for an existing item");
       return Optional.of(generation);
@@ -2060,10 +2060,14 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                                 .setMetadata(encodeMetadata(options.getMetadata())))),
             destination.getBucketName());
 
-    compose.setIfGenerationMatch(
-        destination.hasGenerationId()
-            ? destination.getGenerationId()
-            : getWriteGeneration(destination, true).get());
+    if (destination.hasGenerationId()) {
+      compose.setIfGenerationMatch(destination.getGenerationId());
+    } else {
+      // TODO: Investigate if IfGenerationMatch should also be ignored for Cgitompose in certain
+      // case.
+      Optional<Long> generation = getWriteGeneration(destination, true);
+      compose.setIfGenerationMatch(generation.isPresent() ? generation.get() : 0L);
+    }
 
     logger.atFine().log("composeObjects.execute()");
     GoogleCloudStorageItemInfo compositeInfo =
