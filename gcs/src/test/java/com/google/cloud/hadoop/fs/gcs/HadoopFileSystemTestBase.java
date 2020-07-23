@@ -445,6 +445,38 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     assertThat(readText).isEqualTo(text);
   }
 
+  @Test
+  public void testConcurrentCreateExistingObjectWithOverwrite_bothSucceed()
+      throws IOException, ExecutionException, InterruptedException {
+    // Get a temp path and ensure that it does not already exist.
+    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
+    assertThrows(FileNotFoundException.class, () -> ghfs.getFileStatus(hadoopPath));
+
+    String text = "Hello World!";
+    int numBytesWritten = ghfsHelper.writeFile(hadoopPath, text, 1, /* overwrite= */ false);
+    assertThat(numBytesWritten).isEqualTo(text.getBytes(UTF_8).length);
+
+    ExecutorService executorService = Executors.newFixedThreadPool(2);
+    Future<Integer> future1 =
+        executorService.submit(
+            () -> ghfsHelper.writeFile(hadoopPath, text, 1, /* overwrite= */ true));
+    Future<Integer> future2 =
+        executorService.submit(
+            () -> ghfsHelper.writeFile(hadoopPath, text, 1, /* overwrite= */ true));
+    // wait until result will be ready
+    Integer numBytesWritten1 = future1.get();
+    Integer numBytesWritten2 = future2.get();
+    assertThat(numBytesWritten1).isEqualTo(text.getBytes(UTF_8).length);
+    assertThat(numBytesWritten2).isEqualTo(text.getBytes(UTF_8).length);
+
+    executorService.shutdown();
+
+    // Verify the final write result is as expected.
+    String readText = ghfsHelper.readTextFile(hadoopPath, 0, text.getBytes().length, true);
+    assertThat(readText).isEqualTo(text);
+  }
+
   /** Validates append(). */
   @Test
   public void testAppend() throws IOException {
