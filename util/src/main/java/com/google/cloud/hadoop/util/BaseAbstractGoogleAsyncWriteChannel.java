@@ -16,6 +16,7 @@ package com.google.cloud.hadoop.util;
 
 import static com.google.common.base.Preconditions.checkState;
 
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.common.flogger.GoogleLogger;
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -31,6 +32,7 @@ import java.nio.channels.WritableByteChannel;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 
 /**
  * Skeletal implementation of a WritableByteChannel that executes an asynchronous upload operation
@@ -260,6 +262,14 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
       exception.addSuppressed(e);
       throw exception;
     } catch (ExecutionException e) {
+      GoogleJsonResponseException exception =
+          ApiErrorExtractor.getJsonResponseException(e.getCause());
+      if (exception != null && exception.getStatusCode() == 412) {
+        throw (FileAlreadyExistsException)
+            new FileAlreadyExistsException(
+                    String.format("Object %s already exists.", getResourceString()))
+                .initCause(e.getCause());
+      }
       if (e.getCause() instanceof Error) {
         throw (Error) e.getCause();
       }

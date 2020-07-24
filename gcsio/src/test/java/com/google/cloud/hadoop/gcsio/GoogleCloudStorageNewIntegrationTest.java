@@ -567,7 +567,6 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
-            getRequestString(testBucket, testFile.getObjectName()),
             resumableUploadRequestString(
                 testBucket,
                 testFile.getObjectName(),
