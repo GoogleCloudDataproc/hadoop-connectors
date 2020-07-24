@@ -108,11 +108,9 @@ class InMemoryGlobberFileSystem extends FileSystem {
     }
 
     FileStatus[] fileStatusArr = new FileStatus[fileStatuses.size()];
-    int i = 0;
-
-    for (FileStatus fs : fileStatuses)
+    for (int i = 0; i < fileStatuses.size(); i++)
     {
-      fileStatusArr[i++] = new FileStatus(fs);
+      fileStatusArr[i++] = new FileStatus(fileStatuses.get(i));
     }
 
     return fileStatusArr;
