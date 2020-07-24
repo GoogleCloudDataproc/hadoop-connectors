@@ -105,7 +105,7 @@ class InMemoryGlobberFileSystem extends FileSystem {
       throw new FileNotFoundException(
           String.format("Path '%s' (qualified: '%s') does not exist.", f, qualifiedPath));
     }
-    return fileStatuses.toArray(new FileStatus[0]);
+    return cloneFileStatusList(fileStatuses);
   }
 
   /** @inheritDoc */
@@ -117,7 +117,7 @@ class InMemoryGlobberFileSystem extends FileSystem {
       throw new FileNotFoundException(
           String.format("Path '%s' (qualified: '%s') does not exist.", f, qualifiedPath));
     }
-    return fileStatus;
+    return new FileStatus(fileStatus);
   }
 
   // Below are unsupported methods that are not used in 'globStatus' calls
@@ -177,5 +177,17 @@ class InMemoryGlobberFileSystem extends FileSystem {
   @Override
   public boolean mkdirs(Path f, FsPermission permission) throws IOException {
     throw new UnsupportedOperationException();
+  }
+
+  private FileStatus[] cloneFileStatusList(List<FileStatus> fileStatusList) throws IOException {
+    FileStatus[] fileStatusArr = new FileStatus[fileStatusList.size()];
+    int i = 0;
+
+    for (FileStatus fs : fileStatusList)
+    {
+      fileStatusArr[i++] = new FileStatus(fs);
+    }
+
+    return fileStatusArr;
   }
 }

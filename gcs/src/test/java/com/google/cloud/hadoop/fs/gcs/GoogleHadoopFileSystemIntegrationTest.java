@@ -54,6 +54,7 @@ import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Before;
@@ -663,6 +664,41 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     try (FSDataOutputStream output = ghfs.create(filePath)) {
       output.write(data);
     }
+  }
+
+  @Test
+  public void testGlobStatusPathExpansionAndFilter() throws IOException {
+    Path testRoot = new Path("/parent");
+    ghfs.mkdirs(testRoot);
+    ghfs.mkdirs(new Path("/parent/date"));
+    ghfs.mkdirs(new Path("/parent/date/2020"));
+    ghfs.mkdirs(new Path("/parent/date/2020/07"));
+    ghfs.mkdirs(new Path("/parent/date/2020/07/17"));
+    ghfs.mkdirs(new Path("/parent/date/2020/07/18"));
+    ghfs.mkdirs(new Path("/parent/date/2020/07/19"));
+    ghfs.mkdirs(new Path("/parent/date/2020/07/17/0"));
+    ghfs.mkdirs(new Path("/parent/date/2020/07/18/0"));
+    ghfs.mkdirs(new Path("/parent/date/2020/07/19/0"));
+
+    byte[] data = "data".getBytes(StandardCharsets.UTF_8);
+
+    PathFilter FILE_FILTER = path -> path.getName().endsWith(".json");
+
+    createFile(new Path("/parent/date/2020/07/17/0/file1.xml"), data);
+    createFile(new Path("/parent/date/2020/07/17/0/file1.json"), data);
+    createFile(new Path("/parent/date/2020/07/18/0/file2.xml"), data);
+    createFile(new Path("/parent/date/2020/07/18/0/file2.json"), data);
+    createFile(new Path("/parent/date/2020/07/19/0/file3.xml"), data);
+    createFile(new Path("/parent/date/2020/07/19/0/file3.json"), data);
+
+    FileStatus[] files =
+        ghfs.globStatus(new Path("/parent/*/{2020/07/17,2020/07/18,2020/07/19}/*/*"), FILE_FILTER);
+    assertThat(files).hasLength(3);
+    assertThat(files[0].getPath().getName()).isEqualTo("file1.json");
+    assertThat(files[1].getPath().getName()).isEqualTo("file2.json");
+    assertThat(files[2].getPath().getName()).isEqualTo("file3.json");
+
+    assertThat(ghfs.delete(testRoot, /* recursive= */ true)).isTrue();
   }
 
   @Test
