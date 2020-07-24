@@ -21,9 +21,11 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_HTTP_HEADERS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ROOT_URL;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_SERVICE_PATH;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_ADDRESS_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_PASSWORD_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_USERNAME_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.cloud.hadoop.util.testing.HadoopConfigurationUtils.getDefaultProperties;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
@@ -266,5 +268,27 @@ public class GoogleHadoopFileSystemConfigurationTest {
 
     assertThat(options.getStorageRootUrl()).isEqualTo("https://unit-test-storage.googleapis.com/");
     assertThat(options.getStorageServicePath()).isEqualTo("storage/dev_v1/");
+  }
+
+  @Test
+  public void testImpersonationIdentifier() {
+    Configuration config = new Configuration();
+    config.set(
+        GCS_CONFIG_PREFIX + USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey() + "test-user",
+        "test-service-account1");
+    config.set(
+        GCS_CONFIG_PREFIX + GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey() + "test-grp",
+        "test-service-account2");
+
+    assertThat(
+            USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
+                .withPrefixes(ImmutableList.of(GCS_CONFIG_PREFIX))
+                .getPropsWithPrefix(config))
+        .containsExactly("test-user", "test-service-account1");
+    assertThat(
+            GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
+                .withPrefixes(ImmutableList.of(GCS_CONFIG_PREFIX))
+                .getPropsWithPrefix(config))
+        .containsExactly("test-grp", "test-service-account2");
   }
 }
