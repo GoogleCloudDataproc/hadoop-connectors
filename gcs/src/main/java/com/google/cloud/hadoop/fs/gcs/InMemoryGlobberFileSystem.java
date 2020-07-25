@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -107,13 +106,12 @@ class InMemoryGlobberFileSystem extends FileSystem {
           String.format("Path '%s' (qualified: '%s') does not exist.", f, qualifiedPath));
     }
 
-    FileStatus[] fileStatusArr = new FileStatus[fileStatuses.size()];
-    for (int i = 0; i < fileStatuses.size(); i++)
-    {
-      fileStatusArr[i++] = new FileStatus(fileStatuses.get(i));
+    FileStatus[] result = new FileStatus[fileStatuses.size()];
+    for (int i = 0; i < fileStatuses.size(); i++) {
+      // Clone FileStatus objects because they are mutable and Hadoop actually can modify them
+      result[i] = new FileStatus(fileStatuses.get(i));
     }
-
-    return fileStatusArr;
+    return result;
   }
 
   /** @inheritDoc */
@@ -125,6 +123,7 @@ class InMemoryGlobberFileSystem extends FileSystem {
       throw new FileNotFoundException(
           String.format("Path '%s' (qualified: '%s') does not exist.", f, qualifiedPath));
     }
+    // Clone FileStatus object because it is mutable and Hadoop actually can modify it
     return new FileStatus(fileStatus);
   }
 

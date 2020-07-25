@@ -54,7 +54,6 @@ import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Before;
@@ -669,29 +668,30 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   @Test
   public void testGlobStatusPathExpansionAndFilter() throws IOException {
     Path testRoot = new Path("/testGlobStatusPathExpansionAndFilter");
-    ghfs.mkdirs(testRoot);
 
-    byte[] data = "data".getBytes(StandardCharsets.UTF_8);
+    byte[] data = "testGlobStatusPathExpansionAndFilter_data".getBytes(UTF_8);
 
-    createFile(new Path("/testGlobStatusPathExpansionAndFilter/date/2020/07/17/0/file1.xml"), data);
-    createFile(new Path("/testGlobStatusPathExpansionAndFilter/date/2020/07/17/0/file1.json"), data);
-    createFile(new Path("/testGlobStatusPathExpansionAndFilter/date/2020/07/18/0/file2.xml"), data);
-    createFile(new Path("/testGlobStatusPathExpansionAndFilter/date/2020/07/18/0/file2.json"), data);
-    createFile(new Path("/testGlobStatusPathExpansionAndFilter/date/2020/07/19/0/file3.xml"), data);
-    createFile(new Path("/testGlobStatusPathExpansionAndFilter/date/2020/07/19/0/file3.json"), data);
+    createFile(testRoot.suffix("/date/2020/07/17/0/file1.xml"), data);
+    createFile(testRoot.suffix("/date/2020/07/17/0/file1.json"), data);
+    createFile(testRoot.suffix("/date/2020/07/18/0/file2.xml"), data);
+    createFile(testRoot.suffix("/date/2020/07/18/0/file2.json"), data);
+    createFile(testRoot.suffix("/date/2020/07/19/0/file3.xml"), data);
+    createFile(testRoot.suffix("/date/2020/07/19/0/file3.json"), data);
+    createFile(testRoot.suffix("/date/2020/07/20/0/file4.xml"), data);
+    createFile(testRoot.suffix("/date/2020/07/20/0/file4.json"), data);
 
     FileStatus[] files =
-        ghfs.globStatus(new Path("/testGlobStatusPathExpansionAndFilter/*/{2020/07/17,2020/07/18,2020/07/19}/*/*"),
+        ghfs.globStatus(
+            testRoot.suffix("/*/{2020/07/17,2020/07/18,2020/07/19}/*/*"),
             path -> path.getName().endsWith(".json"));
-    assertThat(files).hasLength(3);
 
-    String workingDir = ghfs.getWorkingDirectory().toString();
-    List<String> fileList =
-        Arrays.stream(files).map(d -> d.getPath().toString()).collect(toImmutableList());
-    assertThat(fileList)
-        .containsExactly(workingDir + "testGlobStatusPathExpansionAndFilter/date/2020/07/17/0/file1.json",
-            workingDir + "testGlobStatusPathExpansionAndFilter/date/2020/07/18/0/file2.json",
-            workingDir + "testGlobStatusPathExpansionAndFilter/date/2020/07/19/0/file3.json");
+    Path workingDirRoot = new Path(ghfs.getWorkingDirectory(), testRoot);
+
+    assertThat(Arrays.stream(files).map(FileStatus::getPath).collect(toImmutableList()))
+        .containsExactly(
+            workingDirRoot.suffix("/date/2020/07/17/0/file1.json"),
+            workingDirRoot.suffix("/date/2020/07/18/0/file2.json"),
+            workingDirRoot.suffix("/date/2020/07/19/0/file3.json"));
 
     assertThat(ghfs.delete(testRoot, /* recursive= */ true)).isTrue();
   }
