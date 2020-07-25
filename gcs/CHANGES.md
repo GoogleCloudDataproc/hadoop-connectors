@@ -1,5 +1,7 @@
 ### 2.1.5 - 2020-XX-XX
 
+1.  Fix complex patterns globbing.
+
 ### 2.1.4 - 2020-07-15
 
 1.  Added a new parameter to configure output stream pipe type:
