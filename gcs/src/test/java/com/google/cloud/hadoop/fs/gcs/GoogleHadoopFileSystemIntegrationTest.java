@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -34,6 +35,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
@@ -553,6 +555,37 @@ public class GoogleHadoopFileSystemIntegrationTest
     try (FSDataOutputStream output = ghfs.create(filePath)) {
       output.write(data);
     }
+  }
+
+  @Test
+  public void testGlobStatusPathExpansionAndFilter() throws IOException {
+    Path testRoot = new Path("/testGlobStatusPathExpansionAndFilter");
+
+    byte[] data = "testGlobStatusPathExpansionAndFilter_data".getBytes(UTF_8);
+
+    createFile(testRoot.suffix("/date/2020/07/17/0/file1.xml"), data);
+    createFile(testRoot.suffix("/date/2020/07/17/0/file1.json"), data);
+    createFile(testRoot.suffix("/date/2020/07/18/0/file2.xml"), data);
+    createFile(testRoot.suffix("/date/2020/07/18/0/file2.json"), data);
+    createFile(testRoot.suffix("/date/2020/07/19/0/file3.xml"), data);
+    createFile(testRoot.suffix("/date/2020/07/19/0/file3.json"), data);
+    createFile(testRoot.suffix("/date/2020/07/20/0/file4.xml"), data);
+    createFile(testRoot.suffix("/date/2020/07/20/0/file4.json"), data);
+
+    FileStatus[] files =
+        ghfs.globStatus(
+            testRoot.suffix("/*/{2020/07/17,2020/07/18,2020/07/19}/*/*"),
+            path -> path.getName().endsWith(".json"));
+
+    Path workingDirRoot = new Path(ghfs.getWorkingDirectory(), testRoot);
+
+    assertThat(Arrays.stream(files).map(FileStatus::getPath).collect(toImmutableList()))
+        .containsExactly(
+            workingDirRoot.suffix("/date/2020/07/17/0/file1.json"),
+            workingDirRoot.suffix("/date/2020/07/18/0/file2.json"),
+            workingDirRoot.suffix("/date/2020/07/19/0/file3.json"));
+
+    assertThat(ghfs.delete(testRoot, /* recursive= */ true)).isTrue();
   }
 
   @Test
