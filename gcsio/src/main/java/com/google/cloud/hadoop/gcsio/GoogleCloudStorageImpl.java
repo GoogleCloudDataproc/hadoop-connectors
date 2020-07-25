@@ -74,6 +74,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.nio.file.FileAlreadyExistsException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -356,8 +357,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
      * generation matches the marker file.
      */
 
-    Optional<Long> overwriteGeneration =
-        options.overwriteExisting() ? Optional.absent() : Optional.of(0L);
+    Optional<Long> overwriteGeneration = options.overwriteExisting() && !resourceId.hasGenerationId() ? Optional.absent() : Optional.of(getWriteGeneration(resourceId));
+
+    boolean fileExsits = overwriteGeneration.isPresent() && overwriteGeneration.get() > 0;
+    if (!resourceId.hasGenerationId() && fileExsits) {
+      throw new FileAlreadyExistsException(String.format("Object %s already exists.", resourceId));
+    }
 
     ObjectWriteConditions writeConditions =
         new ObjectWriteConditions(overwriteGeneration, Optional.<Long>absent());
