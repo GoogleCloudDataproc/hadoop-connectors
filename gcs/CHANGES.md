@@ -87,6 +87,8 @@
 
 1.  Update all dependencies to latest versions.
 
+1.  Support atomic file creation with overwrite in concurrent environment.
+
 ### 2.1.1 - 2020-03-11
 
 1.  Add upload cache to support high-level retries of failed uploads. Cache size
