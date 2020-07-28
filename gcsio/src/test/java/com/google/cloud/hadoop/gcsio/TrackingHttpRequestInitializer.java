@@ -90,7 +90,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   private static final String BATCH_REQUEST = "POST:" + GOOGLEAPIS_ENDPOINT + "/batch/storage/v1";
 
   private static final String COMPOSE_REQUEST_FORMAT =
-      "POST:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o/%s/compose?ifGenerationMatch=%s";
+      "POST:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o/%s/compose";
 
   private static final String CREATE_BUCKET_REQUEST_FORMAT =
       "POST:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b?project=%s";
@@ -290,11 +290,12 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
 
   public static String composeRequestString(
       String bucketName, String object, Integer generationId, boolean replaceGenerationId) {
-    return String.format(
-        COMPOSE_REQUEST_FORMAT,
-        bucketName,
-        urlEncode(object),
-        replaceGenerationId ? "generationId_" + generationId : generationId);
+    String request = String.format(COMPOSE_REQUEST_FORMAT, bucketName, urlEncode(object));
+    return generationId == null
+        ? request
+        : String.format(
+            "%s?ifGenerationMatch=%s",
+            request, replaceGenerationId ? "generationId_" + generationId : generationId);
   }
 
   public static String listBucketsRequestString(String projectId) {

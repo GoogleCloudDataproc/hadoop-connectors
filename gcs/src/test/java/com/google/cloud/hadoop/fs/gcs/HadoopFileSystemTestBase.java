@@ -374,7 +374,8 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     // Try to create the same file again with overwrite == true.
     String textToOverwrite = "World Hello!";
     ghfsHelper.writeFile(hadoopPath, textToOverwrite, 1, /* overwrite= */ true);
-    String readText = ghfsHelper.readTextFile(hadoopPath, 0, textToOverwrite.getBytes().length, true);
+    String readText =
+        ghfsHelper.readTextFile(hadoopPath, 0, textToOverwrite.getBytes().length, true);
     assertThat(readText).isEqualTo(textToOverwrite);
   }
 
@@ -418,8 +419,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   }
 
   @Test
-  public void testConcurrentCreationWithOverwrite_bothSucceed()
-      throws IOException, ExecutionException, InterruptedException {
+  public void testConcurrentCreationWithOverwrite_bothSucceed() throws Exception {
     // Get a temp path and ensure that it does not already exist.
     URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
@@ -429,9 +429,11 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     String text2 = "World Hello!";
     ExecutorService executorService = Executors.newFixedThreadPool(2);
 
-    List<Future<Integer>> futures = executorService.invokeAll(ImmutableList.of(
-        () -> ghfsHelper.writeFile(hadoopPath, text1, 1, /* overwrite= */ true),
-        () -> ghfsHelper.writeFile(hadoopPath, text2, 1, /* overwrite= */ true)));
+    List<Future<Integer>> futures =
+        executorService.invokeAll(
+            ImmutableList.of(
+                () -> ghfsHelper.writeFile(hadoopPath, text1, 1, /* overwrite= */ true),
+                () -> ghfsHelper.writeFile(hadoopPath, text2, 1, /* overwrite= */ true)));
     // wait until result will be ready
     assertThat(futures.get(0).get()).isEqualTo(text1.getBytes(UTF_8).length);
     assertThat(futures.get(1).get()).isEqualTo(text1.getBytes(UTF_8).length);
@@ -444,8 +446,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   }
 
   @Test
-  public void testConcurrentCreateExistingObjectWithOverwrite_bothSucceed()
-      throws IOException, ExecutionException, InterruptedException {
+  public void testConcurrentCreateExistingObjectWithOverwrite_bothSucceed() throws Exception {
     // Get a temp path and ensure that it does not already exist.
     URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
@@ -459,9 +460,11 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     String text2 = "World Hello!";
     ExecutorService executorService = Executors.newFixedThreadPool(2);
 
-    List<Future<Integer>> futures = executorService.invokeAll(ImmutableList.of(
-        () -> ghfsHelper.writeFile(hadoopPath, text1, 1, /* overwrite= */ true),
-        () -> ghfsHelper.writeFile(hadoopPath, text2, 1, /* overwrite= */ true)));
+    List<Future<Integer>> futures =
+        executorService.invokeAll(
+            ImmutableList.of(
+                () -> ghfsHelper.writeFile(hadoopPath, text1, 1, /* overwrite= */ true),
+                () -> ghfsHelper.writeFile(hadoopPath, text2, 1, /* overwrite= */ true)));
     // wait until result will be ready
     assertThat(futures.get(0).get()).isEqualTo(text1.getBytes(UTF_8).length);
     assertThat(futures.get(1).get()).isEqualTo(text1.getBytes(UTF_8).length);

@@ -237,7 +237,7 @@ public class GoogleCloudStorageTest {
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(
             resumableUploadRequestString(
-                BUCKET_NAME, OBJECT_NAME, 13, /* replaceGenerationId= */ false),
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 13, /* replaceGenerationId= */ false),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 1))
         .inOrder();
 
@@ -534,7 +534,6 @@ public class GoogleCloudStorageTest {
 
     MockHttpTransport transport =
         mockTransport(
-            emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
             jsonErrorResponse(ErrorResponses.GONE));
 
@@ -553,7 +552,7 @@ public class GoogleCloudStorageTest {
     IOException writeException = assertThrows(IOException.class, writeChannel::close);
 
     assertThat(writeException).hasCauseThat().isInstanceOf(GoogleJsonResponseException.class);
-    assertThat(writeException).hasCauseThat().hasMessageThat().startsWith("404");
+    assertThat(writeException).hasCauseThat().hasMessageThat().startsWith("410");
   }
 
   /** Test successful operation of GoogleCloudStorage.createEmptyObject(1). */
@@ -2461,9 +2460,7 @@ public class GoogleCloudStorageTest {
     gcs.compose(BUCKET_NAME, sources, OBJECT_NAME, CreateFileOptions.DEFAULT_CONTENT_TYPE);
 
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
-            composeRequestString(BUCKET_NAME, OBJECT_NAME, 1))
+        .containsExactly(composeRequestString(BUCKET_NAME, OBJECT_NAME, /* generationId= */ null))
         .inOrder();
   }
 

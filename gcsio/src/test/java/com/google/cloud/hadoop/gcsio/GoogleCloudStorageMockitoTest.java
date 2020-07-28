@@ -255,7 +255,7 @@ public class GoogleCloudStorageMockitoTest {
         .that(threadsDoneLatch.await(5000, TimeUnit.MILLISECONDS))
         .isTrue();
 
-    verify(mockStorage, times(1)).objects();
+    verify(mockStorage).objects();
     verify(mockStorageObjects)
         .insert(eq(BUCKET_NAME), any(StorageObject.class), any(AbstractInputStreamContent.class));
     verify(mockStorageObjectsInsert).setName(eq(OBJECT_NAME));
@@ -288,7 +288,7 @@ public class GoogleCloudStorageMockitoTest {
     assertThat(thrown).hasCauseThat().isEqualTo(fakeException);
 
     verify(mockStorageObjectsInsert).execute();
-    verify(mockStorage, times(1)).objects();
+    verify(mockStorage).objects();
     verify(mockStorageObjects)
         .insert(eq(BUCKET_NAME), any(StorageObject.class), any(AbstractInputStreamContent.class));
     verify(mockStorageObjectsInsert).setName(eq(OBJECT_NAME));
@@ -319,7 +319,7 @@ public class GoogleCloudStorageMockitoTest {
     Error thrown = assertThrows(Error.class, writeChannel::close);
     assertThat(thrown).isEqualTo(fakeError);
 
-    verify(mockStorage, times(1)).objects();
+    verify(mockStorage).objects();
     verify(mockStorageObjects)
         .insert(eq(BUCKET_NAME), any(StorageObject.class), any(AbstractInputStreamContent.class));
     verify(mockStorageObjectsInsert).setName(eq(OBJECT_NAME));
