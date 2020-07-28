@@ -377,4 +377,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
 
   @Override
   public void testMd5FileChecksum() {}
+
+  @Override
+  public void testConcurrentCreationWithoutOverwrite_onlyOneSucceeds() {}
 }
