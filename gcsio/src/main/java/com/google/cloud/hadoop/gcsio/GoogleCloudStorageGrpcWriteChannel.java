@@ -174,6 +174,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
     private final BufferedInputStream pipeSource;
     private final int MAX_BYTES_PER_MESSAGE = MAX_WRITE_CHUNK_BYTES.getNumber();
 
+    private Hasher objectHasher;
+    private String uploadId;
+
     UploadOperation(InputStream pipeSource) {
       this.pipeSource = new BufferedInputStream(pipeSource, MAX_BYTES_PER_MESSAGE);
     }
@@ -189,45 +192,78 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
     private Object doResumableUpload() throws IOException {
       // Send the initial StartResumableWrite request to get an uploadId.
-      String uploadId = startResumableUpload();
+      uploadId = startResumableUpload();
       InsertChunkResponseObserver responseObserver;
 
       long writeOffset = 0;
       int retriesAttempted = 0;
-      Hasher objectHasher = Hashing.crc32c().newHasher();
+      objectHasher = Hashing.crc32c().newHasher();
+
       // Holds list of most recent number of NUMBER_OF_REQUESTS_TO_RETAIN requests, so upload can be
       // rewound and re-sent upon non-transient errors.
       TreeMap<Long, ByteString> dataChunkMap = new TreeMap<>();
-      do {
-        responseObserver =
-            new InsertChunkResponseObserver(uploadId, writeOffset, objectHasher, dataChunkMap);
-        // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
-        stub.withDeadlineAfter(WRITE_STREAM_TIMEOUT.toMillis(), MILLISECONDS)
-            .insertObject(responseObserver);
-        try {
-          responseObserver.done.await();
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw new IOException(
-              String.format("Resumable upload failed for '%s'", getResourceString()), e);
-        }
+      responseObserver = new InsertChunkResponseObserver(uploadId, writeOffset);
+      // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
+      StreamObserver<InsertObjectRequest> requestStreamObserver =
+          stub.withDeadlineAfter(WRITE_STREAM_TIMEOUT.toMillis(), MILLISECONDS)
+              .insertObject(responseObserver);
+      ByteString data = ByteString.readFrom(ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE));
+      boolean objectFinalized = data.size() < MAX_BYTES_PER_MESSAGE;
+      InsertObjectRequest insertRequest = buildInsertRequest(writeOffset, data, objectFinalized);
+      requestStreamObserver.onNext(insertRequest);
+      while (!objectFinalized) {
+        data = ByteString.readFrom(ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE));
+        objectFinalized = data.size() < MAX_BYTES_PER_MESSAGE;
+        writeOffset += data.size();
+        insertRequest = buildInsertRequest(writeOffset, data, objectFinalized);
+        requestStreamObserver.onNext(insertRequest);
+      }
 
-        if (responseObserver.hasTransientError()) {
-          writeOffset = getCommittedWriteSize(uploadId);
-          ++retriesAttempted;
-        } else {
-          writeOffset += responseObserver.bytesWritten();
-          retriesAttempted = 0;
-        }
+      requestStreamObserver.onCompleted();
 
-        if (retriesAttempted >= UPLOAD_RETRIES) {
-          throw new IOException(
-              String.format(
-                  "Too many retry attempts. Resumable upload failed for '%s'", resourceId));
-        }
-      } while (!responseObserver.hasFinalized());
+      try {
+        responseObserver.done.await();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IOException(
+            String.format("Resumable upload failed for '%s'", getResourceString()), e);
+      }
 
       return responseObserver.getResponseOrThrow();
+    }
+
+    private InsertObjectRequest buildInsertRequest(
+        long writeOffset, ByteString dataChunk, boolean objectFinalized) {
+      InsertObjectRequest.Builder requestBuilder =
+          InsertObjectRequest.newBuilder().setUploadId(uploadId).setWriteOffset(writeOffset);
+
+      if (dataChunk.size() > 0) {
+        ChecksummedData.Builder requestDataBuilder =
+            ChecksummedData.newBuilder().setContent(dataChunk);
+        if (checksumsEnabled) {
+          Hasher chunkHasher = Hashing.crc32c().newHasher();
+          for (ByteBuffer buffer : dataChunk.asReadOnlyByteBufferList()) {
+            chunkHasher.putBytes(buffer);
+          }
+          for (ByteBuffer buffer : dataChunk.asReadOnlyByteBufferList()) {
+            objectHasher.putBytes(buffer);
+          }
+          requestDataBuilder.setCrc32C(
+              UInt32Value.newBuilder().setValue(chunkHasher.hash().asInt()));
+        }
+        requestBuilder.setChecksummedData(requestDataBuilder);
+      }
+
+      if (objectFinalized) {
+        requestBuilder.setFinishWrite(true);
+        if (checksumsEnabled) {
+          requestBuilder.setObjectChecksums(
+              ObjectChecksums.newBuilder()
+                  .setCrc32C(UInt32Value.newBuilder().setValue(objectHasher.hash().asInt())));
+        }
+      }
+
+      return requestBuilder.build();
     }
 
     /** Handler for responses from the Insert streaming RPC. */
@@ -236,9 +272,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       private final long writeOffset;
       private final String uploadId;
-      // A map holding cached data chunks, keyed by the offset to start writing each data chunk.
-      private final TreeMap<Long, ByteString> dataChunkMap;
-      private volatile boolean objectFinalized = false;
       // The last transient error to occur during the streaming RPC.
       private Throwable transientError = null;
       // The last non-transient error to occur during the streaming RPC.
@@ -247,8 +280,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
       private IOException error;
       // The response from the server, populated at the end of a successful streaming RPC.
       private Object response;
-      private ByteString chunkData;
-      private Hasher objectHasher;
       // This flag is to avoid onReady handler of requestObserver from being called multiple times.
       private boolean readyHandlerExecuted = false;
 
@@ -256,177 +287,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
       // stream is closed.
       final CountDownLatch done = new CountDownLatch(1);
 
-      InsertChunkResponseObserver(
-          String uploadId,
-          long writeOffset,
-          Hasher objectHasher,
-          TreeMap<Long, ByteString> dataChunkMap) {
+      InsertChunkResponseObserver(String uploadId, long writeOffset) {
         this.uploadId = uploadId;
-        this.chunkData = ByteString.EMPTY;
         this.writeOffset = writeOffset;
-        this.objectHasher = objectHasher;
-        this.dataChunkMap = dataChunkMap;
-      }
-
-      @Override
-      public void beforeStart(ClientCallStreamObserver<InsertObjectRequest> requestObserver) {
-        requestObserver.setOnReadyHandler(
-            new Runnable() {
-              @Override
-              public void run() {
-                if (objectFinalized || readyHandlerExecuted) {
-                  // onReadyHandler may be called after we've closed the request half of the stream.
-                  return;
-                }
-                readyHandlerExecuted = true;
-
-                // Create new request builder if the writeOffset grows over inserts. Otherwise
-                // something went wrong and resume write from a cached request builder.
-                boolean shouldAttemptRetry =
-                    dataChunkMap.size() > 0 && dataChunkMap.lastKey() >= writeOffset;
-                InsertObjectRequest.Builder requestBuilder =
-                    shouldAttemptRetry
-                        ? buildRequestFromCachedDataChunk(dataChunkMap)
-                        : buildRequestFromPipeData();
-
-                if (requestBuilder == null) {
-                  requestObserver.onError(nonTransientError);
-                  return;
-                }
-
-                requestObserver.onNext(requestBuilder.build());
-                requestObserver.onCompleted();
-              }
-
-              // Handles the case where we're not resuming a write, and instead we need to read data
-              // from the input pipe.
-              private InsertObjectRequest.Builder buildRequestFromPipeData() {
-                try {
-                  chunkData = readRequestData();
-                } catch (IOException e) {
-                  nonTransientError =
-                      new IOException(
-                          String.format(
-                              "InsertChunkResponseObserver.beforeStart for uploadId %s.", uploadId),
-                          e);
-                  return null;
-                }
-
-                InsertObjectRequest.Builder requestBuilder =
-                    InsertObjectRequest.newBuilder()
-                        .setUploadId(uploadId)
-                        .setWriteOffset(writeOffset);
-
-                if (chunkData.size() > 0) {
-                  ChecksummedData.Builder requestDataBuilder =
-                      ChecksummedData.newBuilder().setContent(chunkData);
-                  if (checksumsEnabled) {
-                    Hasher chunkHasher = Hashing.crc32c().newHasher();
-                    for (ByteBuffer buffer : chunkData.asReadOnlyByteBufferList()) {
-                      chunkHasher.putBytes(buffer.duplicate());
-                      // TODO(b/7502351): Switch to "concatenating" the chunk-level crc32c values
-                      //  if/when the hashing library supports that, to avoid re-scanning all data
-                      //  bytes when computing the object-level crc32c.
-                      objectHasher.putBytes(buffer.duplicate());
-                    }
-                    requestDataBuilder.setCrc32C(
-                        UInt32Value.newBuilder().setValue(chunkHasher.hash().asInt()));
-                  }
-                  requestBuilder.setChecksummedData(requestDataBuilder);
-                }
-
-                if (objectFinalized) {
-                  requestBuilder.setFinishWrite(true);
-                  if (checksumsEnabled) {
-                    requestBuilder.setObjectChecksums(
-                        ObjectChecksums.newBuilder()
-                            .setCrc32C(
-                                UInt32Value.newBuilder().setValue(objectHasher.hash().asInt())));
-                  }
-                }
-                if (dataChunkMap.size() == NUMBER_OF_REQUESTS_TO_RETAIN) {
-                  dataChunkMap.remove(dataChunkMap.firstKey());
-                }
-                dataChunkMap.put(writeOffset, chunkData);
-                return requestBuilder;
-              }
-
-              private ByteString readRequestData() throws IOException {
-                ByteString data =
-                    ByteString.readFrom(ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE));
-                pipeSource.mark(1);
-                objectFinalized = data.size() < MAX_BYTES_PER_MESSAGE || pipeSource.read() == -1;
-                pipeSource.reset();
-                return data;
-              }
-
-              // Handles the case when a writeOffset of data read previously is being processed.
-              // This happens if a transient failure happens while uploading, and can be resumed by
-              // querying the current committed offset.
-              private InsertObjectRequest.Builder buildRequestFromCachedDataChunk(
-                  TreeMap<Long, ByteString> dataChunkMap) {
-                // Resume will only work if the first request builder in the cache carries an offset
-                // not greater than the current writeOffset.
-                InsertObjectRequest.Builder requestBuilder = null;
-                if (dataChunkMap.size() > 0 && dataChunkMap.firstKey() <= writeOffset) {
-                  for (Map.Entry<Long, ByteString> entry : dataChunkMap.entrySet()) {
-                    if (entry.getKey() + entry.getValue().size() > writeOffset) {
-                      Long writeOffsetToResume = entry.getKey();
-                      chunkData = entry.getValue();
-                      requestBuilder =
-                          buildRequestFromWriteOffsetAndDataChunk(writeOffsetToResume, chunkData);
-                      break;
-                    }
-                  }
-                }
-                if (requestBuilder == null) {
-                  nonTransientError =
-                      new IOException(
-                          String.format(
-                              "Didn't have enough data buffered for attempt to resume upload for"
-                                  + " uploadID %s: last committed offset=%s, earliest buffered"
-                                  + " offset=%s. Upload must be restarted from the beginning.",
-                              uploadId, writeOffset, dataChunkMap.firstKey()));
-                  return null;
-                }
-                return requestBuilder;
-              }
-
-              private InsertObjectRequest.Builder buildRequestFromWriteOffsetAndDataChunk(
-                  long writeOffset, ByteString dataChunk) {
-                InsertObjectRequest.Builder requestBuilder =
-                    InsertObjectRequest.newBuilder()
-                        .setUploadId(uploadId)
-                        .setWriteOffset(writeOffset);
-
-                if (dataChunk.size() > 0) {
-                  ChecksummedData.Builder requestDataBuilder =
-                      ChecksummedData.newBuilder().setContent(dataChunk);
-                  if (checksumsEnabled) {
-                    Hasher chunkHasher = Hashing.crc32c().newHasher();
-                    for (ByteBuffer buffer : dataChunk.asReadOnlyByteBufferList()) {
-                      chunkHasher.putBytes(buffer);
-                    }
-                    requestDataBuilder.setCrc32C(
-                        UInt32Value.newBuilder().setValue(chunkHasher.hash().asInt()));
-                  }
-                  requestBuilder.setChecksummedData(requestDataBuilder);
-                }
-
-                if (dataChunk.size() < MAX_BYTES_PER_MESSAGE) {
-                  objectFinalized = true;
-                  requestBuilder.setFinishWrite(true);
-                  if (checksumsEnabled) {
-                    requestBuilder.setObjectChecksums(
-                        ObjectChecksums.newBuilder()
-                            .setCrc32C(
-                                UInt32Value.newBuilder().setValue(objectHasher.hash().asInt())));
-                  }
-                }
-
-                return requestBuilder;
-              }
-            });
       }
 
       public Object getResponseOrThrow() throws IOException {
@@ -434,7 +297,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
           throw new IOException(
               String.format("Resumable upload failed for '%s'", getResourceString()),
               nonTransientError);
-        }
+      }
         return checkNotNull(response, "Response not present for '%s'", resourceId);
       }
 
@@ -444,14 +307,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       boolean hasNonTransientError() {
         return nonTransientError != null;
-      }
-
-      int bytesWritten() {
-        return chunkData.size();
-      }
-
-      boolean hasFinalized() {
-        return objectFinalized;
       }
 
       @Override
@@ -471,9 +326,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
                   : ((StatusRuntimeException) t).getStatus().getCode();
           if (TRANSIENT_ERRORS.contains(code)) {
             transientError = t;
-            objectFinalized = false;
-          }
         }
+      }
         if (transientError == null) {
           nonTransientError =
               new IOException(
@@ -482,15 +336,18 @@ public final class GoogleCloudStorageGrpcWriteChannel
                           + " Status: %s",
                       resourceId, uploadId, writeOffset, statusDesc),
                   t);
-          objectFinalized = true;
-        }
+      }
         done.countDown();
       }
 
       @Override
       public void onCompleted() {
         done.countDown();
-      }
+    }
+
+      @Override
+      public void beforeStart(
+          ClientCallStreamObserver<InsertObjectRequest> clientCallStreamObserver) {}
     }
 
     private void runWithRetries(Runnable block, SimpleResponseObserver responseObserver)
