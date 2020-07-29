@@ -363,9 +363,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             : getWriteGeneration(resourceId, options.overwriteExisting());
 
     ObjectWriteConditions writeConditions =
-        new ObjectWriteConditions(
-            com.google.common.base.Optional.fromJavaUtil(writeGeneration),
-            com.google.common.base.Optional.absent());
+        ObjectWriteConditions.builder()
+            .setContentGenerationMatch(writeGeneration.orElse(null))
+            .build();
 
     Map<String, String> rewrittenMetadata = encodeMetadata(options.getMetadata());
 
@@ -381,7 +381,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               resourceId,
               storageOptions.getWriteChannelOptions(),
               writeConditions,
-              com.google.common.base.Optional.fromJavaUtil(requesterPaysProject),
+              requesterPaysProject,
               rewrittenMetadata,
               options.getContentType());
       channel.initialize();
