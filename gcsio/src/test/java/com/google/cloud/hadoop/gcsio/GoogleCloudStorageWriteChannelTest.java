@@ -50,7 +50,7 @@ public class GoogleCloudStorageWriteChannelTest {
             /* contentEncoding= */ null,
             kmsKeyName,
             AsyncWriteChannelOptions.DEFAULT,
-            new ObjectWriteConditions(),
+            ObjectWriteConditions.NONE,
             /* objectMetadata= */ null);
 
     Storage.Objects.Insert request =
