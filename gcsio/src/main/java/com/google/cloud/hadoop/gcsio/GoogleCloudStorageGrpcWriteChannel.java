@@ -176,6 +176,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
     private Hasher objectHasher;
     private String uploadId;
+    private int retriesAttempted = 0;
+    // Holds list of most recent number of NUMBER_OF_REQUESTS_TO_RETAIN requests, so upload can be
+    // rewound and re-sent upon transient errors.
+    private TreeMap<Long, ByteString> dataChunkMap = new TreeMap<>();
 
     UploadOperation(InputStream pipeSource) {
       this.pipeSource = new BufferedInputStream(pipeSource, MAX_BYTES_PER_MESSAGE);
@@ -191,38 +195,57 @@ public final class GoogleCloudStorageGrpcWriteChannel
     }
 
     private Object doResumableUpload() throws IOException {
+      if (retriesAttempted >= UPLOAD_RETRIES) {
+        throw new IOException(
+            String.format("Too many retry attempts. Resumable upload failed for '%s'", resourceId));
+      }
+
       // Send the initial StartResumableWrite request to get an uploadId.
       uploadId = startResumableUpload();
       InsertChunkResponseObserver responseObserver;
 
-      long writeOffset = 0;
-      int retriesAttempted = 0;
+      long writeOffset = retriesAttempted > 0 ? getCommittedWriteSize(uploadId) : 0;
       objectHasher = Hashing.crc32c().newHasher();
 
-      // Holds list of most recent number of NUMBER_OF_REQUESTS_TO_RETAIN requests, so upload can be
-      // rewound and re-sent upon non-transient errors.
-      TreeMap<Long, ByteString> dataChunkMap = new TreeMap<>();
       responseObserver = new InsertChunkResponseObserver(uploadId, writeOffset);
       // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
       StreamObserver<InsertObjectRequest> requestStreamObserver =
           stub.withDeadlineAfter(WRITE_STREAM_TIMEOUT.toMillis(), MILLISECONDS)
               .insertObject(responseObserver);
-      ByteString data = ByteString.readFrom(ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE));
-      boolean objectFinalized = data.size() < MAX_BYTES_PER_MESSAGE;
-      InsertObjectRequest insertRequest = buildInsertRequest(writeOffset, data, objectFinalized);
-      requestStreamObserver.onNext(insertRequest);
+
+      boolean objectFinalized = false;
       while (!objectFinalized) {
-        data = ByteString.readFrom(ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE));
-        objectFinalized = data.size() < MAX_BYTES_PER_MESSAGE;
-        writeOffset += data.size();
-        insertRequest = buildInsertRequest(writeOffset, data, objectFinalized);
+        InsertObjectRequest insertRequest;
+        if (dataChunkMap.size() > 0 && dataChunkMap.lastKey() >= writeOffset) {
+          insertRequest = buildRequestFromCachedDataChunk(dataChunkMap, writeOffset);
+          writeOffset += insertRequest.getChecksummedData().getContent().size();
+        } else {
+          ByteString data =
+              ByteString.readFrom(ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE));
+          dataChunkMap.put(writeOffset, data);
+          if (dataChunkMap.size() >= NUMBER_OF_REQUESTS_TO_RETAIN) {
+            dataChunkMap.remove(dataChunkMap.firstKey());
+          }
+          insertRequest = buildInsertRequest(writeOffset, data);
+          writeOffset += data.size();
+        }
         requestStreamObserver.onNext(insertRequest);
+        objectFinalized = insertRequest.getFinishWrite();
+
+        if (responseObserver.hasTransientError()) {
+          retriesAttempted++;
+          return doResumableUpload();
+        }
       }
 
       requestStreamObserver.onCompleted();
 
       try {
         responseObserver.done.await();
+        if (responseObserver.hasTransientError()) {
+          retriesAttempted++;
+          return doResumableUpload();
+        }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         throw new IOException(
@@ -232,8 +255,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       return responseObserver.getResponseOrThrow();
     }
 
-    private InsertObjectRequest buildInsertRequest(
-        long writeOffset, ByteString dataChunk, boolean objectFinalized) {
+    private InsertObjectRequest buildInsertRequest(long writeOffset, ByteString dataChunk) {
       InsertObjectRequest.Builder requestBuilder =
           InsertObjectRequest.newBuilder().setUploadId(uploadId).setWriteOffset(writeOffset);
 
@@ -254,7 +276,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
         requestBuilder.setChecksummedData(requestDataBuilder);
       }
 
-      if (objectFinalized) {
+      if (dataChunk.size() < MAX_BYTES_PER_MESSAGE) {
         requestBuilder.setFinishWrite(true);
         if (checksumsEnabled) {
           requestBuilder.setObjectChecksums(
@@ -264,6 +286,35 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
 
       return requestBuilder.build();
+    }
+
+    // Handles the case when a writeOffset of data read previously is being processed.
+    // This happens if a transient failure happens while uploading, and can be resumed by
+    // querying the current committed offset.
+    private InsertObjectRequest buildRequestFromCachedDataChunk(
+        TreeMap<Long, ByteString> dataChunkMap, long writeOffset) throws IOException {
+      // Resume will only work if the first request builder in the cache carries an offset
+      // not greater than the current writeOffset.
+      InsertObjectRequest request = null;
+      if (dataChunkMap.size() > 0 && dataChunkMap.firstKey() <= writeOffset) {
+        for (Map.Entry<Long, ByteString> entry : dataChunkMap.entrySet()) {
+          if (entry.getKey() + entry.getValue().size() > writeOffset) {
+            Long writeOffsetToResume = entry.getKey();
+            ByteString chunkData = entry.getValue();
+            request = buildInsertRequest(writeOffsetToResume, chunkData);
+            break;
+          }
+        }
+      }
+      if (request == null) {
+        throw new IOException(
+            String.format(
+                "Didn't have enough data buffered for attempt to resume upload for"
+                    + " uploadID %s: last committed offset=%s, earliest buffered"
+                    + " offset=%s. Upload must be restarted from the beginning.",
+                uploadId, writeOffset, dataChunkMap.firstKey()));
+      }
+      return request;
     }
 
     /** Handler for responses from the Insert streaming RPC. */
@@ -302,11 +353,11 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
 
       boolean hasTransientError() {
-        return transientError != null || response == null;
+        return (response != null && transientError != null) || response == null;
       }
 
       boolean hasNonTransientError() {
-        return nonTransientError != null;
+        return response == null && nonTransientError != null;
       }
 
       @Override
@@ -326,8 +377,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
                   : ((StatusRuntimeException) t).getStatus().getCode();
           if (TRANSIENT_ERRORS.contains(code)) {
             transientError = t;
+          }
         }
-      }
         if (transientError == null) {
           nonTransientError =
               new IOException(
@@ -336,14 +387,14 @@ public final class GoogleCloudStorageGrpcWriteChannel
                           + " Status: %s",
                       resourceId, uploadId, writeOffset, statusDesc),
                   t);
-      }
+        }
         done.countDown();
       }
 
       @Override
       public void onCompleted() {
         done.countDown();
-    }
+      }
 
       @Override
       public void beforeStart(
