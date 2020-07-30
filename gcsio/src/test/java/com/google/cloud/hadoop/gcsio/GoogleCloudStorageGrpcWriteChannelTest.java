@@ -14,7 +14,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -48,6 +47,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.junit.Before;
@@ -130,9 +130,9 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   public void writeSendsSingleInsertObjectRequestWithoutChecksums() throws Exception {
     AsyncWriteChannelOptions options =
         AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(false).build();
-    ObjectWriteConditions writeConditions = new ObjectWriteConditions();
+    ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, Optional.absent());
+        newWriteChannel(options, writeConditions, Optional.empty());
 
     ByteString data = ByteString.copyFromUtf8("test data");
     writeChannel.initialize();
@@ -178,9 +178,9 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   public void writeSendsMultipleInsertObjectRequestsWithChecksums() throws Exception {
     AsyncWriteChannelOptions options =
         AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
-    ObjectWriteConditions writeConditions = new ObjectWriteConditions();
+    ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, Optional.absent());
+        newWriteChannel(options, writeConditions, Optional.empty());
     int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
@@ -229,9 +229,9 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   public void writeUsesContentGenerationIfProvided() throws Exception {
     AsyncWriteChannelOptions options = AsyncWriteChannelOptions.builder().build();
     ObjectWriteConditions writeConditions =
-        new ObjectWriteConditions(Optional.of(1L), Optional.absent());
+        ObjectWriteConditions.builder().setContentGenerationMatch(1L).build();
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, Optional.absent());
+        newWriteChannel(options, writeConditions, Optional.empty());
 
     ByteString data = ByteString.copyFromUtf8("test data");
     writeChannel.initialize();
@@ -249,9 +249,9 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   public void writeUsesMetaGenerationIfProvided() throws Exception {
     AsyncWriteChannelOptions options = AsyncWriteChannelOptions.builder().build();
     ObjectWriteConditions writeConditions =
-        new ObjectWriteConditions(Optional.absent(), Optional.of(1L));
+        ObjectWriteConditions.builder().setMetaGenerationMatch(1L).build();
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, Optional.absent());
+        newWriteChannel(options, writeConditions, Optional.empty());
 
     ByteString data = ByteString.copyFromUtf8("test data");
     writeChannel.initialize();
@@ -268,7 +268,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   @Test
   public void writeUsesRequesterPaysProjectIfProvided() throws Exception {
     AsyncWriteChannelOptions options = AsyncWriteChannelOptions.builder().build();
-    ObjectWriteConditions writeConditions = new ObjectWriteConditions();
+    ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
     GoogleCloudStorageGrpcWriteChannel writeChannel =
         newWriteChannel(options, writeConditions, Optional.of("project-id"));
 
@@ -353,9 +353,9 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
     AsyncWriteChannelOptions options =
         AsyncWriteChannelOptions.builder().setUploadChunkSize(chunkSize).build();
-    ObjectWriteConditions writeConditions = new ObjectWriteConditions();
+    ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, Optional.absent());
+        newWriteChannel(options, writeConditions, Optional.empty());
     fakeService.setInsertObjectExceptions(
         ImmutableList.of(new StatusException(Status.DEADLINE_EXCEEDED)));
     fakeService.setQueryWriteStatusResponses(
@@ -395,9 +395,9 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
     AsyncWriteChannelOptions options =
         AsyncWriteChannelOptions.builder().setUploadChunkSize(chunkSize).build();
-    ObjectWriteConditions writeConditions = new ObjectWriteConditions();
+    ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, Optional.absent());
+        newWriteChannel(options, writeConditions, Optional.empty());
     fakeService.setInsertObjectExceptions(
         ImmutableList.of(new StatusException(Status.DEADLINE_EXCEEDED)));
     fakeService.setQueryWriteStatusResponses(
@@ -585,9 +585,9 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
 
   private GoogleCloudStorageGrpcWriteChannel newWriteChannel() {
     AsyncWriteChannelOptions options = AsyncWriteChannelOptions.builder().build();
-    ObjectWriteConditions writeConditions = new ObjectWriteConditions();
+    ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
 
-    return newWriteChannel(options, writeConditions, Optional.absent());
+    return newWriteChannel(options, writeConditions, Optional.empty());
   }
 
   /* Returns an int with the same bytes as the uint32 representation of value. */
