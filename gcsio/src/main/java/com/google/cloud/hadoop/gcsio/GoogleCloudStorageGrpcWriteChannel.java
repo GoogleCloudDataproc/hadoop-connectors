@@ -205,7 +205,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       InsertChunkResponseObserver responseObserver;
 
       long writeOffset = retriesAttempted > 0 ? getCommittedWriteSize(uploadId) : 0;
-      objectHasher = Hashing.crc32c().newHasher();
+      objectHasher = retriesAttempted > 0 ? objectHasher : Hashing.crc32c().newHasher();
 
       responseObserver = new InsertChunkResponseObserver(uploadId, writeOffset);
       // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
@@ -226,7 +226,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
           if (dataChunkMap.size() >= NUMBER_OF_REQUESTS_TO_RETAIN) {
             dataChunkMap.remove(dataChunkMap.firstKey());
           }
-          insertRequest = buildInsertRequest(writeOffset, data);
+          insertRequest = buildInsertRequest(writeOffset, data, false);
           writeOffset += data.size();
         }
         requestStreamObserver.onNext(insertRequest);
@@ -255,7 +255,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
       return responseObserver.getResponseOrThrow();
     }
 
-    private InsertObjectRequest buildInsertRequest(long writeOffset, ByteString dataChunk) {
+    private InsertObjectRequest buildInsertRequest(
+        long writeOffset, ByteString dataChunk, boolean resumeMode) {
       InsertObjectRequest.Builder requestBuilder =
           InsertObjectRequest.newBuilder().setUploadId(uploadId).setWriteOffset(writeOffset);
 
@@ -267,8 +268,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
           for (ByteBuffer buffer : dataChunk.asReadOnlyByteBufferList()) {
             chunkHasher.putBytes(buffer);
           }
-          for (ByteBuffer buffer : dataChunk.asReadOnlyByteBufferList()) {
-            objectHasher.putBytes(buffer);
+          if (!resumeMode) {
+            for (ByteBuffer buffer : dataChunk.asReadOnlyByteBufferList()) {
+              objectHasher.putBytes(buffer);
+            }
           }
           requestDataBuilder.setCrc32C(
               UInt32Value.newBuilder().setValue(chunkHasher.hash().asInt()));
@@ -301,7 +304,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
           if (entry.getKey() + entry.getValue().size() > writeOffset) {
             Long writeOffsetToResume = entry.getKey();
             ByteString chunkData = entry.getValue();
-            request = buildInsertRequest(writeOffsetToResume, chunkData);
+            request = buildInsertRequest(writeOffsetToResume, chunkData, true);
             break;
           }
         }
@@ -353,7 +356,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
 
       boolean hasTransientError() {
-        return (response != null && transientError != null) || response == null;
+        return transientError != null;
       }
 
       boolean hasNonTransientError() {
