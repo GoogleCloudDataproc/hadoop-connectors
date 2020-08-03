@@ -544,7 +544,8 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
-            composeRequestString(testBucket, testDir + "f3", /* generationId= */ null));
+            getRequestString(testBucket, testDir + "f3"),
+            composeRequestString(testBucket, testDir + "f3", /* generationId= */ 1));
 
     List<String> listedObjects = gcs.listObjectNames(testBucket, testDir, PATH_DELIMITER);
     assertThat(listedObjects).containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");
