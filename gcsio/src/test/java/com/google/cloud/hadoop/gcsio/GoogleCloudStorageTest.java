@@ -182,6 +182,7 @@ public class GoogleCloudStorageTest {
 
     MockHttpTransport transport =
         mockTransport(
+            jsonErrorResponse(ErrorResponses.NOT_FOUND),
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
             jsonDataResponse(
                 newStorageObject(BUCKET_NAME, OBJECT_NAME)
@@ -197,15 +198,13 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(
+            getRequestString(BUCKET_NAME, OBJECT_NAME),
             resumableUploadRequestString(
-                BUCKET_NAME,
-                OBJECT_NAME,
-                /* generationId= */ null,
-                /* replaceGenerationId= */ false),
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 1))
         .inOrder();
 
-    HttpRequest chunkUploadRequest = trackingHttpRequestInitializer.getAllRequests().get(1);
+    HttpRequest chunkUploadRequest = trackingHttpRequestInitializer.getAllRequests().get(2);
     assertThat(chunkUploadRequest.getContent().getLength()).isEqualTo(testData.length);
     try (ByteArrayOutputStream writtenData = new ByteArrayOutputStream(testData.length)) {
       chunkUploadRequest.getContent().writeTo(writtenData);
@@ -271,11 +270,9 @@ public class GoogleCloudStorageTest {
     assertThat(thrown).hasMessageThat().isEqualTo("Upload failed for 'gs://foo-bucket/bar-object'");
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(
+            getRequestString(BUCKET_NAME, OBJECT_NAME),
             resumableUploadRequestString(
-                BUCKET_NAME,
-                OBJECT_NAME,
-                /* generationId= */ null,
-                /* replaceGenerationId= */ true))
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 1, /* replaceGenerationId= */ true))
         .inOrder();
   }
 
@@ -288,6 +285,7 @@ public class GoogleCloudStorageTest {
 
     MockHttpTransport transport =
         mockTransport(
+            emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
             jsonErrorResponse(ErrorResponses.GONE),
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
@@ -311,21 +309,16 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(
+            getRequestString(BUCKET_NAME, OBJECT_NAME),
             resumableUploadRequestString(
-                BUCKET_NAME,
-                OBJECT_NAME,
-                /* generationId= */ null,
-                /* replaceGenerationId= */ false),
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 1),
             resumableUploadRequestString(
-                BUCKET_NAME,
-                OBJECT_NAME,
-                /* generationId= */ null,
-                /* replaceGenerationId= */ false),
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 2))
         .inOrder();
 
-    HttpRequest writeRequest = trackingHttpRequestInitializer.getAllRequests().get(3);
+    HttpRequest writeRequest = trackingHttpRequestInitializer.getAllRequests().get(4);
     assertThat(writeRequest.getContent().getLength()).isEqualTo(testData.length);
     try (ByteArrayOutputStream writtenData = new ByteArrayOutputStream(testData.length)) {
       writeRequest.getContent().writeTo(writtenData);
@@ -342,6 +335,7 @@ public class GoogleCloudStorageTest {
 
     MockHttpTransport transport =
         mockTransport(
+            emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
             // "308 Resume Incomplete" - successfully uploaded 1st chunk
             emptyResponse(308).addHeader("Range", "bytes=0-" + (uploadChunkSize - 1)),
@@ -369,25 +363,20 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(
+            getRequestString(BUCKET_NAME, OBJECT_NAME),
             resumableUploadRequestString(
-                BUCKET_NAME,
-                OBJECT_NAME,
-                /* generationId= */ null,
-                /* replaceGenerationId= */ false),
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 1),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 2),
             resumableUploadRequestString(
-                BUCKET_NAME,
-                OBJECT_NAME,
-                /* generationId= */ null,
-                /* replaceGenerationId= */ false),
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 3),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 4))
         .inOrder();
 
-    HttpRequest writeRequestChunk1 = trackingHttpRequestInitializer.getAllRequests().get(4);
+    HttpRequest writeRequestChunk1 = trackingHttpRequestInitializer.getAllRequests().get(5);
     assertThat(writeRequestChunk1.getContent().getLength()).isEqualTo(testData.length / 2);
-    HttpRequest writeRequestChunk2 = trackingHttpRequestInitializer.getAllRequests().get(5);
+    HttpRequest writeRequestChunk2 = trackingHttpRequestInitializer.getAllRequests().get(6);
     assertThat(writeRequestChunk2.getContent().getLength()).isEqualTo(testData.length / 2);
     try (ByteArrayOutputStream writtenData = new ByteArrayOutputStream(testData.length)) {
       writeRequestChunk1.getContent().writeTo(writtenData);
@@ -405,6 +394,7 @@ public class GoogleCloudStorageTest {
 
     MockHttpTransport transport =
         mockTransport(
+            emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
             jsonErrorResponse(ErrorResponses.GONE),
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
@@ -429,21 +419,16 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(
+            getRequestString(BUCKET_NAME, OBJECT_NAME),
             resumableUploadRequestString(
-                BUCKET_NAME,
-                OBJECT_NAME,
-                /* generationId= */ null,
-                /* replaceGenerationId= */ false),
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 1),
             resumableUploadRequestString(
-                BUCKET_NAME,
-                OBJECT_NAME,
-                /* generationId= */ null,
-                /* replaceGenerationId= */ false),
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 2))
         .inOrder();
 
-    HttpRequest writeRequest = trackingHttpRequestInitializer.getAllRequests().get(3);
+    HttpRequest writeRequest = trackingHttpRequestInitializer.getAllRequests().get(4);
     assertThat(writeRequest.getContent().getLength()).isEqualTo(2 * testData.length);
     try (ByteArrayOutputStream writtenData = new ByteArrayOutputStream(testData.length)) {
       writeRequest.getContent().writeTo(writtenData);
@@ -460,6 +445,7 @@ public class GoogleCloudStorageTest {
 
     MockHttpTransport transport =
         mockTransport(
+            emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
             // "308 Resume Incomplete" - successfully uploaded 1st chunk
             emptyResponse(308).addHeader("Range", "bytes=0-" + (uploadChunkSize - 1)),
@@ -490,31 +476,26 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(
+            getRequestString(BUCKET_NAME, OBJECT_NAME),
             resumableUploadRequestString(
-                BUCKET_NAME,
-                OBJECT_NAME,
-                /* generationId= */ null,
-                /* replaceGenerationId= */ false),
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 1),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 2),
             resumableUploadRequestString(
-                BUCKET_NAME,
-                OBJECT_NAME,
-                /* generationId= */ null,
-                /* replaceGenerationId= */ false),
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 3),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 4),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 5),
             resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 6))
         .inOrder();
 
-    HttpRequest writeRequestChunk1 = trackingHttpRequestInitializer.getAllRequests().get(4);
+    HttpRequest writeRequestChunk1 = trackingHttpRequestInitializer.getAllRequests().get(5);
     assertThat(writeRequestChunk1.getContent().getLength()).isEqualTo(testData.length / 2);
-    HttpRequest writeRequestChunk2 = trackingHttpRequestInitializer.getAllRequests().get(5);
+    HttpRequest writeRequestChunk2 = trackingHttpRequestInitializer.getAllRequests().get(6);
     assertThat(writeRequestChunk2.getContent().getLength()).isEqualTo(testData.length / 2);
-    HttpRequest writeRequestChunk3 = trackingHttpRequestInitializer.getAllRequests().get(6);
+    HttpRequest writeRequestChunk3 = trackingHttpRequestInitializer.getAllRequests().get(7);
     assertThat(writeRequestChunk3.getContent().getLength()).isEqualTo(testData.length / 2);
-    HttpRequest writeRequestChunk4 = trackingHttpRequestInitializer.getAllRequests().get(7);
+    HttpRequest writeRequestChunk4 = trackingHttpRequestInitializer.getAllRequests().get(8);
     assertThat(writeRequestChunk4.getContent().getLength()).isEqualTo(testData.length / 2);
     try (ByteArrayOutputStream writtenData = new ByteArrayOutputStream(testData.length)) {
       writeRequestChunk1.getContent().writeTo(writtenData);
@@ -534,6 +515,7 @@ public class GoogleCloudStorageTest {
 
     MockHttpTransport transport =
         mockTransport(
+            emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
             jsonErrorResponse(ErrorResponses.GONE));
 
@@ -2459,7 +2441,9 @@ public class GoogleCloudStorageTest {
     gcs.compose(BUCKET_NAME, sources, OBJECT_NAME, CreateFileOptions.DEFAULT_CONTENT_TYPE);
 
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
-        .containsExactly(composeRequestString(BUCKET_NAME, OBJECT_NAME, /* generationId= */ null))
+        .containsExactly(
+            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            composeRequestString(BUCKET_NAME, OBJECT_NAME, 1))
         .inOrder();
   }
 
