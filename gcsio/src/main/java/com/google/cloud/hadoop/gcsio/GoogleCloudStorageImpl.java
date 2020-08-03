@@ -360,7 +360,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     Optional<Long> writeGeneration =
         resourceId.hasGenerationId()
             ? Optional.of(resourceId.getGenerationId())
-            : getWriteGeneration(resourceId, options.overwriteExisting());
+            : Optional.of(getWriteGeneration(resourceId, options.overwriteExisting()));
 
     ObjectWriteConditions writeConditions =
         ObjectWriteConditions.builder()
@@ -1910,22 +1910,24 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   /**
    * Gets the object generation for a write operation
    *
-   * @param resourceId object for which write generation is requested
+   * @param resourceId object for which generation info is requested
    * @param overwrite whether existing object should be overwritten
    * @return the generation of the object
    * @throws IOException if the object already exists and cannot be overwritten
    */
-  private Optional<Long> getWriteGeneration(StorageResourceId resourceId, boolean overwrite)
+  private long getWriteGeneration(StorageResourceId resourceId, boolean overwrite)
       throws IOException {
     logger.atFine().log("getWriteGeneration(%s, %s)", resourceId, overwrite);
-    if (overwrite) {
-      return Optional.empty();
-    }
     GoogleCloudStorageItemInfo info = getItemInfo(resourceId);
-    if (info.exists()) {
-      throw new FileAlreadyExistsException(String.format("Object %s already exists.", resourceId));
+    if (!info.exists()) {
+      return 0L;
     }
-    return Optional.of(0L);
+    if (info.exists() && overwrite) {
+      long generation = info.getContentGeneration();
+      Preconditions.checkState(generation != 0, "Generation should not be 0 for an existing item");
+      return generation;
+    }
+    throw new FileAlreadyExistsException(String.format("Object %s already exists.", resourceId));
   }
 
   /**
@@ -2061,12 +2063,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                                 .setMetadata(encodeMetadata(options.getMetadata())))),
             destination.getBucketName());
 
-    Optional<Long> writeGeneration =
+    compose.setIfGenerationMatch(
         destination.hasGenerationId()
-            ? Optional.of(destination.getGenerationId())
-            : getWriteGeneration(destination, /* overwrite= */ true);
-
-    writeGeneration.ifPresent(compose::setIfGenerationMatch);
+            ? destination.getGenerationId()
+            : getWriteGeneration(destination, /* overwrite= */ true));
 
     logger.atFine().log("composeObjects.execute()");
     GoogleCloudStorageItemInfo compositeInfo =
