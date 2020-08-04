@@ -118,6 +118,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.grpc.server.address", null);
           put("fs.gs.authorization.handler.impl", null);
           put("fs.gs.authorization.handler.properties.", ImmutableMap.of());
+          put("fs.gs.overwrite.mutations.ignore.generation.mismatch", false);          put("fs.gs.overwrite.mutations.ignore.generation.mismatch", false);
         }
       };
 

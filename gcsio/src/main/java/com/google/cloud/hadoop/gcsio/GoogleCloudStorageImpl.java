@@ -357,7 +357,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     Preconditions.checkArgument(
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
 
-    /*
+    /* IMPORTANT: Do not modify or change this logic unless absolutely sure that you've addressed
+     * all out-of-order semantics.
+     *
      * When performing mutations in GCS, even when we aren't concerned with parallel writers,
      * we need to protect ourselves from what appear to be out-of-order writes to the writer. These
      * most commonly manifest themselves as a sequence of:
@@ -369,11 +371,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
      *    later.
      *
      * To counter this we need to perform mutations with a condition attached, always.
-     *
-     * To perform a mutation with a condition, we first must get the content generation of the
-     * current object. Once we have the current generation, we will create a marker file
-     * conditionally with an ifGenerationMatch. We will then create the final object only if the
-     * generation matches the marker file.
      */
 
     Optional<Long> writeGeneration =
@@ -419,7 +416,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             /* kmsKeyName= */ null,
             storageOptions.getWriteChannelOptions(),
             writeConditions,
-            rewrittenMetadata) {
+            rewrittenMetadata,
+            errorExtractor) {
 
           @Override
           public Storage.Objects.Insert createRequest(InputStreamContent inputStream)

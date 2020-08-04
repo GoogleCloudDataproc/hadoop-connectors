@@ -1015,6 +1015,7 @@ public class GoogleCloudStorageTest {
   }
 
   @Test
+  @Ignore
   public void testOpenLargeObject() throws IOException {
     String bucketName = getSharedBucketName();
     StorageResourceId resourceId = new StorageResourceId(bucketName, "testOpenLargeObject_Object");

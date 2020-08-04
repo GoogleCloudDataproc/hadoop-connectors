@@ -21,6 +21,7 @@ import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.Storage.Objects.Insert;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.util.AbstractGoogleAsyncWriteChannel;
+import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.LoggingMediaHttpUploaderProgressListener;
@@ -44,6 +45,7 @@ public class GoogleCloudStorageWriteChannel
   private final Map<String, String> metadata;
 
   private GoogleCloudStorageItemInfo completedItemInfo = null;
+  private ApiErrorExtractor errorExtractor = null;
 
   /**
    * Constructs an instance of GoogleCloudStorageWriteChannel.
@@ -70,7 +72,8 @@ public class GoogleCloudStorageWriteChannel
       String kmsKeyName,
       AsyncWriteChannelOptions options,
       ObjectWriteConditions writeConditions,
-      Map<String, String> objectMetadata) {
+      Map<String, String> objectMetadata,
+      ApiErrorExtractor errorExtractor) {
     super(uploadThreadPool, options);
     this.gcs = gcs;
     this.setClientRequestHelper(requestHelper);
@@ -83,6 +86,7 @@ public class GoogleCloudStorageWriteChannel
     this.kmsKeyName = kmsKeyName;
     this.writeConditions = writeConditions;
     this.metadata = objectMetadata;
+    this.errorExtractor = errorExtractor;
   }
 
   @Override
@@ -106,6 +110,13 @@ public class GoogleCloudStorageWriteChannel
       insert.setKmsKeyName(kmsKeyName);
     }
     return insert;
+  }
+
+  @Override
+  protected boolean ignoreConditionFailureForCreate(IOException e) {
+    return errorExtractor != null
+        && errorExtractor.preconditionNotMet(e)
+        && options.isGenerationMismatchForOverwriteMutationsIgnored();
   }
 
   @Override

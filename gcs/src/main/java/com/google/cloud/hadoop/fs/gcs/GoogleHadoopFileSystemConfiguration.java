@@ -424,6 +424,12 @@ public class GoogleHadoopFileSystemConfiguration {
           new HadoopConfigurationProperty<>(
               "fs.gs.authorization.handler.properties.", ImmutableMap.of());
 
+  /** Configuration key for ignoring generation mismatch error for overwrite mutations. */
+  public static final HadoopConfigurationProperty<Boolean>
+      GCS_OVERWRITE_MUTATIONS_IGNORE_GENERATION_MISMATCH =
+          new HadoopConfigurationProperty<>(
+              "fs.gs.overwrite.mutations.ignore.generation.mismatch", false);
+
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
   // @VisibleForTesting
@@ -529,6 +535,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setDirectUploadEnabled(
             GCS_OUTPUT_STREAM_DIRECT_UPLOAD_ENABLE.get(config, config::getBoolean))
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
+        .setGenerationMismatchForOverwriteMutationsIgnored(
+            GCS_OVERWRITE_MUTATIONS_IGNORE_GENERATION_MISMATCH.get(config, config::getBoolean))
         .build();
   }
 

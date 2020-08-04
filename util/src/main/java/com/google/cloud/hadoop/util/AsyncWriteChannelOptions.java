@@ -60,6 +60,9 @@ public abstract class AsyncWriteChannelOptions {
 
   public static final AsyncWriteChannelOptions DEFAULT = builder().build();
 
+  /** Default of whether to ignore generation mismatch for overwrite mutations. */
+  public static final boolean GENERATION_MISMATCH_FOR_OVERWRITE_MUTATIONS_IGNORED_DEFAULT = false;
+
   public static Builder builder() {
     return new AutoValue_AsyncWriteChannelOptions.Builder()
         .setBufferSize(BUFFER_SIZE_DEFAULT)
@@ -68,7 +71,9 @@ public abstract class AsyncWriteChannelOptions {
         .setUploadChunkSize(UPLOAD_CHUNK_SIZE_DEFAULT)
         .setUploadCacheSize(UPLOAD_CACHE_SIZE_DEFAULT)
         .setDirectUploadEnabled(DIRECT_UPLOAD_ENABLED_DEFAULT)
-        .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT);
+        .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT)
+        .setGenerationMismatchForOverwriteMutationsIgnored(
+            GENERATION_MISMATCH_FOR_OVERWRITE_MUTATIONS_IGNORED_DEFAULT);
   }
 
   public abstract Builder toBuilder();
@@ -86,6 +91,8 @@ public abstract class AsyncWriteChannelOptions {
   public abstract boolean isDirectUploadEnabled();
 
   public abstract boolean isGrpcChecksumsEnabled();
+
+  public abstract boolean isGenerationMismatchForOverwriteMutationsIgnored();
 
   /** Mutable builder for the GoogleCloudStorageWriteChannelOptions class. */
   @AutoValue.Builder
@@ -134,5 +141,8 @@ public abstract class AsyncWriteChannelOptions {
      * @return the Builder
      */
     public abstract Builder setGrpcChecksumsEnabled(boolean grpcChecksumsEnabled);
+
+    public abstract Builder setGenerationMismatchForOverwriteMutationsIgnored(
+        boolean generationMismatchForOverwriteMutationsIgnored);
   }
 }

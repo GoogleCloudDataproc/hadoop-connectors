@@ -48,6 +48,9 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
    */
   public abstract T createRequest(InputStreamContent inputStream) throws IOException;
 
+  /** Indicate whether the condition failure for Create request can be ignored. */
+  protected abstract boolean ignoreConditionFailureForCreate(IOException e);
+
   @Override
   public void startUpload(InputStream pipeSource) throws IOException {
     // Connect pipe-source to the stream used by uploader.
@@ -93,7 +96,14 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
               "Received IOException, but successfully converted to response '%s'.", response);
           return response;
         }
-        throw ioe;
+
+        if (ignoreConditionFailureForCreate(ioe)) {
+          logger.atWarning().withCause(ioe).log(
+              "412 Precondition failure was ignored for resource %s.", getResourceString());
+          return null;
+        } else {
+          throw ioe;
+        }
       }
     }
   }
