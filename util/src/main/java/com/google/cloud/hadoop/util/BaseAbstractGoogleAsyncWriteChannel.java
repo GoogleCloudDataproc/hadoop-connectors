@@ -242,6 +242,9 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
     this.contentType = contentType;
   }
 
+  /** Indicate whether the condition failure for Create request can be ignored. */
+  protected abstract boolean ignoreConditionFailureForUpload(IOException e);
+
   protected abstract String getResourceString();
 
   /**
@@ -260,11 +263,16 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
       exception.addSuppressed(e);
       throw exception;
     } catch (ExecutionException e) {
-      if (e.getCause() instanceof Error) {
+      if (ignoreConditionFailureForUpload(new IOException(e.getCause()))) {
+        logger.atWarning().withCause(e.getCause()).log(
+            "412 Precondition failure was ignored for resource %s.", getResourceString());
+        return null;
+      } else if (e.getCause() instanceof Error) {
         throw (Error) e.getCause();
+      } else {
+        throw new IOException(
+            String.format("Upload failed for '%s'", getResourceString()), e.getCause());
       }
-      throw new IOException(
-          String.format("Upload failed for '%s'", getResourceString()), e.getCause());
     }
   }
 }

@@ -113,10 +113,10 @@ public class GoogleCloudStorageWriteChannel
   }
 
   @Override
-  protected boolean ignoreConditionFailureForCreate(IOException e) {
-    return errorExtractor != null
-        && errorExtractor.preconditionNotMet(e)
-        && options.isGenerationMismatchForOverwriteMutationsIgnored();
+  protected boolean ignoreConditionFailureForUpload(IOException e) {
+    return options.isGenerationMismatchForOverwriteMutationsIgnored()
+        && errorExtractor != null
+        && errorExtractor.preconditionNotMet(e);
   }
 
   @Override

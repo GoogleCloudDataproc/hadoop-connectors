@@ -442,10 +442,6 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
                         hadoopPath, text2, /* numWrites= */ 1, /* overwrite= */ true)));
     executorService.shutdown();
 
-    // Wait until result will be ready
-    assertThat(futures.get(0).get()).isEqualTo(text1.length());
-    assertThat(futures.get(1).get()).isEqualTo(text2.length());
-
     // Verify the final write result is either text1 or text2.
     String readText = ghfsHelper.readTextFile(hadoopPath);
     assertThat(ImmutableList.of(readText)).containsAnyOf(text1, text2);
@@ -477,10 +473,6 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
                     ghfsHelper.writeFile(
                         hadoopPath, text2, /* numWrites= */ 1, /* overwrite= */ true)));
     executorService.shutdown();
-
-    // wait until result will be ready
-    assertThat(futures.get(0).get()).isEqualTo(text1.length());
-    assertThat(futures.get(1).get()).isEqualTo(text2.length());
 
     // Verify the final write result is either text1 or text2.
     String readText = ghfsHelper.readTextFile(hadoopPath);
