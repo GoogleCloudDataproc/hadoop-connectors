@@ -370,7 +370,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
      * 4) Some time later, get O1 and see M1 and not M2, even though M2 appears to have happened
      *    later.
      *
-     * To counter this we need to perform mutations with a condition attached, always.
+     * To counter this we need to perform mutations with a condition attached, always. This prevents
+     * the race condition as described in:
+     * https://cloud.google.com/storage/docs/generations-preconditions#preventing_the_race_condition
      */
 
     Optional<Long> writeGeneration =
@@ -416,8 +418,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             /* kmsKeyName= */ null,
             storageOptions.getWriteChannelOptions(),
             writeConditions,
-            rewrittenMetadata,
-            errorExtractor) {
+            rewrittenMetadata) {
 
           @Override
           public Storage.Objects.Insert createRequest(InputStreamContent inputStream)

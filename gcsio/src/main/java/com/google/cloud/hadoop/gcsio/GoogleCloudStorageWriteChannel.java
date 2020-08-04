@@ -72,8 +72,7 @@ public class GoogleCloudStorageWriteChannel
       String kmsKeyName,
       AsyncWriteChannelOptions options,
       ObjectWriteConditions writeConditions,
-      Map<String, String> objectMetadata,
-      ApiErrorExtractor errorExtractor) {
+      Map<String, String> objectMetadata) {
     super(uploadThreadPool, options);
     this.gcs = gcs;
     this.setClientRequestHelper(requestHelper);
@@ -86,7 +85,6 @@ public class GoogleCloudStorageWriteChannel
     this.kmsKeyName = kmsKeyName;
     this.writeConditions = writeConditions;
     this.metadata = objectMetadata;
-    this.errorExtractor = errorExtractor;
   }
 
   @Override
@@ -115,8 +113,7 @@ public class GoogleCloudStorageWriteChannel
   @Override
   protected boolean ignoreConditionFailureForUpload(IOException e) {
     return options.isGenerationMismatchForOverwriteMutationsIgnored()
-        && errorExtractor != null
-        && errorExtractor.preconditionNotMet(e);
+        && ApiErrorExtractor.INSTANCE.preconditionNotMet(e);
   }
 
   @Override

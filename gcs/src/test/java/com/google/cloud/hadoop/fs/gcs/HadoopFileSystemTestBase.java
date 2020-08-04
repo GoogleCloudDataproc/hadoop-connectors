@@ -427,8 +427,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
     assertThrows(FileNotFoundException.class, () -> ghfs.getFileStatus(hadoopPath));
 
-    String text1 = "Hello World!";
-    String text2 = "World Hello! Long";
+    List<String> texts = ImmutableList.of("Hello World!", "World Hello! Long");
 
     ExecutorService executorService = Executors.newFixedThreadPool(2);
     List<Future<Integer>> futures =
@@ -436,15 +435,26 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
             ImmutableList.of(
                 () ->
                     ghfsHelper.writeFile(
-                        hadoopPath, text1, /* numWrites= */ 1, /* overwrite= */ true),
+                        hadoopPath, texts.get(0), /* numWrites= */ 1, /* overwrite= */ true),
                 () ->
                     ghfsHelper.writeFile(
-                        hadoopPath, text2, /* numWrites= */ 1, /* overwrite= */ true)));
+                        hadoopPath, texts.get(1), /* numWrites= */ 1, /* overwrite= */ true)));
     executorService.shutdown();
 
     // Verify the final write result is either text1 or text2.
     String readText = ghfsHelper.readTextFile(hadoopPath);
-    assertThat(ImmutableList.of(readText)).containsAnyOf(text1, text2);
+    assertThat(ImmutableList.of(readText)).containsAnyIn(texts);
+
+    // One future should fail and one succeed
+    for (int i = 0; i < futures.size(); i++) {
+      Future<Integer> future = futures.get(i);
+      String text = texts.get(i);
+      if (readText.equals(text)) {
+        assertThat(future.get()).isEqualTo(text.length());
+      } else {
+        assertThrows(ExecutionException.class, future::get);
+      }
+    }
   }
 
   @Test
@@ -459,8 +469,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
         ghfsHelper.writeFile(hadoopPath, text, /* numWrites= */ 1, /* overwrite= */ false);
     assertThat(numBytesWritten).isEqualTo(text.getBytes(UTF_8).length);
 
-    String text1 = "Hello World!";
-    String text2 = "World Hello! Long";
+    List<String> texts = ImmutableList.of("Hello World!", "World Hello! Long");
 
     ExecutorService executorService = Executors.newFixedThreadPool(2);
     List<Future<Integer>> futures =
@@ -468,15 +477,26 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
             ImmutableList.of(
                 () ->
                     ghfsHelper.writeFile(
-                        hadoopPath, text1, /* numWrites= */ 1, /* overwrite= */ true),
+                        hadoopPath, texts.get(0), /* numWrites= */ 1, /* overwrite= */ true),
                 () ->
                     ghfsHelper.writeFile(
-                        hadoopPath, text2, /* numWrites= */ 1, /* overwrite= */ true)));
+                        hadoopPath, texts.get(1), /* numWrites= */ 1, /* overwrite= */ true)));
     executorService.shutdown();
 
     // Verify the final write result is either text1 or text2.
     String readText = ghfsHelper.readTextFile(hadoopPath);
-    assertThat(ImmutableList.of(readText)).containsAnyOf(text1, text2);
+    assertThat(ImmutableList.of(readText)).containsAnyIn(texts);
+
+    // One future should fail and one succeed
+    for (int i = 0; i < futures.size(); i++) {
+      Future<Integer> future = futures.get(i);
+      text = texts.get(i);
+      if (readText.equals(text)) {
+        assertThat(future.get()).isEqualTo(text.length());
+      } else {
+        assertThrows(ExecutionException.class, future::get);
+      }
+    }
   }
 
   @Test

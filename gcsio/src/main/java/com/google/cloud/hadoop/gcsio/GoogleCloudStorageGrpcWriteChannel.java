@@ -168,11 +168,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
     }
   }
 
-  @Override
-  protected boolean ignoreConditionFailureForUpload(IOException e) {
-    return false;
-  }
-
   private class UploadOperation implements Callable<Object> {
 
     // Read end of the pipe.
