@@ -217,7 +217,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       while (!objectFinalized) {
         InsertObjectRequest insertRequest;
         if (dataChunkMap.size() > 0 && dataChunkMap.lastKey() >= writeOffset) {
-          insertRequest = buildRequestFromCachedDataChunk(dataChunkMap, writeOffset);
+          insertRequest = buildRequestFromBufferedDataChunk(dataChunkMap, writeOffset);
           writeOffset += insertRequest.getChecksummedData().getContent().size();
         } else {
           ByteString data =
@@ -294,7 +294,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     // Handles the case when a writeOffset of data read previously is being processed.
     // This happens if a transient failure happens while uploading, and can be resumed by
     // querying the current committed offset.
-    private InsertObjectRequest buildRequestFromCachedDataChunk(
+    private InsertObjectRequest buildRequestFromBufferedDataChunk(
         TreeMap<Long, ByteString> dataChunkMap, long writeOffset) throws IOException {
       // Resume will only work if the first request builder in the cache carries an offset
       // not greater than the current writeOffset.
@@ -330,12 +330,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
       private Throwable transientError = null;
       // The last non-transient error to occur during the streaming RPC.
       private Throwable nonTransientError = null;
-      // The last error to occur during the streaming RPC. Present only on error.
-      private IOException error;
       // The response from the server, populated at the end of a successful streaming RPC.
       private Object response;
-      // This flag is to avoid onReady handler of requestObserver from being called multiple times.
-      private boolean readyHandlerExecuted = false;
 
       // CountDownLatch tracking completion of the streaming RPC. Set on error, or once the request
       // stream is closed.
