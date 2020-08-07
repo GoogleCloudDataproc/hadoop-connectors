@@ -317,6 +317,7 @@
                     <include>com.google.type.**</include>
                   </includes>
                   <excludes>
+                    <exclude>com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler</exclude>
                     <exclude>com.google.cloud.hadoop.util.AccessTokenProvider</exclude>
                     <exclude>com.google.cloud.hadoop.util.AccessTokenProvider$AccessToken</exclude>
                   </excludes>
