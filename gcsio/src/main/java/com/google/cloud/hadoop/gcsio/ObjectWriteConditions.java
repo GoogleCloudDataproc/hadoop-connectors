@@ -17,47 +17,39 @@
 package com.google.cloud.hadoop.gcsio;
 
 import com.google.api.services.storage.Storage.Objects.Insert;
-import com.google.common.base.Optional;
+import com.google.auto.value.AutoValue;
+import javax.annotation.Nullable;
 
 /**
  * Conditions on which a object write should be allowed to continue. Corresponds to setting
- * IfGenerationMatch and IfMetaGenerationMatch in API requests.
+ * {@code IfGenerationMatch} and {@code IfMetaGenerationMatch} in API requests.
  */
-public class ObjectWriteConditions {
+@AutoValue
+public abstract class ObjectWriteConditions {
 
-  /**
-   * No conditions for completing the write.
-   */
-  public static final ObjectWriteConditions NONE = new ObjectWriteConditions();
+  /** No conditions for completing the write. */
+  public static final ObjectWriteConditions NONE = builder().build();
 
-  private final Optional<Long> contentGenerationMatch;
-  private final Optional<Long> metaGenerationMatch;
-
-  public ObjectWriteConditions() {
-    metaGenerationMatch = Optional.absent();
-    contentGenerationMatch = Optional.absent();
+  public static Builder builder() {
+    return new AutoValue_ObjectWriteConditions.Builder()
+        .setMetaGenerationMatch(null)
+        .setContentGenerationMatch(null);
   }
 
-  public ObjectWriteConditions(Optional<Long> contentGenerationMatch,
-      Optional<Long> metaGenerationMatch) {
-    this.contentGenerationMatch = contentGenerationMatch;
-    this.metaGenerationMatch = metaGenerationMatch;
-  }
+  public abstract Builder toBuilder();
 
-  public boolean hasContentGenerationMatch() {
-    return contentGenerationMatch.isPresent();
-  }
+  @Nullable
+  public abstract Long getMetaGenerationMatch();
 
   public boolean hasMetaGenerationMatch() {
-    return metaGenerationMatch.isPresent();
+    return getMetaGenerationMatch() != null;
   }
 
-  public long getContentGenerationMatch() {
-    return contentGenerationMatch.get();
-  }
+  @Nullable
+  public abstract Long getContentGenerationMatch();
 
-  public long getMetaGenerationMatch() {
-    return metaGenerationMatch.get();
+  public boolean hasContentGenerationMatch() {
+    return getContentGenerationMatch() != null;
   }
 
   /**
@@ -71,5 +63,14 @@ public class ObjectWriteConditions {
     if (hasMetaGenerationMatch()) {
       objectToInsert.setIfMetagenerationMatch(getMetaGenerationMatch());
     }
+  }
+
+  @AutoValue.Builder
+  public abstract static class Builder {
+    public abstract Builder setMetaGenerationMatch(Long metaGenerationMatch);
+
+    public abstract Builder setContentGenerationMatch(Long contentGenerationMatch);
+
+    public abstract ObjectWriteConditions build();
   }
 }

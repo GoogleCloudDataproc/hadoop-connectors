@@ -29,7 +29,8 @@ public class CreateObjectOptions {
   public static final ImmutableMap<String, byte[]> EMPTY_METADATA = ImmutableMap.of();
   public static final String DEFAULT_CONTENT_TYPE = "application/octet-stream";
   public static final String DEFAULT_CONTENT_ENCODING = null;
-  public static final CreateObjectOptions DEFAULT = new CreateObjectOptions(true);
+  public static final CreateObjectOptions DEFAULT =
+      new CreateObjectOptions(/* overwriteExisting= */ true);
 
   private final boolean overwriteExisting;
   private final String contentType;

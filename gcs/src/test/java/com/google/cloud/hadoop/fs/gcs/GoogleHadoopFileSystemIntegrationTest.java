@@ -666,6 +666,37 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
+  public void testGlobStatusPathExpansionAndFilter() throws IOException {
+    Path testRoot = new Path("/testGlobStatusPathExpansionAndFilter");
+
+    byte[] data = "testGlobStatusPathExpansionAndFilter_data".getBytes(UTF_8);
+
+    createFile(testRoot.suffix("/date/2020/07/17/0/file1.xml"), data);
+    createFile(testRoot.suffix("/date/2020/07/17/0/file1.json"), data);
+    createFile(testRoot.suffix("/date/2020/07/18/0/file2.xml"), data);
+    createFile(testRoot.suffix("/date/2020/07/18/0/file2.json"), data);
+    createFile(testRoot.suffix("/date/2020/07/19/0/file3.xml"), data);
+    createFile(testRoot.suffix("/date/2020/07/19/0/file3.json"), data);
+    createFile(testRoot.suffix("/date/2020/07/20/0/file4.xml"), data);
+    createFile(testRoot.suffix("/date/2020/07/20/0/file4.json"), data);
+
+    FileStatus[] files =
+        ghfs.globStatus(
+            testRoot.suffix("/*/{2020/07/17,2020/07/18,2020/07/19}/*/*"),
+            path -> path.getName().endsWith(".json"));
+
+    Path workingDirRoot = new Path(ghfs.getWorkingDirectory(), testRoot);
+
+    assertThat(Arrays.stream(files).map(FileStatus::getPath).collect(toImmutableList()))
+        .containsExactly(
+            workingDirRoot.suffix("/date/2020/07/17/0/file1.json"),
+            workingDirRoot.suffix("/date/2020/07/18/0/file2.json"),
+            workingDirRoot.suffix("/date/2020/07/19/0/file3.json"));
+
+    assertThat(ghfs.delete(testRoot, /* recursive= */ true)).isTrue();
+  }
+
+  @Test
   public void testGlobStatus() throws IOException {
     Path testRoot = new Path("/directory1/");
     ghfs.mkdirs(testRoot);
