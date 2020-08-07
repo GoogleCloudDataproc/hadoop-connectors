@@ -415,6 +415,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             resourceId.getObjectName(),
             options.getContentType(),
             options.getContentEncoding(),
+            options.overwriteExisting(),
             /* kmsKeyName= */ null,
             storageOptions.getWriteChannelOptions(),
             writeConditions,

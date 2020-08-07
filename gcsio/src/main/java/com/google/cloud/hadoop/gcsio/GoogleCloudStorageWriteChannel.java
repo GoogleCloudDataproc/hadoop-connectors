@@ -44,8 +44,8 @@ public class GoogleCloudStorageWriteChannel
   private final ObjectWriteConditions writeConditions;
   private final Map<String, String> metadata;
 
+  private boolean overwriteExisting = false;
   private GoogleCloudStorageItemInfo completedItemInfo = null;
-  private ApiErrorExtractor errorExtractor = null;
 
   /**
    * Constructs an instance of GoogleCloudStorageWriteChannel.
@@ -69,6 +69,7 @@ public class GoogleCloudStorageWriteChannel
       String objectName,
       String contentType,
       String contentEncoding,
+      boolean overwriteExisting,
       String kmsKeyName,
       AsyncWriteChannelOptions options,
       ObjectWriteConditions writeConditions,
@@ -82,6 +83,7 @@ public class GoogleCloudStorageWriteChannel
       setContentType(contentType);
     }
     this.contentEncoding = contentEncoding;
+    this.overwriteExisting = overwriteExisting;
     this.kmsKeyName = kmsKeyName;
     this.writeConditions = writeConditions;
     this.metadata = objectMetadata;
@@ -111,9 +113,21 @@ public class GoogleCloudStorageWriteChannel
   }
 
   @Override
-  protected boolean ignoreConditionFailureForUpload(IOException e) {
-    return options.isGenerationMismatchForOverwriteMutationsIgnored()
-        && ApiErrorExtractor.INSTANCE.preconditionNotMet(e);
+  public StorageObject createResponseFromException(IOException e) {
+    StorageObject object = new StorageObject();
+    object.setBucket(bucketName);
+    object.setName(objectName);
+    return object;
+  }
+
+  @Override
+  protected boolean ignoreUploadPreconditonFailure(IOException e) {
+    boolean uploadPreconditionFailureIgnored =
+        overwriteExisting
+            && options.isOverwriteGenerationMismatchIgnored()
+            && ApiErrorExtractor.INSTANCE.preconditionNotMet(e);
+    setUploadPreconditionFailureIgnored(uploadPreconditionFailureIgnored);
+    return uploadPreconditionFailureIgnored;
   }
 
   @Override

@@ -534,7 +534,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setDirectUploadEnabled(
             GCS_OUTPUT_STREAM_DIRECT_UPLOAD_ENABLE.get(config, config::getBoolean))
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
-        .setGenerationMismatchForOverwriteMutationsIgnored(
+        .setOverwriteGenerationMismatchIgnored(
             GCS_OVERWRITE_GENERATION_MISMATCH_IGNORE.get(config, config::getBoolean))
         .build();
   }

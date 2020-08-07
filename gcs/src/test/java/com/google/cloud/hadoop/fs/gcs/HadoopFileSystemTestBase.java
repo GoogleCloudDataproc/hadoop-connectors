@@ -445,15 +445,11 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     String readText = ghfsHelper.readTextFile(hadoopPath);
     assertThat(ImmutableList.of(readText)).containsAnyIn(texts);
 
-    // One future should fail and one succeed
-    for (int i = 0; i < futures.size(); i++) {
-      Future<Integer> future = futures.get(i);
+    // both futures should succeed
+    for (int i = 0; i < texts.size(); i++) {
       String text = texts.get(i);
-      if (readText.equals(text)) {
-        assertThat(future.get()).isEqualTo(text.length());
-      } else {
-        assertThrows(ExecutionException.class, future::get);
-      }
+      Future future = futures.get(i);
+      assertThat(future.get()).isEqualTo(text.length());
     }
   }
 
@@ -487,15 +483,11 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     String readText = ghfsHelper.readTextFile(hadoopPath);
     assertThat(ImmutableList.of(readText)).containsAnyIn(texts);
 
-    // One future should fail and one succeed
-    for (int i = 0; i < futures.size(); i++) {
-      Future<Integer> future = futures.get(i);
+    // both futures should succeed
+    for (int i = 0; i < texts.size(); i++) {
       text = texts.get(i);
-      if (readText.equals(text)) {
-        assertThat(future.get()).isEqualTo(text.length());
-      } else {
-        assertThrows(ExecutionException.class, future::get);
-      }
+      Future future = futures.get(i);
+      assertThat(future.get()).isEqualTo(text.length());
     }
   }
 
