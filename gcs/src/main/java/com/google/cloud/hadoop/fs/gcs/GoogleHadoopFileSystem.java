@@ -42,6 +42,9 @@ public class GoogleHadoopFileSystem extends GoogleHadoopFileSystemBase {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
+  /** URI scheme for GoogleHadoopFileSystem */
+  public static final String SCHEME = GoogleHadoopFileSystemBase.SCHEME;
+
   // The bucket the file system is rooted in used for default values of:
   // -- working directory
   // -- user home directories (only for Hadoop purposes).

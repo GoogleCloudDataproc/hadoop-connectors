@@ -157,6 +157,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
+  static final String SCHEME = GoogleCloudStorageFileSystem.SCHEME;
+
   /**
    * Available types for use with {@link
    * GoogleHadoopFileSystemConfiguration#GCS_OUTPUT_STREAM_TYPE}.
@@ -1120,7 +1122,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   boolean couldUseFlatGlob(Path fixedPath) {
     // Only works for filesystems where the base Hadoop Path scheme matches the underlying URI
     // scheme for GCS.
-    if (!getUri().getScheme().equals(GoogleCloudStorageFileSystem.SCHEME)) {
+    if (!getUri().getScheme().equals(SCHEME)) {
       logger.atFinest().log(
           "Flat glob is on, but doesn't work for scheme '%s', using default behavior.",
           getUri().getScheme());
