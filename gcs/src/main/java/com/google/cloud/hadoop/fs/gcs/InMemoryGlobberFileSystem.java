@@ -203,7 +203,7 @@ class InMemoryGlobberFileSystem extends FileSystem {
             : new FsPermission(
                 fsPermission.getUserAction(),
                 fsPermission.getGroupAction(),
-                fsPermission.getGroupAction()),
+                fsPermission.getOtherAction()),
         fileStatus.getOwner(),
         fileStatus.getGroup(),
         fileStatus.getPath());
