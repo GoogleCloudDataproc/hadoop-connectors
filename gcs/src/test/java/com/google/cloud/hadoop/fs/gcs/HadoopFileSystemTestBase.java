@@ -44,6 +44,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.ClassRule;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -420,6 +421,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     assertThat(ghfsHelper.readTextFile(hadoopPath)).isEqualTo("World!");
   }
 
+  @Ignore
   @Test
   public void testConcurrentCreationWithOverwrite_bothSucceed() throws Exception {
     // Get a temp path and ensure that it does not already exist.
@@ -451,6 +453,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     assertThat(ImmutableList.of(readText)).containsAnyOf(text1, text2);
   }
 
+  @Ignore
   @Test
   public void testConcurrentCreateExistingObjectWithOverwrite_bothSucceed() throws Exception {
     // Get a temp path and ensure that it does not already exist.
