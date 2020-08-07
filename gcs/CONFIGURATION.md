@@ -276,6 +276,22 @@ user name will take precedence over the service account associated with the
 group name for a matching user and group, which in turn will take precedence
 over default service account impersonation.
 
+### Authorization handler configuration
+
+*   `fs.gs.authorization.handler.impl` (not set by default)
+
+    Enable authorization handler.
+    If this property is set, the specified authorization handler will be used.
+    GCS connector will use the specified authorization handler to check if a
+    user has enough permission to perform a GCS resource access request 
+    before granting access.
+    
+*   `fs.gs.authorization.handler.properties.<PROPERTY>=<VALUE>` (not set by default)
+
+    Properties for the custom authroization handler.
+    All the properties set with this prefix will be set to the handler after 
+    instantiation.
+
 ### IO configuration
 
 *   `fs.gs.inputstream.buffer.size` (default: `0`)
@@ -533,3 +549,4 @@ over default service account impersonation.
 
     Maximum number of concurrent directory modification operations per bucket
     guarded by cooperative locking feature.
+
