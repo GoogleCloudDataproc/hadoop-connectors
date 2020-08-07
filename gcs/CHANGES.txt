@@ -1,3 +1,5 @@
+1.9.19 - 2020-XX-XX
+
 1.9.18 - 2020-08-06
 
   1. Fix complex patterns globbing.
