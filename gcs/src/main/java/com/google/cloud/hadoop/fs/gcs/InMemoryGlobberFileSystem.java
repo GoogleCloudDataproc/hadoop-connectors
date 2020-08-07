@@ -112,11 +112,7 @@ class InMemoryGlobberFileSystem extends FileSystem {
     FileStatus[] result = new FileStatus[fileStatuses.size()];
     for (int i = 0; i < fileStatuses.size(); i++) {
       // Clone FileStatus objects because they are mutable and Hadoop actually can modify them
-      FileStatus fileStatus = fileStatuses.get(i);
-      result[i] = new FileStatus(fileStatus.getLen(), fileStatus.isDir(), fileStatus.getReplication(),
-          fileStatus.getBlockSize(), fileStatus.getModificationTime(), fileStatus.getAccessTime(),
-          fileStatus.getPermission(), fileStatus.getOwner(), fileStatus.getGroup(),
-          fileStatus.getPath());
+      result[i] = newFileStatus(fileStatuses.get(i));
     }
     return result;
   }
@@ -131,10 +127,7 @@ class InMemoryGlobberFileSystem extends FileSystem {
           String.format("Path '%s' (qualified: '%s') does not exist.", f, qualifiedPath));
     }
     // Clone FileStatus object because it is mutable and Hadoop actually can modify it
-    return new FileStatus(fileStatus.getLen(), fileStatus.isDir(), fileStatus.getReplication(),
-        fileStatus.getBlockSize(), fileStatus.getModificationTime(), fileStatus.getAccessTime(),
-        fileStatus.getPermission(), fileStatus.getOwner(), fileStatus.getGroup(),
-        fileStatus.getPath());
+    return newFileStatus(fileStatus);
   }
 
   // Below are unsupported methods that are not used in 'globStatus' calls
@@ -194,5 +187,25 @@ class InMemoryGlobberFileSystem extends FileSystem {
   @Override
   public boolean mkdirs(Path f, FsPermission permission) throws IOException {
     throw new UnsupportedOperationException();
+  }
+
+  private static FileStatus newFileStatus(FileStatus fileStatus) {
+    FsPermission fsPermission = fileStatus.getPermission();
+    return new FileStatus(
+        fileStatus.getLen(),
+        fileStatus.isDir(),
+        fileStatus.getReplication(),
+        fileStatus.getBlockSize(),
+        fileStatus.getModificationTime(),
+        fileStatus.getAccessTime(),
+        fsPermission == null
+            ? null
+            : new FsPermission(
+                fsPermission.getUserAction(),
+                fsPermission.getGroupAction(),
+                fsPermission.getGroupAction()),
+        fileStatus.getOwner(),
+        fileStatus.getGroup(),
+        fileStatus.getPath());
   }
 }
