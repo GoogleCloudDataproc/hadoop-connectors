@@ -112,7 +112,11 @@ class InMemoryGlobberFileSystem extends FileSystem {
     FileStatus[] result = new FileStatus[fileStatuses.size()];
     for (int i = 0; i < fileStatuses.size(); i++) {
       // Clone FileStatus objects because they are mutable and Hadoop actually can modify them
-      result[i] = new FileStatus(fileStatuses.get(i));
+      FileStatus fileStatus = fileStatuses.get(i);
+      result[i] = new FileStatus(fileStatus.getLen(), fileStatus.isDir(), fileStatus.getReplication(),
+          fileStatus.getBlockSize(), fileStatus.getModificationTime(), fileStatus.getAccessTime(),
+          fileStatus.getPermission(), fileStatus.getOwner(), fileStatus.getGroup(),
+          fileStatus.getPath());
     }
     return result;
   }
@@ -127,7 +131,10 @@ class InMemoryGlobberFileSystem extends FileSystem {
           String.format("Path '%s' (qualified: '%s') does not exist.", f, qualifiedPath));
     }
     // Clone FileStatus object because it is mutable and Hadoop actually can modify it
-    return new FileStatus(fileStatus);
+    return new FileStatus(fileStatus.getLen(), fileStatus.isDir(), fileStatus.getReplication(),
+        fileStatus.getBlockSize(), fileStatus.getModificationTime(), fileStatus.getAccessTime(),
+        fileStatus.getPermission(), fileStatus.getOwner(), fileStatus.getGroup(),
+        fileStatus.getPath());
   }
 
   // Below are unsupported methods that are not used in 'globStatus' calls
