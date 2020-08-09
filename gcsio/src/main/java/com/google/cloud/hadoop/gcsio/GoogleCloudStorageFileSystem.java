@@ -1048,7 +1048,11 @@ public class GoogleCloudStorageFileSystem {
         if (e instanceof InterruptedException) {
           Thread.currentThread().interrupt();
         }
-        throw new IOException(String.format("Failed to listFileInfo for '%s': %s", path, e.getMessage()), e);
+        throw new IOException(
+            String.format(
+                "Failed to listFileInfo for '%s': %s",
+                path, (e instanceof ExecutionException ? e.getCause() : e).getMessage()),
+            e);
       }
     } finally {
       dirExecutor.shutdownNow();
