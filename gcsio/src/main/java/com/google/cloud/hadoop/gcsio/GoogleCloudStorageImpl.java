@@ -49,13 +49,13 @@ import com.google.api.services.storage.model.ComposeRequest;
 import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.RewriteResponse;
 import com.google.api.services.storage.model.StorageObject;
+import com.google.cloud.hadoop.gcsio.authorization.StorageRequestAuthorizer;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
-import com.google.cloud.hadoop.gcsio.authorization.StorageRequestAuthorizer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -202,7 +202,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       RetryDeterminer.createRateLimitedRetryDeterminer(errorExtractor);
 
   // Authorization Handler instance.
-  final private StorageRequestAuthorizer storageRequestAuthorizer;
+  private final StorageRequestAuthorizer storageRequestAuthorizer;
 
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
@@ -251,7 +251,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           new StorageStubProvider(options.getReadChannelOptions(), backgroundTasksThreadPool);
     }
 
-    storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);
+    this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);
   }
 
   /**
@@ -276,22 +276,23 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       this.httpRequestInitializer = gcs.getRequestFactory().getInitializer();
     }
 
-    storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);
+    this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);
   }
 
   @VisibleForTesting
   protected GoogleCloudStorageImpl() {
     this.storageOptions = GoogleCloudStorageOptions.builder().setAppName("test-app").build();
-    storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);
+    this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);
   }
 
   @VisibleForTesting
   static StorageRequestAuthorizer initializeStorageRequestAuthorizer(
       GoogleCloudStorageOptions options) {
-    return options.getAuthorizationHandlerClass() == null
+    return options.getAuthorizationHandlerImplClass() == null
         ? null
         : new StorageRequestAuthorizer(
-            options.getAuthorizationHandlerClass(), options.getAuthorizationHandlerProperties());
+            options.getAuthorizationHandlerImplClass(),
+            options.getAuthorizationHandlerProperties());
   }
 
   private ExecutorService createManualBatchingThreadPool() {
@@ -1357,7 +1358,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         bucketName, objectNamePrefix, delimiter, includeTrailingDelimiter, maxResults);
     checkArgument(!Strings.isNullOrEmpty(bucketName), "bucketName must not be null or empty");
 
-    Storage.Objects.List listObject = gcs.objects().list(bucketName);
+    Storage.Objects.List listObject = initializeRequest(gcs.objects().list(bucketName), bucketName);
 
     // Set delimiter if supplied.
     if (delimiter != null) {
@@ -1377,8 +1378,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     if (!Strings.isNullOrEmpty(objectNamePrefix)) {
       listObject.setPrefix(objectNamePrefix);
     }
-
-    listObject = initializeRequest(listObject, bucketName);
 
     return listObject;
   }
@@ -2097,12 +2096,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   <RequestT extends StorageRequest<?>> RequestT initializeRequest(
       RequestT request, String bucketName) throws IOException {
-    // Check if authorizer is set by user
     if (storageRequestAuthorizer != null) {
-      logger.atFine().log(
-          "initializeRequest(%s, %s) calling authorization handler.",
-          request, bucketName);
-      storageRequestAuthorizer.authorize(request, bucketName);
+      storageRequestAuthorizer.authorize(request);
     }
     return configureRequest(request, bucketName);
   }
