@@ -159,7 +159,7 @@ public class GoogleHadoopFileSystemConfiguration {
    * parallel to reduce latency.
    */
   public static final HadoopConfigurationProperty<Boolean> GCS_STATUS_PARALLEL_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.status.parallel.enable", false);
+      new HadoopConfigurationProperty<>("fs.gs.status.parallel.enable", true);
 
   /** Configuration key for enabling lazy initialization of GCS FS instance. */
   public static final HadoopConfigurationProperty<Boolean> GCS_LAZY_INITIALIZATION_ENABLE =

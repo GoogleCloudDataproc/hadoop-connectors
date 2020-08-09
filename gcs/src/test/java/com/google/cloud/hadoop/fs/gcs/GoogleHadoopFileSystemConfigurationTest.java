@@ -70,7 +70,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.delegation.token.binding", null);
           put("fs.gs.bucket.delete.enable", false);
           put("fs.gs.checksum.type", GcsFileChecksumType.NONE);
-          put("fs.gs.status.parallel.enable", false);
+          put("fs.gs.status.parallel.enable", true);
           put("fs.gs.lazy.init.enable", false);
           put("fs.gs.block.size", 64 * 1024 * 1024L);
           put("fs.gs.implicit.dir.infer.enable", true);

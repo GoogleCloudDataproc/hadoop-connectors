@@ -60,10 +60,10 @@
     return `null` for that file. Supported checksum types are `NONE`, `CRC32C`
     and `MD5`
 
-*   `fs.gs.status.parallel.enable` (default: `false`)
+*   `fs.gs.status.parallel.enable` (default: `true`)
 
-    If true, executes Cloud Storage object requests in FileSystem listStatus and
-    getFileStatus methods in parallel to reduce latency.
+    If true, executes Cloud Storage object requests in `FileSystem`'s
+    `listStatus` and `getFileStatus` methods in parallel to reduce latency.
 
 *   `fs.gs.lazy.init.enable` (default: `false`)
 
