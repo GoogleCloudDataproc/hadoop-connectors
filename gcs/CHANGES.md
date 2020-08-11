@@ -106,6 +106,8 @@
     passed to an instance of the configured authorization handler class after
     instantiation before calling any Cloud Storage requests handling methods.
 
+1.  Set default value for `fs.gs.status.parallel.enable` property to `true`.
+
 ### 2.1.1 - 2020-03-11
 
 1.  Add upload cache to support high-level retries of failed uploads. Cache size
