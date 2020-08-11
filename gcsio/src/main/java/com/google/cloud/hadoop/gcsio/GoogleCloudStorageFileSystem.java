@@ -1051,7 +1051,7 @@ public class GoogleCloudStorageFileSystem {
         throw new IOException(
             String.format(
                 "Failed to listFileInfo for '%s': %s",
-                path, (e instanceof ExecutionException ? e.getCause() : e).getMessage()),
+                path, e instanceof ExecutionException ? e.getCause() : e),
             e);
       }
     } finally {
