@@ -30,13 +30,13 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
 import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
 import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
 import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
-import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -413,12 +413,12 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<RedactedString> GCS_ENCRYPTION_KEY_HASH =
       new HadoopConfigurationProperty<>("fs.gs.encryption.key.hash");
 
-  /** Configuration for authorization handler. */
+  /** Configuration for authorization handler implementation class. */
   public static final HadoopConfigurationProperty<Class<? extends AuthorizationHandler>>
-      GCS_AUTHORIZATION_HANDLER_CLASS_IMPL =
+      GCS_AUTHORIZATION_HANDLER_IMPL =
           new HadoopConfigurationProperty<>("fs.gs.authorization.handler.impl");
 
-  /** Configuration prefix for custom authorization hook properties. */
+  /** Configuration prefix for custom authorization handler properties. */
   public static final HadoopConfigurationProperty<Map<String, String>>
       GCS_AUTHORIZATION_HANDLER_PROPERTIES_PREFIX =
           new HadoopConfigurationProperty<>(
@@ -482,11 +482,9 @@ public class GoogleHadoopFileSystemConfiguration {
         .setEncryptionKey(RedactedString.create(GCS_ENCRYPTION_KEY.getPassword(config)))
         .setEncryptionKeyHash(RedactedString.create(GCS_ENCRYPTION_KEY_HASH.getPassword(config)))
         .setGrpcEnabled(GCS_GRPC_ENABLE.get(config, config::getBoolean))
-        .setAuthorizationHandlerClass(
-            GCS_AUTHORIZATION_HANDLER_CLASS_IMPL.get(
-                config,
-                (lookupKey, defaultValue) ->
-                    config.getClass(lookupKey, defaultValue, AuthorizationHandler.class)))
+        .setAuthorizationHandlerImplClass(
+            GCS_AUTHORIZATION_HANDLER_IMPL.get(
+                config, (k, d) -> config.getClass(k, d, AuthorizationHandler.class)))
         .setAuthorizationHandlerProperties(
             GCS_AUTHORIZATION_HANDLER_PROPERTIES_PREFIX.getPropsWithPrefix(config));
   }

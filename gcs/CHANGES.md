@@ -79,31 +79,12 @@
     fs.gs.auth.impersonation.service.account.for.group.<GROUP_NAME> (not set by default)
     ```
 
-    If any of these properties is set, an access token will be generated for
+    If any of these properties are set, an access token will be generated for
     the service account associated with specified user name or group name in
     order to access GCS. The caller who issues a request for the access token
     must have been granted the Service Account Token Creator role
     (`roles/iam.serviceAccountTokenCreator`) on the service account to
     impersonate.
-    
-1.  Add properties to set a resource authorization handler and the handler's properties:
-    ```
-    fs.gs.authorization.handler.impl=<FULLY_QUALIFIED_HANDLER_CLASS_NAME>
-    fs.gs.authorization.handler.properties.<PROPERTY>=<PROPERTY_VALUE>
-    ```
-    
-    If the ```fs.gs.authorization.handler.impl``` property is set, the specified
-    authorization handler will be used before sending storage requests.
-    GCS connector will use the specified authorization handler to check if a
-    user has enough permission to perform a GCS resource access request 
-    before granting access.
-    The handler can throw AccessDeniedException to reject access requests.
-    
-    All properties with the ```fs.gs.authorization.handler.properties``` prefix 
-    will be set to the custom authorization handler.
-    The property is set after instantiation of the authorization handler and
-    before calling the handling methods.
-    
 
 1.  Fix complex patterns globbing.
 

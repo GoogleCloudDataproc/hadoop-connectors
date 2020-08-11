@@ -67,10 +67,10 @@ import com.google.api.services.storage.model.Bucket;
 import com.google.api.services.storage.model.Buckets;
 import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.StorageObject;
+import com.google.cloud.hadoop.gcsio.authorization.FakeAuthorizationHandler;
+import com.google.cloud.hadoop.gcsio.authorization.StorageRequestAuthorizer;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
-import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
-import com.google.cloud.hadoop.gcsio.authorization.StorageRequestAuthorizer;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -84,13 +84,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
 import java.net.SocketTimeoutException;
-import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.AccessDeniedException;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
@@ -2754,19 +2752,19 @@ public class GoogleCloudStorageTest {
   }
 
   @Test
-  public void testInstantiateAuthorizationHandler() throws ReflectiveOperationException {
+  public void testInstantiateAuthorizationHandler() {
     GoogleCloudStorageOptions options =
         GoogleCloudStorageOptions.builder()
             .setAppName("test-name")
             .setProjectId("test-project")
-            .setAuthorizationHandlerClass(TestConfAuthorizationHandler.class)
+            .setAuthorizationHandlerImplClass(FakeAuthorizationHandler.class)
             .setAuthorizationHandlerProperties(
                 ImmutableMap.of(
-                    TestConfAuthorizationHandler.PROPERTY_KEY,
-                    TestConfAuthorizationHandler.EXPECTED_VALUE))
+                    FakeAuthorizationHandler.PROPERTY_KEY, FakeAuthorizationHandler.EXPECTED_VALUE))
             .build();
 
     StorageRequestAuthorizer authorizer = initializeStorageRequestAuthorizer(options);
+
     assertThat(authorizer).isNotNull();
   }
 
@@ -2831,55 +2829,5 @@ public class GoogleCloudStorageTest {
         return data[position++] & 0xff;
       }
     };
-  }
-
-  /** Fake AuthorizationHandler to test instantiation behavior. */
-  public static class TestConfAuthorizationHandler implements AuthorizationHandler {
-    public static String PROPERTY_KEY = "required.property";
-    public static String EXPECTED_VALUE = "required-value";
-
-    @Override
-    public void setProperties(Map<String, String> property) {
-      assertThat(property.get(PROPERTY_KEY)).isEqualTo(EXPECTED_VALUE);
-    }
-
-    @Override
-    public void handleListObject(URI resource) throws AccessDeniedException {}
-
-    @Override
-    public void handleInsertObject(URI resource) throws AccessDeniedException {}
-
-    @Override
-    public void handleComposeObject(URI destinationResource, List<URI> sourceResources)
-        throws AccessDeniedException {}
-
-    @Override
-    public void handleGetObject(URI resource) throws AccessDeniedException {}
-
-    @Override
-    public void handleDeleteObject(URI resource) throws AccessDeniedException {}
-
-    @Override
-    public void handleRewriteObject(URI sourceResource, URI destinationResource)
-        throws AccessDeniedException {}
-
-    @Override
-    public void handleCopyObject(URI sourceResource, URI destinationResource)
-        throws AccessDeniedException {}
-
-    @Override
-    public void handlePatchObject(URI resource) throws AccessDeniedException {}
-
-    @Override
-    public void handleListBucket() throws AccessDeniedException {}
-
-    @Override
-    public void handleInsertBucket(URI resource) throws AccessDeniedException {}
-
-    @Override
-    public void handleGetBucket(URI resource) throws AccessDeniedException {}
-
-    @Override
-    public void handleDeleteBucket(URI resource) throws AccessDeniedException {}
   }
 }
