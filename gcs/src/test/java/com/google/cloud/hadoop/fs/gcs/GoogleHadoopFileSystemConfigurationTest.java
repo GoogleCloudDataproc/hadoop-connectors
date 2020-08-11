@@ -14,7 +14,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_AUTHORIZATION_HANDLER_CLASS_IMPL;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_AUTHORIZATION_HANDLER_IMPL;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_ALGORITHM;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY;
@@ -36,15 +36,13 @@ import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamTyp
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
+import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
+import com.google.cloud.hadoop.gcsio.authorization.FakeAuthorizationHandler;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
 import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
-import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import java.net.URI;
-import java.nio.file.AccessDeniedException;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.Test;
@@ -303,70 +301,26 @@ public class GoogleHadoopFileSystemConfigurationTest {
   public void testGetAuthorizationHandler() {
     Configuration config = new Configuration();
     config.setClass(
-        GCS_AUTHORIZATION_HANDLER_CLASS_IMPL.getKey(),
-        NullAuthorizationHandler.class,
+        GCS_AUTHORIZATION_HANDLER_IMPL.getKey(),
+        FakeAuthorizationHandler.class,
         AuthorizationHandler.class);
 
     GoogleCloudStorageOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
 
-    Class<? extends AuthorizationHandler> handler = options.getAuthorizationHandlerClass();
+    Class<? extends AuthorizationHandler> handler = options.getAuthorizationHandlerImplClass();
 
     assertThat(handler).isAssignableTo(AuthorizationHandler.class);
+    assertThat(handler).isEqualTo(FakeAuthorizationHandler.class);
   }
 
   @Test
   public void testAuthorizationHandlerClassNotFound() {
     Configuration config = new Configuration();
-    config.set(GCS_AUTHORIZATION_HANDLER_CLASS_IMPL.getKey(), "test.class.not.exist");
+    config.set(GCS_AUTHORIZATION_HANDLER_IMPL.getKey(), "test.class.not.exist");
 
-    assertThrows(RuntimeException.class, () -> {
-      GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
-    });
-  }
-
-  /** A null behavior authorization handler. This class used by java reflection. */
-  protected static class NullAuthorizationHandler implements AuthorizationHandler {
-    @Override
-    public void setProperties(Map<String, String> properties) {}
-
-    @Override
-    public void handleListObject(URI resource) throws AccessDeniedException {}
-
-    @Override
-    public void handleInsertObject(URI resource) throws AccessDeniedException {}
-
-    @Override
-    public void handleComposeObject(URI destinationResource, List<URI> sourceResources)
-        throws AccessDeniedException {}
-
-    @Override
-    public void handleGetObject(URI resource) throws AccessDeniedException {}
-
-    @Override
-    public void handleDeleteObject(URI resource) throws AccessDeniedException {}
-
-    @Override
-    public void handleRewriteObject(URI sourceResource, URI destinationResource)
-        throws AccessDeniedException {}
-
-    @Override
-    public void handleCopyObject(URI sourceResource, URI destinationResource)
-        throws AccessDeniedException {}
-
-    @Override
-    public void handlePatchObject(URI resource) throws AccessDeniedException {}
-
-    @Override
-    public void handleListBucket() throws AccessDeniedException {}
-
-    @Override
-    public void handleInsertBucket(URI resource) throws AccessDeniedException {}
-
-    @Override
-    public void handleGetBucket(URI resource) throws AccessDeniedException {}
-
-    @Override
-    public void handleDeleteBucket(URI resource) throws AccessDeniedException {}
+    assertThrows(
+        RuntimeException.class,
+        () -> GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build());
   }
 }

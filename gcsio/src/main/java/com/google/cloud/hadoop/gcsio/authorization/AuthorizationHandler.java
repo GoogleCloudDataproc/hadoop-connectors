@@ -28,7 +28,7 @@ public interface AuthorizationHandler {
    * @param resource A GCS object URI.
    * @throws AccessDeniedException Thrown when access denied.
    */
-  void handleListObject(URI resource) throws AccessDeniedException;
+  void handleListObjects(URI resource) throws AccessDeniedException;
 
   /**
    * Handles <a href=https://cloud.google.com/storage/docs/json_api/v1/objects/insert>insert object
@@ -102,18 +102,20 @@ public interface AuthorizationHandler {
    * Handles <a href=https://cloud.google.com/storage/docs/json_api/v1/buckets/list>list bucket
    * request</a>.
    *
+   * @param project A GCP project ID in which buckets are listed.
    * @throws AccessDeniedException Thrown when access denied.
    */
-  void handleListBucket() throws AccessDeniedException;
+  void handleListBuckets(String project) throws AccessDeniedException;
 
   /**
    * Handles <a href=https://cloud.google.com/storage/docs/json_api/v1/buckets/insert>insert bucket
    * request</a>.
    *
+   * @param project A GCP project ID where bucket created.
    * @param resource A GCS bucket URI.
    * @throws AccessDeniedException Thrown when access denied.
    */
-  void handleInsertBucket(URI resource) throws AccessDeniedException;
+  void handleInsertBucket(String project, URI resource) throws AccessDeniedException;
 
   /**
    * Handles <a href=https://cloud.google.com/storage/docs/json_api/v1/buckets/get>get bucket

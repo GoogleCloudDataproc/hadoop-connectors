@@ -19,13 +19,13 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.services.storage.Storage;
 import com.google.auto.value.AutoValue;
+import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
 import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
-import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
 import com.google.common.collect.ImmutableMap;
 import java.time.Duration;
 import java.util.Map;
@@ -90,8 +90,8 @@ public abstract class GoogleCloudStorageOptions {
   public static final ImmutableMap<String, String> HTTP_REQUEST_HEADERS_DEFAULT = ImmutableMap.of();
 
   /** Default setting for authorization handler. */
-  public static final Class<? extends AuthorizationHandler> AUTHORIZATION_HANDLER_CLASS_DEFAULT =
-      null;
+  public static final Class<? extends AuthorizationHandler>
+      AUTHORIZATION_HANDLER_IMPL_CLASS_DEFAULT = null;
 
   /** Default properties for authorization handler. */
   public static final Map<String, String> AUTHORIZATION_HANDLER_PROPERTIES_DEFAULT =
@@ -123,7 +123,7 @@ public abstract class GoogleCloudStorageOptions {
         .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
         .setCooperativeLockingOptions(CooperativeLockingOptions.DEFAULT)
         .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT)
-        .setAuthorizationHandlerClass(AUTHORIZATION_HANDLER_CLASS_DEFAULT)
+        .setAuthorizationHandlerImplClass(AUTHORIZATION_HANDLER_IMPL_CLASS_DEFAULT)
         .setAuthorizationHandlerProperties(AUTHORIZATION_HANDLER_PROPERTIES_DEFAULT);
   }
 
@@ -208,7 +208,7 @@ public abstract class GoogleCloudStorageOptions {
   }
 
   @Nullable
-  public abstract Class<? extends AuthorizationHandler> getAuthorizationHandlerClass();
+  public abstract Class<? extends AuthorizationHandler> getAuthorizationHandlerImplClass();
 
   public abstract Map<String, String> getAuthorizationHandlerProperties();
 
@@ -283,8 +283,8 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setEncryptionKeyHash(RedactedString encryptionKeyHash);
 
-    public abstract Builder setAuthorizationHandlerClass(
-        Class<? extends AuthorizationHandler> authorizationHandler);
+    public abstract Builder setAuthorizationHandlerImplClass(
+        Class<? extends AuthorizationHandler> authorizationHandlerImpl);
 
     public abstract Builder setAuthorizationHandlerProperties(Map<String, String> properties);
 
