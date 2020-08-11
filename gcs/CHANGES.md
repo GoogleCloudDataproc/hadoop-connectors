@@ -88,6 +88,24 @@
 
 1.  Fix complex patterns globbing.
 
+1.  Added support for an authorization handler for Cloud Storage requests. This
+    feature is configurable through the properties:	
+
+    ```	
+    fs.gs.authorization.handler.impl=<FULLY_QUALIFIED_AUTHORIZATION_HANDLER_CLASS>	
+    fs.gs.authorization.handler.properties.<AUTHORIZATION_HANDLER_PROPERTY>=<VALUE>	
+    ```	
+
+    If the `fs.gs.authorization.handler.impl` property is set, the specified	
+    authorization handler will be used to authorize Cloud Storage API requests	
+    before executing them. The handler will throw `AccessDeniedException` for	
+    rejected requests if user does not have enough permissions (not authorized)	
+    to execute these requests.	
+
+    All properties with the `fs.gs.authorization.handler.properties.` prefix	
+    passed to an instance of the configured authorization handler class after	
+    instantiation before calling any Cloud Storage requests handling methods.
+
 1.  Set default value for `fs.gs.status.parallel.enable` property to `true`.
 
 ### 2.1.1 - 2020-03-11
