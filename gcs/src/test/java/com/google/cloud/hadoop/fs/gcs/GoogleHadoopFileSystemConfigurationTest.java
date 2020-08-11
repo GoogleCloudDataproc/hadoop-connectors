@@ -37,6 +37,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
+import com.google.cloud.hadoop.gcsio.authorization.FakeAuthorizationHandler;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
 import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.common.collect.ImmutableList;
@@ -301,7 +302,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
     Configuration config = new Configuration();
     config.setClass(
         GCS_AUTHORIZATION_HANDLER_IMPL.getKey(),
-        NullAuthorizationHandler.class,
+        FakeAuthorizationHandler.class,
         AuthorizationHandler.class);
 
     GoogleCloudStorageOptions options =
@@ -310,7 +311,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
     Class<? extends AuthorizationHandler> handler = options.getAuthorizationHandlerImplClass();
 
     assertThat(handler).isAssignableTo(AuthorizationHandler.class);
-    assertThat(handler).isEqualTo(NullAuthorizationHandler.class);
+    assertThat(handler).isEqualTo(FakeAuthorizationHandler.class);
   }
 
   @Test
@@ -322,7 +323,4 @@ public class GoogleHadoopFileSystemConfigurationTest {
         RuntimeException.class,
         () -> GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build());
   }
-
-  // A null behavior authorization handler. This class used by java reflection.
-  private abstract static class NullAuthorizationHandler implements AuthorizationHandler {}
 }

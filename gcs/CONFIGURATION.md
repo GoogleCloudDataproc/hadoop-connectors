@@ -280,7 +280,7 @@ over default service account impersonation.
 
 When configured, a specified authorization handler will be used to authorize
 Cloud Storage API requests before executing them. The handler will throw
-`AccessDeniedException` for reject requests if user does not have enough
+`AccessDeniedException` for rejected requests if user does not have enough
 permissions (not authorized) to execute these requests.
 
 *   `fs.gs.authorization.handler.impl` (not set by default)

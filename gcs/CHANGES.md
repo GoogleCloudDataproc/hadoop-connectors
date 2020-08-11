@@ -96,11 +96,11 @@
     fs.gs.authorization.handler.properties.<AUTHORIZATION_HANDLER_PROPERTY>=<VALUE>
     ```
 
-    If the `fs.gs.authorization.handler.impl` property set, the specified
+    If the `fs.gs.authorization.handler.impl` property is set, the specified
     authorization handler will be used to authorize Cloud Storage API requests
     before executing them. The handler will throw `AccessDeniedException` for
-    reject requests if user does not have enough permissions (not authorized) to
-    execute these requests.
+    rejected requests if user does not have enough permissions (not authorized)
+    to execute these requests.
 
     All properties with the `fs.gs.authorization.handler.properties.` prefix
     passed to an instance of the configured authorization handler class after
