@@ -54,7 +54,7 @@ public abstract class AsyncWriteChannelOptions {
   public static final boolean DIRECT_UPLOAD_ENABLED_DEFAULT = false;
 
   /** Default of whether to enabled checksums for gRPC. */
-  public static final boolean GRPC_CHECKSUMS_ENABLED_DEFAULT = true;
+  public static final boolean GRPC_CHECKSUMS_ENABLED_DEFAULT = false;
 
   public static final PipeType PIPE_TYPE_DEFAULT = PipeType.IO_STREAM_PIPE;
 
