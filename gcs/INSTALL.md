@@ -121,3 +121,15 @@ the installation.
     [gsutil](https://cloud.google.com/storage/docs/gsutil) (`gsutil ls -b
     gs://<some-bucket>`), and that the credentials in your configuration are
     correct.
+*   To troubleshot other issues run `hadoop fs` command with debug logs:
+    ```
+    $ cat <<EOF > "/tmp/google-logging.properties"
+    handlers = java.util.logging.ConsoleHandler
+    java.util.logging.ConsoleHandler.level = CONFIG
+    com.google.level = CONFIG
+    EOF
+
+    $ export HADOOP_CLIENT_OPTS="-Djava.util.logging.config.file=/tmp/google-logging.properties"
+
+    $ hadoop --loglevel debug fs -ls gs://<some-bucket>
+    ```
