@@ -107,6 +107,7 @@ the installation.
 
 *   If the installation test reported `No FileSystem for scheme: gs`, make sure
     that you correctly set the two properties in the correct `core-site.xml`.
+
 *   If the test reported `java.lang.ClassNotFoundException:
     com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem`, check that you added
     the connector to the Hadoop/Spark classpath. If this error caused by
@@ -116,12 +117,15 @@ the installation.
     case, Guava); using a
     [shaded version](https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-hadoop2-latest.jar)
     of the `gcs-connector` jar can resolve this.
+
 *   If the test issued a message related to authorization, make sure that you
     have access to Cloud Storage using
     [gsutil](https://cloud.google.com/storage/docs/gsutil) (`gsutil ls -b
     gs://<some-bucket>`), and that the credentials in your configuration are
     correct.
+
 *   To troubleshot other issues run `hadoop fs` command with debug logs:
+
     ```
     $ cat <<EOF > "/tmp/google-logging.properties"
     handlers = java.util.logging.ConsoleHandler
