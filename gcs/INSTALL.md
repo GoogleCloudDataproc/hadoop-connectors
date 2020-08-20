@@ -127,7 +127,7 @@ the installation.
 *   To troubleshot other issues run `hadoop fs` command with debug logs:
 
     ```
-    $ cat <<EOF > "/tmp/google-logging.properties"
+    $ cat <<EOF >"/tmp/google-logging.properties"
     handlers = java.util.logging.ConsoleHandler
     java.util.logging.ConsoleHandler.level = CONFIG
     com.google.level = CONFIG
