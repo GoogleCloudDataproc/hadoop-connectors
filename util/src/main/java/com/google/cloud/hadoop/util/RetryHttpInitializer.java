@@ -234,7 +234,17 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     // IOExceptions such as "socket timed out" of "insufficient bytes written" will follow a
     // straightforward backoff.
     HttpBackOffIOExceptionHandler exceptionHandler =
-        new HttpBackOffIOExceptionHandler(new ExponentialBackOff());
+        new HttpBackOffIOExceptionHandler(
+            new ExponentialBackOff.Builder()
+                // Set initial timeout to 1.25 seconds to have a 1 second minimum initial interval
+                // after 0.2 randomization factor will be applied
+                .setInitialIntervalMillis(1_250)
+                .setMultiplier(1.6)
+                .setRandomizationFactor(0.2)
+                .setMaxIntervalMillis(20_000)
+                // 30 minutes
+                .setMaxElapsedTimeMillis(1_800_000)
+                .build());
     if (sleeperOverride != null) {
       exceptionHandler.setSleeper(sleeperOverride);
     }
