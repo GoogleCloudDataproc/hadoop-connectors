@@ -116,7 +116,7 @@ public class BigQueryHelperTest {
     // Mock getting Bigquery job.
     when(mockBigqueryJobs.get(any(String.class), any(String.class)))
         .thenReturn(mockBigqueryJobsGet);
-    when(mockBigqueryJobsGet.setLocation(any(String.class))).thenReturn(mockBigqueryJobsGet);
+    when(mockBigqueryJobsGet.setLocation(any())).thenReturn(mockBigqueryJobsGet);
 
     // Mock inserting Bigquery job.
     when(mockBigqueryJobs.insert(any(String.class), any(Job.class)))
@@ -355,6 +355,7 @@ public class BigQueryHelperTest {
     assertThat(job).isEqualTo(jobHandle);
     verify(mockBigqueryJobsInsert, times(1)).execute();
     verify(mockBigqueryJobs, times(1)).get(eq(jobProjectId), eq(jobId));
+    verify(mockBigqueryJobsGet, times(1)).setLocation(eq(null));
     verify(mockBigqueryJobsGet, times(1)).execute();
     verify(mockErrorExtractor).itemAlreadyExists(eq(fakeConflictException));
   }

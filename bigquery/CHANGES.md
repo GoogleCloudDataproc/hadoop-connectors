@@ -2,6 +2,8 @@
 
 1.  Update all dependencies to latest versions.
 
+1.  Fix BigQuery job status retrieval in non-US locations.
+
 ### 1.1.1 - 2020-03-11
 
 1.  Fix shaded jar - add back missing relocated dependencies.
