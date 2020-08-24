@@ -357,16 +357,12 @@ public class BigQueryHelper {
             "Fetching existing job after catching exception for duplicate jobId '%s'",
             job.getJobReference().getJobId());
         try {
-          if (job.getJobReference().getLocation()!=null) {
-            response =
-                    service
-                            .jobs()
-                            .get(projectId, job.getJobReference().getJobId())
-                            .setLocation(job.getJobReference().getLocation())
-                            .execute();
-          } else {
-            response = service.jobs().get(projectId, job.getJobReference().getJobId()).execute();
-          }
+          response =
+              service
+                  .jobs()
+                  .get(projectId, job.getJobReference().getJobId())
+                  .setLocation(job.getJobReference().getLocation())
+                  .execute();
         } catch (IOException getJobException) {
           getJobException.addSuppressed(insertJobException);
           throw new IOException(
