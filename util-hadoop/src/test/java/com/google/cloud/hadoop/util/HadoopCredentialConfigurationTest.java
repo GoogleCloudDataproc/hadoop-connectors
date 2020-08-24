@@ -159,7 +159,7 @@ public class HadoopCredentialConfigurationTest {
 
     GoogleCredentialWithRetry credential =
         (GoogleCredentialWithRetry)
-        withEnvironmentVariable(CREDENTIAL_ENV_VAR, getStringPath("test-credential.json"))
+            withEnvironmentVariable(CREDENTIAL_ENV_VAR, getStringPath("test-credential.json"))
                 .execute(() -> credentialFactory.getCredential(TEST_SCOPES));
 
     assertThat(credential.getServiceAccountId()).isEqualTo("test-email@gserviceaccount.com");
