@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.util;
 
+import static com.github.stefanbirkner.systemlambda.SystemLambda.withEnvironmentVariable;
 import static com.google.cloud.hadoop.util.CredentialFactory.CREDENTIAL_ENV_VAR;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.CLIENT_ID_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.CLIENT_SECRET_SUFFIX;
@@ -48,9 +49,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.contrib.java.lang.system.EnvironmentVariables;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
@@ -89,8 +88,6 @@ public class HadoopCredentialConfigurationTest {
       };
 
   private static final ImmutableList<String> TEST_SCOPES = ImmutableList.of("scope1", "scope2");
-
-  @Rule public final EnvironmentVariables environmentVariables = new EnvironmentVariables();
 
   private Configuration configuration;
 
@@ -158,12 +155,12 @@ public class HadoopCredentialConfigurationTest {
 
   @Test
   public void applicationDefaultServiceAccountWhenConfigured() throws Exception {
-    environmentVariables.set(CREDENTIAL_ENV_VAR, getStringPath("test-credential.json"));
-
     CredentialFactory credentialFactory = getCredentialFactory();
 
     GoogleCredentialWithRetry credential =
-        (GoogleCredentialWithRetry) credentialFactory.getCredential(TEST_SCOPES);
+        (GoogleCredentialWithRetry)
+            withEnvironmentVariable(CREDENTIAL_ENV_VAR, getStringPath("test-credential.json"))
+                .execute(() -> credentialFactory.getCredential(TEST_SCOPES));
 
     assertThat(credential.getServiceAccountId()).isEqualTo("test-email@gserviceaccount.com");
     assertThat(credential.getServiceAccountPrivateKeyId()).isEqualTo("test-key-id");
