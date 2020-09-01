@@ -357,23 +357,22 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     Preconditions.checkArgument(
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
 
-    /* IMPORTANT: Do not modify or change this logic unless absolutely sure that you've addressed
-     * all out-of-order semantics.
-     *
-     * When performing mutations in GCS, even when we aren't concerned with parallel writers,
-     * we need to protect ourselves from what appear to be out-of-order writes to the writer. These
-     * most commonly manifest themselves as a sequence of:
-     * 1) Perform mutation M1 on object O1, which results in an HTTP 503 error,
-     *    but can be any 5XX class error.
-     * 2) Retry mutation M1, which yields a 200 OK
-     * 3) Perform mutation M2 on O1, which yields a 200 OK
-     * 4) Some time later, get O1 and see M1 and not M2, even though M2 appears to have happened
-     *    later.
-     *
-     * To counter this we need to perform mutations with a condition attached, always. This prevents
-     * the race condition as described in:
-     * https://cloud.google.com/storage/docs/generations-preconditions#preventing_the_race_condition
-     */
+    // IMPORTANT: Do not modify or change this logic unless absolutely sure that you've addressed
+    // all out-of-order semantics.
+    //
+    // When performing mutations in GCS, even when we aren't concerned with parallel writers,
+    // we need to protect ourselves from what appear to be out-of-order writes to the writer. These
+    // most commonly manifest themselves as a sequence of:
+    // 1) Perform mutation M1 on object O1, which results in an HTTP 503 error,
+    //    but can be any 5XX class error.
+    // 2) Retry mutation M1, which yields a 200 OK
+    // 3) Perform mutation M2 on O1, which yields a 200 OK
+    // 4) Some time later, get O1 and see M1 and not M2, even though M2 appears to have happened
+    //    later.
+    //
+    // To counter this we need to perform mutations with a condition attached, always. This prevents
+    // the race condition as described in:
+    // https://cloud.google.com/storage/docs/generations-preconditions#preventing_the_race_condition
 
     Optional<Long> writeGeneration =
         resourceId.hasGenerationId()
@@ -383,6 +382,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     ObjectWriteConditions writeConditions =
         ObjectWriteConditions.builder()
             .setContentGenerationMatch(writeGeneration.orElse(null))
+            .setIgnoreGenerationMismatch(
+                options.overwriteExisting() && getOptions().isOverwriteGenerationMismatchIgnored())
             .build();
 
     Map<String, String> rewrittenMetadata = encodeMetadata(options.getMetadata());
@@ -415,7 +416,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             resourceId.getObjectName(),
             options.getContentType(),
             options.getContentEncoding(),
-            options.overwriteExisting(),
             /* kmsKeyName= */ null,
             storageOptions.getWriteChannelOptions(),
             writeConditions,

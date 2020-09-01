@@ -230,6 +230,11 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Long> GCS_REWRITE_MAX_BYTES_PER_CALL =
       new HadoopConfigurationProperty<>("fs.gs.rewrite.max.bytes.per.call", 512 * 1024 * 1024L);
 
+  /** Configuration key for ignoring generation mismatch error for overwrite mutations. */
+  public static final HadoopConfigurationProperty<Boolean>
+      GCS_OVERWRITE_GENERATION_MISMATCH_IGNORE =
+          new HadoopConfigurationProperty<>("fs.gs.overwrite.generation.mismatch.ignore", false);
+
   /** Configuration key for number of items to return per call to the list* GCS RPCs. */
   public static final HadoopConfigurationProperty<Long> GCS_MAX_LIST_ITEMS_PER_CALL =
       new HadoopConfigurationProperty<>("fs.gs.list.max.items.per.call", 1024L);
@@ -424,11 +429,6 @@ public class GoogleHadoopFileSystemConfiguration {
           new HadoopConfigurationProperty<>(
               "fs.gs.authorization.handler.properties.", ImmutableMap.of());
 
-  /** Configuration key for ignoring generation mismatch error for overwrite mutations. */
-  public static final HadoopConfigurationProperty<Boolean>
-      GCS_OVERWRITE_GENERATION_MISMATCH_IGNORE =
-          new HadoopConfigurationProperty<>("fs.gs.overwrite.generation.mismatch.ignore", false);
-
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
   // @VisibleForTesting
@@ -458,6 +458,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setMaxBytesRewrittenPerCall(GCS_REWRITE_MAX_BYTES_PER_CALL.get(config, config::getLong))
         .setCopyMaxRequestsPerBatch(GCS_COPY_MAX_REQUESTS_PER_BATCH.get(config, config::getLong))
         .setCopyBatchThreads(GCS_COPY_BATCH_THREADS.get(config, config::getInt))
+        .setOverwriteGenerationMismatchIgnored(
+            GCS_OVERWRITE_GENERATION_MISMATCH_IGNORE.get(config, config::getBoolean))
         .setTransportType(
             HTTP_TRANSPORT_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::getEnum))
         .setProxyAddress(
@@ -534,8 +536,6 @@ public class GoogleHadoopFileSystemConfiguration {
         .setDirectUploadEnabled(
             GCS_OUTPUT_STREAM_DIRECT_UPLOAD_ENABLE.get(config, config::getBoolean))
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
-        .setOverwriteGenerationMismatchIgnored(
-            GCS_OVERWRITE_GENERATION_MISMATCH_IGNORE.get(config, config::getBoolean))
         .build();
   }
 

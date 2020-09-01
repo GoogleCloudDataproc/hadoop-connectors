@@ -54,8 +54,6 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
   // Upload operation that takes place on a separate thread.
   protected Future<T> uploadOperation;
 
-  private boolean uploadPreconditionFailureIgnored = false;
-
   private boolean initialized = false;
 
   private WritableByteChannel pipeSink;
@@ -137,9 +135,6 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
     try {
       return pipeSink.write(buffer);
     } catch (IOException e) {
-      if (uploadPreconditionFailureIgnored) {
-        return 0;
-      }
       throw new IOException(
           String.format(
               "Failed to write %d bytes in '%s'", buffer.remaining(), getResourceString()),
@@ -173,10 +168,7 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
     }
     try {
       pipeSink.close();
-      T response = waitForCompletionAndThrowIfUploadFailed();
-      if (!uploadPreconditionFailureIgnored) {
-        handleResponse(response);
-      }
+      handleResponse(waitForCompletionAndThrowIfUploadFailed());
     } catch (IOException e) {
       if (uploadCache == null) {
         throw e;
@@ -248,10 +240,6 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
   /** Sets the contentType. This must be called before {@link #initialize()} for any effect. */
   protected void setContentType(String contentType) {
     this.contentType = contentType;
-  }
-
-  protected void setUploadPreconditionFailureIgnored(boolean uploadPreconditionFailureIgnored) {
-    this.uploadPreconditionFailureIgnored = uploadPreconditionFailureIgnored;
   }
 
   protected abstract String getResourceString();

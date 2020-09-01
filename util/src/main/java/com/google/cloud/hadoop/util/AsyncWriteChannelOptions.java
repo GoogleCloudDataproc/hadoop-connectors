@@ -58,9 +58,6 @@ public abstract class AsyncWriteChannelOptions {
 
   public static final PipeType PIPE_TYPE_DEFAULT = PipeType.IO_STREAM_PIPE;
 
-  /** Default of whether to ignore generation mismatch for overwrite mutations. */
-  public static final boolean OVERWRITE_GENERATION_MISMATCH_IGNORED_DEFAULT = false;
-
   public static final AsyncWriteChannelOptions DEFAULT = builder().build();
 
   public static Builder builder() {
@@ -71,8 +68,7 @@ public abstract class AsyncWriteChannelOptions {
         .setUploadChunkSize(UPLOAD_CHUNK_SIZE_DEFAULT)
         .setUploadCacheSize(UPLOAD_CACHE_SIZE_DEFAULT)
         .setDirectUploadEnabled(DIRECT_UPLOAD_ENABLED_DEFAULT)
-        .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT)
-        .setOverwriteGenerationMismatchIgnored(OVERWRITE_GENERATION_MISMATCH_IGNORED_DEFAULT);
+        .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT);
   }
 
   public abstract Builder toBuilder();
@@ -91,8 +87,6 @@ public abstract class AsyncWriteChannelOptions {
 
   public abstract boolean isGrpcChecksumsEnabled();
 
-  public abstract boolean isOverwriteGenerationMismatchIgnored();
-
   /** Mutable builder for the GoogleCloudStorageWriteChannelOptions class. */
   @AutoValue.Builder
   public abstract static class Builder {
@@ -108,6 +102,12 @@ public abstract class AsyncWriteChannelOptions {
     public abstract Builder setUploadCacheSize(int uploadCacheSize);
 
     public abstract Builder setDirectUploadEnabled(boolean directUploadEnabled);
+
+    /**
+     * Enable gRPC checksumming. On by default. It is strongly recommended to leave this enabled, to
+     * protect against possible data corruption caused by software bugs.
+     */
+    public abstract Builder setGrpcChecksumsEnabled(boolean grpcChecksumsEnabled);
 
     abstract AsyncWriteChannelOptions autoBuild();
 
@@ -131,17 +131,5 @@ public abstract class AsyncWriteChannelOptions {
             UPLOAD_CHUNK_SIZE_GRANULARITY, chunkSize);
       }
     }
-
-    /**
-     * Enable gRPC checksumming. On by default. It is strongly recommended to leave this enabled, to
-     * protect against possible data corruption caused by software bugs.
-     *
-     * @param grpcChecksumsEnabled
-     * @return the Builder
-     */
-    public abstract Builder setGrpcChecksumsEnabled(boolean grpcChecksumsEnabled);
-
-    public abstract Builder setOverwriteGenerationMismatchIgnored(
-        boolean overwriteGenerationMismatchIgnored);
   }
 }

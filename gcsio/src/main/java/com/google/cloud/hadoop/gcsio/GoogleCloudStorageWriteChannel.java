@@ -44,7 +44,6 @@ public class GoogleCloudStorageWriteChannel
   private final ObjectWriteConditions writeConditions;
   private final Map<String, String> metadata;
 
-  private boolean overwriteExisting = false;
   private GoogleCloudStorageItemInfo completedItemInfo = null;
 
   /**
@@ -69,7 +68,6 @@ public class GoogleCloudStorageWriteChannel
       String objectName,
       String contentType,
       String contentEncoding,
-      boolean overwriteExisting,
       String kmsKeyName,
       AsyncWriteChannelOptions options,
       ObjectWriteConditions writeConditions,
@@ -83,7 +81,6 @@ public class GoogleCloudStorageWriteChannel
       setContentType(contentType);
     }
     this.contentEncoding = contentEncoding;
-    this.overwriteExisting = overwriteExisting;
     this.kmsKeyName = kmsKeyName;
     this.writeConditions = writeConditions;
     this.metadata = objectMetadata;
@@ -113,27 +110,23 @@ public class GoogleCloudStorageWriteChannel
   }
 
   @Override
-  public StorageObject createResponseFromException(IOException e) {
-    StorageObject object = new StorageObject();
-    object.setBucket(bucketName);
-    object.setName(objectName);
-    return object;
-  }
-
-  @Override
-  protected boolean ignoreUploadPreconditonFailure(IOException e) {
-    boolean uploadPreconditionFailureIgnored =
-        overwriteExisting
-            && options.isOverwriteGenerationMismatchIgnored()
-            && ApiErrorExtractor.INSTANCE.preconditionNotMet(e);
-    setUploadPreconditionFailureIgnored(uploadPreconditionFailureIgnored);
-    return uploadPreconditionFailureIgnored;
-  }
-
-  @Override
   public void handleResponse(StorageObject response) {
-    this.completedItemInfo = GoogleCloudStorageImpl.createItemInfoForStorageObject(
-        new StorageResourceId(bucketName, objectName), response);
+    StorageResourceId resourceId = new StorageResourceId(bucketName, objectName);
+    this.completedItemInfo =
+        writeConditions.getIgnoreGenerationMismatch()
+            ? GoogleCloudStorageItemInfo.createNotFound(resourceId)
+            : GoogleCloudStorageImpl.createItemInfoForStorageObject(resourceId, response);
+  }
+
+  @Override
+  public StorageObject createResponseFromException(IOException e) {
+    if (writeConditions.getIgnoreGenerationMismatch()
+        && ApiErrorExtractor.INSTANCE.preconditionNotMet(e)) {
+      logger.atWarning().withCause(e).log(
+          "412 Precondition failure was ignored for resource '%s'", getResourceString());
+      return new StorageObject().setBucket(bucketName).setName(objectName);
+    }
+    return super.createResponseFromException(e);
   }
 
   @Override

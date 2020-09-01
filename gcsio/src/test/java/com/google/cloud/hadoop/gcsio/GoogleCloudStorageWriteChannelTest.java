@@ -48,7 +48,6 @@ public class GoogleCloudStorageWriteChannelTest {
             OBJECT_NAME,
             "content-type",
             /* contentEncoding= */ null,
-            false,
             kmsKeyName,
             AsyncWriteChannelOptions.DEFAULT,
             ObjectWriteConditions.NONE,
