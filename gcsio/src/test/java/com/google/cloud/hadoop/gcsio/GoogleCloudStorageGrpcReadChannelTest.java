@@ -182,7 +182,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
             .setBucket(BUCKET_NAME)
             .setObject(OBJECT_NAME)
             .setGeneration(OBJECT_GENERATION)
-            .setReadLimit(50)
+            .setReadLimit(GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE)
             .setReadOffset(10)
             .build();
     verify(fakeService, times(1)).getObjectMedia(eq(expectedRequest), any());
@@ -213,7 +213,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
             .setBucket(BUCKET_NAME)
             .setObject(OBJECT_NAME)
             .setGeneration(OBJECT_GENERATION)
-            .setReadLimit(50)
+            .setReadLimit(GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE)
             .setReadOffset(10)
             .build();
     GetObjectMediaRequest secondExpectedRequest =
@@ -221,7 +221,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
             .setBucket(BUCKET_NAME)
             .setObject(OBJECT_NAME)
             .setGeneration(OBJECT_GENERATION)
-            .setReadLimit(25)
+            .setReadLimit(GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE)
             .setReadOffset(20)
             .build();
 
