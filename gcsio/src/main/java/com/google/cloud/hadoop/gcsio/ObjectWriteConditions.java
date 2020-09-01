@@ -32,16 +32,26 @@ public class ObjectWriteConditions {
 
   private final Optional<Long> contentGenerationMatch;
   private final Optional<Long> metaGenerationMatch;
+  private final boolean ignoreGenerationMismatch;
 
   public ObjectWriteConditions() {
-    metaGenerationMatch = Optional.absent();
-    contentGenerationMatch = Optional.absent();
+    this(
+        /* contentGenerationMatch= */ Optional.absent(),
+        /* metaGenerationMatch= */ Optional.absent());
   }
 
-  public ObjectWriteConditions(Optional<Long> contentGenerationMatch,
-      Optional<Long> metaGenerationMatch) {
+  public ObjectWriteConditions(
+      Optional<Long> contentGenerationMatch, Optional<Long> metaGenerationMatch) {
+    this(contentGenerationMatch, metaGenerationMatch, /* ignoreGenerationMismatch= */ false);
+  }
+
+  public ObjectWriteConditions(
+      Optional<Long> contentGenerationMatch,
+      Optional<Long> metaGenerationMatch,
+      boolean ignoreGenerationMismatch) {
     this.contentGenerationMatch = contentGenerationMatch;
     this.metaGenerationMatch = metaGenerationMatch;
+    this.ignoreGenerationMismatch = ignoreGenerationMismatch;
   }
 
   public boolean hasContentGenerationMatch() {
@@ -58,6 +68,10 @@ public class ObjectWriteConditions {
 
   public long getMetaGenerationMatch() {
     return metaGenerationMatch.get();
+  }
+
+  public boolean getIgnoreGenerationMismatch() {
+    return ignoreGenerationMismatch;
   }
 
   /**

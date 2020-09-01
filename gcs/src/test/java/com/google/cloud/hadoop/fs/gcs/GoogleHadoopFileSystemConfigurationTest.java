@@ -113,6 +113,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.grpc.enable", false);
           put("fs.gs.grpc.checksums.enable", false);
           put("fs.gs.grpc.server.address", null);
+          put("fs.gs.overwrite.generation.mismatch.ignore", false);
         }
       };
 

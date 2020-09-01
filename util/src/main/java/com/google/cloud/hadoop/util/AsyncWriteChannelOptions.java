@@ -97,15 +97,12 @@ public abstract class AsyncWriteChannelOptions {
 
     public abstract Builder setDirectUploadEnabled(boolean directUploadEnabled);
 
-    public abstract AsyncWriteChannelOptions build();
-
     /**
      * Enable gRPC checksumming. On by default. It is strongly recommended to leave this enabled, to
      * protect against possible data corruption caused by software bugs.
-     *
-     * @param grpcChecksumsEnabled
-     * @return the Builder
      */
     public abstract Builder setGrpcChecksumsEnabled(boolean grpcChecksumsEnabled);
+
+    public abstract AsyncWriteChannelOptions build();
   }
 }

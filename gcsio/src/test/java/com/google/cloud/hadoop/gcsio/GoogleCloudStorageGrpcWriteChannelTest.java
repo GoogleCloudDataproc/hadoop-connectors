@@ -97,7 +97,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
         AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
     ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, Optional.empty());
+        newWriteChannel(options, writeConditions, Optional.absent());
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
                 QueryWriteStatusResponse.newBuilder().setCommittedSize(0).build(),

@@ -28,6 +28,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
@@ -94,8 +95,7 @@ public abstract class GoogleCloudStorageIntegrationHelper {
    * @return number of bytes written
    */
   public int writeTextFile(String bucketName, String objectName, String text) throws IOException {
-    byte[] textBytes = text.getBytes(UTF_8);
-    return writeFile(bucketName, objectName, textBytes, 1);
+    return writeFile(bucketName, objectName, text.getBytes(UTF_8), /* numWrites= */ 1);
   }
 
   /**
@@ -113,8 +113,19 @@ public abstract class GoogleCloudStorageIntegrationHelper {
    */
   protected int writeTextFileOverwriting(String bucketName, String objectName, String text)
       throws IOException {
-    byte[] textBytes = text.getBytes(UTF_8);
-    return writeFileOverwriting(bucketName, objectName, textBytes, 1);
+    return writeFileOverwriting(bucketName, objectName, text.getBytes(UTF_8), /* numWrites= */ 1);
+  }
+
+  protected int writeFile(URI path, String text, int numWrites, boolean overwrite)
+      throws IOException {
+    StorageResourceId resourceId =
+        StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ false);
+    return writeFile(
+        resourceId.getBucketName(),
+        resourceId.getObjectName(),
+        text.getBytes(UTF_8),
+        numWrites,
+        overwrite);
   }
 
   /**
@@ -174,6 +185,13 @@ public abstract class GoogleCloudStorageIntegrationHelper {
   protected int writeFileOverwriting(
       String bucketName, String objectName, byte[] buffer, int numWrites) throws IOException {
     return writeFile(bucketName, objectName, buffer, numWrites, /* overwriteExisting= */ true);
+  }
+
+  /** Helper which reads the entire file as a String. */
+  public String readTextFile(URI path) throws IOException {
+    StorageResourceId resourceId =
+        StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ false);
+    return readTextFile(resourceId.getBucketName(), resourceId.getObjectName());
   }
 
   /** Helper which reads the entire file as a String. */
