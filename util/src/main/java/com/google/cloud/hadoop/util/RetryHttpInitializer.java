@@ -26,6 +26,7 @@ import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpStatusCodes;
 import com.google.api.client.http.HttpUnsuccessfulResponseHandler;
+import com.google.api.client.util.BackOff;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.Sleeper;
 import com.google.common.annotations.VisibleForTesting;
@@ -165,7 +166,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
     public CredentialOrBackoffResponseHandler() {
       HttpBackOffUnsuccessfulResponseHandler errorCodeHandler =
-          new HttpBackOffUnsuccessfulResponseHandler(new ExponentialBackOff());
+          new HttpBackOffUnsuccessfulResponseHandler(getDefaultBackOff());
       errorCodeHandler.setBackOffRequired(
           new HttpBackOffUnsuccessfulResponseHandler.BackOffRequired() {
             @Override
@@ -283,17 +284,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     // IOExceptions such as "socket timed out" of "insufficient bytes written" will follow a
     // straightforward backoff.
     HttpBackOffIOExceptionHandler exceptionHandler =
-        new HttpBackOffIOExceptionHandler(
-            new ExponentialBackOff.Builder()
-                // Set initial timeout to 1.25 seconds to have a 1 second minimum initial interval
-                // after 0.2 randomization factor will be applied
-                .setInitialIntervalMillis(1_250)
-                .setMultiplier(1.6)
-                .setRandomizationFactor(0.2)
-                .setMaxIntervalMillis(20_000)
-                // 30 minutes
-                .setMaxElapsedTimeMillis(1_800_000)
-                .build());
+        new HttpBackOffIOExceptionHandler(getDefaultBackOff());
     if (sleeperOverride != null) {
       exceptionHandler.setSleeper(sleeperOverride);
     }
@@ -319,6 +310,19 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     for (Map.Entry<String, String> header : headers.entrySet()) {
       request.getHeaders().set(header.getKey(), header.getValue());
     }
+  }
+
+  private static BackOff getDefaultBackOff() {
+    return new ExponentialBackOff.Builder()
+        // Set initial timeout to 1.25 seconds to have a 1 second minimum initial interval
+        // after 0.2 randomization factor will be applied
+        .setInitialIntervalMillis(1_250)
+        .setMultiplier(1.6)
+        .setRandomizationFactor(0.2)
+        .setMaxIntervalMillis(20_000)
+        // 30 minutes
+        .setMaxElapsedTimeMillis(1_800_000)
+        .build();
   }
 
   /** Overrides the default Sleepers used in backoff retry handler instances. */
