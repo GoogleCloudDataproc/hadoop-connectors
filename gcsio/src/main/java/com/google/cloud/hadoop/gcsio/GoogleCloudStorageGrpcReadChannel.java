@@ -36,7 +36,7 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.time.Duration;
 import java.util.Iterator;
-import java.util.OptionalInt;
+import java.util.OptionalLong;
 import javax.annotation.Nullable;
 
 public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
@@ -201,7 +201,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     // The server responds in 2MB chunks, but the client can ask for less than that. We store the
     // remainder in bufferedContent and return pieces of that on the next read call (and flush
     // that buffer if there is a seek).
-    if (bufferedContent != null && readStrategy != Fadvise.RANDOM) {
+    if (bufferedContent != null) {
       bytesRead += readBufferedContentInto(byteBuffer);
     }
     if (!byteBuffer.hasRemaining()) {
@@ -211,11 +211,13 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       return bytesRead > 0 ? bytesRead : -1;
     }
     if (resIterator == null) {
-      OptionalInt bytesToRead;
+      OptionalLong bytesToRead;
       if (readStrategy == Fadvise.RANDOM) {
-        bytesToRead = OptionalInt.of(byteBuffer.remaining());
+        long randomRangeSize =
+            Math.max(byteBuffer.remaining(), readOptions.getMinRangeRequestSize());
+        bytesToRead = OptionalLong.of(randomRangeSize);
       } else {
-        bytesToRead = OptionalInt.empty();
+        bytesToRead = OptionalLong.empty();
       }
       requestObjectMedia(bytesToRead);
     }
@@ -260,7 +262,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     return bytesRead;
   }
 
-  private void requestObjectMedia(OptionalInt bytesToRead) throws IOException {
+  private void requestObjectMedia(OptionalLong bytesToRead) throws IOException {
     GetObjectMediaRequest.Builder requestBuilder =
         GetObjectMediaRequest.newBuilder()
             .setBucket(bucketName)
@@ -268,7 +270,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
             .setGeneration(objectGeneration)
             .setReadOffset(position);
     if (bytesToRead.isPresent()) {
-      requestBuilder.setReadLimit(bytesToRead.getAsInt());
+      requestBuilder.setReadLimit(bytesToRead.getAsLong());
     }
     GetObjectMediaRequest request = requestBuilder.build();
     try {
@@ -302,6 +304,10 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
    */
   private boolean moreServerContent() throws IOException {
     try {
+      if (requestContext.isCancelled()) {
+        return false;
+      }
+
       boolean moreDataAvailable = resIterator.hasNext();
       if (!moreDataAvailable) {
         cancelCurrentRequest();
