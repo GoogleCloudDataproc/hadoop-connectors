@@ -49,7 +49,8 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   private static final String BUCKET_NAME = "bucket-name";
   private static final String OBJECT_NAME = "object-name";
   private static final long OBJECT_GENERATION = 7;
-  private static final int OBJECT_SIZE = GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE + 10;
+  private static final int OBJECT_SIZE =
+      GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE + 10;
   private static final int DEFAULT_OBJECT_CRC32C = 185327488;
   private static Object DEFAULT_OBJECT =
       Object.newBuilder()
