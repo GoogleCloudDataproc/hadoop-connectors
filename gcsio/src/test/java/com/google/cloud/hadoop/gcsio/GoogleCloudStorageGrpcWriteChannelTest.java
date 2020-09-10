@@ -667,6 +667,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
 
       @Override
       public void onError(Throwable t) {
+        responseObserver.onError(t);
       }
 
       @Override

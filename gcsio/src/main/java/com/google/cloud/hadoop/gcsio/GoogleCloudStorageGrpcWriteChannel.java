@@ -211,6 +211,17 @@ public final class GoogleCloudStorageGrpcWriteChannel
             stub.withDeadlineAfter(WRITE_STREAM_TIMEOUT.toMillis(), MILLISECONDS)
                 .insertObject(responseObserver);
 
+        // Wait for streaming RPC to become ready for upload.
+        try {
+          responseObserver.ready.await();
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new IOException(
+              String.format(
+                  "Streaming RPC failed to become ready for resumable upload for '%s'",
+                  getResourceString()),
+              e);
+        }
         boolean objectFinalized = false;
         while (!objectFinalized) {
           InsertObjectRequest insertRequest;
@@ -230,14 +241,16 @@ public final class GoogleCloudStorageGrpcWriteChannel
           requestStreamObserver.onNext(insertRequest);
           objectFinalized = insertRequest.getFinishWrite();
 
-          if (responseObserver.hasTransientError()) {
+          if (responseObserver.hasTransientError() || responseObserver.hasNonTransientError()) {
+            requestStreamObserver.onError(
+                responseObserver.hasTransientError()
+                    ? responseObserver.transientError
+                    : responseObserver.nonTransientError);
             break;
+          } else if (objectFinalized) {
+            requestStreamObserver.onCompleted();
           }
         }
-        if (responseObserver.hasTransientError()) {
-          continue;
-        }
-        requestStreamObserver.onCompleted();
 
         try {
           responseObserver.done.await();
@@ -335,16 +348,18 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       private final long writeOffset;
       private final String uploadId;
-      // The last transient error to occur during the streaming RPC.
-      private Throwable transientError = null;
-      // The last non-transient error to occur during the streaming RPC.
-      private Throwable nonTransientError = null;
       // The response from the server, populated at the end of a successful streaming RPC.
       private Object response;
+      // The last transient error to occur during the streaming RPC.
+      public Throwable transientError = null;
+      // The last non-transient error to occur during the streaming RPC.
+      public Throwable nonTransientError = null;
 
       // CountDownLatch tracking completion of the streaming RPC. Set on error, or once the request
       // stream is closed.
       final CountDownLatch done = new CountDownLatch(1);
+      // CountDownLatch tracking readiness of the streaming RPC.
+      final CountDownLatch ready = new CountDownLatch(1);
 
       InsertChunkResponseObserver(String uploadId, long writeOffset) {
         this.uploadId = uploadId;
@@ -406,7 +421,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       @Override
       public void beforeStart(
-          ClientCallStreamObserver<InsertObjectRequest> clientCallStreamObserver) {}
+          ClientCallStreamObserver<InsertObjectRequest> clientCallStreamObserver) {
+        clientCallStreamObserver.setOnReadyHandler(() -> ready.countDown());
+      }
     }
 
     private void runWithRetries(Runnable block, SimpleResponseObserver responseObserver)
