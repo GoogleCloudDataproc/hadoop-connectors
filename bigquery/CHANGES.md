@@ -2,6 +2,8 @@
 
 1.  Fix BigQuery job status retrieval in non-US locations.
 
+1.  Update all dependencies to latest versions.
+
 ### 1.1.4 - 2020-07-15
 
 1.  Update all dependencies to latest versions.

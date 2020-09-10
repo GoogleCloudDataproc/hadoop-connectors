@@ -12,6 +12,8 @@
     fs.gs.overwrite.generation.mismatch.ignore (default: false)
     ```
 
+1.  Update all dependencies to latest versions.
+
 ### 2.1.4 - 2020-07-15
 
 1.  Added a new parameter to configure output stream pipe type:
