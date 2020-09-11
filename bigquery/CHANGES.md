@@ -1,3 +1,5 @@
+### 1.1.6 - 2020-XX-XX
+
 ### 1.1.5 - 2020-09-11
 
 1.  Fix BigQuery job status retrieval in non-US locations.
