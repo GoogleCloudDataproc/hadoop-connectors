@@ -325,19 +325,6 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
         .build();
   }
 
-  private static BackOff getDefaultBackOff() {
-    return new ExponentialBackOff.Builder()
-        // Set initial timeout to 1.25 seconds to have a 1 second minimum initial interval
-        // after 0.2 randomization factor will be applied
-        .setInitialIntervalMillis(1_250)
-        .setMultiplier(1.6)
-        .setRandomizationFactor(0.2)
-        .setMaxIntervalMillis(20_000)
-        // 30 minutes
-        .setMaxElapsedTimeMillis(1_800_000)
-        .build();
-  }
-
   /** Overrides the default Sleepers used in backoff retry handler instances. */
   @VisibleForTesting
   void setSleeperOverride(Sleeper sleeper) {
