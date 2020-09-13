@@ -376,7 +376,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
       @Override
       public void onError(Throwable t) {
         Status s = Status.fromThrowable(t);
-        String statusDesc = s == null ? "" : s.getDescription();
 
         if (t.getClass() == StatusException.class || t.getClass() == StatusRuntimeException.class) {
           Code code =
@@ -393,7 +392,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
                   String.format(
                       "Caught exception for '%s', while uploading to uploadId %s at writeOffset %d."
                           + " Status: %s",
-                      resourceId, uploadId, writeOffset, statusDesc),
+                      resourceId, uploadId, writeOffset, s.toString()),
                   t);
         }
         done.countDown();
