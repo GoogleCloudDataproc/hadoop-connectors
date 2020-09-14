@@ -108,6 +108,16 @@
 
 1.  Set default value for `fs.gs.status.parallel.enable` property to `true`.
 
+1.  Tune exponential backoff configuration for Cloud Storage requests.
+
+1.  Add a property to ignore
+    [Cloud Storage precondition](https://cloud.google.com/storage/docs/generations-preconditions#_Preconditions)
+    failures when overwriting objects in concurrent environment:
+    
+    ```
+    fs.gs.overwrite.generation.mismatch.ignore (default: false)
+    ```
+
 ### 2.1.1 - 2020-03-11
 
 1.  Add upload cache to support high-level retries of failed uploads. Cache size

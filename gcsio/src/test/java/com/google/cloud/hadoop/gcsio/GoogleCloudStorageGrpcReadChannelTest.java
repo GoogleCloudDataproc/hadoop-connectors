@@ -49,7 +49,8 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   private static final String BUCKET_NAME = "bucket-name";
   private static final String OBJECT_NAME = "object-name";
   private static final long OBJECT_GENERATION = 7;
-  private static final int OBJECT_SIZE = FakeService.CHUNK_SIZE * 2 + 10;
+  private static final int OBJECT_SIZE =
+      GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE + 10;
   private static final int DEFAULT_OBJECT_CRC32C = 185327488;
   private static Object DEFAULT_OBJECT =
       Object.newBuilder()
@@ -182,7 +183,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
             .setBucket(BUCKET_NAME)
             .setObject(OBJECT_NAME)
             .setGeneration(OBJECT_GENERATION)
-            .setReadLimit(50)
+            .setReadLimit(GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE)
             .setReadOffset(10)
             .build();
     verify(fakeService, times(1)).getObjectMedia(eq(expectedRequest), any());
@@ -213,7 +214,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
             .setBucket(BUCKET_NAME)
             .setObject(OBJECT_NAME)
             .setGeneration(OBJECT_GENERATION)
-            .setReadLimit(50)
+            .setReadLimit(GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE)
             .setReadOffset(10)
             .build();
     GetObjectMediaRequest secondExpectedRequest =
@@ -221,8 +222,51 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
             .setBucket(BUCKET_NAME)
             .setObject(OBJECT_NAME)
             .setGeneration(OBJECT_GENERATION)
-            .setReadLimit(25)
+            .setReadLimit(GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE)
             .setReadOffset(20)
+            .build();
+
+    verify(fakeService, times(1)).getObject(eq(GET_OBJECT_REQUEST), any());
+    verify(fakeService, times(1)).getObjectMedia(eq(firstExpectedRequest), any());
+    verify(fakeService, times(1)).getObjectMedia(eq(secondExpectedRequest), any());
+  }
+
+  @Test
+  public void randomReadRequestsExpectedBytes() throws Exception {
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder()
+            .setFadvise(Fadvise.RANDOM)
+            .setGrpcChecksumsEnabled(true)
+            .build();
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
+
+    // Request bytes less than minimum request size.
+    ByteBuffer buffer = ByteBuffer.allocate(50);
+    readChannel.position(10);
+    readChannel.read(buffer);
+    assertArrayEquals(fakeService.data.substring(10, 60).toByteArray(), buffer.array());
+
+    // Request bytes larger than minimum request size.
+    buffer = ByteBuffer.allocate(GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE + 1);
+    readChannel.position(0);
+    readChannel.read(buffer);
+    assertArrayEquals(fakeService.data.substring(0, 524289).toByteArray(), buffer.array());
+
+    GetObjectMediaRequest firstExpectedRequest =
+        GetObjectMediaRequest.newBuilder()
+            .setBucket(BUCKET_NAME)
+            .setObject(OBJECT_NAME)
+            .setGeneration(OBJECT_GENERATION)
+            .setReadLimit(GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE)
+            .setReadOffset(10)
+            .build();
+    GetObjectMediaRequest secondExpectedRequest =
+        GetObjectMediaRequest.newBuilder()
+            .setBucket(BUCKET_NAME)
+            .setObject(OBJECT_NAME)
+            .setGeneration(OBJECT_GENERATION)
+            .setReadLimit(GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE + 1)
+            .setReadOffset(0)
             .build();
 
     verify(fakeService, times(1)).getObject(eq(GET_OBJECT_REQUEST), any());
@@ -374,7 +418,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   }
 
   @Test
-  public void readHandlesGetError() throws Exception {
+  public void readHandlesGetError() {
     GoogleCloudStorageReadOptions options =
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
     fakeService.setGetException(
@@ -560,7 +604,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   }
 
   @Test
-  public void fastFailOnNotFoundFailsOnCreateWhenEnabled() throws Exception {
+  public void fastFailOnNotFoundFailsOnCreateWhenEnabled() {
     fakeService.setGetException(Status.NOT_FOUND.asException());
     GoogleCloudStorageReadOptions options =
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(true).build();
@@ -569,7 +613,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   }
 
   @Test
-  public void fastFailOnNotFoundFailsByReadWhenDisabled() throws Exception {
+  public void fastFailOnNotFoundFailsByReadWhenDisabled() {
     fakeService.setGetException(Status.NOT_FOUND.asException());
     GoogleCloudStorageReadOptions options =
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
