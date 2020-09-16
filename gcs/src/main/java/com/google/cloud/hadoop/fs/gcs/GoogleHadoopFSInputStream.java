@@ -104,6 +104,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
 
     totalBytesRead++;
     statistics.incrementBytesRead(1);
+    statistics.incrementReadOps(1);
     long duration = System.nanoTime() - startTime;
     ghfs.increment(GoogleHadoopFileSystemBase.Counter.READ1);
     ghfs.increment(GoogleHadoopFileSystemBase.Counter.READ1_TIME, duration);
@@ -133,6 +134,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     if (numRead > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
       statistics.incrementBytesRead(numRead);
+      statistics.incrementReadOps(1);
       totalBytesRead += numRead;
     }
 
