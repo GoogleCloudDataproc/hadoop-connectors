@@ -165,7 +165,6 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     if (result > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
       statistics.incrementBytesRead(result);
-      statistics.incrementReadOps(1);
       totalBytesRead += result;
     }
 

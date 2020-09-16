@@ -245,7 +245,7 @@ public class GoogleHadoopSyncableOutputStreamTest {
             mockExecutorService);
 
     byte[] data1 = new byte[] {0x0f, 0x0e, 0x0e, 0x0d};
-    byte[] data2 = new byte[] {0x0b, 0x0e, 0x0e, 0x0f};
+    byte[] data2 = new byte[] {0x0b, 0x0d, 0x0e, 0x0e, 0x0f};
 
     fout.write(data1, 0, data1.length);
     fout.sync();
@@ -253,7 +253,7 @@ public class GoogleHadoopSyncableOutputStreamTest {
     assertThat(statistics.getWriteOps()).isEqualTo(1);
     fout.write(data2, 0, data2.length);
     fout.sync();
-    assertThat(statistics.getBytesWritten()).isEqualTo(8);
+    assertThat(statistics.getBytesWritten()).isEqualTo(9);
     assertThat(statistics.getWriteOps()).isEqualTo(2);
 
     verify(mockExecutorService).submit(any(Callable.class));
