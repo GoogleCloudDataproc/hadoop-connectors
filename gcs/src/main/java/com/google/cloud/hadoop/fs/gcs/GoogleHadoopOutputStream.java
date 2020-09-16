@@ -103,6 +103,7 @@ class GoogleHadoopOutputStream extends OutputStream {
     long startTime = System.nanoTime();
     out.write(b);
     statistics.incrementBytesWritten(1);
+    statistics.incrementWriteOps(1);
     long duration = System.nanoTime() - startTime;
     ghfs.increment(GoogleHadoopFileSystemBase.Counter.WRITE1);
     ghfs.increment(GoogleHadoopFileSystemBase.Counter.WRITE1_TIME, duration);
@@ -117,6 +118,7 @@ class GoogleHadoopOutputStream extends OutputStream {
     long startTime = System.nanoTime();
     out.write(b, offset, len);
     statistics.incrementBytesWritten(len);
+    statistics.incrementWriteOps(1);
     long duration = System.nanoTime() - startTime;
     ghfs.increment(GoogleHadoopFileSystemBase.Counter.WRITE);
     ghfs.increment(GoogleHadoopFileSystemBase.Counter.WRITE_TIME, duration);
