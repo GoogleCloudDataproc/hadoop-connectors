@@ -141,8 +141,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     Status status = error.getStatus();
     String msg =
         String.format("Error reading '%s', got status: %s",
-            StringPaths.fromComponents(bucketName, objectName),
-            status.toString());
+            StringPaths.fromComponents(bucketName, objectName), status);
     if (statusCode == Status.Code.NOT_FOUND) {
       return GoogleCloudStorageExceptions.createFileNotFoundException(
           bucketName, objectName, new IOException(msg, error));
