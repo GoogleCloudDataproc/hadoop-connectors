@@ -83,18 +83,18 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     String testContent = "test content";
     gcsFsIHelper.writeTextFile(testFile.getBucketName(), testFile.getObjectName(), testContent);
 
+    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
     GoogleHadoopFSInputStream in =
         new GoogleHadoopFSInputStream(
-            ghfs,
-            new URI(testFile.toString()),
-            GoogleCloudStorageReadOptions.DEFAULT,
-            new FileSystem.Statistics(ghfs.getScheme()));
+            ghfs, new URI(testFile.toString()), GoogleCloudStorageReadOptions.DEFAULT, statistics);
 
     byte[] value = new byte[2];
     byte[] expected = Arrays.copyOf(testContent.getBytes(StandardCharsets.UTF_8), 2);
 
     assertThat(in.read(value, 0, 1)).isEqualTo(1);
+    assertThat(statistics.getReadOps()).isEqualTo(1);
     assertThat(in.read(1, value, 1, 1)).isEqualTo(1);
+    assertThat(statistics.getReadOps()).isEqualTo(2);
     assertThat(value).isEqualTo(expected);
   }
 

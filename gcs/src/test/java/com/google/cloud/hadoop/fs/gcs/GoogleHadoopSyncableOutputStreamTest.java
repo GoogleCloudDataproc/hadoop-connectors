@@ -233,6 +233,34 @@ public class GoogleHadoopSyncableOutputStreamTest {
     assertThat(readFile(objectPath)).isEqualTo(testData);
   }
 
+  @Test
+  public void testWriteStatistics() throws IOException {
+    Path objectPath = new Path(ghfs.getFileSystemRoot(), "dir/object2.txt");
+    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
+    GoogleHadoopSyncableOutputStream fout =
+        new GoogleHadoopSyncableOutputStream(
+            ghfs,
+            ghfs.getGcsPath(objectPath),
+            statistics,
+            CreateFileOptions.DEFAULT_OVERWRITE,
+            SyncableOutputStreamOptions.DEFAULT,
+            mockExecutorService);
+
+    byte[] data1 = new byte[] {0x0f, 0x0e, 0x0e, 0x0d};
+    byte[] data2 = new byte[] {0x0b, 0x0d, 0x0e, 0x0e, 0x0f};
+
+    fout.write(data1, 0, data1.length);
+    fout.sync();
+    assertThat(statistics.getBytesWritten()).isEqualTo(4);
+    assertThat(statistics.getWriteOps()).isEqualTo(1);
+    fout.write(data2, 0, data2.length);
+    fout.sync();
+    assertThat(statistics.getBytesWritten()).isEqualTo(9);
+    assertThat(statistics.getWriteOps()).isEqualTo(2);
+
+    verify(mockExecutorService).submit(any(Callable.class));
+  }
+
   private byte[] readFile(Path objectPath) throws IOException {
     FileStatus status = ghfs.getFileStatus(objectPath);
     ByteArrayOutputStream allReadBytes =
