@@ -185,7 +185,7 @@ public class GoogleCloudStorageFileSystem {
   /** Convert {@code CreateFileOptions} to {@code CreateObjectOptions}. */
   public static CreateObjectOptions objectOptionsFromFileOptions(CreateFileOptions options) {
     return new CreateObjectOptions(
-        options.overwriteExisting(), options.getContentType(), options.getAttributes());
+        options.isOverwriteExisting(), options.getContentType(), options.getAttributes());
   }
 
   /**
@@ -218,7 +218,7 @@ public class GoogleCloudStorageFileSystem {
     }
 
     // Check if a directory of that name exists.
-    if (options.checkNoDirectoryConflict()
+    if (options.isEnsureNoDirectoryConflict()
         && getFileInfoInternal(
                 resourceId.toDirectoryId(), gcs.getOptions().isInferImplicitDirectoriesEnabled())
             .exists()) {
@@ -226,7 +226,7 @@ public class GoogleCloudStorageFileSystem {
     }
 
     // Ensure that parent directories exist.
-    if (options.ensureParentDirectoriesExist()) {
+    if (options.isEnsureParentDirectoriesExist()) {
       URI parentPath = UriPaths.getParentPath(path);
       if (parentPath != null) {
         mkdirs(parentPath);

@@ -23,7 +23,6 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 
 import com.google.api.client.util.Clock;
-import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
@@ -1403,7 +1402,7 @@ public class GoogleCloudStorageTest {
         bucketName,
         ImmutableList.of("testCompose_SourceObject1", "testCompose_SourceObject2"),
         destinationObject.getObjectName(),
-        CreateFileOptions.DEFAULT_CONTENT_TYPE);
+        CreateObjectOptions.DEFAULT_CONTENT_TYPE);
 
     assertObjectContent(rawStorage, destinationObject, Bytes.concat(content1, content2));
   }

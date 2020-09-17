@@ -91,7 +91,7 @@
     </dependency>
     <dependency>
       <groupId>com.google.api.grpc</groupId>
-      <artifactId>proto-google-cloud-bigquerystorage-v1beta1</artifactId>
+      <artifactId>proto-google-cloud-bigquerystorage-v1</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.apis</groupId>

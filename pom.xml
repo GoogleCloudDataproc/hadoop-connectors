@@ -90,7 +90,7 @@
     <apache.httpclient.version>4.5.12</apache.httpclient.version>
     <apache.httpcore.version>4.4.13</apache.httpcore.version>
     <google.api.gax.version>1.57.1</google.api.gax.version>
-    <google.api.grpc.proto-google-bigquerystorage-v1beta1.version>0.101.1</google.api.grpc.proto-google-bigquerystorage-v1beta1.version>
+    <google.api.grpc.proto-google-bigquerystorage-v1.version>1.5.1</google.api.grpc.proto-google-bigquerystorage-v1.version>
     <google.api.grpc.proto-google-common-protos.version>1.18.0</google.api.grpc.proto-google-common-protos.version>
     <google.api.grpc.proto-google-iam-v1.version>0.13.0</google.api.grpc.proto-google-iam-v1.version>
     <google.api-client.version>1.30.10</google.api-client.version>
@@ -99,7 +99,7 @@
     <google.api-storage.version>v1-rev20200611-${google.api-client.version}</google.api-storage.version>
     <google.auth.version>0.21.1</google.auth.version>
     <google.auto-value.version>1.7.4</google.auto-value.version>
-    <google.cloud-bigquery-storage.version>0.134.1-beta</google.cloud-bigquery-storage.version>
+    <google.cloud-bigquery-storage.version>1.5.1</google.cloud-bigquery-storage.version>
     <!--
         When updating Flogger version, also update DefaultPlatform class
         source code in util-hadoop module with code from new Flogger version
@@ -406,8 +406,8 @@
       </dependency>
       <dependency>
         <groupId>com.google.api.grpc</groupId>
-        <artifactId>proto-google-cloud-bigquerystorage-v1beta1</artifactId>
-        <version>${google.api.grpc.proto-google-bigquerystorage-v1beta1.version}</version>
+        <artifactId>proto-google-cloud-bigquerystorage-v1</artifactId>
+        <version>${google.api.grpc.proto-google-bigquerystorage-v1.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.api.grpc</groupId>
