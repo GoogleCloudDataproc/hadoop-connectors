@@ -1472,19 +1472,15 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       throws IOException, GeneralSecurityException {
     Credential credential = null;
 
-    // In case of impersonating service account, service account scopes need to be expanded in order
-    // to request access token from IAM.
-    ImmutableList<String> scopes =
-        isImpersonatingServiceAccount(config)
-            ? CredentialFactory.CLOUD_SCOPES
-            : CredentialFactory.GCS_SCOPES;
     // Check if delegation token support is configured
     if (delegationTokens != null) {
       // If so, use the delegation token to acquire the Google credentials
       AccessTokenProvider atp = delegationTokens.getAccessTokenProvider();
       if (atp != null) {
         atp.setConf(config);
-        credential = CredentialFromAccessTokenProviderClassFactory.credential(atp, scopes);
+        credential =
+            CredentialFromAccessTokenProviderClassFactory.credential(
+                atp, CredentialFactory.GCS_SCOPES);
       }
     } else {
       // If delegation token support is not configured, check if a
@@ -1492,43 +1488,20 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       // to acquire the Google credentials using it
       credential =
           CredentialFromAccessTokenProviderClassFactory.credential(
-              config, ImmutableList.of(GCS_CONFIG_PREFIX), scopes);
+              config, ImmutableList.of(GCS_CONFIG_PREFIX), CredentialFactory.GCS_SCOPES);
 
       if (credential == null) {
         // Finally, if no credentials have been acquired at this point, employ
         // the default mechanism.
         credential =
             HadoopCredentialConfiguration.getCredentialFactory(config, GCS_CONFIG_PREFIX)
-                .getCredential(scopes);
+                .getCredential(CredentialFactory.GCS_SCOPES);
       }
     }
 
     // If impersonation service account exists, then use current credential to request access token
     // for the impersonating service account.
     return getImpersonatedCredential(config, gcsFsOptions, credential).orElse(credential);
-  }
-
-  @VisibleForTesting
-  boolean isImpersonatingServiceAccount(Configuration config) {
-    Map<String, String> userMapping =
-        USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
-            .withPrefixes(CONFIG_KEY_PREFIXES)
-            .getPropsWithPrefix(config);
-    if (!userMapping.isEmpty()) {
-      return true;
-    }
-    Map<String, String> groupMapping =
-        GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
-            .withPrefixes(CONFIG_KEY_PREFIXES)
-            .getPropsWithPrefix(config);
-    if (!groupMapping.isEmpty()) {
-      return true;
-    }
-    String impersonatedServiceAccount =
-        IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
-            .withPrefixes(CONFIG_KEY_PREFIXES)
-            .get(config, config::get);
-    return impersonatedServiceAccount != null;
   }
 
   /**
