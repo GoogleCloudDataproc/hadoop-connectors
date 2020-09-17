@@ -25,14 +25,20 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class CreateFileOptionsTest {
   @Test
-  public void testConstructorChecksForContentTypeAttributes() throws Exception {
-    new CreateFileOptions(
-        true, "", ImmutableMap.<String, byte[]>of("Innocuous", "".getBytes(UTF_8)));
+  public void testChecksForContentTypeAttributes() {
+    CreateFileOptions.builder()
+        .setOverwriteExisting(true)
+        .setContentType("")
+        .setAttributes(ImmutableMap.of("Innocuous", "".getBytes(UTF_8)))
+        .build();
 
     assertThrows(
         IllegalArgumentException.class,
         () ->
-            new CreateFileOptions(
-                true, "", ImmutableMap.<String, byte[]>of("Content-Type", "".getBytes(UTF_8))));
+            CreateFileOptions.builder()
+                .setOverwriteExisting(true)
+                .setContentType("")
+                .setAttributes(ImmutableMap.of("Content-Type", "".getBytes(UTF_8)))
+                .build());
   }
 }

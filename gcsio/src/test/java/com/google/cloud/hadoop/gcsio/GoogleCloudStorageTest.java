@@ -2442,7 +2442,7 @@ public class GoogleCloudStorageTest {
 
     GoogleCloudStorage gcs = mockedGcs(transport);
 
-    gcs.compose(BUCKET_NAME, sources, OBJECT_NAME, CreateFileOptions.DEFAULT_CONTENT_TYPE);
+    gcs.compose(BUCKET_NAME, sources, OBJECT_NAME, CreateObjectOptions.DEFAULT_CONTENT_TYPE);
 
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(
