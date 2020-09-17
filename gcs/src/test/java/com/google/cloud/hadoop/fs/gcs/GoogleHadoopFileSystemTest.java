@@ -196,6 +196,33 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   }
 
   @Test
+  public void testImpsersonatingServiceAccount() throws Exception {
+    GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+    Configuration config = new Configuration();
+    assertThat(ghfs.isImpersonatingServiceAccount(config)).isFalse();
+
+    config.set(
+        GCS_CONFIG_PREFIX + IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey(), "test-service-account");
+    assertThat(ghfs.isImpersonatingServiceAccount(config)).isTrue();
+
+    config = new Configuration();
+    config.set(
+        GCS_CONFIG_PREFIX
+            + USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey()
+            + UserGroupInformation.getCurrentUser().getShortUserName(),
+        "test-service-account");
+    assertThat(ghfs.isImpersonatingServiceAccount(config)).isTrue();
+
+    config = new Configuration();
+    config.set(
+        GCS_CONFIG_PREFIX
+            + GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey()
+            + UserGroupInformation.getCurrentUser().getGroupNames()[0],
+        "test-service-account");
+    assertThat(ghfs.isImpersonatingServiceAccount(config)).isTrue();
+  }
+
+  @Test
   public void testImpsersonationServiceAccountUsed() throws Exception {
     Configuration config = new Configuration();
     config.setClass(
