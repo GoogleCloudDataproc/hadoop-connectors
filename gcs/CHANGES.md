@@ -1,5 +1,8 @@
 ### 2.1.6 - 2020-XX-XX
 
+1.  Increment Hadoop `FileSystem.Statistics` counters for read and write
+    operations.
+
 ### 2.1.5 - 2020-09-11
 
 1.  Fix complex patterns globbing.
