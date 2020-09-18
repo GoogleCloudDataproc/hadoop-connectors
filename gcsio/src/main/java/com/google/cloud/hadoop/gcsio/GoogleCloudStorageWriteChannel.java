@@ -16,6 +16,8 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.encodeMetadata;
+
 import com.google.api.client.http.InputStreamContent;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.Storage.Objects.Insert;
@@ -26,7 +28,6 @@ import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.LoggingMediaHttpUploaderProgressListener;
 import java.io.IOException;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 
 /** Implements WritableByteChannel to provide write access to GCS. */
@@ -37,53 +38,36 @@ public class GoogleCloudStorageWriteChannel
   private static final long MIN_LOGGING_INTERVAL_MS = 60000L;
 
   private final Storage gcs;
-  private final String bucketName;
-  private final String objectName;
-  private final String contentEncoding;
-  private final String kmsKeyName;
+  private final StorageResourceId resourceId;
+  private final CreateObjectOptions createOptions;
   private final ObjectWriteConditions writeConditions;
-  private final Map<String, String> metadata;
 
   private GoogleCloudStorageItemInfo completedItemInfo = null;
 
   /**
    * Constructs an instance of GoogleCloudStorageWriteChannel.
    *
-   * @param uploadThreadPool thread pool to use for running the upload operation
    * @param gcs storage object instance
+   * @param uploadThreadPool thread pool to use for running the upload operation
    * @param requestHelper a ClientRequestHelper to set extra headers
-   * @param bucketName name of the bucket to create object in
-   * @param objectName name of the object to create
-   * @param contentType content type
-   * @param contentEncoding content encoding
-   * @param kmsKeyName Name of Cloud KMS key to use to encrypt the newly created object
+   * @param channelOptions write channel options
+   * @param resourceId object to create
+   * @param createOptions object creation options
    * @param writeConditions conditions on which write should be allowed to continue
-   * @param objectMetadata metadata to apply to the newly created object
    */
   public GoogleCloudStorageWriteChannel(
-      ExecutorService uploadThreadPool,
       Storage gcs,
       ClientRequestHelper<StorageObject> requestHelper,
-      String bucketName,
-      String objectName,
-      String contentType,
-      String contentEncoding,
-      String kmsKeyName,
-      AsyncWriteChannelOptions options,
-      ObjectWriteConditions writeConditions,
-      Map<String, String> objectMetadata) {
-    super(uploadThreadPool, options);
+      ExecutorService uploadThreadPool,
+      AsyncWriteChannelOptions channelOptions,
+      StorageResourceId resourceId,
+      CreateObjectOptions createOptions,
+      ObjectWriteConditions writeConditions) {
+    super(requestHelper, uploadThreadPool, channelOptions);
     this.gcs = gcs;
-    this.setClientRequestHelper(requestHelper);
-    this.bucketName = bucketName;
-    this.objectName = objectName;
-    if (contentType != null) {
-      setContentType(contentType);
-    }
-    this.contentEncoding = contentEncoding;
-    this.kmsKeyName = kmsKeyName;
+    this.resourceId = resourceId;
+    this.createOptions = createOptions;
     this.writeConditions = writeConditions;
-    this.metadata = objectMetadata;
   }
 
   @Override
@@ -91,27 +75,29 @@ public class GoogleCloudStorageWriteChannel
     // Create object with the given name and metadata.
     StorageObject object =
         new StorageObject()
-            .setContentEncoding(contentEncoding)
-            .setMetadata(metadata)
-            .setName(objectName);
+            .setContentEncoding(createOptions.getContentEncoding())
+            .setMetadata(encodeMetadata(createOptions.getMetadata()))
+            .setName(resourceId.getObjectName());
 
-    Insert insert = gcs.objects().insert(bucketName, object, inputStream);
+    Insert insert =
+        gcs.objects()
+            .insert(resourceId.getBucketName(), object, inputStream)
+            .setName(resourceId.getObjectName())
+            .setKmsKeyName(createOptions.getKmsKeyName());
     writeConditions.apply(insert);
     if (insert.getMediaHttpUploader() != null) {
-      insert.getMediaHttpUploader().setDirectUploadEnabled(isDirectUploadEnabled());
-      insert.getMediaHttpUploader().setProgressListener(
-        new LoggingMediaHttpUploaderProgressListener(this.objectName, MIN_LOGGING_INTERVAL_MS));
-    }
-    insert.setName(objectName);
-    if (kmsKeyName != null) {
-      insert.setKmsKeyName(kmsKeyName);
+      insert
+          .getMediaHttpUploader()
+          .setDirectUploadEnabled(isDirectUploadEnabled())
+          .setProgressListener(
+              new LoggingMediaHttpUploaderProgressListener(
+                  resourceId.getObjectName(), MIN_LOGGING_INTERVAL_MS));
     }
     return insert;
   }
 
   @Override
   public void handleResponse(StorageObject response) {
-    StorageResourceId resourceId = new StorageResourceId(bucketName, objectName);
     this.completedItemInfo =
         writeConditions.getIgnoreGenerationMismatch()
             ? GoogleCloudStorageItemInfo.createNotFound(resourceId)
@@ -124,14 +110,21 @@ public class GoogleCloudStorageWriteChannel
         && ApiErrorExtractor.INSTANCE.preconditionNotMet(e)) {
       logger.atWarning().withCause(e).log(
           "412 Precondition failure was ignored for resource '%s'", getResourceString());
-      return new StorageObject().setBucket(bucketName).setName(objectName);
+      return new StorageObject()
+          .setBucket(resourceId.getBucketName())
+          .setName(resourceId.getObjectName());
     }
     return super.createResponseFromException(e);
   }
 
   @Override
+  protected String getContentType() {
+    return createOptions.getContentType();
+  }
+
+  @Override
   protected String getResourceString() {
-    return new StorageResourceId(bucketName, objectName).toString();
+    return resourceId.toString();
   }
 
   /**
@@ -140,6 +133,6 @@ public class GoogleCloudStorageWriteChannel
    */
   @Override
   public GoogleCloudStorageItemInfo getItemInfo() {
-    return this.completedItemInfo;
+    return completedItemInfo;
   }
 }

@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.encodeMetadata;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.google.storage.v1.ServiceConstants.Values.MAX_WRITE_CHUNK_BYTES;
@@ -22,7 +23,6 @@ import static java.util.stream.Collectors.toMap;
 
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
@@ -55,7 +55,6 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.Map;
-import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -82,7 +81,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
   // more complex implementation that periodically queries the service to find out the last
   // committed offset, to determine what's safe to discard, but that would also impose a performance
   // penalty.
-  private static int NUMBER_OF_REQUESTS_TO_RETAIN = 5;
+  private static final int NUMBER_OF_REQUESTS_TO_RETAIN = 5;
   // A set that defines all transient errors on which retry can be attempted.
   private static final ImmutableSet<Code> TRANSIENT_ERRORS =
       ImmutableSet.of(
@@ -90,30 +89,26 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
   private final StorageStub stub;
   private final StorageResourceId resourceId;
+  private final CreateObjectOptions createOptions;
   private final ObjectWriteConditions writeConditions;
-  private final Optional<String> requesterPaysProject;
-  private final ImmutableMap<String, String> metadata;
-  private final boolean checksumsEnabled;
+  private final String requesterPaysProject;
 
   private GoogleCloudStorageItemInfo completedItemInfo = null;
 
   GoogleCloudStorageGrpcWriteChannel(
-      ExecutorService threadPool,
       StorageStub stub,
+      ExecutorService threadPool,
+      AsyncWriteChannelOptions channelOptions,
       StorageResourceId resourceId,
-      AsyncWriteChannelOptions options,
+      CreateObjectOptions createOptions,
       ObjectWriteConditions writeConditions,
-      Optional<String> requesterPaysProject,
-      Map<String, String> metadata,
-      String contentType) {
-    super(threadPool, options);
+      String requesterPaysProject) {
+    super(threadPool, channelOptions);
     this.stub = stub;
     this.resourceId = resourceId;
+    this.createOptions = createOptions;
     this.writeConditions = writeConditions;
     this.requesterPaysProject = requesterPaysProject;
-    this.metadata = ImmutableMap.copyOf(metadata);
-    this.contentType = contentType;
-    this.checksumsEnabled = options.isGrpcChecksumsEnabled();
   }
 
   @Override
@@ -179,11 +174,11 @@ public final class GoogleCloudStorageGrpcWriteChannel
     private int retriesAttempted = 0;
     // Holds list of most recent number of NUMBER_OF_REQUESTS_TO_RETAIN requests, so upload can be
     // rewound and re-sent upon transient errors.
-    private TreeMap<Long, ByteString> dataChunkMap = new TreeMap<>();
+    private final TreeMap<Long, ByteString> dataChunkMap = new TreeMap<>();
 
     UploadOperation(InputStream pipeSource) {
       this.pipeSource = new BufferedInputStream(pipeSource, MAX_BYTES_PER_MESSAGE);
-      if (checksumsEnabled) {
+      if (channelOptions.isGrpcChecksumsEnabled()) {
         objectHasher = Hashing.crc32c().newHasher();
       }
     }
@@ -278,7 +273,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       if (dataChunk.size() > 0) {
         ChecksummedData.Builder requestDataBuilder =
             ChecksummedData.newBuilder().setContent(dataChunk);
-        if (checksumsEnabled) {
+        if (channelOptions.isGrpcChecksumsEnabled()) {
           if (!resumeFromFailedInsert) {
             updateObjectHash(dataChunk);
           }
@@ -289,7 +284,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       if (dataChunk.size() < MAX_BYTES_PER_MESSAGE) {
         requestBuilder.setFinishWrite(true);
-        if (checksumsEnabled) {
+        if (channelOptions.isGrpcChecksumsEnabled()) {
           requestBuilder.setObjectChecksums(
               ObjectChecksums.newBuilder()
                   .setCrc32C(UInt32Value.newBuilder().setValue(objectHasher.hash().asInt())));
@@ -425,19 +420,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
     }
 
-    private void runWithRetries(Runnable block, SimpleResponseObserver responseObserver)
-        throws IOException {
-      for (int attemptedRetries = 0; attemptedRetries < UPLOAD_RETRIES; attemptedRetries++) {
-        block.run();
-        if (!responseObserver.hasError()) {
-          return;
-        }
-      }
-      throw new IOException(
-          String.format("Failed to start resumable upload for '%s'", resourceId),
-          responseObserver.getError());
-    }
-
     /** Send a StartResumableWriteRequest and return the uploadId of the resumable write. */
     private String startResumableUpload() throws IOException {
       InsertObjectSpec.Builder insertObjectSpecBuilder =
@@ -446,8 +428,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
                   Object.newBuilder()
                       .setBucket(resourceId.getBucketName())
                       .setName(resourceId.getObjectName())
-                      .setContentType(contentType)
-                      .putAllMetadata(metadata)
+                      .setContentType(createOptions.getContentType())
+                      .putAllMetadata(encodeMetadata(createOptions.getMetadata()))
                       .build());
       if (writeConditions.hasContentGenerationMatch()) {
         insertObjectSpecBuilder.setIfGenerationMatch(
@@ -457,8 +439,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
         insertObjectSpecBuilder.setIfMetagenerationMatch(
             Int64Value.newBuilder().setValue(writeConditions.getMetaGenerationMatch()));
       }
-      if (requesterPaysProject.isPresent()) {
-        insertObjectSpecBuilder.setUserProject(requesterPaysProject.get());
+      if (requesterPaysProject != null) {
+        insertObjectSpecBuilder.setUserProject(requesterPaysProject);
       }
       StartResumableWriteRequest request =
           StartResumableWriteRequest.newBuilder()
@@ -516,10 +498,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       public T getResponse() {
         return checkNotNull(response, "Response not present for '%s'", resourceId);
-      }
-
-      boolean hasError() {
-        return error != null || response == null;
       }
 
       public Throwable getError() {
