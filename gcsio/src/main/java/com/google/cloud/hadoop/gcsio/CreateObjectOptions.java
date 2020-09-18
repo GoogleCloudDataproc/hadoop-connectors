@@ -39,6 +39,7 @@ public abstract class CreateObjectOptions {
         .setContentEncoding(null)
         .setContentType(CONTENT_TYPE_DEFAULT)
         .setEnsureEmptyObjectsMetadataMatch(true)
+        .setKmsKeyName(null)
         .setMetadata(ImmutableMap.of())
         .setOverwriteExisting(false);
   }
@@ -63,6 +64,10 @@ public abstract class CreateObjectOptions {
    */
   public abstract boolean isEnsureEmptyObjectsMetadataMatch();
 
+  /** A KMS key name to encrypt the created object. */
+  @Nullable
+  public abstract String getKmsKeyName();
+
   /** A metadata to apply to the create object. */
   public abstract ImmutableMap<String, byte[]> getMetadata();
 
@@ -78,6 +83,8 @@ public abstract class CreateObjectOptions {
 
     public abstract Builder setEnsureEmptyObjectsMetadataMatch(
         boolean ensureEmptyObjectsMetadataMatch);
+
+    public abstract Builder setKmsKeyName(String kmsKeyName);
 
     public abstract Builder setMetadata(Map<String, byte[]> metadata);
 

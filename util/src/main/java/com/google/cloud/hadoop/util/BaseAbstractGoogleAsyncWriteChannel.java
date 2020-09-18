@@ -42,14 +42,12 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
 
   protected static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  protected String contentType;
-
   // A pipe that connects write channel used by caller to the input stream used by GCS uploader.
   // The uploader reads from input stream, which blocks till a caller writes some data to the
   // write channel (pipeSinkChannel below). The pipe is formed by connecting pipeSink to pipeSource
   protected final ExecutorService threadPool;
 
-  protected final AsyncWriteChannelOptions options;
+  protected final AsyncWriteChannelOptions channelOptions;
 
   // Upload operation that takes place on a separate thread.
   protected Future<T> uploadOperation;
@@ -62,13 +60,12 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
 
   /** Construct a new channel using the given ExecutorService to run background uploads. */
   public BaseAbstractGoogleAsyncWriteChannel(
-      ExecutorService threadPool, AsyncWriteChannelOptions options) {
+      ExecutorService threadPool, AsyncWriteChannelOptions channelOptions) {
     this.threadPool = threadPool;
-    this.options = options;
-    if (options.getUploadCacheSize() > 0) {
-      this.uploadCache = ByteBuffer.allocate(options.getUploadCacheSize());
+    this.channelOptions = channelOptions;
+    if (channelOptions.getUploadCacheSize() > 0) {
+      this.uploadCache = ByteBuffer.allocate(channelOptions.getUploadCacheSize());
     }
-    setContentType("application/octet-stream");
   }
 
   /**
@@ -96,7 +93,7 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
 
   /** Returns true if direct media uploads are enabled. */
   public boolean isDirectUploadEnabled() {
-    return options.isDirectUploadEnabled();
+    return channelOptions.isDirectUploadEnabled();
   }
 
   /**
@@ -217,30 +214,26 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
   // Create a pipe such that its one end is connected to the input stream used by
   // the uploader and the other end is the write channel used by the caller.
   private InputStream initializeUploadPipe() throws IOException {
-    switch (options.getPipeType()) {
+    switch (channelOptions.getPipeType()) {
       case NIO_CHANNEL_PIPE:
         Pipe pipe = Pipe.open();
         pipeSink = pipe.sink();
         InputStream pipeSource = Channels.newInputStream(pipe.source());
-        return options.getPipeBufferSize() > 0
-            ? new BufferedInputStream(pipeSource, options.getPipeBufferSize())
+        return channelOptions.getPipeBufferSize() > 0
+            ? new BufferedInputStream(pipeSource, channelOptions.getPipeBufferSize())
             : pipeSource;
       case IO_STREAM_PIPE:
-        PipedInputStream internalPipeSource = new PipedInputStream(options.getPipeBufferSize());
+        PipedInputStream internalPipeSource =
+            new PipedInputStream(channelOptions.getPipeBufferSize());
         PipedOutputStream internalPipeSink = new PipedOutputStream(internalPipeSource);
         pipeSink = Channels.newChannel(internalPipeSink);
         return internalPipeSource;
     }
-    throw new IllegalStateException("Unknown PipeType: " + options.getPipeType());
+    throw new IllegalStateException("Unknown PipeType: " + channelOptions.getPipeType());
   }
 
   /** Create a new thread which handles the upload. */
   public abstract void startUpload(InputStream pipeSource) throws IOException;
-
-  /** Sets the contentType. This must be called before {@link #initialize()} for any effect. */
-  protected void setContentType(String contentType) {
-    this.contentType = contentType;
-  }
 
   protected abstract String getResourceString();
 
