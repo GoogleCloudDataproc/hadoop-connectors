@@ -63,12 +63,10 @@ import org.junit.runners.JUnit4;
 public class GoogleCloudStorageNewIntegrationTest {
 
   private static final CreateObjectOptions GZIP_CREATE_OPTIONS =
-      new CreateObjectOptions(
-          /* overwriteExisting= */ false,
-          CreateObjectOptions.DEFAULT_CONTENT_TYPE,
-          "gzip",
-          CreateObjectOptions.EMPTY_METADATA,
-          /* requireMetadataMatchForEmptyObjects= */ true);
+      CreateObjectOptions.DEFAULT_NO_OVERWRITE.toBuilder()
+          .setContentEncoding("gzip")
+          .setRequireMetadataMatchForEmptyObjects(true)
+          .build();
 
   private static GoogleCloudStorageOptions gcsOptions;
   private static RetryHttpInitializer httpRequestsInitializer;

@@ -24,15 +24,32 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class CreateObjectOptionsTest {
+
   @Test
-  public void testConstructorChecksForContentTypeAttributes() throws Exception {
-    new CreateObjectOptions(
-        true, "", ImmutableMap.<String, byte[]>of("Innocuous", "".getBytes(UTF_8)));
+  public void build_checksContentTypeMetadata() {
+    CreateObjectOptions.builder()
+        .setMetadata(ImmutableMap.of("Innocuous-Type", "".getBytes(UTF_8)))
+        .build();
 
     assertThrows(
         IllegalArgumentException.class,
         () ->
-            new CreateObjectOptions(
-                true, "", ImmutableMap.<String, byte[]>of("Content-Type", "".getBytes(UTF_8))));
+            CreateObjectOptions.builder()
+                .setMetadata(ImmutableMap.of("Content-Type", "".getBytes(UTF_8)))
+                .build());
+  }
+
+  @Test
+  public void build_checksContentEncodingMetadata() {
+    CreateObjectOptions.builder()
+        .setMetadata(ImmutableMap.of("Innocuous-Encoding", "".getBytes(UTF_8)))
+        .build();
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            CreateObjectOptions.builder()
+                .setMetadata(ImmutableMap.of("Content-Encoding", "".getBytes(UTF_8)))
+                .build());
   }
 }

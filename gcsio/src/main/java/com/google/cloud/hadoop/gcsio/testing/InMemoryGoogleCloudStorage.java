@@ -109,7 +109,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
   @Override
   public synchronized WritableByteChannel create(StorageResourceId resourceId) throws IOException {
-    return create(resourceId, CreateObjectOptions.DEFAULT);
+    return create(resourceId, CreateObjectOptions.DEFAULT_OVERWRITE);
   }
 
   @Override
@@ -133,7 +133,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
                 resourceId.getGenerationId(), itemInfo.getContentGeneration(), resourceId));
       }
     }
-    if (!options.overwriteExisting() || resourceId.getGenerationId() == 0L) {
+    if (!options.isOverwriteExisting() || resourceId.getGenerationId() == 0L) {
       if (getItemInfo(resourceId).exists()) {
         throw new FileAlreadyExistsException(String.format("%s exists.", resourceId));
       }
@@ -174,7 +174,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
   @Override
   public synchronized void createEmptyObject(StorageResourceId resourceId) throws IOException {
-    createEmptyObject(resourceId, CreateObjectOptions.DEFAULT);
+    createEmptyObject(resourceId, CreateObjectOptions.DEFAULT_OVERWRITE);
   }
 
   @Override
@@ -188,7 +188,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   @Override
   public synchronized void createEmptyObjects(List<StorageResourceId> resourceIds)
       throws IOException {
-    createEmptyObjects(resourceIds, CreateObjectOptions.DEFAULT);
+    createEmptyObjects(resourceIds, CreateObjectOptions.DEFAULT_OVERWRITE);
   }
 
   @Override
@@ -522,8 +522,8 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     List<StorageResourceId> sourceResourcesIds =
         Lists.transform(sources, s -> new StorageResourceId(bucketName, s));
     StorageResourceId destinationId = new StorageResourceId(bucketName, destination);
-    CreateObjectOptions options = new CreateObjectOptions(
-        true, contentType, CreateObjectOptions.EMPTY_METADATA);
+    CreateObjectOptions options =
+        CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder().setContentType(contentType).build();
     composeObjects(sourceResourcesIds, destinationId, options);
   }
 

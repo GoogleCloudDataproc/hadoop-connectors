@@ -19,126 +19,80 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
+import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 
-/**
- * Options for creating objects in GCS.
- */
-public class CreateObjectOptions {
-  public static final ImmutableMap<String, byte[]> EMPTY_METADATA = ImmutableMap.of();
-  public static final String DEFAULT_CONTENT_TYPE = "application/octet-stream";
-  public static final String DEFAULT_CONTENT_ENCODING = null;
-  public static final CreateObjectOptions DEFAULT =
-      new CreateObjectOptions(/* overwriteExisting= */ true);
+/** Options that can be specified when creating a file in the {@link GoogleCloudStorage}. */
+@AutoValue
+public abstract class CreateObjectOptions {
 
-  private final boolean overwriteExisting;
-  private final String contentType;
-  private final String contentEncoding;
-  private final Map<String, byte[]> metadata;
-  private final boolean requireMetadataMatchForEmptyObjects;
+  public static final String CONTENT_TYPE_DEFAULT = "application/octet-stream";
 
-  /**
-   * Construct a new CreateObjectOptions with empty metadata and the default content-type.
-   * Since no metadata was explicitly provided, we will set metadata-match for
-   * empty objects to false.
-   *
-   * @param overwriteExisting True to overwrite any existing objects with the same name.
-   */
-  public CreateObjectOptions(boolean overwriteExisting) {
-    this(overwriteExisting, DEFAULT_CONTENT_TYPE, DEFAULT_CONTENT_ENCODING, EMPTY_METADATA, false);
+  public static final CreateObjectOptions DEFAULT_NO_OVERWRITE = builder().build();
+  public static final CreateObjectOptions DEFAULT_OVERWRITE =
+      builder().setOverwriteExisting(true).build();
+
+  public static Builder builder() {
+    return new AutoValue_CreateObjectOptions.Builder()
+        .setContentEncoding(null)
+        .setContentType(CONTENT_TYPE_DEFAULT)
+        .setMetadata(ImmutableMap.of())
+        .setOverwriteExisting(false)
+        .setRequireMetadataMatchForEmptyObjects(false);
   }
 
-  /**
-   * Construct a new CreateObjectOptions with the specified metadata, and default content-type.
-   * Since metadata was explicitly provided, even if empty, we will set metadata-match for
-   * empty objects to true.
-   * 
-   *
-   * @param overwriteExisting True to overwrite any existing objects with the same name.
-   * @param metadata A dictionary of metadata to apply to created objects.
-   */
-  public CreateObjectOptions(boolean overwriteExisting, Map<String, byte[]> metadata) {
-    this(overwriteExisting, DEFAULT_CONTENT_TYPE, metadata);
-  }
+  public abstract Builder toBuilder();
+
+  /** Content encoding for the created object. */
+  @Nullable
+  public abstract String getContentEncoding();
+
+  /** Content type for the created object. */
+  public abstract String getContentType();
+
+  /** A metadata to apply to the create object. */
+  public abstract ImmutableMap<String, byte[]> getMetadata();
+
+  /** Whether to overwrite any existing objects with the same name */
+  public abstract boolean isOverwriteExisting();
 
   /**
-   * Construct a new CreateObjectOptions with the spec metadata and content-type.
-   * Since metadata was explicitly provided, even if empty, we will set metadata-match for
-   * empty objects to true.
-   *
-   * @param overwriteExisting True to overwrite any existing objects with the same name
-   * @param contentType content-type for the created file
-   * @param metadata A dictionary of metadata to apply to created objects
+   * When creating an empty object and certain types of errors occur, any existing object is checked
+   * for an exact metadata match to the metadata in this {@link CreateObjectOptions} before
+   * accepting the creation as successful. If {@code false}, then on error for creating empty
+   * objects, as long as an appropriate empty object already exists, even if it holds different
+   * metadata than provided in this {@link CreateObjectOptions} instance, it may be considered
+   * created successfully.
    */
-  public CreateObjectOptions(
-      boolean overwriteExisting, String contentType, Map<String, byte[]> metadata) {
-    this(overwriteExisting, contentType, DEFAULT_CONTENT_ENCODING, metadata, true);
-  }
+  public abstract boolean getRequireMetadataMatchForEmptyObjects();
 
-  /**
-   * Construct a new CreateObjectOptions with the spec metadata and content-type.
-   *
-   * @param overwriteExisting True to overwrite any existing objects with the same name
-   * @param contentType content-type for the created file
-   * @param contentEncoding content-encoding for the created file
-   * @param metadata A dictionary of metadata to apply to created objects
-   * @param requireMetadataMatchForEmptyObjects if true, when creating an empty object and certain
-   *     types of errors occur, any existing object is checked for an exact metadata match to the
-   *     metadata in this CreateObjectOptions before accepting the creation as successful. If false,
-   *     then on error for creating empty objects, as long as an appropriate empty object already
-   *     exists, even if it holds different metadata than provided in this CreateObjectOptions
-   *     instance, it may be considered created successfully.
-   */
-  public CreateObjectOptions(
-      boolean overwriteExisting,
-      String contentType,
-      String contentEncoding,
-      Map<String, byte[]> metadata,
-      boolean requireMetadataMatchForEmptyObjects) {
-    checkArgument(
-        !metadata.containsKey("Content-Type"),
-        "The Content-Type must be provided explicitly via the 'contentType' parameter");
-    checkArgument(
-        !metadata.containsKey("Content-Encoding"),
-        "The Content-Encoding must be provided explicitly via the 'contentEncoding' parameter");
-    this.overwriteExisting = overwriteExisting;
-    this.contentType = contentType;
-    this.contentEncoding = contentEncoding;
-    this.metadata = metadata;
-    this.requireMetadataMatchForEmptyObjects = requireMetadataMatchForEmptyObjects;
-  }
+  @AutoValue.Builder
+  public abstract static class Builder {
 
-  /**
-   * Get the value of overwriteExisting.
-   */
-  public boolean overwriteExisting() {
-    return overwriteExisting;
-  }
+    public abstract Builder setContentEncoding(String contentEncoding);
 
-  /**
-   * Content type to set when creating a file.
-   */
-  public String getContentType() {
-    return contentType;
-  }
+    public abstract Builder setContentType(String contentType);
 
-  /** Content type to set when creating a file. */
-  public String getContentEncoding() {
-    return contentEncoding;
-  }
+    public abstract Builder setMetadata(Map<String, byte[]> metadata);
 
-  /**
-   * Custom metadata to apply to this object.
-   */
-  public Map<String, byte[]> getMetadata() {
-    return metadata;
-  }
+    public abstract Builder setOverwriteExisting(boolean overwriteExisting);
 
-  /**
-   * See constructor param for details.
-   */
-  public boolean getRequireMetadataMatchForEmptyObjects() {
-    return requireMetadataMatchForEmptyObjects;
+    public abstract Builder setRequireMetadataMatchForEmptyObjects(
+        boolean requireMetadataMatchForEmptyObjects);
+
+    protected abstract CreateObjectOptions autoBuild();
+
+    public CreateObjectOptions build() {
+      CreateObjectOptions options = autoBuild();
+      checkArgument(
+          !options.getMetadata().containsKey("Content-Type"),
+          "The Content-Type must be provided explicitly via the 'contentType' parameter");
+      checkArgument(
+          !options.getMetadata().containsKey("Content-Encoding"),
+          "The Content-Encoding must be provided explicitly via the 'contentEncoding' parameter");
+      return options;
+    }
   }
 }

@@ -377,13 +377,14 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     Optional<Long> writeGeneration =
         resourceId.hasGenerationId()
             ? Optional.of(resourceId.getGenerationId())
-            : Optional.of(getWriteGeneration(resourceId, options.overwriteExisting()));
+            : Optional.of(getWriteGeneration(resourceId, options.isOverwriteExisting()));
 
     ObjectWriteConditions writeConditions =
         ObjectWriteConditions.builder()
             .setContentGenerationMatch(writeGeneration.orElse(null))
             .setIgnoreGenerationMismatch(
-                options.overwriteExisting() && getOptions().isOverwriteGenerationMismatchIgnored())
+                options.isOverwriteExisting()
+                    && getOptions().isOverwriteGenerationMismatchIgnored())
             .build();
 
     Map<String, String> rewrittenMetadata = encodeMetadata(options.getMetadata());
@@ -442,7 +443,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     Preconditions.checkArgument(
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
 
-    return create(resourceId, CreateObjectOptions.DEFAULT);
+    return create(resourceId, CreateObjectOptions.DEFAULT_OVERWRITE);
   }
 
   /** See {@link GoogleCloudStorage#create(String)} for details about expected behavior. */
@@ -525,7 +526,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     logger.atFine().log("createEmptyObject(%s)", resourceId);
     Preconditions.checkArgument(
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
-    createEmptyObject(resourceId, CreateObjectOptions.DEFAULT);
+    createEmptyObject(resourceId, CreateObjectOptions.DEFAULT_OVERWRITE);
   }
 
   public void updateMetadata(GoogleCloudStorageItemInfo itemInfo, Map<String, byte[]> metadata)
@@ -623,7 +624,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    */
   @Override
   public void createEmptyObjects(List<StorageResourceId> resourceIds) throws IOException {
-    createEmptyObjects(resourceIds, CreateObjectOptions.DEFAULT);
+    createEmptyObjects(resourceIds, CreateObjectOptions.DEFAULT_OVERWRITE);
   }
 
   /**
@@ -1208,7 +1209,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     if (resourceId.hasGenerationId()) {
       insertObject.setIfGenerationMatch(resourceId.getGenerationId());
-    } else if (!createObjectOptions.overwriteExisting()) {
+    } else if (!createObjectOptions.isOverwriteExisting()) {
       insertObject.setIfGenerationMatch(0L);
     }
     return insertObject;
@@ -2045,8 +2046,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     List<StorageResourceId> sourceIds =
         Lists.transform(sources, objectName -> new StorageResourceId(bucketName, objectName));
     StorageResourceId destinationId = new StorageResourceId(bucketName, destination);
-    CreateObjectOptions options = new CreateObjectOptions(
-        true, contentType, CreateObjectOptions.EMPTY_METADATA);
+    CreateObjectOptions options =
+        CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder().setContentType(contentType).build();
     composeObjects(sourceIds, destinationId, options);
   }
 

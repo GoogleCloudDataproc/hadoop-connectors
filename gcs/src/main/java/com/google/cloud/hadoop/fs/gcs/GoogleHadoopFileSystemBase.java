@@ -838,7 +838,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       // concat operation appends to the target.
       List<URI> sources = Lists.newArrayList(tgtPath);
       sources.addAll(partition);
-      getGcsFs().compose(sources, tgtPath, CreateObjectOptions.DEFAULT_CONTENT_TYPE);
+      getGcsFs().compose(sources, tgtPath, CreateObjectOptions.CONTENT_TYPE_DEFAULT);
     }
   }
 
