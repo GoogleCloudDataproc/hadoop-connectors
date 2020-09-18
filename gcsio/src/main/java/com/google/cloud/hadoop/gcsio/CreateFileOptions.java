@@ -21,8 +21,11 @@ import static com.google.common.base.Preconditions.checkArgument;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 
-/** Options that can be specified when creating a file in the {@code GoogleCloudFileSystem}. */
+/**
+ * Options that can be specified when creating a file in the {@link GoogleCloudStorageFileSystem}.
+ */
 @AutoValue
 public abstract class CreateFileOptions {
 
@@ -33,7 +36,7 @@ public abstract class CreateFileOptions {
   public static Builder builder() {
     return new AutoValue_CreateFileOptions.Builder()
         .setAttributes(ImmutableMap.of())
-        .setContentType(CreateObjectOptions.DEFAULT_CONTENT_TYPE)
+        .setContentType(CreateObjectOptions.CONTENT_TYPE_DEFAULT)
         .setEnsureNoDirectoryConflict(true)
         .setEnsureParentDirectoriesExist(true)
         .setExistingGenerationId(StorageResourceId.UNKNOWN_GENERATION_ID)
@@ -46,6 +49,7 @@ public abstract class CreateFileOptions {
   public abstract ImmutableMap<String, byte[]> getAttributes();
 
   /** Content-type to set when creating a file. */
+  @Nullable
   public abstract String getContentType();
 
   /**

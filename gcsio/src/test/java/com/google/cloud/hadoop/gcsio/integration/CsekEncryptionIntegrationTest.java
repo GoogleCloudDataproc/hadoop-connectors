@@ -54,8 +54,7 @@ public class CsekEncryptionIntegrationTest {
 
     gcs.create(bucketName);
     gcs.createEmptyObject(
-        resourceId,
-        new CreateObjectOptions(true, "text/plain", CreateObjectOptions.EMPTY_METADATA));
+        resourceId, CreateObjectOptions.builder().setContentType("text/plain").build());
 
     assertThat(gcs.getItemInfo(resourceId).getContentType()).isEqualTo("text/plain");
   }

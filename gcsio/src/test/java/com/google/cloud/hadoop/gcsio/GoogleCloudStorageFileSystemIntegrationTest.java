@@ -1593,7 +1593,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     assertThat(gcsfs.exists(object1) && gcsfs.exists(object2)).isTrue();
 
     gcsfs.compose(
-        ImmutableList.of(object1, object2), destination, CreateObjectOptions.DEFAULT_CONTENT_TYPE);
+        ImmutableList.of(object1, object2), destination, CreateObjectOptions.CONTENT_TYPE_DEFAULT);
 
     byte[] expectedOutput = "content1content2".getBytes(UTF_8);
     ByteBuffer actualOutput = ByteBuffer.allocate(expectedOutput.length);

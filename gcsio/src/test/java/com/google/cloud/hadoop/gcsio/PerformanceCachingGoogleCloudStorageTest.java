@@ -57,7 +57,10 @@ public class PerformanceCachingGoogleCloudStorageTest {
           .build();
 
   private static final CreateObjectOptions CREATE_OBJECT_OPTIONS =
-      new CreateObjectOptions(/* overwriteExisting= */ true, "test_content_type", TEST_METADATA);
+      CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
+          .setContentType("test_content_type")
+          .setMetadata(TEST_METADATA)
+          .build();
 
   // Sample bucket names.
   private static final String BUCKET_A = "alpha";

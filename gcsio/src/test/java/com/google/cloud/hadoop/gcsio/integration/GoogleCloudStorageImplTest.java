@@ -121,11 +121,13 @@ public class GoogleCloudStorageImplTest {
     gcs.create(bucketName);
     byte[] bytesToWrite = new byte[1024];
     GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
-    WritableByteChannel byteChannel1 = gcs.create(resourceId, new CreateObjectOptions(false));
+    WritableByteChannel byteChannel1 =
+        gcs.create(resourceId, CreateObjectOptions.DEFAULT_NO_OVERWRITE);
     byteChannel1.write(ByteBuffer.wrap(bytesToWrite));
 
     // Creating this channel should succeed. Only when we close will an error bubble up.
-    WritableByteChannel byteChannel2 = gcs.create(resourceId, new CreateObjectOptions(false));
+    WritableByteChannel byteChannel2 =
+        gcs.create(resourceId, CreateObjectOptions.DEFAULT_NO_OVERWRITE);
 
     byteChannel1.close();
 
@@ -164,11 +166,8 @@ public class GoogleCloudStorageImplTest {
 
     gcs.create(bucketName);
     gcs.createEmptyObject(
-        resourceId1,
-        new CreateObjectOptions(true, "text/plain", CreateObjectOptions.EMPTY_METADATA));
-    gcs.create(
-            resourceId2,
-            new CreateObjectOptions(true, "image/png", CreateObjectOptions.EMPTY_METADATA))
+        resourceId1, CreateObjectOptions.builder().setContentType("text/plain").build());
+    gcs.create(resourceId2, CreateObjectOptions.builder().setContentType("image/png").build())
         .close();
     gcs.create(resourceId3).close(); // default content-type: "application/octet-stream"
 
@@ -228,7 +227,7 @@ public class GoogleCloudStorageImplTest {
             "key3", "value3".getBytes(StandardCharsets.UTF_8),
             "key4", "value4".getBytes(StandardCharsets.UTF_8));
 
-    gcs.createEmptyObject(object, new CreateObjectOptions(true, "text/plain", metadata1));
+    gcs.createEmptyObject(object, CreateObjectOptions.builder().setMetadata(metadata1).build());
 
     GoogleCloudStorageItemInfo itemInfo1 = gcs.getItemInfo(object);
 

@@ -55,7 +55,8 @@ public class ForwardingGoogleCloudStorageTest {
   private static final List<UpdatableItemInfo> TEST_ITEM_INFOS = Lists.newArrayList(TEST_ITEM_INFO);
 
   /** Sample create object options. */
-  private static final CreateObjectOptions TEST_OBJECT_OPTIONS = new CreateObjectOptions(false);
+  private static final CreateObjectOptions TEST_OBJECT_OPTIONS =
+      CreateObjectOptions.DEFAULT_NO_OVERWRITE;
 
   /** Sample create bucket options. */
   private static final CreateBucketOptions TEST_BUCKET_OPTIONS =
