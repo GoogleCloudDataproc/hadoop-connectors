@@ -83,7 +83,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
       CreateFileOptions.DEFAULT_NO_OVERWRITE.toBuilder()
           .setEnsureNoDirectoryConflict(false)
           .setEnsureParentDirectoriesExist(false)
-          .setExistingGenerationId(0)
+          .setOverwriteGenerationId(0)
           .build();
 
   // Deletion of temporary files occurs asynchronously for performance reasons, but in-flight
