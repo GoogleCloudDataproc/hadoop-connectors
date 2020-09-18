@@ -307,7 +307,7 @@ public class GoogleCloudStorageTest {
             new StorageResourceId(bucketName, "testCreateEmptyObjectsWithOptions_Object1"),
             new StorageResourceId(bucketName, "testCreateEmptyObjectsWithOptions_Object2"));
 
-    rawStorage.createEmptyObjects(storageResourceIds, CreateObjectOptions.DEFAULT);
+    rawStorage.createEmptyObjects(storageResourceIds, CreateObjectOptions.DEFAULT_OVERWRITE);
 
     rawStorage
         .getItemInfos(storageResourceIds)
@@ -416,7 +416,7 @@ public class GoogleCloudStorageTest {
 
     GoogleCloudStorageItemInfo composedObject =
         rawStorage.composeObjects(
-            ImmutableList.of(srcObject), dstObject, CreateObjectOptions.DEFAULT);
+            ImmutableList.of(srcObject), dstObject, CreateObjectOptions.DEFAULT_OVERWRITE);
     assertThat(composedObject.exists()).isTrue();
     assertThat(composedObject.getObjectName()).isEqualTo(dstObject.getObjectName());
   }
@@ -428,7 +428,7 @@ public class GoogleCloudStorageTest {
     StorageResourceId objectToCreate =
         new StorageResourceId(bucketName, "testCreateWithOptions_Object");
 
-    rawStorage.create(objectToCreate, CreateObjectOptions.DEFAULT).close();
+    rawStorage.create(objectToCreate, CreateObjectOptions.DEFAULT_OVERWRITE).close();
 
     GoogleCloudStorageItemInfo itemInfo = rawStorage.getItemInfo(objectToCreate);
     assertThat(itemInfo.exists()).isTrue();
@@ -1178,7 +1178,8 @@ public class GoogleCloudStorageTest {
     StorageResourceId objectToCreate =
         new StorageResourceId(bucketName, "testUpdateItemInfoUpdatesMetadata_Object");
     try (WritableByteChannel channel =
-        rawStorage.create(objectToCreate, new CreateObjectOptions(false, metadata))) {
+        rawStorage.create(
+            objectToCreate, CreateObjectOptions.builder().setMetadata(metadata).build())) {
       channel.write(ByteBuffer.wrap(bytesToWrite));
     }
 
@@ -1199,7 +1200,8 @@ public class GoogleCloudStorageTest {
     // Verify the bucket exist by creating an object
     StorageResourceId objectToCreate =
         new StorageResourceId(bucketName, "testMetadataIsWrittenWhenCreatingEmptyObjects_Object");
-    rawStorage.createEmptyObject(objectToCreate, new CreateObjectOptions(false, metadata));
+    rawStorage.createEmptyObject(
+        objectToCreate, CreateObjectOptions.builder().setMetadata(metadata).build());
 
     // Verify we get metadata from getItemInfo
     GoogleCloudStorageItemInfo itemInfo = rawStorage.getItemInfo(objectToCreate);
@@ -1402,7 +1404,7 @@ public class GoogleCloudStorageTest {
         bucketName,
         ImmutableList.of("testCompose_SourceObject1", "testCompose_SourceObject2"),
         destinationObject.getObjectName(),
-        CreateObjectOptions.DEFAULT_CONTENT_TYPE);
+        CreateObjectOptions.CONTENT_TYPE_DEFAULT);
 
     assertObjectContent(rawStorage, destinationObject, Bytes.concat(content1, content2));
   }
