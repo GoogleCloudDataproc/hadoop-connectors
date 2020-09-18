@@ -37,7 +37,7 @@ public class GoogleCredentialWithIamAccessTokenTest {
 
     GoogleCredential credential =
         new GoogleCredentialWithIamAccessToken(
-            transport, ignore -> {}, "test-service-account", CredentialFactory.GCS_SCOPES);
+            transport, ignore -> {}, "test-service-account", CredentialFactory.DEFAULT_SCOPES);
 
     assertThat(credential.getAccessToken()).isEqualTo(TEST_ACCESS_TOKEN);
     assertThat(credential.getExpirationTimeMilliseconds()).isEqualTo(TEST_TIME_MILLISECONDS);
@@ -51,7 +51,7 @@ public class GoogleCredentialWithIamAccessTokenTest {
 
     GoogleCredential credential =
         new GoogleCredentialWithIamAccessToken(
-            transport, ignore -> {}, "test-service-account", CredentialFactory.GCS_SCOPES);
+            transport, ignore -> {}, "test-service-account", CredentialFactory.DEFAULT_SCOPES);
 
     assertThat(credential.getAccessToken()).isEqualTo(TEST_ACCESS_TOKEN);
   }
@@ -69,6 +69,6 @@ public class GoogleCredentialWithIamAccessTokenTest {
         NullPointerException.class,
         () ->
             new GoogleCredentialWithIamAccessToken(
-                transport, ignore -> {}, "test-service-account", CredentialFactory.GCS_SCOPES));
+                transport, ignore -> {}, "test-service-account", CredentialFactory.DEFAULT_SCOPES));
   }
 }

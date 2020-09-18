@@ -198,8 +198,8 @@ public class CredentialFactory {
     }
   }
 
-  // List of GCS scopes to specify when obtaining a credential.
-  public static final ImmutableList<String> GCS_SCOPES =
+  // List of scopes to specify when obtaining a credential.
+  public static final ImmutableList<String> DEFAULT_SCOPES =
       ImmutableList.of(StorageScopes.CLOUD_PLATFORM);
 
   // JSON factory used for formatting credential-handling payloads.
