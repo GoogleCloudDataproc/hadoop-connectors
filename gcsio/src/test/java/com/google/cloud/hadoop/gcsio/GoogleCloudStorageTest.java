@@ -2628,7 +2628,6 @@ public class GoogleCloudStorageTest {
     CreateObjectOptions createOptions =
         CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
             .setMetadata(ImmutableMap.of("foo", new byte[0]))
-            .setRequireMetadataMatchForEmptyObjects(true)
             .build();
 
     IOException thrown =

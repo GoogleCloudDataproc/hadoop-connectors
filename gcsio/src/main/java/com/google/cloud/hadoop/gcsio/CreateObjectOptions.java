@@ -38,9 +38,9 @@ public abstract class CreateObjectOptions {
     return new AutoValue_CreateObjectOptions.Builder()
         .setContentEncoding(null)
         .setContentType(CONTENT_TYPE_DEFAULT)
+        .setEnsureEmptyObjectsMetadataMatch(true)
         .setMetadata(ImmutableMap.of())
-        .setOverwriteExisting(false)
-        .setRequireMetadataMatchForEmptyObjects(false);
+        .setOverwriteExisting(false);
   }
 
   public abstract Builder toBuilder();
@@ -52,12 +52,6 @@ public abstract class CreateObjectOptions {
   /** Content type for the created object. */
   public abstract String getContentType();
 
-  /** A metadata to apply to the create object. */
-  public abstract ImmutableMap<String, byte[]> getMetadata();
-
-  /** Whether to overwrite any existing objects with the same name */
-  public abstract boolean isOverwriteExisting();
-
   /**
    * When creating an empty object and certain types of errors occur, any existing object is checked
    * for an exact metadata match to the metadata in this {@link CreateObjectOptions} before
@@ -66,7 +60,13 @@ public abstract class CreateObjectOptions {
    * metadata than provided in this {@link CreateObjectOptions} instance, it may be considered
    * created successfully.
    */
-  public abstract boolean getRequireMetadataMatchForEmptyObjects();
+  public abstract boolean isEnsureEmptyObjectsMetadataMatch();
+
+  /** A metadata to apply to the create object. */
+  public abstract ImmutableMap<String, byte[]> getMetadata();
+
+  /** Whether to overwrite any existing objects with the same name */
+  public abstract boolean isOverwriteExisting();
 
   @AutoValue.Builder
   public abstract static class Builder {
@@ -75,23 +75,23 @@ public abstract class CreateObjectOptions {
 
     public abstract Builder setContentType(String contentType);
 
+    public abstract Builder setEnsureEmptyObjectsMetadataMatch(
+        boolean ensureEmptyObjectsMetadataMatch);
+
     public abstract Builder setMetadata(Map<String, byte[]> metadata);
 
     public abstract Builder setOverwriteExisting(boolean overwriteExisting);
-
-    public abstract Builder setRequireMetadataMatchForEmptyObjects(
-        boolean requireMetadataMatchForEmptyObjects);
 
     protected abstract CreateObjectOptions autoBuild();
 
     public CreateObjectOptions build() {
       CreateObjectOptions options = autoBuild();
       checkArgument(
-          !options.getMetadata().containsKey("Content-Type"),
-          "The Content-Type must be provided explicitly via the 'contentType' parameter");
-      checkArgument(
           !options.getMetadata().containsKey("Content-Encoding"),
           "The Content-Encoding must be provided explicitly via the 'contentEncoding' parameter");
+      checkArgument(
+          !options.getMetadata().containsKey("Content-Type"),
+          "The Content-Type must be provided explicitly via the 'contentType' parameter");
       return options;
     }
   }

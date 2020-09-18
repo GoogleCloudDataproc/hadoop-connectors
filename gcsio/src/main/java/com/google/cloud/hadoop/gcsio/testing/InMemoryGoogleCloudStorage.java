@@ -51,6 +51,11 @@ import java.util.Set;
  */
 public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
+  private static final CreateObjectOptions EMPTY_OBJECT_CREATE_OPTIONS =
+      CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
+          .setEnsureEmptyObjectsMetadataMatch(false)
+          .build();
+
   // Mapping from bucketName to structs representing a bucket.
   private final Map<String, InMemoryBucketEntry> bucketLookup = new HashMap<>();
   private final GoogleCloudStorageOptions storageOptions;
@@ -90,12 +95,9 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
       return false;
     }
 
-    if (bucketName.length() > 63) {
-      return false;
-    }
+    return bucketName.length() <= 63;
 
     // TODO(user): Handle dots and names longer than 63, but less than 222.
-    return true;
   }
 
   private boolean validateObjectName(String objectName) {
@@ -174,7 +176,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
   @Override
   public synchronized void createEmptyObject(StorageResourceId resourceId) throws IOException {
-    createEmptyObject(resourceId, CreateObjectOptions.DEFAULT_OVERWRITE);
+    createEmptyObject(resourceId, EMPTY_OBJECT_CREATE_OPTIONS);
   }
 
   @Override
@@ -188,7 +190,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   @Override
   public synchronized void createEmptyObjects(List<StorageResourceId> resourceIds)
       throws IOException {
-    createEmptyObjects(resourceIds, CreateObjectOptions.DEFAULT_OVERWRITE);
+    createEmptyObjects(resourceIds, EMPTY_OBJECT_CREATE_OPTIONS);
   }
 
   @Override
