@@ -50,6 +50,7 @@ public abstract class CreateObjectOptions {
   public abstract String getContentEncoding();
 
   /** Content type for the created object. */
+  @Nullable
   public abstract String getContentType();
 
   /**
