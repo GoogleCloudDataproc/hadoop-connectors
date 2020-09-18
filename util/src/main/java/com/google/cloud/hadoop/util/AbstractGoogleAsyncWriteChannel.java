@@ -16,7 +16,6 @@ package com.google.cloud.hadoop.util;
 
 import com.google.api.client.googleapis.services.AbstractGoogleClientRequest;
 import com.google.api.client.http.InputStreamContent;
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.Callable;
@@ -25,20 +24,15 @@ import java.util.concurrent.ExecutorService;
 public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleClientRequest<S>, S>
     extends BaseAbstractGoogleAsyncWriteChannel<S> {
   // ClientRequestHelper to be used instead of calling final methods in client requests.
-  private ClientRequestHelper<S> clientRequestHelper = new ClientRequestHelper<>();
+  private final ClientRequestHelper<S> clientRequestHelper;
 
   /** Construct a new channel using the given ExecutorService to run background uploads. */
   public AbstractGoogleAsyncWriteChannel(
-      ExecutorService threadPool, AsyncWriteChannelOptions options) {
+      ClientRequestHelper<S> clientRequestHelper,
+      ExecutorService threadPool,
+      AsyncWriteChannelOptions options) {
     super(threadPool, options);
-  }
-
-  /**
-   * Sets the ClientRequestHelper to be used instead of calling final methods in client requests.
-   */
-  @VisibleForTesting
-  public void setClientRequestHelper(ClientRequestHelper<S> helper) {
-    clientRequestHelper = helper;
+    this.clientRequestHelper = clientRequestHelper;
   }
 
   /**
@@ -51,7 +45,7 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
   @Override
   public void startUpload(InputStream pipeSource) throws IOException {
     // Connect pipe-source to the stream used by uploader.
-    InputStreamContent objectContentStream = new InputStreamContent(contentType, pipeSource);
+    InputStreamContent objectContentStream = new InputStreamContent(getContentType(), pipeSource);
     // Indicate that we do not know length of file in advance.
     objectContentStream.setLength(-1);
     objectContentStream.setCloseInputStream(false);
@@ -60,12 +54,14 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
     request.setDisableGZipContent(true);
 
     // Change chunk size from default value (10MB) to one that yields higher performance.
-    clientRequestHelper.setChunkSize(request, options.getUploadChunkSize());
+    clientRequestHelper.setChunkSize(request, channelOptions.getUploadChunkSize());
 
     // Given that the two ends of the pipe must operate asynchronous relative
     // to each other, we need to start the upload operation on a separate thread.
     uploadOperation = threadPool.submit(new UploadOperation(request, pipeSource));
   }
+
+  protected abstract String getContentType();
 
   class UploadOperation implements Callable<S> {
     // Object to be uploaded. This object declared final for safe object publishing.
