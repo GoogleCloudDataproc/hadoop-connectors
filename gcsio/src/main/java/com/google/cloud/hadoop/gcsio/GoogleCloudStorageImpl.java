@@ -38,6 +38,7 @@ import com.google.api.client.util.Data;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.Sleeper;
 import com.google.api.services.storage.Storage;
+import com.google.api.services.storage.Storage.Objects.Insert;
 import com.google.api.services.storage.StorageRequest;
 import com.google.api.services.storage.model.Bucket;
 import com.google.api.services.storage.model.Bucket.Lifecycle;
@@ -51,6 +52,7 @@ import com.google.api.services.storage.model.RewriteResponse;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.authorization.StorageRequestAuthorizer;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
+import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.ResilientOperation;
@@ -118,7 +120,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           .build();
 
   // A function to encode metadata map values
-  private static String encodeMetadataValues(byte[] bytes) {
+  static String encodeMetadataValues(byte[] bytes) {
     return bytes == null ? Data.NULL_STRING : BaseEncoding.base64().encode(bytes);
   }
 
@@ -389,50 +391,34 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                     && getOptions().isOverwriteGenerationMismatchIgnored())
             .build();
 
-    Map<String, String> rewrittenMetadata = encodeMetadata(options.getMetadata());
+    BaseAbstractGoogleAsyncWriteChannel<?> channel =
+        storageOptions.isGrpcEnabled()
+            ? new GoogleCloudStorageGrpcWriteChannel(
+                storageStubProvider.getAsyncStub(),
+                backgroundTasksThreadPool,
+                storageOptions.getWriteChannelOptions(),
+                resourceId,
+                options,
+                writeConditions,
+                requesterShouldPay(resourceId.getBucketName())
+                    ? storageOptions.getRequesterPaysOptions().getProjectId()
+                    : null)
+            : new GoogleCloudStorageWriteChannel(
+                gcs,
+                clientRequestHelper,
+                backgroundTasksThreadPool,
+                storageOptions.getWriteChannelOptions(),
+                resourceId,
+                options,
+                writeConditions) {
 
-    if (storageOptions.isGrpcEnabled()) {
-      Optional<String> requesterPaysProject =
-          requesterShouldPay(resourceId.getBucketName())
-              ? Optional.of(storageOptions.getRequesterPaysOptions().getProjectId())
-              : Optional.empty();
-      GoogleCloudStorageGrpcWriteChannel channel =
-          new GoogleCloudStorageGrpcWriteChannel(
-              backgroundTasksThreadPool,
-              storageStubProvider.getAsyncStub(),
-              resourceId,
-              storageOptions.getWriteChannelOptions(),
-              writeConditions,
-              requesterPaysProject,
-              rewrittenMetadata,
-              options.getContentType());
-      channel.initialize();
-      return channel;
-    }
-
-    GoogleCloudStorageWriteChannel channel =
-        new GoogleCloudStorageWriteChannel(
-            backgroundTasksThreadPool,
-            gcs,
-            clientRequestHelper,
-            resourceId.getBucketName(),
-            resourceId.getObjectName(),
-            options.getContentType(),
-            options.getContentEncoding(),
-            /* kmsKeyName= */ null,
-            storageOptions.getWriteChannelOptions(),
-            writeConditions,
-            rewrittenMetadata) {
-
-          @Override
-          public Storage.Objects.Insert createRequest(InputStreamContent inputStream)
-              throws IOException {
-            return initializeRequest(super.createRequest(inputStream), resourceId.getBucketName());
-          }
-        };
-
+              @Override
+              public Insert createRequest(InputStreamContent inputStream) throws IOException {
+                return initializeRequest(
+                    super.createRequest(inputStream), resourceId.getBucketName());
+              }
+            };
     channel.initialize();
-
     return channel;
   }
 
