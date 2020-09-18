@@ -1484,7 +1484,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         atp.setConf(config);
         credential =
             CredentialFromAccessTokenProviderClassFactory.credential(
-                atp, CredentialFactory.GCS_SCOPES);
+                atp, CredentialFactory.DEFAULT_SCOPES);
       }
     } else {
       // If delegation token support is not configured, check if a
@@ -1492,14 +1492,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       // to acquire the Google credentials using it
       credential =
           CredentialFromAccessTokenProviderClassFactory.credential(
-              config, ImmutableList.of(GCS_CONFIG_PREFIX), CredentialFactory.GCS_SCOPES);
+              config, ImmutableList.of(GCS_CONFIG_PREFIX), CredentialFactory.DEFAULT_SCOPES);
 
       if (credential == null) {
         // Finally, if no credentials have been acquired at this point, employ
         // the default mechanism.
         credential =
             HadoopCredentialConfiguration.getCredentialFactory(config, GCS_CONFIG_PREFIX)
-                .getCredential(CredentialFactory.GCS_SCOPES);
+                .getCredential(CredentialFactory.DEFAULT_SCOPES);
       }
     }
 
@@ -1555,11 +1555,11 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
               httpTransport,
               new CredentialHttpRetryInitializer(credential),
               serviceAccountToImpersonate.get(),
-              CredentialFactory.GCS_SCOPES);
+              CredentialFactory.DEFAULT_SCOPES);
       logger.atFine().log(
           "Impersonating '%s' service account for '%s' user",
           serviceAccountToImpersonate.get(), currentUser);
-      return Optional.of(impersonatedCredential.createScoped(CredentialFactory.GCS_SCOPES));
+      return Optional.of(impersonatedCredential.createScoped(CredentialFactory.DEFAULT_SCOPES));
     }
 
     return Optional.empty();
