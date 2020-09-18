@@ -39,8 +39,8 @@ public abstract class CreateFileOptions {
         .setContentType(CreateObjectOptions.CONTENT_TYPE_DEFAULT)
         .setEnsureNoDirectoryConflict(true)
         .setEnsureParentDirectoriesExist(true)
-        .setExistingGenerationId(StorageResourceId.UNKNOWN_GENERATION_ID)
-        .setOverwriteExisting(false);
+        .setOverwriteExisting(false)
+        .setOverwriteGenerationId(StorageResourceId.UNKNOWN_GENERATION_ID);
   }
 
   public abstract Builder toBuilder();
@@ -67,16 +67,17 @@ public abstract class CreateFileOptions {
    */
   public abstract boolean isEnsureParentDirectoriesExist();
 
-  /**
-   * Generation of existing object. Ignored if set to StorageResourceId.UNKNOWN_GENERATION_ID, but
-   * otherwise this is used instead of {@code overwriteExisting}, where 0 indicates no existing
-   * object, and otherwise an existing object will only be overwritten by the newly created file if
-   * its generation matches this provided generationId.
-   */
-  public abstract long getExistingGenerationId();
-
   /** Whether to overwrite an existing file with the same name. */
   public abstract boolean isOverwriteExisting();
+
+  /**
+   * Generation of existing object to overwrite. Ignored if set to {@link
+   * StorageResourceId#UNKNOWN_GENERATION_ID}, but otherwise this is used instead of {@code
+   * overwriteExisting}, where 0 indicates no existing object, and otherwise an existing object will
+   * only be overwritten by the newly created file if its generation matches this provided
+   * generationId.
+   */
+  public abstract long getOverwriteGenerationId();
 
   /** Builder for {@link CreateFileOptions} */
   @AutoValue.Builder
@@ -90,7 +91,7 @@ public abstract class CreateFileOptions {
 
     public abstract Builder setEnsureParentDirectoriesExist(boolean ensureParentDirectoriesExist);
 
-    public abstract Builder setExistingGenerationId(long existingGenerationId);
+    public abstract Builder setOverwriteGenerationId(long overwriteGenerationId);
 
     public abstract Builder setOverwriteExisting(boolean overwriteExisting);
 

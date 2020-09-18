@@ -236,12 +236,12 @@ public class GoogleCloudStorageFileSystem {
       }
     }
 
-    if (options.getExistingGenerationId() != StorageResourceId.UNKNOWN_GENERATION_ID) {
+    if (options.getOverwriteGenerationId() != StorageResourceId.UNKNOWN_GENERATION_ID) {
       resourceId =
           new StorageResourceId(
               resourceId.getBucketName(),
               resourceId.getObjectName(),
-              options.getExistingGenerationId());
+              options.getOverwriteGenerationId());
     }
     return gcs.create(resourceId, objectOptionsFromFileOptions(options));
   }
