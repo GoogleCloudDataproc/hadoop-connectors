@@ -1012,54 +1012,26 @@ public class GoogleCloudStorageFileSystem {
     StorageResourceId pathId = StorageResourceId.fromUriPath(path, true);
     StorageResourceId dirId = StorageResourceId.fromUriPath(UriPaths.toDirectory(path), true);
 
-    ExecutorService dirExecutor =
-        options.isStatusParallelEnabled()
-            ? Executors.newFixedThreadPool(2, DAEMON_THREAD_FACTORY)
-            : new LazyExecutorService();
-    try {
-      Future<GoogleCloudStorageItemInfo> dirFuture =
-          dirExecutor.submit(() -> gcs.getItemInfo(dirId));
-      Future<List<GoogleCloudStorageItemInfo>> dirChildrenFutures =
-          dirExecutor.submit(
-              () ->
-                  dirId.isRoot()
-                      ? gcs.listBucketInfo()
-                      : gcs.listObjectInfo(
-                          dirId.getBucketName(), dirId.getObjectName(), PATH_DELIMITER));
-      dirExecutor.shutdown();
-
-      if (!pathId.isDirectory()) {
-        GoogleCloudStorageItemInfo pathInfo = gcs.getItemInfo(pathId);
-        if (pathInfo.exists()) {
-          List<FileInfo> listedInfo = new ArrayList<>();
-          listedInfo.add(FileInfo.fromItemInfo(pathInfo));
-          return listedInfo;
-        }
+    if (!pathId.isDirectory()) {
+      GoogleCloudStorageItemInfo pathInfo = gcs.getItemInfo(pathId);
+      if (pathInfo.exists()) {
+        List<FileInfo> listedInfo = new ArrayList<>();
+        listedInfo.add(FileInfo.fromItemInfo(pathInfo));
+        return listedInfo;
       }
-
-      try {
-        GoogleCloudStorageItemInfo dirInfo = dirFuture.get();
-        List<GoogleCloudStorageItemInfo> dirItemInfos = dirChildrenFutures.get();
-        if (!dirInfo.exists() && dirItemInfos.isEmpty()) {
-          throw new FileNotFoundException("Item not found: " + path);
-        }
-
-        List<FileInfo> fileInfos = FileInfo.fromItemInfos(dirItemInfos);
-        fileInfos.sort(FILE_INFO_PATH_COMPARATOR);
-        return fileInfos;
-      } catch (InterruptedException | ExecutionException e) {
-        if (e instanceof InterruptedException) {
-          Thread.currentThread().interrupt();
-        }
-        throw new IOException(
-            String.format(
-                "Failed to listFileInfo for '%s': %s",
-                path, e instanceof ExecutionException ? e.getCause() : e),
-            e);
-      }
-    } finally {
-      dirExecutor.shutdownNow();
     }
+
+    List<GoogleCloudStorageItemInfo> dirItemInfos =
+        dirId.isRoot()
+            ? gcs.listBucketInfo()
+            : gcs.listObjectInfo(dirId.getBucketName(), dirId.getObjectName(), PATH_DELIMITER);
+    if (dirItemInfos.isEmpty() && !gcs.getItemInfo(dirId).exists()) {
+      throw new FileNotFoundException("Item not found: " + path);
+    }
+
+    List<FileInfo> fileInfos = FileInfo.fromItemInfos(dirItemInfos);
+    fileInfos.sort(FILE_INFO_PATH_COMPARATOR);
+    return fileInfos;
   }
 
   /**
