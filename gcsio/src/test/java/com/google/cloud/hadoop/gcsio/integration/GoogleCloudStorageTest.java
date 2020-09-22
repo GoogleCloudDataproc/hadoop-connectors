@@ -22,15 +22,12 @@ import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 
-import com.google.api.client.util.Clock;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
-import com.google.cloud.hadoop.gcsio.LaggedGoogleCloudStorage;
-import com.google.cloud.hadoop.gcsio.LaggedGoogleCloudStorage.ListVisibilityCalculator;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
@@ -132,16 +129,10 @@ public class GoogleCloudStorageTest {
   @Parameters
   public static Collection<Object[]> getConstructorArguments() throws IOException {
     GoogleCloudStorage gcs = new InMemoryGoogleCloudStorage();
-    GoogleCloudStorage zeroLaggedGcs =
-        new LaggedGoogleCloudStorage(
-            new InMemoryGoogleCloudStorage(),
-            Clock.SYSTEM,
-            ListVisibilityCalculator.IMMEDIATELY_VISIBLE);
     GoogleCloudStorage performanceCachingGcs =
         new PerformanceCachingGoogleCloudStorage(
             new InMemoryGoogleCloudStorage(), PerformanceCachingGoogleCloudStorageOptions.DEFAULT);
-    return Arrays.asList(
-        new Object[] {gcs}, new Object[] {zeroLaggedGcs}, new Object[] {performanceCachingGcs});
+    return Arrays.asList(new Object[] {gcs}, new Object[] {performanceCachingGcs});
   }
 
   private final GoogleCloudStorage rawStorage;
