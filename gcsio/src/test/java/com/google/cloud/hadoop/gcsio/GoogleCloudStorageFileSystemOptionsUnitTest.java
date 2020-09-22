@@ -17,8 +17,6 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import com.google.api.client.util.Clock;
-import com.google.cloud.hadoop.gcsio.LaggedGoogleCloudStorage.ListVisibilityCalculator;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
@@ -52,15 +50,6 @@ public class GoogleCloudStorageFileSystemOptionsUnitTest
     }
   }
 
-  static class ZeroLaggedGcsCreator implements GcsCreator {
-    public GoogleCloudStorage createGcs(GoogleCloudStorageOptions options) {
-      return new LaggedGoogleCloudStorage(
-          new InMemoryGoogleCloudStorage(options),
-          Clock.SYSTEM,
-          ListVisibilityCalculator.IMMEDIATELY_VISIBLE);
-    }
-  }
-
   private GcsCreator gcsCreator;
 
   public GoogleCloudStorageFileSystemOptionsUnitTest(GcsCreator gcsCreator) {
@@ -69,8 +58,7 @@ public class GoogleCloudStorageFileSystemOptionsUnitTest
 
   @Parameters
   public static Collection<Object[]> getConstructorArguments() {
-    return ImmutableList.of(
-        new Object[] {new InMemoryGcsCreator()}, new Object[] {new ZeroLaggedGcsCreator()});
+    return ImmutableList.of(new Object[] {new InMemoryGcsCreator()});
   }
 
   @BeforeClass
