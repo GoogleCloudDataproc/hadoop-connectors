@@ -428,8 +428,7 @@ public class CredentialFactory {
   // TODO: Copied (mostly) over from Google Credential since it has private scope
   private static PrivateKey privateKeyFromPkcs8(RedactedString privateKeyPem) throws IOException {
     // Unescape new-line symbols in privateKeyPem string value
-    Reader reader =
-        new StringReader(privateKeyPem.value().replaceAll("\\n", System.lineSeparator()));
+    Reader reader = new StringReader(privateKeyPem.value().replace("\\n", System.lineSeparator()));
     Section section = PemReader.readFirstSectionAndClose(reader, "PRIVATE KEY");
     if (section == null) {
       throw new IOException("Invalid PKCS8 data.");
