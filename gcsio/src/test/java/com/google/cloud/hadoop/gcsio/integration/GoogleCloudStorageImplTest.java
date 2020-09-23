@@ -85,7 +85,7 @@ public class GoogleCloudStorageImplTest {
     GoogleCloudStorageImpl gcs = makeStorageWithBufferSize(1024 * 1024);
 
     String bucketName = BUCKET_HELPER.getUniqueBucketName("write-large-obj");
-    gcs.create(bucketName);
+    gcs.createBucket(bucketName);
 
     StorageResourceId resourceId = new StorageResourceId(bucketName, "LargeObject");
     int partitionsCount = 64;
@@ -100,7 +100,7 @@ public class GoogleCloudStorageImplTest {
     GoogleCloudStorageImpl gcs = makeStorageWithBufferSize(3 * 1024 * 1024);
 
     String bucketName = BUCKET_HELPER.getUniqueBucketName("write-3m-buff-obj");
-    gcs.create(bucketName);
+    gcs.createBucket(bucketName);
 
     StorageResourceId resourceId = new StorageResourceId(bucketName, "Object");
     int partitionsCount = 64;
@@ -118,7 +118,7 @@ public class GoogleCloudStorageImplTest {
     GoogleCloudStorageImpl gcs =
         makeStorage(GoogleCloudStorageTestHelper.getStandardOptionBuilder().build());
 
-    gcs.create(bucketName);
+    gcs.createBucket(bucketName);
     byte[] bytesToWrite = new byte[1024];
     GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
     WritableByteChannel byteChannel1 =
@@ -143,13 +143,13 @@ public class GoogleCloudStorageImplTest {
 
     GoogleCloudStorageImpl gcs = makeStorageWithInferImplicit();
 
-    gcs.create(bucketName);
+    gcs.createBucket(bucketName);
     gcs.createEmptyObject(resourceId);
 
     GoogleCloudStorageItemInfo itemInfo = gcs.getItemInfo(new StorageResourceId(bucketName, "d0/"));
     assertThat(itemInfo.exists()).isFalse();
 
-    List<GoogleCloudStorageItemInfo> d0ItemInfo = gcs.listObjectInfo(bucketName, "d0/", "/");
+    List<GoogleCloudStorageItemInfo> d0ItemInfo = gcs.listObjectInfo(bucketName, "d0/");
     assertWithMessage("d0 length").that(d0ItemInfo.size()).isEqualTo(1);
   }
 
@@ -164,7 +164,7 @@ public class GoogleCloudStorageImplTest {
     StorageResourceId resourceId2 = new StorageResourceId(bucketName, "obj2");
     StorageResourceId resourceId3 = new StorageResourceId(bucketName, "obj3");
 
-    gcs.create(bucketName);
+    gcs.createBucket(bucketName);
     gcs.createEmptyObject(
         resourceId1, CreateObjectOptions.builder().setContentType("text/plain").build());
     gcs.create(resourceId2, CreateObjectOptions.builder().setContentType("image/png").build())
@@ -186,12 +186,13 @@ public class GoogleCloudStorageImplTest {
                 .build());
 
     String srcBucketName = BUCKET_HELPER.getUniqueBucketName("copy-with-rewrite-src");
-    gcs.create(srcBucketName);
+    gcs.createBucket(srcBucketName);
 
     String dstBucketName = BUCKET_HELPER.getUniqueBucketName("copy-with-rewrite-dst");
     // Create destination bucket with different location and storage class,
     // because this is supported by rewrite but not copy requests
-    gcs.create(dstBucketName, CreateBucketOptions.builder().setStorageClass("coldline").build());
+    gcs.createBucket(
+        dstBucketName, CreateBucketOptions.builder().setStorageClass("coldline").build());
 
     StorageResourceId resourceId =
         new StorageResourceId(srcBucketName, "testCopySingleItemWithRewrite_SourceObject");
@@ -214,7 +215,7 @@ public class GoogleCloudStorageImplTest {
         makeStorage(GoogleCloudStorageTestHelper.getStandardOptionBuilder().build());
 
     String bucketName = BUCKET_HELPER.getUniqueBucketName("metadata-equals");
-    gcs.create(bucketName);
+    gcs.createBucket(bucketName);
 
     StorageResourceId object = new StorageResourceId(bucketName, "testMetadataEquals_Object");
 
