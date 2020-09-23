@@ -64,13 +64,13 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
 
   @Override
   public void createBucket(String bucketName) throws IOException {
-    logger.atFine().log("%s.create(%s)", delegateClassName, bucketName);
+    logger.atFine().log("%s.createBucket(%s)", delegateClassName, bucketName);
     delegate.createBucket(bucketName);
   }
 
   @Override
   public void createBucket(String bucketName, CreateBucketOptions options) throws IOException {
-    logger.atFine().log("%s.create(%s, %s)", delegateClassName, bucketName, options);
+    logger.atFine().log("%s.createBucket(%s, %s)", delegateClassName, bucketName, options);
     delegate.createBucket(bucketName, options);
   }
 
