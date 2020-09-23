@@ -217,21 +217,96 @@ public class PerformanceCachingGoogleCloudStorageTest {
   }
 
   @Test
-  public void testListObjectInfo_delimiter() throws IOException {
+  public void testListObjectNames_delimiter() throws IOException {
     GoogleCloudStorageItemInfo itemAAPrefix = createInferredDirectory(BUCKET_A, PREFIX_A + "/");
 
-    List<GoogleCloudStorageItemInfo> expectedResult = Lists.newArrayList(ITEM_A_A, itemAAPrefix);
+    List<String> expectedResult =
+        Lists.newArrayList(ITEM_A_A.getObjectName(), itemAAPrefix.getObjectName());
     List<GoogleCloudStorageItemInfo> expectedCached = Lists.newArrayList(ITEM_A_A, itemAAPrefix);
 
-    List<GoogleCloudStorageItemInfo> result =
-        gcs.listObjectInfo(BUCKET_A, PREFIX_A, ListObjectOptions.DEFAULT);
+    List<String> result = gcs.listObjectNames(BUCKET_A, PREFIX_A, ListObjectOptions.DEFAULT);
 
     // Verify the delegate call.
-    verify(gcsDelegate).listObjectInfo(eq(BUCKET_A), eq(PREFIX_A), eq(ListObjectOptions.DEFAULT));
+    verify(gcsDelegate).listObjectNames(eq(BUCKET_A), eq(PREFIX_A), eq(ListObjectOptions.DEFAULT));
 
     // Verify the result.
     assertThat(result).containsExactlyElementsIn(expectedResult);
 
+    // Verify the state of the cache.
+    assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expectedCached);
+  }
+
+  @Test
+  public void testListObjectNames_prefixDir_delimiter() throws IOException {
+    String prefixADir = PREFIX_A + "/";
+
+    String prefixABADir = PREFIX_ABA.substring(0, PREFIX_ABA.lastIndexOf('/') + 1);
+    GoogleCloudStorageItemInfo itemABAPrefix = createInferredDirectory(BUCKET_A, prefixABADir);
+
+    List<String> expectedResult =
+        Lists.newArrayList(ITEM_A_AA.getObjectName(), itemABAPrefix.getObjectName());
+    List<GoogleCloudStorageItemInfo> expectedCached = Lists.newArrayList(ITEM_A_AA, itemABAPrefix);
+
+    List<String> result = gcs.listObjectNames(BUCKET_A, prefixADir, ListObjectOptions.DEFAULT);
+
+    // Verify the delegate call.
+    verify(gcsDelegate)
+        .listObjectNames(eq(BUCKET_A), eq(prefixADir), eq(ListObjectOptions.DEFAULT));
+
+    // Verify the result.
+    assertThat(result).containsExactlyElementsIn(expectedResult);
+
+    // Verify the state of the cache.
+    assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expectedCached);
+  }
+
+  @Test
+  public void testListObjectNamesAlt() throws IOException {
+    List<String> expected = Lists.newArrayList(ITEM_B_A.getObjectName(), ITEM_B_B.getObjectName());
+    List<GoogleCloudStorageItemInfo> expectedCached = Lists.newArrayList(ITEM_B_A, ITEM_B_B);
+
+    List<String> result =
+        gcs.listObjectNames(
+            BUCKET_B, /* objectNamePrefix= */ null, ListObjectOptions.DEFAULT_FLAT_LIST);
+
+    // Verify the delegate call.
+    verify(gcsDelegate)
+        .listObjectNames(
+            eq(BUCKET_B),
+            ArgumentMatchers.eq(null),
+            ArgumentMatchers.eq(ListObjectOptions.DEFAULT_FLAT_LIST));
+
+    assertThat(result).containsExactlyElementsIn(expected);
+    // Verify the state of the cache.
+    assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expectedCached);
+  }
+
+  @Test
+  public void testListObjectNamesCached() throws IOException {
+    List<String> expected =
+        Lists.newArrayList(
+            ITEM_A_A.getObjectName(),
+            ITEM_A_AA.getObjectName(),
+            ITEM_A_ABA.getObjectName(),
+            ITEM_A_B.getObjectName());
+    List<GoogleCloudStorageItemInfo> expectedCached =
+        Lists.newArrayList(ITEM_A_A, ITEM_A_AA, ITEM_A_ABA, ITEM_A_B);
+
+    // First call to get the values in cache.
+    gcs.listObjectNames(
+        BUCKET_A, /* objectNamePrefix= */ null, ListObjectOptions.DEFAULT_FLAT_LIST);
+    // Second call to ensure the values are being served from cache.
+    List<String> result =
+        gcs.listObjectNames(
+            BUCKET_A, /* objectNamePrefix= */ null, ListObjectOptions.DEFAULT_FLAT_LIST);
+
+    // Verify the delegate call once.
+    verify(gcsDelegate, times(2))
+        .listObjectNames(
+            eq(BUCKET_A),
+            ArgumentMatchers.eq(null),
+            ArgumentMatchers.eq(ListObjectOptions.DEFAULT_FLAT_LIST));
+    assertThat(result).containsExactlyElementsIn(expected);
     // Verify the state of the cache.
     assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expectedCached);
   }
