@@ -16,7 +16,6 @@
 
 package com.google.cloud.hadoop.gcsio.cooplock;
 
-import static com.google.cloud.hadoop.gcsio.CreateObjectOptions.EMPTY_METADATA;
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao.LOCK_DIRECTORY;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -69,9 +68,11 @@ public class CoopLockOperationDao {
   private static final String OPERATION_LOCK_FILE_FORMAT = "%s_%s_%s.lock";
 
   private static final CreateObjectOptions CREATE_OBJECT_OPTIONS =
-      new CreateObjectOptions(/* overwriteExisting= */ false, "application/text", EMPTY_METADATA);
+      CreateObjectOptions.DEFAULT_NO_OVERWRITE.toBuilder()
+          .setContentType("application/text")
+          .build();
   private static final CreateObjectOptions UPDATE_OBJECT_OPTIONS =
-      new CreateObjectOptions(/* overwriteExisting= */ true, "application/text", EMPTY_METADATA);
+      CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder().setContentType("application/text").build();
 
   private static final int LOCK_MODIFY_RETRY_BACK_OFF_MILLIS = 1_100;
 

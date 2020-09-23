@@ -410,16 +410,11 @@ public class GoogleCloudStorageFileSystemTest
   public void testCreateNoParentDirectories()
       throws URISyntaxException, IOException {
     String bucketName = sharedBucketName1;
-    gcsfs.create(
-        new URI("gs://" + bucketName + "/no/parent/dirs/exist/a.txt"),
-        new CreateFileOptions(
-            false,  // overwriteExisting
-            CreateFileOptions.DEFAULT_CONTENT_TYPE,
-            CreateFileOptions.EMPTY_ATTRIBUTES,
-            true,  // checkNoDirectoryConflict
-            false,  // ensureParentDirectoriesExist
-            StorageResourceId.UNKNOWN_GENERATION_ID))
-      .close();
+    gcsfs
+        .create(
+            new URI("gs://" + bucketName + "/no/parent/dirs/exist/a.txt"),
+            CreateFileOptions.builder().setEnsureParentDirectoriesExist(false).build())
+        .close();
     assertThat(
             gcsfs
                 .getGcs()
@@ -445,15 +440,10 @@ public class GoogleCloudStorageFileSystemTest
       throws URISyntaxException, IOException {
     String bucketName = sharedBucketName1;
     gcsfs.mkdirs(new URI("gs://" + bucketName + "/conflicting-dirname"));
-    gcsfs.create(
-        new URI("gs://" + bucketName + "/conflicting-dirname"),
-        new CreateFileOptions(
-            false,  // overwriteExisting
-            CreateFileOptions.DEFAULT_CONTENT_TYPE,
-            CreateFileOptions.EMPTY_ATTRIBUTES,
-            false,  // checkNoDirectoryConflict
-            true,  // ensureParentDirectoriesExist
-            StorageResourceId.UNKNOWN_GENERATION_ID))
+    gcsfs
+        .create(
+            new URI("gs://" + bucketName + "/conflicting-dirname"),
+            CreateFileOptions.builder().setEnsureNoDirectoryConflict(false).build())
         .close();
 
     // This is a "shoot yourself in the foot" use case, but working as intended if

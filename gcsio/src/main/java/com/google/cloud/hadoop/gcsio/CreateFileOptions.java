@@ -16,173 +16,93 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import com.google.common.base.MoreObjects;
-import com.google.common.base.Preconditions;
+import static com.google.common.base.Preconditions.checkArgument;
+
+import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 
 /**
- * Options that can be specified when creating a file in the {@code GoogleCloudFileSystem}.
+ * Options that can be specified when creating a file in the {@link GoogleCloudStorageFileSystem}.
  */
-public class CreateFileOptions {
-  public static final ImmutableMap<String, byte[]> EMPTY_ATTRIBUTES = ImmutableMap.of();
-  public static final String DEFAULT_CONTENT_TYPE = "application/octet-stream";
+@AutoValue
+public abstract class CreateFileOptions {
 
+  public static final CreateFileOptions DEFAULT_NO_OVERWRITE = builder().build();
   public static final CreateFileOptions DEFAULT_OVERWRITE =
-      new CreateFileOptions(/* overwriteExisting= */ true, DEFAULT_CONTENT_TYPE, EMPTY_ATTRIBUTES);
+      builder().setOverwriteExisting(true).build();
 
-  public static final CreateFileOptions DEFAULT_NO_OVERWRITE =
-      new CreateFileOptions(/* overwriteExisting= */ true, DEFAULT_CONTENT_TYPE, EMPTY_ATTRIBUTES);
-
-  private final boolean overwriteExisting;
-  private final String contentType;
-  private final Map<String, byte[]> attributes;
-  private final boolean checkNoDirectoryConflict;
-  private final boolean ensureParentDirectoriesExist;
-  private final long existingGenerationId;
-
-  /**
-   * Create a file with empty attributes and optionally overwriting any existing file.
-   *
-   * @param overwriteExisting True to overwrite an existing file with the same name
-   */
-  public CreateFileOptions(boolean overwriteExisting) {
-    this(overwriteExisting, DEFAULT_CONTENT_TYPE, EMPTY_ATTRIBUTES);
+  public static Builder builder() {
+    return new AutoValue_CreateFileOptions.Builder()
+        .setAttributes(ImmutableMap.of())
+        .setContentType(CreateObjectOptions.CONTENT_TYPE_DEFAULT)
+        .setEnsureNoDirectoryConflict(true)
+        .setEnsureParentDirectoriesExist(true)
+        .setOverwriteExisting(false)
+        .setOverwriteGenerationId(StorageResourceId.UNKNOWN_GENERATION_ID);
   }
 
-  /**
-   * Create a file with empty attributes, and optionally overwriting any existing file with one
-   * having the given content-type.
-   *
-   * @param overwriteExisting True to overwrite an existing file with the same name
-   * @param contentType content-type for the created file
-   */
-  public CreateFileOptions(boolean overwriteExisting, String contentType) {
-    this(overwriteExisting, contentType, EMPTY_ATTRIBUTES);
-  }
+  public abstract Builder toBuilder();
+
+  /** Extended attributes to set when creating a file. */
+  public abstract ImmutableMap<String, byte[]> getAttributes();
+
+  /** Content-type to set when creating a file. */
+  @Nullable
+  public abstract String getContentType();
 
   /**
-   * Create a file with specified attributes and optionally overwriting an existing file.
-   *
-   * @param overwriteExisting True to overwrite an existing file with the same name
-   * @param attributes File attributes to apply to the file at creation
+   * If true, makes sure there isn't already a directory object of the same name. If false, you run
+   * the risk of creating hard-to-cleanup/access files whose names collide with directory names. If
+   * already sure no such directory exists, then this is safe to set for improved performance.
    */
-  public CreateFileOptions(boolean overwriteExisting, Map<String, byte[]> attributes) {
-    this(overwriteExisting, DEFAULT_CONTENT_TYPE, attributes);
-  }
+  public abstract boolean isEnsureNoDirectoryConflict();
 
   /**
-   * Create a file with specified attributes, and optionally overwriting an existing file with one
-   * having the given content-type.
-   *
-   * @param overwriteExisting True to overwrite an existing file with the same name
-   * @param contentType content-type for the created file
-   * @param attributes File attributes to apply to the file at creation
+   * If true, ensures parent directories exist, creating them on-demand if they don't. If false, you
+   * run the risk of creating objects without parent directories, which may degrade or break the
+   * behavior of some filesystem functionality. If already sure parent directories exist, then this
+   * is safe to set for improved performance.
    */
-  public CreateFileOptions(boolean overwriteExisting, String contentType,
-      Map<String, byte[]> attributes) {
-    this(overwriteExisting, contentType, attributes, true, true,
-        StorageResourceId.UNKNOWN_GENERATION_ID);
-  }
+  public abstract boolean isEnsureParentDirectoriesExist();
+
+  /** Whether to overwrite an existing file with the same name. */
+  public abstract boolean isOverwriteExisting();
 
   /**
-   * Create a file with specified attributes, and optionally overwriting an existing file with one
-   * having the given content-type.
-   *
-   * @param overwriteExisting True to overwrite an existing file with the same name
-   * @param contentType content-type for the created file
-   * @param attributes File attributes to apply to the file at creation
-   * @param checkNoDirectoryConflict If true, makes sure there isn't already a directory object
-   *     of the same name. If false, you run the risk of creating hard-to-cleanup/access files
-   *     whose names collide with directory names. If already sure no such directory exists,
-   *     then this is safe to set for improved performance.
-   * @param ensureParentDirectoriesExist If true, ensures parent directories exist, creating
-   *     them on-demand if they don't. If false, you run the risk of creating objects without
-   *     parent directories, which may degrade or break the behavior of some filesystem
-   *     functionality. If already sure parent directories exist, then this is safe to set for
-   *     improved performance.
-   * @param existingGenerationId Ignored if set to StorageResourceId.UNKNOWN_GENERATION_ID, but
-   *     otherwise this is used instead of {@code overwriteExisting}, where 0 indicates no
-   *     existing object, and otherwise an existing object will only be overwritten by the newly
-   *     created file if its generation matches this provided generationId.
+   * Generation of existing object to overwrite. Ignored if set to {@link
+   * StorageResourceId#UNKNOWN_GENERATION_ID}, but otherwise this is used instead of {@code
+   * overwriteExisting}, where 0 indicates no existing object, and otherwise an existing object will
+   * only be overwritten by the newly created file if its generation matches this provided
+   * generationId.
    */
-  public CreateFileOptions(
-      boolean overwriteExisting,
-      String contentType,
-      Map<String, byte[]> attributes,
-      boolean checkNoDirectoryConflict,
-      boolean ensureParentDirectoriesExist,
-      long existingGenerationId) {
-    Preconditions.checkArgument(!attributes.containsKey("Content-Type"),
-        "The Content-Type attribute must be provided explicitly via the 'contentType' parameter");
-    this.overwriteExisting = overwriteExisting;
-    this.contentType = contentType;
-    this.attributes = attributes;
-    this.checkNoDirectoryConflict = checkNoDirectoryConflict;
-    this.ensureParentDirectoriesExist = ensureParentDirectoriesExist;
-    this.existingGenerationId = existingGenerationId;
-  }
+  public abstract long getOverwriteGenerationId();
 
-  /**
-   * Get the value of overwriteExisting.
-   */
-  public boolean overwriteExisting() {
-    return overwriteExisting;
-  }
+  /** Builder for {@link CreateFileOptions} */
+  @AutoValue.Builder
+  public abstract static class Builder {
 
-  /**
-   * Content-type to set when creating a file.
-   */
-  public String getContentType() {
-    return contentType;
-  }
+    public abstract Builder setAttributes(Map<String, byte[]> attributes);
 
-  /**
-   * Extended attributes to set when creating a file.
-   */
-  public Map<String, byte[]> getAttributes() {
-    return attributes;
-  }
+    public abstract Builder setContentType(String contentType);
 
-  /**
-   * If true, makes sure there isn't already a directory object of the same name.
-   * If false, you run the risk of creating hard-to-cleanup/access files whose names collide with
-   * directory names. If already sure no such directory exists, then this is safe to set for
-   * improved performance.
-   */
-  public boolean checkNoDirectoryConflict() {
-    return checkNoDirectoryConflict;
-  }
+    public abstract Builder setEnsureNoDirectoryConflict(boolean ensureNoDirectoryConflict);
 
-  /**
-   * If true, ensures parent directories exist, creating them on-demand if they don't.
-   * If false, you run the risk of creating objects without parent directories, which may degrade
-   * or break the behavior of some filesystem functionality. If already sure parent directories
-   * exist, then this is safe to set for improved performance.
-   */
-  public boolean ensureParentDirectoriesExist() {
-    return ensureParentDirectoriesExist;
-  }
+    public abstract Builder setEnsureParentDirectoriesExist(boolean ensureParentDirectoriesExist);
 
-  /**
-   * Generation of existing object. Ignored if set to StorageResourceId.UNKNOWN_GENERATION_ID, but
-   * otherwise this is used instead of {@code overwriteExisting}, where 0 indicates no
-   * existing object, and otherwise an existing object will only be overwritten by the newly
-   * created file if its generation matches this provided generationId.
-   */
-  public long getExistingGenerationId() {
-    return existingGenerationId;
-  }
+    public abstract Builder setOverwriteGenerationId(long overwriteGenerationId);
 
-  @Override
-  public String toString() {
-    return MoreObjects.toStringHelper(this)
-        .add("overwriteExisting", overwriteExisting)
-        .add("contentType", contentType)
-        .add("attributes", attributes)
-        .add("checkNoDirectoryConflict", checkNoDirectoryConflict)
-        .add("ensureParentDirectoriesExist", ensureParentDirectoriesExist)
-        .add("resources", existingGenerationId)
-        .toString();
+    public abstract Builder setOverwriteExisting(boolean overwriteExisting);
+
+    abstract CreateFileOptions autoBuild();
+
+    public CreateFileOptions build() {
+      CreateFileOptions options = autoBuild();
+      checkArgument(
+          !options.getAttributes().containsKey("Content-Type"),
+          "The Content-Type attribute must be provided explicitly via the 'contentType' parameter");
+      return options;
+    }
   }
 }

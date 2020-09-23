@@ -1516,9 +1516,9 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   @Test
   public void testFileCreationSetsAttributes() throws IOException {
     CreateFileOptions createFileOptions =
-        new CreateFileOptions(
-            false /* overwrite existing */,
-            ImmutableMap.of("key1", "value1".getBytes(StandardCharsets.UTF_8)));
+        CreateFileOptions.builder()
+            .setAttributes(ImmutableMap.of("key1", "value1".getBytes(StandardCharsets.UTF_8)))
+            .build();
 
     URI testFilePath = gcsiHelper.getPath(sharedBucketName1, "test-file-creation-attributes.txt");
     try (WritableByteChannel channel =
@@ -1593,7 +1593,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     assertThat(gcsfs.exists(object1) && gcsfs.exists(object2)).isTrue();
 
     gcsfs.compose(
-        ImmutableList.of(object1, object2), destination, CreateFileOptions.DEFAULT_CONTENT_TYPE);
+        ImmutableList.of(object1, object2), destination, CreateObjectOptions.CONTENT_TYPE_DEFAULT);
 
     byte[] expectedOutput = "content1content2".getBytes(UTF_8);
     ByteBuffer actualOutput = ByteBuffer.allocate(expectedOutput.length);

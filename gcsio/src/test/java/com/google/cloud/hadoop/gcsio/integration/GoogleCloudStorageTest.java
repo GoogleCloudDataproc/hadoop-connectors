@@ -22,16 +22,12 @@ import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 
-import com.google.api.client.util.Clock;
-import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
-import com.google.cloud.hadoop.gcsio.LaggedGoogleCloudStorage;
-import com.google.cloud.hadoop.gcsio.LaggedGoogleCloudStorage.ListVisibilityCalculator;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
@@ -133,16 +129,10 @@ public class GoogleCloudStorageTest {
   @Parameters
   public static Collection<Object[]> getConstructorArguments() throws IOException {
     GoogleCloudStorage gcs = new InMemoryGoogleCloudStorage();
-    GoogleCloudStorage zeroLaggedGcs =
-        new LaggedGoogleCloudStorage(
-            new InMemoryGoogleCloudStorage(),
-            Clock.SYSTEM,
-            ListVisibilityCalculator.IMMEDIATELY_VISIBLE);
     GoogleCloudStorage performanceCachingGcs =
         new PerformanceCachingGoogleCloudStorage(
             new InMemoryGoogleCloudStorage(), PerformanceCachingGoogleCloudStorageOptions.DEFAULT);
-    return Arrays.asList(
-        new Object[] {gcs}, new Object[] {zeroLaggedGcs}, new Object[] {performanceCachingGcs});
+    return Arrays.asList(new Object[] {gcs}, new Object[] {performanceCachingGcs});
   }
 
   private final GoogleCloudStorage rawStorage;
@@ -308,7 +298,7 @@ public class GoogleCloudStorageTest {
             new StorageResourceId(bucketName, "testCreateEmptyObjectsWithOptions_Object1"),
             new StorageResourceId(bucketName, "testCreateEmptyObjectsWithOptions_Object2"));
 
-    rawStorage.createEmptyObjects(storageResourceIds, CreateObjectOptions.DEFAULT);
+    rawStorage.createEmptyObjects(storageResourceIds, CreateObjectOptions.DEFAULT_OVERWRITE);
 
     rawStorage
         .getItemInfos(storageResourceIds)
@@ -417,7 +407,7 @@ public class GoogleCloudStorageTest {
 
     GoogleCloudStorageItemInfo composedObject =
         rawStorage.composeObjects(
-            ImmutableList.of(srcObject), dstObject, CreateObjectOptions.DEFAULT);
+            ImmutableList.of(srcObject), dstObject, CreateObjectOptions.DEFAULT_OVERWRITE);
     assertThat(composedObject.exists()).isTrue();
     assertThat(composedObject.getObjectName()).isEqualTo(dstObject.getObjectName());
   }
@@ -429,7 +419,7 @@ public class GoogleCloudStorageTest {
     StorageResourceId objectToCreate =
         new StorageResourceId(bucketName, "testCreateWithOptions_Object");
 
-    rawStorage.create(objectToCreate, CreateObjectOptions.DEFAULT).close();
+    rawStorage.create(objectToCreate, CreateObjectOptions.DEFAULT_OVERWRITE).close();
 
     GoogleCloudStorageItemInfo itemInfo = rawStorage.getItemInfo(objectToCreate);
     assertThat(itemInfo.exists()).isTrue();
@@ -1179,7 +1169,8 @@ public class GoogleCloudStorageTest {
     StorageResourceId objectToCreate =
         new StorageResourceId(bucketName, "testUpdateItemInfoUpdatesMetadata_Object");
     try (WritableByteChannel channel =
-        rawStorage.create(objectToCreate, new CreateObjectOptions(false, metadata))) {
+        rawStorage.create(
+            objectToCreate, CreateObjectOptions.builder().setMetadata(metadata).build())) {
       channel.write(ByteBuffer.wrap(bytesToWrite));
     }
 
@@ -1200,7 +1191,8 @@ public class GoogleCloudStorageTest {
     // Verify the bucket exist by creating an object
     StorageResourceId objectToCreate =
         new StorageResourceId(bucketName, "testMetadataIsWrittenWhenCreatingEmptyObjects_Object");
-    rawStorage.createEmptyObject(objectToCreate, new CreateObjectOptions(false, metadata));
+    rawStorage.createEmptyObject(
+        objectToCreate, CreateObjectOptions.builder().setMetadata(metadata).build());
 
     // Verify we get metadata from getItemInfo
     GoogleCloudStorageItemInfo itemInfo = rawStorage.getItemInfo(objectToCreate);
@@ -1403,7 +1395,7 @@ public class GoogleCloudStorageTest {
         bucketName,
         ImmutableList.of("testCompose_SourceObject1", "testCompose_SourceObject2"),
         destinationObject.getObjectName(),
-        CreateFileOptions.DEFAULT_CONTENT_TYPE);
+        CreateObjectOptions.CONTENT_TYPE_DEFAULT);
 
     assertObjectContent(rawStorage, destinationObject, Bytes.concat(content1, content2));
   }

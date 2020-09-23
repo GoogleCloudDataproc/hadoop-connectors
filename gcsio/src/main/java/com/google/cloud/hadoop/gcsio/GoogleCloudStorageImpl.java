@@ -38,6 +38,7 @@ import com.google.api.client.util.Data;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.Sleeper;
 import com.google.api.services.storage.Storage;
+import com.google.api.services.storage.Storage.Objects.Insert;
 import com.google.api.services.storage.StorageRequest;
 import com.google.api.services.storage.model.Bucket;
 import com.google.api.services.storage.model.Bucket.Lifecycle;
@@ -51,6 +52,7 @@ import com.google.api.services.storage.model.RewriteResponse;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.authorization.StorageRequestAuthorizer;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
+import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.ResilientOperation;
@@ -102,21 +104,23 @@ import javax.annotation.Nullable;
  */
 public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
   // JSON factory used for formatting GCS JSON API payloads.
   private static final JsonFactory JSON_FACTORY = new JacksonFactory();
-
-  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Maximum number of times to retry deletes in the case of precondition failures.
   private static final int MAXIMUM_PRECONDITION_FAILURES_IN_DELETE = 4;
 
   private static final String USER_PROJECT_FIELD_NAME = "userProject";
 
-  // The maximum number of times to automatically retry gRPC requests.
-  private static final double GRPC_MAX_RETRY_ATTEMPTS = 10;
+  private static final CreateObjectOptions EMPTY_OBJECT_CREATE_OPTIONS =
+      CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
+          .setEnsureEmptyObjectsMetadataMatch(false)
+          .build();
 
   // A function to encode metadata map values
-  private static String encodeMetadataValues(byte[] bytes) {
+  static String encodeMetadataValues(byte[] bytes) {
     return bytes == null ? Data.NULL_STRING : BaseEncoding.base64().encode(bytes);
   }
 
@@ -377,59 +381,44 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     Optional<Long> writeGeneration =
         resourceId.hasGenerationId()
             ? Optional.of(resourceId.getGenerationId())
-            : Optional.of(getWriteGeneration(resourceId, options.overwriteExisting()));
+            : Optional.of(getWriteGeneration(resourceId, options.isOverwriteExisting()));
 
     ObjectWriteConditions writeConditions =
         ObjectWriteConditions.builder()
             .setContentGenerationMatch(writeGeneration.orElse(null))
             .setIgnoreGenerationMismatch(
-                options.overwriteExisting() && getOptions().isOverwriteGenerationMismatchIgnored())
+                options.isOverwriteExisting()
+                    && getOptions().isOverwriteGenerationMismatchIgnored())
             .build();
 
-    Map<String, String> rewrittenMetadata = encodeMetadata(options.getMetadata());
+    BaseAbstractGoogleAsyncWriteChannel<?> channel =
+        storageOptions.isGrpcEnabled()
+            ? new GoogleCloudStorageGrpcWriteChannel(
+                storageStubProvider.getAsyncStub(),
+                backgroundTasksThreadPool,
+                storageOptions.getWriteChannelOptions(),
+                resourceId,
+                options,
+                writeConditions,
+                requesterShouldPay(resourceId.getBucketName())
+                    ? storageOptions.getRequesterPaysOptions().getProjectId()
+                    : null)
+            : new GoogleCloudStorageWriteChannel(
+                gcs,
+                clientRequestHelper,
+                backgroundTasksThreadPool,
+                storageOptions.getWriteChannelOptions(),
+                resourceId,
+                options,
+                writeConditions) {
 
-    if (storageOptions.isGrpcEnabled()) {
-      Optional<String> requesterPaysProject =
-          requesterShouldPay(resourceId.getBucketName())
-              ? Optional.of(storageOptions.getRequesterPaysOptions().getProjectId())
-              : Optional.empty();
-      GoogleCloudStorageGrpcWriteChannel channel =
-          new GoogleCloudStorageGrpcWriteChannel(
-              backgroundTasksThreadPool,
-              storageStubProvider.getAsyncStub(),
-              resourceId,
-              storageOptions.getWriteChannelOptions(),
-              writeConditions,
-              requesterPaysProject,
-              rewrittenMetadata,
-              options.getContentType());
-      channel.initialize();
-      return channel;
-    }
-
-    GoogleCloudStorageWriteChannel channel =
-        new GoogleCloudStorageWriteChannel(
-            backgroundTasksThreadPool,
-            gcs,
-            clientRequestHelper,
-            resourceId.getBucketName(),
-            resourceId.getObjectName(),
-            options.getContentType(),
-            options.getContentEncoding(),
-            /* kmsKeyName= */ null,
-            storageOptions.getWriteChannelOptions(),
-            writeConditions,
-            rewrittenMetadata) {
-
-          @Override
-          public Storage.Objects.Insert createRequest(InputStreamContent inputStream)
-              throws IOException {
-            return initializeRequest(super.createRequest(inputStream), resourceId.getBucketName());
-          }
-        };
-
+              @Override
+              public Insert createRequest(InputStreamContent inputStream) throws IOException {
+                return initializeRequest(
+                    super.createRequest(inputStream), resourceId.getBucketName());
+              }
+            };
     channel.initialize();
-
     return channel;
   }
 
@@ -442,7 +431,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     Preconditions.checkArgument(
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
 
-    return create(resourceId, CreateObjectOptions.DEFAULT);
+    return create(resourceId, CreateObjectOptions.DEFAULT_OVERWRITE);
   }
 
   /** See {@link GoogleCloudStorage#create(String)} for details about expected behavior. */
@@ -525,7 +514,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     logger.atFine().log("createEmptyObject(%s)", resourceId);
     Preconditions.checkArgument(
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
-    createEmptyObject(resourceId, CreateObjectOptions.DEFAULT);
+    createEmptyObject(resourceId, EMPTY_OBJECT_CREATE_OPTIONS);
   }
 
   public void updateMetadata(GoogleCloudStorageItemInfo itemInfo, Map<String, byte[]> metadata)
@@ -623,7 +612,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    */
   @Override
   public void createEmptyObjects(List<StorageResourceId> resourceIds) throws IOException {
-    createEmptyObjects(resourceIds, CreateObjectOptions.DEFAULT);
+    createEmptyObjects(resourceIds, EMPTY_OBJECT_CREATE_OPTIONS);
   }
 
   /**
@@ -1208,7 +1197,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     if (resourceId.hasGenerationId()) {
       insertObject.setIfGenerationMatch(resourceId.getGenerationId());
-    } else if (!createObjectOptions.overwriteExisting()) {
+    } else if (!createObjectOptions.isOverwriteExisting()) {
       insertObject.setIfGenerationMatch(0L);
     }
     return insertObject;
@@ -2027,11 +2016,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       // matches, since we don't know for sure whether our low-level request succeeded
       // first or some other client succeeded first.
       if (existingInfo.exists() && existingInfo.getSize() == 0) {
-        if (!options.getRequireMetadataMatchForEmptyObjects()) {
-          return true;
-        } else if (existingInfo.metadataEquals(options.getMetadata())) {
-          return true;
+        if (options.isEnsureEmptyObjectsMetadataMatch()) {
+          return existingInfo.metadataEquals(options.getMetadata());
         }
+        return true;
       }
     }
     return false;
@@ -2045,8 +2033,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     List<StorageResourceId> sourceIds =
         Lists.transform(sources, objectName -> new StorageResourceId(bucketName, objectName));
     StorageResourceId destinationId = new StorageResourceId(bucketName, destination);
-    CreateObjectOptions options = new CreateObjectOptions(
-        true, contentType, CreateObjectOptions.EMPTY_METADATA);
+    CreateObjectOptions options =
+        CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
+            .setContentType(contentType)
+            .setEnsureEmptyObjectsMetadataMatch(false)
+            .build();
     composeObjects(sourceIds, destinationId, options);
   }
 

@@ -64,7 +64,7 @@ public class GoogleCloudStorageTestHelper {
     CredentialFactory credentialFactory = new CredentialFactory(credentialOptions);
 
     try {
-      return credentialFactory.getCredential(CredentialFactory.GCS_SCOPES);
+      return credentialFactory.getCredential(CredentialFactory.DEFAULT_SCOPES);
     } catch (GeneralSecurityException e) {
       throw new IOException("Failed to create test credentials", e);
     }

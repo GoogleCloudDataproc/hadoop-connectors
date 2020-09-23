@@ -2442,7 +2442,7 @@ public class GoogleCloudStorageTest {
 
     GoogleCloudStorage gcs = mockedGcs(transport);
 
-    gcs.compose(BUCKET_NAME, sources, OBJECT_NAME, CreateFileOptions.DEFAULT_CONTENT_TYPE);
+    gcs.compose(BUCKET_NAME, sources, OBJECT_NAME, CreateObjectOptions.CONTENT_TYPE_DEFAULT);
 
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(
@@ -2478,7 +2478,7 @@ public class GoogleCloudStorageTest {
         ImmutableMap.of("foo", new byte[] {0x01}, "bar", new byte[] {0x02});
     GoogleCloudStorageItemInfo composedInfo =
         gcs.composeObjects(
-            sources, destinationId, new CreateObjectOptions(false, "text-content", rawMetadata));
+            sources, destinationId, CreateObjectOptions.builder().setMetadata(rawMetadata).build());
 
     assertThat(composedInfo)
         .isEqualTo(
@@ -2604,7 +2604,9 @@ public class GoogleCloudStorageTest {
 
     gcs.createEmptyObject(
         new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
-        new CreateObjectOptions(true, ImmutableMap.of("foo", new byte[0])));
+        CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
+            .setMetadata(ImmutableMap.of("foo", new byte[0]))
+            .build());
 
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(
@@ -2622,13 +2624,14 @@ public class GoogleCloudStorageTest {
 
     GoogleCloudStorage gcs = mockedGcs(transport);
 
+    StorageResourceId resourceId = new StorageResourceId(BUCKET_NAME, OBJECT_NAME);
+    CreateObjectOptions createOptions =
+        CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
+            .setMetadata(ImmutableMap.of("foo", new byte[0]))
+            .build();
+
     IOException thrown =
-        assertThrows(
-            IOException.class,
-            () ->
-                gcs.createEmptyObject(
-                    new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
-                    new CreateObjectOptions(true, ImmutableMap.of("foo", new byte[0]))));
+        assertThrows(IOException.class, () -> gcs.createEmptyObject(resourceId, createOptions));
     assertThat(thrown).hasMessageThat().contains(ApiErrorExtractor.RATE_LIMITED_REASON);
 
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())

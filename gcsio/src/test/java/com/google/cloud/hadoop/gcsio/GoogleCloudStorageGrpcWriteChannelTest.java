@@ -41,11 +41,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.junit.Before;
@@ -60,7 +58,6 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   private static final String OBJECT_NAME = "object-name";
   private static final String UPLOAD_ID = "upload-id";
   private static final String CONTENT_TYPE = "image/jpeg";
-  private static final Map<String, String> OBJECT_METADATA = new HashMap<>();
   private static final StartResumableWriteRequest START_REQUEST =
       StartResumableWriteRequest.newBuilder()
           .setInsertObjectSpec(
@@ -97,7 +94,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
         AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
     ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, Optional.empty());
+        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
                 QueryWriteStatusResponse.newBuilder().setCommittedSize(0).build(),
@@ -133,7 +130,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
         AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(false).build();
     ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, Optional.empty());
+        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
 
     ByteString data = ByteString.copyFromUtf8("test data");
     writeChannel.initialize();
@@ -181,7 +178,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
         AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
     ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, Optional.empty());
+        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
     int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
@@ -232,7 +229,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     ObjectWriteConditions writeConditions =
         ObjectWriteConditions.builder().setContentGenerationMatch(1L).build();
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, Optional.empty());
+        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
 
     ByteString data = ByteString.copyFromUtf8("test data");
     writeChannel.initialize();
@@ -252,7 +249,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     ObjectWriteConditions writeConditions =
         ObjectWriteConditions.builder().setMetaGenerationMatch(1L).build();
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, Optional.empty());
+        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
 
     ByteString data = ByteString.copyFromUtf8("test data");
     writeChannel.initialize();
@@ -271,7 +268,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     AsyncWriteChannelOptions options = AsyncWriteChannelOptions.builder().build();
     ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, Optional.of("project-id"));
+        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ "project-id");
 
     ByteString data = ByteString.copyFromUtf8("test data");
     writeChannel.initialize();
@@ -356,7 +353,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
         AsyncWriteChannelOptions.builder().setUploadChunkSize(chunkSize).build();
     ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, Optional.empty());
+        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
     fakeService.setInsertObjectExceptions(
         ImmutableList.of(new StatusException(Status.DEADLINE_EXCEEDED)));
     fakeService.setQueryWriteStatusResponses(
@@ -398,7 +395,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
         AsyncWriteChannelOptions.builder().setUploadChunkSize(chunkSize).build();
     ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, Optional.empty());
+        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
     fakeService.setInsertObjectExceptions(
         ImmutableList.of(new StatusException(Status.DEADLINE_EXCEEDED)));
     fakeService.setQueryWriteStatusResponses(
@@ -525,23 +522,22 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   private GoogleCloudStorageGrpcWriteChannel newWriteChannel(
       AsyncWriteChannelOptions options,
       ObjectWriteConditions writeConditions,
-      Optional<String> requesterPaysProject) {
+      String requesterPaysProject) {
     return new GoogleCloudStorageGrpcWriteChannel(
-        executor,
         stub,
-        new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+        executor,
         options,
+        new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+        CreateObjectOptions.DEFAULT_NO_OVERWRITE.toBuilder().setContentType(CONTENT_TYPE).build(),
         writeConditions,
-        requesterPaysProject,
-        OBJECT_METADATA,
-        CONTENT_TYPE);
+        requesterPaysProject);
   }
 
   private GoogleCloudStorageGrpcWriteChannel newWriteChannel() {
     AsyncWriteChannelOptions options = AsyncWriteChannelOptions.builder().build();
     ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
 
-    return newWriteChannel(options, writeConditions, Optional.empty());
+    return newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
   }
 
   /* Returns an int with the same bytes as the uint32 representation of value. */

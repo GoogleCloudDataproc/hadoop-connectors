@@ -51,6 +51,11 @@ import java.util.Set;
  */
 public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
+  private static final CreateObjectOptions EMPTY_OBJECT_CREATE_OPTIONS =
+      CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
+          .setEnsureEmptyObjectsMetadataMatch(false)
+          .build();
+
   // Mapping from bucketName to structs representing a bucket.
   private final Map<String, InMemoryBucketEntry> bucketLookup = new HashMap<>();
   private final GoogleCloudStorageOptions storageOptions;
@@ -90,12 +95,9 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
       return false;
     }
 
-    if (bucketName.length() > 63) {
-      return false;
-    }
+    return bucketName.length() <= 63;
 
     // TODO(user): Handle dots and names longer than 63, but less than 222.
-    return true;
   }
 
   private boolean validateObjectName(String objectName) {
@@ -109,7 +111,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
   @Override
   public synchronized WritableByteChannel create(StorageResourceId resourceId) throws IOException {
-    return create(resourceId, CreateObjectOptions.DEFAULT);
+    return create(resourceId, CreateObjectOptions.DEFAULT_OVERWRITE);
   }
 
   @Override
@@ -133,7 +135,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
                 resourceId.getGenerationId(), itemInfo.getContentGeneration(), resourceId));
       }
     }
-    if (!options.overwriteExisting() || resourceId.getGenerationId() == 0L) {
+    if (!options.isOverwriteExisting() || resourceId.getGenerationId() == 0L) {
       if (getItemInfo(resourceId).exists()) {
         throw new FileAlreadyExistsException(String.format("%s exists.", resourceId));
       }
@@ -174,7 +176,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
   @Override
   public synchronized void createEmptyObject(StorageResourceId resourceId) throws IOException {
-    createEmptyObject(resourceId, CreateObjectOptions.DEFAULT);
+    createEmptyObject(resourceId, EMPTY_OBJECT_CREATE_OPTIONS);
   }
 
   @Override
@@ -188,7 +190,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   @Override
   public synchronized void createEmptyObjects(List<StorageResourceId> resourceIds)
       throws IOException {
-    createEmptyObjects(resourceIds, CreateObjectOptions.DEFAULT);
+    createEmptyObjects(resourceIds, EMPTY_OBJECT_CREATE_OPTIONS);
   }
 
   @Override
@@ -522,8 +524,8 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     List<StorageResourceId> sourceResourcesIds =
         Lists.transform(sources, s -> new StorageResourceId(bucketName, s));
     StorageResourceId destinationId = new StorageResourceId(bucketName, destination);
-    CreateObjectOptions options = new CreateObjectOptions(
-        true, contentType, CreateObjectOptions.EMPTY_METADATA);
+    CreateObjectOptions options =
+        CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder().setContentType(contentType).build();
     composeObjects(sourceResourcesIds, destinationId, options);
   }
 

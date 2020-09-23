@@ -198,9 +198,9 @@ public class CredentialFactory {
     }
   }
 
-  // List of GCS scopes to specify when obtaining a credential.
-  public static final ImmutableList<String> GCS_SCOPES =
-      ImmutableList.of(StorageScopes.DEVSTORAGE_FULL_CONTROL);
+  // List of scopes to specify when obtaining a credential.
+  public static final ImmutableList<String> DEFAULT_SCOPES =
+      ImmutableList.of(StorageScopes.CLOUD_PLATFORM);
 
   // JSON factory used for formatting credential-handling payloads.
   private static final JsonFactory JSON_FACTORY = new JacksonFactory();
@@ -385,7 +385,7 @@ public class CredentialFactory {
   private static PrivateKey privateKeyFromPkcs8(String privateKeyPem) throws IOException {
     // Unescape new-line symbols in privateKeyPem string value
     Reader reader = new StringReader(privateKeyPem.replace("\\n", System.lineSeparator()));
-     Section section = PemReader.readFirstSectionAndClose(reader, "PRIVATE KEY");
+    Section section = PemReader.readFirstSectionAndClose(reader, "PRIVATE KEY");
     if (section == null) {
       throw new IOException("Invalid PKCS8 data.");
     }

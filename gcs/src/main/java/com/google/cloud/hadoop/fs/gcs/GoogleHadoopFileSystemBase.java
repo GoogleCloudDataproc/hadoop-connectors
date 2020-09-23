@@ -29,7 +29,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_TYPE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT;
-import static com.google.cloud.hadoop.gcsio.CreateFileOptions.DEFAULT_NO_OVERWRITE;
+import static com.google.cloud.hadoop.gcsio.CreateFileOptions.DEFAULT_OVERWRITE;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
@@ -46,6 +46,7 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.http.HttpTransport;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
+import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
@@ -691,7 +692,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       case BASIC:
         out =
             new GoogleHadoopOutputStream(
-                this, gcsPath, statistics, new CreateFileOptions(overwrite));
+                this,
+                gcsPath,
+                statistics,
+                CreateFileOptions.builder().setOverwriteExisting(overwrite).build());
         break;
       case FLUSHABLE_COMPOSITE:
         SyncableOutputStreamOptions flushableOutputStreamOptions =
@@ -706,7 +710,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 this,
                 gcsPath,
                 statistics,
-                new CreateFileOptions(overwrite),
+                CreateFileOptions.builder().setOverwriteExisting(overwrite).build(),
                 flushableOutputStreamOptions);
         break;
       case SYNCABLE_COMPOSITE:
@@ -721,7 +725,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 this,
                 gcsPath,
                 statistics,
-                new CreateFileOptions(overwrite),
+                CreateFileOptions.builder().setOverwriteExisting(overwrite).build(),
                 syncableOutputStreamOptions);
         break;
       default:
@@ -798,7 +802,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     FSDataOutputStream appendStream =
         new FSDataOutputStream(
             new GoogleHadoopSyncableOutputStream(
-                this, filePath, statistics, DEFAULT_NO_OVERWRITE, syncableOutputStreamOptions),
+                this, filePath, statistics, DEFAULT_OVERWRITE, syncableOutputStreamOptions),
             statistics);
 
     long duration = System.nanoTime() - startTime;
@@ -834,7 +838,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       // concat operation appends to the target.
       List<URI> sources = Lists.newArrayList(tgtPath);
       sources.addAll(partition);
-      getGcsFs().compose(sources, tgtPath, CreateFileOptions.DEFAULT_CONTENT_TYPE);
+      getGcsFs().compose(sources, tgtPath, CreateObjectOptions.CONTENT_TYPE_DEFAULT);
     }
   }
 
@@ -1480,7 +1484,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         atp.setConf(config);
         credential =
             CredentialFromAccessTokenProviderClassFactory.credential(
-                atp, CredentialFactory.GCS_SCOPES);
+                atp, CredentialFactory.DEFAULT_SCOPES);
       }
     } else {
       // If delegation token support is not configured, check if a
@@ -1488,14 +1492,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       // to acquire the Google credentials using it
       credential =
           CredentialFromAccessTokenProviderClassFactory.credential(
-              config, ImmutableList.of(GCS_CONFIG_PREFIX), CredentialFactory.GCS_SCOPES);
+              config, ImmutableList.of(GCS_CONFIG_PREFIX), CredentialFactory.DEFAULT_SCOPES);
 
       if (credential == null) {
         // Finally, if no credentials have been acquired at this point, employ
         // the default mechanism.
         credential =
             HadoopCredentialConfiguration.getCredentialFactory(config, GCS_CONFIG_PREFIX)
-                .getCredential(CredentialFactory.GCS_SCOPES);
+                .getCredential(CredentialFactory.DEFAULT_SCOPES);
       }
     }
 
@@ -1551,11 +1555,11 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
               httpTransport,
               new CredentialHttpRetryInitializer(credential),
               serviceAccountToImpersonate.get(),
-              CredentialFactory.GCS_SCOPES);
+              CredentialFactory.DEFAULT_SCOPES);
       logger.atFine().log(
           "Impersonating '%s' service account for '%s' user",
           serviceAccountToImpersonate.get(), currentUser);
-      return Optional.of(impersonatedCredential.createScoped(CredentialFactory.GCS_SCOPES));
+      return Optional.of(impersonatedCredential.createScoped(CredentialFactory.DEFAULT_SCOPES));
     }
 
     return Optional.empty();
