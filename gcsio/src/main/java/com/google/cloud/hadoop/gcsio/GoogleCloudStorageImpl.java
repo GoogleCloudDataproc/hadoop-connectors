@@ -447,7 +447,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    */
   @Override
   public void createBucket(String bucketName, CreateBucketOptions options) throws IOException {
-    logger.atFine().log("create(%s)", bucketName);
+    logger.atFine().log("createBucket(%s)", bucketName);
     Preconditions.checkArgument(
         !Strings.isNullOrEmpty(bucketName), "bucketName must not be null or empty");
     checkNotNull(options, "options must not be null");
