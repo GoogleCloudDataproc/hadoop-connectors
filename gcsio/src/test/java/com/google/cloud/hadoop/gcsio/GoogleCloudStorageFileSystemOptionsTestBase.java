@@ -158,7 +158,7 @@ public abstract class GoogleCloudStorageFileSystemOptionsTestBase {
   private void createBucket(
       GoogleCloudStorage gcs, String bucketName)
       throws IOException {
-    gcs.create(bucketName);
+    gcs.createBucket(bucketName);
   }
 
   private void createEmptyFile(

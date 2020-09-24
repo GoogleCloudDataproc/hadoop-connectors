@@ -16,7 +16,6 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.batchRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.composeRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.copyRequestString;
@@ -115,7 +114,8 @@ public class GoogleCloudStorageNewIntegrationTest {
     String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "f3");
 
     List<String> listedObjects =
-        gcs.listObjectNames(testBucket, testDir, PATH_DELIMITER, /* maxResults= */ 1);
+        gcs.listObjectNames(
+            testBucket, testDir, ListObjectOptions.DEFAULT.toBuilder().setMaxResults(1).build());
 
     assertThat(listedObjects).containsExactly(testDir + "f1");
     // Assert that only 1 GCS request was sent
@@ -136,7 +136,9 @@ public class GoogleCloudStorageNewIntegrationTest {
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "subdir1/f3", "subdir2/f4");
 
-    List<String> listedObjects = gcs.listObjectNames(testBucket, testDir, PATH_DELIMITER, 3);
+    List<String> listedObjects =
+        gcs.listObjectNames(
+            testBucket, testDir, ListObjectOptions.DEFAULT.toBuilder().setMaxResults(3).build());
 
     assertThat(listedObjects).containsExactly(testDir + "f1", testDir + "f2", testDir + "subdir1/");
     // Assert that 4 GCS requests were sent
@@ -160,7 +162,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "subdir/f3", "subdir/f4");
 
-    List<String> listedObjects = gcs.listObjectNames(testBucket, testDir, PATH_DELIMITER);
+    List<String> listedObjects = gcs.listObjectNames(testBucket, testDir);
 
     assertThat(listedObjects).containsExactly(testDir + "f1", testDir + "f2", testDir + "subdir/");
     // Assert that 5 GCS requests were sent
@@ -183,7 +185,8 @@ public class GoogleCloudStorageNewIntegrationTest {
     String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "f3");
 
     List<GoogleCloudStorageItemInfo> listedObjects =
-        gcs.listObjectInfo(testBucket, testDir, PATH_DELIMITER, /* maxResults= */ 1);
+        gcs.listObjectInfo(
+            testBucket, testDir, ListObjectOptions.DEFAULT.toBuilder().setMaxResults(1).build());
 
     assertThat(toObjectNames(listedObjects)).containsExactly(testDir + "f1");
     // Assert that only 1 GCS request was sent
@@ -206,7 +209,8 @@ public class GoogleCloudStorageNewIntegrationTest {
     String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "f3", "f4");
 
     List<GoogleCloudStorageItemInfo> listedObjects =
-        gcs.listObjectInfo(testBucket, testDir, PATH_DELIMITER, /* maxResults= */ 2);
+        gcs.listObjectInfo(
+            testBucket, testDir, ListObjectOptions.DEFAULT.toBuilder().setMaxResults(2).build());
 
     assertThat(toObjectNames(listedObjects)).containsExactly(testDir + "f1", testDir + "f2");
     // Assert that 3 GCS requests were sent
@@ -230,8 +234,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     String testBucket = gcsfsIHelper.sharedBucketName1;
     String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "f3");
 
-    List<GoogleCloudStorageItemInfo> listedObjects =
-        gcs.listObjectInfo(testBucket, testDir, PATH_DELIMITER);
+    List<GoogleCloudStorageItemInfo> listedObjects = gcs.listObjectInfo(testBucket, testDir);
 
     assertThat(toObjectNames(listedObjects))
         .containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");
@@ -436,7 +439,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             copyRequestString(testBucket1, testDir + "f1", testBucket2, testDir + "f4", "copyTo"),
             copyRequestString(testBucket1, testDir + "f2", testBucket2, testDir + "f5", "copyTo"));
 
-    List<String> listedObjects = gcs.listObjectNames(testBucket2, testDir, PATH_DELIMITER);
+    List<String> listedObjects = gcs.listObjectNames(testBucket2, testDir);
     assertThat(listedObjects).containsExactly(testDir + "f4", testDir + "f5");
   }
 
@@ -468,7 +471,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             copyRequestString(
                 testBucket1, testDir + "f2", testBucket2, testDir + "f5", "rewriteTo"));
 
-    List<String> listedObjects = gcs.listObjectNames(testBucket2, testDir, PATH_DELIMITER);
+    List<String> listedObjects = gcs.listObjectNames(testBucket2, testDir);
     assertThat(listedObjects).containsExactly(testDir + "f4", testDir + "f5");
   }
 
@@ -495,7 +498,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             deleteRequestString(testBucket, testDir + "f1", /* generationId= */ 1),
             deleteRequestString(testBucket, testDir + "f2", /* generationId= */ 2));
 
-    List<String> listedObjects = gcs.listObjectNames(testBucket, testDir, PATH_DELIMITER);
+    List<String> listedObjects = gcs.listObjectNames(testBucket, testDir);
     assertThat(listedObjects).containsExactly(testDir + "f3");
   }
 
@@ -522,7 +525,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             getRequestString(testBucket, testDir + "f2"),
             deleteRequestString(testBucket, testDir + "f2", /* generationId= */ 2));
 
-    List<String> listedObjects = gcs.listObjectNames(testBucket, testDir, PATH_DELIMITER);
+    List<String> listedObjects = gcs.listObjectNames(testBucket, testDir);
     assertThat(listedObjects).containsExactly(testDir + "f3");
   }
 
@@ -542,7 +545,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             getRequestString(testBucket, testDir + "f3"),
             composeRequestString(testBucket, testDir + "f3", /* generationId= */ 1));
 
-    List<String> listedObjects = gcs.listObjectNames(testBucket, testDir, PATH_DELIMITER);
+    List<String> listedObjects = gcs.listObjectNames(testBucket, testDir);
     assertThat(listedObjects).containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");
   }
 

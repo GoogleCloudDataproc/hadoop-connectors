@@ -152,16 +152,16 @@ public class ForwardingGoogleCloudStorageTest {
 
   @Test
   public void testCreateWithBucket() throws IOException {
-    gcs.create(TEST_STRING);
+    gcs.createBucket(TEST_STRING);
 
-    verify(mockGcsDelegate).create(eq(TEST_STRING));
+    verify(mockGcsDelegate).createBucket(eq(TEST_STRING));
   }
 
   @Test
   public void testCreateWithBucketAndOptions() throws IOException {
-    gcs.create(TEST_STRING, TEST_BUCKET_OPTIONS);
+    gcs.createBucket(TEST_STRING, TEST_BUCKET_OPTIONS);
 
-    verify(mockGcsDelegate).create(eq(TEST_STRING), eq(TEST_BUCKET_OPTIONS));
+    verify(mockGcsDelegate).createBucket(eq(TEST_STRING), eq(TEST_BUCKET_OPTIONS));
   }
 
   @Test
@@ -202,32 +202,32 @@ public class ForwardingGoogleCloudStorageTest {
 
   @Test
   public void testListObjectNames() throws IOException {
-    gcs.listObjectNames(TEST_STRING, TEST_STRING, TEST_STRING);
+    gcs.listObjectNames(TEST_STRING, TEST_STRING);
 
-    verify(mockGcsDelegate).listObjectNames(eq(TEST_STRING), eq(TEST_STRING), eq(TEST_STRING));
+    verify(mockGcsDelegate).listObjectNames(eq(TEST_STRING), eq(TEST_STRING));
   }
 
   @Test
   public void testListObjectNamesWithMax() throws IOException {
-    gcs.listObjectNames(TEST_STRING, TEST_STRING, TEST_STRING, 1L);
+    gcs.listObjectNames(TEST_STRING, TEST_STRING, ListObjectOptions.DEFAULT);
 
     verify(mockGcsDelegate)
-        .listObjectNames(eq(TEST_STRING), eq(TEST_STRING), eq(TEST_STRING), eq(1L));
+        .listObjectNames(eq(TEST_STRING), eq(TEST_STRING), eq(ListObjectOptions.DEFAULT));
   }
 
   @Test
   public void testListObjectInfo() throws IOException {
-    gcs.listObjectInfo(TEST_STRING, TEST_STRING, TEST_STRING);
+    gcs.listObjectInfo(TEST_STRING, TEST_STRING);
 
-    verify(mockGcsDelegate).listObjectInfo(eq(TEST_STRING), eq(TEST_STRING), eq(TEST_STRING));
+    verify(mockGcsDelegate).listObjectInfo(eq(TEST_STRING), eq(TEST_STRING));
   }
 
   @Test
   public void testListObjectInfoWithMax() throws IOException {
-    gcs.listObjectInfo(TEST_STRING, TEST_STRING, TEST_STRING, 1L);
+    gcs.listObjectInfo(TEST_STRING, TEST_STRING, ListObjectOptions.DEFAULT);
 
     verify(mockGcsDelegate)
-        .listObjectInfo(eq(TEST_STRING), eq(TEST_STRING), eq(TEST_STRING), eq(1L));
+        .listObjectInfo(eq(TEST_STRING), eq(TEST_STRING), eq(ListObjectOptions.DEFAULT));
   }
 
   @Test

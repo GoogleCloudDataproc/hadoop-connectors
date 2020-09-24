@@ -63,15 +63,15 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public void create(String bucketName) throws IOException {
-    logger.atFine().log("%s.create(%s)", delegateClassName, bucketName);
-    delegate.create(bucketName);
+  public void createBucket(String bucketName) throws IOException {
+    logger.atFine().log("%s.createBucket(%s)", delegateClassName, bucketName);
+    delegate.createBucket(bucketName);
   }
 
   @Override
-  public void create(String bucketName, CreateBucketOptions options) throws IOException {
-    logger.atFine().log("%s.create(%s, %s)", delegateClassName, bucketName, options);
-    delegate.create(bucketName, options);
+  public void createBucket(String bucketName, CreateBucketOptions options) throws IOException {
+    logger.atFine().log("%s.createBucket(%s, %s)", delegateClassName, bucketName, options);
+    delegate.createBucket(bucketName, options);
   }
 
   @Override
@@ -151,51 +151,49 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public List<String> listObjectNames(String bucketName, String objectNamePrefix, String delimiter)
+  public List<String> listObjectNames(String bucketName, String objectNamePrefix)
       throws IOException {
     logger.atFine().log(
-        "%s.listObjectNames(%s, %s, %s)",
-        delegateClassName, bucketName, objectNamePrefix, delimiter);
-    return delegate.listObjectNames(bucketName, objectNamePrefix, delimiter);
+        "%s.listObjectNames(%s, %s)", delegateClassName, bucketName, objectNamePrefix);
+    return delegate.listObjectNames(bucketName, objectNamePrefix);
   }
 
   @Override
   public List<String> listObjectNames(
-      String bucketName, String objectNamePrefix, String delimiter, long maxResults)
+      String bucketName, String objectNamePrefix, ListObjectOptions listOptions)
       throws IOException {
     logger.atFine().log(
-        "%s.listObjectNames(%s, %s, %s, %s)",
-        delegateClassName, bucketName, objectNamePrefix, delimiter, maxResults);
-    return delegate.listObjectNames(bucketName, objectNamePrefix, delimiter, maxResults);
+        "%s.listObjectNames(%s, %s, %s)",
+        delegateClassName, bucketName, objectNamePrefix, listOptions);
+    return delegate.listObjectNames(bucketName, objectNamePrefix, listOptions);
+  }
+
+  @Override
+  public List<GoogleCloudStorageItemInfo> listObjectInfo(String bucketName, String objectNamePrefix)
+      throws IOException {
+    logger.atFine().log(
+        "%s.listObjectInfo(%s, %s)", delegateClassName, bucketName, objectNamePrefix);
+    return delegate.listObjectInfo(bucketName, objectNamePrefix);
   }
 
   @Override
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
-      String bucketName, String objectNamePrefix, String delimiter) throws IOException {
+      String bucketName, String objectNamePrefix, ListObjectOptions listOptions)
+      throws IOException {
     logger.atFine().log(
         "%s.listObjectInfo(%s, %s, %s)",
-        delegateClassName, bucketName, objectNamePrefix, delimiter);
-    return delegate.listObjectInfo(bucketName, objectNamePrefix, delimiter);
-  }
-
-  @Override
-  public List<GoogleCloudStorageItemInfo> listObjectInfo(
-      String bucketName, String objectNamePrefix, String delimiter, long maxResults)
-      throws IOException {
-    logger.atFine().log(
-        "%s.listObjectInfo(%s, %s, %s, %s)",
-        delegateClassName, bucketName, objectNamePrefix, delimiter, maxResults);
-    return delegate.listObjectInfo(bucketName, objectNamePrefix, delimiter, maxResults);
+        delegateClassName, bucketName, objectNamePrefix, listOptions);
+    return delegate.listObjectInfo(bucketName, objectNamePrefix, listOptions);
   }
 
   @Override
   public ListPage<GoogleCloudStorageItemInfo> listObjectInfoPage(
-      String bucketName, String objectNamePrefix, String delimiter, String pageToken)
+      String bucketName, String objectNamePrefix, ListObjectOptions listOptions, String pageToken)
       throws IOException {
     logger.atFine().log(
         "%s.listObjectInfoPage(%s, %s, %s, %s)",
-        delegateClassName, bucketName, objectNamePrefix, delimiter, pageToken);
-    return delegate.listObjectInfoPage(bucketName, objectNamePrefix, delimiter, pageToken);
+        delegateClassName, bucketName, objectNamePrefix, listOptions, pageToken);
+    return delegate.listObjectInfoPage(bucketName, objectNamePrefix, listOptions, pageToken);
   }
 
   @Override

@@ -14,7 +14,6 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.createItemInfoForBucket;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.createItemInfoForStorageObject;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.initializeStorageRequestAuthorizer;
@@ -1469,8 +1468,8 @@ public class GoogleCloudStorageTest {
   @Test
   public void testCreateBucketIllegalArguments() {
     GoogleCloudStorage gcs = mockedGcs(HTTP_TRANSPORT);
-    assertThrows(IllegalArgumentException.class, () -> gcs.create((String) null));
-    assertThrows(IllegalArgumentException.class, () -> gcs.create(""));
+    assertThrows(IllegalArgumentException.class, () -> gcs.createBucket(null));
+    assertThrows(IllegalArgumentException.class, () -> gcs.createBucket(""));
   }
 
   /** Test successful operation of GoogleCloudStorage.create(String). */
@@ -1480,7 +1479,7 @@ public class GoogleCloudStorageTest {
 
     GoogleCloudStorage gcs = mockedGcs(transport);
 
-    gcs.create(BUCKET_NAME);
+    gcs.createBucket(BUCKET_NAME);
 
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(createBucketRequestString(PROJECT_ID))
@@ -1499,7 +1498,7 @@ public class GoogleCloudStorageTest {
     CreateBucketOptions bucketOptions =
         CreateBucketOptions.builder().setLocation(location).setStorageClass(storageClass).build();
 
-    gcs.create(BUCKET_NAME, bucketOptions);
+    gcs.createBucket(BUCKET_NAME, bucketOptions);
 
     assertThat(bucketOptions.getLocation()).isEqualTo(location);
     assertThat(bucketOptions.getStorageClass()).isEqualTo(storageClass);
@@ -1519,7 +1518,7 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorage gcs = mockedGcs(transport);
 
     // TODO(user): Switch to testing for FileExistsException once implemented.
-    IOException exception = assertThrows(IOException.class, () -> gcs.create(BUCKET_NAME));
+    IOException exception = assertThrows(IOException.class, () -> gcs.createBucket(BUCKET_NAME));
     assertThat(exception)
         .hasMessageThat()
         .contains("\"code\" : " + ErrorResponses.GONE.getErrorCode());
@@ -1538,7 +1537,7 @@ public class GoogleCloudStorageTest {
 
     GoogleCloudStorage gcs = mockedGcs(transport);
 
-    gcs.create(BUCKET_NAME);
+    gcs.createBucket(BUCKET_NAME);
 
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(
@@ -1910,7 +1909,7 @@ public class GoogleCloudStorageTest {
 
     GoogleCloudStorage gcs = mockedGcs(transport);
 
-    List<String> objectNames = gcs.listObjectNames(BUCKET_NAME, prefix, PATH_DELIMITER);
+    List<String> objectNames = gcs.listObjectNames(BUCKET_NAME, prefix);
 
     assertThat(objectNames)
         .containsExactly(
@@ -1942,7 +1941,11 @@ public class GoogleCloudStorageTest {
 
     GoogleCloudStorage gcs = mockedGcs(transport);
 
-    List<String> objectNames = gcs.listObjectNames(BUCKET_NAME, prefix, PATH_DELIMITER, maxResults);
+    List<String> objectNames =
+        gcs.listObjectNames(
+            BUCKET_NAME,
+            prefix,
+            ListObjectOptions.DEFAULT.toBuilder().setMaxResults(maxResults).build());
 
     assertThat(objectNames)
         .containsExactly("foo/bar/baz/dir0/", "foo/bar/baz/dir1/", "foo/bar/baz/obj0")
@@ -1960,7 +1963,6 @@ public class GoogleCloudStorageTest {
   @Test
   public void testListObjectNamesPrefixApiException() throws IOException {
     String objectPrefix = "foo/bar/baz/";
-    String delimiter = "/";
 
     MockHttpTransport transport =
         mockTransport(
@@ -1969,13 +1971,12 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorage gcs = mockedGcs(transport);
 
     // First time should just return empty list.
-    List<String> objectNames = gcs.listObjectNames(BUCKET_NAME, objectPrefix, delimiter);
+    List<String> objectNames = gcs.listObjectNames(BUCKET_NAME, objectPrefix);
     assertThat(objectNames).isEmpty();
 
     // Second time throws.
     IOException thrown =
-        assertThrows(
-            IOException.class, () -> gcs.listObjectNames(BUCKET_NAME, objectPrefix, delimiter));
+        assertThrows(IOException.class, () -> gcs.listObjectNames(BUCKET_NAME, objectPrefix));
 
     String expectedErrorMessage = "\"code\" : " + ErrorResponses.GONE.getErrorCode();
     assertThat(thrown).hasCauseThat().hasMessageThat().contains(expectedErrorMessage);
@@ -2012,8 +2013,7 @@ public class GoogleCloudStorageTest {
 
     GoogleCloudStorage gcs = mockedGcs(transport);
 
-    List<GoogleCloudStorageItemInfo> objectInfos =
-        gcs.listObjectInfo(BUCKET_NAME, prefix, PATH_DELIMITER);
+    List<GoogleCloudStorageItemInfo> objectInfos = gcs.listObjectInfo(BUCKET_NAME, prefix);
 
     // The item exactly matching the input prefix will be discarded.
     assertThat(objectInfos)
@@ -2037,7 +2037,6 @@ public class GoogleCloudStorageTest {
   @Test
   public void testListObjectInfoReturnPrefixes() throws IOException {
     String objectPrefix = "foo/bar/baz/";
-    String delimiter = "/";
     String dir0Name = "foo/bar/baz/dir0/";
     String dir1Name = "foo/bar/baz/dir1/";
     StorageObject dir0 = newStorageObject(BUCKET_NAME, dir0Name);
@@ -2051,8 +2050,7 @@ public class GoogleCloudStorageTest {
 
     GoogleCloudStorage gcs = mockedGcs(transport);
 
-    List<GoogleCloudStorageItemInfo> objectInfos =
-        gcs.listObjectInfo(BUCKET_NAME, objectPrefix, delimiter);
+    List<GoogleCloudStorageItemInfo> objectInfos = gcs.listObjectInfo(BUCKET_NAME, objectPrefix);
 
     trackingHttpRequestInitializer.getAllRequestStrings();
     assertThat(objectInfos)
@@ -2079,7 +2077,6 @@ public class GoogleCloudStorageTest {
 
   private void runTestListObjectInfo(boolean inferImplicit) throws IOException {
     String objectPrefix = "foo/bar/baz/";
-    String delimiter = "/";
     String dir0Name = "foo/bar/baz/dir0/";
     String dir1Name = "foo/bar/baz/dir1/";
     String dir2Name = "foo/bar/baz/dir2/";
@@ -2098,8 +2095,7 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorage gcs = mockedGcs(gcsOptions, transport);
 
     // List the objects
-    List<GoogleCloudStorageItemInfo> objectInfos =
-        gcs.listObjectInfo(BUCKET_NAME, objectPrefix, delimiter);
+    List<GoogleCloudStorageItemInfo> objectInfos = gcs.listObjectInfo(BUCKET_NAME, objectPrefix);
 
     if (gcs.getOptions().isInferImplicitDirectoriesEnabled()) {
       assertThat(objectInfos)
@@ -2129,7 +2125,6 @@ public class GoogleCloudStorageTest {
   @Test
   public void testListObjectInfoInferImplicit() throws IOException {
     String objectPrefix = "foo/bar/baz/";
-    String delimiter = "/";
     String dir0Name = "foo/bar/baz/dir0/";
     String dir1Name = "foo/bar/baz/dir1/";
     String dir2Name = "foo/bar/baz/dir2/";
@@ -2149,8 +2144,7 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorage gcs = mockedGcs(gcsOptions, transport);
 
     // List the objects
-    List<GoogleCloudStorageItemInfo> objectInfos =
-        gcs.listObjectInfo(BUCKET_NAME, objectPrefix, delimiter);
+    List<GoogleCloudStorageItemInfo> objectInfos = gcs.listObjectInfo(BUCKET_NAME, objectPrefix);
 
     // Only one of our three directory objects existed.
     assertThat(objectInfos)

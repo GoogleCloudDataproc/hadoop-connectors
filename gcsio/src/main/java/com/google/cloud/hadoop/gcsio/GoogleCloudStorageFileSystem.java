@@ -85,6 +85,9 @@ public class GoogleCloudStorageFileSystem {
   // URI of the root path.
   public static final URI GCS_ROOT = URI.create(SCHEME + ":/");
 
+  public static final ListObjectOptions LIST_SINGLE_OBJECT_OPTIONS =
+      ListObjectOptions.DEFAULT.toBuilder().setMaxResults(1).build();
+
   // GCS access instance.
   private GoogleCloudStorage gcs;
 
@@ -474,7 +477,7 @@ public class GoogleCloudStorageFileSystem {
     }
 
     if (!checkNotNull(bucketInfo, "bucketInfo should not be null").exists()) {
-      gcs.create(bucketInfo.getBucketName());
+      gcs.createBucket(bucketInfo.getBucketName());
     }
     gcs.createEmptyObjects(subdirsToCreate);
   }
@@ -873,12 +876,13 @@ public class GoogleCloudStorageFileSystem {
           // that is what we want for a recursive list. On the other hand,
           // when a delimiter is specified, only items with relative depth
           // of 1 are returned.
-          String delimiter = recursive ? null : PATH_DELIMITER;
+          ListObjectOptions listOptions =
+              recursive ? ListObjectOptions.DEFAULT_FLAT_LIST : ListObjectOptions.DEFAULT;
 
           GoogleCloudStorageItemInfo itemInfo = fileInfo.getItemInfo();
           // Obtain paths of children.
           childNames =
-              gcs.listObjectNames(itemInfo.getBucketName(), itemInfo.getObjectName(), delimiter);
+              gcs.listObjectNames(itemInfo.getBucketName(), itemInfo.getObjectName(), listOptions);
 
           // Obtain path for each child.
           for (String childName : childNames) {
@@ -957,7 +961,9 @@ public class GoogleCloudStorageFileSystem {
     StorageResourceId prefixId = getPrefixId(prefix);
     List<GoogleCloudStorageItemInfo> itemInfos =
         gcs.listObjectInfo(
-            prefixId.getBucketName(), prefixId.getObjectName(), /* delimiter= */ null);
+            prefixId.getBucketName(),
+            prefixId.getObjectName(),
+            ListObjectOptions.DEFAULT_FLAT_LIST);
     List<FileInfo> fileInfos = FileInfo.fromItemInfos(itemInfos);
     fileInfos.sort(FILE_INFO_PATH_COMPARATOR);
     return fileInfos;
@@ -977,7 +983,10 @@ public class GoogleCloudStorageFileSystem {
     StorageResourceId prefixId = getPrefixId(prefix);
     ListPage<GoogleCloudStorageItemInfo> itemInfosPage =
         gcs.listObjectInfoPage(
-            prefixId.getBucketName(), prefixId.getObjectName(), /* delimiter= */ null, pageToken);
+            prefixId.getBucketName(),
+            prefixId.getObjectName(),
+            ListObjectOptions.DEFAULT_FLAT_LIST,
+            pageToken);
     List<FileInfo> fileInfosPage = FileInfo.fromItemInfos(itemInfosPage.getItems());
     fileInfosPage.sort(FILE_INFO_PATH_COMPARATOR);
     return new ListPage<>(fileInfosPage, itemInfosPage.getNextPageToken());
@@ -1024,7 +1033,7 @@ public class GoogleCloudStorageFileSystem {
     List<GoogleCloudStorageItemInfo> dirItemInfos =
         dirId.isRoot()
             ? gcs.listBucketInfo()
-            : gcs.listObjectInfo(dirId.getBucketName(), dirId.getObjectName(), PATH_DELIMITER);
+            : gcs.listObjectInfo(dirId.getBucketName(), dirId.getObjectName());
     if (dirItemInfos.isEmpty() && !gcs.getItemInfo(dirId).exists()) {
       throw new FileNotFoundException("Item not found: " + path);
     }
@@ -1072,7 +1081,7 @@ public class GoogleCloudStorageFileSystem {
           dirExecutor.submit(
               () ->
                   gcs.listObjectNames(
-                      dirId.getBucketName(), dirId.getObjectName(), PATH_DELIMITER, 1));
+                      dirId.getBucketName(), dirId.getObjectName(), LIST_SINGLE_OBJECT_OPTIONS));
       Future<GoogleCloudStorageItemInfo> dirFuture =
           resourceId.isDirectory()
               ? Futures.immediateFuture(gcs.getItemInfo(resourceId))
@@ -1195,7 +1204,7 @@ public class GoogleCloudStorageFileSystem {
 
     // If this is a top level directory, create the corresponding bucket.
     if (resourceId.isBucket()) {
-      gcs.create(resourceId.getBucketName());
+      gcs.createBucket(resourceId.getBucketName());
       return;
     }
 

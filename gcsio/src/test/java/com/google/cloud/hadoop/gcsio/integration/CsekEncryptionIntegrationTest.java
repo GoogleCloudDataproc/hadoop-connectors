@@ -52,7 +52,7 @@ public class CsekEncryptionIntegrationTest {
     String bucketName = BUCKET_HELPER.getUniqueBucketName("upload-and-get");
     StorageResourceId resourceId = new StorageResourceId(bucketName, "obj");
 
-    gcs.create(bucketName);
+    gcs.createBucket(bucketName);
     gcs.createEmptyObject(
         resourceId, CreateObjectOptions.builder().setContentType("text/plain").build());
 
@@ -69,12 +69,13 @@ public class CsekEncryptionIntegrationTest {
                 .build());
 
     String srcBucketName = BUCKET_HELPER.getUniqueBucketName("rewrite-src");
-    gcs.create(srcBucketName);
+    gcs.createBucket(srcBucketName);
 
     String dstBucketName = BUCKET_HELPER.getUniqueBucketName("rewrite-dst");
     // Create destination bucket with different location and storage class,
     // because this is supported by rewrite but not copy requests
-    gcs.create(dstBucketName, CreateBucketOptions.builder().setStorageClass("coldline").build());
+    gcs.createBucket(
+        dstBucketName, CreateBucketOptions.builder().setStorageClass("coldline").build());
 
     StorageResourceId srcResourceId = new StorageResourceId(srcBucketName, "encryptedObject");
     int partitionsCount = 32;
