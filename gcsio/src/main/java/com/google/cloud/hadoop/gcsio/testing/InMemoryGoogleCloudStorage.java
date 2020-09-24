@@ -27,6 +27,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStrings;
+import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
 import com.google.common.base.Preconditions;
@@ -154,12 +155,12 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public synchronized void create(String bucketName) throws IOException {
-    create(bucketName, CreateBucketOptions.DEFAULT);
+  public synchronized void createBucket(String bucketName) throws IOException {
+    createBucket(bucketName, CreateBucketOptions.DEFAULT);
   }
 
   @Override
-  public synchronized void create(String bucketName, CreateBucketOptions options)
+  public synchronized void createBucket(String bucketName, CreateBucketOptions options)
       throws IOException {
     if (!validateBucketName(bucketName)) {
       throw new IOException("Error creating bucket. Invalid name: " + bucketName);
@@ -372,27 +373,26 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public synchronized List<String> listObjectNames(
-      String bucketName, String objectNamePrefix, String delimiter) {
-    return listObjectNames(bucketName, objectNamePrefix, delimiter,
-        GoogleCloudStorage.MAX_RESULTS_UNLIMITED);
+  public synchronized List<String> listObjectNames(String bucketName, String objectNamePrefix) {
+    return listObjectNames(bucketName, objectNamePrefix, ListObjectOptions.DEFAULT);
   }
 
   @Override
   public synchronized List<String> listObjectNames(
-      String bucketName, String objectNamePrefix, String delimiter, long maxResults) {
+      String bucketName, String objectNamePrefix, ListObjectOptions listOptions) {
     InMemoryBucketEntry bucketEntry = bucketLookup.get(bucketName);
     if (bucketEntry == null) {
       return new ArrayList<>();
     }
     Set<String> uniqueNames = new HashSet<>();
     for (String objectName : bucketEntry.getObjectNames()) {
-      String processedName = GoogleCloudStorageStrings.matchListPrefix(
-          objectNamePrefix, delimiter, objectName);
+      String processedName =
+          GoogleCloudStorageStrings.matchListPrefix(
+              objectNamePrefix, listOptions.getDelimiter(), objectName);
       if (processedName != null) {
         uniqueNames.add(processedName);
       }
-      if (maxResults > 0 && uniqueNames.size() >= maxResults) {
+      if (listOptions.getMaxResults() > 0 && uniqueNames.size() >= listOptions.getMaxResults()) {
         break;
       }
     }
@@ -401,27 +401,30 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
   @Override
   public ListPage<GoogleCloudStorageItemInfo> listObjectInfoPage(
-      String bucketName, String objectNamePrefix, String delimiter, String pageToken)
+      String bucketName, String objectNamePrefix, ListObjectOptions listOptions, String pageToken)
       throws IOException {
     // TODO: implement pagination
-    return new ListPage<>(listObjectInfo(bucketName, objectNamePrefix, delimiter), null);
+    return new ListPage<>(
+        listObjectInfo(bucketName, objectNamePrefix, listOptions), /* nextPageToken= */ null);
   }
 
   @Override
   public synchronized List<GoogleCloudStorageItemInfo> listObjectInfo(
-      String bucketName, String objectNamePrefix, String delimiter) throws IOException {
-    return listObjectInfo(bucketName, objectNamePrefix, delimiter,
-        GoogleCloudStorage.MAX_RESULTS_UNLIMITED);
+      String bucketName, String objectNamePrefix) throws IOException {
+    return listObjectInfo(bucketName, objectNamePrefix, ListObjectOptions.DEFAULT);
   }
 
   @Override
   public synchronized List<GoogleCloudStorageItemInfo> listObjectInfo(
-      String bucketName, String objectNamePrefix, String delimiter, long maxResults)
+      String bucketName, String objectNamePrefix, ListObjectOptions listOptions)
       throws IOException {
     // Since we're just in memory, we can do the naive implementation of just listing names and
     // then calling getItemInfo for each.
-    List<String> listedNames = listObjectNames(bucketName, objectNamePrefix,
-        delimiter, GoogleCloudStorage.MAX_RESULTS_UNLIMITED);
+    List<String> listedNames =
+        listObjectNames(
+            bucketName,
+            objectNamePrefix,
+            listOptions.toBuilder().setMaxResults(MAX_RESULTS_UNLIMITED).build());
     List<GoogleCloudStorageItemInfo> listedInfo = new ArrayList<>();
     for (String objectName : listedNames) {
       GoogleCloudStorageItemInfo itemInfo =
@@ -433,7 +436,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
         listedInfo.add(
             GoogleCloudStorageItemInfo.createInferredDirectory(itemInfo.getResourceId()));
       }
-      if (maxResults > 0 && listedInfo.size() >= maxResults) {
+      if (listOptions.getMaxResults() > 0 && listedInfo.size() >= listOptions.getMaxResults()) {
         break;
       }
     }

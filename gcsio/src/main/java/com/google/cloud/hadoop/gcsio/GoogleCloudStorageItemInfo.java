@@ -32,7 +32,7 @@ public class GoogleCloudStorageItemInfo {
    * GoogleCloudStorageItemInfo for callers which may not know the concrete type of an object, but
    * want to check if the object happens to be an instance of this InfoProvider.
    */
-  public static interface Provider {
+  public interface Provider {
     GoogleCloudStorageItemInfo getItemInfo();
   }
 
@@ -123,7 +123,7 @@ public class GoogleCloudStorageItemInfo {
         storageClass,
         /* contentType= */ null,
         /* contentEncoding= */ null,
-        /* metadata= */ ImmutableMap.<String, byte[]>of(),
+        /* metadata= */ ImmutableMap.of(),
         /* contentGeneration= */ 0,
         /* metaGeneration= */ 0);
   }
@@ -314,10 +314,7 @@ public class GoogleCloudStorageItemInfo {
     return isRoot() && exists();
   }
 
-  /**
-   * Indicates whether {@code itemInfo} is a directory; static version of {@link #isDirectory()} to
-   * avoid having to create a FileInfo object just to use this logic.
-   */
+  /** Indicates whether {@code itemInfo} is a directory. */
   public boolean isDirectory() {
     return isGlobalRoot() || isBucket() || resourceId.isDirectory();
   }
@@ -384,11 +381,9 @@ public class GoogleCloudStorageItemInfo {
    */
   @Override
   public String toString() {
-    if (exists()) {
-      return String.format("%s: created on: %s", resourceId, new Date(creationTime));
-    } else {
-      return String.format("%s: exists: no", resourceId);
-    }
+    return exists()
+        ? String.format("%s: created on: %s", resourceId, new Date(creationTime))
+        : String.format("%s: exists: no", resourceId);
   }
 
   @Override

@@ -25,6 +25,7 @@ import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.CredentialFactory;
@@ -244,12 +245,16 @@ public class GoogleCloudStorageTestHelper {
       }
 
       List<GoogleCloudStorageItemInfo> objectsToDelete =
-          bucketsToDelete
-              .parallelStream()
+          bucketsToDelete.parallelStream()
               .flatMap(
                   bucket -> {
                     try {
-                      return storage.listObjectInfo(bucket, null, null).stream();
+                      return storage
+                          .listObjectInfo(
+                              bucket,
+                              /* objectNamePrefix= */ null,
+                              ListObjectOptions.DEFAULT_FLAT_LIST)
+                          .stream();
                     } catch (IOException e) {
                       throw new RuntimeException(e);
                     }

@@ -13,7 +13,6 @@
  */
 package com.google.cloud.hadoop.gcsio;
 
-
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.channels.WritableByteChannel;
@@ -107,22 +106,21 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
     return result;
   }
 
-  /** This function may return cached copies of GoogleCloudStorageItemInfo. */
+  /** This function may return cached copies of {@link GoogleCloudStorageItemInfo}. */
   @Override
-  public List<GoogleCloudStorageItemInfo> listObjectInfo(
-      String bucketName, String objectNamePrefix, String delimiter) throws IOException {
-    return this.listObjectInfo(
-        bucketName, objectNamePrefix, delimiter, GoogleCloudStorage.MAX_RESULTS_UNLIMITED);
+  public List<GoogleCloudStorageItemInfo> listObjectInfo(String bucketName, String objectNamePrefix)
+      throws IOException {
+    return this.listObjectInfo(bucketName, objectNamePrefix, ListObjectOptions.DEFAULT);
   }
 
-  /** This function may return cached copies of GoogleCloudStorageItemInfo. */
+  /** This function may return cached copies of {@link GoogleCloudStorageItemInfo}. */
   @Override
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
-      String bucketName, String objectNamePrefix, String delimiter, long maxResults)
+      String bucketName, String objectNamePrefix, ListObjectOptions listOptions)
       throws IOException {
     List<GoogleCloudStorageItemInfo> result;
 
-    result = super.listObjectInfo(bucketName, objectNamePrefix, delimiter, maxResults);
+    result = super.listObjectInfo(bucketName, objectNamePrefix, listOptions);
     for (GoogleCloudStorageItemInfo item : result) {
       cache.putItem(item);
     }
@@ -132,10 +130,10 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
 
   @Override
   public ListPage<GoogleCloudStorageItemInfo> listObjectInfoPage(
-      String bucketName, String objectNamePrefix, String delimiter, String pageToken)
+      String bucketName, String objectNamePrefix, ListObjectOptions listOptions, String pageToken)
       throws IOException {
     ListPage<GoogleCloudStorageItemInfo> result =
-        super.listObjectInfoPage(bucketName, objectNamePrefix, delimiter, pageToken);
+        super.listObjectInfoPage(bucketName, objectNamePrefix, listOptions, pageToken);
     for (GoogleCloudStorageItemInfo item : result.getItems()) {
       cache.putItem(item);
     }
@@ -157,7 +155,8 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
       String directoryName =
           lastSlashIndex >= 0 ? objectName.substring(0, lastSlashIndex + 1) : null;
       // make just 1 request to prefetch only 1 page of directory items
-      listObjectInfoPage(bucketName, directoryName, PATH_DELIMITER, /* pageToken= */ null);
+      listObjectInfoPage(
+          bucketName, directoryName, ListObjectOptions.DEFAULT, /* pageToken= */ null);
       item = cache.getItem(resourceId);
     }
 
