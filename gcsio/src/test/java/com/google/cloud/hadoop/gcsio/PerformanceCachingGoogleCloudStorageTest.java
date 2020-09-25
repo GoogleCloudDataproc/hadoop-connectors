@@ -309,6 +309,24 @@ public class PerformanceCachingGoogleCloudStorageTest {
   }
 
   @Test
+  public void testListObjectInfo_delimiter() throws IOException {
+    GoogleCloudStorageItemInfo itemAAPrefix = createInferredDirectory(BUCKET_A, PREFIX_A + "/");
+
+    List<GoogleCloudStorageItemInfo> expectedResult = Lists.newArrayList(ITEM_A_A, itemAAPrefix);
+    List<GoogleCloudStorageItemInfo> expectedCached = Lists.newArrayList(ITEM_A_A, itemAAPrefix);
+
+    List<GoogleCloudStorageItemInfo> result =
+        gcs.listObjectInfo(BUCKET_A, PREFIX_A, ListObjectOptions.DEFAULT);
+
+    // Verify the delegate call.
+    verify(gcsDelegate).listObjectInfo(eq(BUCKET_A), eq(PREFIX_A), eq(ListObjectOptions.DEFAULT));
+    // Verify the result.
+    assertThat(result).containsExactlyElementsIn(expectedResult);
+    // Verify the state of the cache.
+    assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expectedCached);
+  }
+
+  @Test
   public void testListObjectInfo_prefixDir_delimiter() throws IOException {
     String prefixADir = PREFIX_A + "/";
 
