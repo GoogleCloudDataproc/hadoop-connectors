@@ -53,6 +53,7 @@ commands from the main directory:
 ```bash
 # with Hadoop 2 and YARN support:
 ./mvnw -P hadoop2 -P coverage clean verify
+
 # with Hadoop 3 and YARN support:
 ./mvnw -P hadoop3 -P coverage clean verify
 ```
