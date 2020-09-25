@@ -22,6 +22,7 @@ import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.copyR
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.deleteRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestString;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestWithTrailingDelimiter;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.uploadRequestString;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.truth.Truth.assertThat;
@@ -404,12 +405,8 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             getRequestString(bucketName, dirObject),
-            listRequestString(
-                bucketName,
-                /* includeTrailingDelimiter= */ true,
-                dirObject + "/",
-                /* maxResults= */ 1024,
-                /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(
+                bucketName, dirObject + "/", /* maxResults= */ 1024, /* pageToken= */ null));
 
     assertThat(fileInfos.stream().map(FileInfo::exists).collect(toList()))
         .containsExactly(true, true);
@@ -434,12 +431,8 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
-            listRequestString(
-                bucketName,
-                /* includeTrailingDelimiter= */ true,
-                dirObject + "/",
-                /* maxResults= */ 1024,
-                /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(
+                bucketName, dirObject + "/", /* maxResults= */ 1024, /* pageToken= */ null));
 
     assertThat(fileInfos.stream().map(FileInfo::exists).collect(toList()))
         .containsExactly(true, true);
@@ -465,12 +458,8 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             getRequestString(bucketName, dirObject),
-            listRequestString(
-                bucketName,
-                /* includeTrailingDelimiter= */ true,
-                dirObject + "/",
-                /* maxResults= */ 1024,
-                /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(
+                bucketName, dirObject + "/", /* maxResults= */ 1024, /* pageToken= */ null));
 
     assertThat(fileInfos.stream().map(FileInfo::exists).collect(toList())).containsExactly(true);
     assertThat(fileInfos.stream().map(FileInfo::getPath).collect(toList()))
@@ -494,12 +483,8 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             getRequestString(bucketName, dirObject),
-            listRequestString(
-                bucketName,
-                /* includeTrailingDelimiter= */ true,
-                dirObject + "/",
-                /* maxResults= */ 1024,
-                /* pageToken= */ null),
+            listRequestWithTrailingDelimiter(
+                bucketName, dirObject + "/", /* maxResults= */ 1024, /* pageToken= */ null),
             getRequestString(bucketName, dirObject + "/"));
 
     assertThat(fileInfos).isEmpty();
@@ -521,12 +506,8 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             getRequestString(bucketName, dirObject),
-            listRequestString(
-                bucketName,
-                /* includeTrailingDelimiter= */ true,
-                dirObject + "/",
-                /* maxResults= */ 1024,
-                /* pageToken= */ null),
+            listRequestWithTrailingDelimiter(
+                bucketName, dirObject + "/", /* maxResults= */ 1024, /* pageToken= */ null),
             getRequestString(bucketName, dirObject + "/"));
   }
 

@@ -33,6 +33,7 @@ import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getMe
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listBucketsRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestString;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestWithTrailingDelimiter;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.resumableUploadChunkRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.resumableUploadRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.uploadRequestString;
@@ -66,6 +67,7 @@ import com.google.api.services.storage.model.Bucket;
 import com.google.api.services.storage.model.Buckets;
 import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.StorageObject;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.authorization.FakeAuthorizationHandler;
 import com.google.cloud.hadoop.gcsio.authorization.StorageRequestAuthorizer;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
@@ -132,6 +134,9 @@ public class GoogleCloudStorageTest {
           .build();
 
   private static final ImmutableMap<String, byte[]> EMPTY_METADATA = ImmutableMap.of();
+
+  private static final ListObjectOptions INCLUDE_PREFIX_LIST_OPTIONS =
+      ListObjectOptions.DEFAULT.toBuilder().setIncludePrefix(true).build();
 
   private TrackingHttpRequestInitializer trackingHttpRequestInitializer;
 
@@ -1888,7 +1893,7 @@ public class GoogleCloudStorageTest {
 
   /** Test successful operation of GoogleCloudStorage.listObjectNames(3). */
   @Test
-  public void testListObjectNamesPrefix() throws IOException {
+  public void listObjectNames_prefixesAndObjects() throws IOException {
     String prefix = "foo/bar/baz/";
     String pageToken = "pageToken_0";
 
@@ -1922,9 +1927,177 @@ public class GoogleCloudStorageTest {
         .inOrder();
   }
 
+  @Test
+  public void listObjectNames_includePrefix_prefixObjectDoesNotExist() throws IOException {
+    String prefix = "foo/bar/baz/";
+    String pageToken = "pageToken_0";
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new Objects()
+                    .setPrefixes(ImmutableList.of("foo/bar/baz/dir0/"))
+                    .setNextPageToken(pageToken)),
+            jsonDataResponse(
+                new Objects()
+                    .setItems(ImmutableList.of(newStorageObject(BUCKET_NAME, "foo/bar/baz/obj0")))
+                    .setNextPageToken(null)));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    List<String> objectNames =
+        gcs.listObjectNames(BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS);
+
+    assertThat(objectNames)
+        .containsExactly("foo/bar/baz/", "foo/bar/baz/dir0/", "foo/bar/baz/obj0")
+        .inOrder();
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            listRequestString(BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null),
+            listRequestString(BUCKET_NAME, prefix, /* maxResults= */ 1024, pageToken))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectNames_includePrefix_prefixObjectDoesNotExist_objects() throws IOException {
+    String prefix = "foo/bar/baz/";
+    String pageToken = "pageToken_0";
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new Objects()
+                    .setItems(ImmutableList.of(newStorageObject(BUCKET_NAME, "foo/bar/baz/obj0")))
+                    .setNextPageToken(pageToken)),
+            jsonDataResponse(
+                new Objects()
+                    .setItems(ImmutableList.of(newStorageObject(BUCKET_NAME, "foo/bar/baz/obj1")))
+                    .setNextPageToken(null)));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    List<String> objectNames =
+        gcs.listObjectNames(BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS);
+
+    assertThat(objectNames)
+        .containsExactly("foo/bar/baz/", "foo/bar/baz/obj0", "foo/bar/baz/obj1")
+        .inOrder();
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            listRequestString(BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null),
+            listRequestString(BUCKET_NAME, prefix, /* maxResults= */ 1024, pageToken))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectNames_includePrefix_prefixObjectDoesNotExist_prefixes() throws IOException {
+    String prefix = "foo/bar/baz/";
+    String pageToken = "pageToken_0";
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new Objects()
+                    .setPrefixes(ImmutableList.of("foo/bar/baz/dir0/"))
+                    .setNextPageToken(pageToken)),
+            jsonDataResponse(
+                new Objects()
+                    .setPrefixes(ImmutableList.of("foo/bar/baz/dir1/"))
+                    .setNextPageToken(null)));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    List<String> objectNames =
+        gcs.listObjectNames(BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS);
+
+    assertThat(objectNames)
+        .containsExactly("foo/bar/baz/", "foo/bar/baz/dir0/", "foo/bar/baz/dir1/")
+        .inOrder();
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            listRequestString(BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null),
+            listRequestString(BUCKET_NAME, prefix, /* maxResults= */ 1024, pageToken))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectNames_includePrefix_prefixObjectExists() throws IOException {
+    String prefix = "foo/bar/baz/";
+    String pageToken = "pageToken_0";
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new Objects()
+                    .setPrefixes(ImmutableList.of("foo/bar/baz/dir0/"))
+                    .setNextPageToken(pageToken)),
+            jsonDataResponse(
+                new Objects()
+                    .setItems(
+                        ImmutableList.of(
+                            newStorageObject(BUCKET_NAME, "foo/bar/baz/"),
+                            newStorageObject(BUCKET_NAME, "foo/bar/baz/obj0")))
+                    .setNextPageToken(null)));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    List<String> objectNames =
+        gcs.listObjectNames(BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS);
+
+    assertThat(objectNames)
+        .containsExactly("foo/bar/baz/", "foo/bar/baz/dir0/", "foo/bar/baz/obj0")
+        .inOrder();
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            listRequestString(BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null),
+            listRequestString(BUCKET_NAME, prefix, /* maxResults= */ 1024, pageToken))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectNames_includePrefix_onlyPrefixObjectExists() throws IOException {
+    String prefix = "foo/bar/baz/";
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new Objects()
+                    .setItems(ImmutableList.of(newStorageObject(BUCKET_NAME, "foo/bar/baz/")))
+                    .setNextPageToken(null)));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    List<String> objectNames =
+        gcs.listObjectNames(BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS);
+
+    assertThat(objectNames).containsExactly("foo/bar/baz/").inOrder();
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            listRequestString(BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectNames_includePrefix_prefixDoesNotExist() throws IOException {
+    String prefix = "foo/bar/baz/";
+
+    MockHttpTransport transport = mockTransport(jsonDataResponse(new Objects()));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    List<String> objectNames =
+        gcs.listObjectNames(BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS);
+
+    assertThat(objectNames).isEmpty();
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            listRequestString(BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+        .inOrder();
+  }
+
   /** Test GoogleCloudStorage.listObjectNames(3) with maxResults set. */
   @Test
-  public void testListObjectNamesPrefixLimited() throws IOException {
+  public void listObjectNames_limited() throws IOException {
     String prefix = "foo/bar/baz/";
     int maxResults = 3;
 
@@ -1961,7 +2134,7 @@ public class GoogleCloudStorageTest {
    * GoogleCloudStorage.listObjectNames(3).
    */
   @Test
-  public void testListObjectNamesPrefixApiException() throws IOException {
+  public void listObjectNames_apiException() throws IOException {
     String objectPrefix = "foo/bar/baz/";
 
     MockHttpTransport transport =
@@ -1985,13 +2158,11 @@ public class GoogleCloudStorageTest {
         .containsExactly(
             listRequestString(
                 BUCKET_NAME,
-                /* includeTrailingDelimiter= */ false,
                 objectPrefix,
                 /* maxResults= */ 1024,
                 /* pageToken= */ null),
             listRequestString(
                 BUCKET_NAME,
-                /* includeTrailingDelimiter= */ false,
                 objectPrefix,
                 /* maxResults= */ 1024,
                 /* pageToken= */ null))
@@ -1999,7 +2170,7 @@ public class GoogleCloudStorageTest {
   }
 
   @Test
-  public void testListObjectInfoBasic() throws IOException {
+  public void listObjectInfo_objects() throws IOException {
     String prefix = "foo/bar/baz/";
 
     StorageObject object1 = newStorageObject(BUCKET_NAME, "foo/bar/baz/obj0");
@@ -2025,28 +2196,28 @@ public class GoogleCloudStorageTest {
         .inOrder();
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(
-            listRequestString(
-                BUCKET_NAME,
-                /* includeTrailingDelimiter= */ true,
-                prefix,
-                /* maxResults= */ 1024,
-                /* pageToken= */ null))
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
         .inOrder();
   }
 
   @Test
-  public void testListObjectInfoReturnPrefixes() throws IOException {
+  public void listObjectInfo_prefixesAndPrefixObjects() throws IOException {
     String objectPrefix = "foo/bar/baz/";
-    String dir0Name = "foo/bar/baz/dir0/";
-    String dir1Name = "foo/bar/baz/dir1/";
-    StorageObject dir0 = newStorageObject(BUCKET_NAME, dir0Name);
-    StorageObject dir1 = newStorageObject(BUCKET_NAME, dir1Name);
+
+    StorageObject dir0 = newStorageObject(BUCKET_NAME, "foo/bar/baz/dir0/");
+    StorageObject dir1 = newStorageObject(BUCKET_NAME, "foo/bar/baz/dir1/");
 
     List<StorageObject> objects =
         ImmutableList.of(newStorageObject(BUCKET_NAME, objectPrefix), dir0, dir1);
 
     MockHttpTransport transport =
-        mockTransport(jsonDataResponse(new Objects().setItems(objects).setNextPageToken(null)));
+        mockTransport(
+            jsonDataResponse(
+                new Objects()
+                    .setPrefixes(ImmutableList.of(dir0.getName(), dir1.getName()))
+                    .setItems(objects)
+                    .setNextPageToken(null)));
 
     GoogleCloudStorage gcs = mockedGcs(transport);
 
@@ -2054,24 +2225,250 @@ public class GoogleCloudStorageTest {
 
     trackingHttpRequestInitializer.getAllRequestStrings();
     assertThat(objectInfos)
-        .containsExactly(
-            createItemInfoForStorageObject(new StorageResourceId(BUCKET_NAME, dir0Name), dir0),
-            createItemInfoForStorageObject(new StorageResourceId(BUCKET_NAME, dir1Name), dir1))
+        .containsExactly(createItemInfoForStorageObject(dir0), createItemInfoForStorageObject(dir1))
         .inOrder();
 
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(
-            listRequestString(
-                BUCKET_NAME,
-                /* includeTrailingDelimiter= */ true,
-                objectPrefix,
-                /* maxResults= */ 1024,
-                /* pageToken= */ null))
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, objectPrefix, /* maxResults= */ 1024, /* pageToken= */ null))
         .inOrder();
   }
 
   @Test
-  public void testListObjectInfoWithoutInferImplicit() throws IOException {
+  public void listObjectInfo_prefixesAndObjects() throws IOException {
+    String prefix = "foo/bar/baz/";
+    String pageToken = "pageToken_0";
+
+    StorageObject obj1 = newStorageObject(BUCKET_NAME, "foo/bar/baz/obj0");
+    StorageObject obj2 = newStorageObject(BUCKET_NAME, "foo/bar/baz/obj1");
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new Objects()
+                    .setPrefixes(ImmutableList.of("foo/bar/baz/dir0/", "foo/bar/baz/dir1/"))
+                    .setNextPageToken(pageToken)),
+            jsonDataResponse(
+                new Objects()
+                    .setItems(
+                        ImmutableList.of(newStorageObject(BUCKET_NAME, "foo/bar/baz/"), obj1, obj2))
+                    .setNextPageToken(null)));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    List<GoogleCloudStorageItemInfo> objects = gcs.listObjectInfo(BUCKET_NAME, prefix);
+
+    assertThat(objects)
+        .containsExactly(
+            createInferredDirectory(new StorageResourceId(BUCKET_NAME, "foo/bar/baz/dir0/")),
+            createInferredDirectory(new StorageResourceId(BUCKET_NAME, "foo/bar/baz/dir1/")),
+            createItemInfoForStorageObject(obj1),
+            createItemInfoForStorageObject(obj2))
+        .inOrder();
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null),
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, prefix, /* maxResults= */ 1024, pageToken))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectInfo_includePrefix_prefixObjectDoesNotExist() throws IOException {
+    String prefix = "foo/bar/baz/";
+    String pageToken = "pageToken_0";
+
+    StorageObject obj0 = newStorageObject(BUCKET_NAME, "foo/bar/baz/obj0");
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new Objects()
+                    .setPrefixes(ImmutableList.of("foo/bar/baz/dir0/"))
+                    .setNextPageToken(pageToken)),
+            jsonDataResponse(
+                new Objects().setItems(ImmutableList.of(obj0)).setNextPageToken(null)));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    List<GoogleCloudStorageItemInfo> objects =
+        gcs.listObjectInfo(BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS);
+
+    assertThat(objects)
+        .containsExactly(
+            createInferredDirectory(new StorageResourceId(BUCKET_NAME, "foo/bar/baz/")),
+            createInferredDirectory(new StorageResourceId(BUCKET_NAME, "foo/bar/baz/dir0/")),
+            createItemInfoForStorageObject(obj0))
+        .inOrder();
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null),
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, prefix, /* maxResults= */ 1024, pageToken))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectInfo_includePrefix_prefixObjectDoesNotExist_objects() throws IOException {
+    String prefix = "foo/bar/baz/";
+    String pageToken = "pageToken_0";
+
+    StorageObject obj0 = newStorageObject(BUCKET_NAME, "foo/bar/baz/obj0");
+    StorageObject obj1 = newStorageObject(BUCKET_NAME, "foo/bar/baz/obj1");
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new Objects().setItems(ImmutableList.of(obj0)).setNextPageToken(pageToken)),
+            jsonDataResponse(
+                new Objects().setItems(ImmutableList.of(obj1)).setNextPageToken(null)));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    List<GoogleCloudStorageItemInfo> objects =
+        gcs.listObjectInfo(BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS);
+
+    assertThat(objects)
+        .containsExactly(
+            createInferredDirectory(new StorageResourceId(BUCKET_NAME, "foo/bar/baz/")),
+            createItemInfoForStorageObject(obj0),
+            createItemInfoForStorageObject(obj1))
+        .inOrder();
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null),
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, prefix, /* maxResults= */ 1024, pageToken))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectInfo_includePrefix_prefixObjectDoesNotExist_prefixes() throws IOException {
+    String prefix = "foo/bar/baz/";
+    String pageToken = "pageToken_0";
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new Objects()
+                    .setPrefixes(ImmutableList.of("foo/bar/baz/dir0/"))
+                    .setNextPageToken(pageToken)),
+            jsonDataResponse(
+                new Objects()
+                    .setPrefixes(ImmutableList.of("foo/bar/baz/dir1/"))
+                    .setNextPageToken(null)));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    List<GoogleCloudStorageItemInfo> objects =
+        gcs.listObjectInfo(BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS);
+
+    assertThat(objects)
+        .containsExactly(
+            createInferredDirectory(new StorageResourceId(BUCKET_NAME, "foo/bar/baz/")),
+            createInferredDirectory(new StorageResourceId(BUCKET_NAME, "foo/bar/baz/dir0/")),
+            createInferredDirectory(new StorageResourceId(BUCKET_NAME, "foo/bar/baz/dir1/")))
+        .inOrder();
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null),
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, prefix, /* maxResults= */ 1024, pageToken))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectInfo_includePrefix_prefixObjectExists() throws IOException {
+    String prefix = "foo/bar/baz/";
+    String pageToken = "pageToken_0";
+
+    StorageObject prefixObj = newStorageObject(BUCKET_NAME, "foo/bar/baz/");
+    StorageObject obj0 = newStorageObject(BUCKET_NAME, "foo/bar/baz/obj0");
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new Objects()
+                    .setPrefixes(ImmutableList.of("foo/bar/baz/dir0/"))
+                    .setNextPageToken(pageToken)),
+            jsonDataResponse(
+                new Objects().setItems(ImmutableList.of(prefixObj, obj0)).setNextPageToken(null)));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    List<GoogleCloudStorageItemInfo> objects =
+        gcs.listObjectInfo(BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS);
+
+    assertThat(objects)
+        .containsExactly(
+            createItemInfoForStorageObject(prefixObj),
+            createInferredDirectory(new StorageResourceId(BUCKET_NAME, "foo/bar/baz/dir0/")),
+            createItemInfoForStorageObject(obj0))
+        .inOrder();
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null),
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, prefix, /* maxResults= */ 1024, pageToken))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectInfo_includePrefix_onlyPrefixObjectExists() throws IOException {
+    String prefix = "foo/bar/baz/";
+
+    StorageObject prefixObj = newStorageObject(BUCKET_NAME, "foo/bar/baz/");
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new Objects().setItems(ImmutableList.of(prefixObj)).setNextPageToken(null)));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    List<GoogleCloudStorageItemInfo> objects =
+        gcs.listObjectInfo(BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS);
+
+    assertThat(objects).containsExactly(createItemInfoForStorageObject(prefixObj)).inOrder();
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectInfo_includePrefix_prefixDoesNotExist() throws IOException {
+    String prefix = "foo/bar/baz/";
+
+    MockHttpTransport transport = mockTransport(jsonDataResponse(new Objects()));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    List<GoogleCloudStorageItemInfo> objects =
+        gcs.listObjectInfo(BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS);
+
+    assertThat(objects).isEmpty();
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectInfo_inferImplicit() throws IOException {
+    runTestListObjectInfo(true);
+  }
+
+  @Test
+  public void listObjectInfo_noInferImplicit() throws IOException {
     runTestListObjectInfo(false);
   }
 
@@ -2113,17 +2510,316 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(
-            listRequestString(
-                BUCKET_NAME,
-                /* includeTrailingDelimiter= */ true,
-                objectPrefix,
-                /* maxResults= */ 1024,
-                /* pageToken= */ null))
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, objectPrefix, /* maxResults= */ 1024, /* pageToken= */ null))
         .inOrder();
   }
 
   @Test
-  public void testListObjectInfoInferImplicit() throws IOException {
+  public void listObjectInfoPage_objects() throws IOException {
+    String prefix = "foo/bar/baz/";
+
+    StorageObject object1 = newStorageObject(BUCKET_NAME, "foo/bar/baz/obj0");
+    StorageObject object2 = newStorageObject(BUCKET_NAME, "foo/bar/baz/obj1");
+
+    List<StorageObject> objects =
+        ImmutableList.of(newStorageObject(BUCKET_NAME, "foo/bar/baz/"), object1, object2);
+
+    MockHttpTransport transport =
+        mockTransport(jsonDataResponse(new Objects().setItems(objects).setNextPageToken(null)));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    ListPage<GoogleCloudStorageItemInfo> objectsPage =
+        gcs.listObjectInfoPage(
+            BUCKET_NAME, prefix, ListObjectOptions.DEFAULT, /* pageToken= */ null);
+
+    // The item exactly matching the input prefix will be discarded.
+    assertThat(objectsPage.getNextPageToken()).isNull();
+    assertThat(objectsPage.getItems())
+        .containsExactly(
+            createItemInfoForStorageObject(
+                new StorageResourceId(BUCKET_NAME, object1.getName()), object1),
+            createItemInfoForStorageObject(
+                new StorageResourceId(BUCKET_NAME, object2.getName()), object2))
+        .inOrder();
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectInfoPage_prefixesAndPrefixObjects() throws IOException {
+    String objectPrefix = "foo/bar/baz/";
+
+    StorageObject dir0 = newStorageObject(BUCKET_NAME, "foo/bar/baz/dir0/");
+    StorageObject dir1 = newStorageObject(BUCKET_NAME, "foo/bar/baz/dir1/");
+
+    List<StorageObject> objects =
+        ImmutableList.of(newStorageObject(BUCKET_NAME, objectPrefix), dir0, dir1);
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new Objects()
+                    .setPrefixes(ImmutableList.of(dir0.getName(), dir1.getName()))
+                    .setItems(objects)
+                    .setNextPageToken(null)));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    ListPage<GoogleCloudStorageItemInfo> objectsPage =
+        gcs.listObjectInfoPage(
+            BUCKET_NAME, objectPrefix, ListObjectOptions.DEFAULT, /* pageToken= */ null);
+
+    trackingHttpRequestInitializer.getAllRequestStrings();
+    assertThat(objectsPage.getNextPageToken()).isNull();
+    assertThat(objectsPage.getItems())
+        .containsExactly(createItemInfoForStorageObject(dir0), createItemInfoForStorageObject(dir1))
+        .inOrder();
+
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, objectPrefix, /* maxResults= */ 1024, /* pageToken= */ null))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectInfoPage_prefixesAndObjects() throws IOException {
+    String prefix = "foo/bar/baz/";
+
+    StorageObject obj1 = newStorageObject(BUCKET_NAME, "foo/bar/baz/obj0");
+    StorageObject obj2 = newStorageObject(BUCKET_NAME, "foo/bar/baz/obj1");
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new Objects()
+                    .setPrefixes(ImmutableList.of("foo/bar/baz/dir0/", "foo/bar/baz/dir1/"))
+                    .setItems(
+                        ImmutableList.of(newStorageObject(BUCKET_NAME, "foo/bar/baz/"), obj1, obj2))
+                    .setNextPageToken(null)));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    ListPage<GoogleCloudStorageItemInfo> objectsPage =
+        gcs.listObjectInfoPage(
+            BUCKET_NAME, prefix, ListObjectOptions.DEFAULT, /* pageToken= */ null);
+
+    assertThat(objectsPage.getNextPageToken()).isNull();
+    assertThat(objectsPage.getItems())
+        .containsExactly(
+            createInferredDirectory(new StorageResourceId(BUCKET_NAME, "foo/bar/baz/dir0/")),
+            createInferredDirectory(new StorageResourceId(BUCKET_NAME, "foo/bar/baz/dir1/")),
+            createItemInfoForStorageObject(obj1),
+            createItemInfoForStorageObject(obj2))
+        .inOrder();
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectInfoPage_includePrefix_prefixObjectDoesNotExist() throws IOException {
+    String prefix = "foo/bar/baz/";
+
+    StorageObject obj0 = newStorageObject(BUCKET_NAME, "foo/bar/baz/obj0");
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new Objects()
+                    .setPrefixes(ImmutableList.of("foo/bar/baz/dir0/"))
+                    .setItems(ImmutableList.of(obj0))
+                    .setNextPageToken(null)));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    ListPage<GoogleCloudStorageItemInfo> objectsPage =
+        gcs.listObjectInfoPage(
+            BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS, /* pageToken= */ null);
+
+    assertThat(objectsPage.getNextPageToken()).isNull();
+    assertThat(objectsPage.getItems())
+        .containsExactly(
+            createInferredDirectory(new StorageResourceId(BUCKET_NAME, "foo/bar/baz/")),
+            createInferredDirectory(new StorageResourceId(BUCKET_NAME, "foo/bar/baz/dir0/")),
+            createItemInfoForStorageObject(obj0))
+        .inOrder();
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectInfoPage_includePrefix_prefixObjectDoesNotExist_objects()
+      throws IOException {
+    String prefix = "foo/bar/baz/";
+
+    StorageObject obj0 = newStorageObject(BUCKET_NAME, "foo/bar/baz/obj0");
+    StorageObject obj1 = newStorageObject(BUCKET_NAME, "foo/bar/baz/obj1");
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new Objects().setItems(ImmutableList.of(obj0, obj1)).setNextPageToken(null)));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    ListPage<GoogleCloudStorageItemInfo> objectsPage =
+        gcs.listObjectInfoPage(
+            BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS, /* pageToken= */ null);
+
+    assertThat(objectsPage.getNextPageToken()).isNull();
+    assertThat(objectsPage.getItems())
+        .containsExactly(
+            createInferredDirectory(new StorageResourceId(BUCKET_NAME, "foo/bar/baz/")),
+            createItemInfoForStorageObject(obj0),
+            createItemInfoForStorageObject(obj1))
+        .inOrder();
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectInfoPage_includePrefix_prefixObjectDoesNotExist_prefixes()
+      throws IOException {
+    String prefix = "foo/bar/baz/";
+    String pageToken = "pageToken_0";
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new Objects()
+                    .setPrefixes(ImmutableList.of("foo/bar/baz/dir0/", "foo/bar/baz/dir1/"))
+                    .setNextPageToken(pageToken)));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    ListPage<GoogleCloudStorageItemInfo> objects =
+        gcs.listObjectInfoPage(
+            BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS, /* pageToken= */ null);
+
+    assertThat(objects.getNextPageToken()).isEqualTo(pageToken);
+    assertThat(objects.getItems())
+        .containsExactly(
+            createInferredDirectory(new StorageResourceId(BUCKET_NAME, "foo/bar/baz/")),
+            createInferredDirectory(new StorageResourceId(BUCKET_NAME, "foo/bar/baz/dir0/")),
+            createInferredDirectory(new StorageResourceId(BUCKET_NAME, "foo/bar/baz/dir1/")))
+        .inOrder();
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectInfoPage_includePrefix_prefixObjectExists() throws IOException {
+    String prefix = "foo/bar/baz/";
+    String pageToken = "pageToken_0";
+
+    StorageObject prefixObj = newStorageObject(BUCKET_NAME, "foo/bar/baz/");
+    StorageObject obj0 = newStorageObject(BUCKET_NAME, "foo/bar/baz/obj0");
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new Objects()
+                    .setPrefixes(ImmutableList.of("foo/bar/baz/dir0/"))
+                    .setItems(ImmutableList.of(prefixObj, obj0))
+                    .setNextPageToken(pageToken)));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    ListPage<GoogleCloudStorageItemInfo> objectsPage =
+        gcs.listObjectInfoPage(
+            BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS, /* pageToken= */ null);
+
+    assertThat(objectsPage.getNextPageToken()).isEqualTo(pageToken);
+    assertThat(objectsPage.getItems())
+        .containsExactly(
+            createItemInfoForStorageObject(prefixObj),
+            createInferredDirectory(new StorageResourceId(BUCKET_NAME, "foo/bar/baz/dir0/")),
+            createItemInfoForStorageObject(obj0))
+        .inOrder();
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectInfoPage_includePrefix_onlyPrefixObjectExists() throws IOException {
+    String prefix = "foo/bar/baz/";
+
+    StorageObject prefixObj = newStorageObject(BUCKET_NAME, "foo/bar/baz/");
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new Objects().setItems(ImmutableList.of(prefixObj)).setNextPageToken(null)));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    ListPage<GoogleCloudStorageItemInfo> objectsPage =
+        gcs.listObjectInfoPage(
+            BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS, /* pageToken= */ null);
+
+    assertThat(objectsPage.getNextPageToken()).isNull();
+    assertThat(objectsPage.getItems())
+        .containsExactly(createItemInfoForStorageObject(prefixObj))
+        .inOrder();
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectInfoPage_includePrefix_prefixDoesNotExist() throws IOException {
+    String prefix = "foo/bar/baz/";
+
+    MockHttpTransport transport = mockTransport(jsonDataResponse(new Objects()));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    ListPage<GoogleCloudStorageItemInfo> objectsPage =
+        gcs.listObjectInfoPage(
+            BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS, /* pageToken= */ null);
+
+    assertThat(objectsPage.getNextPageToken()).isNull();
+    assertThat(objectsPage.getItems()).isEmpty();
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectInfoPage_inferImplicit() throws IOException {
+    runTestListObjectInfoPage(true);
+  }
+
+  @Test
+  public void listObjectInfoPage_noInferImplicit() throws IOException {
+    runTestListObjectInfoPage(false);
+  }
+
+  private void runTestListObjectInfoPage(boolean inferImplicit) throws IOException {
     String objectPrefix = "foo/bar/baz/";
     String dir0Name = "foo/bar/baz/dir0/";
     String dir1Name = "foo/bar/baz/dir1/";
@@ -2139,29 +2835,33 @@ public class GoogleCloudStorageTest {
                     .setNextPageToken(null)));
 
     GoogleCloudStorageOptions gcsOptions =
-        GCS_OPTIONS.toBuilder().setInferImplicitDirectoriesEnabled(true).build();
-
+        GCS_OPTIONS.toBuilder().setInferImplicitDirectoriesEnabled(inferImplicit).build();
     GoogleCloudStorage gcs = mockedGcs(gcsOptions, transport);
 
     // List the objects
-    List<GoogleCloudStorageItemInfo> objectInfos = gcs.listObjectInfo(BUCKET_NAME, objectPrefix);
+    ListPage<GoogleCloudStorageItemInfo> objectInfos =
+        gcs.listObjectInfoPage(
+            BUCKET_NAME, objectPrefix, ListObjectOptions.DEFAULT, /* pageToken= */ null);
 
-    // Only one of our three directory objects existed.
-    assertThat(objectInfos)
-        .containsExactly(
-            createItemInfoForStorageObject(new StorageResourceId(BUCKET_NAME, dir1Name), dir1),
-            createInferredDirectory(new StorageResourceId(BUCKET_NAME, dir0Name)),
-            createInferredDirectory(new StorageResourceId(BUCKET_NAME, dir2Name)))
-        .inOrder();
+    assertThat(objectInfos.getNextPageToken()).isNull();
+    if (gcs.getOptions().isInferImplicitDirectoriesEnabled()) {
+      assertThat(objectInfos.getItems())
+          .containsExactly(
+              createInferredDirectory(new StorageResourceId(BUCKET_NAME, dir0Name)),
+              createItemInfoForStorageObject(new StorageResourceId(BUCKET_NAME, dir1Name), dir1),
+              createInferredDirectory(new StorageResourceId(BUCKET_NAME, dir2Name)))
+          .inOrder();
+    } else {
+      assertThat(objectInfos.getItems())
+          .containsExactly(
+              createItemInfoForStorageObject(new StorageResourceId(BUCKET_NAME, dir1Name), dir1))
+          .inOrder();
+    }
 
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(
-            listRequestString(
-                BUCKET_NAME,
-                /* includeTrailingDelimiter= */ true,
-                objectPrefix,
-                /* maxResults= */ 1024,
-                /* pageToken= */ null))
+            listRequestWithTrailingDelimiter(
+                BUCKET_NAME, objectPrefix, /* maxResults= */ 1024, /* pageToken= */ null))
         .inOrder();
   }
 

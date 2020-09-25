@@ -35,18 +35,20 @@ public class GoogleCloudStorageStringsTest {
   @Test
   public void testMatchListPrefixIllegalArguments() {
     String[][] invalidArgs = {
-      {"my-prefix", "/", null},
-      {"my-prefix", "/", ""},
-      // Even if prefix and delimiter are null, the argument-check should throw.
-      {null, null, null},
-      {null, null, ""},
+      {"my-prefix", null},
+      {"my-prefix", ""},
+      // Even if prefix is null, the argument-check should throw.
+      {null, null},
+      {null, ""},
     };
 
     for (String[] args : invalidArgs) {
       IllegalArgumentException iae =
           assertThrows(
               IllegalArgumentException.class,
-              () -> GoogleCloudStorageStrings.matchListPrefix(args[0], args[1], args[2]));
+              () ->
+                  GoogleCloudStorageStrings.matchListPrefix(
+                      args[0], args[1], ListObjectOptions.DEFAULT));
       assertThat(iae).hasMessageThat().matches(".*objectName.*");
     }
   }
@@ -92,8 +94,11 @@ public class GoogleCloudStorageStringsTest {
    */
   private void verifyExpectations(MatchResultExpectation[] expectations) {
     for (MatchResultExpectation expectation : expectations) {
-      String actualReturn = GoogleCloudStorageStrings.matchListPrefix(
-          expectation.objectNamePrefix, expectation.delimiter, expectation.objectName);
+      String actualReturn =
+          GoogleCloudStorageStrings.matchListPrefix(
+              expectation.objectNamePrefix,
+              expectation.objectName,
+              ListObjectOptions.DEFAULT.toBuilder().setDelimiter(expectation.delimiter).build());
       assertWithMessage(
               String.format("Got returnValue '%s' for expectation: %s", actualReturn, expectation))
           .that(actualReturn)

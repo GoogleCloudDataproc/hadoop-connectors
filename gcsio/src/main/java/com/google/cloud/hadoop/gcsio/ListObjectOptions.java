@@ -33,6 +33,7 @@ public abstract class ListObjectOptions {
   public static Builder builder() {
     return new AutoValue_ListObjectOptions.Builder()
         .setDelimiter(PATH_DELIMITER)
+        .setIncludePrefix(false)
         .setMaxResults(MAX_RESULTS_UNLIMITED);
   }
 
@@ -42,6 +43,9 @@ public abstract class ListObjectOptions {
   @Nullable
   public abstract String getDelimiter();
 
+  /** Whether to include prefix object in the result. */
+  public abstract boolean isIncludePrefix();
+
   /** Maximum number of results to return, unlimited if negative or zero. */
   public abstract long getMaxResults();
 
@@ -49,6 +53,8 @@ public abstract class ListObjectOptions {
   @AutoValue.Builder
   public abstract static class Builder {
     public abstract Builder setDelimiter(String delimiter);
+
+    public abstract Builder setIncludePrefix(boolean includePrefix);
 
     public abstract Builder setMaxResults(long maxResults);
 

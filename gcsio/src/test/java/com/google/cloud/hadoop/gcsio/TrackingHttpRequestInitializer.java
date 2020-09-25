@@ -312,6 +312,12 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         bucket, /* includeTrailingDelimiter= */ false, prefix, maxResults, pageToken);
   }
 
+  public static String listRequestWithTrailingDelimiter(
+      String bucket, String prefix, int maxResults, String pageToken) {
+    return listRequestString(
+        bucket, /* includeTrailingDelimiter= */ true, prefix, maxResults, pageToken);
+  }
+
   public static String listRequestString(
       String bucket,
       boolean includeTrailingDelimiter,
