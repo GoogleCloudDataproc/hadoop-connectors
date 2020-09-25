@@ -68,17 +68,25 @@ Storage connector is `gcs-connector` and for BigQuery connectors is
 
 To add a dependency on one of the connectors using Maven, use the following:
 
-```xml
-<dependency>
-  <groupId>com.google.cloud.bigdataoss</groupId>
-  <!-- Cloud Storage: -->
-  <artifactId>gcs-connector</artifactId>
-  <version>hadoop2-2.1.3</version>
-  <!-- or, for BigQuery: -->
-  <artifactId>bigquery-connector</artifactId>
-  <version>hadoop2-1.1.3</version>
-</dependency>
-```
+*   Cloud Storage connector:
+
+    ```xml
+    <dependency>
+      <groupId>com.google.cloud.bigdataoss</groupId>
+      <artifactId>gcs-connector</artifactId>
+      <version>hadoop2-2.1.5</version>
+    </dependency>
+    ```
+
+*   BigQuery connector:
+
+    ```xml
+    <dependency>
+      <groupId>com.google.cloud.bigdataoss</groupId>
+      <artifactId>bigquery-connector</artifactId>
+      <version>hadoop2-1.1.5</version>
+    </dependency>
+    ```
 
 ## Resources
 
