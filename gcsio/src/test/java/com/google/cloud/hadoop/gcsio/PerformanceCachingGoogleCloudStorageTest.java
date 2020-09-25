@@ -228,10 +228,8 @@ public class PerformanceCachingGoogleCloudStorageTest {
 
     // Verify the delegate call.
     verify(gcsDelegate).listObjectNames(eq(BUCKET_A), eq(PREFIX_A), eq(ListObjectOptions.DEFAULT));
-
     // Verify the result.
     assertThat(result).containsExactlyElementsIn(expectedResult);
-
     // Verify the state of the cache.
     assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expectedCached);
   }
@@ -252,10 +250,8 @@ public class PerformanceCachingGoogleCloudStorageTest {
     // Verify the delegate call.
     verify(gcsDelegate)
         .listObjectNames(eq(BUCKET_A), eq(prefixADir), eq(ListObjectOptions.DEFAULT));
-
     // Verify the result.
     assertThat(result).containsExactlyElementsIn(expectedResult);
-
     // Verify the state of the cache.
     assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expectedCached);
   }
@@ -275,7 +271,7 @@ public class PerformanceCachingGoogleCloudStorageTest {
             eq(BUCKET_B),
             ArgumentMatchers.eq(null),
             ArgumentMatchers.eq(ListObjectOptions.DEFAULT_FLAT_LIST));
-
+    // Verify the result.
     assertThat(result).containsExactlyElementsIn(expected);
     // Verify the state of the cache.
     assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expectedCached);
@@ -306,6 +302,7 @@ public class PerformanceCachingGoogleCloudStorageTest {
             eq(BUCKET_A),
             ArgumentMatchers.eq(null),
             ArgumentMatchers.eq(ListObjectOptions.DEFAULT_FLAT_LIST));
+    // Verify the result.
     assertThat(result).containsExactlyElementsIn(expected);
     // Verify the state of the cache.
     assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expectedCached);
@@ -326,10 +323,8 @@ public class PerformanceCachingGoogleCloudStorageTest {
 
     // Verify the delegate call.
     verify(gcsDelegate).listObjectInfo(eq(BUCKET_A), eq(prefixADir), eq(ListObjectOptions.DEFAULT));
-
     // Verify the result.
     assertThat(result).containsExactlyElementsIn(expectedResult);
-
     // Verify the state of the cache.
     assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expectedCached);
   }
@@ -348,7 +343,7 @@ public class PerformanceCachingGoogleCloudStorageTest {
             eq(BUCKET_B),
             ArgumentMatchers.eq(null),
             ArgumentMatchers.eq(ListObjectOptions.DEFAULT_FLAT_LIST));
-
+    // Verify the result.
     assertThat(result).containsExactlyElementsIn(expected);
     // Verify the state of the cache.
     assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expected);
@@ -372,6 +367,7 @@ public class PerformanceCachingGoogleCloudStorageTest {
             eq(BUCKET_A),
             ArgumentMatchers.eq(null),
             ArgumentMatchers.eq(ListObjectOptions.DEFAULT_FLAT_LIST));
+    // Verify the result.
     assertThat(result).containsExactlyElementsIn(expected);
     // Verify the state of the cache.
     assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expected);
