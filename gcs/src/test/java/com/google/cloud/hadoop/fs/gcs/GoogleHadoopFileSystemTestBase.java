@@ -343,9 +343,15 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     assertWithMessage("Expected to %s: %s", exists ? "exist" : "not exist", path)
         .that(gcsfs.exists(path))
         .isEqualTo(exists);
-    assertWithMessage("Expected to be a directory: %s", path)
-        .that(gcsfs.getFileInfo(path).isDirectory())
-        .isTrue();
+    if (exists) {
+      assertWithMessage("Expected to be a directory: %s", path)
+          .that(gcsfs.getFileInfo(path).isDirectory())
+          .isTrue();
+    } else {
+      assertWithMessage("Expected to have requested ID: %s", path)
+          .that(gcsfs.getFileInfo(path).getItemInfo().getResourceId())
+          .isEqualTo(StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true));
+    }
   }
 
   /** Validates makeQualified() when working directory is not root. */

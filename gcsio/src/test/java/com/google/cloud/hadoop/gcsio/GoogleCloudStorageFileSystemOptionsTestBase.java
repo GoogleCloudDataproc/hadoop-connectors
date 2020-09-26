@@ -149,7 +149,7 @@ public abstract class GoogleCloudStorageFileSystemOptionsTestBase {
     // should not exist.
     for (String dir : impliedDirs) {
       FileInfo dirInfo = gcsfs.getFileInfo(new URI(dir));
-      assertWithMessage("Implied directory " + dir + " should not exist.")
+      assertWithMessage("Implied directory %s should not exist.", dir)
           .that(dirInfo.exists())
           .isFalse();
     }

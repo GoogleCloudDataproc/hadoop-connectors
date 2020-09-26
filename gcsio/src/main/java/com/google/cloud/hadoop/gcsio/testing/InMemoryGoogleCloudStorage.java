@@ -458,7 +458,8 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
       }
     } else {
       if (!validateObjectName(resourceId.getObjectName())) {
-        throw new IOException("Error accessing");
+        throw new IOException(
+            String.format("Invalid object name: '%s'", resourceId.getObjectName()));
       }
       if (bucketLookup.containsKey(resourceId.getBucketName())
           && bucketLookup.get(resourceId.getBucketName()).get(resourceId.getObjectName()) != null) {
