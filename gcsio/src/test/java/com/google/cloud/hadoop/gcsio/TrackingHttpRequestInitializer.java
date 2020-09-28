@@ -82,7 +82,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   private static final String LIST_REQUEST_FORMAT =
       "GET:"
           + GOOGLEAPIS_ENDPOINT
-          + "/storage/v1/b/%s/o?delimiter=/&includeTrailingDelimiter=%s&maxResults=%d%s&prefix=%s";
+          + "/storage/v1/b/%s/o?delimiter=/&includeTrailingDelimiter=%s&maxResults=%d%s";
 
   private static final String LIST_SIMPLE_REQUEST_FORMAT =
       "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o?maxResults=%d&prefix=%s";
@@ -324,9 +324,10 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
       String prefix,
       int maxResults,
       String pageToken) {
-    String pageTokenParam = pageToken == null ? "" : "&pageToken=" + pageToken;
+    String extraParams = pageToken == null ? "" : "&pageToken=" + pageToken;
+    extraParams += prefix == null ? "" : "&prefix=" + prefix;
     return String.format(
-        LIST_REQUEST_FORMAT, bucket, includeTrailingDelimiter, maxResults, pageTokenParam, prefix);
+        LIST_REQUEST_FORMAT, bucket, includeTrailingDelimiter, maxResults, extraParams);
   }
 
   public static String createBucketRequestString(String projectId) {

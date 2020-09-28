@@ -1422,6 +1422,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     // Add prefix object name if necessary
     if (listOptions.isIncludePrefix()
+        && objectNamePrefix != null
         && listOptions.getDelimiter() != null
         && (!listedPrefixes.isEmpty() || !listedObjects.isEmpty())
         && (listedObjects.isEmpty() || !listedObjects.get(0).getName().equals(objectNamePrefix))) {
@@ -1521,6 +1522,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // Create inferred directory for the prefix object if necessary
     if (storageOptions.isInferImplicitDirectoriesEnabled()
         && listOptions.isIncludePrefix()
+        && objectNamePrefix != null
         && listOptions.getDelimiter() != null
         && (!listedPrefixes.isEmpty() || !listedObjects.isEmpty())
         && (listedObjects.isEmpty() || !listedObjects.get(0).getName().equals(objectNamePrefix))) {
