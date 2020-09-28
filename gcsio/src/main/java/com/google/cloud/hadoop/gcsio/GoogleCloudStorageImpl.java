@@ -1420,11 +1420,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // Size to accommodate listed prefixes, objects and prefix object
     List<String> objectNames = new ArrayList<>(listedPrefixes.size() + listedObjects.size() + 1);
 
-    // Add prefix object name if necessary
+    // Add a prefix name if necessary
     if (listOptions.isIncludePrefix()
+        // Only add a non-null prefix name
         && objectNamePrefix != null
-        && listOptions.getDelimiter() != null
+        // Only add a prefix name if listed any prefixes or objects, i.e prefix "exists"
         && (!listedPrefixes.isEmpty() || !listedObjects.isEmpty())
+        // Only add a prefix name if prefix object is not listed already
         && (listedObjects.isEmpty() || !listedObjects.get(0).getName().equals(objectNamePrefix))) {
       objectNames.add(objectNamePrefix);
     }
@@ -1522,9 +1524,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // Create inferred directory for the prefix object if necessary
     if (storageOptions.isInferImplicitDirectoriesEnabled()
         && listOptions.isIncludePrefix()
+        // Only add an inferred directory for non-null prefix name
         && objectNamePrefix != null
+        // Only add an inferred directory if listing in directory mode (non-flat listing)
         && listOptions.getDelimiter() != null
+        // Only add an inferred directory if listed any prefixes or objects, i.e prefix "exists"
         && (!listedPrefixes.isEmpty() || !listedObjects.isEmpty())
+        // Only add an inferred directory if prefix object is not listed already
         && (listedObjects.isEmpty() || !listedObjects.get(0).getName().equals(objectNamePrefix))) {
       objectInfos.add(createInferredDirectory(new StorageResourceId(bucketName, objectNamePrefix)));
     }
