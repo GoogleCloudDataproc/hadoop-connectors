@@ -40,11 +40,11 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 /**
  * InMemoryGoogleCloudStorage overrides the public methods of GoogleCloudStorage by implementing all
@@ -58,7 +58,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
           .build();
 
   // Mapping from bucketName to structs representing a bucket.
-  private final Map<String, InMemoryBucketEntry> bucketLookup = new HashMap<>();
+  private final Map<String, InMemoryBucketEntry> bucketLookup = new TreeMap<>();
   private final GoogleCloudStorageOptions storageOptions;
   private final Clock clock;
 
@@ -384,17 +384,19 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     if (bucketEntry == null) {
       return new ArrayList<>();
     }
-    Set<String> uniqueNames = new HashSet<>();
+    Set<String> uniqueNames = new TreeSet<>();
     for (String objectName : bucketEntry.getObjectNames()) {
       String processedName =
-          GoogleCloudStorageStrings.matchListPrefix(
-              objectNamePrefix, listOptions.getDelimiter(), objectName);
+          GoogleCloudStorageStrings.matchListPrefix(objectNamePrefix, objectName, listOptions);
       if (processedName != null) {
         uniqueNames.add(processedName);
       }
       if (listOptions.getMaxResults() > 0 && uniqueNames.size() >= listOptions.getMaxResults()) {
         break;
       }
+    }
+    if (listOptions.isIncludePrefix() && !uniqueNames.isEmpty() && objectNamePrefix != null) {
+      uniqueNames.add(objectNamePrefix);
     }
     return new ArrayList<>(uniqueNames);
   }

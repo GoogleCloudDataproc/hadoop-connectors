@@ -18,9 +18,9 @@ import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.common.base.MoreObjects;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * InMemoryBucketEntry represents a GCS bucket in-memory by containing mappings to objects in
@@ -30,7 +30,7 @@ import java.util.Set;
 public class InMemoryBucketEntry {
   // Mapping from objectName to InMemoryObjectEntries which hold byte contents, metadata, and write
   // channels.
-  private Map<String, InMemoryObjectEntry> objectLookup = new HashMap<>();
+  private Map<String, InMemoryObjectEntry> objectLookup = new TreeMap<>();
 
   // The metadata associated with this InMemoryBucketEntry compatible with GoogleCloudStorage; its
   // objectName is always null and size is zero.

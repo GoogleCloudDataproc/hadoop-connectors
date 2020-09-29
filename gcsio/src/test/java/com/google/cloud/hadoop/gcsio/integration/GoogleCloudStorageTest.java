@@ -18,6 +18,7 @@ import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHe
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.writeObject;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
+import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 
@@ -80,6 +81,9 @@ public class GoogleCloudStorageTest {
 
   // This string is used to prefix all bucket names that are created for GCS IO integration testing
   private static final String BUCKET_NAME_PREFIX = "gcsio-it";
+
+  private static final ListObjectOptions INCLUDE_PREFIX_LIST_OPTIONS =
+      ListObjectOptions.DEFAULT.toBuilder().setIncludePrefix(true).build();
 
   private static final Supplier<TestBucketHelper> BUCKET_HELPER =
       Suppliers.memoize(() -> new TestBucketHelper(BUCKET_NAME_PREFIX));
@@ -347,55 +351,113 @@ public class GoogleCloudStorageTest {
   }
 
   @Test
-  public void testListObjectNames() throws IOException {
+  public void listObjectNames() throws IOException {
     String bucketName = getSharedBucketName();
 
     StorageResourceId objectToCreate =
-        new StorageResourceId(bucketName, "testListObjectNames_Object");
+        new StorageResourceId(bucketName, "listObjectNames_test_object");
 
     writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
 
-    List<String> listedName = rawStorage.listObjectNames(bucketName, "testListObjectNames");
+    List<String> listedName = rawStorage.listObjectNames(bucketName, "listObjectNames_test_");
 
     assertThat(listedName).containsExactly(objectToCreate.getObjectName());
   }
 
   @Test
-  public void testListObjectInfo() throws IOException {
+  public void listObjectNames_includePrefix() throws IOException {
+    String bucketName = getSharedBucketName();
+
+    String prefix = "listObjectNames_includePrefix_test_";
+
+    StorageResourceId objectToCreate = new StorageResourceId(bucketName, prefix + "object");
+
+    writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
+
+    List<String> listedName =
+        rawStorage.listObjectNames(bucketName, prefix, INCLUDE_PREFIX_LIST_OPTIONS);
+
+    assertThat(listedName).containsExactly(prefix, objectToCreate.getObjectName()).inOrder();
+  }
+
+  @Test
+  public void listObjectInfo() throws IOException {
     String bucketName = getSharedBucketName();
 
     StorageResourceId objectToCreate =
-        new StorageResourceId(bucketName, "testListObjectInfo_Object");
+        new StorageResourceId(bucketName, "listObjectInfo_test_object");
 
     writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
 
     List<GoogleCloudStorageItemInfo> listedObjects =
-        rawStorage.listObjectInfo(bucketName, "testListObjectInfo_");
+        rawStorage.listObjectInfo(bucketName, "listObjectInfo_test_");
 
-    assertThat(listedObjects).hasSize(1);
-    assertThat(listedObjects.get(0).getObjectName()).isEqualTo(objectToCreate.getObjectName());
+    assertThat(
+            listedObjects.stream().map(GoogleCloudStorageItemInfo::getObjectName).collect(toList()))
+        .containsExactly(objectToCreate.getObjectName());
   }
 
   @Test
-  public void testlistObjectInfoPage() throws IOException {
+  public void listObjectInfo_includePrefix() throws IOException {
+    String bucketName = getSharedBucketName();
+
+    String prefix = "listObjectInfo_includePrefix_test_";
+
+    StorageResourceId objectToCreate = new StorageResourceId(bucketName, prefix + "object");
+
+    writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
+
+    List<GoogleCloudStorageItemInfo> listedObjects =
+        rawStorage.listObjectInfo(bucketName, prefix, INCLUDE_PREFIX_LIST_OPTIONS);
+
+    assertThat(
+            listedObjects.stream().map(GoogleCloudStorageItemInfo::getObjectName).collect(toList()))
+        .containsExactly(prefix, objectToCreate.getObjectName())
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectInfoPage() throws IOException {
     String bucketName = getSharedBucketName();
 
     StorageResourceId objectToCreate =
-        new StorageResourceId(bucketName, "testListObjectInfoPage_Object");
+        new StorageResourceId(bucketName, "listObjectInfoPage_test_object");
 
     writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
 
     ListPage<GoogleCloudStorageItemInfo> listedObjectsPage =
         rawStorage.listObjectInfoPage(
-            bucketName,
-            "testListObjectInfoPage_Object",
-            ListObjectOptions.DEFAULT,
-            /* pageToken= */ "");
+            bucketName, "listObjectInfoPage_test_", ListObjectOptions.DEFAULT, /* pageToken= */ "");
 
     assertThat(listedObjectsPage.getNextPageToken()).isNull();
-    assertThat(listedObjectsPage.getItems()).hasSize(1);
-    assertThat(listedObjectsPage.getItems().get(0).getObjectName())
-        .isEqualTo(objectToCreate.getObjectName());
+    assertThat(
+            listedObjectsPage.getItems().stream()
+                .map(GoogleCloudStorageItemInfo::getObjectName)
+                .collect(toList()))
+        .containsExactly(objectToCreate.getObjectName());
+  }
+
+  @Test
+  public void listObjectInfoPage_includePrefix() throws IOException {
+    String bucketName = getSharedBucketName();
+
+    String prefix = "listObjectInfoPage_includePrefix_test_";
+
+    StorageResourceId objectToCreate = new StorageResourceId(bucketName, prefix + "object");
+
+    writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
+
+    ListPage<GoogleCloudStorageItemInfo> listedObjectsPage =
+        rawStorage.listObjectInfoPage(
+            bucketName, prefix, INCLUDE_PREFIX_LIST_OPTIONS, /* pageToken= */ "");
+
+    assertThat(listedObjectsPage.getNextPageToken()).isNull();
+    assertThat(
+            listedObjectsPage.getItems().stream()
+                .map(GoogleCloudStorageItemInfo::getObjectName)
+                .collect(toList()))
+        .containsExactly(prefix, objectToCreate.getObjectName())
+        .inOrder();
   }
 
   @Test
@@ -737,94 +799,402 @@ public class GoogleCloudStorageTest {
   }
 
   @Test
-  public void testListObjectNamesLimited() throws IOException {
+  public void listObjectNames_limited() throws IOException {
     String bucketName = getSharedBucketName();
 
     String[] names = {"a", "b", "c", "d"};
     for (String name : names) {
       StorageResourceId id =
-          new StorageResourceId(bucketName, "testListObjectNamesLimited_" + name);
+          new StorageResourceId(bucketName, "listObjectNames_limited_test_" + name);
       rawStorage.createEmptyObject(id);
     }
 
     List<String> gcsNames =
         rawStorage.listObjectNames(
             bucketName,
-            "testListObjectNamesLimited_",
+            "listObjectNames_limited_test_",
             ListObjectOptions.DEFAULT.toBuilder().setMaxResults(2).build());
 
-    assertThat(gcsNames).hasSize(2);
+    assertThat(gcsNames)
+        .containsExactly("listObjectNames_limited_test_a", "listObjectNames_limited_test_b")
+        .inOrder();
   }
 
   @Test
-  public void testListObjectInfoLimited() throws IOException {
+  public void listObjectNames_includePrefix_limited() throws IOException {
+    String bucketName = getSharedBucketName();
+
+    rawStorage.createEmptyObject(
+        new StorageResourceId(bucketName, "listObjectNames_includePrefix_limited_test_"));
+    String[] names = {"a", "b", "c", "d"};
+    for (String name : names) {
+      StorageResourceId id =
+          new StorageResourceId(bucketName, "listObjectNames_includePrefix_limited_test_" + name);
+      rawStorage.createEmptyObject(id);
+    }
+
+    List<String> gcsNames =
+        rawStorage.listObjectNames(
+            bucketName,
+            "listObjectNames_includePrefix_limited_test_",
+            ListObjectOptions.DEFAULT.toBuilder().setIncludePrefix(true).setMaxResults(2).build());
+
+    assertThat(gcsNames)
+        .containsExactly(
+            "listObjectNames_includePrefix_limited_test_",
+            "listObjectNames_includePrefix_limited_test_a")
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectNames_subdirectories() throws IOException {
+    String bucketName = getSharedBucketName();
+
+    String[] names = {
+      "listObjectNames_subdirectories_test_",
+      "listObjectNames_subdirectories_test_d1/",
+      "listObjectNames_subdirectories_test_d1/o1",
+      "listObjectNames_subdirectories_test_d2/d3/",
+      "listObjectNames_subdirectories_test_d2/d3/o2"
+    };
+    for (String name : names) {
+      StorageResourceId id = new StorageResourceId(bucketName, name);
+      rawStorage.createEmptyObject(id);
+    }
+
+    GoogleCloudStorageItemInfo itemInfo =
+        rawStorage.getItemInfo(
+            new StorageResourceId(bucketName, "listObjectNames_subdirectories_test_d2/"));
+    assertThat(itemInfo.exists()).isFalse();
+
+    List<String> rootNames =
+        rawStorage.listObjectNames(bucketName, "listObjectNames_subdirectories_test_");
+    assertWithMessage("Infos not expected to be empty")
+        .that(rootNames)
+        .containsExactly(
+            "listObjectNames_subdirectories_test_",
+            "listObjectNames_subdirectories_test_d1/",
+            "listObjectNames_subdirectories_test_d2/")
+        .inOrder();
+
+    GoogleCloudStorageItemInfo d2Info =
+        rawStorage.getItemInfo(
+            new StorageResourceId(bucketName, "listObjectNames_subdirectories_test_d2/"));
+    assertThat(d2Info.exists())
+        .isEqualTo(rawStorage instanceof PerformanceCachingGoogleCloudStorage);
+
+    List<String> d2ItemNames =
+        rawStorage.listObjectNames(bucketName, "listObjectNames_subdirectories_test_d2/");
+    assertWithMessage("D2 item infos expected to be not empty")
+        .that(d2ItemNames)
+        .containsExactly("listObjectNames_subdirectories_test_d2/d3/");
+
+    List<String> d3ItemNames =
+        rawStorage.listObjectNames(bucketName, "listObjectNames_subdirectories_test_d2/d3/");
+    assertWithMessage("D3 item infos expected to be not empty")
+        .that(d3ItemNames)
+        .containsExactly("listObjectNames_subdirectories_test_d2/d3/o2");
+
+    // Testing GCS treating object names as opaque blobs
+    List<String> blobNames =
+        rawStorage.listObjectNames(
+            bucketName,
+            "listObjectNames_subdirectories_test_",
+            ListObjectOptions.DEFAULT_FLAT_LIST);
+
+    assertWithMessage("blobNamesInfo not expected to be empty")
+        .that(blobNames)
+        .containsExactly(
+            "listObjectNames_subdirectories_test_",
+            "listObjectNames_subdirectories_test_d1/",
+            "listObjectNames_subdirectories_test_d1/o1",
+            "listObjectNames_subdirectories_test_d2/d3/",
+            "listObjectNames_subdirectories_test_d2/d3/o2")
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectNames_includePrefix_subdirectories() throws IOException {
+    String bucketName = getSharedBucketName();
+
+    String[] names = {
+      "listObjectNames_includePrefix_subdirectories_test_",
+      "listObjectNames_includePrefix_subdirectories_test_d1/",
+      "listObjectNames_includePrefix_subdirectories_test_d1/o1",
+      "listObjectNames_includePrefix_subdirectories_test_d2/d3/",
+      "listObjectNames_includePrefix_subdirectories_test_d2/d3/o2"
+    };
+    for (String name : names) {
+      StorageResourceId id = new StorageResourceId(bucketName, name);
+      rawStorage.createEmptyObject(id);
+    }
+
+    GoogleCloudStorageItemInfo itemInfo =
+        rawStorage.getItemInfo(
+            new StorageResourceId(
+                bucketName, "listObjectNames_includePrefix_subdirectories_test_d2/"));
+    assertThat(itemInfo.exists()).isFalse();
+
+    List<String> rootNames =
+        rawStorage.listObjectNames(
+            bucketName,
+            "listObjectNames_includePrefix_subdirectories_test_",
+            INCLUDE_PREFIX_LIST_OPTIONS);
+    assertWithMessage("Infos not expected to be empty")
+        .that(rootNames)
+        .containsExactly(
+            "listObjectNames_includePrefix_subdirectories_test_",
+            "listObjectNames_includePrefix_subdirectories_test_d1/",
+            "listObjectNames_includePrefix_subdirectories_test_d2/")
+        .inOrder();
+
+    GoogleCloudStorageItemInfo d2Info =
+        rawStorage.getItemInfo(
+            new StorageResourceId(
+                bucketName, "listObjectNames_includePrefix_subdirectories_test_d2/"));
+    assertThat(d2Info.exists())
+        .isEqualTo(rawStorage instanceof PerformanceCachingGoogleCloudStorage);
+
+    List<String> d2ItemNames =
+        rawStorage.listObjectNames(
+            bucketName,
+            "listObjectNames_includePrefix_subdirectories_test_d2/",
+            INCLUDE_PREFIX_LIST_OPTIONS);
+    assertWithMessage("D2 item infos expected to be not empty")
+        .that(d2ItemNames)
+        .containsExactly(
+            "listObjectNames_includePrefix_subdirectories_test_d2/",
+            "listObjectNames_includePrefix_subdirectories_test_d2/d3/")
+        .inOrder();
+
+    List<String> d3ItemNames =
+        rawStorage.listObjectNames(
+            bucketName,
+            "listObjectNames_includePrefix_subdirectories_test_d2/d3/",
+            INCLUDE_PREFIX_LIST_OPTIONS);
+    assertWithMessage("D3 item infos expected to be not empty")
+        .that(d3ItemNames)
+        .containsExactly(
+            "listObjectNames_includePrefix_subdirectories_test_d2/d3/",
+            "listObjectNames_includePrefix_subdirectories_test_d2/d3/o2")
+        .inOrder();
+
+    // Testing GCS treating object names as opaque blobs
+    List<String> blobNames =
+        rawStorage.listObjectNames(
+            bucketName,
+            "listObjectNames_includePrefix_subdirectories_test_",
+            ListObjectOptions.DEFAULT_FLAT_LIST.toBuilder().setIncludePrefix(true).build());
+
+    assertWithMessage("blobNamesInfo not expected to be empty")
+        .that(blobNames)
+        .containsExactly(
+            "listObjectNames_includePrefix_subdirectories_test_",
+            "listObjectNames_includePrefix_subdirectories_test_d1/",
+            "listObjectNames_includePrefix_subdirectories_test_d1/o1",
+            "listObjectNames_includePrefix_subdirectories_test_d2/d3/",
+            "listObjectNames_includePrefix_subdirectories_test_d2/d3/o2")
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectInfo_limited() throws IOException {
     String bucketName = getSharedBucketName();
 
     String[] names = {"x", "y", "z"};
     for (String name : names) {
-      StorageResourceId id = new StorageResourceId(bucketName, "testListObjectInfoLimited_" + name);
+      StorageResourceId id =
+          new StorageResourceId(bucketName, "listObjectInfo_limited_test_" + name);
       rawStorage.createEmptyObject(id);
     }
 
     List<GoogleCloudStorageItemInfo> info =
         rawStorage.listObjectInfo(
             bucketName,
-            "testListObjectInfoLimited_",
+            "listObjectInfo_limited_",
             ListObjectOptions.DEFAULT.toBuilder().setMaxResults(2).build());
 
-    assertThat(info).hasSize(2);
+    assertThat(info.stream().map(GoogleCloudStorageItemInfo::getObjectName).collect(toList()))
+        .containsExactly("listObjectInfo_limited_test_x", "listObjectInfo_limited_test_y")
+        .inOrder();
   }
 
   @Test
-  public void testListObjectInfoWithDirectoryRepair() throws IOException {
+  public void listObjectInfo_includePrefix_limited() throws IOException {
     String bucketName = getSharedBucketName();
 
-    StorageResourceId d1 =
-        new StorageResourceId(bucketName, "testListObjectInfoWithDirectoryRepair_d1/");
-    rawStorage.createEmptyObject(d1);
+    rawStorage.createEmptyObject(
+        new StorageResourceId(bucketName, "listObjectInfo_includePrefix_limited_test_"));
 
-    StorageResourceId o1 =
-        new StorageResourceId(bucketName, "testListObjectInfoWithDirectoryRepair_d1/o1");
-    rawStorage.createEmptyObject(o1);
+    String[] names = {"x", "y", "z"};
+    for (String name : names) {
+      StorageResourceId id =
+          new StorageResourceId(bucketName, "listObjectInfo_includePrefix_limited_test_" + name);
+      rawStorage.createEmptyObject(id);
+    }
 
-    // No empty d2/ prefix:
-    StorageResourceId d3 =
-        new StorageResourceId(bucketName, "testListObjectInfoWithDirectoryRepair_d2/d3/");
-    rawStorage.createEmptyObject(d3);
+    List<GoogleCloudStorageItemInfo> info =
+        rawStorage.listObjectInfo(
+            bucketName,
+            "listObjectInfo_includePrefix_limited_test_",
+            ListObjectOptions.DEFAULT.toBuilder().setMaxResults(2).build());
 
-    StorageResourceId o2 =
-        new StorageResourceId(bucketName, "testListObjectInfoWithDirectoryRepair_d2/d3/o2");
-    rawStorage.createEmptyObject(o2);
+    assertThat(info.stream().map(GoogleCloudStorageItemInfo::getObjectName).collect(toList()))
+        .containsExactly(
+            "listObjectInfo_includePrefix_limited_test_",
+            "listObjectInfo_includePrefix_limited_test_x")
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectInfo_subdirectories() throws IOException {
+    String bucketName = getSharedBucketName();
+
+    String[] names = {
+      "listObjectInfo_subdirectories_test_",
+      "listObjectInfo_subdirectories_test_d1/",
+      "listObjectInfo_subdirectories_test_d1/o1",
+      "listObjectInfo_subdirectories_test_d2/d3/",
+      "listObjectInfo_subdirectories_test_d2/d3/o2"
+    };
+    for (String name : names) {
+      StorageResourceId id = new StorageResourceId(bucketName, name);
+      rawStorage.createEmptyObject(id);
+    }
 
     GoogleCloudStorageItemInfo itemInfo =
         rawStorage.getItemInfo(
-            new StorageResourceId(bucketName, "testListObjectInfoWithDirectoryRepair_d2/"));
+            new StorageResourceId(bucketName, "listObjectInfo_subdirectories_test_d2/"));
     assertThat(itemInfo.exists()).isFalse();
 
     List<GoogleCloudStorageItemInfo> rootInfo =
-        rawStorage.listObjectInfo(bucketName, "testListObjectInfoWithDirectoryRepair_");
-
-    assertWithMessage("Infos not expected to be empty").that(rootInfo).hasSize(2);
+        rawStorage.listObjectInfo(bucketName, "listObjectInfo_subdirectories_test_");
+    assertWithMessage("Infos not expected to be empty")
+        .that(rootInfo.stream().map(GoogleCloudStorageItemInfo::getObjectName).collect(toList()))
+        .containsExactly(
+            "listObjectInfo_subdirectories_test_",
+            "listObjectInfo_subdirectories_test_d1/",
+            "listObjectInfo_subdirectories_test_d2/")
+        .inOrder();
 
     GoogleCloudStorageItemInfo d2Info =
         rawStorage.getItemInfo(
-            new StorageResourceId(bucketName, "testListObjectInfoWithDirectoryRepair_d2/"));
+            new StorageResourceId(bucketName, "listObjectInfo_subdirectories_test_d2/"));
     assertThat(d2Info.exists())
         .isEqualTo(rawStorage instanceof PerformanceCachingGoogleCloudStorage);
 
-    List<GoogleCloudStorageItemInfo> d2ItemInfo =
-        rawStorage.listObjectInfo(bucketName, "testListObjectInfoWithDirectoryRepair_d2/d3/");
-    assertWithMessage("D2 item info not expected to be empty").that(d2ItemInfo.isEmpty()).isFalse();
+    List<GoogleCloudStorageItemInfo> d2ItemInfos =
+        rawStorage.listObjectInfo(bucketName, "listObjectInfo_subdirectories_test_d2/");
+    assertWithMessage("D2 item infos expected to be not empty")
+        .that(d2ItemInfos.stream().map(GoogleCloudStorageItemInfo::getObjectName).collect(toList()))
+        .containsExactly("listObjectInfo_subdirectories_test_d2/d3/");
+
+    List<GoogleCloudStorageItemInfo> d3ItemInfos =
+        rawStorage.listObjectInfo(bucketName, "listObjectInfo_subdirectories_test_d2/d3/");
+    assertWithMessage("D3 item infos expected to be not empty")
+        .that(d3ItemInfos.stream().map(GoogleCloudStorageItemInfo::getObjectName).collect(toList()))
+        .containsExactly("listObjectInfo_subdirectories_test_d2/d3/o2");
+
+    // Testing GCS treating object names as opaque blobs
+    List<GoogleCloudStorageItemInfo> blobNamesInfo =
+        rawStorage.listObjectInfo(
+            bucketName, "listObjectInfo_subdirectories_test_", ListObjectOptions.DEFAULT_FLAT_LIST);
+
+    assertWithMessage("blobNamesInfo not expected to be empty")
+        .that(
+            blobNamesInfo.stream().map(GoogleCloudStorageItemInfo::getObjectName).collect(toList()))
+        .containsExactly(
+            "listObjectInfo_subdirectories_test_",
+            "listObjectInfo_subdirectories_test_d1/",
+            "listObjectInfo_subdirectories_test_d1/o1",
+            "listObjectInfo_subdirectories_test_d2/d3/",
+            "listObjectInfo_subdirectories_test_d2/d3/o2")
+        .inOrder();
+  }
+
+  @Test
+  public void listObjectInfo_includePrefix_subdirectories() throws IOException {
+    String bucketName = getSharedBucketName();
+
+    String[] names = {
+      "listObjectInfo_includePrefix_subdirectories_test_",
+      "listObjectInfo_includePrefix_subdirectories_test_d1/",
+      "listObjectInfo_includePrefix_subdirectories_test_d1/o1",
+      "listObjectInfo_includePrefix_subdirectories_test_d2/d3/",
+      "listObjectInfo_includePrefix_subdirectories_test_d2/d3/o2"
+    };
+    for (String name : names) {
+      StorageResourceId id = new StorageResourceId(bucketName, name);
+      rawStorage.createEmptyObject(id);
+    }
+
+    GoogleCloudStorageItemInfo itemInfo =
+        rawStorage.getItemInfo(
+            new StorageResourceId(
+                bucketName, "listObjectInfo_includePrefix_subdirectories_test_d2/"));
+    assertThat(itemInfo.exists()).isFalse();
+
+    List<GoogleCloudStorageItemInfo> rootInfo =
+        rawStorage.listObjectInfo(
+            bucketName,
+            "listObjectInfo_includePrefix_subdirectories_test_",
+            INCLUDE_PREFIX_LIST_OPTIONS);
+    assertWithMessage("Infos not expected to be empty")
+        .that(rootInfo.stream().map(GoogleCloudStorageItemInfo::getObjectName).collect(toList()))
+        .containsExactly(
+            "listObjectInfo_includePrefix_subdirectories_test_",
+            "listObjectInfo_includePrefix_subdirectories_test_d1/",
+            "listObjectInfo_includePrefix_subdirectories_test_d2/")
+        .inOrder();
+
+    GoogleCloudStorageItemInfo d2Info =
+        rawStorage.getItemInfo(
+            new StorageResourceId(
+                bucketName, "listObjectInfo_includePrefix_subdirectories_test_d2/"));
+    assertThat(d2Info.exists())
+        .isEqualTo(rawStorage instanceof PerformanceCachingGoogleCloudStorage);
+
+    List<GoogleCloudStorageItemInfo> d2ItemInfos =
+        rawStorage.listObjectInfo(
+            bucketName,
+            "listObjectInfo_includePrefix_subdirectories_test_d2/",
+            INCLUDE_PREFIX_LIST_OPTIONS);
+    assertWithMessage("D2 item infos expected to be not empty")
+        .that(d2ItemInfos.stream().map(GoogleCloudStorageItemInfo::getObjectName).collect(toList()))
+        .containsExactly(
+            "listObjectInfo_includePrefix_subdirectories_test_d2/",
+            "listObjectInfo_includePrefix_subdirectories_test_d2/d3/")
+        .inOrder();
+
+    List<GoogleCloudStorageItemInfo> d3ItemInfos =
+        rawStorage.listObjectInfo(
+            bucketName,
+            "listObjectInfo_includePrefix_subdirectories_test_d2/d3/",
+            INCLUDE_PREFIX_LIST_OPTIONS);
+    assertWithMessage("D3 item infos expected to be not empty")
+        .that(d3ItemInfos.stream().map(GoogleCloudStorageItemInfo::getObjectName).collect(toList()))
+        .containsExactly(
+            "listObjectInfo_includePrefix_subdirectories_test_d2/d3/",
+            "listObjectInfo_includePrefix_subdirectories_test_d2/d3/o2")
+        .inOrder();
 
     // Testing GCS treating object names as opaque blobs
     List<GoogleCloudStorageItemInfo> blobNamesInfo =
         rawStorage.listObjectInfo(
             bucketName,
-            "testListObjectInfoWithDirectoryRepair_",
-            ListObjectOptions.DEFAULT_FLAT_LIST);
+            "listObjectInfo_includePrefix_subdirectories_test_",
+            ListObjectOptions.DEFAULT_FLAT_LIST.toBuilder().setIncludePrefix(true).build());
+
     assertWithMessage("blobNamesInfo not expected to be empty")
-        .that(blobNamesInfo.isEmpty())
-        .isFalse();
+        .that(
+            blobNamesInfo.stream().map(GoogleCloudStorageItemInfo::getObjectName).collect(toList()))
+        .containsExactly(
+            "listObjectInfo_includePrefix_subdirectories_test_",
+            "listObjectInfo_includePrefix_subdirectories_test_d1/",
+            "listObjectInfo_includePrefix_subdirectories_test_d1/o1",
+            "listObjectInfo_includePrefix_subdirectories_test_d2/d3/",
+            "listObjectInfo_includePrefix_subdirectories_test_d2/d3/o2")
+        .inOrder();
   }
 
   @Test
