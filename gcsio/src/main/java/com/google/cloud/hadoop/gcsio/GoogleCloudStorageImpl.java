@@ -21,6 +21,8 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createJ
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInferredDirectory;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.Sets.newConcurrentHashSet;
 
 import com.google.api.client.auth.oauth2.Credential;
@@ -61,7 +63,6 @@ import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -81,6 +82,7 @@ import java.nio.file.FileAlreadyExistsException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -448,8 +450,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @Override
   public void createBucket(String bucketName, CreateBucketOptions options) throws IOException {
     logger.atFine().log("createBucket(%s)", bucketName);
-    Preconditions.checkArgument(
-        !Strings.isNullOrEmpty(bucketName), "bucketName must not be null or empty");
+    Preconditions.checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
     checkNotNull(options, "options must not be null");
     checkNotNull(storageOptions.getProjectId(), "projectId must not be null");
 
@@ -681,7 +682,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // Validate all the inputs first.
     for (String bucketName : bucketNames) {
       Preconditions.checkArgument(
-          !Strings.isNullOrEmpty(bucketName), "bucketName must not be null or empty");
+          !isNullOrEmpty(bucketName), "bucketName must not be null or empty");
     }
 
     // Gather exceptions to wrap in a composite exception at the end.
@@ -878,10 +879,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       List<String> dstObjectNames,
       GoogleCloudStorage gcsImpl)
       throws IOException {
-    Preconditions.checkArgument(!Strings.isNullOrEmpty(srcBucketName),
-        "srcBucketName must not be null or empty");
-    Preconditions.checkArgument(!Strings.isNullOrEmpty(dstBucketName),
-        "dstBucketName must not be null or empty");
+    Preconditions.checkArgument(
+        !isNullOrEmpty(srcBucketName), "srcBucketName must not be null or empty");
+    Preconditions.checkArgument(
+        !isNullOrEmpty(dstBucketName), "dstBucketName must not be null or empty");
     Preconditions.checkArgument(srcObjectNames != null,
         "srcObjectNames must not be null");
     Preconditions.checkArgument(dstObjectNames != null,
@@ -916,10 +917,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       }
     }
     for (int i = 0; i < srcObjectNames.size(); i++) {
-      Preconditions.checkArgument(!Strings.isNullOrEmpty(srcObjectNames.get(i)),
-          "srcObjectName must not be null or empty");
-      Preconditions.checkArgument(!Strings.isNullOrEmpty(dstObjectNames.get(i)),
-          "dstObjectName must not be null or empty");
+      Preconditions.checkArgument(
+          !isNullOrEmpty(srcObjectNames.get(i)), "srcObjectName must not be null or empty");
+      Preconditions.checkArgument(
+          !isNullOrEmpty(dstObjectNames.get(i)), "dstObjectName must not be null or empty");
       if (srcBucketName.equals(dstBucketName)
           && srcObjectNames.get(i).equals(dstObjectNames.get(i))) {
         throw new IllegalArgumentException(
@@ -1318,7 +1319,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       // Determine if the caller sent a directory name as a prefix.
       String objectNamePrefix = listObject.getPrefix();
       boolean objectPrefixEndsWithDelimiter =
-          !Strings.isNullOrEmpty(objectNamePrefix) && objectNamePrefix.endsWith(PATH_DELIMITER);
+          !isNullOrEmpty(objectNamePrefix) && objectNamePrefix.endsWith(PATH_DELIMITER);
 
       long maxRemainingResults =
           getMaxRemainingResults(listOptions.getMaxResults(), prefixes, listedObjects);
@@ -1332,6 +1333,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           }
           // Do not break here, because we want to be sure
           // that we replaced all prefixes with prefix objects
+        } else if (listOptions.isIncludePrefix() && object.getName().equals(objectNamePrefix)) {
+          checkState(
+              listedObjects.isEmpty(), "prefix object should be the first object in the result");
+          listedObjects.add(object);
         }
       }
     }
@@ -1352,7 +1357,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     logger.atFine().log(
         "createListRequest(%s, %s, %s, %s, %d)",
         bucketName, objectNamePrefix, delimiter, includeTrailingDelimiter, maxResults);
-    checkArgument(!Strings.isNullOrEmpty(bucketName), "bucketName must not be null or empty");
+    checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
 
     Storage.Objects.List listObject = initializeRequest(gcs.objects().list(bucketName), bucketName);
 
@@ -1371,7 +1376,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
 
     // Set prefix if supplied.
-    if (!Strings.isNullOrEmpty(objectNamePrefix)) {
+    if (!isNullOrEmpty(objectNamePrefix)) {
       listObject.setPrefix(objectNamePrefix);
     }
 
@@ -1412,13 +1417,30 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         listedObjects,
         listedPrefixes);
 
+    // Size to accommodate listed prefixes, objects and prefix object
+    List<String> objectNames = new ArrayList<>(listedPrefixes.size() + listedObjects.size() + 1);
+
+    // Add a prefix name if necessary
+    if (listOptions.isIncludePrefix()
+        // Only add a non-null prefix name
+        && objectNamePrefix != null
+        // Only add a prefix name if listed any prefixes or objects, i.e prefix "exists"
+        && (!listedPrefixes.isEmpty() || !listedObjects.isEmpty())
+        // Only add a prefix name if prefix object is not listed already
+        && (listedObjects.isEmpty() || !listedObjects.get(0).getName().equals(objectNamePrefix))) {
+      objectNames.add(objectNamePrefix);
+    }
+
+    objectNames.addAll(listedPrefixes);
+
     // Just use the prefix list as a starting point, and extract all the names from the
     // StorageObjects, adding them to the list.
-    // TODO(user): Maybe de-dupe if it's possible for GCS to return duplicates.
-    List<String> objectNames = listedPrefixes;
     for (StorageObject obj : listedObjects) {
       objectNames.add(obj.getName());
     }
+
+    objectNames.sort(String::compareTo);
+
     return objectNames;
   }
 
@@ -1447,21 +1469,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         listedObjects,
         listedPrefixes);
 
-    // For the listedObjects, we simply parse each item into a GoogleCloudStorageItemInfo without
-    // further work.
-    List<GoogleCloudStorageItemInfo> objectInfos = new ArrayList<>(listedObjects.size());
-    for (StorageObject obj : listedObjects) {
-      objectInfos.add(
-          createItemInfoForStorageObject(new StorageResourceId(bucketName, obj.getName()), obj));
-    }
-
-    if (listedPrefixes.isEmpty()) {
-      return objectInfos;
-    }
-
-    handlePrefixes(bucketName, listedPrefixes, objectInfos);
-
-    return objectInfos;
+    return getGoogleCloudStorageItemInfos(
+        bucketName, objectNamePrefix, listOptions, listedPrefixes, listedObjects);
   }
 
   /** @see GoogleCloudStorage#listObjectInfoPage(String, String, ListObjectOptions, String) */
@@ -1494,19 +1503,49 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     List<String> listedPrefixes = new ArrayList<>();
     String nextPageToken =
         listStorageObjectsAndPrefixesPage(listObject, listOptions, listedObjects, listedPrefixes);
+    List<GoogleCloudStorageItemInfo> objectInfos =
+        getGoogleCloudStorageItemInfos(
+            bucketName, objectNamePrefix, listOptions, listedPrefixes, listedObjects);
+    return new ListPage<>(objectInfos, nextPageToken);
+  }
+
+  private List<GoogleCloudStorageItemInfo> getGoogleCloudStorageItemInfos(
+      String bucketName,
+      String objectNamePrefix,
+      ListObjectOptions listOptions,
+      List<String> listedPrefixes,
+      List<StorageObject> listedObjects) {
+    List<GoogleCloudStorageItemInfo> objectInfos =
+        new ArrayList<>(
+            // Size to accommodate inferred directories for listed prefixes and prefix object
+            (storageOptions.isInferImplicitDirectoriesEnabled() ? listedPrefixes.size() + 1 : 0)
+                + listedObjects.size());
+
+    // Create inferred directory for the prefix object if necessary
+    if (storageOptions.isInferImplicitDirectoriesEnabled()
+        && listOptions.isIncludePrefix()
+        // Only add an inferred directory for non-null prefix name
+        && objectNamePrefix != null
+        // Only add an inferred directory if listing in directory mode (non-flat listing)
+        && listOptions.getDelimiter() != null
+        // Only add an inferred directory if listed any prefixes or objects, i.e prefix "exists"
+        && (!listedPrefixes.isEmpty() || !listedObjects.isEmpty())
+        // Only add an inferred directory if prefix object is not listed already
+        && (listedObjects.isEmpty() || !listedObjects.get(0).getName().equals(objectNamePrefix))) {
+      objectInfos.add(createInferredDirectory(new StorageResourceId(bucketName, objectNamePrefix)));
+    }
+
     // For the listedObjects, we simply parse each item into a GoogleCloudStorageItemInfo without
     // further work.
-    List<GoogleCloudStorageItemInfo> objectInfos = new ArrayList<>(listedObjects.size());
     for (StorageObject obj : listedObjects) {
-      objectInfos.add(
-          createItemInfoForStorageObject(new StorageResourceId(bucketName, obj.getName()), obj));
+      objectInfos.add(createItemInfoForStorageObject(obj));
     }
 
-    if (!listedPrefixes.isEmpty()) {
-      handlePrefixes(bucketName, listedPrefixes, objectInfos);
-    }
+    handlePrefixes(bucketName, listedPrefixes, objectInfos);
 
-    return new ListPage<>(objectInfos, nextPageToken);
+    objectInfos.sort(Comparator.comparing(GoogleCloudStorageItemInfo::getObjectName));
+
+    return objectInfos;
   }
 
   /** Handle prefixes without prefix objects. */
@@ -1516,10 +1555,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       for (String prefix : prefixes) {
         objectInfos.add(createInferredDirectory(new StorageResourceId(bucketName, prefix)));
       }
-    } else {
-      logger.atInfo().log(
-          "Inferred directories are disabled, giving up on retrieving missing directories: %s",
-          prefixes);
+    } else if (!prefixes.isEmpty()) {
+      logger.atInfo().log("Inferred directories are disabled for prefixes: %s", prefixes);
     }
   }
 
@@ -1543,6 +1580,14 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         /* size= */ 0,
         bucket.getLocation(),
         bucket.getStorageClass());
+  }
+
+  public static GoogleCloudStorageItemInfo createItemInfoForStorageObject(StorageObject object) {
+    checkNotNull(object, "object must not be null");
+    checkArgument(!isNullOrEmpty(object.getBucket()), "object must have a bucket: %s", object);
+    checkArgument(!isNullOrEmpty(object.getName()), "object must have a name: %s", object);
+    return createItemInfoForStorageObject(
+        new StorageResourceId(object.getBucket(), object.getName()), object);
   }
 
   /**
@@ -1570,11 +1615,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     byte[] md5Hash = null;
     byte[] crc32c = null;
 
-    if (!Strings.isNullOrEmpty(object.getCrc32c())) {
+    if (!isNullOrEmpty(object.getCrc32c())) {
       crc32c = BaseEncoding.base64().decode(object.getCrc32c());
     }
 
-    if (!Strings.isNullOrEmpty(object.getMd5Hash())) {
+    if (!isNullOrEmpty(object.getMd5Hash())) {
       md5Hash = BaseEncoding.base64().decode(object.getMd5Hash());
     }
 
@@ -1893,7 +1938,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private Bucket getBucket(String bucketName)
       throws IOException {
     logger.atFine().log("getBucket(%s)", bucketName);
-    checkArgument(!Strings.isNullOrEmpty(bucketName), "bucketName must not be null or empty");
+    checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
     Storage.Buckets.Get getBucket = initializeRequest(gcs.buckets().get(bucketName), bucketName);
     try {
       return getBucket.execute();

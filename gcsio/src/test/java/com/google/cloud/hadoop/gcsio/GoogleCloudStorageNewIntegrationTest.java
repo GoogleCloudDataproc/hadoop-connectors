@@ -24,6 +24,7 @@ import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getBu
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getMediaRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestString;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestWithTrailingDelimiter;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.postRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.resumableUploadChunkRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.resumableUploadRequestString;
@@ -63,6 +64,9 @@ public class GoogleCloudStorageNewIntegrationTest {
 
   private static final CreateObjectOptions GZIP_CREATE_OPTIONS =
       CreateObjectOptions.DEFAULT_NO_OVERWRITE.toBuilder().setContentEncoding("gzip").build();
+
+  private static final ListObjectOptions INCLUDE_PREFIX_LIST_OPTIONS =
+      ListObjectOptions.DEFAULT.toBuilder().setIncludePrefix(true).build();
 
   private static GoogleCloudStorageOptions gcsOptions;
   private static RetryHttpInitializer httpRequestsInitializer;
@@ -188,7 +192,7 @@ public class GoogleCloudStorageNewIntegrationTest {
         gcs.listObjectInfo(
             testBucket, testDir, ListObjectOptions.DEFAULT.toBuilder().setMaxResults(1).build());
 
-    assertThat(toObjectNames(listedObjects)).containsExactly(testDir + "f1");
+    assertThat(getObjectNames(listedObjects)).containsExactly(testDir + "f1");
     // Assert that only 1 GCS request was sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
@@ -212,7 +216,7 @@ public class GoogleCloudStorageNewIntegrationTest {
         gcs.listObjectInfo(
             testBucket, testDir, ListObjectOptions.DEFAULT.toBuilder().setMaxResults(2).build());
 
-    assertThat(toObjectNames(listedObjects)).containsExactly(testDir + "f1", testDir + "f2");
+    assertThat(getObjectNames(listedObjects)).containsExactly(testDir + "f1", testDir + "f2");
     // Assert that 3 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
@@ -236,7 +240,7 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     List<GoogleCloudStorageItemInfo> listedObjects = gcs.listObjectInfo(testBucket, testDir);
 
-    assertThat(toObjectNames(listedObjects))
+    assertThat(getObjectNames(listedObjects))
         .containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");
     // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
@@ -246,6 +250,184 @@ public class GoogleCloudStorageNewIntegrationTest {
             listRequestString(testBucket, true, testDir, maxResultsPerRequest, "token_1"),
             listRequestString(testBucket, true, testDir, maxResultsPerRequest, "token_2"),
             listRequestString(testBucket, true, testDir, maxResultsPerRequest, "token_3"));
+  }
+
+  @Test
+  public void listObjectInfo_onlyPrefixObject() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = createObjectsInTestDir(testBucket, "dir/") + "dir/";
+
+    List<GoogleCloudStorageItemInfo> listedObjects = gcs.listObjectInfo(testBucket, testDir);
+
+    assertThat(listedObjects).isEmpty();
+    // Assert that 4 GCS requests were sent
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                testBucket, testDir, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_includePrefix_emptyBucket() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = gcsfsIHelper.createUniqueBucket("lst-objs_incl-pfx_empty-bckt");
+
+    List<GoogleCloudStorageItemInfo> listedObjects =
+        gcs.listObjectInfo(testBucket, /* objectNamePrefix= */ null, INCLUDE_PREFIX_LIST_OPTIONS);
+
+    assertThat(getObjectNames(listedObjects)).isEmpty();
+    // Assert that 4 GCS requests were sent
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                testBucket, /* prefix= */ null, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_includePrefix_objectInBucket() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = gcsfsIHelper.createUniqueBucket("lst-objs_incl-pfx_obj-in-bckt");
+    gcsfsIHelper.createObjects(testBucket, "obj");
+
+    List<GoogleCloudStorageItemInfo> listedObjects =
+        gcs.listObjectInfo(testBucket, /* objectNamePrefix= */ null, INCLUDE_PREFIX_LIST_OPTIONS);
+
+    assertThat(getObjectNames(listedObjects)).containsExactly("obj");
+    // Assert that 4 GCS requests were sent
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                testBucket, /* prefix= */ null, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_includePrefix_implicitDirInBucket() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = gcsfsIHelper.createUniqueBucket("lst-objs_incl-pfx_impl-dir-in-bckt");
+    gcsfsIHelper.createObjects(testBucket, "implDir/obj");
+
+    List<GoogleCloudStorageItemInfo> listedObjects =
+        gcs.listObjectInfo(testBucket, /* objectNamePrefix= */ null, INCLUDE_PREFIX_LIST_OPTIONS);
+
+    assertThat(getObjectNames(listedObjects)).containsExactly("implDir/");
+    // Assert that 4 GCS requests were sent
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                testBucket, /* prefix= */ null, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_includePrefix_onlyPrefixObject() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = createObjectsInTestDir(testBucket, "dir/") + "dir/";
+
+    List<GoogleCloudStorageItemInfo> listedObjects =
+        gcs.listObjectInfo(testBucket, testDir, INCLUDE_PREFIX_LIST_OPTIONS);
+
+    assertThat(getObjectNames(listedObjects)).containsExactly(testDir);
+    // Assert that 4 GCS requests were sent
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                testBucket, testDir, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_includePrefix_object() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = createObjectsInTestDir(testBucket, "obj");
+
+    List<GoogleCloudStorageItemInfo> listedObjects =
+        gcs.listObjectInfo(testBucket, testDir, INCLUDE_PREFIX_LIST_OPTIONS);
+
+    assertThat(getObjectNames(listedObjects)).containsExactly(testDir, testDir + "obj");
+    // Assert that 4 GCS requests were sent
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                testBucket, testDir, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_includePrefix_subdir() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = createObjectsInTestDir(testBucket, "dir/");
+
+    List<GoogleCloudStorageItemInfo> listedObjects =
+        gcs.listObjectInfo(testBucket, testDir, INCLUDE_PREFIX_LIST_OPTIONS);
+
+    assertThat(getObjectNames(listedObjects)).containsExactly(testDir, testDir + "dir/");
+    // Assert that 4 GCS requests were sent
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                testBucket, testDir, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_includePrefix_implicitPrefixObject() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = createObjectsInTestDirWithoutSubdirs(testBucket, "obj");
+
+    List<GoogleCloudStorageItemInfo> listedObjects =
+        gcs.listObjectInfo(testBucket, testDir, INCLUDE_PREFIX_LIST_OPTIONS);
+
+    assertThat(getObjectNames(listedObjects)).containsExactly(testDir, testDir + "obj");
+    // Assert that 4 GCS requests were sent
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                testBucket, testDir, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_includePrefix_implicitSubdir() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = createObjectsInTestDirWithoutSubdirs(testBucket, "dir/obj");
+
+    List<GoogleCloudStorageItemInfo> listedObjects =
+        gcs.listObjectInfo(testBucket, testDir, INCLUDE_PREFIX_LIST_OPTIONS);
+
+    assertThat(getObjectNames(listedObjects)).containsExactly(testDir, testDir + "dir/");
+    // Assert that 4 GCS requests were sent
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                testBucket, testDir, /* maxResults= */ 1024, /* pageToken= */ null));
   }
 
   @Test
@@ -283,7 +465,7 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     List<GoogleCloudStorageItemInfo> objects = gcs.getItemInfos(resourceIdsList);
 
-    assertThat(toObjectNames(objects))
+    assertThat(getObjectNames(objects))
         .containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");
     // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
@@ -312,7 +494,7 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     List<GoogleCloudStorageItemInfo> objects = gcs.getItemInfos(resourceIdsList);
 
-    assertThat(toObjectNames(objects))
+    assertThat(getObjectNames(objects))
         .containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");
     // Assert that 3 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
@@ -341,7 +523,7 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     List<GoogleCloudStorageItemInfo> objects = gcs.getItemInfos(resourceIdsList);
 
-    assertThat(toObjectNames(objects))
+    assertThat(getObjectNames(objects))
         .containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");
     // Assert that 5 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
@@ -369,7 +551,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     List<GoogleCloudStorageItemInfo> updatedObjects =
         gcs.updateItems(ImmutableList.of(new UpdatableItemInfo(resourceId, updatedMetadata)));
 
-    assertThat(toObjectNames(updatedObjects)).containsExactly(testDir + "f1");
+    assertThat(getObjectNames(updatedObjects)).containsExactly(testDir + "f1");
     assertThat(updatedObjects.get(0).getMetadata().keySet()).isEqualTo(updatedMetadata.keySet());
 
     // Assert that 2 GCS requests were sent
@@ -401,7 +583,7 @@ public class GoogleCloudStorageNewIntegrationTest {
                 new UpdatableItemInfo(
                     new StorageResourceId(testBucket, testDir + "f3"), updatedMetadata)));
 
-    assertThat(toObjectNames(updatedObjects))
+    assertThat(getObjectNames(updatedObjects))
         .containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");
     assertThat(updatedObjects.get(0).getMetadata().keySet()).isEqualTo(updatedMetadata.keySet());
 
@@ -635,7 +817,7 @@ public class GoogleCloudStorageNewIntegrationTest {
         .containsExactly(getRequestString(testBucket, testFile.getObjectName()));
   }
 
-  private static List<String> toObjectNames(List<GoogleCloudStorageItemInfo> listedObjects) {
+  private static List<String> getObjectNames(List<GoogleCloudStorageItemInfo> listedObjects) {
     return listedObjects.stream().map(GoogleCloudStorageItemInfo::getObjectName).collect(toList());
   }
 
@@ -643,6 +825,14 @@ public class GoogleCloudStorageNewIntegrationTest {
     String testDir = getTestResource() + "/";
     String[] objectPaths = Arrays.stream(objects).map(o -> testDir + o).toArray(String[]::new);
     gcsfsIHelper.createObjectsWithSubdirs(bucketName, objectPaths);
+    return testDir;
+  }
+
+  private String createObjectsInTestDirWithoutSubdirs(String bucketName, String... objects)
+      throws Exception {
+    String testDir = getTestResource() + "/";
+    String[] objectPaths = Arrays.stream(objects).map(o -> testDir + o).toArray(String[]::new);
+    gcsfsIHelper.createObjects(bucketName, objectPaths);
     return testDir;
   }
 

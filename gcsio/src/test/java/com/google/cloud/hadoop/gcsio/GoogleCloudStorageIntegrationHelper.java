@@ -377,7 +377,7 @@ public abstract class GoogleCloudStorageIntegrationHelper {
   }
 
   /** Creates objects with the given names in the given bucket. */
-  private void createObjects(final String bucketName, String[] objectNames) throws Exception {
+  public void createObjects(String bucketName, String... objectNames) throws Exception {
     final ExecutorService threadPool = Executors.newCachedThreadPool();
     final CountDownLatch counter = new CountDownLatch(objectNames.length);
     List<Future<?>> futures = new ArrayList<>();
