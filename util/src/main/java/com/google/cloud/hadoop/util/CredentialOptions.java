@@ -28,7 +28,7 @@ public abstract class CredentialOptions {
 
   static final boolean SERVICE_ACCOUNT_ENABLED_DEFAULT = true;
 
-  static final boolean NULL_CREDENTIALS_ENABLED_DEFAULT = false;
+  static final boolean NULL_CREDENTIALS_ENABLED_DEFAULT = true;
 
   static final HttpTransportType HTTP_TRANSPORT_TYPE_DEFAULT =
       HttpTransportFactory.DEFAULT_TRANSPORT_TYPE;
