@@ -21,6 +21,10 @@ import static com.google.google.storage.v1.ServiceConstants.Values.MAX_WRITE_CHU
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.stream.Collectors.toMap;
 
+import com.github.rholder.retry.Retryer;
+import com.github.rholder.retry.RetryerBuilder;
+import com.github.rholder.retry.StopStrategies;
+import com.github.rholder.retry.WaitStrategies;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
 import com.google.common.collect.ImmutableSet;
@@ -171,7 +175,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
     private Hasher objectHasher;
     private String uploadId;
-    private int retriesAttempted = 0;
+    private long writeOffset = 0;
+    InsertChunkResponseObserver responseObserver;
     // Holds list of most recent number of NUMBER_OF_REQUESTS_TO_RETAIN requests, so upload can be
     // rewound and re-sent upon transient errors.
     private final TreeMap<Long, ByteString> dataChunkMap = new TreeMap<>();
@@ -193,76 +198,87 @@ public final class GoogleCloudStorageGrpcWriteChannel
     }
 
     private Object doResumableUpload() throws IOException {
-      while (retriesAttempted++ < UPLOAD_RETRIES) {
-        // Send the initial StartResumableWrite request to get an uploadId.
-        uploadId = startResumableUpload();
-        InsertChunkResponseObserver responseObserver;
+      Retryer<Boolean> retryer =
+          RetryerBuilder.<Boolean>newBuilder()
+              .retryIfExceptionOfType(IOException.class)
+              .retryIfRuntimeException()
+              .withWaitStrategy(WaitStrategies.exponentialWait(2, 20_000, MILLISECONDS))
+              .withStopStrategy(StopStrategies.stopAfterAttempt(UPLOAD_RETRIES))
+              .build();
 
-        long writeOffset = retriesAttempted > 1 ? getCommittedWriteSize(uploadId) : 0;
+      // Send the initial StartResumableWrite request to get an uploadId.
+      uploadId = startResumableUpload();
+      try {
+        retryer.call(
+            () -> {
+              // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
+              // Only request committed size for the first insert request.
+              if (writeOffset > 0) {
+                writeOffset = getCommittedWriteSize(uploadId);
+              }
+              responseObserver = new InsertChunkResponseObserver(uploadId, writeOffset);
+              StreamObserver<InsertObjectRequest> requestStreamObserver =
+                  stub.withDeadlineAfter(WRITE_STREAM_TIMEOUT.toMillis(), MILLISECONDS)
+                      .insertObject(responseObserver);
 
-        responseObserver = new InsertChunkResponseObserver(uploadId, writeOffset);
-        // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
-        StreamObserver<InsertObjectRequest> requestStreamObserver =
-            stub.withDeadlineAfter(WRITE_STREAM_TIMEOUT.toMillis(), MILLISECONDS)
-                .insertObject(responseObserver);
+              // Wait for streaming RPC to become ready for upload.
+              try {
+                responseObserver.ready.await();
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException(
+                    String.format(
+                        "Streaming RPC failed to become ready for resumable upload for '%s'",
+                        getResourceString()),
+                    e);
+              }
 
-        // Wait for streaming RPC to become ready for upload.
-        try {
-          responseObserver.ready.await();
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw new IOException(
-              String.format(
-                  "Streaming RPC failed to become ready for resumable upload for '%s'",
-                  getResourceString()),
-              e);
-        }
-        boolean objectFinalized = false;
-        while (!objectFinalized) {
-          InsertObjectRequest insertRequest;
-          if (dataChunkMap.size() > 0 && dataChunkMap.lastKey() >= writeOffset) {
-            insertRequest = buildRequestFromBufferedDataChunk(dataChunkMap, writeOffset);
-            writeOffset += insertRequest.getChecksummedData().getContent().size();
-          } else {
-            ByteString data =
-                ByteString.readFrom(ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE));
-            dataChunkMap.put(writeOffset, data);
-            if (dataChunkMap.size() >= NUMBER_OF_REQUESTS_TO_RETAIN) {
-              dataChunkMap.remove(dataChunkMap.firstKey());
-            }
-            insertRequest = buildInsertRequest(writeOffset, data, false);
-            writeOffset += data.size();
-          }
-          requestStreamObserver.onNext(insertRequest);
-          objectFinalized = insertRequest.getFinishWrite();
+              boolean objectFinalized = false;
+              while (!objectFinalized) {
+                InsertObjectRequest insertRequest;
+                if (dataChunkMap.size() > 0 && dataChunkMap.lastKey() >= writeOffset) {
+                  insertRequest = buildRequestFromBufferedDataChunk(dataChunkMap, writeOffset);
+                  writeOffset += insertRequest.getChecksummedData().getContent().size();
+                } else {
+                  ByteString data =
+                      ByteString.readFrom(ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE));
+                  dataChunkMap.put(writeOffset, data);
+                  if (dataChunkMap.size() >= NUMBER_OF_REQUESTS_TO_RETAIN) {
+                    dataChunkMap.remove(dataChunkMap.firstKey());
+                  }
+                  insertRequest = buildInsertRequest(writeOffset, data, false);
+                  writeOffset += data.size();
+                }
+                requestStreamObserver.onNext(insertRequest);
+                objectFinalized = insertRequest.getFinishWrite();
 
-          if (responseObserver.hasTransientError() || responseObserver.hasNonTransientError()) {
-            requestStreamObserver.onError(
-                responseObserver.hasTransientError()
-                    ? responseObserver.transientError
-                    : responseObserver.nonTransientError);
-            break;
-          } else if (objectFinalized) {
-            requestStreamObserver.onCompleted();
-          }
-        }
+                if (responseObserver.hasTransientError()
+                    || responseObserver.hasNonTransientError()) {
+                  requestStreamObserver.onError(
+                      responseObserver.hasTransientError()
+                          ? responseObserver.transientError
+                          : responseObserver.nonTransientError);
+                  break;
+                } else if (objectFinalized) {
+                  requestStreamObserver.onCompleted();
+                }
+              }
 
-        try {
-          responseObserver.done.await();
-          if (responseObserver.hasTransientError()) {
-            continue;
-          }
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw new IOException(
-              String.format("Resumable upload failed for '%s'", getResourceString()), e);
-        }
-
-        return responseObserver.getResponseOrThrow();
+              try {
+                responseObserver.done.await();
+                if (responseObserver.hasTransientError()) {
+                  throw new IOException(responseObserver.transientError);
+                }
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+              }
+              return null;
+            });
+      } catch (Exception e) {
+        throw new IOException(
+            String.format("Resumable upload failed for '%s'", getResourceString()), e);
       }
-
-      throw new IOException(
-          String.format("Too many retry attempts. Resumable upload failed for '%s'", resourceId));
+      return responseObserver.getResponseOrThrow();
     }
 
     private InsertObjectRequest buildInsertRequest(
@@ -449,16 +465,33 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       SimpleResponseObserver<StartResumableWriteResponse> responseObserver =
           new SimpleResponseObserver<>();
-            stub.withDeadlineAfter(START_RESUMABLE_WRITE_TIMEOUT.toMillis(), MILLISECONDS)
-                .startResumableWrite(request, responseObserver);
-            try {
-              responseObserver.done.await();
-            } catch (InterruptedException e) {
-              Thread.currentThread().interrupt();
-              throw new RuntimeException(
-                  String.format("Failed to start resumable upload for '%s'", getResourceString()),
-                  e);
-            }
+      Retryer<Boolean> retryer =
+          RetryerBuilder.<Boolean>newBuilder()
+              .retryIfExceptionOfType(IOException.class)
+              .retryIfRuntimeException()
+              .withWaitStrategy(WaitStrategies.exponentialWait(2, 20_000, MILLISECONDS))
+              .withStopStrategy(StopStrategies.stopAfterAttempt(UPLOAD_RETRIES))
+              .build();
+      try {
+        retryer.call(
+            () -> {
+              stub.withDeadlineAfter(START_RESUMABLE_WRITE_TIMEOUT.toMillis(), MILLISECONDS)
+                  .startResumableWrite(request, responseObserver);
+              try {
+                responseObserver.done.await();
+                if (responseObserver.hasError()) {
+                  throw new IOException(responseObserver.getError());
+                }
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(e);
+              }
+              return null;
+            });
+      } catch (Exception e) {
+        throw new IOException(
+            String.format("Failed to start resumable upload for '%s'", getResourceString()), e);
+      }
 
       return responseObserver.getResponse().getUploadId();
     }
@@ -470,16 +503,33 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       SimpleResponseObserver<QueryWriteStatusResponse> responseObserver =
           new SimpleResponseObserver<>();
-            stub.withDeadlineAfter(QUERY_WRITE_STATUS_TIMEOUT.toMillis(), MILLISECONDS)
-                .queryWriteStatus(request, responseObserver);
-            try {
-              responseObserver.done.await();
-            } catch (InterruptedException e) {
-              Thread.currentThread().interrupt();
-              throw new RuntimeException(
-                  String.format("Failed to get committed write size for '%s'", getResourceString()),
-                  e);
-            }
+      Retryer<Boolean> retryer =
+          RetryerBuilder.<Boolean>newBuilder()
+              .retryIfExceptionOfType(IOException.class)
+              .retryIfRuntimeException()
+              .withWaitStrategy(WaitStrategies.exponentialWait(2, 20_000, MILLISECONDS))
+              .withStopStrategy(StopStrategies.stopAfterAttempt(UPLOAD_RETRIES))
+              .build();
+      try {
+        retryer.call(
+            () -> {
+              stub.withDeadlineAfter(QUERY_WRITE_STATUS_TIMEOUT.toMillis(), MILLISECONDS)
+                  .queryWriteStatus(request, responseObserver);
+              try {
+                responseObserver.done.await();
+                if (responseObserver.hasError()) {
+                  throw new IOException(responseObserver.getError());
+                }
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(e);
+              }
+              return null;
+            });
+      } catch (Exception e) {
+        throw new IOException(
+            String.format("Failed to get committed write size for '%s'", getResourceString()), e);
+      }
 
       return responseObserver.getResponse().getCommittedSize();
     }
@@ -498,6 +548,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       public T getResponse() {
         return checkNotNull(response, "Response not present for '%s'", resourceId);
+      }
+
+      boolean hasError() {
+        return error != null || response == null;
       }
 
       public Throwable getError() {
