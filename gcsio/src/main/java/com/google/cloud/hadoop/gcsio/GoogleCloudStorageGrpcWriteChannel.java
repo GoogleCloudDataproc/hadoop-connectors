@@ -19,6 +19,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.google.storage.v1.ServiceConstants.Values.MAX_WRITE_CHUNK_BYTES;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toMap;
 
 import com.github.rholder.retry.Retryer;
@@ -198,13 +199,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     }
 
     private Object doResumableUpload() throws IOException {
-      Retryer<Boolean> retryer =
-          RetryerBuilder.<Boolean>newBuilder()
-              .retryIfExceptionOfType(IOException.class)
-              .retryIfRuntimeException()
-              .withWaitStrategy(WaitStrategies.exponentialWait(2, 20_000, MILLISECONDS))
-              .withStopStrategy(StopStrategies.stopAfterAttempt(UPLOAD_RETRIES))
-              .build();
+      Retryer<Boolean> retryer = getRetryer();
 
       // Send the initial StartResumableWrite request to get an uploadId.
       uploadId = startResumableUpload();
@@ -465,13 +460,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       SimpleResponseObserver<StartResumableWriteResponse> responseObserver =
           new SimpleResponseObserver<>();
-      Retryer<Boolean> retryer =
-          RetryerBuilder.<Boolean>newBuilder()
-              .retryIfExceptionOfType(IOException.class)
-              .retryIfRuntimeException()
-              .withWaitStrategy(WaitStrategies.exponentialWait(2, 20_000, MILLISECONDS))
-              .withStopStrategy(StopStrategies.stopAfterAttempt(UPLOAD_RETRIES))
-              .build();
+      Retryer<Boolean> retryer = getRetryer();
       try {
         retryer.call(
             () -> {
@@ -503,13 +492,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       SimpleResponseObserver<QueryWriteStatusResponse> responseObserver =
           new SimpleResponseObserver<>();
-      Retryer<Boolean> retryer =
-          RetryerBuilder.<Boolean>newBuilder()
-              .retryIfExceptionOfType(IOException.class)
-              .retryIfRuntimeException()
-              .withWaitStrategy(WaitStrategies.exponentialWait(2, 20_000, MILLISECONDS))
-              .withStopStrategy(StopStrategies.stopAfterAttempt(UPLOAD_RETRIES))
-              .build();
+      Retryer<Boolean> retryer = getRetryer();
       try {
         retryer.call(
             () -> {
@@ -532,6 +515,14 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
 
       return responseObserver.getResponse().getCommittedSize();
+    }
+
+    private Retryer<Boolean> getRetryer() {
+      return RetryerBuilder.<Boolean>newBuilder()
+          .retryIfExceptionOfType(IOException.class)
+          .withWaitStrategy(WaitStrategies.exponentialWait(2, 20, SECONDS))
+          .withStopStrategy(StopStrategies.stopAfterAttempt(UPLOAD_RETRIES))
+          .build();
     }
 
     /** Stream observer for single response RPCs. */
