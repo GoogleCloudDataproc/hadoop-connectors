@@ -177,7 +177,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     private Hasher objectHasher;
     private String uploadId;
     private long writeOffset = 0;
-    InsertChunkResponseObserver responseObserver;
+    private InsertChunkResponseObserver responseObserver;
     // Holds list of most recent number of NUMBER_OF_REQUESTS_TO_RETAIN requests, so upload can be
     // rewound and re-sent upon transient errors.
     private final TreeMap<Long, ByteString> dataChunkMap = new TreeMap<>();
