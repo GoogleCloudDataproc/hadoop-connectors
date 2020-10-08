@@ -199,12 +199,15 @@ public final class GoogleCloudStorageGrpcWriteChannel
       try (InputStream ignore = pipeSource) {
         return retryer.call(this::doResumableUpload);
       } catch (Exception e) {
+        if (e instanceof InterruptedException) {
+          Thread.currentThread().interrupt();
+        }
         throw new IOException(
             String.format("Resumable upload failed for '%s'", getResourceString()), e);
       }
     }
 
-    private Object doResumableUpload() throws IOException {
+    private Object doResumableUpload() throws IOException, InterruptedException {
       // Only request committed size for the first insert request.
       if (writeOffset > 0) {
         writeOffset = getCommittedWriteSize(uploadId);
@@ -258,14 +261,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
         }
       }
 
-      try {
-        responseObserver.done.await();
-        if (responseObserver.hasTransientError()) {
-          throw new IOException(responseObserver.transientError);
-        }
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new RuntimeException(e);
+      responseObserver.done.await();
+      if (responseObserver.hasTransientError()) {
+        throw new IOException(responseObserver.transientError);
       }
 
       return responseObserver.getResponseOrThrow();
@@ -461,18 +459,17 @@ public final class GoogleCloudStorageGrpcWriteChannel
             () -> {
               stub.withDeadlineAfter(START_RESUMABLE_WRITE_TIMEOUT.toMillis(), MILLISECONDS)
                   .startResumableWrite(request, responseObserver);
-              try {
-                responseObserver.done.await();
-                if (responseObserver.hasError()) {
-                  throw new IOException(responseObserver.getError());
-                }
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException(e);
+              responseObserver.done.await();
+              if (responseObserver.hasError()) {
+                throw new IOException(responseObserver.getError());
               }
+
               return null;
             });
       } catch (Exception e) {
+        if (e instanceof InterruptedException) {
+          Thread.currentThread().interrupt();
+        }
         throw new IOException(
             String.format("Failed to start resumable upload for '%s'", getResourceString()), e);
       }
@@ -493,18 +490,16 @@ public final class GoogleCloudStorageGrpcWriteChannel
             () -> {
               stub.withDeadlineAfter(QUERY_WRITE_STATUS_TIMEOUT.toMillis(), MILLISECONDS)
                   .queryWriteStatus(request, responseObserver);
-              try {
-                responseObserver.done.await();
-                if (responseObserver.hasError()) {
-                  throw new IOException(responseObserver.getError());
-                }
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException(e);
+              responseObserver.done.await();
+              if (responseObserver.hasError()) {
+                throw new IOException(responseObserver.getError());
               }
               return null;
             });
       } catch (Exception e) {
+        if (e instanceof InterruptedException) {
+          Thread.currentThread().interrupt();
+        }
         throw new IOException(
             String.format("Failed to get committed write size for '%s'", getResourceString()), e);
       }
