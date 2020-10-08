@@ -265,6 +265,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
         }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
+        throw new RuntimeException(e);
       }
 
       return responseObserver.getResponseOrThrow();
