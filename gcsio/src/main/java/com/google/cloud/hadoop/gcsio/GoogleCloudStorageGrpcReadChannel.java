@@ -14,7 +14,12 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
+import com.github.rholder.retry.Retryer;
+import com.github.rholder.retry.RetryerBuilder;
+import com.github.rholder.retry.StopStrategies;
+import com.github.rholder.retry.WaitStrategies;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
@@ -44,6 +49,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   private static final Duration READ_STREAM_TIMEOUT = Duration.ofMinutes(20);
+  private static final Duration READ_OBJECT_METADATA_TIMEOUT = Duration.ofMinutes(1);
+  private static final int READ_RETRIES = 5;
 
   // Context of the request that returned resIterator.
   @Nullable CancellableContext requestContext;
@@ -108,7 +115,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     try {
       // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
       getObjectResult =
-          stub.withDeadlineAfter(READ_STREAM_TIMEOUT.toMillis(), MILLISECONDS)
+          stub.withDeadlineAfter(READ_OBJECT_METADATA_TIMEOUT.toMillis(), MILLISECONDS)
               .getObject(
                   GetObjectRequest.newBuilder()
                       .setBucket(bucketName)
@@ -275,16 +282,29 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       requestBuilder.setReadLimit(bytesToRead.getAsLong());
     }
     GetObjectMediaRequest request = requestBuilder.build();
+    Retryer<Boolean> retryer = getRetryer();
     try {
-      requestContext = Context.current().withCancellation();
-      Context toReattach = requestContext.attach();
-      try {
-        resIterator = stub.getObjectMedia(request);
-      } finally {
-        requestContext.detach(toReattach);
-      }
-    } catch (StatusRuntimeException e) {
-      throw convertError(e, bucketName, objectName);
+      retryer.call(
+          () -> {
+            try {
+              requestContext = Context.current().withCancellation();
+              Context toReattach = requestContext.attach();
+              try {
+                resIterator =
+                    stub.withDeadlineAfter(READ_STREAM_TIMEOUT.toMillis(), MILLISECONDS)
+                        .getObjectMedia(request);
+              } finally {
+                requestContext.detach(toReattach);
+              }
+            } catch (StatusRuntimeException e) {
+              throw convertError(e, bucketName, objectName);
+            }
+            return null;
+          });
+    } catch (Exception e) {
+      throw new IOException(
+          String.format("Error reading '%s'", StringPaths.fromComponents(bucketName, objectName)),
+          e);
     }
   }
 
@@ -305,20 +325,36 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
    * @throws IOException of the appropriate type if there was an I/O error.
    */
   private boolean moreServerContent() throws IOException {
-    try {
-      if (requestContext.isCancelled()) {
-        return false;
-      }
-
-      boolean moreDataAvailable = resIterator.hasNext();
-      if (!moreDataAvailable) {
-        cancelCurrentRequest();
-      }
-      return moreDataAvailable;
-    } catch (StatusRuntimeException e) {
-      cancelCurrentRequest();
-      throw convertError(e, bucketName, objectName);
+    if (resIterator == null || requestContext == null || requestContext.isCancelled()) {
+      return false;
     }
+
+    Retryer<Boolean> retryer = getRetryer();
+    try {
+      return retryer
+          .call(
+              () -> {
+                try {
+                  return resIterator.hasNext();
+                } catch (StatusRuntimeException e) {
+                  throw convertError(e, bucketName, objectName);
+                }
+              })
+          .booleanValue();
+    } catch (Exception e) {
+      cancelCurrentRequest();
+      throw new IOException(
+          String.format("Error reading '%s'", StringPaths.fromComponents(bucketName, objectName)),
+          e);
+    }
+  }
+
+  private Retryer<Boolean> getRetryer() {
+    return RetryerBuilder.<Boolean>newBuilder()
+        .retryIfExceptionOfType(IOException.class)
+        .withWaitStrategy(WaitStrategies.exponentialWait(2, 20, SECONDS))
+        .withStopStrategy(StopStrategies.stopAfterAttempt(READ_RETRIES))
+        .build();
   }
 
   @Override
