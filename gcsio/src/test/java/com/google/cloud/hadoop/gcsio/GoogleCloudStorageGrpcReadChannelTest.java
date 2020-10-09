@@ -1,5 +1,6 @@
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -440,7 +441,20 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
     ByteBuffer buffer = ByteBuffer.allocate(10);
     IOException thrown = assertThrows(IOException.class, () -> readChannel.read(buffer));
-    assertTrue(thrown.getCause().getMessage().contains("Custom error message."));
+    assertThat(thrown.getCause().getCause()).hasMessageThat().contains("Custom error message.");
+  }
+
+  @Test
+  public void retryGetMediaError() throws Exception {
+    fakeService.setGetMediaException(
+        Status.fromCode(Status.Code.INTERNAL)
+            .withDescription("Custom error message.")
+            .asException());
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel();
+
+    ByteBuffer buffer = ByteBuffer.allocate(10);
+    IOException thrown = assertThrows(IOException.class, () -> readChannel.read(buffer));
+    assertThat(thrown.getCause()).hasMessageThat().contains("Retrying failed to complete");
   }
 
   @Test
