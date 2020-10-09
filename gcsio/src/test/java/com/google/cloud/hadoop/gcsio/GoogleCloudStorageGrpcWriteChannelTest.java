@@ -360,7 +360,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     fakeService.setInsertObjectExceptions(
         ImmutableList.of(new StatusException(Status.DEADLINE_EXCEEDED)));
     fakeService.setQueryWriteStatusResponses(
-        ImmutableList.of(QueryWriteStatusResponse.newBuilder().setCommittedSize(0).build())
+        ImmutableList.of(QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build())
             .iterator());
     ByteString chunk = createTestData(chunkSize);
     List<InsertObjectRequest> expectedRequests =
@@ -383,7 +383,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     writeChannel.write(chunk.asReadOnlyByteBuffer());
     writeChannel.close();
 
-    verify(fakeService, times(2)).startResumableWrite(eq(START_REQUEST), any());
+    verify(fakeService, times(1)).startResumableWrite(eq(START_REQUEST), any());
     verify(fakeService, times(1)).queryWriteStatus(eq(WRITE_STATUS_REQUEST), any());
     verify(fakeService.insertRequestObserver, atLeast(1)).onNext(requestCaptor.capture());
     // TODO(hgong): Figure out a way to check the expected requests and actual reqeusts builder.
@@ -409,6 +409,37 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     writeChannel.initialize();
     writeChannel.write(chunk.asReadOnlyByteBuffer());
     assertThrows(IOException.class, writeChannel::close);
+  }
+
+  @Test
+  public void retryInsertOnIOException() throws Exception {
+    int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
+    AsyncWriteChannelOptions options =
+        AsyncWriteChannelOptions.builder().setUploadChunkSize(chunkSize).build();
+    ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
+    GoogleCloudStorageGrpcWriteChannel writeChannel =
+        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
+    fakeService.setInsertObjectExceptions(
+        ImmutableList.of(
+            new StatusException(Status.DEADLINE_EXCEEDED),
+            new StatusException(Status.DEADLINE_EXCEEDED),
+            new StatusException(Status.DEADLINE_EXCEEDED),
+            new StatusException(Status.DEADLINE_EXCEEDED),
+            new StatusException(Status.DEADLINE_EXCEEDED)));
+    fakeService.setQueryWriteStatusResponses(
+        ImmutableList.of(
+                QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build(),
+                QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build(),
+                QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build(),
+                QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build())
+            .iterator());
+    ByteString chunk = createTestData(chunkSize);
+
+    writeChannel.initialize();
+    writeChannel.write(chunk.asReadOnlyByteBuffer());
+    assertThat(assertThrows(IOException.class, writeChannel::close).getCause().getCause())
+        .hasMessageThat()
+        .contains("after 5 attempts");
   }
 
   @Test
@@ -604,7 +635,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     public void queryWriteStatus(
         QueryWriteStatusRequest request,
         StreamObserver<QueryWriteStatusResponse> responseObserver) {
-      if (queryWriteStatusException != null) {
+      if (queryWriteStatusException != null && queryWriteStatusResponses.hasNext()) {
         responseObserver.onError(queryWriteStatusException);
       } else {
         QueryWriteStatusResponse response = queryWriteStatusResponses.next();
