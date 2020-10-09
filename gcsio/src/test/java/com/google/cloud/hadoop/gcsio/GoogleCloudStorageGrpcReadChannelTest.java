@@ -1,5 +1,6 @@
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -365,7 +366,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
     ByteBuffer buffer = ByteBuffer.allocate(10);
     IOException thrown = assertThrows(IOException.class, () -> readChannel.read(buffer));
-    assertTrue(thrown.getMessage().contains("checksum"));
+    assertThat(thrown).hasMessageThat().contains("checksum");
   }
 
   @Test
@@ -425,9 +426,8 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         Status.fromCode(Status.Code.INTERNAL)
             .withDescription("Custom error message.")
             .asException());
-    ByteBuffer buffer = ByteBuffer.allocate(10);
     IOException thrown = assertThrows(IOException.class, () -> newReadChannel(options));
-    assertTrue(thrown.getCause().getMessage().contains("Custom error message."));
+    assertThat(thrown).hasCauseThat().hasMessageThat().contains("Custom error message.");
   }
 
   @Test
@@ -440,7 +440,20 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
     ByteBuffer buffer = ByteBuffer.allocate(10);
     IOException thrown = assertThrows(IOException.class, () -> readChannel.read(buffer));
-    assertTrue(thrown.getCause().getMessage().contains("Custom error message."));
+    assertThat(thrown).hasCauseThat().hasCauseThat().hasMessageThat().contains("Custom error message.");
+  }
+
+  @Test
+  public void retryGetMediaError() throws Exception {
+    fakeService.setGetMediaException(
+        Status.fromCode(Status.Code.INTERNAL)
+            .withDescription("Custom error message.")
+            .asException());
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel();
+
+    ByteBuffer buffer = ByteBuffer.allocate(10);
+    IOException thrown = assertThrows(IOException.class, () -> readChannel.read(buffer));
+    assertThat(thrown).hasCauseThat().hasMessageThat().contains("Retrying failed to complete");
   }
 
   @Test
