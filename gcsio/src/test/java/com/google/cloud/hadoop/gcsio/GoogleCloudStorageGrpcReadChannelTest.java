@@ -366,7 +366,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
     ByteBuffer buffer = ByteBuffer.allocate(10);
     IOException thrown = assertThrows(IOException.class, () -> readChannel.read(buffer));
-    assertTrue(thrown.getMessage().contains("checksum"));
+    assertThat(thrown).hasMessageThat().contains("checksum");
   }
 
   @Test
@@ -426,9 +426,8 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         Status.fromCode(Status.Code.INTERNAL)
             .withDescription("Custom error message.")
             .asException());
-    ByteBuffer buffer = ByteBuffer.allocate(10);
     IOException thrown = assertThrows(IOException.class, () -> newReadChannel(options));
-    assertTrue(thrown.getCause().getMessage().contains("Custom error message."));
+    assertThat(thrown).hasCauseThat().hasMessageThat().contains("Custom error message.");
   }
 
   @Test
@@ -441,7 +440,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
     ByteBuffer buffer = ByteBuffer.allocate(10);
     IOException thrown = assertThrows(IOException.class, () -> readChannel.read(buffer));
-    assertThat(thrown.getCause().getCause()).hasMessageThat().contains("Custom error message.");
+    assertThat(thrown).hasCauseThat().hasCauseThat().hasMessageThat().contains("Custom error message.");
   }
 
   @Test
@@ -454,7 +453,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
     ByteBuffer buffer = ByteBuffer.allocate(10);
     IOException thrown = assertThrows(IOException.class, () -> readChannel.read(buffer));
-    assertThat(thrown.getCause()).hasMessageThat().contains("Retrying failed to complete");
+    assertThat(thrown).hasCauseThat().hasMessageThat().contains("Retrying failed to complete");
   }
 
   @Test
