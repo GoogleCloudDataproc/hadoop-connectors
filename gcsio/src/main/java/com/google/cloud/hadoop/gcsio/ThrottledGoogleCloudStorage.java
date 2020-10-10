@@ -97,22 +97,10 @@ public class ThrottledGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public WritableByteChannel create(StorageResourceId resourceId) throws IOException {
-    throttle(StorageOperation.CREATE_OBJECT);
-    return wrappedGcs.create(resourceId);
-  }
-
-  @Override
   public WritableByteChannel create(StorageResourceId resourceId, CreateObjectOptions options)
       throws IOException {
     throttle(StorageOperation.CREATE_OBJECT);
     return wrappedGcs.create(resourceId, options);
-  }
-
-  @Override
-  public void createBucket(String bucketName) throws IOException {
-    throttle(StorageOperation.CREATE_BUCKET);
-    wrappedGcs.createBucket(bucketName);
   }
 
   @Override
@@ -150,15 +138,7 @@ public class ThrottledGoogleCloudStorage implements GoogleCloudStorage {
 
   @Override
   public SeekableByteChannel open(
-      StorageResourceId resourceId) throws IOException {
-    throttle(StorageOperation.OPEN_OBJECT);
-    return wrappedGcs.open(resourceId);
-  }
-
-  @Override
-  public SeekableByteChannel open(
-      StorageResourceId resourceId, GoogleCloudStorageReadOptions readOptions)
-      throws IOException {
+      StorageResourceId resourceId, GoogleCloudStorageReadOptions readOptions) throws IOException {
     throttle(StorageOperation.OPEN_OBJECT);
     return wrappedGcs.open(resourceId, readOptions);
   }
@@ -199,23 +179,11 @@ public class ThrottledGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public List<String> listObjectNames(String bucketName, String objectNamePrefix)
-      throws IOException {
-    return listObjectNames(bucketName, objectNamePrefix, ListObjectOptions.DEFAULT);
-  }
-
-  @Override
   public List<String> listObjectNames(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions)
       throws IOException {
     throttle(StorageOperation.LIST_OBJECTS);
     return wrappedGcs.listObjectNames(bucketName, objectNamePrefix, listOptions);
-  }
-
-  @Override
-  public List<GoogleCloudStorageItemInfo> listObjectInfo(String bucketName, String objectNamePrefix)
-      throws IOException {
-    return listObjectInfo(bucketName, objectNamePrefix, ListObjectOptions.DEFAULT);
   }
 
   @Override

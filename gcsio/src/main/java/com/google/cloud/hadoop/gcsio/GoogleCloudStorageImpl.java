@@ -426,24 +426,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   /**
-   * See {@link GoogleCloudStorage#create(StorageResourceId)} for details about expected behavior.
-   */
-  @Override
-  public WritableByteChannel create(StorageResourceId resourceId) throws IOException {
-    logger.atFine().log("create(%s)", resourceId);
-    Preconditions.checkArgument(
-        resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
-
-    return create(resourceId, CreateObjectOptions.DEFAULT_OVERWRITE);
-  }
-
-  /** See {@link GoogleCloudStorage#createBucket(String)} for details about expected behavior. */
-  @Override
-  public void createBucket(String bucketName) throws IOException {
-    createBucket(bucketName, CreateBucketOptions.DEFAULT);
-  }
-
-  /**
    * See {@link GoogleCloudStorage#createBucket(String, CreateBucketOptions)} for details about
    * expected behavior.
    */
@@ -615,15 +597,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @Override
   public void createEmptyObjects(List<StorageResourceId> resourceIds) throws IOException {
     createEmptyObjects(resourceIds, EMPTY_OBJECT_CREATE_OPTIONS);
-  }
-
-  /**
-   * See {@link GoogleCloudStorage#open(StorageResourceId)} for details about expected behavior.
-   */
-  @Override
-  public SeekableByteChannel open(StorageResourceId resourceId)
-      throws IOException {
-    return open(resourceId, GoogleCloudStorageReadOptions.DEFAULT);
   }
 
   /** See {@link GoogleCloudStorage#open(StorageResourceId)} for details about expected behavior. */
@@ -1392,13 +1365,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     return maxResults - numResults;
   }
 
-  /** @see GoogleCloudStorage#listObjectNames(String, String) */
-  @Override
-  public List<String> listObjectNames(String bucketName, String objectNamePrefix)
-      throws IOException {
-    return listObjectNames(bucketName, objectNamePrefix, ListObjectOptions.DEFAULT);
-  }
-
   /** @see GoogleCloudStorage#listObjectNames(String, String, ListObjectOptions) */
   @Override
   public List<String> listObjectNames(
@@ -1442,13 +1408,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     objectNames.sort(String::compareTo);
 
     return objectNames;
-  }
-
-  /** @see GoogleCloudStorage#listObjectInfo(String, String) */
-  @Override
-  public List<GoogleCloudStorageItemInfo> listObjectInfo(String bucketName, String objectNamePrefix)
-      throws IOException {
-    return listObjectInfo(bucketName, objectNamePrefix, ListObjectOptions.DEFAULT);
   }
 
   /** @see GoogleCloudStorage#listObjectInfo(String, String, ListObjectOptions) */
