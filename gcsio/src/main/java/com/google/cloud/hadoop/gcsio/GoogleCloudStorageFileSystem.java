@@ -35,6 +35,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.FileNotFoundException;
@@ -323,8 +324,8 @@ public class GoogleCloudStorageFileSystem {
       StorageResourceId parentId =
           StorageResourceId.fromUriPath(UriPaths.getParentPath(path), true);
       parentInfoFuture =
-          cachedExecutor.submit(
-              () -> getFileInfoInternal(parentId, /* inferImplicitDirectories= */ false));
+          Futures.immediateFuture(
+              getFileInfoInternal(parentId, /* inferImplicitDirectories= */ false));
     }
 
     Optional<CoopLockOperationDelete> coopLockOp =
@@ -1091,8 +1092,10 @@ public class GoogleCloudStorageFileSystem {
       Future<List<GoogleCloudStorageItemInfo>> listDirFuture =
           dirExecutor.submit(
               () ->
-                  gcs.listObjectInfo(
-                      dirId.getBucketName(), dirId.getObjectName(), GET_FILE_INFO_LIST_OPTIONS));
+                  inferImplicitDirectories
+                      ? gcs.listObjectInfo(
+                          dirId.getBucketName(), dirId.getObjectName(), GET_FILE_INFO_LIST_OPTIONS)
+                      : ImmutableList.of(gcs.getItemInfo(dirId)));
       dirExecutor.shutdown();
 
       if (!resourceId.isDirectory()) {
@@ -1121,7 +1124,7 @@ public class GoogleCloudStorageFileSystem {
           "listed wrong object '%s', but should be '%s'",
           dirInfo.getResourceId(),
           resourceId);
-      return dirInfo.getResourceId().equals(dirId)
+      return dirInfo.getResourceId().equals(dirId) && dirInfo.exists()
           ? dirInfo
           : GoogleCloudStorageItemInfo.createNotFound(resourceId);
     } finally {
