@@ -116,7 +116,7 @@
     <grpc.version>1.30.2</grpc.version>
     <hadoop.two.version>2.10.0</hadoop.two.version>
     <hadoop.three.version>3.2.1</hadoop.three.version>
-    <junit.version>4.13</junit.version>
+    <junit.version>4.13.1</junit.version>
     <mockito.version>3.4.0</mockito.version>
     <system-lambda.version>1.1.0</system-lambda.version>
     <guava.retrying.version>2.0.0</guava.retrying.version>
