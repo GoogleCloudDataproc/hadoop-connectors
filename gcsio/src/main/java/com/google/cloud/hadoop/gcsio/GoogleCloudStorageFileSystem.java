@@ -35,7 +35,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
-import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.FileNotFoundException;
@@ -324,8 +323,8 @@ public class GoogleCloudStorageFileSystem {
       StorageResourceId parentId =
           StorageResourceId.fromUriPath(UriPaths.getParentPath(path), true);
       parentInfoFuture =
-          Futures.immediateFuture(
-              getFileInfoInternal(parentId, /* inferImplicitDirectories= */ false));
+          cachedExecutor.submit(
+              () -> getFileInfoInternal(parentId, /* inferImplicitDirectories= */ false));
     }
 
     Optional<CoopLockOperationDelete> coopLockOp =
