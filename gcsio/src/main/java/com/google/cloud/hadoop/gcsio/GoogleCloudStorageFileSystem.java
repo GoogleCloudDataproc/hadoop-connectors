@@ -21,6 +21,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Comparator.comparing;
+import static java.util.concurrent.Executors.newSingleThreadExecutor;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
@@ -31,6 +32,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.Futures;
@@ -48,6 +50,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
@@ -76,17 +79,20 @@ public class GoogleCloudStorageFileSystem {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  private static final ThreadFactory DAEMON_THREAD_FACTORY =
-      new ThreadFactoryBuilder().setNameFormat("gcsfs-thread-%d").setDaemon(true).build();
-
   // URI scheme for GCS.
   public static final String SCHEME = "gs";
 
   // URI of the root path.
   public static final URI GCS_ROOT = URI.create(SCHEME + ":/");
 
-  public static final ListObjectOptions LIST_SINGLE_OBJECT_OPTIONS =
-      ListObjectOptions.DEFAULT.toBuilder().setMaxResults(1).build();
+  private static final ThreadFactory DAEMON_THREAD_FACTORY =
+      new ThreadFactoryBuilder().setNameFormat("gcsfs-thread-%d").setDaemon(true).build();
+
+  private static final ListObjectOptions GET_FILE_INFO_LIST_OPTIONS =
+      ListObjectOptions.DEFAULT.toBuilder().setIncludePrefix(true).setMaxResults(1).build();
+
+  private static final ListObjectOptions LIST_FILE_INFO_LIST_OPTIONS =
+      ListObjectOptions.DEFAULT.toBuilder().setIncludePrefix(true).build();
 
   // GCS access instance.
   private GoogleCloudStorage gcs;
@@ -318,8 +324,8 @@ public class GoogleCloudStorageFileSystem {
       StorageResourceId parentId =
           StorageResourceId.fromUriPath(UriPaths.getParentPath(path), true);
       parentInfoFuture =
-          cachedExecutor.submit(
-              () -> getFileInfoInternal(parentId, /* inferImplicitDirectories= */ false));
+          Futures.immediateFuture(
+              getFileInfoInternal(parentId, /* inferImplicitDirectories= */ false));
     }
 
     Optional<CoopLockOperationDelete> coopLockOp =
@@ -1018,8 +1024,8 @@ public class GoogleCloudStorageFileSystem {
     Preconditions.checkNotNull(path, "path can not be null");
     logger.atFinest().log("listFileInfo(path: %s)", path);
 
-    StorageResourceId pathId = StorageResourceId.fromUriPath(path, true);
-    StorageResourceId dirId = StorageResourceId.fromUriPath(UriPaths.toDirectory(path), true);
+    StorageResourceId pathId =
+        StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true);
 
     if (!pathId.isDirectory()) {
       GoogleCloudStorageItemInfo pathInfo = gcs.getItemInfo(pathId);
@@ -1030,12 +1036,20 @@ public class GoogleCloudStorageFileSystem {
       }
     }
 
+    StorageResourceId dirId =
+        StorageResourceId.fromUriPath(UriPaths.toDirectory(path), /* allowEmptyObjectName= */ true);
+
     List<GoogleCloudStorageItemInfo> dirItemInfos =
         dirId.isRoot()
             ? gcs.listBucketInfo()
-            : gcs.listObjectInfo(dirId.getBucketName(), dirId.getObjectName());
-    if (dirItemInfos.isEmpty() && !gcs.getItemInfo(dirId).exists()) {
+            : gcs.listObjectInfo(
+                dirId.getBucketName(), dirId.getObjectName(), LIST_FILE_INFO_LIST_OPTIONS);
+    if (pathId.isStorageObject() && dirItemInfos.isEmpty()) {
       throw new FileNotFoundException("Item not found: " + path);
+    }
+
+    if (!dirItemInfos.isEmpty() && Objects.equals(dirItemInfos.get(0).getResourceId(), dirId)) {
+      dirItemInfos.remove(0);
     }
 
     List<FileInfo> fileInfos = FileInfo.fromItemInfos(dirItemInfos);
@@ -1072,20 +1086,16 @@ public class GoogleCloudStorageFileSystem {
 
     ExecutorService dirExecutor =
         options.isStatusParallelEnabled()
-            ? resourceId.isDirectory()
-                ? Executors.newSingleThreadExecutor(DAEMON_THREAD_FACTORY)
-                : Executors.newFixedThreadPool(2, DAEMON_THREAD_FACTORY)
+            ? newSingleThreadExecutor(DAEMON_THREAD_FACTORY)
             : new LazyExecutorService();
     try {
-      Future<List<String>> dirChildFuture =
+      Future<List<GoogleCloudStorageItemInfo>> listDirFuture =
           dirExecutor.submit(
               () ->
-                  gcs.listObjectNames(
-                      dirId.getBucketName(), dirId.getObjectName(), LIST_SINGLE_OBJECT_OPTIONS));
-      Future<GoogleCloudStorageItemInfo> dirFuture =
-          resourceId.isDirectory()
-              ? Futures.immediateFuture(gcs.getItemInfo(resourceId))
-              : dirExecutor.submit(() -> gcs.getItemInfo(dirId));
+                  inferImplicitDirectories
+                      ? gcs.listObjectInfo(
+                          dirId.getBucketName(), dirId.getObjectName(), GET_FILE_INFO_LIST_OPTIONS)
+                      : ImmutableList.of(gcs.getItemInfo(dirId)));
       dirExecutor.shutdown();
 
       if (!resourceId.isDirectory()) {
@@ -1095,25 +1105,28 @@ public class GoogleCloudStorageFileSystem {
         }
       }
 
+      List<GoogleCloudStorageItemInfo> listDirInfo;
       try {
-        GoogleCloudStorageItemInfo dirInfo = dirFuture.get();
-        if (dirInfo.exists()) {
-          return dirInfo;
-        }
-
-        if (dirChildFuture.get().isEmpty()) {
-          return GoogleCloudStorageItemInfo.createNotFound(resourceId);
-        }
-
-        return inferImplicitDirectories
-            ? GoogleCloudStorageItemInfo.createInferredDirectory(dirId)
-            : GoogleCloudStorageItemInfo.createNotFound(dirId);
+        listDirInfo = listDirFuture.get();
       } catch (ExecutionException | InterruptedException e) {
         if (e instanceof InterruptedException) {
           Thread.currentThread().interrupt();
         }
         throw new IOException(String.format("Failed to get dir info for '%s'", resourceId), e);
       }
+      if (listDirInfo.isEmpty()) {
+        return GoogleCloudStorageItemInfo.createNotFound(resourceId);
+      }
+      checkState(listDirInfo.size() <= 2, "listed more than 2 objects: '%s'", listDirInfo);
+      GoogleCloudStorageItemInfo dirInfo = Iterables.get(listDirInfo, /* position= */ 0);
+      checkState(
+          dirInfo.getResourceId().equals(dirId) || !inferImplicitDirectories,
+          "listed wrong object '%s', but should be '%s'",
+          dirInfo.getResourceId(),
+          resourceId);
+      return dirInfo.getResourceId().equals(dirId) && dirInfo.exists()
+          ? dirInfo
+          : GoogleCloudStorageItemInfo.createNotFound(resourceId);
     } finally {
       dirExecutor.shutdownNow();
     }
