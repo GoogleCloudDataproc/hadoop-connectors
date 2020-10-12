@@ -59,7 +59,9 @@ public interface GoogleCloudStorage {
    * @return a channel for writing to the given object
    * @throws IOException on IO error
    */
-  WritableByteChannel create(StorageResourceId resourceId) throws IOException;
+  default WritableByteChannel create(StorageResourceId resourceId) throws IOException {
+    return create(resourceId, CreateObjectOptions.DEFAULT_OVERWRITE);
+  }
 
   /**
    * Creates and opens an object for writing. The bucket must already exist. If {@code resourceId}
@@ -82,7 +84,9 @@ public interface GoogleCloudStorage {
    * @param bucketName name of the bucket to create
    * @throws IOException on IO error
    */
-  void createBucket(String bucketName) throws IOException;
+  default void createBucket(String bucketName) throws IOException {
+    createBucket(bucketName, CreateBucketOptions.DEFAULT);
+  }
 
   /**
    * Creates a bucket.
@@ -145,7 +149,9 @@ public interface GoogleCloudStorage {
    * @throws java.io.FileNotFoundException if the given object does not exist
    * @throws IOException if object exists but cannot be opened
    */
-  SeekableByteChannel open(StorageResourceId resourceId) throws IOException;
+  default SeekableByteChannel open(StorageResourceId resourceId) throws IOException {
+    return open(resourceId, GoogleCloudStorageReadOptions.DEFAULT);
+  }
 
   /**
    * Opens an object for reading.
@@ -235,7 +241,10 @@ public interface GoogleCloudStorage {
    * @return list of object names
    * @throws IOException on IO error
    */
-  List<String> listObjectNames(String bucketName, String objectNamePrefix) throws IOException;
+  default List<String> listObjectNames(String bucketName, String objectNamePrefix)
+      throws IOException {
+    return listObjectNames(bucketName, objectNamePrefix, ListObjectOptions.DEFAULT);
+  }
 
   /**
    * Gets names of objects contained in the given bucket and whose names begin with the given
@@ -274,8 +283,10 @@ public interface GoogleCloudStorage {
    * @return list of object info
    * @throws IOException on IO error
    */
-  List<GoogleCloudStorageItemInfo> listObjectInfo(String bucketName, String objectNamePrefix)
-      throws IOException;
+  default List<GoogleCloudStorageItemInfo> listObjectInfo(
+      String bucketName, String objectNamePrefix) throws IOException {
+    return listObjectInfo(bucketName, objectNamePrefix, ListObjectOptions.DEFAULT);
+  }
 
   /**
    * Same name-matching semantics as {@link #listObjectNames} except this method retrieves the full
@@ -290,6 +301,21 @@ public interface GoogleCloudStorage {
   List<GoogleCloudStorageItemInfo> listObjectInfo(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions) throws IOException;
 
+  /**
+   * The same semantics as {@link #listObjectInfo}, but returns only result of single list request
+   * (1 page).
+   *
+   * @param bucketName bucket name
+   * @param objectNamePrefix object name prefix or null if all objects in the bucket are desired
+   * @param pageToken the page token
+   * @return {@link ListPage} object with listed {@link GoogleCloudStorageItemInfo}s and next page
+   *     token if any
+   * @throws IOException on IO error
+   */
+  default ListPage<GoogleCloudStorageItemInfo> listObjectInfoPage(
+      String bucketName, String objectNamePrefix, String pageToken) throws IOException {
+    return listObjectInfoPage(bucketName, objectNamePrefix, ListObjectOptions.DEFAULT, pageToken);
+  }
   /**
    * The same semantics as {@link #listObjectInfo}, but returns only result of single list request
    * (1 page).
