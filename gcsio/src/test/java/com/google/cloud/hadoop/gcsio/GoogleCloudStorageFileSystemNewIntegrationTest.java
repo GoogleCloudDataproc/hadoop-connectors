@@ -541,8 +541,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
         .containsExactly(
             getRequestString(bucketName, dirObject + "/f1"),
             getRequestString(bucketName, dirObject + "/"),
-            deleteRequestString(bucketName, dirObject + "/f1", 1))
-        .inOrder();
+            deleteRequestString(bucketName, dirObject + "/f1", 1));
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isFalse();
   }
@@ -605,8 +604,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
             getRequestString(bucketName, dirObject + "/"),
             copyRequestString(
                 bucketName, dirObject + "/f1", bucketName, dirObject + "/f2", "copyTo"),
-            deleteRequestString(bucketName, dirObject + "/f1", 1))
-        .inOrder();
+            deleteRequestString(bucketName, dirObject + "/f1", 1));
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isFalse();
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f2"))).isTrue();
