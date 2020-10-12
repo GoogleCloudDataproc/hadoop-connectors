@@ -28,6 +28,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksumType;
+import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest;
@@ -961,18 +962,15 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
   @Test
   public void testGlobStatusOptions_directoriesNamesShouldBeConsistent() throws IOException {
-    testGlobStatusFlatConcurrent(/* flat= */ true, /* concurrent= */ true);
-    testGlobStatusFlatConcurrent(/* flat= */ true, /* concurrent= */ false);
-    testGlobStatusFlatConcurrent(/* flat= */ false, /* concurrent= */ true);
-    testGlobStatusFlatConcurrent(/* flat= */ false, /* concurrent= */ false);
+    testGlobStatusFlatConcurrent(GlobAlgorithm.CONCURRENT);
+    testGlobStatusFlatConcurrent(GlobAlgorithm.DEFAULT);
+    testGlobStatusFlatConcurrent(GlobAlgorithm.FLAT);
   }
 
-  private void testGlobStatusFlatConcurrent(boolean flat, boolean concurrent) throws IOException {
+  private void testGlobStatusFlatConcurrent(GlobAlgorithm globAlgorithm) throws IOException {
     Configuration configuration = ghfs.getConf();
-    configuration.setBoolean(
-        GoogleHadoopFileSystemConfiguration.GCS_FLAT_GLOB_ENABLE.getKey(), flat);
-    configuration.setBoolean(
-        GoogleHadoopFileSystemConfiguration.GCS_CONCURRENT_GLOB_ENABLE.getKey(), concurrent);
+    configuration.setEnum(
+        GoogleHadoopFileSystemConfiguration.GCS_GLOB_ALGORITHM.getKey(), globAlgorithm);
     ghfs.initialize(ghfs.getUri(), configuration);
 
     Path testRoot = new Path("/directory1/");

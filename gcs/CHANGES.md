@@ -113,13 +113,21 @@
 1.  Add a property to ignore
     [Cloud Storage precondition](https://cloud.google.com/storage/docs/generations-preconditions#_Preconditions)
     failures when overwriting objects in concurrent environment:
-    
+
     ```
     fs.gs.overwrite.generation.mismatch.ignore (default: false)
     ```
 
 1.  Increment Hadoop `FileSystem.Statistics` counters for read and write
     operations.
+
+1.  Replace 2 glob-related properties (`fs.gs.glob.flatlist.enable` and
+    `fs.gs.glob.concurrent.enable`) with a single property to configure glob
+    search algorithm:
+
+    ```
+    fs.gs.glob.algorithm (default: CONCURENT)
+    ```
 
 ### 2.1.1 - 2020-03-11
 

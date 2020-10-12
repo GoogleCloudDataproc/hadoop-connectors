@@ -88,17 +88,23 @@
     backing object exists, but it could be inferred that it should exist because
     there are files with the same prefix.
 
-*   `fs.gs.glob.flatlist.enable` (default: `true`)
+*   `fs.gs.glob.algorithm` (default: `CONCURENT`)
 
-    Whether or not to prepopulate potential glob matches in a single list
-    request to minimize calls to GCS in nested glob cases.
+    Glob search algorithm to use in Hadoop
+    [FileSystem.globStatus](https://hadoop.apache.org/docs/r3.3.0/api/org/apache/hadoop/fs/FileSystem.html#globStatus-org.apache.hadoop.fs.Path-)
+    method.
 
-*   `fs.gs.glob.concurrent.enable` (default: `true`)
+    Valid options:
 
-    Enables concurrent execution of flat and regular glob search algorithms in
-    two parallel threads to improve globbing performance. Whichever algorithm
-    will finish first that result will be returned and the other algorithm
-    execution one will be interrupted.
+    *   `FLAT` - fetch potential glob matches in a single list request to
+        minimize calls to GCS in nested glob cases.
+
+    *   `DEFAULT` - use default Hadoop glob search algorithm implementation.
+
+    *   `CONCURENT` - enables concurrent execution of flat and default glob
+        search algorithms in two parallel threads to improve globbing
+        performance. Whichever algorithm will finish first that result will be
+        returned, and the other algorithm execution will be interrupted.
 
 *   `fs.gs.max.requests.per.batch` (default: `15`)
 
