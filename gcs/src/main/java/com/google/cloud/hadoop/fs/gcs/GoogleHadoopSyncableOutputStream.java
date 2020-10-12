@@ -82,7 +82,6 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
   private static final CreateFileOptions TEMPFILE_CREATE_OPTIONS =
       CreateFileOptions.DEFAULT_NO_OVERWRITE.toBuilder()
           .setEnsureNoDirectoryConflict(false)
-          .setEnsureParentDirectoriesExist(false)
           .setOverwriteGenerationId(0)
           .build();
 
