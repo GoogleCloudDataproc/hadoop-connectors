@@ -66,14 +66,15 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
   }
 
   @Override
-  public WritableByteChannel create(StorageResourceId resourceId) throws IOException {
+  public WritableByteChannel create(StorageResourceId resourceId, CreateObjectOptions options)
+      throws IOException {
     // If the item exists in cache upon creation, remove it from cache so that later getItemInfo
     // will pull the most updated item info.
     if (cache.getItem(resourceId) != null) {
       cache.removeItem(resourceId);
     }
 
-    return super.create(resourceId);
+    return super.create(resourceId, options);
   }
 
   @Override
@@ -110,26 +111,12 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
 
   /** This function may return names from cached copies of {@link GoogleCloudStorageItemInfo}. */
   @Override
-  public List<String> listObjectNames(String bucketName, String objectNamePrefix)
-      throws IOException {
-    return this.listObjectNames(bucketName, objectNamePrefix, ListObjectOptions.DEFAULT);
-  }
-
-  /** This function may return names from cached copies of {@link GoogleCloudStorageItemInfo}. */
-  @Override
   public List<String> listObjectNames(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions)
       throws IOException {
     return this.listObjectInfo(bucketName, objectNamePrefix, listOptions).stream()
         .map(GoogleCloudStorageItemInfo::getObjectName)
         .collect(toImmutableList());
-  }
-
-  /** This function may return cached copies of {@link GoogleCloudStorageItemInfo}. */
-  @Override
-  public List<GoogleCloudStorageItemInfo> listObjectInfo(String bucketName, String objectNamePrefix)
-      throws IOException {
-    return this.listObjectInfo(bucketName, objectNamePrefix, ListObjectOptions.DEFAULT);
   }
 
   /** This function may return cached copies of {@link GoogleCloudStorageItemInfo}. */

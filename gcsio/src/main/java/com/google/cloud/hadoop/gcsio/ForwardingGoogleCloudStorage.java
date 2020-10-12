@@ -50,22 +50,10 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public WritableByteChannel create(StorageResourceId resourceId) throws IOException {
-    logger.atFine().log("%s.create(%s)", delegateClassName, resourceId);
-    return delegate.create(resourceId);
-  }
-
-  @Override
   public WritableByteChannel create(StorageResourceId resourceId, CreateObjectOptions options)
       throws IOException {
     logger.atFine().log("%s.create(%s, %s)", delegateClassName, resourceId, options);
     return delegate.create(resourceId, options);
-  }
-
-  @Override
-  public void createBucket(String bucketName) throws IOException {
-    logger.atFine().log("%s.createBucket(%s)", delegateClassName, bucketName);
-    delegate.createBucket(bucketName);
   }
 
   @Override
@@ -98,12 +86,6 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
       throws IOException {
     logger.atFine().log("%s.createEmptyObjects(%s, %s)", delegateClassName, resourceIds, options);
     delegate.createEmptyObjects(resourceIds, options);
-  }
-
-  @Override
-  public SeekableByteChannel open(StorageResourceId resourceId) throws IOException {
-    logger.atFine().log("%s.open(%s)", delegateClassName, resourceId);
-    return delegate.open(resourceId);
   }
 
   @Override
@@ -151,14 +133,6 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public List<String> listObjectNames(String bucketName, String objectNamePrefix)
-      throws IOException {
-    logger.atFine().log(
-        "%s.listObjectNames(%s, %s)", delegateClassName, bucketName, objectNamePrefix);
-    return delegate.listObjectNames(bucketName, objectNamePrefix);
-  }
-
-  @Override
   public List<String> listObjectNames(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions)
       throws IOException {
@@ -166,14 +140,6 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
         "%s.listObjectNames(%s, %s, %s)",
         delegateClassName, bucketName, objectNamePrefix, listOptions);
     return delegate.listObjectNames(bucketName, objectNamePrefix, listOptions);
-  }
-
-  @Override
-  public List<GoogleCloudStorageItemInfo> listObjectInfo(String bucketName, String objectNamePrefix)
-      throws IOException {
-    logger.atFine().log(
-        "%s.listObjectInfo(%s, %s)", delegateClassName, bucketName, objectNamePrefix);
-    return delegate.listObjectInfo(bucketName, objectNamePrefix);
   }
 
   @Override

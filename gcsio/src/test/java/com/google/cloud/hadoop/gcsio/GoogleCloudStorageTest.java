@@ -2677,8 +2677,7 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorage gcs = mockedGcs(transport);
 
     ListPage<GoogleCloudStorageItemInfo> objectsPage =
-        gcs.listObjectInfoPage(
-            BUCKET_NAME, prefix, ListObjectOptions.DEFAULT, /* pageToken= */ null);
+        gcs.listObjectInfoPage(BUCKET_NAME, prefix, /* pageToken= */ null);
 
     // The item exactly matching the input prefix will be discarded.
     assertThat(objectsPage.getNextPageToken()).isNull();
@@ -2717,8 +2716,7 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorage gcs = mockedGcs(transport);
 
     ListPage<GoogleCloudStorageItemInfo> objectsPage =
-        gcs.listObjectInfoPage(
-            BUCKET_NAME, objectPrefix, ListObjectOptions.DEFAULT, /* pageToken= */ null);
+        gcs.listObjectInfoPage(BUCKET_NAME, objectPrefix, /* pageToken= */ null);
 
     trackingHttpRequestInitializer.getAllRequestStrings();
     assertThat(objectsPage.getNextPageToken()).isNull();
@@ -2752,8 +2750,7 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorage gcs = mockedGcs(transport);
 
     ListPage<GoogleCloudStorageItemInfo> objectsPage =
-        gcs.listObjectInfoPage(
-            BUCKET_NAME, prefix, ListObjectOptions.DEFAULT, /* pageToken= */ null);
+        gcs.listObjectInfoPage(BUCKET_NAME, prefix, /* pageToken= */ null);
 
     assertThat(objectsPage.getNextPageToken()).isNull();
     assertThat(objectsPage.getItems())
@@ -3078,8 +3075,7 @@ public class GoogleCloudStorageTest {
 
     // List the objects
     ListPage<GoogleCloudStorageItemInfo> objectInfos =
-        gcs.listObjectInfoPage(
-            BUCKET_NAME, objectPrefix, ListObjectOptions.DEFAULT, /* pageToken= */ null);
+        gcs.listObjectInfoPage(BUCKET_NAME, objectPrefix, /* pageToken= */ null);
 
     assertThat(objectInfos.getNextPageToken()).isNull();
     assertThat(objectInfos.getItems())
