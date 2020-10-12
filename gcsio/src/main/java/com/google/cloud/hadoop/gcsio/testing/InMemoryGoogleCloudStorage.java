@@ -433,8 +433,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
           getItemInfo(new StorageResourceId(bucketName, objectName));
       if (itemInfo.exists()) {
         listedInfo.add(itemInfo);
-      } else if (itemInfo.getResourceId().isStorageObject()
-                 && storageOptions.isInferImplicitDirectoriesEnabled()) {
+      } else if (itemInfo.getResourceId().isStorageObject()) {
         listedInfo.add(
             GoogleCloudStorageItemInfo.createInferredDirectory(itemInfo.getResourceId()));
       }

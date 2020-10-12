@@ -71,7 +71,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.status.parallel.enable", true);
           put("fs.gs.lazy.init.enable", false);
           put("fs.gs.block.size", 64 * 1024 * 1024L);
-          put("fs.gs.implicit.dir.infer.enable", true);
           put("fs.gs.glob.flatlist.enable", true);
           put("fs.gs.glob.concurrent.enable", true);
           put("fs.gs.max.requests.per.batch", 15L);

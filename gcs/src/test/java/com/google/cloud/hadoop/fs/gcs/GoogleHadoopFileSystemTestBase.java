@@ -16,7 +16,6 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCE_BUCKET_DELETE_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_INFER_IMPLICIT_DIRECTORIES_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX;
@@ -25,7 +24,6 @@ import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.assertThrows;
-import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
@@ -82,7 +80,6 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
       config.set(GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_KEYFILE_SUFFIX.getKey(), privateKeyFile);
     }
     config.setBoolean(GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.getKey(), true);
-    config.setBoolean(GCS_INFER_IMPLICIT_DIRECTORIES_ENABLE.getKey(), false);
     // Allow buckets to be deleted in test cleanup:
     config.setBoolean(GCE_BUCKET_DELETE_ENABLE.getKey(), true);
     return config;
@@ -190,12 +187,9 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     URI leafUri = myghfs.getGcsPath(leafPath);
     gcsfs.mkdir(leafUri);
 
-    boolean inferredDirExists =
-        gcsfs.getOptions().getCloudStorageOptions().isInferImplicitDirectoriesEnabled();
-
     assertDirectory(gcsfs, leafUri, /* exists= */ true);
-    assertDirectory(gcsfs, subdirUri, /* exists= */ inferredDirExists);
-    assertDirectory(gcsfs, parentUri, /* exists= */ inferredDirExists);
+    assertDirectory(gcsfs, subdirUri, /* exists= */ true);
+    assertDirectory(gcsfs, parentUri, /* exists= */ true);
 
     ghfsHelper.clearBucket(bucketName);
   }
@@ -216,12 +210,10 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     StorageResourceId resource = StorageResourceId.fromUriPath(objUri, false);
     gcs.createEmptyObject(resource);
 
-    boolean inferImplicitDirectories =
-        gcsfs.getOptions().getCloudStorageOptions().isInferImplicitDirectoriesEnabled();
     boolean autoRepairImplicitDirectories =
         gcsfs.getOptions().getCloudStorageOptions().isAutoRepairImplicitDirectoriesEnabled();
 
-    assertDirectory(gcsfs, dirUri, /* exists= */ inferImplicitDirectories);
+    assertDirectory(gcsfs, dirUri, /* exists= */ true);
 
     gcsfs.delete(objUri, false);
 
@@ -236,10 +228,6 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     GoogleHadoopFileSystemBase myghfs = (GoogleHadoopFileSystemBase) ghfs;
     GoogleCloudStorageFileSystem gcsfs = myghfs.getGcsFs();
     GoogleCloudStorage gcs = gcsfs.getGcs();
-
-    // only if directory inferring is enabled, the directory without the implicit
-    // directory entry can be deleted without the FileNotFoundException
-    assumeTrue(gcsfs.getOptions().getCloudStorageOptions().isInferImplicitDirectoriesEnabled());
 
     URI seedUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path dirPath = ghfsHelper.castAsHadoopPath(seedUri);
@@ -285,12 +273,10 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     StorageResourceId resource = StorageResourceId.fromUriPath(objUri, false);
     gcs.createEmptyObject(resource);
 
-    boolean inferImplicitDirectories =
-        gcsfs.getOptions().getCloudStorageOptions().isInferImplicitDirectoriesEnabled();
     boolean autoRepairImplicitDirectories =
         gcsfs.getOptions().getCloudStorageOptions().isAutoRepairImplicitDirectoriesEnabled();
 
-    assertDirectory(gcsfs, dirUri, /* exists= */ inferImplicitDirectories);
+    assertDirectory(gcsfs, dirUri, /* exists= */ true);
 
     gcsfs.rename(objUri, objUri.resolve(".."));
 
@@ -306,10 +292,6 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     GoogleHadoopFileSystemBase myghfs = (GoogleHadoopFileSystemBase) ghfs;
     GoogleCloudStorageFileSystem gcsfs = myghfs.getGcsFs();
     GoogleCloudStorage gcs = gcsfs.getGcs();
-
-    // only if directory inferring is enabled, the directory without the implicit
-    // directory entry can be deleted without the FileNotFoundException
-    assumeTrue(gcsfs.getOptions().getCloudStorageOptions().isInferImplicitDirectoriesEnabled());
 
     URI seedUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path dirPath = ghfsHelper.castAsHadoopPath(seedUri);

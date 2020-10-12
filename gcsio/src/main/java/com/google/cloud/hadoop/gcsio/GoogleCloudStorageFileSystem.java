@@ -231,8 +231,7 @@ public class GoogleCloudStorageFileSystem {
 
     // Check if a directory of that name exists.
     if (options.isEnsureNoDirectoryConflict()
-        && getFileInfoInternal(
-                resourceId.toDirectoryId(), gcs.getOptions().isInferImplicitDirectoriesEnabled())
+        && getFileInfoInternal(resourceId.toDirectoryId(), /* inferImplicitDirectories */ true)
             .exists()) {
       throw new FileAlreadyExistsException("A directory with that name exists: " + path);
     }
@@ -1071,7 +1070,7 @@ public class GoogleCloudStorageFileSystem {
     StorageResourceId resourceId = StorageResourceId.fromUriPath(path, true);
     FileInfo fileInfo =
         FileInfo.fromItemInfo(
-            getFileInfoInternal(resourceId, gcs.getOptions().isInferImplicitDirectoriesEnabled()));
+            getFileInfoInternal(resourceId, /* inferImplicitDirectories= */ true));
     logger.atFinest().log("getFileInfo(path: %s): %s", path, fileInfo);
     return fileInfo;
   }
