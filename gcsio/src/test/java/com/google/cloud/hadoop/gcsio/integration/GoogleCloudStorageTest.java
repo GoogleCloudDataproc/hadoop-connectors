@@ -426,8 +426,7 @@ public class GoogleCloudStorageTest {
     writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
 
     ListPage<GoogleCloudStorageItemInfo> listedObjectsPage =
-        rawStorage.listObjectInfoPage(
-            bucketName, "listObjectInfoPage_test_", ListObjectOptions.DEFAULT, /* pageToken= */ "");
+        rawStorage.listObjectInfoPage(bucketName, "listObjectInfoPage_test_", /* pageToken= */ "");
 
     assertThat(listedObjectsPage.getNextPageToken()).isNull();
     assertThat(
@@ -1690,17 +1689,14 @@ public class GoogleCloudStorageTest {
     StorageResourceId resourceId = new StorageResourceId(bucketName, objectName);
 
     ListPage<GoogleCloudStorageItemInfo> itemInfosPage =
-        rawStorage.listObjectInfoPage(
-            bucketName, objectName, ListObjectOptions.DEFAULT, /* pageToken= */ null);
+        rawStorage.listObjectInfoPage(bucketName, objectName, /* pageToken= */ null);
 
     assertThat(itemInfosPage.getNextPageToken()).isNull();
     assertThat(itemInfosPage.getItems()).isEmpty();
 
     writeObject(rawStorage, resourceId, /* objectSize= */ 512);
 
-    itemInfosPage =
-        rawStorage.listObjectInfoPage(
-            bucketName, objectName, ListObjectOptions.DEFAULT, /* pageToken= */ null);
+    itemInfosPage = rawStorage.listObjectInfoPage(bucketName, objectName, /* pageToken= */ null);
 
     assertThat(itemInfosPage.getNextPageToken()).isNull();
     assertThat(itemInfosPage.getItems()).hasSize(1);
