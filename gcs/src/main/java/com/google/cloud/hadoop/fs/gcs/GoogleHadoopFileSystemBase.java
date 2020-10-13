@@ -39,6 +39,7 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.flogger.LazyArgs.lazy;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.concurrent.Executors.newFixedThreadPool;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
@@ -101,10 +102,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -1243,19 +1242,19 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   private FileStatus[] concurrentGlobInternal(Path fixedPath, PathFilter filter)
       throws IOException {
-    ExecutorService executorService = Executors.newFixedThreadPool(2, DAEMON_THREAD_FACTORY);
-    Callable<FileStatus[]> flatGlobTask = () -> flatGlobInternal(fixedPath, filter);
-    Callable<FileStatus[]> nonFlatGlobTask = () -> super.globStatus(fixedPath, filter);
-
+    ExecutorService globExecutor = newFixedThreadPool(2, DAEMON_THREAD_FACTORY);
     try {
-      return executorService.invokeAny(Arrays.asList(flatGlobTask, nonFlatGlobTask));
+      return globExecutor.invokeAny(
+          ImmutableList.of(
+              () -> flatGlobInternal(fixedPath, filter),
+              () -> super.globStatus(fixedPath, filter)));
     } catch (InterruptedException | ExecutionException e) {
       if (e instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
       throw new IOException("Concurrent glob execution failed", e);
     } finally {
-      executorService.shutdownNow();
+      globExecutor.shutdownNow();
     }
   }
 
