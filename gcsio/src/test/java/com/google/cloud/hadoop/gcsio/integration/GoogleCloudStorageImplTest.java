@@ -61,23 +61,19 @@ public class GoogleCloudStorageImplTest {
   }
 
   protected GoogleCloudStorageImpl makeStorageWithBufferSize(int bufferSize) throws IOException {
-    GoogleCloudStorageOptions.Builder builder =
+    return makeStorage(
         GoogleCloudStorageTestHelper.getStandardOptionBuilder()
             .setWriteChannelOptions(
-                AsyncWriteChannelOptions.builder().setUploadChunkSize(bufferSize).build());
-
-    return makeStorage(builder.build());
+                AsyncWriteChannelOptions.builder().setUploadChunkSize(bufferSize).build())
+            .build());
   }
 
-  protected GoogleCloudStorageImpl makeStorageWithInferImplicit()
+  protected GoogleCloudStorageImpl makeStorageWithoutImplicitDirectoriesAutoRepair()
       throws IOException {
-    GoogleCloudStorageOptions.Builder builder =
-        GoogleCloudStorageTestHelper.getStandardOptionBuilder();
-
-    builder.setAutoRepairImplicitDirectoriesEnabled(false);
-    builder.setInferImplicitDirectoriesEnabled(true);
-
-    return makeStorage(builder.build());
+    return makeStorage(
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setAutoRepairImplicitDirectoriesEnabled(false)
+            .build());
   }
 
   @Test
@@ -137,11 +133,11 @@ public class GoogleCloudStorageImplTest {
   }
 
   @Test
-  public void testInferImplicitDirectories() throws IOException {
-    String bucketName = BUCKET_HELPER.getUniqueBucketName("infer-implicit");
+  public void testDoNotAutoRepairImplicitDirectories() throws IOException {
+    String bucketName = BUCKET_HELPER.getUniqueBucketName("infer-no-repair");
     StorageResourceId resourceId = new StorageResourceId(bucketName, "d0/o1");
 
-    GoogleCloudStorageImpl gcs = makeStorageWithInferImplicit();
+    GoogleCloudStorageImpl gcs = makeStorageWithoutImplicitDirectoriesAutoRepair();
 
     gcs.createBucket(bucketName);
     gcs.createEmptyObject(resourceId);

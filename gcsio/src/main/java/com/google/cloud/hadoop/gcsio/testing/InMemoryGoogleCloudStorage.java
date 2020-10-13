@@ -111,11 +111,6 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public synchronized WritableByteChannel create(StorageResourceId resourceId) throws IOException {
-    return create(resourceId, CreateObjectOptions.DEFAULT_OVERWRITE);
-  }
-
-  @Override
   public synchronized WritableByteChannel create(
       StorageResourceId resourceId, CreateObjectOptions options) throws IOException {
     if (!bucketLookup.containsKey(resourceId.getBucketName())) {
@@ -152,11 +147,6 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
             options.getMetadata());
     bucketLookup.get(resourceId.getBucketName()).add(entry);
     return entry.getWriteChannel();
-  }
-
-  @Override
-  public synchronized void createBucket(String bucketName) throws IOException {
-    createBucket(bucketName, CreateBucketOptions.DEFAULT);
   }
 
   @Override
@@ -202,12 +192,6 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     for (StorageResourceId resourceId : resourceIds) {
       createEmptyObject(resourceId, options);
     }
-  }
-
-  @Override
-  public synchronized SeekableByteChannel open(StorageResourceId resourceId)
-      throws IOException {
-    return open(resourceId, GoogleCloudStorageReadOptions.DEFAULT);
   }
 
   @Override
@@ -373,11 +357,6 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public synchronized List<String> listObjectNames(String bucketName, String objectNamePrefix) {
-    return listObjectNames(bucketName, objectNamePrefix, ListObjectOptions.DEFAULT);
-  }
-
-  @Override
   public synchronized List<String> listObjectNames(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions) {
     InMemoryBucketEntry bucketEntry = bucketLookup.get(bucketName);
@@ -412,12 +391,6 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
   @Override
   public synchronized List<GoogleCloudStorageItemInfo> listObjectInfo(
-      String bucketName, String objectNamePrefix) throws IOException {
-    return listObjectInfo(bucketName, objectNamePrefix, ListObjectOptions.DEFAULT);
-  }
-
-  @Override
-  public synchronized List<GoogleCloudStorageItemInfo> listObjectInfo(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions)
       throws IOException {
     // Since we're just in memory, we can do the naive implementation of just listing names and
@@ -433,8 +406,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
           getItemInfo(new StorageResourceId(bucketName, objectName));
       if (itemInfo.exists()) {
         listedInfo.add(itemInfo);
-      } else if (itemInfo.getResourceId().isStorageObject()
-                 && storageOptions.isInferImplicitDirectoriesEnabled()) {
+      } else if (itemInfo.getResourceId().isStorageObject()) {
         listedInfo.add(
             GoogleCloudStorageItemInfo.createInferredDirectory(itemInfo.getResourceId()));
       }

@@ -121,6 +121,9 @@
 1.  Increment Hadoop `FileSystem.Statistics` counters for read and write
     operations.
 
+1.  Always infer implicit directories and remove
+    `fs.gs.implicit.dir.infer.enable` property.
+
 1.  Replace 2 glob-related properties (`fs.gs.glob.flatlist.enable` and
     `fs.gs.glob.concurrent.enable`) with a single property to configure glob
     search algorithm:

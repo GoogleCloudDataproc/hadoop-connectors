@@ -2628,15 +2628,6 @@ public class GoogleCloudStorageTest {
 
   @Test
   public void listObjectInfo_inferImplicit() throws IOException {
-    runTestListObjectInfo(true);
-  }
-
-  @Test
-  public void listObjectInfo_noInferImplicit() throws IOException {
-    runTestListObjectInfo(false);
-  }
-
-  private void runTestListObjectInfo(boolean inferImplicit) throws IOException {
     String objectPrefix = "foo/bar/baz/";
     String dir0Name = "foo/bar/baz/dir0/";
     String dir1Name = "foo/bar/baz/dir1/";
@@ -2651,26 +2642,17 @@ public class GoogleCloudStorageTest {
                     .setItems(ImmutableList.of(dir1))
                     .setNextPageToken(null)));
 
-    GoogleCloudStorageOptions gcsOptions =
-        GCS_OPTIONS.toBuilder().setInferImplicitDirectoriesEnabled(inferImplicit).build();
-    GoogleCloudStorage gcs = mockedGcs(gcsOptions, transport);
+    GoogleCloudStorage gcs = mockedGcs(GCS_OPTIONS, transport);
 
     // List the objects
     List<GoogleCloudStorageItemInfo> objectInfos = gcs.listObjectInfo(BUCKET_NAME, objectPrefix);
 
-    if (gcs.getOptions().isInferImplicitDirectoriesEnabled()) {
-      assertThat(objectInfos)
-          .containsExactly(
-              createInferredDirectory(new StorageResourceId(BUCKET_NAME, dir0Name)),
-              createItemInfoForStorageObject(new StorageResourceId(BUCKET_NAME, dir1Name), dir1),
-              createInferredDirectory(new StorageResourceId(BUCKET_NAME, dir2Name)))
-          .inOrder();
-    } else {
-      assertThat(objectInfos)
-          .containsExactly(
-              createItemInfoForStorageObject(new StorageResourceId(BUCKET_NAME, dir1Name), dir1))
-          .inOrder();
-    }
+    assertThat(objectInfos)
+        .containsExactly(
+            createInferredDirectory(new StorageResourceId(BUCKET_NAME, dir0Name)),
+            createItemInfoForStorageObject(new StorageResourceId(BUCKET_NAME, dir1Name), dir1),
+            createInferredDirectory(new StorageResourceId(BUCKET_NAME, dir2Name)))
+        .inOrder();
 
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(
@@ -2695,8 +2677,7 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorage gcs = mockedGcs(transport);
 
     ListPage<GoogleCloudStorageItemInfo> objectsPage =
-        gcs.listObjectInfoPage(
-            BUCKET_NAME, prefix, ListObjectOptions.DEFAULT, /* pageToken= */ null);
+        gcs.listObjectInfoPage(BUCKET_NAME, prefix, /* pageToken= */ null);
 
     // The item exactly matching the input prefix will be discarded.
     assertThat(objectsPage.getNextPageToken()).isNull();
@@ -2735,8 +2716,7 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorage gcs = mockedGcs(transport);
 
     ListPage<GoogleCloudStorageItemInfo> objectsPage =
-        gcs.listObjectInfoPage(
-            BUCKET_NAME, objectPrefix, ListObjectOptions.DEFAULT, /* pageToken= */ null);
+        gcs.listObjectInfoPage(BUCKET_NAME, objectPrefix, /* pageToken= */ null);
 
     trackingHttpRequestInitializer.getAllRequestStrings();
     assertThat(objectsPage.getNextPageToken()).isNull();
@@ -2770,8 +2750,7 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorage gcs = mockedGcs(transport);
 
     ListPage<GoogleCloudStorageItemInfo> objectsPage =
-        gcs.listObjectInfoPage(
-            BUCKET_NAME, prefix, ListObjectOptions.DEFAULT, /* pageToken= */ null);
+        gcs.listObjectInfoPage(BUCKET_NAME, prefix, /* pageToken= */ null);
 
     assertThat(objectsPage.getNextPageToken()).isNull();
     assertThat(objectsPage.getItems())
@@ -3078,15 +3057,6 @@ public class GoogleCloudStorageTest {
 
   @Test
   public void listObjectInfoPage_inferImplicit() throws IOException {
-    runTestListObjectInfoPage(true);
-  }
-
-  @Test
-  public void listObjectInfoPage_noInferImplicit() throws IOException {
-    runTestListObjectInfoPage(false);
-  }
-
-  private void runTestListObjectInfoPage(boolean inferImplicit) throws IOException {
     String objectPrefix = "foo/bar/baz/";
     String dir0Name = "foo/bar/baz/dir0/";
     String dir1Name = "foo/bar/baz/dir1/";
@@ -3101,29 +3071,19 @@ public class GoogleCloudStorageTest {
                     .setItems(ImmutableList.of(dir1))
                     .setNextPageToken(null)));
 
-    GoogleCloudStorageOptions gcsOptions =
-        GCS_OPTIONS.toBuilder().setInferImplicitDirectoriesEnabled(inferImplicit).build();
-    GoogleCloudStorage gcs = mockedGcs(gcsOptions, transport);
+    GoogleCloudStorage gcs = mockedGcs(GCS_OPTIONS, transport);
 
     // List the objects
     ListPage<GoogleCloudStorageItemInfo> objectInfos =
-        gcs.listObjectInfoPage(
-            BUCKET_NAME, objectPrefix, ListObjectOptions.DEFAULT, /* pageToken= */ null);
+        gcs.listObjectInfoPage(BUCKET_NAME, objectPrefix, /* pageToken= */ null);
 
     assertThat(objectInfos.getNextPageToken()).isNull();
-    if (gcs.getOptions().isInferImplicitDirectoriesEnabled()) {
-      assertThat(objectInfos.getItems())
-          .containsExactly(
-              createInferredDirectory(new StorageResourceId(BUCKET_NAME, dir0Name)),
-              createItemInfoForStorageObject(new StorageResourceId(BUCKET_NAME, dir1Name), dir1),
-              createInferredDirectory(new StorageResourceId(BUCKET_NAME, dir2Name)))
-          .inOrder();
-    } else {
-      assertThat(objectInfos.getItems())
-          .containsExactly(
-              createItemInfoForStorageObject(new StorageResourceId(BUCKET_NAME, dir1Name), dir1))
-          .inOrder();
-    }
+    assertThat(objectInfos.getItems())
+        .containsExactly(
+            createInferredDirectory(new StorageResourceId(BUCKET_NAME, dir0Name)),
+            createItemInfoForStorageObject(new StorageResourceId(BUCKET_NAME, dir1Name), dir1),
+            createInferredDirectory(new StorageResourceId(BUCKET_NAME, dir2Name)))
+        .inOrder();
 
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(

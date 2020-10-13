@@ -1279,8 +1279,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     do {
       ListPage<FileInfo> infoPage = getGcsFs().listAllFileInfoForPrefixPage(prefixUri, pageToken);
 
-      // TODO: Are implicit directories really always needed for globbing?
-      //  Probably they should be inferred only when fs.gs.implicit.dir.infer.enable is true.
       Collection<FileStatus> statusPage =
           toFileStatusesWithImplicitDirectories(infoPage.getItems());
 

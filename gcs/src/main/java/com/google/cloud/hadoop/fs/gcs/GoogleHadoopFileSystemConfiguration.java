@@ -173,14 +173,6 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.implicit.dir.repair.enable", true);
 
-  /**
-   * Configuration key for enabling automatic inference of implicit directories. If set, we create
-   * and return in-memory directory objects on the fly when no backing object exists, but we know
-   * there are files with the same prefix.
-   */
-  public static final HadoopConfigurationProperty<Boolean> GCS_INFER_IMPLICIT_DIRECTORIES_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.implicit.dir.infer.enable", true);
-
   /** Configuration key for customizing glob search algorithm. */
   public static final HadoopConfigurationProperty<GlobAlgorithm> GCS_GLOB_ALGORITHM =
       new HadoopConfigurationProperty<>("fs.gs.glob.algorithm", GlobAlgorithm.CONCURRENT);
@@ -442,8 +434,6 @@ public class GoogleHadoopFileSystemConfiguration {
         .setStorageServicePath(GCS_SERVICE_PATH.get(config, config::get))
         .setAutoRepairImplicitDirectoriesEnabled(
             GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.get(config, config::getBoolean))
-        .setInferImplicitDirectoriesEnabled(
-            GCS_INFER_IMPLICIT_DIRECTORIES_ENABLE.get(config, config::getBoolean))
         .setCopyWithRewriteEnabled(GCS_COPY_WITH_REWRITE_ENABLE.get(config, config::getBoolean))
         .setMaxBytesRewrittenPerCall(GCS_REWRITE_MAX_BYTES_PER_CALL.get(config, config::getLong))
         .setCopyMaxRequestsPerBatch(GCS_COPY_MAX_REQUESTS_PER_BATCH.get(config, config::getLong))

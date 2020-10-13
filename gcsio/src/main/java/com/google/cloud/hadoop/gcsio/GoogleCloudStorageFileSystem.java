@@ -35,7 +35,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
-import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.FileNotFoundException;
@@ -231,8 +230,7 @@ public class GoogleCloudStorageFileSystem {
 
     // Check if a directory of that name exists.
     if (options.isEnsureNoDirectoryConflict()
-        && getFileInfoInternal(
-                resourceId.toDirectoryId(), gcs.getOptions().isInferImplicitDirectoriesEnabled())
+        && getFileInfoInternal(resourceId.toDirectoryId(), /* inferImplicitDirectories */ true)
             .exists()) {
       throw new FileAlreadyExistsException("A directory with that name exists: " + path);
     }
@@ -324,8 +322,8 @@ public class GoogleCloudStorageFileSystem {
       StorageResourceId parentId =
           StorageResourceId.fromUriPath(UriPaths.getParentPath(path), true);
       parentInfoFuture =
-          Futures.immediateFuture(
-              getFileInfoInternal(parentId, /* inferImplicitDirectories= */ false));
+          cachedExecutor.submit(
+              () -> getFileInfoInternal(parentId, /* inferImplicitDirectories= */ false));
     }
 
     Optional<CoopLockOperationDelete> coopLockOp =
@@ -1071,7 +1069,7 @@ public class GoogleCloudStorageFileSystem {
     StorageResourceId resourceId = StorageResourceId.fromUriPath(path, true);
     FileInfo fileInfo =
         FileInfo.fromItemInfo(
-            getFileInfoInternal(resourceId, gcs.getOptions().isInferImplicitDirectoriesEnabled()));
+            getFileInfoInternal(resourceId, /* inferImplicitDirectories= */ true));
     logger.atFinest().log("getFileInfo(path: %s): %s", path, fileInfo);
     return fileInfo;
   }
