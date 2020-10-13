@@ -1475,14 +1475,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       List<String> listedPrefixes,
       List<StorageObject> listedObjects) {
     List<GoogleCloudStorageItemInfo> objectInfos =
-        new ArrayList<>(
-            // Size to accommodate inferred directories for listed prefixes and prefix object
-            (storageOptions.isInferImplicitDirectoriesEnabled() ? listedPrefixes.size() + 1 : 0)
-                + listedObjects.size());
+        // Size to accommodate inferred directories for listed prefixes and prefix object
+        new ArrayList<>(listedPrefixes.size() + listedObjects.size() + 1);
 
     // Create inferred directory for the prefix object if necessary
-    if (storageOptions.isInferImplicitDirectoriesEnabled()
-        && listOptions.isIncludePrefix()
+    if (listOptions.isIncludePrefix()
         // Only add an inferred directory for non-null prefix name
         && objectNamePrefix != null
         // Only add an inferred directory if listing in directory mode (non-flat listing)
@@ -1510,12 +1507,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   /** Handle prefixes without prefix objects. */
   private void handlePrefixes(
       String bucketName, List<String> prefixes, List<GoogleCloudStorageItemInfo> objectInfos) {
-    if (storageOptions.isInferImplicitDirectoriesEnabled()) {
-      for (String prefix : prefixes) {
-        objectInfos.add(createInferredDirectory(new StorageResourceId(bucketName, prefix)));
-      }
-    } else if (!prefixes.isEmpty()) {
-      logger.atInfo().log("Inferred directories are disabled for prefixes: %s", prefixes);
+    for (String prefix : prefixes) {
+      objectInfos.add(createInferredDirectory(new StorageResourceId(bucketName, prefix)));
     }
   }
 

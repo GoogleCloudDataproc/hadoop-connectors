@@ -81,13 +81,6 @@
     behavior of the connector or the underlying GCS objects. However it will
     affect the number of splits Hadoop MapReduce uses for a given input.
 
-*   `fs.gs.implicit.dir.infer.enable` (default: `true`)
-
-    Enables automatic inference of implicit directories. If set to true,
-    connector creates and return in-memory directory objects on the fly when no
-    backing object exists, but it could be inferred that it should exist because
-    there are files with the same prefix.
-
 *   `fs.gs.glob.flatlist.enable` (default: `true`)
 
     Whether or not to prepopulate potential glob matches in a single list
