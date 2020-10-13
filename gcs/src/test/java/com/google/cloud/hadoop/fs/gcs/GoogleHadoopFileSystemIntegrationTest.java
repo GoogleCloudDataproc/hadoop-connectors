@@ -16,7 +16,6 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_INFER_IMPLICIT_DIRECTORIES_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
@@ -419,7 +418,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
   /** Validates that we correctly build our Options object from a Hadoop config. */
   @Test
-  public void testBuildOptionsFromConfig() throws IOException {
+  public void testBuildOptionsFromConfig() {
     Configuration config = loadConfig("projectId", "serviceAccount", "priveKeyFile");
 
     GoogleCloudStorageFileSystemOptions.Builder optionsBuilder =
@@ -428,17 +427,14 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     GoogleCloudStorageOptions gcsOptions = options.getCloudStorageOptions();
 
     assertThat(gcsOptions.isAutoRepairImplicitDirectoriesEnabled()).isTrue();
-    assertThat(gcsOptions.isInferImplicitDirectoriesEnabled()).isFalse();
 
     config.setBoolean(GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.getKey(), false);
-    config.setBoolean(GCS_INFER_IMPLICIT_DIRECTORIES_ENABLE.getKey(), true);
 
     optionsBuilder = GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config);
     options = optionsBuilder.build();
 
     gcsOptions = options.getCloudStorageOptions();
     assertThat(gcsOptions.isAutoRepairImplicitDirectoriesEnabled()).isFalse();
-    assertThat(gcsOptions.isInferImplicitDirectoriesEnabled()).isTrue();
   }
 
   /** Validates success path in initialize(). */

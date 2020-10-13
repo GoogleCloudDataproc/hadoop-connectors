@@ -47,9 +47,6 @@ public abstract class GoogleCloudStorageOptions {
   /** Default setting for enabling auto-repair of implicit directories. */
   public static final boolean AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT = true;
 
-  /** Default setting for enabling inferring of implicit directories. */
-  public static final boolean INFER_IMPLICIT_DIRECTORIES_DEFAULT = true;
-
   /**
    * Default setting for the length of time to wait for empty objects to appear if we believe we are
    * in a race with multiple workers.
@@ -108,7 +105,6 @@ public abstract class GoogleCloudStorageOptions {
         .setStorageRootUrl(STORAGE_ROOT_URL_DEFAULT)
         .setStorageServicePath(STORAGE_SERVICE_PATH_DEFAULT)
         .setAutoRepairImplicitDirectoriesEnabled(AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT)
-        .setInferImplicitDirectoriesEnabled(INFER_IMPLICIT_DIRECTORIES_DEFAULT)
         .setMaxWaitMillisForEmptyObjectCreation(MAX_WAIT_MILLIS_FOR_EMPTY_OBJECT_CREATION)
         .setMaxListItemsPerCall(MAX_LIST_ITEMS_PER_CALL_DEFAULT)
         .setMaxRequestsPerBatch(MAX_REQUESTS_PER_BATCH_DEFAULT)
@@ -146,8 +142,6 @@ public abstract class GoogleCloudStorageOptions {
   public abstract String getAppName();
 
   public abstract boolean isAutoRepairImplicitDirectoriesEnabled();
-
-  public abstract boolean isInferImplicitDirectoriesEnabled();
 
   public abstract int getMaxWaitMillisForEmptyObjectCreation();
 
@@ -237,8 +231,6 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setAppName(String appName);
 
     public abstract Builder setAutoRepairImplicitDirectoriesEnabled(boolean autoRepair);
-
-    public abstract Builder setInferImplicitDirectoriesEnabled(boolean inferImplicitDirectories);
 
     public abstract Builder setMaxWaitMillisForEmptyObjectCreation(int durationMillis);
 
