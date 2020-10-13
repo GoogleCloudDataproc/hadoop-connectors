@@ -96,13 +96,6 @@
     <google.auth.version>0.21.1</google.auth.version>
     <google.auto-value.version>1.7.4</google.auto-value.version>
     <google.cloud-bigquerystorage.version>1.5.5</google.cloud-bigquerystorage.version>
-    <!--
-        When updating Flogger version, also update DefaultPlatform class
-        source code in util-hadoop module with code from new Flogger version
-        and override default SimpleBackendFactory with Slf4jBackendFactory.
-        See example in
-        https://github.com/GoogleCloudDataproc/hadoop-connectors/pull/337
-    -->
     <google.flogger.version>0.5.1</google.flogger.version>
     <google.guava.version>29.0-jre</google.guava.version>
     <google.http-client.version>1.37.0</google.http-client.version>
@@ -437,12 +430,6 @@
       <dependency>
         <groupId>com.google.flogger</groupId>
         <artifactId>flogger-system-backend</artifactId>
-        <version>${google.flogger.version}</version>
-        <scope>runtime</scope>
-      </dependency>
-      <dependency>
-        <groupId>com.google.flogger</groupId>
-        <artifactId>flogger-slf4j-backend</artifactId>
         <version>${google.flogger.version}</version>
         <scope>runtime</scope>
       </dependency>
