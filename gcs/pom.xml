@@ -340,9 +340,9 @@
                      io.grpc.netty.shaded.io.grpc.netty, which will cause the
                      ServicesResourceTransformer to replace both occurrences of io.grpc -->
                 <relocation>
-                  <pattern>io.grpc.netty.shaded.io.grpc.netty</pattern>
+                  <pattern>io.grpc.netty.shaded</pattern>
                   <shadedPattern>
-                    com.google.cloud.hadoop.repackaged.gcs.io.grpc.netty
+                    com.google.cloud.hadoop.repackaged.gcs.io.grpc.netty.shaded
                   </shadedPattern>
                 </relocation>
                 <relocation>
@@ -355,15 +355,15 @@
                   </includes>
                 </relocation>
                 <relocation>
-                  <pattern>META-INF/native/io_grpc_netty_</pattern>
+                  <pattern>META-INF/native/io_grpc_netty_shaded_</pattern>
                   <shadedPattern>
-                    META-INF/native/com_google_cloud_hadoop_repackaged_gcs_io_grpc_netty_
+                    META-INF/native/com_google_cloud_hadoop_repackaged_gcs_io_grpc_netty_shaded_
                   </shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>META-INF/native/libio_grpc_netty_</pattern>
+                  <pattern>META-INF/native/libio_grpc_netty_shaded_</pattern>
                   <shadedPattern>
-                    META-INF/native/libcom_google_cloud_hadoop_repackaged_gcs_io_grpc_netty_
+                    META-INF/native/libcom_google_cloud_hadoop_repackaged_gcs_io_grpc_netty_shaded_
                   </shadedPattern>
                 </relocation>
               </relocations>
