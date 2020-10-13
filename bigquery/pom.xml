@@ -86,14 +86,6 @@
       <artifactId>google-http-client-jackson2</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.google.api</groupId>
-      <artifactId>gax</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.google.api.grpc</groupId>
-      <artifactId>proto-google-cloud-bigquerystorage-v1</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.google.apis</groupId>
       <artifactId>google-api-services-storage</artifactId>
     </dependency>
@@ -277,8 +269,7 @@
                   <include>io.grpc</include>
                   <include>io.opencensus</include>
                   <include>io.perfmark</include>
-                  <include>org.apache.httpcomponents:httpclient</include>
-                  <include>org.apache.httpcomponents:httpcore</include>
+                  <include>org.apache.httpcomponents</include>
                   <include>org.threeten</include>
                   <!-- needed by http client and versions conflict -->
                   <include>commons-codec:commons-codec</include>
