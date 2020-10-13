@@ -244,6 +244,12 @@
 
                 <!-- minimizeJar breaks all the dynamic load hacks; add them explicitly -->
                 <filter>
+                  <artifact>com.google.auth:*</artifact>
+                  <includes>
+                    <include>**</include>
+                  </includes>
+                </filter>
+                <filter>
                   <artifact>com.google.flogger:flogger-slf4j-backend</artifact>
                   <includes>
                     <include>**</include>
@@ -278,9 +284,7 @@
                   <include>com.google.api.grpc</include>
                   <include>com.google.apis</include>
                   <include>com.google.auth</include>
-                  <include>com.google.cloud.bigdataoss:gcsio</include>
-                  <include>com.google.cloud.bigdataoss:util-hadoop</include>
-                  <include>com.google.cloud.bigdataoss:util</include>
+                  <include>com.google.cloud.bigdataoss</include>
                   <include>com.google.flogger</include>
                   <include>com.google.guava</include>
                   <include>com.google.http-client</include>
