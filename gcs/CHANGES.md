@@ -126,7 +126,7 @@
     search algorithm:
 
     ```
-    fs.gs.glob.algorithm (default: CONCURENT)
+    fs.gs.glob.algorithm (default: CONCURRENT)
     ```
 
 ### 2.1.1 - 2020-03-11
