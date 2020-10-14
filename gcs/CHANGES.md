@@ -132,6 +132,9 @@
     fs.gs.glob.algorithm (default: CONCURRENT)
     ```
 
+1.  Do not create the parent directory objects when writing a file, instead rely
+    on the implicit directory inference.
+
 ### 2.1.1 - 2020-03-11
 
 1.  Add upload cache to support high-level retries of failed uploads. Cache size
