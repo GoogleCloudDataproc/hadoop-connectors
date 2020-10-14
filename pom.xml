@@ -87,19 +87,15 @@
     <apache.avro.version>1.7.7</apache.avro.version>
     <google.gson.version>2.2.4</google.gson.version>
 
-    <apache.httpclient.version>4.5.12</apache.httpclient.version>
-    <apache.httpcore.version>4.4.13</apache.httpcore.version>
-    <google.api.gax.version>1.57.1</google.api.gax.version>
-    <google.api.grpc.proto-google-bigquerystorage-v1.version>1.5.1</google.api.grpc.proto-google-bigquerystorage-v1.version>
-    <google.api.grpc.proto-google-common-protos.version>1.18.0</google.api.grpc.proto-google-common-protos.version>
-    <google.api.grpc.proto-google-iam-v1.version>0.13.0</google.api.grpc.proto-google-iam-v1.version>
+    <apache.httpclient.version>4.5.13</apache.httpclient.version>
+    <google.api.grpc.proto-google-iam-v1.version>1.0.1</google.api.grpc.proto-google-iam-v1.version>
     <google.api-client.version>1.30.10</google.api-client.version>
-    <google.api-bigquery.version>v2-rev20200625-${google.api-client.version}</google.api-bigquery.version>
-    <google.api-iamcredentials.version>v1-rev20200612-${google.api-client.version}</google.api-iamcredentials.version>
-    <google.api-storage.version>v1-rev20200611-${google.api-client.version}</google.api-storage.version>
+    <google.api-bigquery.version>v2-rev20200925-${google.api-client.version}</google.api-bigquery.version>
+    <google.api-iamcredentials.version>v1-rev20200821-${google.api-client.version}</google.api-iamcredentials.version>
+    <google.api-storage.version>v1-rev20200927-${google.api-client.version}</google.api-storage.version>
     <google.auth.version>0.21.1</google.auth.version>
     <google.auto-value.version>1.7.4</google.auto-value.version>
-    <google.cloud-bigquery-storage.version>1.5.1</google.cloud-bigquery-storage.version>
+    <google.cloud-bigquerystorage.version>1.5.5</google.cloud-bigquerystorage.version>
     <!--
         When updating Flogger version, also update DefaultPlatform class
         source code in util-hadoop module with code from new Flogger version
@@ -109,17 +105,19 @@
     -->
     <google.flogger.version>0.5.1</google.flogger.version>
     <google.guava.version>29.0-jre</google.guava.version>
-    <google.http-client.version>1.36.0</google.http-client.version>
+    <google.http-client.version>1.37.0</google.http-client.version>
     <google.oauth-client.version>1.31.0</google.oauth-client.version>
-    <google.protobuf.version>3.12.2</google.protobuf.version>
-    <google.truth.version>1.0.1</google.truth.version>
-    <grpc.version>1.30.2</grpc.version>
-    <hadoop.two.version>2.10.0</hadoop.two.version>
-    <hadoop.three.version>3.2.1</hadoop.three.version>
-    <junit.version>4.13.1</junit.version>
-    <mockito.version>3.4.0</mockito.version>
-    <system-lambda.version>1.1.0</system-lambda.version>
+    <google.protobuf.version>3.13.0</google.protobuf.version>
+    <grpc.version>1.32.2</grpc.version>
     <guava.retrying.version>2.0.0</guava.retrying.version>
+    <hadoop.two.version>2.10.1</hadoop.two.version>
+    <hadoop.three.version>3.2.1</hadoop.three.version>
+
+    <!-- Test dependencies -->
+    <google.truth.version>1.0.1</google.truth.version>
+    <junit.version>4.13.1</junit.version>
+    <mockito.version>3.5.13</mockito.version>
+    <system-lambda.version>1.1.0</system-lambda.version>
   </properties>
 
   <modules>
@@ -304,11 +302,6 @@
         <version>${google.api-client.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.google.api</groupId>
-        <artifactId>gax</artifactId>
-        <version>${google.api.gax.version}</version>
-      </dependency>
-      <dependency>
         <groupId>com.google.apis</groupId>
         <artifactId>google-api-services-iamcredentials</artifactId>
         <version>${google.api-iamcredentials.version}</version>
@@ -336,7 +329,7 @@
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>google-cloud-bigquerystorage</artifactId>
-        <version>${google.cloud-bigquery-storage.version}</version>
+        <version>${google.cloud-bigquerystorage.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.code.gson</groupId>
@@ -407,18 +400,8 @@
       </dependency>
       <dependency>
         <groupId>com.google.api.grpc</groupId>
-        <artifactId>proto-google-cloud-bigquerystorage-v1</artifactId>
-        <version>${google.api.grpc.proto-google-bigquerystorage-v1.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.api.grpc</groupId>
         <artifactId>proto-google-iam-v1</artifactId>
         <version>${google.api.grpc.proto-google-iam-v1.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.api.grpc</groupId>
-        <artifactId>proto-google-common-protos</artifactId>
-        <version>${google.api.grpc.proto-google-common-protos.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.protobuf</groupId>
@@ -434,11 +417,6 @@
         <groupId>org.apache.httpcomponents</groupId>
         <artifactId>httpclient</artifactId>
         <version>${apache.httpclient.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.httpcomponents</groupId>
-        <artifactId>httpcore</artifactId>
-        <version>${apache.httpcore.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.avro</groupId>
