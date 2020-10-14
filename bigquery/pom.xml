@@ -86,14 +86,6 @@
       <artifactId>google-http-client-jackson2</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.google.api</groupId>
-      <artifactId>gax</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.google.api.grpc</groupId>
-      <artifactId>proto-google-cloud-bigquerystorage-v1</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.google.apis</groupId>
       <artifactId>google-api-services-storage</artifactId>
     </dependency>
@@ -225,6 +217,12 @@
 
                 <!-- minimizeJar breaks all the dynamic load hacks; add them explicitly -->
                 <filter>
+                  <artifact>com.google.auth:*</artifact>
+                  <includes>
+                    <include>**</include>
+                  </includes>
+                </filter>
+                <filter>
                   <artifact>io.grpc:*</artifact>
                   <includes>
                     <include>**</include>
@@ -269,16 +267,13 @@
                   <include>com.google.cloud.bigdataoss:util-hadoop</include>
                   <include>com.google.flogger</include>
                   <include>com.google.guava</include>
-                  <include>com.google.http-client:google-http-client</include>
-                  <include>com.google.http-client:google-http-client-jackson2</include>
-                  <include>com.google.oauth-client:google-oauth-client</include>
-                  <include>com.google.oauth-client:google-oauth-client-java6</include>
+                  <include>com.google.http-client</include>
+                  <include>com.google.oauth-client</include>
                   <include>com.google.protobuf</include>
                   <include>io.grpc</include>
                   <include>io.opencensus</include>
                   <include>io.perfmark</include>
-                  <include>org.apache.httpcomponents:httpclient</include>
-                  <include>org.apache.httpcomponents:httpcore</include>
+                  <include>org.apache.httpcomponents</include>
                   <include>org.threeten</include>
                   <!-- needed by http client and versions conflict -->
                   <include>commons-codec:commons-codec</include>
@@ -309,9 +304,9 @@
                      io.grpc.netty.shaded.io.grpc.netty, which will cause the
                      ServicesResourceTransformer to replace both occurrences of io.grpc -->
                 <relocation>
-                  <pattern>io.grpc.netty.shaded.io.grpc.netty</pattern>
+                  <pattern>io.grpc.netty.shaded</pattern>
                   <shadedPattern>
-                    com.google.cloud.hadoop.repackaged.bigquery.io.grpc.netty
+                    com.google.cloud.hadoop.repackaged.bigquery.io.grpc.netty.shaded
                   </shadedPattern>
                 </relocation>
                 <relocation>
@@ -337,9 +332,15 @@
                   </includes>
                 </relocation>
                 <relocation>
-                  <pattern>META-INF/native/libio_grpc_netty_shaded_netty</pattern>
+                  <pattern>META-INF/native/io_grpc_netty_shaded_</pattern>
                   <shadedPattern>
-                    META-INF/native/libcom_google_cloud_hadoop_repackaged_bigquery_io_grpc_netty_shaded_netty
+                    META-INF/native/com_google_cloud_hadoop_repackaged_bigquery_io_grpc_netty_shaded_
+                  </shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>META-INF/native/libio_grpc_netty_shaded_</pattern>
+                  <shadedPattern>
+                    META-INF/native/libcom_google_cloud_hadoop_repackaged_bigquery_io_grpc_netty_shaded_
                   </shadedPattern>
                 </relocation>
               </relocations>
