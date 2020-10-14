@@ -162,6 +162,7 @@ public class FederatedBigQueryOutputCommitterTest {
 
   /** Helper method to create basic valid output based. */
   private void generateSampleFiles() throws IOException {
+    ghfs.mkdirs(outputSampleFilePath.getParent());
     ghfs.createNewFile(outputSampleFilePath);
     assertThat(ghfs.exists(outputPath)).isTrue();
     assertThat(ghfs.exists(outputSampleFilePath)).isTrue();

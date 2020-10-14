@@ -180,6 +180,7 @@ public class GsonRecordReaderTest {
 
     // Write values to file.
     Path mockPath = new Path("gs://test_bucket/test-object");
+    ghfs.mkdirs(new Path("gs://test_bucket/"));
     writeFile(ghfs, mockPath, (value1 + "\n" + value2 + "\n").getBytes(UTF_8));
 
     // Create a new InputSplit containing the values.

@@ -217,6 +217,7 @@ public class GsonBigQueryInputFormatTest {
 
     // Write values to file.
     Path mockPath = new Path("gs://test_bucket/path/test");
+    ghfs.mkdirs(new Path("gs://test_bucket/"));
     GsonRecordReaderTest.writeFile(ghfs, mockPath, (value1 + "\n" + value2 + "\n").getBytes(UTF_8));
 
     // Create a new InputSplit containing the values.
@@ -299,6 +300,7 @@ public class GsonBigQueryInputFormatTest {
 
     // Write values to file.
     Path mockPath = new Path("gs://test_bucket/path/test");
+    ghfs.mkdirs(new Path("gs://test_bucket/"));
     GsonRecordReaderTest.writeFile(ghfs, mockPath, (value1 + "\n" + value2 + "\n").getBytes(UTF_8));
 
     // Run getSplits method.
