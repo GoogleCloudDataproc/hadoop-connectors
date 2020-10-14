@@ -19,11 +19,10 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType.FLUSHABLE_COMPOSITE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.CONFIG_KEY_PREFIXES;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONCURRENT_GLOB_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_OVERRIDE_FILE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_FLAT_GLOB_ENABLE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GLOB_ALGORITHM;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_LAZY_INITIALIZATION_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_TYPE;
@@ -174,7 +173,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * Available GCS checksum types for use with {@link
    * GoogleHadoopFileSystemConfiguration#GCS_FILE_CHECKSUM_TYPE}.
    */
-  public static enum GcsFileChecksumType {
+  public enum GcsFileChecksumType {
     NONE(null, 0),
     CRC32C("COMPOSITE-CRC32C", 4),
     MD5("MD5", 16);
@@ -194,6 +193,16 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     public int getByteLength() {
       return byteLength;
     }
+  }
+
+  /**
+   * Available GCS glob algorithms for use with {@link
+   * GoogleHadoopFileSystemConfiguration#GCS_GLOB_ALGORITHM}.
+   */
+  public enum GlobAlgorithm {
+    CONCURRENT,
+    DEFAULT,
+    FLAT
   }
 
   /** Default value of replication factor. */
@@ -233,11 +242,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   private static final ThreadFactory DAEMON_THREAD_FACTORY =
       new ThreadFactoryBuilder().setNameFormat("ghfs-thread-%d").setDaemon(true).build();
 
-  @VisibleForTesting
-  boolean enableFlatGlob = GCS_FLAT_GLOB_ENABLE.getDefault();
-
-  @VisibleForTesting
-  boolean enableConcurrentGlob = GCS_CONCURRENT_GLOB_ENABLE.getDefault();
+  @VisibleForTesting GlobAlgorithm globAlgorithm = GCS_GLOB_ALGORITHM.getDefault();
 
   private GcsFileChecksumType checksumType = GCS_FILE_CHECKSUM_TYPE.getDefault();
 
@@ -1221,11 +1226,11 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     Path fixedPath = new Path(URI.create(encodedFixedPath.toString()));
     logger.atFinest().log("fixed path pattern: %s => %s", pathPattern, fixedPath);
 
-    if (enableConcurrentGlob && couldUseFlatGlob(fixedPath)) {
+    if (globAlgorithm == GlobAlgorithm.CONCURRENT && couldUseFlatGlob(fixedPath)) {
       return concurrentGlobInternal(fixedPath, filter);
     }
 
-    if (enableFlatGlob && couldUseFlatGlob(fixedPath)) {
+    if (globAlgorithm == GlobAlgorithm.FLAT && couldUseFlatGlob(fixedPath)) {
       return flatGlobInternal(fixedPath, filter);
     }
 
@@ -1583,8 +1588,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     // Set this configuration as the default config for this instance.
     setConf(config);
 
-    enableFlatGlob = GCS_FLAT_GLOB_ENABLE.get(config, config::getBoolean);
-    enableConcurrentGlob = GCS_CONCURRENT_GLOB_ENABLE.get(config, config::getBoolean);
+    globAlgorithm = GCS_GLOB_ALGORITHM.get(config, config::getEnum);
     checksumType = GCS_FILE_CHECKSUM_TYPE.get(config, config::getEnum);
     defaultBlockSize = BLOCK_SIZE.get(config, config::getLong);
     reportedPermissions = new FsPermission(PERMISSIONS_TO_REPORT.get(config, config::get));

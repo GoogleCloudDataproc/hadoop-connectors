@@ -24,6 +24,7 @@ import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.getConf
 import static com.google.common.base.Strings.nullToEmpty;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksumType;
+import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
@@ -172,20 +173,9 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.implicit.dir.repair.enable", true);
 
-  /**
-   * Configuration key for enabling the use of a large flat listing to pre-populate possible glob
-   * matches in a single API call before running the core globbing logic in-memory rather than
-   * sequentially and recursively performing API calls.
-   */
-  public static final HadoopConfigurationProperty<Boolean> GCS_FLAT_GLOB_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.glob.flatlist.enable", true);
-
-  /**
-   * Configuration key for enabling the use of flat and regular glob search algorithms in two
-   * parallel threads. After the first one returns result, the other one will be interrupted.
-   */
-  public static final HadoopConfigurationProperty<Boolean> GCS_CONCURRENT_GLOB_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.glob.concurrent.enable", true);
+  /** Configuration key for customizing glob search algorithm. */
+  public static final HadoopConfigurationProperty<GlobAlgorithm> GCS_GLOB_ALGORITHM =
+      new HadoopConfigurationProperty<>("fs.gs.glob.algorithm", GlobAlgorithm.CONCURRENT);
 
   /** Configuration key for marker file pattern. Default value: none */
   public static final HadoopConfigurationProperty<String> GCS_MARKER_FILE_PATTERN =
