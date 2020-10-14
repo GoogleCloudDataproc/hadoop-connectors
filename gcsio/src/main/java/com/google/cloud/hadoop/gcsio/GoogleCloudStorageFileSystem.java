@@ -235,14 +235,6 @@ public class GoogleCloudStorageFileSystem {
       throw new FileAlreadyExistsException("A directory with that name exists: " + path);
     }
 
-    // Ensure that parent directories exist.
-    if (options.isEnsureParentDirectoriesExist()) {
-      URI parentPath = UriPaths.getParentPath(path);
-      if (parentPath != null) {
-        mkdirs(parentPath);
-      }
-    }
-
     if (options.getOverwriteGenerationId() != StorageResourceId.UNKNOWN_GENERATION_ID) {
       resourceId =
           new StorageResourceId(
@@ -423,7 +415,7 @@ public class GoogleCloudStorageFileSystem {
     logger.atFine().log("mkdirs(path: %s)", path);
     Preconditions.checkNotNull(path, "path should not be null");
 
-    mkdirsInternal(StorageResourceId.fromUriPath(path, true));
+    mkdirsInternal(StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true));
   }
 
   public void mkdirsInternal(StorageResourceId resourceId) throws IOException {

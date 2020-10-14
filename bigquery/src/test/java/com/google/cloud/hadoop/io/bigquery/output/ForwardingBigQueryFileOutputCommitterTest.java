@@ -160,6 +160,7 @@ public class ForwardingBigQueryFileOutputCommitterTest {
 
   /** Helper method to create basic valid output based. */
   private void generateSampleFiles() throws IOException {
+    ghfs.mkdirs(outputSampleFilePath.getParent());
     ghfs.createNewFile(outputSampleFilePath);
 
     // Verify the files were created.
