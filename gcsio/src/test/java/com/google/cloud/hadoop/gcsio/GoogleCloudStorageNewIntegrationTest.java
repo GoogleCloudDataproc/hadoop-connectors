@@ -49,6 +49,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.zip.GZIPOutputStream;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -106,6 +108,658 @@ public class GoogleCloudStorageNewIntegrationTest {
     String bucketPath2 = "gs://" + gcsfsIHelper.sharedBucketName2;
     assertThat(gcs.getItemInfo(StorageResourceId.fromStringPath(bucketPath1)).exists()).isFalse();
     assertThat(gcs.getItemInfo(StorageResourceId.fromStringPath(bucketPath2)).exists()).isFalse();
+  }
+
+  @Test
+  public void listObjectNames_nonExistentBucket_nullPrefix() throws Exception {
+    list_nonExistentBucket_nullPrefix(
+        GoogleCloudStorage::listObjectNames,
+        (bucket, prefix) ->
+            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_nonExistentBucket_nullPrefix() throws Exception {
+    list_nonExistentBucket_nullPrefix(
+        (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfoPage_nonExistentBucket_nullPrefix() throws Exception {
+    list_nonExistentBucket_nullPrefix(
+        (gcs, bucket, prefix) ->
+            getObjectNames(
+                gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  private void list_nonExistentBucket_nullPrefix(
+      TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
+      BiFunction<String, String, String> requestFn)
+      throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = "list-neb-np_" + UUID.randomUUID();
+
+    List<String> listResult = listFn.apply(gcs, testBucket, null);
+
+    assertThat(listResult).isEmpty();
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(requestFn.apply(testBucket, /* prefix= */ null));
+  }
+
+  @Test
+  public void listObjectNames_emptyBucket_nullPrefix() throws Exception {
+    list_emptyBucket_nullPrefix(
+        GoogleCloudStorage::listObjectNames,
+        (bucket, prefix) ->
+            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_emptyBucket_nullPrefix() throws Exception {
+    list_emptyBucket_nullPrefix(
+        (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfoPage_emptyBucket_nullPrefix() throws Exception {
+    list_emptyBucket_nullPrefix(
+        (gcs, bucket, prefix) ->
+            getObjectNames(
+                gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  private void list_emptyBucket_nullPrefix(
+      TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
+      BiFunction<String, String, String> requestFn)
+      throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = createUniqueBucket("list-eb-np");
+
+    List<String> listResult = listFn.apply(gcs, testBucket, null);
+
+    assertThat(listResult).isEmpty();
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(requestFn.apply(testBucket, /* prefix= */ null));
+  }
+
+  @Test
+  public void listObjectNames_nonEmptyBucket_nullPrefix_object() throws Exception {
+    list_nonEmptyBucket_nullPrefix_object(
+        GoogleCloudStorage::listObjectNames,
+        (bucket, prefix) ->
+            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_nonEmptyBucket_nullPrefix_object() throws Exception {
+    list_nonEmptyBucket_nullPrefix_object(
+        (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfoPage_nonEmptyBucket_nullPrefix_object() throws Exception {
+    list_nonEmptyBucket_nullPrefix_object(
+        (gcs, bucket, prefix) ->
+            getObjectNames(
+                gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  private void list_nonEmptyBucket_nullPrefix_object(
+      TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
+      BiFunction<String, String, String> requestFn)
+      throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = createUniqueBucket("list-neb-np-o");
+    gcsfsIHelper.createObjects(testBucket, "obj");
+
+    List<String> listResult = listFn.apply(gcs, testBucket, null);
+
+    assertThat(listResult).containsExactly("obj");
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(requestFn.apply(testBucket, /* prefix= */ null));
+  }
+
+  @Test
+  public void listObjectNames_nonEmptyBucket_nullPrefix_emptyDir() throws Exception {
+    list_nonEmptyBucket_nullPrefix_emptyDir(
+        GoogleCloudStorage::listObjectNames,
+        (bucket, prefix) ->
+            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_nonEmptyBucket_nullPrefix_emptyDir() throws Exception {
+    list_nonEmptyBucket_nullPrefix_emptyDir(
+        (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfoPage_nonEmptyBucket_nullPrefix_emptyDir() throws Exception {
+    list_nonEmptyBucket_nullPrefix_emptyDir(
+        (gcs, bucket, prefix) ->
+            getObjectNames(
+                gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  private void list_nonEmptyBucket_nullPrefix_emptyDir(
+      TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
+      BiFunction<String, String, String> requestFn)
+      throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = createUniqueBucket("list-neb-np-ed_");
+    gcsfsIHelper.createObjects(testBucket, "dir/");
+
+    List<String> listResult = listFn.apply(gcs, testBucket, null);
+
+    assertThat(listResult).containsExactly("dir/");
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(requestFn.apply(testBucket, /* prefix= */ null));
+  }
+
+  @Test
+  public void listObjectNames_nonEmptyBucket_nullPrefix_subDir() throws Exception {
+    list_nonEmptyBucket_nullPrefix_subDir(
+        GoogleCloudStorage::listObjectNames,
+        (bucket, prefix) ->
+            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_nonEmptyBucket_nullPrefix_subDir() throws Exception {
+    list_nonEmptyBucket_nullPrefix_subDir(
+        (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfoPage_nonEmptyBucket_nullPrefix_subDir() throws Exception {
+    list_nonEmptyBucket_nullPrefix_subDir(
+        (gcs, bucket, prefix) ->
+            getObjectNames(
+                gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  private void list_nonEmptyBucket_nullPrefix_subDir(
+      TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
+      BiFunction<String, String, String> requestFn)
+      throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = createUniqueBucket("list-neb-np-sd");
+    gcsfsIHelper.createObjects(testBucket, "subdir/", "subdir/obj");
+
+    List<String> listResult = listFn.apply(gcs, testBucket, null);
+
+    assertThat(listResult).containsExactly("subdir/");
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(requestFn.apply(testBucket, /* prefix= */ null));
+  }
+
+  @Test
+  public void listObjectNames_nonEmptyBucket_nullPrefix_implicitSubDir() throws Exception {
+    list_nonEmptyBucket_nullPrefix_implicitSubDir(
+        GoogleCloudStorage::listObjectNames,
+        (bucket, prefix) ->
+            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_nonEmptyBucket_nullPrefix_implicitSubDir() throws Exception {
+    list_nonEmptyBucket_nullPrefix_implicitSubDir(
+        (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfoPage_nonEmptyBucket_nullPrefix_implicitSubDir() throws Exception {
+    list_nonEmptyBucket_nullPrefix_implicitSubDir(
+        (gcs, bucket, prefix) ->
+            getObjectNames(
+                gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  private void list_nonEmptyBucket_nullPrefix_implicitSubDir(
+      TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
+      BiFunction<String, String, String> requestFn)
+      throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = createUniqueBucket("list-neb-np-isd");
+    gcsfsIHelper.createObjects(testBucket, "subdir/obj");
+
+    List<String> listResult = listFn.apply(gcs, testBucket, null);
+
+    assertThat(listResult).containsExactly("subdir/");
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(requestFn.apply(testBucket, /* prefix= */ null));
+  }
+
+  @Test
+  public void listObjectNames_prefix_doesNotExist() throws Exception {
+    list_prefix_doesNotExist(
+        GoogleCloudStorage::listObjectNames,
+        (bucket, prefix) ->
+            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_prefix_doesNotExist() throws Exception {
+    list_prefix_doesNotExist(
+        (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfoPage_prefix_doesNotExist() throws Exception {
+    list_prefix_doesNotExist(
+        (gcs, bucket, prefix) ->
+            getObjectNames(
+                gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  private void list_prefix_doesNotExist(
+      TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
+      BiFunction<String, String, String> requestFn)
+      throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = String.format("list_prefix_doesNotExist_%s/", UUID.randomUUID());
+
+    List<String> listResult = listFn.apply(gcs, testBucket, testDir);
+
+    assertThat(listResult).isEmpty();
+    // Assert that 4 GCS requests were sent
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(requestFn.apply(testBucket, testDir));
+  }
+
+  @Test
+  public void listObjectName_prefixObject_empty() throws Exception {
+    list_prefixObject_empty(
+        GoogleCloudStorage::listObjectNames,
+        (bucket, prefix) ->
+            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_prefixObject_empty() throws Exception {
+    list_prefixObject_empty(
+        (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfoPage_prefixObject_empty() throws Exception {
+    list_prefixObject_empty(
+        (gcs, bucket, prefix) ->
+            getObjectNames(
+                gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  private void list_prefixObject_empty(
+      TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
+      BiFunction<String, String, String> requestFn)
+      throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = getTestResource() + "/";
+    gcsfsIHelper.createObjects(testBucket, testDir);
+
+    List<String> listResult = listFn.apply(gcs, testBucket, testDir);
+
+    assertThat(listResult).isEmpty();
+    // Assert that 4 GCS requests were sent
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(requestFn.apply(testBucket, testDir));
+  }
+
+  @Test
+  public void listObjectName_prefixObject_withObject() throws Exception {
+    list_prefixObject_withObject(
+        GoogleCloudStorage::listObjectNames,
+        (bucket, prefix) ->
+            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_prefixObject_withObject() throws Exception {
+    list_prefixObject_withObject(
+        (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfoPage_prefixObject_withObject() throws Exception {
+    list_prefixObject_withObject(
+        (gcs, bucket, prefix) ->
+            getObjectNames(
+                gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  private void list_prefixObject_withObject(
+      TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
+      BiFunction<String, String, String> requestFn)
+      throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = createObjectsInTestDir(testBucket, "obj");
+
+    List<String> listResult = listFn.apply(gcs, testBucket, testDir);
+
+    assertThat(listResult).containsExactly(testDir + "obj");
+    // Assert that 4 GCS requests were sent
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(requestFn.apply(testBucket, testDir));
+  }
+
+  @Test
+  public void listObjectName_prefixObject_withSubdir() throws Exception {
+    list_prefixObject_withSubdir(
+        GoogleCloudStorage::listObjectNames,
+        (bucket, prefix) ->
+            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_prefixObject_withSubdir() throws Exception {
+    list_prefixObject_withSubdir(
+        (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfoPage_prefixObject_withSubdir() throws Exception {
+    list_prefixObject_withSubdir(
+        (gcs, bucket, prefix) ->
+            getObjectNames(
+                gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  private void list_prefixObject_withSubdir(
+      TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
+      BiFunction<String, String, String> requestFn)
+      throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = createObjectsInTestDir(testBucket, "sub/");
+
+    List<String> listResult = listFn.apply(gcs, testBucket, testDir);
+
+    assertThat(listResult).containsExactly(testDir + "sub/");
+    // Assert that 4 GCS requests were sent
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(requestFn.apply(testBucket, testDir));
+  }
+
+  @Test
+  public void listObjectName_prefixObject_withImplicitSubdir() throws Exception {
+    list_prefixObject_withImplicitSubdir(
+        GoogleCloudStorage::listObjectNames,
+        (bucket, prefix) ->
+            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_prefixObject_withImplicitSubdir() throws Exception {
+    list_prefixObject_withImplicitSubdir(
+        (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfoPage_prefixObject_withImplicitSubdir() throws Exception {
+    list_prefixObject_withImplicitSubdir(
+        (gcs, bucket, prefix) ->
+            getObjectNames(
+                gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  private void list_prefixObject_withImplicitSubdir(
+      TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
+      BiFunction<String, String, String> requestFn)
+      throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = createObjectsInTestDirWithoutSubdirs(testBucket, "sub/obj");
+    gcsfsIHelper.createObjects(testBucket, testDir);
+
+    List<String> listResult = listFn.apply(gcs, testBucket, testDir);
+
+    assertThat(listResult).containsExactly(testDir + "sub/");
+    // Assert that 4 GCS requests were sent
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(requestFn.apply(testBucket, testDir));
+  }
+
+  @Test
+  public void listObjectName_implicitPrefix_withObject() throws Exception {
+    list_implicitPrefix_withObject(
+        GoogleCloudStorage::listObjectNames,
+        (bucket, prefix) ->
+            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_implicitPrefix_withObject() throws Exception {
+    list_implicitPrefix_withObject(
+        (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfoPage_implicitPrefix_withObject() throws Exception {
+    list_implicitPrefix_withObject(
+        (gcs, bucket, prefix) ->
+            getObjectNames(
+                gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  private void list_implicitPrefix_withObject(
+      TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
+      BiFunction<String, String, String> requestFn)
+      throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = createObjectsInTestDirWithoutSubdirs(testBucket, "obj");
+
+    List<String> listResult = listFn.apply(gcs, testBucket, testDir);
+
+    assertThat(listResult).containsExactly(testDir + "obj");
+    // Assert that 4 GCS requests were sent
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(requestFn.apply(testBucket, testDir));
+  }
+
+  @Test
+  public void listObjectName_implicitPrefix_withSubdir() throws Exception {
+    list_implicitPrefix_withSubdir(
+        GoogleCloudStorage::listObjectNames,
+        (bucket, prefix) ->
+            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_implicitPrefix_withSubdir() throws Exception {
+    list_implicitPrefix_withSubdir(
+        (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfoPage_implicitPrefix_withSubdir() throws Exception {
+    list_implicitPrefix_withSubdir(
+        (gcs, bucket, prefix) ->
+            getObjectNames(
+                gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  private void list_implicitPrefix_withSubdir(
+      TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
+      BiFunction<String, String, String> requestFn)
+      throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = createObjectsInTestDirWithoutSubdirs(testBucket, "sub/");
+
+    List<String> listResult = listFn.apply(gcs, testBucket, testDir);
+
+    assertThat(listResult).containsExactly(testDir + "sub/");
+    // Assert that 4 GCS requests were sent
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(requestFn.apply(testBucket, testDir));
+  }
+
+  @Test
+  public void listObjectName_implicitPrefix_withImplicitSubdir() throws Exception {
+    list_implicitPrefix_withImplicitSubdir(
+        GoogleCloudStorage::listObjectNames,
+        (bucket, prefix) ->
+            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_implicitPrefix_withImplicitSubdir() throws Exception {
+    list_implicitPrefix_withImplicitSubdir(
+        (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfoPage_implicitPrefix_withImplicitSubdir() throws Exception {
+    list_implicitPrefix_withImplicitSubdir(
+        (gcs, bucket, prefix) ->
+            getObjectNames(
+                gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
+        (bucket, prefix) ->
+            listRequestWithTrailingDelimiter(
+                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  private void list_implicitPrefix_withImplicitSubdir(
+      TriFunction<GoogleCloudStorage, String, String, List<String>> listFn,
+      BiFunction<String, String, String> requestFn)
+      throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = createObjectsInTestDirWithoutSubdirs(testBucket, "sub/obj");
+
+    List<String> listResult = listFn.apply(gcs, testBucket, testDir);
+
+    assertThat(listResult).containsExactly(testDir + "sub/");
+    // Assert that 4 GCS requests were sent
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(requestFn.apply(testBucket, testDir));
   }
 
   @Test
@@ -250,25 +904,6 @@ public class GoogleCloudStorageNewIntegrationTest {
             listRequestString(testBucket, true, testDir, maxResultsPerRequest, "token_1"),
             listRequestString(testBucket, true, testDir, maxResultsPerRequest, "token_2"),
             listRequestString(testBucket, true, testDir, maxResultsPerRequest, "token_3"));
-  }
-
-  @Test
-  public void listObjectInfo_onlyPrefixObject() throws Exception {
-    TrackingHttpRequestInitializer gcsRequestsTracker =
-        new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
-
-    String testBucket = gcsfsIHelper.sharedBucketName1;
-    String testDir = createObjectsInTestDir(testBucket, "dir/") + "dir/";
-
-    List<GoogleCloudStorageItemInfo> listedObjects = gcs.listObjectInfo(testBucket, testDir);
-
-    assertThat(listedObjects).isEmpty();
-    // Assert that 4 GCS requests were sent
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            listRequestWithTrailingDelimiter(
-                testBucket, testDir, /* maxResults= */ 1024, /* pageToken= */ null));
   }
 
   @Test
@@ -821,6 +1456,10 @@ public class GoogleCloudStorageNewIntegrationTest {
     return listedObjects.stream().map(GoogleCloudStorageItemInfo::getObjectName).collect(toList());
   }
 
+  private static String createUniqueBucket(String suffix) throws IOException {
+    return gcsfsIHelper.createUniqueBucket(suffix + UUID.randomUUID().toString().substring(0, 8));
+  }
+
   private String createObjectsInTestDir(String bucketName, String... objects) throws Exception {
     String testDir = getTestResource() + "/";
     String[] objectPaths = Arrays.stream(objects).map(o -> testDir + o).toArray(String[]::new);
@@ -838,5 +1477,14 @@ public class GoogleCloudStorageNewIntegrationTest {
 
   private String getTestResource() {
     return name.getMethodName() + "_" + UUID.randomUUID();
+  }
+
+  @FunctionalInterface
+  private interface TriFunction<A, B, C, R> {
+    R apply(A a, B b, C c) throws IOException;
+
+    default <V> TriFunction<A, B, C, V> andThen(Function<? super R, ? extends V> after) {
+      return (A a, B b, C c) -> checkNotNull(after).apply(apply(a, b, c));
+    }
   }
 }
