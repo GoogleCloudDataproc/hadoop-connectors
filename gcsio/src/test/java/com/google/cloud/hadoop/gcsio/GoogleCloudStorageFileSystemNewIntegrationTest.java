@@ -460,7 +460,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     URI bucketUri = new URI("gs://" + bucketName + "/");
     String dirObject = getTestResource();
 
-    gcsfsIHelper.create(bucketUri.resolve(dirObject + "/subdir/file"));
+    gcsfsIHelper.createObjects(bucketName, dirObject + "/subdir/file");
 
     List<FileInfo> fileInfos = gcsFs.listFileInfo(bucketUri.resolve(dirObject));
 

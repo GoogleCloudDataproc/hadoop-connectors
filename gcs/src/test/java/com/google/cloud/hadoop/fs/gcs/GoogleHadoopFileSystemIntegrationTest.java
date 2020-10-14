@@ -664,7 +664,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
   @Test
   public void testGlobStatusPathExpansionAndFilter() throws IOException {
-    Path testRoot = new Path("/testGlobStatusPathExpansionAndFilter");
+    Path testRoot = new Path(ghfs.getWorkingDirectory(), "testGlobStatusPathExpansionAndFilter");
 
     byte[] data = "testGlobStatusPathExpansionAndFilter_data".getBytes(UTF_8);
 

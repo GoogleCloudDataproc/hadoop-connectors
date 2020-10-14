@@ -38,7 +38,6 @@ public abstract class CreateFileOptions {
         .setAttributes(ImmutableMap.of())
         .setContentType(CreateObjectOptions.CONTENT_TYPE_DEFAULT)
         .setEnsureNoDirectoryConflict(true)
-        .setEnsureParentDirectoriesExist(true)
         .setOverwriteExisting(false)
         .setOverwriteGenerationId(StorageResourceId.UNKNOWN_GENERATION_ID);
   }
@@ -58,14 +57,6 @@ public abstract class CreateFileOptions {
    * already sure no such directory exists, then this is safe to set for improved performance.
    */
   public abstract boolean isEnsureNoDirectoryConflict();
-
-  /**
-   * If true, ensures parent directories exist, creating them on-demand if they don't. If false, you
-   * run the risk of creating objects without parent directories, which may degrade or break the
-   * behavior of some filesystem functionality. If already sure parent directories exist, then this
-   * is safe to set for improved performance.
-   */
-  public abstract boolean isEnsureParentDirectoriesExist();
 
   /** Whether to overwrite an existing file with the same name. */
   public abstract boolean isOverwriteExisting();
@@ -88,8 +79,6 @@ public abstract class CreateFileOptions {
     public abstract Builder setContentType(String contentType);
 
     public abstract Builder setEnsureNoDirectoryConflict(boolean ensureNoDirectoryConflict);
-
-    public abstract Builder setEnsureParentDirectoriesExist(boolean ensureParentDirectoriesExist);
 
     public abstract Builder setOverwriteGenerationId(long overwriteGenerationId);
 

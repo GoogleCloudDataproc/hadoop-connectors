@@ -410,29 +410,17 @@ public class GoogleCloudStorageFileSystemTest
   public void testCreateNoParentDirectories()
       throws URISyntaxException, IOException {
     String bucketName = sharedBucketName1;
-    gcsfs
-        .create(
-            new URI("gs://" + bucketName + "/no/parent/dirs/exist/a.txt"),
-            CreateFileOptions.builder().setEnsureParentDirectoriesExist(false).build())
-        .close();
+    String testDir = "no/parent/dirs";
+
+    gcsfs.create(new URI(String.format("gs://%s/%s/exist/a.txt", bucketName, testDir))).close();
+
+    GoogleCloudStorage gcs = gcsfs.getGcs();
     assertThat(
-            gcsfs
-                .getGcs()
-                .getItemInfo(new StorageResourceId(bucketName, "no/parent/dirs/exist/a.txt"))
-                .exists())
+            gcs.getItemInfo(new StorageResourceId(bucketName, testDir + "/exist/a.txt")).exists())
         .isTrue();
-    assertThat(
-            gcsfs
-                .getGcs()
-                .getItemInfo(new StorageResourceId(bucketName, "no/parent/dirs/exist/"))
-                .exists())
+    assertThat(gcs.getItemInfo(new StorageResourceId(bucketName, testDir + "/exist/")).exists())
         .isFalse();
-    assertThat(
-            gcsfs
-                .getGcs()
-                .getItemInfo(new StorageResourceId(bucketName, "no/parent/dirs/"))
-                .exists())
-        .isFalse();
+    assertThat(gcs.getItemInfo(new StorageResourceId(bucketName, testDir)).exists()).isFalse();
   }
 
   @Test
