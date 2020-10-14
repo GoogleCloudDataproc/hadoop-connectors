@@ -32,6 +32,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksumType;
+import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
@@ -71,8 +72,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.status.parallel.enable", true);
           put("fs.gs.lazy.init.enable", false);
           put("fs.gs.block.size", 64 * 1024 * 1024L);
-          put("fs.gs.glob.flatlist.enable", true);
-          put("fs.gs.glob.concurrent.enable", true);
+          put("fs.gs.glob.algorithm", GlobAlgorithm.CONCURRENT);
           put("fs.gs.max.requests.per.batch", 15L);
           put("fs.gs.batch.threads", 15);
           put("fs.gs.copy.max.requests.per.batch", 15L);
