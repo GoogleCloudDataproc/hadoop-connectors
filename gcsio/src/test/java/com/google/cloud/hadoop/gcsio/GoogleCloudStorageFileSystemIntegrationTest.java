@@ -1622,7 +1622,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   private List<URI> getSubDirPaths(URI path) {
     StorageResourceId resourceId = StorageResourceId.fromUriPath(path, true);
 
-    List<String> subdirs = GoogleCloudStorageFileSystem.getSubDirs(resourceId.getObjectName());
+    List<String> subdirs = GoogleCloudStorageFileSystem.getDirs(resourceId.getObjectName());
     List<URI> subDirPaths = new ArrayList<>(subdirs.size());
     for (String subdir : subdirs) {
       subDirPaths.add(gcsiHelper.getPath(resourceId.getBucketName(), subdir));

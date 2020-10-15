@@ -29,7 +29,7 @@ public abstract class GoogleCloudStorageFileSystemOptions {
         .setCloudStorageOptions(GoogleCloudStorageOptions.DEFAULT)
         .setBucketDeleteEnabled(false)
         .setMarkerFilePattern((String) null)
-        .setStatusParallelEnabled(false)
+        .setStatusParallelEnabled(true)
         .setCooperativeLockingEnabled(false);
   }
 
@@ -49,6 +49,8 @@ public abstract class GoogleCloudStorageFileSystemOptions {
   public abstract boolean isStatusParallelEnabled();
 
   public abstract boolean isCooperativeLockingEnabled();
+
+  public abstract boolean isEnsureNoConflictingItems();
 
   public void throwIfNotValid() {
     getCloudStorageOptions().throwIfNotValid();

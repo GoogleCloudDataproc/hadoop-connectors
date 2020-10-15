@@ -18,8 +18,10 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Strings.isNullOrEmpty;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.lang.Math.min;
 import static java.util.Comparator.comparing;
@@ -29,10 +31,10 @@ import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationDelete;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationRename;
+import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.LazyExecutorService;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -219,8 +221,8 @@ public class GoogleCloudStorageFileSystem {
    * @param path Object full path of the form gs://bucket/object-path.
    * @return A channel for writing to the given object.
    */
-  public WritableByteChannel create(URI path, CreateFileOptions options) throws IOException {
-    logger.atFine().log("create(path: %s, options: %s)", path, options);
+  public WritableByteChannel create(URI path, CreateFileOptions createOptions) throws IOException {
+    logger.atFine().log("create(path: %s, createOptions: %s)", path, createOptions);
     Preconditions.checkNotNull(path, "path could not be null");
     StorageResourceId resourceId =
         StorageResourceId.fromUriPath(path, /* allowEmptyObjectName=*/ true);
@@ -231,21 +233,34 @@ public class GoogleCloudStorageFileSystem {
               "Cannot create a file whose name looks like a directory: '%s'", resourceId));
     }
 
-    // Check if a directory of that name exists.
-    if (options.isEnsureNoDirectoryConflict()
-        && getFileInfoInternal(resourceId.toDirectoryId(), /* inferImplicitDirectories */ true)
-            .exists()) {
-      throw new FileAlreadyExistsException("A directory with that name exists: " + path);
+    // Before creating a top-level directory we need to check if there are no conflicting files
+    // with the same name as any subdirectory
+    if (options.isEnsureNoConflictingItems()) {
+      // Asynchronously check if a directory with the same name exists.
+      StorageResourceId dirId = resourceId.toDirectoryId();
+      Future<Boolean> conflictingDirExist =
+          createOptions.isEnsureNoDirectoryConflict()
+              ? cachedExecutor.submit(
+                  () -> getFileInfoInternal(dirId, /* inferImplicitDirectories */ true).exists())
+              : immediateFuture(false);
+
+      checkNoFilesConflictingWithDirs(resourceId);
+
+      // Check if a directory of that name exists.
+      if (getFromFuture(conflictingDirExist)) {
+        throw new FileAlreadyExistsException("A directory with that name exists: " + path);
+      }
     }
 
-    if (options.getOverwriteGenerationId() != StorageResourceId.UNKNOWN_GENERATION_ID) {
+    if (createOptions.getOverwriteGenerationId() != StorageResourceId.UNKNOWN_GENERATION_ID) {
       resourceId =
           new StorageResourceId(
               resourceId.getBucketName(),
               resourceId.getObjectName(),
-              options.getOverwriteGenerationId());
+              createOptions.getOverwriteGenerationId());
     }
-    return gcs.create(resourceId, objectOptionsFromFileOptions(options));
+
+    return gcs.create(resourceId, objectOptionsFromFileOptions(createOptions));
   }
 
   /**
@@ -421,64 +436,45 @@ public class GoogleCloudStorageFileSystem {
     mkdirsInternal(StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true));
   }
 
-  public void mkdirsInternal(StorageResourceId resourceId) throws IOException {
+  private void mkdirsInternal(StorageResourceId resourceId) throws IOException {
     if (resourceId.isRoot()) {
       // GCS_ROOT directory always exists, no need to go through the rest of the method.
       return;
     }
 
+    // In case path is a bucket we just attempt to create it without additional checks
+    if (resourceId.isBucket()) {
+      try {
+        gcs.createBucket(resourceId.getBucketName());
+      } catch (FileAlreadyExistsException e) {
+        // This means that bucket already exist and we do not need to do anything.
+        logger.atFine().withCause(e).log(
+            "mkdirs: %s already exists, ignoring creation failure", resourceId);
+      }
+      return;
+    }
+
     resourceId = resourceId.toDirectoryId();
 
-    // Create a list of all intermediate paths.
-    // For example,
-    // gs://foo/bar/zoo/ => (gs://foo/, gs://foo/bar/, gs://foo/bar/zoo/)
-    //
-    // We also need to find out if any of the subdir path item exists as a file
-    // therefore, also create a list of file equivalent of each subdir path.
-    // For example,
-    // gs://foo/bar/zoo/ => (gs://foo/bar, gs://foo/bar/zoo)
-    List<String> subdirs = getSubDirs(resourceId.getObjectName());
-    List<StorageResourceId> itemIds = new ArrayList<>(subdirs.size() * 2 + 1);
-    for (String subdir : subdirs) {
-      itemIds.add(new StorageResourceId(resourceId.getBucketName(), subdir));
-      if (!Strings.isNullOrEmpty(subdir)) {
-        itemIds.add(
-            new StorageResourceId(resourceId.getBucketName(), StringPaths.toFilePath(subdir)));
-      }
-    }
-    // Add the bucket portion.
-    itemIds.add(new StorageResourceId(resourceId.getBucketName()));
-    logger.atFiner().log("mkdirs: going to create dirs with %s paths", itemIds);
-
-    List<GoogleCloudStorageItemInfo> itemInfos = gcs.getItemInfos(itemIds);
-
-    // Each intermediate path must satisfy one of the following conditions:
-    // -- it does not exist or
-    // -- if it exists, it is a directory
-    //
-    // If any of the intermediate paths violates these requirements then
-    // bail out early so that we do not end up with partial set of
-    // created sub-directories. It is possible that the status of intermediate
-    // paths can change after we make this check therefore this is a
-    // good faith effort and not a guarantee.
-    GoogleCloudStorageItemInfo bucketInfo = null;
-    List<StorageResourceId> subdirsToCreate = new ArrayList<>(subdirs.size());
-    for (GoogleCloudStorageItemInfo info : itemInfos) {
-      if (info.isBucket()) {
-        checkState(bucketInfo == null, "bucketInfo should be null");
-        bucketInfo = info;
-      } else if (info.getResourceId().isDirectory() && !info.exists()) {
-        subdirsToCreate.add(info.getResourceId());
-      } else if (!info.getResourceId().isDirectory() && info.exists()) {
-        throw new FileAlreadyExistsException(
-            "Cannot create directories because of existing file: " + info.getResourceId());
-      }
+    // Before creating a top-level directory we need to check if there are no conflicting files
+    // with the same name as any subdirectory
+    if (options.isEnsureNoConflictingItems()) {
+      checkNoFilesConflictingWithDirs(resourceId);
     }
 
-    if (!checkNotNull(bucketInfo, "bucketInfo should not be null").exists()) {
-      gcs.createBucket(bucketInfo.getBucketName());
+    // Create only a top-level directory because subdirectories will be inferred
+    // if top-level directory exists
+    try {
+      gcs.createEmptyObject(resourceId);
+    } catch (FileAlreadyExistsException e) {
+      // This means that directory object already exist and we do not need to do anything.
+      logger.atFine().withCause(e).log(
+          "mkdirs: %s already exists, ignoring creation failure", resourceId);
+    } catch (IOException e) {
+      throw ApiErrorExtractor.INSTANCE.itemNotFound(e)
+          ? new IOException(String.format("Failed to create: '%s'", resourceId), e)
+          : e;
     }
-    gcs.createEmptyObjects(subdirsToCreate);
   }
 
   /**
@@ -936,14 +932,14 @@ public class GoogleCloudStorageFileSystem {
     }
   }
 
-  private static <T> T getFromFuture(Future<T> future) throws IOException {
+  static <T> T getFromFuture(Future<T> future) throws IOException {
     try {
       return future.get();
-    } catch (InterruptedException | ExecutionException e) {
+    } catch (ExecutionException | InterruptedException e) {
       if (e instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
-      throw new IOException("Failed to get info from future", e);
+      throw new IOException("Failed to get result", e);
     }
   }
 
@@ -1101,15 +1097,7 @@ public class GoogleCloudStorageFileSystem {
       }
     }
 
-    List<GoogleCloudStorageItemInfo> listDirInfo;
-    try {
-      listDirInfo = listDirFuture.get();
-    } catch (ExecutionException | InterruptedException e) {
-      if (e instanceof InterruptedException) {
-        Thread.currentThread().interrupt();
-      }
-      throw new IOException(String.format("Failed to get dir info for '%s'", resourceId), e);
-    }
+    List<GoogleCloudStorageItemInfo> listDirInfo = getFromFuture(listDirFuture);
     if (listDirInfo.isEmpty()) {
       return GoogleCloudStorageItemInfo.createNotFound(resourceId);
     }
@@ -1154,15 +1142,7 @@ public class GoogleCloudStorageFileSystem {
 
       List<FileInfo> infos = new ArrayList<>(paths.size());
       for (Future<FileInfo> infoFuture : infoFutures) {
-        try {
-          infos.add(infoFuture.get());
-        } catch (InterruptedException | ExecutionException e) {
-          if (e instanceof InterruptedException) {
-            Thread.currentThread().interrupt();
-          }
-          throw new IOException(
-              String.format("Failed to getFileInfos for %d paths", paths.size()), e);
-        }
+        infos.add(getFromFuture(infoFuture));
       }
       return infos;
     } finally {
@@ -1222,38 +1202,61 @@ public class GoogleCloudStorageFileSystem {
     gcs.createEmptyObject(resourceId);
   }
 
+  private void checkNoFilesConflictingWithDirs(StorageResourceId resourceId) throws IOException {
+    // Create a list of all files that can conflict with intermediate/subdirectory paths.
+    // For example: gs://foo/bar/zoo/ => (gs://foo/bar, gs://foo/bar/zoo)
+    List<StorageResourceId> fileIds =
+        getDirs(resourceId.getObjectName()).stream()
+            .filter(subdir -> !isNullOrEmpty(subdir))
+            .map(
+                subdir ->
+                    new StorageResourceId(
+                        resourceId.getBucketName(), StringPaths.toFilePath(subdir)))
+            .collect(toImmutableList());
+
+    // Each intermediate path must ensure that corresponding file does not exist
+    //
+    // If for any of the intermediate paths file already exists then bail out early.
+    // It is possible that the status of intermediate paths can change after
+    // we make this check therefore this is a good faith effort and not a guarantee.
+    for (GoogleCloudStorageItemInfo fileInfo : gcs.getItemInfos(fileIds)) {
+      if (fileInfo.exists()) {
+        throw new FileAlreadyExistsException(
+            "Cannot create directories because of existing file: " + fileInfo.getResourceId());
+      }
+    }
+  }
+
   /**
-   * For objects whose name looks like a path (foo/bar/zoo), returns intermediate sub-paths.
+   * For objects whose name looks like a path (foo/bar/zoo), returns all directory paths.
    *
    * <p>For example:
    *
    * <ul>
    *   <li>foo/bar/zoo => returns: (foo/, foo/bar/)
+   *   <li>foo/bar/zoo/ => returns: (foo/, foo/bar/, foo/bar/zoo/)
    *   <li>foo => returns: ()
    * </ul>
    *
    * @param objectName Name of an object.
    * @return List of sub-directory like paths.
    */
-  static List<String> getSubDirs(String objectName) {
-    List<String> subdirs = new ArrayList<>();
-    if (!Strings.isNullOrEmpty(objectName)) {
-      int currentIndex = 0;
-      while (currentIndex < objectName.length()) {
-        int index = objectName.indexOf(PATH_DELIMITER, currentIndex);
-        if (index < 0) {
-          break;
-        }
-        subdirs.add(objectName.substring(0, index + PATH_DELIMITER.length()));
-        currentIndex = index + PATH_DELIMITER.length();
-      }
+  static List<String> getDirs(String objectName) {
+    if (isNullOrEmpty(objectName)) {
+      return ImmutableList.of();
     }
-    return subdirs;
+    List<String> dirs = new ArrayList<>();
+    int index = 0;
+    while ((index = objectName.indexOf(PATH_DELIMITER, index)) >= 0) {
+      index = index + PATH_DELIMITER.length();
+      dirs.add(objectName.substring(0, index));
+    }
+    return dirs;
   }
 
   /** Gets the leaf item of the given path. */
   String getItemName(URI path) {
-    Preconditions.checkNotNull(path);
+    Preconditions.checkNotNull(path, "path can not be null");
 
     // There is no leaf item for the root path.
     if (path.equals(GCS_ROOT)) {
