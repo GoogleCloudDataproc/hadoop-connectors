@@ -30,7 +30,8 @@ public abstract class GoogleCloudStorageFileSystemOptions {
         .setBucketDeleteEnabled(false)
         .setMarkerFilePattern((String) null)
         .setStatusParallelEnabled(true)
-        .setCooperativeLockingEnabled(false);
+        .setCooperativeLockingEnabled(false)
+        .setEnsureNoConflictingItems(true);
   }
 
   public abstract Builder toBuilder();
@@ -83,6 +84,8 @@ public abstract class GoogleCloudStorageFileSystemOptions {
     public abstract Builder setStatusParallelEnabled(boolean statusParallelEnabled);
 
     public abstract Builder setCooperativeLockingEnabled(boolean cooperativeLockingEnabled);
+
+    public abstract Builder setEnsureNoConflictingItems(boolean ensureNoConflictingItems);
 
     public abstract GoogleCloudStorageFileSystemOptions build();
   }

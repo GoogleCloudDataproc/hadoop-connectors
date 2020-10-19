@@ -24,6 +24,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.Sets.newConcurrentHashSet;
+import static java.lang.Math.toIntExact;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.batch.json.JsonBatchCallback;
@@ -442,15 +443,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             .setLocation(options.getLocation())
             .setStorageClass(options.getStorageClass());
     if (options.getTtl() != null) {
-      bucket.setLifecycle(
-          new Lifecycle()
-              .setRule(
-                  ImmutableList.of(
-                      new Rule()
-                          .setAction(new Action().setType("Delete"))
-                          .setCondition(
-                              new Condition()
-                                  .setAge(Math.toIntExact(options.getTtl().toDays()))))));
+      Rule lifecycleRule =
+          new Rule()
+              .setAction(new Action().setType("Delete"))
+              .setCondition(new Condition().setAge(toIntExact(options.getTtl().toDays())));
+      bucket.setLifecycle(new Lifecycle().setRule(ImmutableList.of(lifecycleRule)));
     }
 
     Storage.Buckets.Insert insertBucket =

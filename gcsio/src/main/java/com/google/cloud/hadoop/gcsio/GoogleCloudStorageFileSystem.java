@@ -446,10 +446,14 @@ public class GoogleCloudStorageFileSystem {
     if (resourceId.isBucket()) {
       try {
         gcs.createBucket(resourceId.getBucketName());
-      } catch (FileAlreadyExistsException e) {
-        // This means that bucket already exist and we do not need to do anything.
-        logger.atFine().withCause(e).log(
-            "mkdirs: %s already exists, ignoring creation failure", resourceId);
+      } catch (IOException e) {
+        if (ApiErrorExtractor.INSTANCE.itemAlreadyExists(e)) {
+          // This means that bucket already exist and we do not need to do anything.
+          logger.atFine().withCause(e).log(
+              "mkdirs: %s already exists, ignoring creation failure", resourceId);
+        } else {
+          throw e;
+        }
       }
       return;
     }
@@ -466,14 +470,13 @@ public class GoogleCloudStorageFileSystem {
     // if top-level directory exists
     try {
       gcs.createEmptyObject(resourceId);
-    } catch (FileAlreadyExistsException e) {
-      // This means that directory object already exist and we do not need to do anything.
-      logger.atFine().withCause(e).log(
-          "mkdirs: %s already exists, ignoring creation failure", resourceId);
     } catch (IOException e) {
-      throw ApiErrorExtractor.INSTANCE.itemNotFound(e)
-          ? new IOException(String.format("Failed to create: '%s'", resourceId), e)
-          : e;
+      if (ApiErrorExtractor.INSTANCE.itemAlreadyExists(e)) {
+        logger.atFine().withCause(e).log(
+            "mkdirs: %s already exists, ignoring creation failure", resourceId);
+      } else {
+        throw e;
+      }
     }
   }
 
