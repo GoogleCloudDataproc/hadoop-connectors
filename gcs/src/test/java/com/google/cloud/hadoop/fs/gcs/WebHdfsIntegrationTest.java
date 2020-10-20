@@ -146,11 +146,30 @@ public class WebHdfsIntegrationTest extends HadoopFileSystemTestBase {
 
   /**
    * Validates that we cannot open a non-existent object.
-   * Note: WebHDFS throws IOException (Internal Server Error (error code=500))
+   *
+   * <p>Note: WebHDFS throws IOException (Internal Server Error (error code=500))
    */
-  @Test @Override
-  public void testOpenNonExistent()
-      throws IOException {
+  @Test
+  @Override
+  public void testOpenNonExistentObject() throws IOException {
+    String bucketName = ghfsHelper.sharedBucketName1;
+    IOException e =
+        assertThrows(
+            IOException.class,
+            () ->
+                ghfsHelper.readTextFile(
+                    bucketName, objectName + "_open-non-existent", 0, 100, true));
+    assertThat(e).hasMessageThat().contains("Internal Server Error (error code=500)");
+  }
+
+  /**
+   * Validates that we cannot open an object in non-existent bucket.
+   *
+   * <p>Note: WebHDFS throws IOException (Internal Server Error (error code=500))
+   */
+  @Test
+  @Override
+  public void testOpenInNonExistentBucket() throws IOException {
     String bucketName = ghfsHelper.getUniqueBucketName("open-non-existent");
     IOException e =
         assertThrows(

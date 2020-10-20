@@ -67,8 +67,10 @@ public class ForwardingBigQueryFileOutputFormatTest {
   @SuppressWarnings("rawtypes")
   private static final Class<? extends FileOutputFormat> TEST_OUTPUT_CLASS = TextOutputFormat.class;
 
+  private static final String TEST_BUCKET_STRING = "gs://test_bucket";
+
   /** Sample raw output path for data. */
-  private static final String TEST_OUTPUT_PATH_STRING = "gs://test_bucket/test_directory/";
+  private static final String TEST_OUTPUT_PATH_STRING = TEST_BUCKET_STRING + "/test_directory/";
 
   /** Sample output path for data. */
   private static final Path TEST_OUTPUT_PATH = new Path(TEST_OUTPUT_PATH_STRING);
@@ -104,6 +106,7 @@ public class ForwardingBigQueryFileOutputFormatTest {
 
     // Create the file system.
     ghfs = new InMemoryGoogleHadoopFileSystem();
+    ghfs.mkdirs(new Path(TEST_BUCKET_STRING));
 
     // Create the configuration, but setup in the tests.
     job = Job.getInstance(InMemoryGoogleHadoopFileSystem.getSampleConfiguration());

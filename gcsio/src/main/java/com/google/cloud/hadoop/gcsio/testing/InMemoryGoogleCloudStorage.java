@@ -155,14 +155,13 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     if (!validateBucketName(bucketName)) {
       throw new IOException("Error creating bucket. Invalid name: " + bucketName);
     }
-    if (!bucketLookup.containsKey(bucketName)) {
-      bucketLookup.put(
-          bucketName,
-          new InMemoryBucketEntry(
-              bucketName, clock.currentTimeMillis(), clock.currentTimeMillis(), options));
-    } else {
-      throw new IOException("Bucket '" + bucketName + "'already exists");
+    if (bucketLookup.containsKey(bucketName)) {
+      throw new FileAlreadyExistsException("Bucket '" + bucketName + "' already exists");
     }
+    bucketLookup.put(
+        bucketName,
+        new InMemoryBucketEntry(
+            bucketName, clock.currentTimeMillis(), clock.currentTimeMillis(), options));
   }
 
   @Override

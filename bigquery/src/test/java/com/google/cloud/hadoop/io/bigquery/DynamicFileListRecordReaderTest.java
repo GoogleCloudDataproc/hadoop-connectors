@@ -99,6 +99,7 @@ public class DynamicFileListRecordReaderTest {
     estimatedNumRecords = 2;
 
     fileSystem = basePath.getFileSystem(config);
+    fileSystem.mkdirs(basePath);
     fileSystem.mkdirs(shardPath.getParent());
 
     // Instead of actually blocking, make our mockSleeper throw an exception that we can catch

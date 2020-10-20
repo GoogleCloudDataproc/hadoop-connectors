@@ -587,12 +587,18 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     }
   }
 
-  /**
-   * Validates that we cannot open a non-existent object.
-   */
+  /** Validates that we cannot open a non-existent object. */
   @Test
-  public void testOpenNonExistent()
-      throws IOException {
+  public void testOpenNonExistentObject() throws IOException {
+    String bucketName = sharedBucketName1;
+    assertThrows(
+        FileNotFoundException.class,
+        () -> gcsiHelper.readTextFile(bucketName, objectName + "_open-non-existent", 0, 100, true));
+  }
+
+  /** Validates that we cannot open an object in non-existent bucket. */
+  @Test
+  public void testOpenInNonExistentBucket() throws IOException {
     String bucketName = gcsiHelper.getUniqueBucketName("open-non-existent");
     assertThrows(
         FileNotFoundException.class,
@@ -832,8 +838,12 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // Make a path where the bucket is a non-existent parent directory.
     String uniqueBucketName2 = gcsiHelper.getUniqueBucketName("mkdir-2");
-    dirData.put(gcsiHelper.getPath(uniqueBucketName2, "foo/bar"),
-                new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE));
+    dirData.put(
+        gcsiHelper.getPath(uniqueBucketName2, "foo/bar"),
+        new MethodOutcome(
+            gcsiHelper.getClass().getSimpleName().equals("HadoopFileSystemIntegrationHelper")
+                ? MethodOutcome.Type.RETURNS_TRUE
+                : MethodOutcome.Type.THROWS_EXCEPTION));
 
     // Call mkdirs() for each path and verify the expected behavior.
     for (URI path : dirData.keySet()) {
@@ -842,7 +852,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
         boolean result = gcsiHelper.mkdirs(path);
         if (result) {
           assertWithMessage(
-                  "Unexpected result for path: %s : expected %s, actually returned true.",
+                  "Unexpected result for path: '%s' : expected %s, actually returned true.",
                   path, expectedOutcome)
               .that(expectedOutcome.getType())
               .isEqualTo(MethodOutcome.Type.RETURNS_TRUE);
@@ -850,20 +860,20 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
           // Assert that all of the sub-dirs have been created.
           List<URI> subDirPaths = getSubDirPaths(path);
           for (URI subDirPath : subDirPaths) {
-            assertWithMessage("Sub-path %s of path %s not found or not a dir", subDirPath, path)
+            assertWithMessage("Sub-path '%s' of path '%s' not found or not a dir", subDirPath, path)
                 .that(gcsiHelper.exists(subDirPath) && gcsiHelper.isDirectory(subDirPath))
                 .isTrue();
           }
         } else {
           assertWithMessage(
-                  "Unexpected result for path: %s : expected %s, actually returned false.",
+                  "Unexpected result for path: '%s' : expected '%s', actually returned false.",
                   path, expectedOutcome)
               .that(expectedOutcome.getType())
               .isEqualTo(MethodOutcome.Type.RETURNS_FALSE);
         }
       } catch (Exception e) {
         assertWithMessage(
-                "Unexpected result for path: %s : expected %s, actually threw exception %s.",
+                "Unexpected result for path: '%s' : expected '%s', actually threw exception %s.",
                 path, expectedOutcome, Throwables.getStackTraceAsString(e))
             .that(expectedOutcome.getType())
             .isEqualTo(MethodOutcome.Type.THROWS_EXCEPTION);
@@ -1622,7 +1632,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   private List<URI> getSubDirPaths(URI path) {
     StorageResourceId resourceId = StorageResourceId.fromUriPath(path, true);
 
-    List<String> subdirs = GoogleCloudStorageFileSystem.getSubDirs(resourceId.getObjectName());
+    List<String> subdirs = GoogleCloudStorageFileSystem.getDirs(resourceId.getObjectName());
     List<URI> subDirPaths = new ArrayList<>(subdirs.size());
     for (String subdir : subdirs) {
       subDirPaths.add(gcsiHelper.getPath(resourceId.getBucketName(), subdir));
