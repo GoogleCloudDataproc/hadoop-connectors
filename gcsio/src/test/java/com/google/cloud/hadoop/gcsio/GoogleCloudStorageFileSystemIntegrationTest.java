@@ -59,10 +59,12 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.junit.runners.model.Statement;
 
-/** Integration tests for GoogleCloudStorageFileSystem class. */
+// TODO(user): add tests for multi-threaded reads/writes
+/**
+ * Integration tests for GoogleCloudStorageFileSystem class.
+ */
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageFileSystemIntegrationTest {
-
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // hack to make tests pass until JUnit 4.13 regression will be fixed:
@@ -1342,11 +1344,14 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
                   try {
                     URI src = gcsiHelper.getPath(rd.srcBucketName, rd.srcObjectName);
                     URI dst = gcsiHelper.getPath(rd.dstBucketName, rd.dstObjectName);
-                    String desc = src + " -> " + dst;
+                    boolean result = false;
 
+                    String desc = src.toString() + " -> " + dst.toString();
                     try {
                       // Perform the rename operation.
-                      if (gcsiHelper.rename(src, dst)) {
+                      result = gcsiHelper.rename(src, dst);
+
+                      if (result) {
                         assertWithMessage(
                                 "Unexpected result for '%s': %s :: expected %s,"
                                     + " actually returned true.",

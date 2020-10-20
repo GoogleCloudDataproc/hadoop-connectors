@@ -23,7 +23,6 @@ import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.Storage.Objects.Insert;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.util.AbstractGoogleAsyncWriteChannel;
-import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.LoggingMediaHttpUploaderProgressListener;
@@ -98,28 +97,8 @@ public class GoogleCloudStorageWriteChannel
 
   @Override
   public void handleResponse(StorageObject response) {
-    this.completedItemInfo =
-        writeConditions.getIgnoreGenerationMismatch()
-            ? GoogleCloudStorageItemInfo.createNotFound(resourceId)
-            : GoogleCloudStorageImpl.createItemInfoForStorageObject(resourceId, response);
-  }
-
-  @Override
-  public StorageObject createResponseFromException(IOException e) {
-    if (writeConditions.getIgnoreGenerationMismatch()
-        && ApiErrorExtractor.INSTANCE.preconditionNotMet(e)) {
-      logger.atWarning().withCause(e).log(
-          "412 Precondition failure was ignored for resource '%s'", getResourceString());
-      return new StorageObject()
-          .setBucket(resourceId.getBucketName())
-          .setName(resourceId.getObjectName());
-    }
-    return super.createResponseFromException(e);
-  }
-
-  @Override
-  protected String getContentType() {
-    return createOptions.getContentType();
+    this.completedItemInfo = GoogleCloudStorageImpl.createItemInfoForStorageObject(
+        new StorageResourceId(bucketName, objectName), response);
   }
 
   @Override
