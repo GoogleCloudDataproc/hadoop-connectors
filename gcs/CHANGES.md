@@ -110,14 +110,6 @@
 
 1.  Tune exponential backoff configuration for Cloud Storage requests.
 
-1.  Add a property to ignore
-    [Cloud Storage precondition](https://cloud.google.com/storage/docs/generations-preconditions#_Preconditions)
-    failures when overwriting objects in concurrent environment:
-
-    ```
-    fs.gs.overwrite.generation.mismatch.ignore (default: false)
-    ```
-
 1.  Increment Hadoop `FileSystem.Statistics` counters for read and write
     operations.
 
