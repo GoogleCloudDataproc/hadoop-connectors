@@ -73,6 +73,8 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   public static void postCreateInit(HadoopFileSystemIntegrationHelper helper)
       throws IOException {
     ghfsHelper = helper;
+    ghfsHelper.ghfs.mkdirs(
+        new Path(ghfsHelper.ghfsFileSystemDescriptor.getFileSystemRoot().toUri()));
     GoogleCloudStorageFileSystemIntegrationTest.postCreateInit(ghfsHelper);
 
     // Ensures that we do not accidentally end up testing wrong functionality.
@@ -133,16 +135,19 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
 
       Instant currentTime = Instant.now();
       Instant modificationTime = Instant.ofEpochMilli(fileStatus.getModificationTime());
-      // We must subtract 1000, because some FileSystems, like LocalFileSystem, have only
-      // second granularity, so we might have something like testStartTime == 1234123
-      // and modificationTime == 1234000. Unfortunately, "Instant" doesn't support easy
-      // conversions between units to clip to the "second" precision.
-      // Alternatively, we should just use TimeUnit and formally convert "toSeconds".
-      assertWithMessage(
-              "Stale file? testStartTime: %s modificationTime: %s bucket: '%s' object: '%s'",
-              testStartTime, modificationTime, bucketName, objectName)
-          .that(modificationTime)
-          .isAtLeast(testStartTime.minusMillis(1000));
+      // Ignore modification time for inferred directories that always set to 0
+      if (!expectedToBeDir || fileStatus.getModificationTime() != 0) {
+        // We must subtract 1000, because some FileSystems, like LocalFileSystem, have only
+        // second granularity, so we might have something like testStartTime == 1234123
+        // and modificationTime == 1234000. Unfortunately, "Instant" doesn't support easy
+        // conversions between units to clip to the "second" precision.
+        // Alternatively, we should just use TimeUnit and formally convert "toSeconds".
+        assertWithMessage(
+                "Stale file? testStartTime: %s modificationTime: %s bucket: '%s' object: '%s'",
+                testStartTime, modificationTime, bucketName, objectName)
+            .that(modificationTime)
+            .isAtLeast(testStartTime.minusMillis(1000));
+      }
       assertWithMessage(
               "Clock skew? currentTime: %s modificationTime: %s bucket: '%s' object: '%s'",
               currentTime, modificationTime, bucketName, objectName)

@@ -132,8 +132,9 @@
     fs.gs.glob.algorithm (default: CONCURRENT)
     ```
 
-1.  Do not create the parent directory objects when writing a file, instead rely
-    on the implicit directory inference.
+1.  Do not create the parent directory objects (this includes buckets) when
+    creating a new file or a directory, instead rely on the implicit directory
+    inference.
 
 1.  Use default logging backend for Google Flogger instead of Slf4j.
 
