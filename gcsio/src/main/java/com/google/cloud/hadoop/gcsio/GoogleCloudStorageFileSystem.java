@@ -447,7 +447,8 @@ public class GoogleCloudStorageFileSystem {
       try {
         gcs.createBucket(resourceId.getBucketName());
       } catch (IOException e) {
-        if (ApiErrorExtractor.INSTANCE.itemAlreadyExists(e)) {
+        if (e instanceof FileAlreadyExistsException
+            || ApiErrorExtractor.INSTANCE.itemAlreadyExists(e)) {
           // This means that bucket already exist and we do not need to do anything.
           logger.atFine().withCause(e).log(
               "mkdirs: %s already exists, ignoring creation failure", resourceId);
