@@ -116,8 +116,7 @@ public abstract class GoogleCloudStorageIntegrationHelper {
    * @return number of bytes written
    */
   public int writeTextFile(URI path, String text) throws IOException {
-    byte[] textBytes = text.getBytes(UTF_8);
-    return writeFile(path, textBytes, 1);
+    return writeFile(path, text.getBytes(UTF_8), /* numWrites= */ 1);
   }
 
   /**
@@ -133,8 +132,12 @@ public abstract class GoogleCloudStorageIntegrationHelper {
    * @return number of bytes written
    */
   protected int writeTextFileOverwriting(URI path, String text) throws IOException {
-    byte[] textBytes = text.getBytes(UTF_8);
-    return writeFileOverwriting(path, textBytes, 1);
+    return writeFileOverwriting(path, text.getBytes(UTF_8), /* numWrites= */ 1);
+  }
+
+  protected int writeFile(URI path, String text, int numWrites, boolean overwrite)
+      throws IOException {
+    return writeFile(path, text.getBytes(UTF_8), numWrites, overwrite);
   }
 
   /**

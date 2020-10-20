@@ -97,8 +97,13 @@ public class GoogleCloudStorageWriteChannel
 
   @Override
   public void handleResponse(StorageObject response) {
-    this.completedItemInfo = GoogleCloudStorageImpl.createItemInfoForStorageObject(
-        new StorageResourceId(bucketName, objectName), response);
+    this.completedItemInfo =
+        GoogleCloudStorageImpl.createItemInfoForStorageObject(resourceId, response);
+  }
+
+  @Override
+  protected String getContentType() {
+    return createOptions.getContentType();
   }
 
   @Override
