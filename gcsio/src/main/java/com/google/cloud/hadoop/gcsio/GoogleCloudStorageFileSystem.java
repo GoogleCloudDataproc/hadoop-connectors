@@ -31,7 +31,6 @@ import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationDelete;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationRename;
-import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.LazyExecutorService;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -466,13 +465,10 @@ public class GoogleCloudStorageFileSystem {
     // if leaf directory exists
     try {
       gcs.createEmptyObject(resourceId);
-    } catch (IOException e) {
-      if (ApiErrorExtractor.INSTANCE.itemAlreadyExists(e)) {
-        logger.atFine().withCause(e).log(
-            "mkdirs: %s already exists, ignoring creation failure", resourceId);
-      } else {
-        throw e;
-      }
+    } catch (FileAlreadyExistsException e) {
+      // This means that directory object already exist and we do not need to do anything.
+      logger.atFine().withCause(e).log(
+          "mkdirs: %s already exists, ignoring creation failure", resourceId);
     }
   }
 
