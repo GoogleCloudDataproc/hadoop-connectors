@@ -233,7 +233,7 @@ public class GoogleCloudStorageFileSystem {
               "Cannot create a file whose name looks like a directory: '%s'", resourceId));
     }
 
-    // Before creating a top-level directory we need to check if there are no conflicting files
+    // Before creating a leaf directory we need to check if there are no conflicting files
     // with the same name as any subdirectory
     if (options.isEnsureNoConflictingItems()) {
       // Asynchronously check if a directory with the same name exists.
@@ -446,29 +446,24 @@ public class GoogleCloudStorageFileSystem {
     if (resourceId.isBucket()) {
       try {
         gcs.createBucket(resourceId.getBucketName());
-      } catch (IOException e) {
-        if (e instanceof FileAlreadyExistsException
-            || ApiErrorExtractor.INSTANCE.itemAlreadyExists(e)) {
-          // This means that bucket already exist and we do not need to do anything.
-          logger.atFine().withCause(e).log(
-              "mkdirs: %s already exists, ignoring creation failure", resourceId);
-        } else {
-          throw e;
-        }
+      } catch (FileAlreadyExistsException e) {
+        // This means that bucket already exist and we do not need to do anything.
+        logger.atFine().withCause(e).log(
+            "mkdirs: %s already exists, ignoring creation failure", resourceId);
       }
       return;
     }
 
     resourceId = resourceId.toDirectoryId();
 
-    // Before creating a top-level directory we need to check if there are no conflicting files
+    // Before creating a leaf directory we need to check if there are no conflicting files
     // with the same name as any subdirectory
     if (options.isEnsureNoConflictingItems()) {
       checkNoFilesConflictingWithDirs(resourceId);
     }
 
-    // Create only a top-level directory because subdirectories will be inferred
-    // if top-level directory exists
+    // Create only a leaf directory because subdirectories will be inferred
+    // if leaf directory exists
     try {
       gcs.createEmptyObject(resourceId);
     } catch (IOException e) {

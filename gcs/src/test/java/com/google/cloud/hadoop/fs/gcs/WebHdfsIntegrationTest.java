@@ -170,7 +170,7 @@ public class WebHdfsIntegrationTest extends HadoopFileSystemTestBase {
   @Test
   @Override
   public void testOpenInNonExistentBucket() throws IOException {
-    String bucketName = ghfsHelper.sharedBucketName1 + "_open-non-existent";
+    String bucketName = ghfsHelper.getUniqueBucketName("open-non-existent");
     IOException e =
         assertThrows(
             IOException.class, () -> ghfsHelper.readTextFile(bucketName, objectName, 0, 100, true));

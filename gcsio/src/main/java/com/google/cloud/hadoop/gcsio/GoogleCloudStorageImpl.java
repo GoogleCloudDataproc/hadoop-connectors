@@ -464,6 +464,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new IOException("Failed to create bucket", e);
+    } catch (IOException e) {
+      if (ApiErrorExtractor.INSTANCE.itemAlreadyExists(e)) {
+        throw (FileAlreadyExistsException)
+            new FileAlreadyExistsException(String.format("Bucket '%s' already exists.", bucketName))
+                .initCause(e);
+      }
+      throw e;
     }
   }
 
@@ -476,12 +483,18 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     Storage.Objects.Insert insertObject = prepareEmptyInsert(resourceId, options);
     try {
       insertObject.execute();
-    } catch (IOException ioe) {
-      if (canIgnoreExceptionForEmptyObject(ioe, resourceId, options)) {
-        logger.atInfo().withCause(ioe).log(
+    } catch (IOException e) {
+      if (canIgnoreExceptionForEmptyObject(e, resourceId, options)) {
+        logger.atInfo().withCause(e).log(
             "Ignoring exception; verified object already exists with desired state.");
       } else {
-        throw ioe;
+        if (ApiErrorExtractor.INSTANCE.itemAlreadyExists(e)) {
+          throw (FileAlreadyExistsException)
+              new FileAlreadyExistsException(
+                      String.format("Object '%s' already exists.", resourceId))
+                  .initCause(e);
+        }
+        throw e;
       }
     }
   }
@@ -1968,19 +1981,17 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       // maximum delay that caller will wait to receive an exception in the case of an incorrect
       // assumption and this being a scenario other than the multiple workers racing situation.
       GoogleCloudStorageItemInfo existingInfo;
-      BackOff backOff;
       int maxWaitMillis = storageOptions.getMaxWaitMillisForEmptyObjectCreation();
-      if (maxWaitMillis > 0) {
-        backOff = new ExponentialBackOff.Builder()
-            .setMaxElapsedTimeMillis(maxWaitMillis)
-            .setMaxIntervalMillis(500)
-            .setInitialIntervalMillis(100)
-            .setMultiplier(1.5)
-            .setRandomizationFactor(0.15)
-            .build();
-      } else {
-        backOff = BackOff.STOP_BACKOFF;
-      }
+      BackOff backOff =
+          maxWaitMillis > 0
+              ? new ExponentialBackOff.Builder()
+                  .setMaxElapsedTimeMillis(maxWaitMillis)
+                  .setMaxIntervalMillis(500)
+                  .setInitialIntervalMillis(100)
+                  .setMultiplier(1.5)
+                  .setRandomizationFactor(0.15)
+                  .build()
+              : BackOff.STOP_BACKOFF;
       long nextSleep = 0L;
       do {
         if (nextSleep > 0) {

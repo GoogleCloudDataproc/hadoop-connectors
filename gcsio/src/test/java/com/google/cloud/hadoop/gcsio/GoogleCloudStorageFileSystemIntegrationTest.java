@@ -599,7 +599,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   /** Validates that we cannot open an object in non-existent bucket. */
   @Test
   public void testOpenInNonExistentBucket() throws IOException {
-    String bucketName = sharedBucketName1 + "_open-non-existent";
+    String bucketName = gcsiHelper.getUniqueBucketName("open-non-existent");
     assertThrows(
         FileNotFoundException.class,
         () -> gcsiHelper.readTextFile(bucketName, objectName, 0, 100, true));
