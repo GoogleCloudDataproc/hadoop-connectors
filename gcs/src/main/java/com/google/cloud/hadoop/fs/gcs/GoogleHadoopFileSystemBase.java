@@ -1248,7 +1248,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
           ImmutableList.of(
               () -> flatGlobInternal(fixedPath, filter),
               () -> super.globStatus(fixedPath, filter)));
-    } catch (InterruptedException | ExecutionException e) {
+    } catch (ExecutionException | InterruptedException e) {
       if (e instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }

@@ -15,6 +15,7 @@
  */
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.getFromFuture;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
@@ -31,7 +32,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -261,14 +261,7 @@ public class BatchHelper {
   private void awaitRequestsCompletion() throws IOException {
     // Don't wait until all requests will be completed if enough requests are pending for full batch
     while (!responseFutures.isEmpty() && pendingRequests.size() < maxRequestsPerBatch) {
-      try {
-        responseFutures.remove().get();
-      } catch (InterruptedException | ExecutionException e) {
-        if (e instanceof InterruptedException) {
-          Thread.currentThread().interrupt();
-        }
-        throw new IOException("Failed to execute batch", e);
-      }
+      getFromFuture(responseFutures.remove());
     }
   }
 }
