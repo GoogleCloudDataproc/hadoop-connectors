@@ -390,9 +390,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     ObjectWriteConditions writeConditions =
         ObjectWriteConditions.builder()
             .setContentGenerationMatch(writeGeneration.orElse(null))
-            .setIgnoreGenerationMismatch(
-                options.isOverwriteExisting()
-                    && getOptions().isOverwriteGenerationMismatchIgnored())
             .build();
 
     BaseAbstractGoogleAsyncWriteChannel<?> channel =

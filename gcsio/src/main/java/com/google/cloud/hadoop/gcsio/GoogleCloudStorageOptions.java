@@ -83,9 +83,6 @@ public abstract class GoogleCloudStorageOptions {
   /** Default setting for number of threads to execute GCS batch requests for copy operations. */
   public static final int COPY_BATCH_THREADS_DEFAULT = BATCH_THREADS_DEFAULT;
 
-  /** Default of whether to ignore generation mismatch for overwrite mutations. */
-  public static final boolean OVERWRITE_GENERATION_MISMATCH_IGNORED_DEFAULT = false;
-
   /** Default setting for GCS HTTP request headers. */
   public static final ImmutableMap<String, String> HTTP_REQUEST_HEADERS_DEFAULT = ImmutableMap.of();
 
@@ -117,7 +114,6 @@ public abstract class GoogleCloudStorageOptions {
         .setMaxBytesRewrittenPerCall(MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT)
         .setCopyMaxRequestsPerBatch(COPY_MAX_REQUESTS_PER_BATCH_DEFAULT)
         .setCopyBatchThreads(COPY_BATCH_THREADS_DEFAULT)
-        .setOverwriteGenerationMismatchIgnored(OVERWRITE_GENERATION_MISMATCH_IGNORED_DEFAULT)
         .setReadChannelOptions(GoogleCloudStorageReadOptions.DEFAULT)
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
         .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
@@ -175,8 +171,6 @@ public abstract class GoogleCloudStorageOptions {
   public abstract boolean isCopyWithRewriteEnabled();
 
   public abstract long getMaxBytesRewrittenPerCall();
-
-  public abstract boolean isOverwriteGenerationMismatchIgnored();
 
   public abstract GoogleCloudStorageReadOptions getReadChannelOptions();
 
@@ -263,9 +257,6 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setCopyMaxRequestsPerBatch(long copyMaxRequestsPerBatch);
 
     public abstract Builder setCopyBatchThreads(int copyBatchThreads);
-
-    public abstract Builder setOverwriteGenerationMismatchIgnored(
-        boolean overwriteGenerationMismatchIgnored);
 
     public abstract Builder setReadChannelOptions(GoogleCloudStorageReadOptions readChannelOptions);
 

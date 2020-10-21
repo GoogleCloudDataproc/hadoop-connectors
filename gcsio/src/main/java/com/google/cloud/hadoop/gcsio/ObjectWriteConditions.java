@@ -33,8 +33,7 @@ public abstract class ObjectWriteConditions {
   public static Builder builder() {
     return new AutoValue_ObjectWriteConditions.Builder()
         .setMetaGenerationMatch(null)
-        .setContentGenerationMatch(null)
-        .setIgnoreGenerationMismatch(false);
+        .setContentGenerationMatch(null);
   }
 
   public abstract Builder toBuilder();
@@ -52,8 +51,6 @@ public abstract class ObjectWriteConditions {
   public boolean hasContentGenerationMatch() {
     return getContentGenerationMatch() != null;
   }
-
-  public abstract boolean getIgnoreGenerationMismatch();
 
   /**
    * Apply the conditions represented by this object to an Insert operation.
@@ -73,8 +70,6 @@ public abstract class ObjectWriteConditions {
     public abstract Builder setMetaGenerationMatch(Long metaGenerationMatch);
 
     public abstract Builder setContentGenerationMatch(Long contentGenerationMatch);
-
-    public abstract Builder setIgnoreGenerationMismatch(boolean ignoreGenerationMismatch);
 
     public abstract ObjectWriteConditions build();
   }
