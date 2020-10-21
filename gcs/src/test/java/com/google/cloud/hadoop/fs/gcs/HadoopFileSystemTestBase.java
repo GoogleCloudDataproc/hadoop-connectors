@@ -404,7 +404,8 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
                     ghfsHelper.writeFile(
                         hadoopPath, texts.get(1), /* numWrites= */ 1, /* overwrite= */ false)));
     executorService.shutdown();
-    executorService.awaitTermination(1, MINUTES);
+
+    assertThat(executorService.awaitTermination(1, MINUTES)).isTrue();
 
     // Verify at least one creation request succeeded.
     String readText = ghfsHelper.readTextFile(hadoopPath);

@@ -27,12 +27,6 @@
     Maximum number of bytes rewritten in a single rewrite request when
     `fs.gs.copy.with.rewrite.enable` is set to `true`.
 
-*   `fs.gs.overwrite.generation.mismatch.ignore` (default: `false`)
-
-    Ignore
-    [Cloud Storage precondition](https://cloud.google.com/storage/docs/generations-preconditions#_Preconditions)
-    failures when writing objects in concurrent environment.
-
 *   `fs.gs.config.override.file` (not set by default)
 
     Override configuration file path. Properties defined in this file overrides

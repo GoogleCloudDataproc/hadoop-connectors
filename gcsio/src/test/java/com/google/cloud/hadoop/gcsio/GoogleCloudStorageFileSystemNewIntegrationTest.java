@@ -27,6 +27,7 @@ import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.uploa
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
@@ -40,6 +41,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -651,65 +653,31 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
   }
 
   @Test
-  public void testConcurrentCreationWithOverwrite_bothSucceed() throws Exception {
-    GoogleCloudStorageFileSystemOptions gcsFsOptions =
-        newGcsFsOptions()
-            .setCloudStorageOptions(
-                gcsOptions.toBuilder().setOverwriteGenerationMismatchIgnored(true).build())
-            .build();
-
-    GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(gcsFsOptions, new TrackingHttpRequestInitializer(httpRequestsInitializer));
-    GoogleCloudStorageFileSystemIntegrationHelper testHelper =
-        new GoogleCloudStorageFileSystemIntegrationHelper(gcsFs);
-
-    URI path = new URI("gs://" + gcsfsIHelper.sharedBucketName1 + "/" + getTestResource());
-    assertThat(gcsFs.getFileInfo(path).exists()).isFalse();
-
-    List<String> texts = ImmutableList.of("Hello World!", "World Hello! Long");
-
-    ExecutorService executorService = Executors.newFixedThreadPool(2);
-    List<Future<Integer>> futures =
-        executorService.invokeAll(
-            ImmutableList.of(
-                () ->
-                    testHelper.writeFile(
-                        path, texts.get(0), /* numWrites= */ 1, /* overwrite= */ true),
-                () ->
-                    testHelper.writeFile(
-                        path, texts.get(1), /* numWrites= */ 1, /* overwrite= */ true)));
-    executorService.shutdown();
-
-    // Verify the final write result is either text1 or text2.
-    String readText = testHelper.readTextFile(path);
-    assertThat(ImmutableList.of(readText)).containsAnyIn(texts);
-
-    // both futures should succeed
-    for (int i = 0; i < texts.size(); i++) {
-      assertThat(futures.get(i).get()).isEqualTo(texts.get(i).length());
-    }
+  public void concurrentCreation_newObjet_overwrite_oneSucceeds() throws Exception {
+    concurrentCreate_oneSucceeds(/* overwriteExisting= */ false);
   }
 
   @Test
-  public void testConcurrentCreateExistingObjectWithOverwrite_bothSucceed() throws Exception {
-    GoogleCloudStorageFileSystemOptions gcsFsOptions =
-        newGcsFsOptions()
-            .setCloudStorageOptions(
-                gcsOptions.toBuilder().setOverwriteGenerationMismatchIgnored(true).build())
-            .build();
+  public void concurrentCreate_existingObject_overwrite_oneSucceeds() throws Exception {
+    concurrentCreate_oneSucceeds(/* overwriteExisting= */ true);
+  }
 
+  private void concurrentCreate_oneSucceeds(boolean overwriteExisting) throws Exception {
     GoogleCloudStorageFileSystem gcsFs =
-        newGcsFs(gcsFsOptions, new TrackingHttpRequestInitializer(httpRequestsInitializer));
+        newGcsFs(
+            newGcsFsOptions().build(), new TrackingHttpRequestInitializer(httpRequestsInitializer));
     GoogleCloudStorageFileSystemIntegrationHelper testHelper =
         new GoogleCloudStorageFileSystemIntegrationHelper(gcsFs);
 
     URI path = new URI("gs://" + gcsfsIHelper.sharedBucketName1 + "/" + getTestResource());
     assertThat(gcsFs.getFileInfo(path).exists()).isFalse();
 
-    String text = "Hello World!";
-    int numBytesWritten =
-        gcsfsIHelper.writeFile(path, text, /* numWrites= */ 1, /* overwrite= */ false);
-    assertThat(numBytesWritten).isEqualTo(text.getBytes(UTF_8).length);
+    if (overwriteExisting) {
+      String text = "Hello World! Existing";
+      int numBytesWritten =
+          gcsfsIHelper.writeFile(path, text, /* numWrites= */ 1, /* overwrite= */ false);
+      assertThat(numBytesWritten).isEqualTo(text.getBytes(UTF_8).length);
+    }
 
     List<String> texts = ImmutableList.of("Hello World!", "World Hello! Long");
 
@@ -725,13 +693,21 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
                         path, texts.get(1), /* numWrites= */ 1, /* overwrite= */ true)));
     executorService.shutdown();
 
+    assertThat(executorService.awaitTermination(1, MINUTES)).isTrue();
+
     // Verify the final write result is either text1 or text2.
     String readText = testHelper.readTextFile(path);
     assertThat(ImmutableList.of(readText)).containsAnyIn(texts);
 
-    // both futures should succeed
-    for (int i = 0; i < texts.size(); i++) {
-      assertThat(futures.get(i).get()).isEqualTo(texts.get(i).length());
+    // One future should fail and one succeed
+    for (int i = 0; i < futures.size(); i++) {
+      Future<Integer> future = futures.get(i);
+      String text = texts.get(i);
+      if (readText.equals(text)) {
+        assertThat(future.get()).isEqualTo(text.length());
+      } else {
+        assertThrows(ExecutionException.class, future::get);
+      }
     }
   }
 
