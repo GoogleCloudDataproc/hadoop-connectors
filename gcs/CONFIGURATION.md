@@ -45,10 +45,10 @@
 
 *   `fs.gs.bucket.delete.enable` (default: `false`)
 
-    If true, recursive delete on a path that refers to a Cloud Storage bucket
+    If `true`, recursive delete on a path that refers to a Cloud Storage bucket
     itself or delete on that path when it is empty will result in deletion of
-    the bucket itself. If false, any operation that normally would have deleted
-    the bucket will be ignored. Setting to `false` preserves the typical
+    the bucket itself. If `false`, any operation that normally would have
+    deleted the bucket will be ignored. Setting to `false` preserves the typical
     behavior of `rm -rf /` which translates to deleting everything inside of
     root, but without clobbering the filesystem authority corresponding to that
     root path in the process.
@@ -62,7 +62,7 @@
 
 *   `fs.gs.status.parallel.enable` (default: `true`)
 
-    If true, executes Cloud Storage object requests in `FileSystem`'s
+    If `true`, executes Cloud Storage object requests in `FileSystem`'s
     `listStatus` and `getFileStatus` methods in parallel to reduce latency.
 
 *   `fs.gs.lazy.init.enable` (default: `false`)
@@ -137,13 +137,11 @@
     fs.gs.storage.http.headers.another-custom-header=another_custom_value
     ```
 
-### Encryption (CSEK)
+### Encryption ([CSEK](https://cloud.google.com/storage/docs/encryption/customer-supplied-keys))
 
 *   `fs.gs.encryption.algorithm` (not set by default)
 
-    The encryption algorithm to use. For
-    [CSEK](https://cloud.google.com/storage/docs/encryption/customer-supplied-keys)
-    only `AES256` value is supported.
+    The encryption algorithm to use. For CSEK only `AES256` value is supported.
 
 *   `fs.gs.encryption.key` (not set by default)
 
