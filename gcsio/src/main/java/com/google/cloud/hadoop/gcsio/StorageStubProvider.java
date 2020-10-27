@@ -150,32 +150,25 @@ public class StorageStubProvider {
     return new ChannelAndRequestCounter(channel, counter);
   }
 
-  public synchronized StorageBlockingStub getBlockingStub() {
-    ChannelAndRequestCounter channel;
-    if (mediaChannelPool.size() < MEDIA_CHANNEL_MAX_POOL_SIZE) {
-      channel = buildManagedChannel();
-      mediaChannelPool.add(channel);
-    } else {
-      channel =
-          mediaChannelPool.stream()
-              .min(Comparator.comparingInt(ChannelAndRequestCounter::activeRequests))
-              .get();
-    }
-    return StorageGrpc.newBlockingStub(channel.channel);
+  public StorageBlockingStub getBlockingStub() {
+    return StorageGrpc.newBlockingStub(getManagedChannel());
   }
 
-  public synchronized StorageStub getAsyncStub() {
-    ChannelAndRequestCounter channel;
-    if (mediaChannelPool.size() < MEDIA_CHANNEL_MAX_POOL_SIZE) {
-      channel = buildManagedChannel();
-      mediaChannelPool.add(channel);
-    } else {
-      channel =
-          mediaChannelPool.stream()
-              .min(Comparator.comparingInt(ChannelAndRequestCounter::activeRequests))
-              .get();
+  public StorageStub getAsyncStub() {
+    return StorageGrpc.newStub(getManagedChannel()).withExecutor(backgroundTasksThreadPool);
+  }
+
+  private synchronized ManagedChannel getManagedChannel() {
+    if (mediaChannelPool.size() >= MEDIA_CHANNEL_MAX_POOL_SIZE) {
+      return mediaChannelPool.stream()
+          .min(Comparator.comparingInt(ChannelAndRequestCounter::activeRequests))
+          .get()
+          .channel;
     }
-    return StorageGrpc.newStub(channel.channel).withExecutor(backgroundTasksThreadPool);
+
+    ChannelAndRequestCounter channel = buildManagedChannel();
+    mediaChannelPool.add(channel);
+    return channel.channel;
   }
 
   private Map<String, Object> getGrpcServiceConfig() {
