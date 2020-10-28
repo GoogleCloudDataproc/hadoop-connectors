@@ -70,8 +70,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
     extends BaseAbstractGoogleAsyncWriteChannel<Object>
     implements GoogleCloudStorageItemInfo.Provider {
 
-  // Default GCS upload granularity.
-  static final int GCS_MINIMUM_CHUNK_SIZE = 256 * 1024;
+  // Default size of the chunks in which to read the input stream.
+  static final int MAX_READ_FROM_CHUNK_SIZE = 8196;
 
   private static final Duration START_RESUMABLE_WRITE_TIMEOUT = Duration.ofMinutes(1);
   private static final Duration QUERY_WRITE_STATUS_TIMEOUT = Duration.ofMinutes(1);
@@ -238,7 +238,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
           writeOffset += insertRequest.getChecksummedData().getContent().size();
         } else {
           ByteString data =
-              ByteString.readFrom(ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE));
+              ByteString.readFrom(
+                  ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE), MAX_READ_FROM_CHUNK_SIZE);
           dataChunkMap.put(writeOffset, data);
           if (dataChunkMap.size() >= NUMBER_OF_REQUESTS_TO_RETAIN) {
             dataChunkMap.remove(dataChunkMap.firstKey());
