@@ -56,6 +56,7 @@ import org.mockito.ArgumentCaptor;
 
 @RunWith(JUnit4.class)
 public final class GoogleCloudStorageGrpcWriteChannelTest {
+  private static final int GCS_MINIMUM_CHUNK_SIZE = 256 * 1024;
   private static final String BUCKET_NAME = "bucket-name";
   private static final String OBJECT_NAME = "object-name";
   private static final String UPLOAD_ID = "upload-id";
@@ -155,14 +156,17 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   @Test
   public void writeSendsMultipleInsertObjectRequests() throws Exception {
     GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
-    int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
-                QueryWriteStatusResponse.newBuilder().setCommittedSize(chunkSize).build(),
-                QueryWriteStatusResponse.newBuilder().setCommittedSize(2 * chunkSize).build())
+                QueryWriteStatusResponse.newBuilder()
+                    .setCommittedSize(GCS_MINIMUM_CHUNK_SIZE)
+                    .build(),
+                QueryWriteStatusResponse.newBuilder()
+                    .setCommittedSize(2 * GCS_MINIMUM_CHUNK_SIZE)
+                    .build())
             .iterator());
 
-    ByteString data = createTestData(chunkSize * 5 / 2);
+    ByteString data = createTestData(GCS_MINIMUM_CHUNK_SIZE * 5 / 2);
     writeChannel.initialize();
     writeChannel.write(data.asReadOnlyByteBuffer());
     writeChannel.close();
@@ -181,15 +185,18 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
         AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
     ObjectWriteConditions writeConditions = new ObjectWriteConditions();
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, Optional.absent());
-    int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
+        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
-                QueryWriteStatusResponse.newBuilder().setCommittedSize(chunkSize).build(),
-                QueryWriteStatusResponse.newBuilder().setCommittedSize(2 * chunkSize).build())
+                QueryWriteStatusResponse.newBuilder()
+                    .setCommittedSize(GCS_MINIMUM_CHUNK_SIZE)
+                    .build(),
+                QueryWriteStatusResponse.newBuilder()
+                    .setCommittedSize(2 * GCS_MINIMUM_CHUNK_SIZE)
+                    .build())
             .iterator());
 
-    ByteString data = createTestData(chunkSize * 5 / 2);
+    ByteString data = createTestData(GCS_MINIMUM_CHUNK_SIZE * 5 / 2);
     writeChannel.initialize();
     writeChannel.write(data.asReadOnlyByteBuffer());
     writeChannel.close();
@@ -205,13 +212,14 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   @Test
   public void writeHandlesUncommittedData() throws Exception {
     GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
-    int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
-                QueryWriteStatusResponse.newBuilder().setCommittedSize(chunkSize * 3 / 4).build())
+                QueryWriteStatusResponse.newBuilder()
+                    .setCommittedSize(GCS_MINIMUM_CHUNK_SIZE * 3 / 4)
+                    .build())
             .iterator());
 
-    ByteString data = createTestData(chunkSize * 3 / 2);
+    ByteString data = createTestData(GCS_MINIMUM_CHUNK_SIZE * 3 / 2);
     writeChannel.initialize();
     writeChannel.write(data.asReadOnlyByteBuffer());
     writeChannel.close();
@@ -308,9 +316,8 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   @Test
   public void writeHandlesErrorOnQueryWriteStatusRequest() throws Exception {
     GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
-    int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
     fakeService.setQueryWriteStatusException(new IOException("Test error!"));
-    ByteString data = createTestData(chunkSize * 2);
+    ByteString data = createTestData(GCS_MINIMUM_CHUNK_SIZE * 2);
 
     writeChannel.initialize();
     writeChannel.write(data.asReadOnlyByteBuffer());
@@ -319,14 +326,15 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   @Test
   public void writeHandlesErrorOnInsertRequestWithUncommittedData() throws Exception {
     GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
-    int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
     fakeService.setInsertRequestException(new IOException("Error!"));
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
-                QueryWriteStatusResponse.newBuilder().setCommittedSize(chunkSize * 3 / 4).build())
+                QueryWriteStatusResponse.newBuilder()
+                    .setCommittedSize(GCS_MINIMUM_CHUNK_SIZE * 3 / 4)
+                    .build())
             .iterator());
 
-    ByteString data = createTestData(chunkSize * 3 / 2);
+    ByteString data = createTestData(GCS_MINIMUM_CHUNK_SIZE * 3 / 2);
     writeChannel.initialize();
     writeChannel.write(data.asReadOnlyByteBuffer());
 
@@ -336,13 +344,15 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   @Test
   public void writeHandlesErrorOnInsertRequestWithoutUncommittedData() throws Exception {
     GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
-    int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
     fakeService.setInsertRequestException(new IOException("Error!"));
     fakeService.setQueryWriteStatusResponses(
-        ImmutableList.of(QueryWriteStatusResponse.newBuilder().setCommittedSize(chunkSize).build())
+        ImmutableList.of(
+                QueryWriteStatusResponse.newBuilder()
+                    .setCommittedSize(GCS_MINIMUM_CHUNK_SIZE)
+                    .build())
             .iterator());
 
-    ByteString data = createTestData(chunkSize);
+    ByteString data = createTestData(GCS_MINIMUM_CHUNK_SIZE);
     writeChannel.initialize();
     writeChannel.write(data.asReadOnlyByteBuffer());
 
@@ -351,10 +361,9 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
 
   @Test
   public void writeOneChunkWithSingleErrorAndResume() throws Exception {
-    int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
     AsyncWriteChannelOptions options =
-        AsyncWriteChannelOptions.builder().setUploadChunkSize(chunkSize).build();
-    ObjectWriteConditions writeConditions = new ObjectWriteConditions();
+        AsyncWriteChannelOptions.builder().setUploadChunkSize(GCS_MINIMUM_CHUNK_SIZE).build();
+    ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
     GoogleCloudStorageGrpcWriteChannel writeChannel =
         newWriteChannel(options, writeConditions, Optional.absent());
     fakeService.setInsertObjectExceptions(
@@ -362,7 +371,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build())
             .iterator());
-    ByteString chunk = createTestData(chunkSize);
+    ByteString chunk = createTestData(GCS_MINIMUM_CHUNK_SIZE);
     List<InsertObjectRequest> expectedRequests =
         Arrays.asList(
             InsertObjectRequest.newBuilder()
@@ -393,10 +402,9 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
 
   @Test
   public void writeOneChunkWithSingleErrorFailedToResume() throws Exception {
-    int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
     AsyncWriteChannelOptions options =
-        AsyncWriteChannelOptions.builder().setUploadChunkSize(chunkSize).build();
-    ObjectWriteConditions writeConditions = new ObjectWriteConditions();
+        AsyncWriteChannelOptions.builder().setUploadChunkSize(GCS_MINIMUM_CHUNK_SIZE).build();
+    ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
     GoogleCloudStorageGrpcWriteChannel writeChannel =
         newWriteChannel(options, writeConditions, Optional.absent());
     fakeService.setInsertObjectExceptions(
@@ -404,7 +412,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(QueryWriteStatusResponse.newBuilder().setCommittedSize(-1).build())
             .iterator());
-    ByteString chunk = createTestData(chunkSize);
+    ByteString chunk = createTestData(GCS_MINIMUM_CHUNK_SIZE);
 
     writeChannel.initialize();
     writeChannel.write(chunk.asReadOnlyByteBuffer());
@@ -413,9 +421,8 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
 
   @Test
   public void retryInsertOnIOException() throws Exception {
-    int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
     AsyncWriteChannelOptions options =
-        AsyncWriteChannelOptions.builder().setUploadChunkSize(chunkSize).build();
+        AsyncWriteChannelOptions.builder().setUploadChunkSize(GCS_MINIMUM_CHUNK_SIZE).build();
     ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
     GoogleCloudStorageGrpcWriteChannel writeChannel =
         newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
@@ -433,7 +440,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
                 QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build(),
                 QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build())
             .iterator());
-    ByteString chunk = createTestData(chunkSize);
+    ByteString chunk = createTestData(GCS_MINIMUM_CHUNK_SIZE);
 
     writeChannel.initialize();
     writeChannel.write(chunk.asReadOnlyByteBuffer());
