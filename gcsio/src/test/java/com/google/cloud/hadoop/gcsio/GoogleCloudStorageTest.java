@@ -176,7 +176,7 @@ public class GoogleCloudStorageTest {
 
   /** Test argument sanitization for GoogleCloudStorage.create(2). */
   @Test
-  public void testCreateObjectIllegalArguments() {
+  public void testCreateObjectIllegalArguments() throws IOException {
     GoogleCloudStorage gcs = mockedGcs(HTTP_TRANSPORT);
     ILLEGAL_OBJECT_IDS.forEach(
         resourceId -> assertThrows(IllegalArgumentException.class, () -> gcs.create(resourceId)));
@@ -561,7 +561,7 @@ public class GoogleCloudStorageTest {
 
   /** Test argument sanitization for GoogleCloudStorage.open(2). */
   @Test
-  public void testOpenObjectIllegalArguments() {
+  public void testOpenObjectIllegalArguments() throws IOException {
     GoogleCloudStorage gcs = mockedGcs(HTTP_TRANSPORT);
     ILLEGAL_OBJECT_IDS.forEach(
         resourceId -> assertThrows(IllegalArgumentException.class, () -> gcs.open(resourceId)));
@@ -1471,7 +1471,7 @@ public class GoogleCloudStorageTest {
 
   /** Test argument sanitization for GoogleCloudStorage.create(String). */
   @Test
-  public void testCreateBucketIllegalArguments() {
+  public void testCreateBucketIllegalArguments() throws IOException {
     GoogleCloudStorage gcs = mockedGcs(HTTP_TRANSPORT);
     assertThrows(IllegalArgumentException.class, () -> gcs.createBucket(null));
     assertThrows(IllegalArgumentException.class, () -> gcs.createBucket(""));
@@ -1552,7 +1552,7 @@ public class GoogleCloudStorageTest {
 
   /** Test argument sanitization for GoogleCloudStorage.delete(1). */
   @Test
-  public void testDeleteBucketIllegalArguments() {
+  public void testDeleteBucketIllegalArguments() throws IOException {
     GoogleCloudStorage gcs = mockedGcs(HTTP_TRANSPORT);
     assertThrows(
         IllegalArgumentException.class, () -> gcs.deleteBuckets(Lists.newArrayList((String) null)));
@@ -1617,7 +1617,7 @@ public class GoogleCloudStorageTest {
 
   /** Test argument sanitization for GoogleCloudStorage.delete(2). */
   @Test
-  public void testDeleteObjectIllegalArguments() {
+  public void testDeleteObjectIllegalArguments() throws IOException {
     GoogleCloudStorage gcs = mockedGcs(HTTP_TRANSPORT);
     ILLEGAL_OBJECT_IDS.forEach(
         resourceId ->
@@ -1670,7 +1670,7 @@ public class GoogleCloudStorageTest {
 
   /** Test argument sanitization for GoogleCloudStorage.copy(4). */
   @Test
-  public void testCopyObjectsIllegalArguments() {
+  public void testCopyObjectsIllegalArguments() throws IOException {
     String b = BUCKET_NAME;
     List<String> o = ImmutableList.of(OBJECT_NAME);
 
@@ -3339,7 +3339,7 @@ public class GoogleCloudStorageTest {
 
   /** Test for GoogleCloudStorage.close(0). */
   @Test
-  public void testClose() {
+  public void testClose() throws IOException {
     GoogleCloudStorage gcs = mockedGcs(HTTP_TRANSPORT);
 
     ExecutorService executorService = Executors.newSingleThreadExecutor();
@@ -3415,7 +3415,7 @@ public class GoogleCloudStorageTest {
 
   /** Test validation of Storage passing constructor. */
   @Test
-  public void testStoragePassedConstructor() {
+  public void testStoragePassedConstructor() throws IOException {
     GoogleCloudStorageOptions.Builder optionsBuilder =
         GoogleCloudStorageOptions.builder().setAppName("appName").setProjectId("projectId");
 
@@ -3692,12 +3692,12 @@ public class GoogleCloudStorageTest {
     assertThat(authorizer).isNotNull();
   }
 
-  private GoogleCloudStorage mockedGcs(HttpTransport transport) {
+  private GoogleCloudStorage mockedGcs(HttpTransport transport) throws IOException {
     return mockedGcs(GCS_OPTIONS, transport);
   }
 
   private GoogleCloudStorage mockedGcs(
-      GoogleCloudStorageOptions gcsOptions, HttpTransport transport) {
+      GoogleCloudStorageOptions gcsOptions, HttpTransport transport) throws IOException {
     Storage storage = new Storage(transport, JSON_FACTORY, trackingHttpRequestInitializer);
     return new GoogleCloudStorageImpl(gcsOptions, storage);
   }

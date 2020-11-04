@@ -267,24 +267,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    *
    * @param gcs Preconstructed Storage to use for I/O.
    */
-  public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage gcs) {
-    Preconditions.checkNotNull(options, "options must not be null");
-
-    logger.atFine().log("GCS(%s)", options.getAppName());
-
-    options.throwIfNotValid();
-
-    this.storageOptions = options;
-
+  public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage gcs) throws IOException {
+    this(
+        options, gcs.getRequestFactory() != null ? gcs.getRequestFactory().getInitializer() : null);
     Preconditions.checkNotNull(gcs, "gcs must not be null");
-
     this.gcs = gcs;
-
-    if (gcs.getRequestFactory() != null) {
-      this.httpRequestInitializer = gcs.getRequestFactory().getInitializer();
-    }
-
-    this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);
   }
 
   @VisibleForTesting

@@ -121,7 +121,7 @@ public class GoogleCloudStorageMockitoTest {
    * with the mocks, run before every test case.
    */
   @Before
-  public void setUp() {
+  public void setUp() throws IOException {
     MockitoAnnotations.initMocks(this);
     executorService = Executors.newCachedThreadPool();
     gcs = createTestInstance();
@@ -139,7 +139,7 @@ public class GoogleCloudStorageMockitoTest {
    * Creates an instance of GoogleCloudStorage using GoogleCloudStorageImpl as the concrete type and
    * setting up the proper mocks.
    */
-  protected GoogleCloudStorage createTestInstance() {
+  protected GoogleCloudStorage createTestInstance() throws IOException {
     return createTestInstance(createDefaultCloudStorageOptionsBuilder().build());
   }
 
@@ -147,7 +147,8 @@ public class GoogleCloudStorageMockitoTest {
    * Creates an instance of GoogleCloudStorage with the specified options, using
    * GoogleCloudStorageImpl as the concrete type, and setting up the proper mocks.
    */
-  protected GoogleCloudStorage createTestInstance(GoogleCloudStorageOptions options) {
+  protected GoogleCloudStorage createTestInstance(GoogleCloudStorageOptions options)
+      throws IOException {
     GoogleCloudStorageImpl gcsTestInstance = new GoogleCloudStorageImpl(options, mockStorage);
     gcsTestInstance.setBackgroundTasksThreadPool(executorService);
     gcsTestInstance.setErrorExtractor(mockErrorExtractor);
