@@ -239,7 +239,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
         } else {
           ByteString data =
               ByteString.readFrom(
-                  ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE), MAX_READ_FROM_CHUNK_SIZE);
+                  ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE), MAX_BYTES_PER_MESSAGE);
           dataChunkMap.put(writeOffset, data);
           if (dataChunkMap.size() >= NUMBER_OF_REQUESTS_TO_RETAIN) {
             dataChunkMap.remove(dataChunkMap.firstKey());
