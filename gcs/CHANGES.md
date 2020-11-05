@@ -3,6 +3,8 @@
 1.  Increment Hadoop `FileSystem.Statistics` counters for read and write
     operations.
 
+1.  Update all dependencies to latest versions.
+
 ### 2.1.5 - 2020-09-11
 
 1.  Fix complex patterns globbing.
