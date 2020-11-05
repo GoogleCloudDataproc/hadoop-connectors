@@ -2,6 +2,8 @@
 
 1.  Fix reads using `DirectBigQueryInputFormat`.
 
+1.  Update all dependencies to latest versions.
+
 ### 1.1.5 - 2020-09-11
 
 1.  Fix BigQuery job status retrieval in non-US locations.
