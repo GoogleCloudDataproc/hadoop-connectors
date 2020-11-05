@@ -333,7 +333,12 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
           .call(
               () -> {
                 try {
-                  return resIterator.hasNext();
+                  boolean moreDataAvailable = resIterator.hasNext();
+                  if (!moreDataAvailable) {
+                    cancelCurrentRequest();
+                  }
+
+                  return moreDataAvailable;
                 } catch (StatusRuntimeException e) {
                   throw convertError(e, bucketName, objectName);
                 }
