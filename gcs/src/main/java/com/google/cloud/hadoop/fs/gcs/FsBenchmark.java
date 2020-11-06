@@ -1,7 +1,6 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.common.util.concurrent.Futures.immediateVoidFuture;
-import static com.google.common.util.concurrent.Uninterruptibles.awaitUninterruptibly;
 import static java.lang.Integer.parseInt;
 import static java.lang.Long.parseLong;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
@@ -199,7 +198,7 @@ public class FsBenchmark extends Configured implements Tool {
                 byte[] readBuffer = new byte[readSize];
 
                 initLatch.countDown();
-                awaitUninterruptibly(startLatch);
+                startLatch.await();
                 try {
                   for (int j = 0; j < numReads; j++) {
                     try (FSDataInputStream input = fs.open(testFile)) {
@@ -228,10 +227,10 @@ public class FsBenchmark extends Configured implements Tool {
     }
     executor.shutdown();
 
-    awaitUninterruptibly(initLatch);
+    awaitUnchecked(initLatch);
     long startTimeNs = System.nanoTime();
     startLatch.countDown();
-    awaitUninterruptibly(stopLatch);
+    awaitUnchecked(stopLatch);
     long runtimeNs = System.nanoTime() - startTimeNs;
 
     // Verify that all threads completed without errors
@@ -363,10 +362,10 @@ public class FsBenchmark extends Configured implements Tool {
     }
     executor.shutdown();
 
-    awaitUninterruptibly(initLatch);
+    awaitUnchecked(initLatch);
     long startTime = System.nanoTime();
     startLatch.countDown();
-    awaitUninterruptibly(stopLatch);
+    awaitUnchecked(stopLatch);
     double runtimeSeconds = nanosToSeconds(System.nanoTime() - startTime);
     long operations = combineStats(readLatencyNsList).getCount();
 
@@ -403,6 +402,15 @@ public class FsBenchmark extends Configured implements Tool {
     LongSummaryStatistics openLatencyNs = new LongSummaryStatistics();
     openLatencyNsList.add(openLatencyNs);
     return openLatencyNs;
+  }
+
+  private static void awaitUnchecked(CountDownLatch latch) {
+    try {
+      latch.await();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("CountDownLatch.await interrupted", e);
+    }
   }
 
   private static void printTimeStats(String name, Collection<LongSummaryStatistics> timeStats) {
