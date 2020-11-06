@@ -15,11 +15,14 @@ import com.google.common.util.concurrent.Futures;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.LongSummaryStatistics;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -172,11 +175,11 @@ public class FsBenchmark extends Configured implements Tool {
         "Running read test using %d bytes reads to fully read '%s' file %d times in %d threads%n",
         readSize, testFile, numReads, numThreads);
 
-    List<LongSummaryStatistics> readFileBytesList = new ArrayList<>(numThreads);
-    List<LongSummaryStatistics> readFileTimeNsList = new ArrayList<>(numThreads);
+    Set<LongSummaryStatistics> readFileBytesList = new ConcurrentSkipListSet<>();
+    Set<LongSummaryStatistics> readFileTimeNsList = new ConcurrentSkipListSet<>();
 
-    List<LongSummaryStatistics> readCallBytesList = new ArrayList<>(numThreads);
-    List<LongSummaryStatistics> readCallTimeNsList = new ArrayList<>(numThreads);
+    Set<LongSummaryStatistics> readCallBytesList = new ConcurrentSkipListSet<>();
+    Set<LongSummaryStatistics> readCallTimeNsList = new ConcurrentSkipListSet<>();
 
     ExecutorService executor = Executors.newFixedThreadPool(numThreads);
     CountDownLatch initLatch = new CountDownLatch(numThreads);
@@ -290,10 +293,10 @@ public class FsBenchmark extends Configured implements Tool {
             + " operations in %d threads%n",
         readSize, testFile, numReads, numOpen, numThreads);
 
-    List<LongSummaryStatistics> openLatencyNsList = new ArrayList<>(numThreads);
-    List<LongSummaryStatistics> seekLatencyNsList = new ArrayList<>(numThreads);
-    List<LongSummaryStatistics> readLatencyNsList = new ArrayList<>(numThreads);
-    List<LongSummaryStatistics> closeLatencyNsList = new ArrayList<>(numThreads);
+    Set<LongSummaryStatistics> openLatencyNsList = new ConcurrentSkipListSet<>();
+    Set<LongSummaryStatistics> seekLatencyNsList = new ConcurrentSkipListSet<>();
+    Set<LongSummaryStatistics> readLatencyNsList = new ConcurrentSkipListSet<>();
+    Set<LongSummaryStatistics> closeLatencyNsList = new ConcurrentSkipListSet<>();
 
     ExecutorService executor = Executors.newFixedThreadPool(numThreads);
     CountDownLatch initLatch = new CountDownLatch(numThreads);
@@ -396,13 +399,13 @@ public class FsBenchmark extends Configured implements Tool {
   }
 
   private static LongSummaryStatistics newLongSummaryStatistics(
-      List<LongSummaryStatistics> openLatencyNsList) {
+      Collection<LongSummaryStatistics> openLatencyNsList) {
     LongSummaryStatistics openLatencyNs = new LongSummaryStatistics();
     openLatencyNsList.add(openLatencyNs);
     return openLatencyNs;
   }
 
-  private static void printTimeStats(String name, List<LongSummaryStatistics> timeStats) {
+  private static void printTimeStats(String name, Collection<LongSummaryStatistics> timeStats) {
     printTimeStats(name, combineStats(timeStats));
   }
 
@@ -416,7 +419,7 @@ public class FsBenchmark extends Configured implements Tool {
         timeStats.getCount());
   }
 
-  private static void printSizeStats(String name, List<LongSummaryStatistics> sizeStats) {
+  private static void printSizeStats(String name, Collection<LongSummaryStatistics> sizeStats) {
     printSizeStats(name, combineStats(sizeStats));
   }
 
@@ -431,7 +434,9 @@ public class FsBenchmark extends Configured implements Tool {
   }
 
   private static void printThroughputStats(
-      String name, List<LongSummaryStatistics> timeStats, List<LongSummaryStatistics> sizeStats) {
+      String name,
+      Collection<LongSummaryStatistics> timeStats,
+      Collection<LongSummaryStatistics> sizeStats) {
     printThroughputStats(name, combineStats(timeStats), combineStats(sizeStats).getAverage());
   }
 
@@ -446,7 +451,7 @@ public class FsBenchmark extends Configured implements Tool {
         timeStats.getCount());
   }
 
-  private static LongSummaryStatistics combineStats(List<LongSummaryStatistics> stats) {
+  private static LongSummaryStatistics combineStats(Collection<LongSummaryStatistics> stats) {
     return stats.stream()
         .collect(
             LongSummaryStatistics::new,
