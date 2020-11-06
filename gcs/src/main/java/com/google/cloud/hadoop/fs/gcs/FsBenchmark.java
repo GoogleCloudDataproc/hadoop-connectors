@@ -3,6 +3,7 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.common.util.concurrent.Futures.immediateVoidFuture;
 import static java.lang.Integer.parseInt;
 import static java.lang.Long.parseLong;
+import static java.util.Collections.newSetFromMap;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -21,8 +22,9 @@ import java.util.LongSummaryStatistics;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -174,11 +176,10 @@ public class FsBenchmark extends Configured implements Tool {
         "Running read test using %d bytes reads to fully read '%s' file %d times in %d threads%n",
         readSize, testFile, numReads, numThreads);
 
-    Set<LongSummaryStatistics> readFileBytesList = new ConcurrentSkipListSet<>();
-    Set<LongSummaryStatistics> readFileTimeNsList = new ConcurrentSkipListSet<>();
-
-    Set<LongSummaryStatistics> readCallBytesList = new ConcurrentSkipListSet<>();
-    Set<LongSummaryStatistics> readCallTimeNsList = new ConcurrentSkipListSet<>();
+    Set<LongSummaryStatistics> readFileBytesList = newSetFromMap(new ConcurrentHashMap<>());
+    Set<LongSummaryStatistics> readFileTimeNsList = newSetFromMap(new ConcurrentHashMap<>());
+    Set<LongSummaryStatistics> readCallBytesList = newSetFromMap(new ConcurrentHashMap<>());
+    Set<LongSummaryStatistics> readCallTimeNsList = newSetFromMap(new ConcurrentHashMap<>());
 
     ExecutorService executor = Executors.newFixedThreadPool(numThreads);
     CountDownLatch initLatch = new CountDownLatch(numThreads);
@@ -191,7 +192,6 @@ public class FsBenchmark extends Configured implements Tool {
               () -> {
                 LongSummaryStatistics readFileBytes = newLongSummaryStatistics(readFileBytesList);
                 LongSummaryStatistics readFileTimeNs = newLongSummaryStatistics(readFileTimeNsList);
-
                 LongSummaryStatistics readCallBytes = newLongSummaryStatistics(readCallBytesList);
                 LongSummaryStatistics readCallTimeNs = newLongSummaryStatistics(readCallTimeNsList);
 
@@ -292,10 +292,10 @@ public class FsBenchmark extends Configured implements Tool {
             + " operations in %d threads%n",
         readSize, testFile, numReads, numOpen, numThreads);
 
-    Set<LongSummaryStatistics> openLatencyNsList = new ConcurrentSkipListSet<>();
-    Set<LongSummaryStatistics> seekLatencyNsList = new ConcurrentSkipListSet<>();
-    Set<LongSummaryStatistics> readLatencyNsList = new ConcurrentSkipListSet<>();
-    Set<LongSummaryStatistics> closeLatencyNsList = new ConcurrentSkipListSet<>();
+    Set<LongSummaryStatistics> openLatencyNsList = newSetFromMap(new ConcurrentHashMap<>());
+    Set<LongSummaryStatistics> seekLatencyNsList = newSetFromMap(new ConcurrentHashMap<>());
+    Set<LongSummaryStatistics> readLatencyNsList = newSetFromMap(new ConcurrentHashMap<>());
+    Set<LongSummaryStatistics> closeLatencyNsList = newSetFromMap(new ConcurrentHashMap<>());
 
     ExecutorService executor = Executors.newFixedThreadPool(numThreads);
     CountDownLatch initLatch = new CountDownLatch(numThreads);
@@ -390,7 +390,12 @@ public class FsBenchmark extends Configured implements Tool {
     System.out.println("=== Running warmup ===");
     ExecutorService warmupExecutor = newSingleThreadExecutor();
     try {
-      Futures.getUnchecked(warmupExecutor.submit(warmupFn));
+      warmupExecutor.submit(warmupFn).get();
+    } catch (ExecutionException | InterruptedException e) {
+      if (e instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
+      throw new RuntimeException("Benchmark warmup failed", e);
     } finally {
       warmupExecutor.shutdownNow();
     }
