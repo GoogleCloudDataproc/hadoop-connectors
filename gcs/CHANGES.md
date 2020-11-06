@@ -1,4 +1,6 @@
-### 2.1.6 - 2020-XX-XX
+### 2.1.7 - 2020-XX-XX
+
+### 2.1.6 - 2020-11-06
 
 1.  Increment Hadoop `FileSystem.Statistics` counters for read and write
     operations.

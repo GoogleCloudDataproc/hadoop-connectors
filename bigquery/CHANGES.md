@@ -1,4 +1,6 @@
-### 1.1.6 - 2020-XX-XX
+### 1.1.7 - 2020-XX-XX
+
+### 1.1.6 - 2020-11-06
 
 1.  Fix reads using `DirectBigQueryInputFormat`.
 
