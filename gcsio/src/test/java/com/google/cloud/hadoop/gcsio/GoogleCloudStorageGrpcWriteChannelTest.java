@@ -185,7 +185,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
         AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
     ObjectWriteConditions writeConditions = new ObjectWriteConditions();
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
+        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ Optional.absent());
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
                 QueryWriteStatusResponse.newBuilder()
@@ -425,7 +425,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
         AsyncWriteChannelOptions.builder().setUploadChunkSize(GCS_MINIMUM_CHUNK_SIZE).build();
     ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
+        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ Optional.absent());
     fakeService.setInsertObjectExceptions(
         ImmutableList.of(
             new StatusException(Status.DEADLINE_EXCEEDED),

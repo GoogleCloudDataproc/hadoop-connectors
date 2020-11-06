@@ -3,6 +3,8 @@
 1.  Increment Hadoop `FileSystem.Statistics` counters for read and write
     operations.
 
+1.  Add `FsBenchmark` tool for benchmarking HCFS.
+
 1.  Update all dependencies to latest versions.
 
 ### 2.1.5 - 2020-09-11
@@ -105,8 +107,6 @@
 ### 2.1.2 - 2020-04-02
 
 1.  Update all dependencies to latest versions.
-
-1.  Add `FsBenchmark` tool for benchmarking HCFS.
 
 ### 2.1.1 - 2020-03-11
 

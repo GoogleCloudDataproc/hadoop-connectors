@@ -279,8 +279,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       this.storageStubProvider =
           new StorageStubProvider(options.getReadChannelOptions(), backgroundTasksThreadPool);
     }
-
-    this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);
   }
 
   @VisibleForTesting
