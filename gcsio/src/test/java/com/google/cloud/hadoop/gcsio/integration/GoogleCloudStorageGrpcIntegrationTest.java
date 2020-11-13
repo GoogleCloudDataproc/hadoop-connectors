@@ -37,16 +37,6 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   // GCS to access gRPC API.
   private static final String BUCKET_NAME = "gcs-grpc-team-dataproc-it";
 
-  private static final LoadingCache<GoogleCloudStorage, String> SHARED_BUCKETS =
-      CacheBuilder.newBuilder()
-          .build(
-              new CacheLoader<GoogleCloudStorage, String>() {
-                @Override
-                public String load(GoogleCloudStorage gcs) throws Exception {
-                  return BUCKET_NAME;
-                }
-              });
-
   private static final GoogleCloudStorage rawStorage = getRawStorage();
 
   private static GoogleCloudStorage getRawStorage() {
