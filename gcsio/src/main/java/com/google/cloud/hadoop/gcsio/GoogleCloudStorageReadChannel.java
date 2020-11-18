@@ -155,58 +155,6 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
    * Constructs an instance of GoogleCloudStorageReadChannel.
    *
    * @param gcs storage object instance
-   * @param bucketName name of the bucket containing the object to read
-   * @param objectName name of the object to read
-   * @param requestHelper a ClientRequestHelper used to set any extra headers
-   * @throws IOException on IO error
-   */
-  public GoogleCloudStorageReadChannel(
-      Storage gcs,
-      String bucketName,
-      String objectName,
-      ApiErrorExtractor errorExtractor,
-      ClientRequestHelper<StorageObject> requestHelper)
-      throws IOException {
-    this(
-        gcs,
-        bucketName,
-        objectName,
-        errorExtractor,
-        requestHelper,
-        GoogleCloudStorageReadOptions.DEFAULT);
-  }
-
-  /**
-   * Constructs an instance of GoogleCloudStorageReadChannel.
-   *
-   * @param gcs storage object instance
-   * @param bucketName name of the bucket containing the object to read
-   * @param objectName name of the object to read
-   * @param requestHelper a ClientRequestHelper used to set any extra headers
-   * @param readOptions fine-grained options specifying things like retry settings, buffering, etc.
-   *     Could not be null.
-   * @throws IOException on IO error
-   */
-  public GoogleCloudStorageReadChannel(
-      Storage gcs,
-      String bucketName,
-      String objectName,
-      ApiErrorExtractor errorExtractor,
-      ClientRequestHelper<StorageObject> requestHelper,
-      @Nonnull GoogleCloudStorageReadOptions readOptions)
-      throws IOException {
-    this(
-        gcs,
-        new StorageResourceId(bucketName, objectName),
-        errorExtractor,
-        requestHelper,
-        readOptions);
-  }
-
-  /**
-   * Constructs an instance of GoogleCloudStorageReadChannel.
-   *
-   * @param gcs storage object instance
    * @param resourceId contains information about a specific resource
    * @param requestHelper a ClientRequestHelper used to set any extra headers
    * @param readOptions fine-grained options specifying things like retry settings, buffering, etc.
@@ -232,29 +180,6 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     if (info != null) {
       initMetadata(info);
     }
-  }
-
-  /**
-   * Used for unit testing only. Do not use elsewhere.
-   *
-   * <p>Constructs an instance of GoogleCloudStorageReadChannel.
-   *
-   * @param readOptions fine-grained options specifying things like retry settings, buffering, etc.
-   *     Could not be null.
-   * @throws IOException on IO error
-   */
-  // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
-  // Please check that removing it is correct, and remove this comment along with it.
-  // @VisibleForTesting
-  protected GoogleCloudStorageReadChannel(
-      String bucketName, String objectName, @Nonnull GoogleCloudStorageReadOptions readOptions)
-      throws IOException {
-    this(
-        /* gcs= */ null,
-        new StorageResourceId(bucketName, objectName),
-        /* errorExtractor= */ null,
-        /* requestHelper= */ null,
-        readOptions);
   }
 
   /** Sets the Sleeper used for sleeping between retries. */

@@ -440,14 +440,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
             .getInfo();
       }
     }
-    // return not found item
-    return new GoogleCloudStorageItemInfo(
-        resourceId,
-        /* creationTime= */ 0,
-        /* modificationTime= */ 0,
-        /* size= */ -1,
-        /* location= */ null,
-        /* storageClass= */ null);
+    return GoogleCloudStorageItemInfo.createNotFound(resourceId);
   }
 
   @Override

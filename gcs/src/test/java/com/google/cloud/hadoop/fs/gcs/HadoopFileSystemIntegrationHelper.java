@@ -23,6 +23,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.UriPaths;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.common.base.Strings;
@@ -69,7 +70,12 @@ public class HadoopFileSystemIntegrationHelper
 
   public HadoopFileSystemIntegrationHelper(
       FileSystem hfs, FileSystemDescriptor ghfsFileSystemDescriptor) throws IOException {
-    super(new GoogleCloudStorageFileSystem(new InMemoryGoogleCloudStorage()));
+    super(
+        new GoogleCloudStorageFileSystem(
+            new InMemoryGoogleCloudStorage(),
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(new InMemoryGoogleCloudStorage().getOptions())
+                .build()));
     this.ghfs = hfs;
     this.ghfsFileSystemDescriptor = ghfsFileSystemDescriptor;
   }

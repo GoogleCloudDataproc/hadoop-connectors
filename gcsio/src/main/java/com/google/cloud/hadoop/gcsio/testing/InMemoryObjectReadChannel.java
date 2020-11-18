@@ -19,6 +19,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadChannel;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -49,7 +50,12 @@ public class InMemoryObjectReadChannel extends GoogleCloudStorageReadChannel {
       byte[] content,
       GoogleCloudStorageReadOptions readOptions)
       throws IOException {
-    super(bucketName, objectName, readOptions);
+    super(
+        /* gcs= */ null,
+        new StorageResourceId(bucketName, objectName),
+        /* errorExtractor= */ null,
+        /* requestHelper= */ null,
+        readOptions);
     this.content = checkNotNull(content, "channelContents could not be null");
   }
 

@@ -563,7 +563,11 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     // GCSFS and skip the portions of the config specific to GCSFS.
 
     GoogleCloudStorageFileSystem fakeGcsFs =
-        new GoogleCloudStorageFileSystem(new InMemoryGoogleCloudStorage());
+        new GoogleCloudStorageFileSystem(
+            new InMemoryGoogleCloudStorage(),
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(new InMemoryGoogleCloudStorage().getOptions())
+                .build());
 
     GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem(fakeGcsFs);
     fs.initUri = initUri;
@@ -590,7 +594,11 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     String rootBucketName = ghfsHelper.getUniqueBucketName("configure-root");
     URI initUri = new Path("gs://" + rootBucketName).toUri();
     GoogleCloudStorageFileSystem fakeGcsFs =
-        new GoogleCloudStorageFileSystem(new InMemoryGoogleCloudStorage());
+        new GoogleCloudStorageFileSystem(
+            new InMemoryGoogleCloudStorage(),
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(new InMemoryGoogleCloudStorage().getOptions())
+                .build());
     GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem(fakeGcsFs);
     fs.initUri = initUri;
     fs.configureBuckets(fakeGcsFs);
@@ -605,7 +613,11 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   public void testConfigureBucketsWithNeitherRootBucketNorSystemBucket() throws IOException {
     URI initUri = new Path("gs://").toUri();
     final GoogleCloudStorageFileSystem fakeGcsFs =
-        new GoogleCloudStorageFileSystem(new InMemoryGoogleCloudStorage());
+        new GoogleCloudStorageFileSystem(
+            new InMemoryGoogleCloudStorage(),
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(new InMemoryGoogleCloudStorage().getOptions())
+                .build());
     final GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem(fakeGcsFs);
     fs.initUri = initUri;
 

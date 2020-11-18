@@ -51,7 +51,12 @@ public class GoogleCloudStorageFileSystemOptionsTest {
             .setAppName("foo-app")
             .build();
     GoogleCloudStorage gcs = new InMemoryGoogleCloudStorage(gcsOptions);
-    GoogleCloudStorageFileSystem gcsfs = new GoogleCloudStorageFileSystem(gcs);
+    GoogleCloudStorageFileSystem gcsfs =
+        new GoogleCloudStorageFileSystem(
+            gcs,
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(gcs.getOptions())
+                .build());
     assertThat(gcsfs.getOptions().getCloudStorageOptions().getProjectId()).isEqualTo("foo-project");
     assertThat(gcsfs.getOptions().getCloudStorageOptions().getAppName()).isEqualTo("foo-app");
   }
@@ -87,7 +92,11 @@ public class GoogleCloudStorageFileSystemOptionsTest {
 
     // We need different GCSFS options for our test.
     GoogleCloudStorageFileSystem gcsfs =
-        new GoogleCloudStorageFileSystem(new InMemoryGoogleCloudStorage());
+        new GoogleCloudStorageFileSystem(
+            new InMemoryGoogleCloudStorage(),
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(new InMemoryGoogleCloudStorage().getOptions())
+                .build());
     GoogleCloudStorage gcs = gcsfs.getGcs();
     gcs.createBucket(testBucketName);
     for (String inputFile : inputFiles) {
