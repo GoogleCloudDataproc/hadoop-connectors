@@ -11,21 +11,14 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
-import com.google.cloud.hadoop.gcsio.ThrottledGoogleCloudStorage;
-import com.google.cloud.hadoop.gcsio.ThrottledGoogleCloudStorage.StorageOperation;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
-import com.google.common.util.concurrent.RateLimiter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.util.Arrays;
-import java.util.EnumSet;
 import java.util.List;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -37,18 +30,11 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   // GCS to access gRPC API.
   private static final String BUCKET_NAME = "gcs-grpc-team-dataproc-it";
 
-  private static final GoogleCloudStorage rawStorage = getRawStorage();
-
-  private static GoogleCloudStorage getRawStorage() {
+  private static GoogleCloudStorage createGoogleCloudStorage() {
     try {
-      return new ThrottledGoogleCloudStorage(
-          // Allow 2 create or delete bucket operation every second. This will hit rate limits,
-          // but GCS now has back-offs implemented for bucket operations.
-          RateLimiter.create(2),
-          new GoogleCloudStorageImpl(
-              GoogleCloudStorageTestHelper.getStandardOptionBuilder().setGrpcEnabled(true).build(),
-              GoogleCloudStorageTestHelper.getCredential()),
-          EnumSet.of(StorageOperation.DELETE_BUCKETS, StorageOperation.CREATE_BUCKET));
+      return new GoogleCloudStorageImpl(
+          GoogleCloudStorageTestHelper.getStandardOptionBuilder().setGrpcEnabled(true).build(),
+          GoogleCloudStorageTestHelper.getCredential());
     } catch (IOException e) {
       GoogleLogger logger = GoogleLogger.forEnclosingClass();
       logger.atWarning().withCause(e).log(
@@ -59,11 +45,13 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @BeforeClass
   public static void createBuckets() throws IOException {
+    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     rawStorage.createBucket(BUCKET_NAME);
   }
 
   @AfterClass
   public static void cleanupBuckets() throws IOException {
+    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     // randomize buckets order in case concurrent clean ups are running
     List<GoogleCloudStorageItemInfo> objectsToDelete =
         rawStorage.listObjectInfo(
@@ -76,6 +64,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testCreateObject() throws IOException {
+    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testCreateObject_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
@@ -85,6 +74,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testCreateExistingObject() throws IOException {
+    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testCreateExistingObject_Object");
     writeObject(rawStorage, objectToCreate, /* objectSize= */ 128);
@@ -103,6 +93,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testCreateEmptyObject() throws IOException {
+    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testCreateEmptyObject_Object");
 
@@ -116,6 +107,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testCreateInvalidObject() {
+    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testCreateInvalidObject_InvalidObject\n");
 
@@ -125,6 +117,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testOpen() throws IOException {
+    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME, "testOpen_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
 
@@ -133,6 +126,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testOpenNonExistentItem() {
+    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     assertThrows(
         FileNotFoundException.class,
         () ->
@@ -141,6 +135,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testOpenEmptyObject() throws IOException {
+    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId resourceId = new StorageResourceId(BUCKET_NAME, "testOpenEmptyObject_Object");
     rawStorage.createEmptyObject(resourceId);
 
@@ -149,6 +144,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testOpenLargeObject() throws IOException {
+    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId resourceId = new StorageResourceId(BUCKET_NAME, "testOpenLargeObject_Object");
 
     int partitionsCount = 50;
@@ -160,6 +156,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testPartialRead() throws IOException {
+    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     final int segmentSize = 553;
     final int segmentCount = 5;
 
@@ -187,6 +184,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testChannelClosedException() throws IOException {
+    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     final int totalBytes = 1200;
 
     StorageResourceId resourceId =
