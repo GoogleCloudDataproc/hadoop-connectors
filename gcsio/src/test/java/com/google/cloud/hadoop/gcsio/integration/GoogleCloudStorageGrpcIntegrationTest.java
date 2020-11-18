@@ -9,17 +9,14 @@ import static org.junit.Assert.assertThrows;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
-import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
-import com.google.common.collect.Lists;
-import com.google.common.flogger.GoogleLogger;
+import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.util.Arrays;
-import java.util.List;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -28,19 +25,16 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   // Prefix this name with the prefix used in other gcs io integrate tests once it's whitelisted by
   // GCS to access gRPC API.
-  private static final String BUCKET_NAME = "gcs-grpc-team-dataproc-it";
+  private static final String BUCKET_NAME_PREFIX = "gcs-grpc-team-dataproc-it";
 
-  private static GoogleCloudStorage createGoogleCloudStorage() {
-    try {
-      return new GoogleCloudStorageImpl(
-          GoogleCloudStorageTestHelper.getStandardOptionBuilder().setGrpcEnabled(true).build(),
-          GoogleCloudStorageTestHelper.getCredential());
-    } catch (IOException e) {
-      GoogleLogger logger = GoogleLogger.forEnclosingClass();
-      logger.atWarning().withCause(e).log(
-          "Caught exception during GCS (%s) buckets creation", BUCKET_NAME);
-      return null;
-    }
+  private static final TestBucketHelper BUCKET_HELPER = new TestBucketHelper(BUCKET_NAME_PREFIX);
+
+  private static final String BUCKET_NAME = BUCKET_HELPER.getUniqueBucketName("shared");
+
+  private static GoogleCloudStorage createGoogleCloudStorage() throws IOException {
+    return new GoogleCloudStorageImpl(
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder().setGrpcEnabled(true).build(),
+        GoogleCloudStorageTestHelper.getCredential());
   }
 
   @BeforeClass
@@ -52,14 +46,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   @AfterClass
   public static void cleanupBuckets() throws IOException {
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
-    // randomize buckets order in case concurrent clean ups are running
-    List<GoogleCloudStorageItemInfo> objectsToDelete =
-        rawStorage.listObjectInfo(
-            BUCKET_NAME, /* objectNamePrefix= */ null, ListObjectOptions.DEFAULT_FLAT_LIST);
-
-    rawStorage.deleteObjects(
-        Lists.transform(objectsToDelete, GoogleCloudStorageItemInfo::getResourceId));
-    rawStorage.deleteBuckets(Arrays.asList(BUCKET_NAME));
+    BUCKET_HELPER.cleanup(rawStorage);
   }
 
   @Test
@@ -106,7 +93,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   }
 
   @Test
-  public void testCreateInvalidObject() {
+  public void testCreateInvalidObject() throws IOException {
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testCreateInvalidObject_InvalidObject\n");
@@ -125,7 +112,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   }
 
   @Test
-  public void testOpenNonExistentItem() {
+  public void testOpenNonExistentItem() throws IOException {
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     assertThrows(
         FileNotFoundException.class,
