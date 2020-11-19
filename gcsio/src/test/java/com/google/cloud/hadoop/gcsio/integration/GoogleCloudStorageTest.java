@@ -132,11 +132,12 @@ public class GoogleCloudStorageTest {
   // @Parameterized with @Parameters.
   @Parameters
   public static Collection<Object[]> getConstructorArguments() throws IOException {
-    GoogleCloudStorage gcs = new InMemoryGoogleCloudStorage();
-    GoogleCloudStorage performanceCachingGcs =
-        new PerformanceCachingGoogleCloudStorage(
-            new InMemoryGoogleCloudStorage(), PerformanceCachingGoogleCloudStorageOptions.DEFAULT);
-    return Arrays.asList(new Object[] {gcs}, new Object[] {performanceCachingGcs});
+    return Arrays.asList(
+        new Object[] {new InMemoryGoogleCloudStorage()},
+        new Object[] {
+          new PerformanceCachingGoogleCloudStorage(
+              new InMemoryGoogleCloudStorage(), PerformanceCachingGoogleCloudStorageOptions.DEFAULT)
+        });
   }
 
   private final GoogleCloudStorage rawStorage;

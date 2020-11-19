@@ -32,6 +32,7 @@ import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationDelete;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationRename;
+import com.google.cloud.hadoop.util.CheckedFunction;
 import com.google.cloud.hadoop.util.LazyExecutorService;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -160,8 +161,10 @@ public class GoogleCloudStorageFileSystem {
    */
   @VisibleForTesting
   public GoogleCloudStorageFileSystem(
-      GoogleCloudStorage gcs, GoogleCloudStorageFileSystemOptions options) {
-    this.gcs = gcs;
+      CheckedFunction<GoogleCloudStorageOptions, GoogleCloudStorage, IOException> gcsFn,
+      GoogleCloudStorageFileSystemOptions options)
+      throws IOException {
+    this.gcs = gcsFn.apply(options.getCloudStorageOptions());
     this.options = options;
   }
 

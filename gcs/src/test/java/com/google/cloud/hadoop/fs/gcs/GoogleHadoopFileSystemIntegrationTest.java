@@ -18,6 +18,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem;
+import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
 import static com.google.common.base.StandardSystemProperty.USER_NAME;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -564,9 +565,9 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
     GoogleCloudStorageFileSystem fakeGcsFs =
         new GoogleCloudStorageFileSystem(
-            new InMemoryGoogleCloudStorage(),
+            InMemoryGoogleCloudStorage::new,
             GoogleCloudStorageFileSystemOptions.builder()
-                .setCloudStorageOptions(new InMemoryGoogleCloudStorage().getOptions())
+                .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
                 .build());
 
     GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem(fakeGcsFs);
@@ -595,9 +596,9 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     URI initUri = new Path("gs://" + rootBucketName).toUri();
     GoogleCloudStorageFileSystem fakeGcsFs =
         new GoogleCloudStorageFileSystem(
-            new InMemoryGoogleCloudStorage(),
+            InMemoryGoogleCloudStorage::new,
             GoogleCloudStorageFileSystemOptions.builder()
-                .setCloudStorageOptions(new InMemoryGoogleCloudStorage().getOptions())
+                .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
                 .build());
     GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem(fakeGcsFs);
     fs.initUri = initUri;
@@ -614,9 +615,9 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     URI initUri = new Path("gs://").toUri();
     final GoogleCloudStorageFileSystem fakeGcsFs =
         new GoogleCloudStorageFileSystem(
-            new InMemoryGoogleCloudStorage(),
+            InMemoryGoogleCloudStorage::new,
             GoogleCloudStorageFileSystemOptions.builder()
-                .setCloudStorageOptions(new InMemoryGoogleCloudStorage().getOptions())
+                .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
                 .build());
     final GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem(fakeGcsFs);
     fs.initUri = initUri;

@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -72,9 +73,9 @@ public class HadoopFileSystemIntegrationHelper
       FileSystem hfs, FileSystemDescriptor ghfsFileSystemDescriptor) throws IOException {
     super(
         new GoogleCloudStorageFileSystem(
-            new InMemoryGoogleCloudStorage(),
+            InMemoryGoogleCloudStorage::new,
             GoogleCloudStorageFileSystemOptions.builder()
-                .setCloudStorageOptions(new InMemoryGoogleCloudStorage().getOptions())
+                .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
                 .build()));
     this.ghfs = hfs;
     this.ghfsFileSystemDescriptor = ghfsFileSystemDescriptor;

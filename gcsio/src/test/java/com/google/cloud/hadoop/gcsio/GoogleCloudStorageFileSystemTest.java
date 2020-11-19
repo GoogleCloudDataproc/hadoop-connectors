@@ -57,7 +57,7 @@ public class GoogleCloudStorageFileSystemTest
           if (gcsfs == null) {
             gcsfs =
                 new GoogleCloudStorageFileSystem(
-                    new InMemoryGoogleCloudStorage(),
+                    InMemoryGoogleCloudStorage::new,
                     GoogleCloudStorageFileSystemOptions.builder()
                         .setMarkerFilePattern("_(FAILURE|SUCCESS)")
                         .build());
