@@ -11,7 +11,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
@@ -114,10 +113,13 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   @Test
   public void testOpenNonExistentItem() throws IOException {
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
-    assertThrows(
-        FileNotFoundException.class,
-        () ->
-            rawStorage.open(new StorageResourceId(BUCKET_NAME, "testOpenNonExistentItem_Object")));
+    Throwable throwable =
+        assertThrows(
+            IOException.class,
+            () ->
+                rawStorage.open(
+                    new StorageResourceId(BUCKET_NAME, "testOpenNonExistentItem_Object")));
+    assertThat(throwable).hasCauseThat().hasCauseThat().hasMessageThat().contains("Item not found");
   }
 
   @Test
