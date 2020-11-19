@@ -111,35 +111,44 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     //      That will save about 40ms per read.
     // TODO(b/136088557): If we add metadata to a read, we can also use that first call to
     //      implement footer prefetch.
-    com.google.google.storage.v1.Object getObjectResult;
+    Retryer<GoogleCloudStorageGrpcReadChannel> retryer = getRetryer();
     try {
-      // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
-      getObjectResult =
-          stub.withDeadlineAfter(READ_OBJECT_METADATA_TIMEOUT.toMillis(), MILLISECONDS)
-              .getObject(
-                  GetObjectRequest.newBuilder()
-                      .setBucket(bucketName)
-                      .setObject(objectName)
-                      .build());
-    } catch (StatusRuntimeException e) {
-      throw convertError(e, bucketName, objectName);
-    }
+      return retryer.call(
+          () -> {
+            com.google.google.storage.v1.Object getObjectResult;
+            try {
+              // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
+              getObjectResult =
+                  stub.withDeadlineAfter(READ_OBJECT_METADATA_TIMEOUT.toMillis(), MILLISECONDS)
+                      .getObject(
+                          GetObjectRequest.newBuilder()
+                              .setBucket(bucketName)
+                              .setObject(objectName)
+                              .build());
+            } catch (StatusRuntimeException e) {
+              throw convertError(e, bucketName, objectName);
+            }
+            // The non-gRPC read channel has special support for gzip. This channel doesn't
+            // decompress gzip-encoded objects on the fly, so best to fail fast rather than return
+            // gibberish unexpectedly.
+            if (getObjectResult.getContentEncoding().contains("gzip")) {
+              throw new IOException(
+                  "Can't read GZIP encoded files - content encoding support is disabled.");
+            }
 
-    // The non-gRPC read channel has special support for gzip. This channel doesn't decompress
-    // gzip-encoded objects on the fly, so best to fail fast rather than return gibberish
-    // unexpectedly.
-    if (getObjectResult.getContentEncoding().contains("gzip")) {
+            return new GoogleCloudStorageGrpcReadChannel(
+                stub,
+                bucketName,
+                objectName,
+                getObjectResult.getGeneration(),
+                getObjectResult.getSize(),
+                readOptions);
+          });
+    } catch (Exception e) {
       throw new IOException(
-          "Can't read GZIP encoded files - content encoding support is disabled.");
+          String.format("Error reading '%s'", StringPaths.fromComponents(bucketName, objectName)),
+          e);
     }
-
-    return new GoogleCloudStorageGrpcReadChannel(
-        stub,
-        bucketName,
-        objectName,
-        getObjectResult.getGeneration(),
-        getObjectResult.getSize(),
-        readOptions);
   }
 
   private static IOException convertError(
@@ -352,8 +361,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     }
   }
 
-  private Retryer<Boolean> getRetryer() {
-    return RetryerBuilder.<Boolean>newBuilder()
+  private static <T> Retryer<T> getRetryer() {
+    return RetryerBuilder.<T>newBuilder()
         .retryIfExceptionOfType(IOException.class)
         .withWaitStrategy(WaitStrategies.exponentialWait(2, 20, SECONDS))
         .withStopStrategy(StopStrategies.stopAfterAttempt(READ_RETRIES))

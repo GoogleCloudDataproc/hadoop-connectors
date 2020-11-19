@@ -29,7 +29,6 @@ import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
 import io.grpc.testing.GrpcCleanupRule;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
@@ -427,7 +426,12 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
             .withDescription("Custom error message.")
             .asException());
     IOException thrown = assertThrows(IOException.class, () -> newReadChannel(options));
-    assertThat(thrown).hasCauseThat().hasMessageThat().contains("Custom error message.");
+    assertThat(thrown)
+        .hasCauseThat()
+        .hasCauseThat()
+        .hasCauseThat()
+        .hasMessageThat()
+        .contains("Custom error message.");
   }
 
   @Test
@@ -627,7 +631,8 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     GoogleCloudStorageReadOptions options =
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(true).build();
 
-    assertThrows(FileNotFoundException.class, () -> newReadChannel(options));
+    Throwable throwable = assertThrows(IOException.class, () -> newReadChannel(options));
+    assertThat(throwable).hasCauseThat().hasCauseThat().hasMessageThat().contains("Item not found");
   }
 
   @Test
@@ -640,7 +645,8 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
     // If the user hasn't mandated fail fast, it is permissible for either open() or read() to
     // raise this exception.
-    assertThrows(FileNotFoundException.class, () -> newReadChannel(options).read(buffer));
+    Throwable throwable = assertThrows(IOException.class, () -> newReadChannel(options));
+    assertThat(throwable).hasCauseThat().hasCauseThat().hasMessageThat().contains("Item not found");
   }
 
   @Test
