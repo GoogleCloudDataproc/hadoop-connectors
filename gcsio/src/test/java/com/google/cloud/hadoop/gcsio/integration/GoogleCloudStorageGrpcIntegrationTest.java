@@ -144,8 +144,8 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   @Test
   public void testPartialRead() throws IOException {
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
-    final int segmentSize = 553;
-    final int segmentCount = 5;
+    int segmentSize = 553;
+    int segmentCount = 5;
 
     StorageResourceId resourceId =
         new StorageResourceId(BUCKET_NAME, "testReadPartialObjects_Object");
@@ -160,8 +160,8 @@ public class GoogleCloudStorageGrpcIntegrationTest {
         byte[] expectedSegment =
             Arrays.copyOfRange(
                 data,
-                i * segmentSize, /* from index */
-                (i * segmentSize) + segmentSize /* to index */);
+                /* from= */ i * segmentSize,
+                /* to= */ i * segmentSize + segmentSize);
         assertWithMessage("Unexpected segment data read.")
             .that(readSegments[i])
             .isEqualTo(expectedSegment);
@@ -172,7 +172,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   @Test
   public void testChannelClosedException() throws IOException {
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
-    final int totalBytes = 1200;
+    int totalBytes = 1200;
 
     StorageResourceId resourceId =
         new StorageResourceId(BUCKET_NAME, "testChannelClosedException_Object");
