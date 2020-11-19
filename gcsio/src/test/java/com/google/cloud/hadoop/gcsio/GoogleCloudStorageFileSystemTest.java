@@ -136,7 +136,7 @@ public class GoogleCloudStorageFileSystemTest
 
     // Verify that credential == null throws IllegalArgumentException.
     assertThrows(
-        IllegalArgumentException.class,
+        NullPointerException.class,
         () -> new GoogleCloudStorageFileSystem((Credential) null, optionsBuilder.build()));
 
     // Verify that fake projectId/appName and empty cred does not throw.
