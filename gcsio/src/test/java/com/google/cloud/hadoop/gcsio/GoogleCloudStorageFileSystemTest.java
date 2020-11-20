@@ -57,7 +57,7 @@ public class GoogleCloudStorageFileSystemTest
           if (gcsfs == null) {
             gcsfs =
                 new GoogleCloudStorageFileSystem(
-                    new InMemoryGoogleCloudStorage(),
+                    InMemoryGoogleCloudStorage::new,
                     GoogleCloudStorageFileSystemOptions.builder()
                         .setMarkerFilePattern("_(FAILURE|SUCCESS)")
                         .build());
@@ -136,7 +136,7 @@ public class GoogleCloudStorageFileSystemTest
 
     // Verify that credential == null throws IllegalArgumentException.
     assertThrows(
-        IllegalArgumentException.class,
+        NullPointerException.class,
         () -> new GoogleCloudStorageFileSystem((Credential) null, optionsBuilder.build()));
 
     // Verify that fake projectId/appName and empty cred does not throw.

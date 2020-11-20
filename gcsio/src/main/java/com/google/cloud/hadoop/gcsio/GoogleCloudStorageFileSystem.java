@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -31,6 +32,7 @@ import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationDelete;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationRename;
+import com.google.cloud.hadoop.util.CheckedFunction;
 import com.google.cloud.hadoop.util.LazyExecutorService;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -138,30 +140,19 @@ public class GoogleCloudStorageFileSystem {
   public GoogleCloudStorageFileSystem(
       Credential credential, GoogleCloudStorageFileSystemOptions options) throws IOException {
     logger.atFine().log("GoogleCloudStorageFileSystem(options: %s)", options);
-    options.throwIfNotValid();
 
-    checkArgument(credential != null, "credential must not be null");
+    checkNotNull(credential, "credential must not be null");
 
-    this.options = options;
-    this.gcs = new GoogleCloudStorageImpl(options.getCloudStorageOptions(), credential);
+    this.options = checkNotNull(options, "options must not be null");
+    this.options.throwIfNotValid();
+
+    this.gcs = new GoogleCloudStorageImpl(this.options.getCloudStorageOptions(), credential);
 
     if (options.isPerformanceCacheEnabled()) {
       this.gcs =
-          new PerformanceCachingGoogleCloudStorage(this.gcs, options.getPerformanceCacheOptions());
+          new PerformanceCachingGoogleCloudStorage(
+              this.gcs, this.options.getPerformanceCacheOptions());
     }
-  }
-
-  /**
-   * Constructs a GoogleCloudStorageFilesystem based on an already-configured underlying
-   * GoogleCloudStorage {@code gcs}.
-   */
-  @VisibleForTesting
-  public GoogleCloudStorageFileSystem(GoogleCloudStorage gcs) {
-    this(
-        gcs,
-        GoogleCloudStorageFileSystemOptions.builder()
-            .setCloudStorageOptions(gcs.getOptions())
-            .build());
   }
 
   /**
@@ -170,8 +161,10 @@ public class GoogleCloudStorageFileSystem {
    */
   @VisibleForTesting
   public GoogleCloudStorageFileSystem(
-      GoogleCloudStorage gcs, GoogleCloudStorageFileSystemOptions options) {
-    this.gcs = gcs;
+      CheckedFunction<GoogleCloudStorageOptions, GoogleCloudStorage, IOException> gcsFn,
+      GoogleCloudStorageFileSystemOptions options)
+      throws IOException {
+    this.gcs = gcsFn.apply(options.getCloudStorageOptions());
     this.options = options;
   }
 

@@ -15,6 +15,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 
@@ -44,14 +45,18 @@ public class GoogleCloudStorageFileSystemOptionsTest {
   }
 
   @Test
-  public void testGcsFsInheritsGcsOptions() {
+  public void testGcsFsInheritsGcsOptions() throws Exception {
     GoogleCloudStorageOptions gcsOptions =
         GoogleCloudStorageOptions.builder()
             .setProjectId("foo-project")
             .setAppName("foo-app")
             .build();
-    GoogleCloudStorage gcs = new InMemoryGoogleCloudStorage(gcsOptions);
-    GoogleCloudStorageFileSystem gcsfs = new GoogleCloudStorageFileSystem(gcs);
+    GoogleCloudStorageFileSystem gcsfs =
+        new GoogleCloudStorageFileSystem(
+            InMemoryGoogleCloudStorage::new,
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(gcsOptions)
+                .build());
     assertThat(gcsfs.getOptions().getCloudStorageOptions().getProjectId()).isEqualTo("foo-project");
     assertThat(gcsfs.getOptions().getCloudStorageOptions().getAppName()).isEqualTo("foo-app");
   }
@@ -87,7 +92,11 @@ public class GoogleCloudStorageFileSystemOptionsTest {
 
     // We need different GCSFS options for our test.
     GoogleCloudStorageFileSystem gcsfs =
-        new GoogleCloudStorageFileSystem(new InMemoryGoogleCloudStorage());
+        new GoogleCloudStorageFileSystem(
+            InMemoryGoogleCloudStorage::new,
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
+                .build());
     GoogleCloudStorage gcs = gcsfs.getGcs();
     gcs.createBucket(testBucketName);
     for (String inputFile : inputFiles) {

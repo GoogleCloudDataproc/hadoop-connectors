@@ -3452,12 +3452,6 @@ public class GoogleCloudStorageTest {
         () -> new GoogleCloudStorageImpl(optionsBuilder.build(), (Storage) null));
   }
 
-  /** Provides coverage for default constructor. No real validation is performed. */
-  @Test
-  public void testCoverDefaultConstructor() {
-    new GoogleCloudStorageImpl();
-  }
-
   /** Coverage for GoogleCloudStorageItemInfo.metadataEquals. */
   @Test
   public void testItemInfoMetadataEquals() {

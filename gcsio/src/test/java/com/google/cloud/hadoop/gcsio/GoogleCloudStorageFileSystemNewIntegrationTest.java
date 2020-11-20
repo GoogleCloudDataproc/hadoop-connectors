@@ -729,8 +729,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
       GoogleCloudStorageFileSystemOptions gcsfsOptions,
       TrackingHttpRequestInitializer gcsRequestsTracker)
       throws IOException {
-    GoogleCloudStorage gcs =
-        new GoogleCloudStorageImpl(gcsfsOptions.getCloudStorageOptions(), gcsRequestsTracker);
-    return new GoogleCloudStorageFileSystem(gcs, gcsfsOptions);
+    return new GoogleCloudStorageFileSystem(
+        o -> new GoogleCloudStorageImpl(o, gcsRequestsTracker), gcsfsOptions);
   }
 }
