@@ -48,7 +48,11 @@ public final class GoogleCloudStorageTestUtils {
   public static GoogleCloudStorageReadChannel createReadChannel(
       Storage storage, GoogleCloudStorageReadOptions options) throws IOException {
     return new GoogleCloudStorageReadChannel(
-        storage, BUCKET_NAME, OBJECT_NAME, ERROR_EXTRACTOR, REQUEST_HELPER, options);
+        storage,
+        new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+        ERROR_EXTRACTOR,
+        REQUEST_HELPER,
+        options);
   }
 
   public static GoogleCloudStorageReadChannel createReadChannel(

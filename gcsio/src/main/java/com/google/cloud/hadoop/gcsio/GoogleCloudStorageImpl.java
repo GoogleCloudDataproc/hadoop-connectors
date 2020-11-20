@@ -194,7 +194,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private BatchHelper.Factory batchFactory = new BatchHelper.Factory();
 
   // Request initializer to use for batch and non-batch requests.
-  private HttpRequestInitializer httpRequestInitializer;
+  private final HttpRequestInitializer httpRequestInitializer;
 
   // Configuration values for this instance
   private final GoogleCloudStorageOptions storageOptions;
@@ -231,72 +231,50 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer)
       throws IOException {
-    Preconditions.checkNotNull(options, "options must not be null");
-    options.throwIfNotValid();
-    logger.atFine().log("GCS(%s)", options.getAppName());
-    this.storageOptions = options;
+    this(options, createStorage(options, httpRequestInitializer));
+  }
 
-    this.httpRequestInitializer = httpRequestInitializer;
+  /**
+   * Constructs an instance of GoogleCloudStorageImpl.
+   *
+   * @param gcs {@link Storage} to use for I/O.
+   */
+  @VisibleForTesting
+  GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage gcs) {
+    logger.atFine().log("GCS(options: %s)", options);
 
+    this.storageOptions = checkNotNull(options, "options must not be null");
+    this.storageOptions.throwIfNotValid();
+
+    this.gcs = checkNotNull(gcs, "gcs must not be null");
+
+    this.httpRequestInitializer =
+        this.gcs.getRequestFactory() == null ? null : this.gcs.getRequestFactory().getInitializer();
+
+    // Create the gRPC stub if necessary;
+    if (this.storageOptions.isGrpcEnabled()) {
+      this.storageStubProvider =
+          new StorageStubProvider(
+              this.storageOptions.getReadChannelOptions(), this.backgroundTasksThreadPool);
+    }
+
+    this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);
+  }
+
+  private static Storage createStorage(
+      GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer)
+      throws IOException {
     HttpTransport httpTransport =
         HttpTransportFactory.createHttpTransport(
             options.getTransportType(),
             options.getProxyAddress(),
             options.getProxyUsername(),
             options.getProxyPassword());
-
-    // Create GCS instance.
-    this.gcs =
-        new Storage.Builder(httpTransport, JSON_FACTORY, httpRequestInitializer)
-            .setRootUrl(options.getStorageRootUrl())
-            .setServicePath(options.getStorageServicePath())
-            .setApplicationName(options.getAppName())
-            .build();
-
-    // Create the gRPC stub if necessary;
-    if (storageOptions.isGrpcEnabled()) {
-      this.storageStubProvider =
-          new StorageStubProvider(options.getReadChannelOptions(), backgroundTasksThreadPool);
-    }
-
-    this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);
-  }
-
-  /**
-   * Constructs an instance of GoogleCloudStorageImpl.
-   *
-   * @param gcs Preconstructed Storage to use for I/O.
-   */
-  public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage gcs) {
-    Preconditions.checkNotNull(options, "options must not be null");
-
-    logger.atFine().log("GCS(%s)", options.getAppName());
-
-    options.throwIfNotValid();
-
-    this.storageOptions = options;
-
-    Preconditions.checkNotNull(gcs, "gcs must not be null");
-
-    this.gcs = gcs;
-
-    if (gcs.getRequestFactory() != null) {
-      this.httpRequestInitializer = gcs.getRequestFactory().getInitializer();
-    }
-
-    // Create the gRPC stub if necessary;
-    if (storageOptions.isGrpcEnabled()) {
-      this.storageStubProvider =
-          new StorageStubProvider(options.getReadChannelOptions(), backgroundTasksThreadPool);
-    }
-
-    this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);
-  }
-
-  @VisibleForTesting
-  protected GoogleCloudStorageImpl() {
-    this.storageOptions = GoogleCloudStorageOptions.builder().setAppName("test-app").build();
-    this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);
+    return new Storage.Builder(httpTransport, JSON_FACTORY, httpRequestInitializer)
+        .setRootUrl(options.getStorageRootUrl())
+        .setServicePath(options.getStorageServicePath())
+        .setApplicationName(options.getAppName())
+        .build();
   }
 
   @VisibleForTesting
@@ -334,8 +312,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @VisibleForTesting
   void setErrorExtractor(ApiErrorExtractor errorExtractor) {
     this.errorExtractor = errorExtractor;
-    this.rateLimitedRetryDeterminer = RetryDeterminer.createRateLimitedRetryDeterminer(
-        errorExtractor);
+    this.rateLimitedRetryDeterminer =
+        RetryDeterminer.createRateLimitedRetryDeterminer(errorExtractor);
   }
 
   @VisibleForTesting
@@ -1146,14 +1124,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     List<Bucket> allBuckets = listBucketsInternal();
     List<GoogleCloudStorageItemInfo> bucketInfos = new ArrayList<>(allBuckets.size());
     for (Bucket bucket : allBuckets) {
-      bucketInfos.add(
-          new GoogleCloudStorageItemInfo(
-              new StorageResourceId(bucket.getName()),
-              bucket.getTimeCreated().getValue(),
-              bucket.getUpdated().getValue(),
-              /* size= */ 0,
-              bucket.getLocation(),
-              bucket.getStorageClass()));
+      bucketInfos.add(createItemInfoForBucket(new StorageResourceId(bucket.getName()), bucket));
     }
     return bucketInfos;
   }

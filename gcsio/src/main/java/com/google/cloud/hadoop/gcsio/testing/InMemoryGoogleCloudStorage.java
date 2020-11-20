@@ -63,18 +63,20 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   private final Clock clock;
 
   public InMemoryGoogleCloudStorage() {
-    storageOptions = GoogleCloudStorageOptions.builder().setAppName("GHFS/in-memory").build();
-    clock = Clock.SYSTEM;
+    this(getInMemoryGoogleCloudStorageOptions());
   }
 
-  public InMemoryGoogleCloudStorage(GoogleCloudStorageOptions options) {
-    storageOptions = options;
-    clock = Clock.SYSTEM;
+  public InMemoryGoogleCloudStorage(GoogleCloudStorageOptions storageOptions) {
+    this(storageOptions, Clock.SYSTEM);
   }
 
   public InMemoryGoogleCloudStorage(GoogleCloudStorageOptions storageOptions, Clock clock) {
     this.storageOptions = storageOptions;
     this.clock = clock;
+  }
+
+  public static GoogleCloudStorageOptions getInMemoryGoogleCloudStorageOptions() {
+    return GoogleCloudStorageOptions.builder().setAppName("GHFS/in-memory").build();
   }
 
   @Override
@@ -440,14 +442,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
             .getInfo();
       }
     }
-    // return not found item
-    return new GoogleCloudStorageItemInfo(
-        resourceId,
-        /* creationTime= */ 0,
-        /* modificationTime= */ 0,
-        /* size= */ -1,
-        /* location= */ null,
-        /* storageClass= */ null);
+    return GoogleCloudStorageItemInfo.createNotFound(resourceId);
   }
 
   @Override
