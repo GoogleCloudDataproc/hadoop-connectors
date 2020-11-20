@@ -21,7 +21,6 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInf
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.copyRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.deleteRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
-import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestWithTrailingDelimiter;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.uploadRequestString;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -323,57 +322,6 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
             listRequestWithTrailingDelimiter(
                 bucketName, dirObject + "/subdir/f3/", /* maxResults= */ 2, /* pageToken= */ null),
             getRequestString(bucketName, dirObject + "/subdir/f3"));
-  }
-
-  @Test
-  public void listFileNames() throws Exception {
-    TrackingHttpRequestInitializer gcsRequestsTracker =
-        new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
-
-    String bucketName = gcsfsIHelper.sharedBucketName1;
-    URI bucketUri = new URI("gs://" + bucketName + "/");
-    String dirObject = getTestResource();
-
-    gcsfsIHelper.createObjectsWithSubdirs(
-        bucketName, dirObject + "/f1", dirObject + "/f2", dirObject + "/subdir/f3");
-
-    List<URI> listedNames =
-        gcsFs.listFileNames(inferredDirInfo(bucketName, dirObject), /* recursive= */ false);
-
-    assertThat(listedNames)
-        .containsExactly(
-            bucketUri.resolve(dirObject + "/f1"),
-            bucketUri.resolve(dirObject + "/f2"),
-            bucketUri.resolve(dirObject + "/subdir/"));
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(listRequestString(bucketName, false, dirObject + "/", 1024, null));
-  }
-
-  @Test
-  public void listFileNames_recursive() throws Exception {
-    TrackingHttpRequestInitializer gcsRequestsTracker =
-        new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
-
-    String bucketName = gcsfsIHelper.sharedBucketName1;
-    URI bucketUri = new URI("gs://" + bucketName + "/");
-    String dirObject = getTestResource();
-
-    gcsfsIHelper.createObjectsWithSubdirs(
-        bucketName, dirObject + "/f1", dirObject + "/f2", dirObject + "/subdir/f3");
-
-    List<URI> listedNames =
-        gcsFs.listFileNames(inferredDirInfo(bucketName, dirObject), /* recursive= */ true);
-
-    assertThat(listedNames)
-        .containsExactly(
-            bucketUri.resolve(dirObject + "/f1"),
-            bucketUri.resolve(dirObject + "/f2"),
-            bucketUri.resolve(dirObject + "/subdir/"),
-            bucketUri.resolve(dirObject + "/subdir/f3"));
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(listRequestString(bucketName, dirObject + "/", 1024));
   }
 
   @Test

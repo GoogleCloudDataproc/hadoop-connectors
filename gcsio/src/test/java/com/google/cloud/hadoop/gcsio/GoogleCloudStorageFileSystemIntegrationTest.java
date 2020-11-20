@@ -306,33 +306,6 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     } else {
       assertThat(actualPaths).containsExactlyElementsIn(expectedPaths);
     }
-
-    // Now re-verify using listFileNames instead of listFileInfo.
-    FileInfo baseInfo = gcsfs.getFileInfo(path);
-    List<URI> listedUris = gcsfs.listFileNames(baseInfo);
-
-    if (!baseInfo.isDirectory() && !baseInfo.exists()) {
-      // This is one case which differs between listFileInfo and listFileNames; listFileInfo will
-      // throw an exception for non-existent paths, while listFileNames will *always* return the
-      // unaltered path itself as long as it's not a directory. If it's a non-existent directory
-      // path, it returns an empty list, as opposed to this case, where it's a list of size 1.
-      expectedPaths.add(path);
-    }
-
-    if (listRoot) {
-      // By nature of the globally-visible GCS root (gs://), as long as we share a project for
-      // multiple testing purposes there's no way to know the exact expected contents to be listed,
-      // because other people/tests may have their own buckets alongside those created by this test.
-      // So, we just check that the expectedPaths are at least a subset of the listed ones.
-      Set<URI> actualPathsSet = new HashSet<>(listedUris);
-      for (URI expectedPath : expectedPaths) {
-        assertWithMessage("expected: <%s> in: <%s>", expectedPath, actualPathsSet)
-            .that(actualPathsSet)
-            .contains(expectedPath);
-      }
-    } else {
-      assertThat(listedUris).containsExactlyElementsIn(expectedPaths);
-    }
   }
 
   // -----------------------------------------------------------------

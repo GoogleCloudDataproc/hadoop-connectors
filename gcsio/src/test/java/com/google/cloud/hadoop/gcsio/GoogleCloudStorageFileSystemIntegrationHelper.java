@@ -143,10 +143,8 @@ public class GoogleCloudStorageFileSystemIntegrationHelper
   @Override
   protected void clearBucket(String bucketName) throws IOException {
     URI path = getPath(bucketName, null);
-    FileInfo pathInfo = gcsfs.getFileInfo(path);
-    List<URI> fileNames = gcsfs.listFileNames(pathInfo);
-    for (URI fileName : fileNames) {
-      gcsfs.delete(fileName, true);
+    for (FileInfo fileInfo : gcsfs.listFileInfo(path)) {
+      gcsfs.delete(fileInfo.getPath(), /* recursive= */ true);
     }
   }
 
