@@ -1227,13 +1227,20 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         listedPrefixes != null && listedPrefixes.isEmpty(),
         "Must provide a non-null empty container for listedPrefixes.");
 
+    // List +1 object if prefix should not be included in the result,
+    // because it will be listed anyway.
+    long maxResults =
+        listOptions.getMaxResults() > 0
+            ? listOptions.getMaxResults() + (listOptions.isIncludePrefix() ? 0 : 1)
+            : listOptions.getMaxResults();
+
     Storage.Objects.List listObject =
         createListRequest(
             bucketName,
             objectNamePrefix,
             listOptions.getDelimiter(),
             includeTrailingDelimiter,
-            listOptions.getMaxResults());
+            maxResults);
 
     String pageToken = null;
     do {
@@ -1359,12 +1366,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
 
     // Set number of items to retrieve per call.
-    if (maxResults <= 0 || maxResults + 1 >= storageOptions.getMaxListItemsPerCall()) {
-      listObject.setMaxResults(storageOptions.getMaxListItemsPerCall());
-    } else {
-      // We add one in case we filter out objectNamePrefix.
-      listObject.setMaxResults(maxResults + 1);
-    }
+    listObject.setMaxResults(
+        maxResults <= 0 || maxResults >= storageOptions.getMaxListItemsPerCall()
+            ? storageOptions.getMaxListItemsPerCall()
+            : maxResults);
 
     // Set prefix if supplied.
     if (!isNullOrEmpty(objectNamePrefix)) {
