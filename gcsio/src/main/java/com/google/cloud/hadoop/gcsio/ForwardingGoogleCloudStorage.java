@@ -133,16 +133,6 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public List<String> listObjectNames(
-      String bucketName, String objectNamePrefix, ListObjectOptions listOptions)
-      throws IOException {
-    logger.atFine().log(
-        "%s.listObjectNames(%s, %s, %s)",
-        delegateClassName, bucketName, objectNamePrefix, listOptions);
-    return delegate.listObjectNames(bucketName, objectNamePrefix, listOptions);
-  }
-
-  @Override
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions)
       throws IOException {

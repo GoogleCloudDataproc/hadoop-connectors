@@ -265,7 +265,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     boolean hasError = false;
     for (String bucketName : bucketNames) {
       // TODO(user): Enforcement of not being able to delete non-empty buckets should probably also
-      // be in here, but gcsfs handles it explicitly when it calls listObjectNames.
+      // be in here, but gcsfs handles it explicitly when it calls listObjectInfo.
       if (bucketLookup.containsKey(bucketName)) {
         bucketLookup.remove(bucketName);
       } else {
@@ -357,8 +357,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     return bucketInfos;
   }
 
-  @Override
-  public synchronized List<String> listObjectNames(
+  private synchronized List<String> listObjectNames(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions) {
     InMemoryBucketEntry bucketEntry = bucketLookup.get(bucketName);
     if (bucketEntry == null) {

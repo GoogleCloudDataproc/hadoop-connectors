@@ -179,14 +179,6 @@ public class ThrottledGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public List<String> listObjectNames(
-      String bucketName, String objectNamePrefix, ListObjectOptions listOptions)
-      throws IOException {
-    throttle(StorageOperation.LIST_OBJECTS);
-    return wrappedGcs.listObjectNames(bucketName, objectNamePrefix, listOptions);
-  }
-
-  @Override
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions)
       throws IOException {
