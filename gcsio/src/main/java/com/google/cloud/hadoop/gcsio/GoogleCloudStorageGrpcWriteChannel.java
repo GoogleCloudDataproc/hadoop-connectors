@@ -142,13 +142,11 @@ public final class GoogleCloudStorageGrpcWriteChannel
             : null;
 
     completedItemInfo =
-        new GoogleCloudStorageItemInfo(
+        GoogleCloudStorageItemInfo.createObject(
             new StorageResourceId(response.getBucket(), response.getName()),
             Timestamps.toMillis(response.getTimeCreated()),
             Timestamps.toMillis(response.getUpdated()),
             response.getSize(),
-            /* location= */ null,
-            /* storageClass= */ null,
             response.getContentType(),
             response.getContentEncoding(),
             metadata,

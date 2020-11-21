@@ -1464,11 +1464,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         resourceId.getBucketName(), bucket.getName());
 
     // For buckets, size is 0.
-    return new GoogleCloudStorageItemInfo(
+    return GoogleCloudStorageItemInfo.createBucket(
         resourceId,
         bucket.getTimeCreated().getValue(),
         bucket.getUpdated().getValue(),
-        /* size= */ 0,
         bucket.getLocation(),
         bucket.getStorageClass());
   }
@@ -1514,16 +1513,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       md5Hash = BaseEncoding.base64().decode(object.getMd5Hash());
     }
 
-    // GCS API does not make available location and storage class at object level at present
-    // (it is same for all objects in a bucket). Further, we do not use the values for objects.
-    // The GoogleCloudStorageItemInfo thus has 'null' for location and storage class.
-    return new GoogleCloudStorageItemInfo(
+    return GoogleCloudStorageItemInfo.createObject(
         resourceId,
         object.getTimeCreated().getValue(),
         object.getUpdated().getValue(),
         object.getSize().longValue(),
-        /* location= */ null,
-        /* storageClass= */ null,
         object.getContentType(),
         object.getContentEncoding(),
         decodedMetadata,
