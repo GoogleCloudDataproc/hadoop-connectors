@@ -171,7 +171,7 @@ public class GoogleCloudStorageTest {
 
     GoogleCloudStorageImpl gcsImpl = new GoogleCloudStorageImpl(options, request -> {});
 
-    assertThat(gcsImpl.gcs.getRootUrl()).isEqualTo("https://unit-test-storage.googleapis.com/");
+    assertThat(gcsImpl.storage.getRootUrl()).isEqualTo("https://unit-test-storage.googleapis.com/");
   }
 
   /** Test argument sanitization for GoogleCloudStorage.create(2). */
@@ -1635,7 +1635,7 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            getRequestString(BUCKET_NAME, OBJECT_NAME, /* fields= */ "generation"),
             deleteRequestString(BUCKET_NAME, OBJECT_NAME, /* generationId= */ 1))
         .inOrder();
   }

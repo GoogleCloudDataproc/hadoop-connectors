@@ -34,8 +34,15 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
 
+  private static final String GET_OBJECT_FIELDS =
+      "bucket,name,timeCreated,updated,generation,metageneration,size,contentType,contentEncoding"
+          + ",md5Hash,crc32c,metadata";
+
+  private static final String LIST_OBJECTS_FIELDS =
+      String.format("items(%s),prefixes,nextPageToken", GET_OBJECT_FIELDS);
+
   private static final String GET_REQUEST_FORMAT =
-      "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o/%s";
+      "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o/%s%s";
 
   private static final String GET_MEDIA_REQUEST_FORMAT =
       "GET:" + GOOGLEAPIS_ENDPOINT + "/download/storage/v1/b/%s/o/%s?alt=media";
@@ -82,7 +89,9 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   private static final String LIST_REQUEST_FORMAT =
       "GET:"
           + GOOGLEAPIS_ENDPOINT
-          + "/storage/v1/b/%s/o?delimiter=/&includeTrailingDelimiter=%s&maxResults=%d%s";
+          + "/storage/v1/b/%s/o?delimiter=/&fields="
+          + LIST_OBJECTS_FIELDS
+          + "&includeTrailingDelimiter=%s&maxResults=%d%s";
 
   private static final String LIST_SIMPLE_REQUEST_FORMAT =
       "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o?maxResults=%d&prefix=%s";
@@ -96,6 +105,8 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
       "POST:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b?project=%s";
 
   private static final String PAGE_TOKEN_PARAM_PATTERN = "pageToken=[^&]+";
+
+  private static final String REWRITE_TOKEN_PARAM_PATTERN = "rewriteToken=[^&]+";
 
   private static final String GENERATION_MATCH_TOKEN_PARAM_PATTERN = "ifGenerationMatch=[^&]+";
 
@@ -146,12 +157,14 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
 
   public ImmutableList<String> getAllRequestStrings() {
     AtomicLong pageTokenId = new AtomicLong();
+    AtomicLong rewriteTokenId = new AtomicLong();
     AtomicLong generationMatchId = new AtomicLong();
     AtomicLong resumableUploadId = new AtomicLong();
     return requests.stream()
         .map(GoogleCloudStorageIntegrationHelper::requestToString)
         // Replace randomized pageToken with predictable value so it could be asserted in tests
         .map(r -> replacePageTokenWithId(r, pageTokenId))
+        .map(r -> replaceRewriteTokenWithId(r, rewriteTokenId))
         .map(r -> replaceGenerationMatchWithId(r, generationMatchId))
         .map(r -> replaceResumableUploadIdWithId(r, resumableUploadId))
         .collect(toImmutableList());
@@ -160,6 +173,12 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   private String replacePageTokenWithId(String request, AtomicLong pageTokenId) {
     return replaceRequestParams
         ? replaceWithId(request, PAGE_TOKEN_PARAM_PATTERN, "pageToken=token_", pageTokenId)
+        : request;
+  }
+
+  private String replaceRewriteTokenWithId(String request, AtomicLong rewriteTokenId) {
+    return replaceRequestParams
+        ? replaceWithId(request, REWRITE_TOKEN_PARAM_PATTERN, "rewriteToken=token_", rewriteTokenId)
         : request;
   }
 
@@ -189,7 +208,12 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   }
 
   public static String getRequestString(String bucketName, String object) {
-    return String.format(GET_REQUEST_FORMAT, bucketName, urlEncode(object));
+    return getRequestString(bucketName, object, GET_OBJECT_FIELDS);
+  }
+
+  public static String getRequestString(String bucketName, String object, String fields) {
+    String queryParameters = fields == null ? "" : "?fields=" + fields;
+    return String.format(GET_REQUEST_FORMAT, bucketName, urlEncode(object), queryParameters);
   }
 
   public static String getMediaRequestString(String bucketName, String object) {
@@ -207,6 +231,22 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
 
   public static String postRequestString(String bucketName, String object) {
     return String.format(POST_REQUEST_FORMAT, bucketName, urlEncode(object));
+  }
+
+  public static String rewriteRequestString(
+      String srcBucket,
+      String srcObject,
+      String dstBucket,
+      String dstObject,
+      Integer maxBytesRewrittenPerCall,
+      Integer rewriteTokenId) {
+    String rewriteParams =
+        (maxBytesRewrittenPerCall == null
+                ? ""
+                : "?maxBytesRewrittenPerCall=" + maxBytesRewrittenPerCall)
+            + (rewriteTokenId == null ? "" : "&rewriteToken=token_" + rewriteTokenId);
+    return copyRequestString(srcBucket, srcObject, dstBucket, dstObject, "rewriteTo")
+        + rewriteParams;
   }
 
   public static String copyRequestString(

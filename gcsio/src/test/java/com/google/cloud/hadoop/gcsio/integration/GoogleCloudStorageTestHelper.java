@@ -23,13 +23,16 @@ import static org.junit.Assert.fail;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.CredentialFactory;
 import com.google.cloud.hadoop.util.CredentialOptions;
+import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
@@ -55,6 +58,14 @@ public class GoogleCloudStorageTestHelper {
   public static final String APP_NAME = "GHFS/test";
 
   private static final int BUFFER_SIZE_MAX_BYTES = 32 * 1024 * 1024;
+
+  public static GoogleCloudStorage createGoogleCloudStorage() {
+    try {
+      return new GoogleCloudStorageImpl(getStandardOptionBuilder().build(), getCredential());
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to create GoogleCloudStorage instance", e);
+    }
+  }
 
   public static Credential getCredential() throws IOException {
     CredentialOptions credentialOptions =
@@ -165,20 +176,25 @@ public class GoogleCloudStorageTestHelper {
   public static byte[] writeObject(
       GoogleCloudStorage gcs, StorageResourceId resourceId, int partitionSize, int partitionsCount)
       throws IOException {
+    return writeObject(gcs.create(resourceId), partitionSize, partitionsCount);
+  }
+
+  public static byte[] writeObject(
+      WritableByteChannel channel, int partitionSize, int partitionsCount) throws IOException {
     checkArgument(partitionsCount > 0, "partitionsCount should be greater than 0");
 
     byte[] partition = new byte[partitionSize];
     fillBytes(partition);
 
     long startTime = System.currentTimeMillis();
-    try (WritableByteChannel channel = gcs.create(resourceId)) {
+    try (WritableByteChannel ignore = channel) {
       for (int i = 0; i < partitionsCount; i++) {
         channel.write(ByteBuffer.wrap(partition));
       }
     }
     long endTime = System.currentTimeMillis();
     logger.atInfo().log(
-        "Took %s milliseconds to write %s", (endTime - startTime), partitionsCount * partitionSize);
+        "Took %sms to write %sB", (endTime - startTime), (long) partitionsCount * partitionSize);
     return partition;
   }
 
@@ -273,6 +289,21 @@ public class GoogleCloudStorageTestHelper {
       }
 
       logger.atInfo().log("GCS cleaned up in %s seconds", storageStopwatch.elapsed().getSeconds());
+    }
+  }
+
+  public static class TrackingGoogleCloudStorage {
+
+    public final TrackingHttpRequestInitializer requestsTracker;
+    public final GoogleCloudStorageImpl gcs;
+
+    public TrackingGoogleCloudStorage(GoogleCloudStorageOptions options) throws IOException {
+      RetryHttpInitializer initializer =
+          new RetryHttpInitializer(
+              GoogleCloudStorageTestHelper.getCredential(),
+              options.toRetryHttpInitializerOptions());
+      this.requestsTracker = new TrackingHttpRequestInitializer(initializer);
+      this.gcs = new GoogleCloudStorageImpl(options, this.requestsTracker);
     }
   }
 }
