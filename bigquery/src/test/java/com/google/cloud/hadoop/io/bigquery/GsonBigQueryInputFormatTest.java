@@ -91,7 +91,6 @@ public class GsonBigQueryInputFormatTest {
   @Mock private Bigquery.Jobs.Insert mockBigqueryJobsInsert;
   @Mock private Bigquery.Tables mockBigqueryTables;
   @Mock private Bigquery.Tables.Get mockBigqueryTablesGet;
-  @Mock private Bigquery.Tables.Delete mockBigqueryTablesDelete;
   @Mock private InputFormat<LongWritable, Text> mockInputFormat;
   @Mock private TaskAttemptContext mockTaskAttemptContext;
   @Mock private BigQueryHelper mockBigQueryHelper;

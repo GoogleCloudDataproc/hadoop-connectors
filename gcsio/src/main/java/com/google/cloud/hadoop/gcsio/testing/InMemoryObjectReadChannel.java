@@ -34,12 +34,6 @@ public class InMemoryObjectReadChannel extends GoogleCloudStorageReadChannel {
   // All reads return data from this byte array. Set at construction time.
   private final byte[] content;
 
-  /** Creates a new instance of InMemoryObjectReadChannel. */
-  public InMemoryObjectReadChannel(String bucketName, String objectName, byte[] content)
-      throws IOException {
-    this(bucketName, objectName, content, GoogleCloudStorageReadOptions.DEFAULT);
-  }
-
   /**
    * Creates a new instance of InMemoryObjectReadChannel with {@code readOptions} plumbed into the
    * base class.
