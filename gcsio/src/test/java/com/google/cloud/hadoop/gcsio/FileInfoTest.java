@@ -30,18 +30,17 @@ public class FileInfoTest {
   @Test
   public void fromItemInfo() throws Exception {
     GoogleCloudStorageItemInfo itemInfo =
-        new GoogleCloudStorageItemInfo(
+        GoogleCloudStorageItemInfo.createObject(
             new StorageResourceId("foo-test-bucket", "bar/test/object"),
             /* creationTime= */ 10L,
             /* modificationTime= */ 15L,
             /* size= */ 200L,
-            "us-east1",
-            "nearline",
             "text/plain",
             /* contentEncoding= */ "lzma",
             /* metadata= */ ImmutableMap.of("foo-meta", new byte[] {5, 66, 56}),
             /* contentGeneration= */ 312432L,
-            /* metaGeneration= */ 2L);
+            /* metaGeneration= */ 2L,
+            /* verificationAttributes= */ null);
 
     FileInfo fileInfo = FileInfo.fromItemInfo(itemInfo);
 

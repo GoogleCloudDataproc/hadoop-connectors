@@ -124,13 +124,11 @@ public class InMemoryObjectEntry {
               writeStream = null;
               writeChannel = null;
               info =
-                  new GoogleCloudStorageItemInfo(
+                  GoogleCloudStorageItemInfo.createObject(
                       info.getResourceId(),
                       info.getCreationTime(),
                       info.getModificationTime(),
                       /* size= */ completedContents.length,
-                      /* location= */ null,
-                      /* storageClass= */ null,
                       info.getContentType(),
                       info.getContentEncoding(),
                       info.getMetadata(),
@@ -151,18 +149,17 @@ public class InMemoryObjectEntry {
 
     // Size 0 initially because this object exists, but contains no data.
     info =
-        new GoogleCloudStorageItemInfo(
+        GoogleCloudStorageItemInfo.createObject(
             new StorageResourceId(bucketName, objectName),
             createTimeMillis,
             modificationTimeMillis,
             /* size= */ 0,
-            /* location= */ null,
-            /* storageClass= */ null,
             contentType,
             contentEncoding,
             ImmutableMap.copyOf(metadata),
             /* contentGeneration= */ 0,
-            /* metaGeneration= */ 0);
+            /* metaGeneration= */ 0,
+            /* verificationAttributes= */ null);
   }
 
   /** For internal use in getShallowCopy(2). */
@@ -212,18 +209,17 @@ public class InMemoryObjectEntry {
     sleepUninterruptibly(Duration.ofMillis(10));
 
     copy.info =
-        new GoogleCloudStorageItemInfo(
+        GoogleCloudStorageItemInfo.createObject(
             new StorageResourceId(bucketName, objectName),
             System.currentTimeMillis(),
             System.currentTimeMillis(),
             info.getSize(),
-            /* location= */ null,
-            /* storageClass= */ null,
             info.getContentType(),
             info.getContentEncoding(),
             info.getMetadata(),
             info.getContentGeneration(),
-            info.getMetaGeneration());
+            info.getMetaGeneration(),
+            /* verificationAttributes= */ null);
     return copy;
   }
 
@@ -306,13 +302,11 @@ public class InMemoryObjectEntry {
     }
 
     info =
-        new GoogleCloudStorageItemInfo(
+        GoogleCloudStorageItemInfo.createObject(
             info.getResourceId(),
             info.getCreationTime(),
             info.getModificationTime(),
             /* size= */ completedContents.length,
-            /* location= */ null,
-            /* storageClass= */ null,
             info.getContentType(),
             info.getContentEncoding(),
             mergedMetadata,

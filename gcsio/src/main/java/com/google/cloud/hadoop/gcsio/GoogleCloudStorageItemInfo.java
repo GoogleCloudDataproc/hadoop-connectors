@@ -17,8 +17,8 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Date;
@@ -38,34 +38,132 @@ public class GoogleCloudStorageItemInfo {
 
   // Info about the root of GCS namespace.
   public static final GoogleCloudStorageItemInfo ROOT_INFO =
-      new GoogleCloudStorageItemInfo(StorageResourceId.ROOT, 0, 0, 0, null, null);
+      new GoogleCloudStorageItemInfo(
+          StorageResourceId.ROOT,
+          /* creationTime= */ 0,
+          /* modificationTime= */ 0,
+          /* size= */ 0,
+          /* location= */ null,
+          /* storageClass= */ null,
+          /* contentType= */ null,
+          /* contentEncoding= */ null,
+          /* metadata= */ null,
+          /* contentGeneration= */ 0,
+          /* metaGeneration= */ 0,
+          /* verificationAttributes= */ null);
 
-  // Instead of returning null metadata, we'll return this map.
-  private static final ImmutableMap<String, byte[]> EMPTY_METADATA = ImmutableMap.of();
+  /**
+   * Factory method for creating a GoogleCloudStorageItemInfo for a bucket.
+   *
+   * @param resourceId Resource ID that identifies a bucket
+   * @param creationTime Time when a bucket was created (milliseconds since January 1, 1970 UTC).
+   * @param modificationTime Time when a bucket was last modified (milliseconds since January 1,
+   *     1970 UTC).
+   * @param location Location of a bucket.
+   * @param storageClass Storage class of a bucket.
+   */
+  public static GoogleCloudStorageItemInfo createBucket(
+      StorageResourceId resourceId,
+      long creationTime,
+      long modificationTime,
+      String location,
+      String storageClass) {
+    checkNotNull(resourceId, "resourceId must not be null.");
+    checkArgument(resourceId.isBucket(), "expected bucket but got '%s'", resourceId);
+    return new GoogleCloudStorageItemInfo(
+        resourceId,
+        creationTime,
+        modificationTime,
+        /* size= */ 0,
+        location,
+        storageClass,
+        /* contentType= */ null,
+        /* contentEncoding= */ null,
+        /* metadata= */ null,
+        /* contentGeneration= */ 0,
+        /* metaGeneration= */ 0,
+        /* verificationAttributes= */ null);
+  }
 
-  /** Helper for creating a "found" GoogleCloudStorageItemInfo for an inferred directory. */
+  /**
+   * Factory method for creating a GoogleCloudStorageItemInfo for an object.
+   *
+   * @param resourceId identifies either root, a Bucket, or a StorageObject
+   * @param creationTime Time when object was created (milliseconds since January 1, 1970 UTC).
+   * @param size Size of the given object (number of bytes) or -1 if the object does not exist.
+   * @param metadata User-supplied object metadata for this object.
+   */
+  public static GoogleCloudStorageItemInfo createObject(
+      StorageResourceId resourceId,
+      long creationTime,
+      long modificationTime,
+      long size,
+      String contentType,
+      String contentEncoding,
+      Map<String, byte[]> metadata,
+      long contentGeneration,
+      long metaGeneration,
+      VerificationAttributes verificationAttributes) {
+    checkNotNull(resourceId, "resourceId must not be null.");
+    checkArgument(!resourceId.isRoot(), "expected object or directory but got '%s'", resourceId);
+    checkArgument(!resourceId.isBucket(), "expected object or directory but got '%s'", resourceId);
+    return new GoogleCloudStorageItemInfo(
+        resourceId,
+        creationTime,
+        modificationTime,
+        size,
+        /* location= */ null,
+        /* storageClass= */ null,
+        contentType,
+        contentEncoding,
+        metadata,
+        contentGeneration,
+        metaGeneration,
+        verificationAttributes);
+  }
+
+  /**
+   * Factory method for creating a "found" GoogleCloudStorageItemInfo for an inferred directory.
+   *
+   * @param resourceId Resource ID that identifies an inferred directory
+   */
   public static GoogleCloudStorageItemInfo createInferredDirectory(StorageResourceId resourceId) {
-    checkArgument(resourceId != null, "resourceId must not be null");
+    checkNotNull(resourceId, "resourceId must not be null");
     return new GoogleCloudStorageItemInfo(
         resourceId,
         /* creationTime= */ 0,
         /* modificationTime= */ 0,
         /* size= */ 0,
         /* location= */ null,
-        /* storageClass= */ null);
+        /* storageClass= */ null,
+        /* contentType= */ null,
+        /* contentEncoding= */ null,
+        /* metadata= */ null,
+        /* contentGeneration= */ 0,
+        /* metaGeneration= */ 0,
+        /* verificationAttributes= */ null);
   }
 
-  /** Helper for creating a "not found" GoogleCloudStorageItemInfo for a StorageResourceId. */
+  /**
+   * Factory method for creating a "not found" GoogleCloudStorageItemInfo for a bucket or an object.
+   *
+   * @param resourceId Resource ID that identifies an inferred directory
+   */
   public static GoogleCloudStorageItemInfo createNotFound(StorageResourceId resourceId) {
-    checkArgument(resourceId != null, "resourceId must not be null");
-    // Bucket or StorageObject.
+    checkNotNull(resourceId, "resourceId must not be null.");
     return new GoogleCloudStorageItemInfo(
         resourceId,
         /* creationTime= */ 0,
         /* modificationTime= */ 0,
         /* size= */ -1,
         /* location= */ null,
-        /* storageClass= */ null);
+        /* storageClass= */ null,
+        /* contentType= */ null,
+        /* contentEncoding= */ null,
+        /* metadata= */ null,
+        /* contentGeneration= */ 0,
+        /* metaGeneration= */ 0,
+        /* verificationAttributes= */ null);
   }
 
   // The Bucket and maybe StorageObject names of the GCS "item" referenced by this object. Not null.
@@ -96,82 +194,14 @@ public class GoogleCloudStorageItemInfo {
 
   // User-supplied metadata.
   private final Map<String, byte[]> metadata;
+
   private final long contentGeneration;
+
   private final long metaGeneration;
+
   private final VerificationAttributes verificationAttributes;
 
-  /**
-   * Constructs an instance of GoogleCloudStorageItemInfo.
-   *
-   * @param resourceId identifies either root, a Bucket, or a StorageObject
-   * @param creationTime Time when object was created (milliseconds since January 1, 1970 UTC).
-   * @param size Size of the given object (number of bytes) or -1 if the object does not exist.
-   */
-  public GoogleCloudStorageItemInfo(
-      StorageResourceId resourceId,
-      long creationTime,
-      long modificationTime,
-      long size,
-      String location,
-      String storageClass) {
-    this(
-        resourceId,
-        creationTime,
-        modificationTime,
-        size,
-        location,
-        storageClass,
-        /* contentType= */ null,
-        /* contentEncoding= */ null,
-        /* metadata= */ ImmutableMap.of(),
-        /* contentGeneration= */ 0,
-        /* metaGeneration= */ 0);
-  }
-
-  /**
-   * Constructs an instance of GoogleCloudStorageItemInfo.
-   *
-   * @param resourceId identifies either root, a Bucket, or a StorageObject
-   * @param creationTime Time when object was created (milliseconds since January 1, 1970 UTC).
-   * @param size Size of the given object (number of bytes) or -1 if the object does not exist.
-   * @param metadata User-supplied object metadata for this object.
-   */
-  public GoogleCloudStorageItemInfo(
-      StorageResourceId resourceId,
-      long creationTime,
-      long modificationTime,
-      long size,
-      String location,
-      String storageClass,
-      String contentType,
-      String contentEncoding,
-      Map<String, byte[]> metadata,
-      long contentGeneration,
-      long metaGeneration) {
-    this(
-        resourceId,
-        creationTime,
-        modificationTime,
-        size,
-        location,
-        storageClass,
-        contentType,
-        contentEncoding,
-        metadata,
-        contentGeneration,
-        metaGeneration,
-        new VerificationAttributes(null, null));
-  }
-
-  /**
-   * Constructs an instance of GoogleCloudStorageItemInfo.
-   *
-   * @param resourceId identifies either root, a Bucket, or a StorageObject
-   * @param creationTime Time when object was created (milliseconds since January 1, 1970 UTC).
-   * @param size Size of the given object (number of bytes) or -1 if the object does not exist.
-   * @param metadata User-supplied object metadata for this object.
-   */
-  public GoogleCloudStorageItemInfo(
+  private GoogleCloudStorageItemInfo(
       StorageResourceId resourceId,
       long creationTime,
       long modificationTime,
@@ -184,8 +214,7 @@ public class GoogleCloudStorageItemInfo {
       long contentGeneration,
       long metaGeneration,
       VerificationAttributes verificationAttributes) {
-    Preconditions.checkArgument(resourceId != null,
-        "resourceId must not be null! Use StorageResourceId.ROOT to represent GCS root.");
+    checkNotNull(resourceId, "resourceId must not be null.");
     this.resourceId = resourceId;
     this.creationTime = creationTime;
     this.modificationTime = modificationTime;
@@ -194,7 +223,7 @@ public class GoogleCloudStorageItemInfo {
     this.storageClass = storageClass;
     this.contentType = contentType;
     this.contentEncoding = contentEncoding;
-    this.metadata = (metadata == null) ? EMPTY_METADATA : metadata;
+    this.metadata = (metadata == null) ? ImmutableMap.of() : metadata;
     this.contentGeneration = contentGeneration;
     this.metaGeneration = metaGeneration;
     this.verificationAttributes = verificationAttributes;
