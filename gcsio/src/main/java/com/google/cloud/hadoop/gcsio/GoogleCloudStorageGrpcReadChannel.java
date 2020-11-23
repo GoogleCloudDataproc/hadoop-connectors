@@ -13,6 +13,8 @@
  */
 package com.google.cloud.hadoop.gcsio;
 
+import static java.lang.Math.max;
+import static java.lang.Math.min;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -21,9 +23,9 @@ import com.github.rholder.retry.RetryerBuilder;
 import com.github.rholder.retry.StopStrategies;
 import com.github.rholder.retry.WaitStrategies;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
-import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
 import com.google.google.storage.v1.GetObjectMediaRequest;
 import com.google.google.storage.v1.GetObjectMediaResponse;
@@ -41,7 +43,6 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.time.Duration;
 import java.util.Iterator;
-import java.util.OptionalLong;
 import javax.annotation.Nullable;
 
 public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
@@ -56,15 +57,15 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   @Nullable CancellableContext requestContext;
   Fadvise readStrategy;
   // GCS gRPC stub.
-  private StorageBlockingStub stub;
+  private final StorageBlockingStub stub;
   // Name of the bucket containing the object being read.
-  private String bucketName;
+  private final String bucketName;
   // Name of the object being read.
-  private String objectName;
+  private final String objectName;
   // We read from a specific generation, to maintain consistency between read() calls.
-  private long objectGeneration;
+  private final long objectGeneration;
   // The size of this object generation, in bytes.
-  private long objectSize;
+  private final long objectSize;
   // True if this channel is open, false otherwise.
   private boolean channelIsOpen = true;
   // Current position in the object.
@@ -80,7 +81,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   // The streaming read operation. If null, there is not an in-flight read in progress.
   @Nullable private Iterator<GetObjectMediaResponse> resIterator = null;
   // Fine-grained options.
-  private GoogleCloudStorageReadOptions readOptions;
+  private final GoogleCloudStorageReadOptions readOptions;
 
   private GoogleCloudStorageGrpcReadChannel(
       StorageBlockingStub gcsGrpcBlockingStub,
@@ -153,21 +154,21 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private static IOException convertError(
       StatusRuntimeException error, String bucketName, String objectName) {
-    Status.Code statusCode = Status.fromThrowable(error).getCode();
     String msg =
         String.format("Error reading '%s'", StringPaths.fromComponents(bucketName, objectName));
-    if (statusCode == Status.Code.NOT_FOUND) {
-      return GoogleCloudStorageExceptions.createFileNotFoundException(
-          bucketName, objectName, new IOException(msg, error));
-    } else if (statusCode == Status.Code.OUT_OF_RANGE) {
-      return (IOException) new EOFException(msg).initCause(error);
-    } else {
-      return new IOException(msg, error);
+    switch (Status.fromThrowable(error).getCode()) {
+      case NOT_FOUND:
+        return GoogleCloudStorageExceptions.createFileNotFoundException(
+            bucketName, objectName, new IOException(msg, error));
+      case OUT_OF_RANGE:
+        return (IOException) new EOFException(msg).initCause(error);
+      default:
+        return new IOException(msg, error);
     }
   }
 
   /** Writes part of a ByteString into a ByteBuffer with as little copying as possible */
-  private static final void put(ByteString source, int offset, int size, ByteBuffer dest) {
+  private static void put(ByteString source, int offset, int size, ByteBuffer dest) {
     ByteString croppedSource = source.substring(offset, offset + size);
     for (ByteBuffer sourcePiece : croppedSource.asReadOnlyByteBufferList()) {
       dest.put(sourcePiece);
@@ -177,8 +178,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   private int readBufferedContentInto(ByteBuffer byteBuffer) {
     // Handle skipping forward through the buffer for a seek.
     long bufferSkip =
-        Math.min(bufferedContent.size() - bufferedContentReadOffset, bytesToSkipBeforeReading);
-    bufferSkip = Math.max(0, bufferSkip);
+        min(bufferedContent.size() - bufferedContentReadOffset, bytesToSkipBeforeReading);
+    bufferSkip = max(0, bufferSkip);
     bufferedContentReadOffset += bufferSkip;
     bytesToSkipBeforeReading -= bufferSkip;
     int remainingBufferedBytes = bufferedContent.size() - bufferedContentReadOffset;
@@ -227,14 +228,10 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       return bytesRead > 0 ? bytesRead : -1;
     }
     if (resIterator == null) {
-      OptionalLong bytesToRead;
-      if (readStrategy == Fadvise.RANDOM) {
-        long randomRangeSize =
-            Math.max(byteBuffer.remaining(), readOptions.getMinRangeRequestSize());
-        bytesToRead = OptionalLong.of(randomRangeSize);
-      } else {
-        bytesToRead = OptionalLong.empty();
-      }
+      Integer bytesToRead =
+          readStrategy == Fadvise.RANDOM
+              ? max(byteBuffer.remaining(), readOptions.getMinRangeRequestSize())
+              : null;
       requestObjectMedia(bytesToRead);
     }
     while (moreServerContent() && byteBuffer.hasRemaining()) {
@@ -251,15 +248,14 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
       if (readOptions.isGrpcChecksumsEnabled() && res.getChecksummedData().hasCrc32C()) {
         // TODO: Concatenate all these hashes together and compare the result at the end.
-        Hasher messageHasher = Hashing.crc32c().newHasher();
-        messageHasher.putBytes(res.getChecksummedData().getContent().toByteArray());
-        int calculatedChecksum = messageHasher.hash().asInt();
+        int calculatedChecksum =
+            Hashing.crc32c().hashBytes(res.getChecksummedData().getContent().toByteArray()).asInt();
         int expectedChecksum = res.getChecksummedData().getCrc32C().getValue();
         if (calculatedChecksum != expectedChecksum) {
           throw new IOException(
               String.format(
-                  "For %s: Message checksum didn't match. Expected %s, got %s.",
-                  this, expectedChecksum, calculatedChecksum));
+                  "Message checksum (%s) didn't match expected checksum (%s) for '%s'",
+                  expectedChecksum, calculatedChecksum, resourceIdString()));
         }
       }
 
@@ -278,15 +274,15 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     return bytesRead;
   }
 
-  private void requestObjectMedia(OptionalLong bytesToRead) throws IOException {
+  private void requestObjectMedia(@Nullable Integer bytesToRead) throws IOException {
     GetObjectMediaRequest.Builder requestBuilder =
         GetObjectMediaRequest.newBuilder()
             .setBucket(bucketName)
             .setObject(objectName)
             .setGeneration(objectGeneration)
             .setReadOffset(position);
-    if (bytesToRead.isPresent()) {
-      requestBuilder.setReadLimit(bytesToRead.getAsLong());
+    if (bytesToRead != null) {
+      requestBuilder.setReadLimit(bytesToRead);
     }
     GetObjectMediaRequest request = requestBuilder.build();
     Retryer<Boolean> retryer = getRetryer();
@@ -309,9 +305,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
             return null;
           });
     } catch (Exception e) {
-      throw new IOException(
-          String.format("Error reading '%s'", StringPaths.fromComponents(bucketName, objectName)),
-          e);
+      throw new IOException(String.format("Error reading '%s'", resourceIdString()), e);
     }
   }
 
@@ -338,26 +332,22 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
     Retryer<Boolean> retryer = getRetryer();
     try {
-      return retryer
-          .call(
-              () -> {
-                try {
-                  boolean moreDataAvailable = resIterator.hasNext();
-                  if (!moreDataAvailable) {
-                    cancelCurrentRequest();
-                  }
+      return retryer.call(
+          () -> {
+            try {
+              boolean moreDataAvailable = resIterator.hasNext();
+              if (!moreDataAvailable) {
+                cancelCurrentRequest();
+              }
 
-                  return moreDataAvailable;
-                } catch (StatusRuntimeException e) {
-                  throw convertError(e, bucketName, objectName);
-                }
-              })
-          .booleanValue();
+              return moreDataAvailable;
+            } catch (StatusRuntimeException e) {
+              throw convertError(e, bucketName, objectName);
+            }
+          });
     } catch (Exception e) {
       cancelCurrentRequest();
-      throw new IOException(
-          String.format("Error reading '%s'", StringPaths.fromComponents(bucketName, objectName)),
-          e);
+      throw new IOException(String.format("Error reading '%s'", resourceIdString()), e);
     }
   }
 
@@ -454,11 +444,10 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   @Override
   public String toString() {
-    return "GoogleCloudStorageGrpcReadChannel for bucket: "
-        + bucketName
-        + ", object: "
-        + objectName
-        + ", generation: "
-        + objectGeneration;
+    return MoreObjects.toStringHelper(this)
+        .add("bucketName", bucketName)
+        .add("objectName", objectName)
+        .add("generation", objectGeneration)
+        .toString();
   }
 }

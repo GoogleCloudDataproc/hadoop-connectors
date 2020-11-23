@@ -203,12 +203,6 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     this.readBackOff = Suppliers.ofInstance(checkNotNull(backOff, "backOff could not be null"));
   }
 
-  /** Gets the back-off used for determining sleep duration between read retries. */
-  @VisibleForTesting
-  BackOff getReadBackOff() {
-    return readBackOff.get();
-  }
-
   /** Creates new generic BackOff used for retries. */
   @VisibleForTesting
   ExponentialBackOff createBackOff() {

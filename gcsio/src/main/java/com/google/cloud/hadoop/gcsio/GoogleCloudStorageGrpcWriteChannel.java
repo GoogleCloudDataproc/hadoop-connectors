@@ -22,6 +22,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toMap;
 
+import com.github.rholder.retry.RetryException;
 import com.github.rholder.retry.Retryer;
 import com.github.rholder.retry.RetryerBuilder;
 import com.github.rholder.retry.StopStrategies;
@@ -63,15 +64,13 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 
 /** Implements WritableByteChannel to provide write access to GCS via gRPC. */
 public final class GoogleCloudStorageGrpcWriteChannel
     extends BaseAbstractGoogleAsyncWriteChannel<Object>
     implements GoogleCloudStorageItemInfo.Provider {
-
-  // Default size of the chunks in which to read the input stream.
-  static final int MAX_READ_FROM_CHUNK_SIZE = 8196;
 
   private static final Duration START_RESUMABLE_WRITE_TIMEOUT = Duration.ofMinutes(1);
   private static final Duration QUERY_WRITE_STATUS_TIMEOUT = Duration.ofMinutes(1);
@@ -196,10 +195,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       Retryer<Object> retryer = getRetryer();
       try (InputStream ignore = pipeSource) {
         return retryer.call(this::doResumableUpload);
-      } catch (Exception e) {
-        if (e instanceof InterruptedException) {
-          Thread.currentThread().interrupt();
-        }
+      } catch (ExecutionException | RetryException e) {
         throw new IOException(
             String.format("Resumable upload failed for '%s'", getResourceString()), e);
       }
@@ -420,7 +416,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       @Override
       public void beforeStart(
           ClientCallStreamObserver<InsertObjectRequest> clientCallStreamObserver) {
-        clientCallStreamObserver.setOnReadyHandler(() -> ready.countDown());
+        clientCallStreamObserver.setOnReadyHandler(ready::countDown);
       }
     }
 
@@ -453,7 +449,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       SimpleResponseObserver<StartResumableWriteResponse> responseObserver =
           new SimpleResponseObserver<>();
-      Retryer retryer = getRetryer();
+      Retryer<Void> retryer = getRetryer();
       try {
         retryer.call(
             () -> {
@@ -463,13 +459,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
               if (responseObserver.hasError()) {
                 throw new IOException(responseObserver.getError());
               }
-
               return null;
             });
-      } catch (Exception e) {
-        if (e instanceof InterruptedException) {
-          Thread.currentThread().interrupt();
-        }
+      } catch (ExecutionException | RetryException e) {
         throw new IOException(
             String.format("Failed to start resumable upload for '%s'", getResourceString()), e);
       }
@@ -484,7 +476,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       SimpleResponseObserver<QueryWriteStatusResponse> responseObserver =
           new SimpleResponseObserver<>();
-      Retryer retryer = getRetryer();
+      Retryer<Void> retryer = getRetryer();
       try {
         retryer.call(
             () -> {
@@ -496,23 +488,12 @@ public final class GoogleCloudStorageGrpcWriteChannel
               }
               return null;
             });
-      } catch (Exception e) {
-        if (e instanceof InterruptedException) {
-          Thread.currentThread().interrupt();
-        }
+      } catch (ExecutionException | RetryException e) {
         throw new IOException(
             String.format("Failed to get committed write size for '%s'", getResourceString()), e);
       }
 
       return responseObserver.getResponse().getCommittedSize();
-    }
-
-    private Retryer<Object> getRetryer() {
-      return RetryerBuilder.<Object>newBuilder()
-          .retryIfExceptionOfType(IOException.class)
-          .withWaitStrategy(WaitStrategies.exponentialWait(2, 20, SECONDS))
-          .withStopStrategy(StopStrategies.stopAfterAttempt(UPLOAD_RETRIES))
-          .build();
     }
 
     /** Stream observer for single response RPCs. */
@@ -564,5 +545,13 @@ public final class GoogleCloudStorageGrpcWriteChannel
   @Override
   public GoogleCloudStorageItemInfo getItemInfo() {
     return this.completedItemInfo;
+  }
+
+  private static <T> Retryer<T> getRetryer() {
+    return RetryerBuilder.<T>newBuilder()
+        .retryIfExceptionOfType(IOException.class)
+        .withWaitStrategy(WaitStrategies.exponentialWait(2, 20, SECONDS))
+        .withStopStrategy(StopStrategies.stopAfterAttempt(UPLOAD_RETRIES))
+        .build();
   }
 }

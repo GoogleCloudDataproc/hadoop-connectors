@@ -71,7 +71,6 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   @Rule public final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
   private StorageBlockingStub stub;
   private FakeService fakeService;
-  private ExecutorService executor = Executors.newCachedThreadPool();
 
   @Before
   public void setUp() throws Exception {
@@ -640,8 +639,6 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     fakeService.setGetException(Status.NOT_FOUND.asException());
     GoogleCloudStorageReadOptions options =
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
-
-    ByteBuffer buffer = ByteBuffer.allocate(10);
 
     // If the user hasn't mandated fail fast, it is permissible for either open() or read() to
     // raise this exception.
