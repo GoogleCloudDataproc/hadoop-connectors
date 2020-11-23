@@ -41,10 +41,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -225,14 +223,14 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
   /**
    * Validates FileInfo for the given item.
-   * <p>
-   * See {@link #testListObjectNamesAndGetItemInfo()} for more info.
-   * <p>
-   * Note: The test initialization code creates objects as text files.
-   * Each text file contains name of its associated object.
-   * Therefore, size of an object == objectName.getBytes("UTF-8").length.
+   *
+   * <p>See {@link #testGetAndListFileInfo()} for more info.
+   *
+   * <p>Note: The test initialization code creates objects as text files. Each text file contains
+   * name of its associated object. Therefore, size of an object ==
+   * objectName.getBytes("UTF-8").length.
    */
-  protected void validateGetItemInfo(String bucketName, String objectName, boolean expectedToExist)
+  protected void validateGetFileInfo(String bucketName, String objectName, boolean expectedToExist)
       throws IOException {
     URI path = gcsiHelper.getPath(bucketName, objectName);
     FileInfo fileInfo = gcsfs.getFileInfo(path);
@@ -242,11 +240,14 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
   /**
    * Validates FileInfo returned by listFileInfo().
-   * <p>
-   * See {@link #testListObjectNamesAndGetItemInfo()} for more info.
+   *
+   * <p>See {@link #testGetAndListFileInfo()} for more info.
    */
-  protected void validateListNamesAndInfo(String bucketName, String objectNamePrefix,
-      boolean pathExpectedToExist, String... expectedListedNames)
+  protected void validateListFileInfo(
+      String bucketName,
+      String objectNamePrefix,
+      boolean pathExpectedToExist,
+      String... expectedListedNames)
       throws IOException {
 
     boolean childPathsExpectedToExist =
@@ -305,33 +306,6 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
       assertThat(actualPaths).containsAtLeastElementsIn(expectedPaths);
     } else {
       assertThat(actualPaths).containsExactlyElementsIn(expectedPaths);
-    }
-
-    // Now re-verify using listFileNames instead of listFileInfo.
-    FileInfo baseInfo = gcsfs.getFileInfo(path);
-    List<URI> listedUris = gcsfs.listFileNames(baseInfo);
-
-    if (!baseInfo.isDirectory() && !baseInfo.exists()) {
-      // This is one case which differs between listFileInfo and listFileNames; listFileInfo will
-      // throw an exception for non-existent paths, while listFileNames will *always* return the
-      // unaltered path itself as long as it's not a directory. If it's a non-existent directory
-      // path, it returns an empty list, as opposed to this case, where it's a list of size 1.
-      expectedPaths.add(path);
-    }
-
-    if (listRoot) {
-      // By nature of the globally-visible GCS root (gs://), as long as we share a project for
-      // multiple testing purposes there's no way to know the exact expected contents to be listed,
-      // because other people/tests may have their own buckets alongside those created by this test.
-      // So, we just check that the expectedPaths are at least a subset of the listed ones.
-      Set<URI> actualPathsSet = new HashSet<>(listedUris);
-      for (URI expectedPath : expectedPaths) {
-        assertWithMessage("expected: <%s> in: <%s>", expectedPath, actualPathsSet)
-            .that(actualPathsSet)
-            .contains(expectedPath);
-      }
-    } else {
-      assertThat(listedUris).containsExactlyElementsIn(expectedPaths);
     }
   }
 
@@ -406,13 +380,14 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   }
 
   /**
-   * Tests listObjectNames() and getItemInfo().
+   * Tests {@link GoogleCloudStorageFileSystem#getFileInfo(URI)} and {@link
+   * GoogleCloudStorageFileSystem#listFileInfo(URI)}.
    *
    * <p>The data required for the 2 tests is expensive to create therefore we combine the tests into
    * one.
    */
   @Test
-  public void testListObjectNamesAndGetItemInfo() throws Exception {
+  public void testGetAndListFileInfo() throws Exception {
 
     // Objects created for this test.
     String[] objectNames = {
@@ -441,65 +416,61 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // Verify that getItemInfo() returns correct info for each object.
     for (String objectName : objectNames) {
-      validateGetItemInfo(tempTestBucket, objectName, true);
+      validateGetFileInfo(tempTestBucket, objectName, true);
     }
 
     // Verify that getItemInfo() returns correct info for bucket.
-    validateGetItemInfo(tempTestBucket, null, true);
+    validateGetFileInfo(tempTestBucket, null, true);
 
     // Verify that getItemInfo() returns correct info for a non-existent object.
-    validateGetItemInfo(tempTestBucket, dirDoesNotExist, false);
+    validateGetFileInfo(tempTestBucket, dirDoesNotExist, false);
 
     // Verify that getItemInfo() returns correct info for a non-existent bucket.
-    validateGetItemInfo(tempTestBucket, objDoesNotExist, false);
+    validateGetFileInfo(tempTestBucket, objDoesNotExist, false);
 
     // -------------------------------------------------------
-    // Tests for listObjectNames().
+    // Tests for listFileInfo().
     // -------------------------------------------------------
 
-    // Verify that listObjectNames() returns correct names for each case below.
+    // Verify that listFileInfo() returns correct result for each case below.
 
     // At root.
-    validateListNamesAndInfo(tempTestBucket, null, true, "o1", "o2", "d0/", "d1/", "d2/");
-    validateListNamesAndInfo(tempTestBucket, "", true, "o1", "o2", "d0/", "d1/", "d2/");
+    validateListFileInfo(tempTestBucket, null, true, "o1", "o2", "d0/", "d1/", "d2/");
+    validateListFileInfo(tempTestBucket, "", true, "o1", "o2", "d0/", "d1/", "d2/");
 
     // At d0.
-    validateListNamesAndInfo(tempTestBucket, "d0/", true);
+    validateListFileInfo(tempTestBucket, "d0/", true);
 
     // At o1.
-    validateListNamesAndInfo(tempTestBucket, "o1", true, "o1");
+    validateListFileInfo(tempTestBucket, "o1", true, "o1");
 
     // TODO(user) : bug in GCS? fails only when running gcsfs tests?
-    // validateListNamesAndInfo(bucketName, "d0", true, "d0/");
+    // validateListFileInfo(bucketName, "d0", true, "d0/");
 
     // At d1.
-    validateListNamesAndInfo(tempTestBucket, "d1/", true, "d1/o11", "d1/o12", "d1/d10/", "d1/d11/");
+    validateListFileInfo(tempTestBucket, "d1/", true, "d1/o11", "d1/o12", "d1/d10/", "d1/d11/");
 
     // TODO(user) : bug in GCS? fails only when running gcsfs tests?
-    // validateListNamesAndInfo(bucketName, "d1", true, "d1/");
+    // validateListFileInfo(bucketName, "d1", true, "d1/");
 
     // At d1/d11.
-    validateListNamesAndInfo(tempTestBucket, "d1/d11/", true, "d1/d11/o111");
+    validateListFileInfo(tempTestBucket, "d1/d11/", true, "d1/d11/o111");
 
     // TODO(user) : bug in GCS? fails only when running gcsfs tests?
-    // validateListNamesAndInfo(bucketName, "d1/d11", true, "d1/d11/");
+    // validateListFileInfo(bucketName, "d1/d11", true, "d1/d11/");
 
     // At d2.
-    validateListNamesAndInfo(tempTestBucket, "d2/", true, "d2/o21", "d2/o22");
+    validateListFileInfo(tempTestBucket, "d2/", true, "d2/o21", "d2/o22");
 
     // TODO(user) : bug in GCS? fails only when running gcsfs tests?
-    // validateListNamesAndInfo(bucketName, "d2", true, "d2/");
+    // validateListFileInfo(bucketName, "d2", true, "d2/");
 
     // At non-existent path.
-    validateListNamesAndInfo(tempTestBucket, dirDoesNotExist, false);
-    validateListNamesAndInfo(tempTestBucket, objDoesNotExist, false);
-    validateListNamesAndInfo("gcsio-test-bucket-" + objDoesNotExist, objDoesNotExist, false);
+    validateListFileInfo(tempTestBucket, dirDoesNotExist, false);
+    validateListFileInfo(tempTestBucket, objDoesNotExist, false);
+    validateListFileInfo("gcsio-test-bucket-" + objDoesNotExist, objDoesNotExist, false);
 
-    // -------------------------------------------------------
-    // Tests for listObjectNames().
-    // -------------------------------------------------------
-    validateListNamesAndInfo(
-        null, null, true, sharedBucketName1, sharedBucketName2, tempTestBucket);
+    validateListFileInfo(null, null, true, sharedBucketName1, sharedBucketName2, tempTestBucket);
   }
 
   @Test @SuppressWarnings("EqualsIncompatibleType")

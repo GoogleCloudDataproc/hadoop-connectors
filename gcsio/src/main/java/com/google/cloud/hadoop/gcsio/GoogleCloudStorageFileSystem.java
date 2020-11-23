@@ -813,79 +813,6 @@ public class GoogleCloudStorageFileSystem {
   }
 
   /**
-   * If the given item is a directory then the paths of its immediate children are returned,
-   * otherwise the path of the given item is returned.
-   *
-   * @param fileInfo FileInfo of an item.
-   * @return Paths of children (if directory) or self path.
-   */
-  public List<URI> listFileNames(FileInfo fileInfo) throws IOException {
-    return listFileNames(fileInfo, false);
-  }
-
-  /**
-   * If the given item is a directory then the paths of its children are returned, otherwise the
-   * path of the given item is returned.
-   *
-   * @param fileInfo FileInfo of an item.
-   * @param recursive If true, path of all children are returned; else, only immediate children are
-   *     returned.
-   * @return Paths of children (if directory) or self path.
-   */
-  public List<URI> listFileNames(FileInfo fileInfo, boolean recursive) throws IOException {
-    Preconditions.checkNotNull(fileInfo);
-    URI path = fileInfo.getPath();
-    logger.atFiner().log("listFileNames(path: %s, recursive: %s)", path, recursive);
-    List<URI> paths = new ArrayList<>();
-    List<String> childNames;
-
-    // If it is a directory, obtain info about its children.
-    if (fileInfo.isDirectory()) {
-      if (fileInfo.exists()) {
-        if (fileInfo.isGlobalRoot()) {
-          childNames = gcs.listBucketNames();
-
-          // Obtain path for each child.
-          for (String childName : childNames) {
-            URI childPath =
-                UriPaths.fromStringPathComponents(
-                    childName, /* objectName= */ null, /* allowEmptyObjectName= */ true);
-            paths.add(childPath);
-            logger.atFinest().log("listFileNames: added %s path", childPath);
-          }
-        } else {
-          // A null delimiter asks GCS to return all objects with a given prefix,
-          // regardless of their 'directory depth' relative to the prefix;
-          // that is what we want for a recursive list. On the other hand,
-          // when a delimiter is specified, only items with relative depth
-          // of 1 are returned.
-          ListObjectOptions listOptions =
-              recursive ? ListObjectOptions.DEFAULT_FLAT_LIST : ListObjectOptions.DEFAULT;
-
-          GoogleCloudStorageItemInfo itemInfo = fileInfo.getItemInfo();
-          // Obtain paths of children.
-          childNames =
-              gcs.listObjectNames(itemInfo.getBucketName(), itemInfo.getObjectName(), listOptions);
-
-          // Obtain path for each child.
-          for (String childName : childNames) {
-            URI childPath =
-                UriPaths.fromStringPathComponents(
-                    itemInfo.getBucketName(), childName, /* allowEmptyObjectName= */ false);
-            paths.add(childPath);
-            logger.atFinest().log("listFileNames: added %s path", childPath);
-          }
-        }
-      }
-    } else {
-      paths.add(path);
-      logger.atFinest().log("listFileNames: added a single original path for %s file", path);
-    }
-
-    return paths;
-  }
-
-  /**
    * Attempts to create the directory object explicitly for provided {@code infoFuture} if it
    * doesn't already exist as a directory object.
    */
@@ -988,10 +915,6 @@ public class GoogleCloudStorageFileSystem {
   /**
    * If the given path points to a directory then the information about its children is returned,
    * otherwise information about the given file is returned.
-   *
-   * <p>Note: This function is expensive to call, especially for a directory with many children. Use
-   * the alternative {@link GoogleCloudStorageFileSystem#listFileNames(FileInfo)} if you only need
-   * names of children and no other attributes.
    *
    * @param path Given path.
    * @return Information about a file or children of a directory.

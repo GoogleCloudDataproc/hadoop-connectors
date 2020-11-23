@@ -109,16 +109,6 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
     return result;
   }
 
-  /** This function may return names from cached copies of {@link GoogleCloudStorageItemInfo}. */
-  @Override
-  public List<String> listObjectNames(
-      String bucketName, String objectNamePrefix, ListObjectOptions listOptions)
-      throws IOException {
-    return this.listObjectInfo(bucketName, objectNamePrefix, listOptions).stream()
-        .map(GoogleCloudStorageItemInfo::getObjectName)
-        .collect(toImmutableList());
-  }
-
   /** This function may return cached copies of {@link GoogleCloudStorageItemInfo}. */
   @Override
   public List<GoogleCloudStorageItemInfo> listObjectInfo(

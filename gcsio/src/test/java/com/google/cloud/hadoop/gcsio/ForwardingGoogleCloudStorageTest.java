@@ -203,22 +203,6 @@ public class ForwardingGoogleCloudStorageTest {
   }
 
   @Test
-  public void testListObjectNames() throws IOException {
-    gcs.listObjectNames(TEST_STRING, TEST_STRING);
-
-    verify(mockGcsDelegate)
-        .listObjectNames(eq(TEST_STRING), eq(TEST_STRING), eq(ListObjectOptions.DEFAULT));
-  }
-
-  @Test
-  public void testListObjectNamesWithMax() throws IOException {
-    gcs.listObjectNames(TEST_STRING, TEST_STRING, ListObjectOptions.DEFAULT);
-
-    verify(mockGcsDelegate)
-        .listObjectNames(eq(TEST_STRING), eq(TEST_STRING), eq(ListObjectOptions.DEFAULT));
-  }
-
-  @Test
   public void testListObjectInfo() throws IOException {
     gcs.listObjectInfo(TEST_STRING, TEST_STRING);
 

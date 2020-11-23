@@ -159,10 +159,10 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   /**
    * Validates FileStatus for the given item.
    *
-   * <p>See {@link #testListObjectNamesAndGetItemInfo()} for more info.
+   * <p>See {@link #testGetAndListFileInfo()} for more info.
    */
   @Override
-  protected void validateGetItemInfo(String bucketName, String objectName, boolean expectedToExist)
+  protected void validateGetFileInfo(String bucketName, String objectName, boolean expectedToExist)
       throws IOException {
     URI path = ghfsHelper.getPath(bucketName, objectName, true);
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
@@ -185,10 +185,10 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   /**
    * Validates FileInfo returned by listFileInfo().
    *
-   * <p>See {@link #testListObjectNamesAndGetItemInfo()} for more info.
+   * <p>See {@link #testGetAndListFileInfo()} for more info.
    */
   @Override
-  protected void validateListNamesAndInfo(
+  protected void validateListFileInfo(
       String bucketName,
       String objectNamePrefix,
       boolean pathExpectedToExist,

@@ -1163,9 +1163,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   /**
-   * Helper for both listObjectNames and listObjectInfo that executes the actual API calls to get
-   * paginated lists, accumulating the StorageObjects and String prefixes into the params {@code
-   * listedObjects} and {@code listedPrefixes}.
+   * Helper for both listObjectInfo that executes the actual API calls to get paginated lists,
+   * accumulating the StorageObjects and String prefixes into the params {@code listedObjects} and
+   * {@code listedPrefixes}.
    *
    * @param bucketName bucket name
    * @param objectNamePrefix object name prefix or null if all objects in the bucket are desired
@@ -1347,51 +1347,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
     long numResults = (long) prefixes.size() + objects.size();
     return maxResults - numResults;
-  }
-
-  /** @see GoogleCloudStorage#listObjectNames(String, String, ListObjectOptions) */
-  @Override
-  public List<String> listObjectNames(
-      String bucketName, String objectNamePrefix, ListObjectOptions listOptions)
-      throws IOException {
-    logger.atFine().log("listObjectNames(%s, %s, %s)", bucketName, objectNamePrefix, listOptions);
-
-    // Helper will handle going through pages of list results and accumulating them.
-    List<StorageObject> listedObjects = new ArrayList<>();
-    List<String> listedPrefixes = new ArrayList<>();
-    listStorageObjectsAndPrefixes(
-        bucketName,
-        objectNamePrefix,
-        listOptions,
-        /* includeTrailingDelimiter= */ false,
-        listedObjects,
-        listedPrefixes);
-
-    // Size to accommodate listed prefixes, objects and prefix object
-    List<String> objectNames = new ArrayList<>(listedPrefixes.size() + listedObjects.size() + 1);
-
-    // Add a prefix name if necessary
-    if (listOptions.isIncludePrefix()
-        // Only add a non-null prefix name
-        && objectNamePrefix != null
-        // Only add a prefix name if listed any prefixes or objects, i.e prefix "exists"
-        && (!listedPrefixes.isEmpty() || !listedObjects.isEmpty())
-        // Only add a prefix name if prefix object is not listed already
-        && (listedObjects.isEmpty() || !listedObjects.get(0).getName().equals(objectNamePrefix))) {
-      objectNames.add(objectNamePrefix);
-    }
-
-    objectNames.addAll(listedPrefixes);
-
-    // Just use the prefix list as a starting point, and extract all the names from the
-    // StorageObjects, adding them to the list.
-    for (StorageObject obj : listedObjects) {
-      objectNames.add(obj.getName());
-    }
-
-    objectNames.sort(String::compareTo);
-
-    return objectNames;
   }
 
   /** @see GoogleCloudStorage#listObjectInfo(String, String, ListObjectOptions) */

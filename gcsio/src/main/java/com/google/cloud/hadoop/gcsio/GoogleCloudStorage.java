@@ -218,8 +218,8 @@ public interface GoogleCloudStorage {
       throws IOException;
 
   /**
-   * Gets names of objects contained in the given bucket and whose names begin with the given
-   * prefix.
+   * Lists {@link GoogleCloudStorageItemInfo} of objects contained in the given bucket and whose
+   * names begin with the given prefix.
    *
    * <p>Note: Although GCS does not implement a file system, it treats objects that contain a
    * delimiter ({@link ListObjectOptions#getDelimiter()}) as different from other objects when
@@ -238,49 +238,7 @@ public interface GoogleCloudStorage {
    *
    * @param bucketName bucket name
    * @param objectNamePrefix object name prefix or null if all objects in the bucket are desired
-   * @return list of object names
-   * @throws IOException on IO error
-   */
-  default List<String> listObjectNames(String bucketName, String objectNamePrefix)
-      throws IOException {
-    return listObjectNames(bucketName, objectNamePrefix, ListObjectOptions.DEFAULT);
-  }
-
-  /**
-   * Gets names of objects contained in the given bucket and whose names begin with the given
-   * prefix.
-   *
-   * <p>Note: Although GCS does not implement a file system, it treats objects that contain a
-   * delimiter ({@link ListObjectOptions#getDelimiter()}) as different from other objects when
-   * listing objects. This will be clearer with an example.
-   *
-   * <p>Consider a bucket with objects: {@code o1}, {@code d1/}, {@code d1/o1}, {@code d1/o2}
-   *
-   * <ul>
-   *   <li/>With {@code prefix == null} and {@code delimiter == /}, we get: {@code d1/}, {@code o1}
-   *   <li/>With {@code prefix == null} and {@code delimiter == null}, we get: {@code o1}, {@code
-   *       d1/}, {@code d1/o1}, {@code d1/o2}
-   * </ul>
-   *
-   * <p>Thus when delimiter is {@code null}, the entire key name is considered an opaque string,
-   * otherwise only the part up to the first delimiter is considered.
-   *
-   * @param bucketName bucket name
-   * @param objectNamePrefix object name prefix or null if all objects in the bucket are desired
-   * @param listOptions options to use when listing objects
-   * @return list of object names
-   * @throws IOException on IO error
-   */
-  List<String> listObjectNames(
-      String bucketName, String objectNamePrefix, ListObjectOptions listOptions) throws IOException;
-
-  /**
-   * Same name-matching semantics as {@link #listObjectNames} except this method retrieves the full
-   * {@link GoogleCloudStorageItemInfo} for each item as well.
-   *
-   * @param bucketName bucket name
-   * @param objectNamePrefix object name prefix or null if all objects in the bucket are desired
-   * @return list of object info
+   * @return list of objects
    * @throws IOException on IO error
    */
   default List<GoogleCloudStorageItemInfo> listObjectInfo(
@@ -289,13 +247,28 @@ public interface GoogleCloudStorage {
   }
 
   /**
-   * Same name-matching semantics as {@link #listObjectNames} except this method retrieves the full
-   * {@link GoogleCloudStorageItemInfo} for each item as well.
+   * Lists {@link GoogleCloudStorageItemInfo} of objects contained in the given bucket and whose
+   * names begin with the given prefix.
+   *
+   * <p>Note: Although GCS does not implement a file system, it treats objects that contain a
+   * delimiter ({@link ListObjectOptions#getDelimiter()}) as different from other objects when
+   * listing objects. This will be clearer with an example.
+   *
+   * <p>Consider a bucket with objects: {@code o1}, {@code d1/}, {@code d1/o1}, {@code d1/o2}
+   *
+   * <ul>
+   *   <li/>With {@code prefix == null} and {@code delimiter == /}, we get: {@code d1/}, {@code o1}
+   *   <li/>With {@code prefix == null} and {@code delimiter == null}, we get: {@code o1}, {@code
+   *       d1/}, {@code d1/o1}, {@code d1/o2}
+   * </ul>
+   *
+   * <p>Thus when delimiter is {@code null}, the entire key name is considered an opaque string,
+   * otherwise only the part up to the first delimiter is considered.
    *
    * @param bucketName bucket name
    * @param objectNamePrefix object name prefix or null if all objects in the bucket are desired
    * @param listOptions options to use when listing objects
-   * @return list of object info
+   * @return list of objects
    * @throws IOException on IO error
    */
   List<GoogleCloudStorageItemInfo> listObjectInfo(
