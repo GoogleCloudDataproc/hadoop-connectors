@@ -6,6 +6,8 @@
 
 1.  Use default logging backend for Google Flogger instead of Slf4j.
 
+1.  Removed unused `mapred.bq.output.buffer.size` configuration property.
+
 ### 1.1.1 - 2020-03-11
 
 1.  Fix shaded jar - add back missing relocated dependencies.

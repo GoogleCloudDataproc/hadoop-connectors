@@ -143,45 +143,6 @@ public class FileInfo {
   }
 
   /**
-   * Converts the given resourceId to look like a directory path. If the path already looks like a
-   * directory path then this call is a no-op.
-   *
-   * @param resourceId StorageResourceId to convert.
-   * @return A resourceId with a directory path corresponding to the given resourceId.
-   */
-  public static StorageResourceId convertToDirectoryPath(StorageResourceId resourceId) {
-    if (resourceId.isStorageObject()) {
-      if (!StringPaths.isDirectoryPath(resourceId.getObjectName())) {
-        resourceId =
-            new StorageResourceId(
-                resourceId.getBucketName(),
-                StringPaths.toDirectoryPath(resourceId.getObjectName()));
-      }
-    }
-    return resourceId;
-  }
-
-  /**
-   * Converts the given path to look like a directory path. If the path already looks like a
-   * directory path then this call is a no-op.
-   *
-   * @param path Path to convert.
-   * @return Directory path for the given path.
-   */
-  public static URI convertToDirectoryPath(URI path) {
-    StorageResourceId resourceId =
-        StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true);
-
-    if (resourceId.isStorageObject()) {
-      if (!StringPaths.isDirectoryPath(resourceId.getObjectName())) {
-        resourceId = convertToDirectoryPath(resourceId);
-        path = UriPaths.fromResourceId(resourceId, /* allowEmptyObjectName= */ false);
-      }
-    }
-    return path;
-  }
-
-  /**
    * Handy factory method for constructing a FileInfo from a GoogleCloudStorageItemInfo while
    * potentially returning a singleton instead of really constructing an object for cases like ROOT.
    */
@@ -203,15 +164,5 @@ public class FileInfo {
       fileInfos.add(fromItemInfo(itemInfo));
     }
     return fileInfos;
-  }
-
-  /**
-   * Indicates whether the given path looks like a directory path.
-   *
-   * @param path Path to inspect.
-   * @return Whether the path looks like a directory path.
-   */
-  public static boolean isDirectoryPath(URI path) {
-    return (path != null) && path.toString().endsWith(GoogleCloudStorage.PATH_DELIMITER);
   }
 }

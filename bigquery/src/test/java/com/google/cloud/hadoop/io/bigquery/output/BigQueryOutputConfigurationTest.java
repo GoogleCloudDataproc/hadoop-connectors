@@ -98,8 +98,6 @@ public class BigQueryOutputConfigurationTest {
   /** The Job Configuration for testing. */
   private static Configuration conf;
 
-  @Mock private JobID mockJobID;
-
   /** Set up before all classes. */
   @Before
   public void setUp() throws IOException {

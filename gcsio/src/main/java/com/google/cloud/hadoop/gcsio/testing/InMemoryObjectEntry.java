@@ -240,16 +240,6 @@ public class InMemoryObjectEntry {
    * writer must have already closed the associated WritableByteChannel to commit the byte contents
    * and make them available for reading.
    */
-  public synchronized SeekableByteChannel getReadChannel(String bucketName, String objectName)
-      throws IOException {
-    return getReadChannel(bucketName, objectName, GoogleCloudStorageReadOptions.DEFAULT);
-  }
-
-  /**
-   * Returns a SeekableByteChannel pointing at this InMemoryObjectEntry's byte contents; a previous
-   * writer must have already closed the associated WritableByteChannel to commit the byte contents
-   * and make them available for reading.
-   */
   public synchronized SeekableByteChannel getReadChannel(
       String bucketName, String objectName, GoogleCloudStorageReadOptions readOptions)
       throws IOException {

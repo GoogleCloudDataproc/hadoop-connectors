@@ -53,7 +53,6 @@ public class BigQueryConfigurationTest {
           put("mapred.bq.input.skew.limit", 1.5);
           put("mapred.bq.input.sql.filter", "");
           put("mapred.bq.input.table.id", null);
-          put("mapred.bq.output.buffer.size", 67108864);
           put("mapred.bq.output.dataset.id", null);
           put("mapred.bq.output.gcs.cleanup", true);
           put("mapred.bq.output.gcs.fileformat", null);

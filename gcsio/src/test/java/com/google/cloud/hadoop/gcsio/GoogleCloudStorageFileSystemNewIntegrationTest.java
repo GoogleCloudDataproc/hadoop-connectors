@@ -663,12 +663,6 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     return name.getMethodName() + "_" + UUID.randomUUID();
   }
 
-  private static FileInfo inferredDirInfo(String bucketName, String dirObject) {
-    StorageResourceId resourceId =
-        new StorageResourceId(bucketName, dirObject.endsWith("/") ? dirObject : dirObject + "/");
-    return fromItemInfo(createInferredDirectory(resourceId));
-  }
-
   private static GoogleCloudStorageFileSystemOptions.Builder newGcsFsOptions() {
     return GoogleCloudStorageFileSystemOptions.builder().setCloudStorageOptions(gcsOptions);
   }

@@ -14,20 +14,15 @@
 
 package com.google.cloud.hadoop.gcsio.integration;
 
-import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
-import com.google.cloud.hadoop.gcsio.ThrottledGoogleCloudStorage;
-import com.google.cloud.hadoop.gcsio.ThrottledGoogleCloudStorage.StorageOperation;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
-import com.google.common.util.concurrent.RateLimiter;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.EnumSet;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
@@ -61,13 +56,8 @@ public class GoogleCloudStorageIntegrationTest extends GoogleCloudStorageTest {
 
   private static GoogleCloudStorage getGoogleCloudStorage(
       GoogleCloudStorageOptions.Builder optionsBuilder) throws IOException {
-    Credential credential = GoogleCloudStorageTestHelper.getCredential();
-    return new ThrottledGoogleCloudStorage(
-        // Allow 2 create or delete bucket operation every second. This will hit rate limits,
-        // but GCS now has back-offs implemented for bucket operations.
-        RateLimiter.create(2),
-        new GoogleCloudStorageImpl(optionsBuilder.build(), credential),
-        EnumSet.of(StorageOperation.DELETE_BUCKETS, StorageOperation.CREATE_BUCKET));
+    return new GoogleCloudStorageImpl(
+        optionsBuilder.build(), GoogleCloudStorageTestHelper.getCredential());
   }
 
   public GoogleCloudStorageIntegrationTest(GoogleCloudStorage gcs) {
