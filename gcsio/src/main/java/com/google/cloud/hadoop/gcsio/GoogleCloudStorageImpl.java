@@ -123,6 +123,26 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           .setEnsureEmptyObjectsMetadataMatch(false)
           .build();
 
+  // Object field that are used in GoogleCloudStorageItemInfo
+  private static final String GET_OBJECT_FIELDS =
+      String.join(
+          /* delimiter= */ ",",
+          "bucket",
+          "name",
+          "timeCreated",
+          "updated",
+          "generation",
+          "metageneration",
+          "size",
+          "contentType",
+          "contentEncoding",
+          "md5Hash",
+          "crc32c",
+          "metadata");
+
+  private static final String LIST_OBJECT_FIELDS =
+      String.format("items(%s),prefixes,nextPageToken", GET_OBJECT_FIELDS);
+
   // A function to encode metadata map values
   static String encodeMetadataValues(byte[] bytes) {
     return bytes == null ? Data.NULL_STRING : BaseEncoding.base64().encode(bytes);
@@ -155,7 +175,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                 @Override
                 public Boolean load(String bucketName) throws Exception {
                   try {
-                    gcs.buckets()
+                    storage
+                        .buckets()
                         .testIamPermissions(bucketName, iamPermissions)
                         .executeUnparsed()
                         .disconnect();
@@ -167,7 +188,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               });
 
   // GCS access instance.
-  @VisibleForTesting Storage gcs;
+  @VisibleForTesting Storage storage;
 
   // Utility for building and caching storager channels and stubs.
   private StorageStubProvider storageStubProvider;
@@ -237,19 +258,21 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
    *
-   * @param gcs {@link Storage} to use for I/O.
+   * @param storage {@link Storage} to use for I/O.
    */
   @VisibleForTesting
-  GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage gcs) {
+  GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage storage) {
     logger.atFine().log("GCS(options: %s)", options);
 
     this.storageOptions = checkNotNull(options, "options must not be null");
     this.storageOptions.throwIfNotValid();
 
-    this.gcs = checkNotNull(gcs, "gcs must not be null");
+    this.storage = checkNotNull(storage, "storage must not be null");
 
     this.httpRequestInitializer =
-        this.gcs.getRequestFactory() == null ? null : this.gcs.getRequestFactory().getInitializer();
+        this.storage.getRequestFactory() == null
+            ? null
+            : this.storage.getRequestFactory().getInitializer();
 
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
@@ -389,7 +412,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                     ? storageOptions.getRequesterPaysOptions().getProjectId()
                     : null)
             : new GoogleCloudStorageWriteChannel(
-                gcs,
+                storage,
                 clientRequestHelper,
                 backgroundTasksThreadPool,
                 storageOptions.getWriteChannelOptions(),
@@ -432,7 +455,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
 
     Storage.Buckets.Insert insertBucket =
-        initializeRequest(gcs.buckets().insert(storageOptions.getProjectId(), bucket), bucketName);
+        initializeRequest(
+            storage.buckets().insert(storageOptions.getProjectId(), bucket), bucketName);
     // TODO(user): To match the behavior of throwing FileNotFoundException for 404, we probably
     // want to throw org.apache.commons.io.FileExistsException for 409 here.
     try {
@@ -502,7 +526,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     Storage.Objects.Patch patchObject =
         initializeRequest(
-                gcs.objects()
+                storage
+                    .objects()
                     .patch(resourceId.getBucketName(), resourceId.getObjectName(), storageObject),
                 resourceId.getBucketName())
             .setIfMetagenerationMatch(itemInfo.getMetaGeneration());
@@ -623,7 +648,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
 
     return new GoogleCloudStorageReadChannel(
-        gcs, resourceId, errorExtractor, clientRequestHelper, readOptions) {
+        storage, resourceId, errorExtractor, clientRequestHelper, readOptions) {
 
       @Override
       @Nullable
@@ -654,7 +679,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     for (final String bucketName : bucketNames) {
       final Storage.Buckets.Delete deleteBucket =
-          initializeRequest(gcs.buckets().delete(bucketName), bucketName);
+          initializeRequest(storage.buckets().delete(bucketName), bucketName);
 
       try {
         ResilientOperation.retry(
@@ -681,7 +706,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   public void deleteObject(StorageResourceId resourceId, long metaGeneration) throws IOException {
     String bucketName = resourceId.getBucketName();
     Storage.Objects.Delete deleteObject =
-        initializeRequest(gcs.objects().delete(bucketName, resourceId.getObjectName()), bucketName)
+        initializeRequest(
+                storage.objects().delete(bucketName, resourceId.getObjectName()), bucketName)
             .setIfMetagenerationMatch(metaGeneration);
     deleteObject.execute();
   }
@@ -707,7 +733,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     BatchHelper batchHelper =
         batchFactory.newBatchHelper(
             httpRequestInitializer,
-            gcs,
+            storage,
             storageOptions.getMaxRequestsPerBatch(),
             fullObjectNames.size(),
             storageOptions.getBatchThreads());
@@ -778,7 +804,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       // We can go direct to the deletion request instead of first fetching generation id.
       long generationId = resourceId.getGenerationId();
       Storage.Objects.Delete deleteObject =
-          initializeRequest(gcs.objects().delete(bucketName, objectName), bucketName)
+          initializeRequest(storage.objects().delete(bucketName, objectName), bucketName)
               .setIfGenerationMatch(generationId);
       batchHelper.queue(
           deleteObject,
@@ -787,16 +813,18 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       // We first need to get the current object version to issue a safe delete for only the
       // latest version of the object.
       Storage.Objects.Get getObject =
-          initializeRequest(gcs.objects().get(bucketName, objectName), bucketName);
+          initializeRequest(storage.objects().get(bucketName, objectName), bucketName)
+              .setFields("generation");
       batchHelper.queue(
           getObject,
           new JsonBatchCallback<StorageObject>() {
             @Override
             public void onSuccess(StorageObject storageObject, HttpHeaders httpHeaders)
                 throws IOException {
-              final Long generation = storageObject.getGeneration();
+              Long generation =
+                  checkNotNull(storageObject.getGeneration(), "generation can not be null");
               Storage.Objects.Delete deleteObject =
-                  initializeRequest(gcs.objects().delete(bucketName, objectName), bucketName)
+                  initializeRequest(storage.objects().delete(bucketName, objectName), bucketName)
                       .setIfGenerationMatch(generation);
 
               batchHelper.queue(
@@ -918,7 +946,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     BatchHelper batchHelper =
         batchFactory.newBatchHelper(
             httpRequestInitializer,
-            gcs,
+            storage,
             storageOptions.getCopyMaxRequestsPerBatch(),
             srcObjectNames.size(),
             storageOptions.getCopyBatchThreads());
@@ -962,7 +990,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       throws IOException {
     Storage.Objects.Rewrite rewriteObject =
         initializeRequest(
-            gcs.objects().rewrite(srcBucketName, srcObjectName, dstBucketName, dstObjectName, null),
+            storage
+                .objects()
+                .rewrite(srcBucketName, srcObjectName, dstBucketName, dstObjectName, null),
             srcBucketName);
     if (storageOptions.getMaxBytesRewrittenPerCall() > 0) {
       rewriteObject.setMaxBytesRewrittenPerCall(storageOptions.getMaxBytesRewrittenPerCall());
@@ -987,7 +1017,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               try {
                 Storage.Objects.Rewrite rewriteObjectWithToken =
                     initializeRequest(
-                        gcs.objects()
+                        storage
+                            .objects()
                             .rewrite(
                                 srcBucketName, srcObjectName, dstBucketName, dstObjectName, null),
                         srcBucketName);
@@ -1023,7 +1054,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       throws IOException {
     Storage.Objects.Copy copyObject =
         initializeRequest(
-            gcs.objects().copy(srcBucketName, srcObjectName, dstBucketName, dstObjectName, null),
+            storage
+                .objects()
+                .copy(srcBucketName, srcObjectName, dstBucketName, dstObjectName, null),
             srcBucketName);
 
     batchHelper.queue(
@@ -1071,7 +1104,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     checkNotNull(storageOptions.getProjectId(), "projectId must not be null");
     List<Bucket> allBuckets = new ArrayList<>();
     Storage.Buckets.List listBucket =
-        initializeRequest(gcs.buckets().list(storageOptions.getProjectId()), null);
+        initializeRequest(storage.buckets().list(storageOptions.getProjectId()), null);
 
     // Set number of items to retrieve per call.
     listBucket.setMaxResults(storageOptions.getMaxListItemsPerCall());
@@ -1149,7 +1182,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         new ByteArrayContent(createObjectOptions.getContentType(), new byte[0]);
     Storage.Objects.Insert insertObject =
         initializeRequest(
-            gcs.objects().insert(resourceId.getBucketName(), object, emptyContent),
+            storage.objects().insert(resourceId.getBucketName(), object, emptyContent),
             resourceId.getBucketName());
     insertObject.setDisableGZipContent(true);
     clientRequestHelper.setDirectUploadEnabled(insertObject, true);
@@ -1316,7 +1349,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         bucketName, objectNamePrefix, delimiter, includeTrailingDelimiter, maxResults);
     checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
 
-    Storage.Objects.List listObject = initializeRequest(gcs.objects().list(bucketName), bucketName);
+    Storage.Objects.List listObject =
+        initializeRequest(storage.objects().list(bucketName), bucketName);
 
     // Set delimiter if supplied.
     if (delimiter != null) {
@@ -1336,6 +1370,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     if (!isNullOrEmpty(objectNamePrefix)) {
       listObject.setPrefix(objectNamePrefix);
     }
+
+    // Request only fields used in GoogleCloudStorageItemInfo:
+    // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
+    listObject.setFields(LIST_OBJECT_FIELDS);
 
     return listObject;
   }
@@ -1559,7 +1597,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     BatchHelper batchHelper =
         batchFactory.newBatchHelper(
             httpRequestInitializer,
-            gcs,
+            storage,
             storageOptions.getMaxRequestsPerBatch(),
             resourceIds.size(),
             storageOptions.getBatchThreads());
@@ -1572,7 +1610,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       } else if (resourceId.isBucket()) {
         batchHelper.queue(
             initializeRequest(
-                gcs.buckets().get(resourceId.getBucketName()), resourceId.getBucketName()),
+                storage.buckets().get(resourceId.getBucketName()), resourceId.getBucketName()),
             new JsonBatchCallback<Bucket>() {
               @Override
               public void onSuccess(Bucket bucket, HttpHeaders responseHeaders) {
@@ -1603,7 +1641,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         final String bucketName = resourceId.getBucketName();
         final String objectName = resourceId.getObjectName();
         batchHelper.queue(
-            initializeRequest(gcs.objects().get(bucketName, objectName), bucketName),
+            initializeRequest(storage.objects().get(bucketName, objectName), bucketName)
+                // Request only fields used in GoogleCloudStorageItemInfo:
+                // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
+                .setFields(GET_OBJECT_FIELDS),
             new JsonBatchCallback<StorageObject>() {
               @Override
               public void onSuccess(StorageObject obj, HttpHeaders responseHeaders) {
@@ -1670,7 +1711,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     BatchHelper batchHelper =
         batchFactory.newBatchHelper(
             httpRequestInitializer,
-            gcs,
+            storage,
             storageOptions.getMaxRequestsPerBatch(),
             itemInfoList.size(),
             storageOptions.getBatchThreads());
@@ -1691,7 +1732,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
       Storage.Objects.Patch patch =
           initializeRequest(
-              gcs.objects()
+              storage
+                  .objects()
                   .patch(
                       bucketName, objectName, new StorageObject().setMetadata(rewrittenMetadata)),
               bucketName);
@@ -1824,7 +1866,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       throws IOException {
     logger.atFine().log("getBucket(%s)", bucketName);
     checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
-    Storage.Buckets.Get getBucket = initializeRequest(gcs.buckets().get(bucketName), bucketName);
+    Storage.Buckets.Get getBucket =
+        initializeRequest(storage.buckets().get(bucketName), bucketName);
     try {
       return getBucket.execute();
     } catch (IOException e) {
@@ -1874,7 +1917,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     String bucketName = resourceId.getBucketName();
     String objectName = resourceId.getObjectName();
     Storage.Objects.Get getObject =
-        initializeRequest(gcs.objects().get(bucketName, objectName), bucketName);
+        initializeRequest(storage.objects().get(bucketName, objectName), bucketName)
+            // Request only fields used in GoogleCloudStorageItemInfo:
+            // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
+            .setFields(GET_OBJECT_FIELDS);
     try {
       return getObject.execute();
     } catch (IOException e) {
@@ -1979,7 +2025,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             sources, input -> new ComposeRequest.SourceObjects().setName(input.getObjectName()));
     Storage.Objects.Compose compose =
         initializeRequest(
-            gcs.objects()
+            storage
+                .objects()
                 .compose(
                     destination.getBucketName(),
                     destination.getObjectName(),

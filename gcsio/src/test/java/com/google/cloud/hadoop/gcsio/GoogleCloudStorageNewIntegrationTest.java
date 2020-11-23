@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.decodeMetadata;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.batchRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.composeRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.copyRequestString;
@@ -35,11 +36,14 @@ import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.services.storage.Storage;
+import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.io.BaseEncoding;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -77,7 +81,7 @@ public class GoogleCloudStorageNewIntegrationTest {
   @Rule public TestName name = new TestName();
 
   @BeforeClass
-  public static void before() throws Throwable {
+  public static void beforeClass() throws Throwable {
     String projectId =
         checkNotNull(TestConfiguration.getInstance().getProjectId(), "projectId can not be null");
     String appName = GoogleCloudStorageIntegrationHelper.APP_NAME;
@@ -103,11 +107,6 @@ public class GoogleCloudStorageNewIntegrationTest {
   @AfterClass
   public static void afterClass() throws Throwable {
     gcsfsIHelper.afterAllTests();
-    GoogleCloudStorage gcs = gcsfsIHelper.gcs;
-    String bucketPath1 = "gs://" + gcsfsIHelper.sharedBucketName1;
-    String bucketPath2 = "gs://" + gcsfsIHelper.sharedBucketName2;
-    assertThat(gcs.getItemInfo(StorageResourceId.fromStringPath(bucketPath1)).exists()).isFalse();
-    assertThat(gcs.getItemInfo(StorageResourceId.fromStringPath(bucketPath2)).exists()).isFalse();
   }
 
   @Test
@@ -370,7 +369,6 @@ public class GoogleCloudStorageNewIntegrationTest {
     List<String> listResult = listFn.apply(gcs, testBucket, testDir);
 
     assertThat(listResult).isEmpty();
-    // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(requestFn.apply(testBucket, testDir));
   }
@@ -410,7 +408,6 @@ public class GoogleCloudStorageNewIntegrationTest {
     List<String> listResult = listFn.apply(gcs, testBucket, testDir);
 
     assertThat(listResult).isEmpty();
-    // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(requestFn.apply(testBucket, testDir));
   }
@@ -449,7 +446,6 @@ public class GoogleCloudStorageNewIntegrationTest {
     List<String> listResult = listFn.apply(gcs, testBucket, testDir);
 
     assertThat(listResult).containsExactly(testDir + "obj");
-    // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(requestFn.apply(testBucket, testDir));
   }
@@ -488,7 +484,6 @@ public class GoogleCloudStorageNewIntegrationTest {
     List<String> listResult = listFn.apply(gcs, testBucket, testDir);
 
     assertThat(listResult).containsExactly(testDir + "sub/");
-    // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(requestFn.apply(testBucket, testDir));
   }
@@ -528,7 +523,6 @@ public class GoogleCloudStorageNewIntegrationTest {
     List<String> listResult = listFn.apply(gcs, testBucket, testDir);
 
     assertThat(listResult).containsExactly(testDir + "sub/");
-    // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(requestFn.apply(testBucket, testDir));
   }
@@ -567,7 +561,6 @@ public class GoogleCloudStorageNewIntegrationTest {
     List<String> listResult = listFn.apply(gcs, testBucket, testDir);
 
     assertThat(listResult).containsExactly(testDir + "obj");
-    // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(requestFn.apply(testBucket, testDir));
   }
@@ -606,7 +599,6 @@ public class GoogleCloudStorageNewIntegrationTest {
     List<String> listResult = listFn.apply(gcs, testBucket, testDir);
 
     assertThat(listResult).containsExactly(testDir + "sub/");
-    // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(requestFn.apply(testBucket, testDir));
   }
@@ -645,7 +637,6 @@ public class GoogleCloudStorageNewIntegrationTest {
     List<String> listResult = listFn.apply(gcs, testBucket, testDir);
 
     assertThat(listResult).containsExactly(testDir + "sub/");
-    // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(requestFn.apply(testBucket, testDir));
   }
@@ -664,7 +655,6 @@ public class GoogleCloudStorageNewIntegrationTest {
             testBucket, testDir, ListObjectOptions.DEFAULT.toBuilder().setMaxResults(1).build());
 
     assertThat(getObjectNames(listedObjects)).containsExactly(testDir + "f1");
-    // Assert that only 1 GCS request was sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             listRequestString(
@@ -688,7 +678,6 @@ public class GoogleCloudStorageNewIntegrationTest {
             testBucket, testDir, ListObjectOptions.DEFAULT.toBuilder().setMaxResults(2).build());
 
     assertThat(getObjectNames(listedObjects)).containsExactly(testDir + "f1", testDir + "f2");
-    // Assert that 3 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             listRequestString(
@@ -713,7 +702,6 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     assertThat(getObjectNames(listedObjects))
         .containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");
-    // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             listRequestString(
@@ -735,7 +723,6 @@ public class GoogleCloudStorageNewIntegrationTest {
         gcs.listObjectInfo(testBucket, /* objectNamePrefix= */ null, INCLUDE_PREFIX_LIST_OPTIONS);
 
     assertThat(getObjectNames(listedObjects)).isEmpty();
-    // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             listRequestWithTrailingDelimiter(
@@ -755,7 +742,6 @@ public class GoogleCloudStorageNewIntegrationTest {
         gcs.listObjectInfo(testBucket, /* objectNamePrefix= */ null, INCLUDE_PREFIX_LIST_OPTIONS);
 
     assertThat(getObjectNames(listedObjects)).containsExactly("obj");
-    // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             listRequestWithTrailingDelimiter(
@@ -775,7 +761,6 @@ public class GoogleCloudStorageNewIntegrationTest {
         gcs.listObjectInfo(testBucket, /* objectNamePrefix= */ null, INCLUDE_PREFIX_LIST_OPTIONS);
 
     assertThat(getObjectNames(listedObjects)).containsExactly("implDir/");
-    // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             listRequestWithTrailingDelimiter(
@@ -795,7 +780,6 @@ public class GoogleCloudStorageNewIntegrationTest {
         gcs.listObjectInfo(testBucket, testDir, INCLUDE_PREFIX_LIST_OPTIONS);
 
     assertThat(getObjectNames(listedObjects)).containsExactly(testDir);
-    // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             listRequestWithTrailingDelimiter(
@@ -815,7 +799,6 @@ public class GoogleCloudStorageNewIntegrationTest {
         gcs.listObjectInfo(testBucket, testDir, INCLUDE_PREFIX_LIST_OPTIONS);
 
     assertThat(getObjectNames(listedObjects)).containsExactly(testDir, testDir + "obj");
-    // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             listRequestWithTrailingDelimiter(
@@ -835,7 +818,6 @@ public class GoogleCloudStorageNewIntegrationTest {
         gcs.listObjectInfo(testBucket, testDir, INCLUDE_PREFIX_LIST_OPTIONS);
 
     assertThat(getObjectNames(listedObjects)).containsExactly(testDir, testDir + "dir/");
-    // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             listRequestWithTrailingDelimiter(
@@ -855,7 +837,6 @@ public class GoogleCloudStorageNewIntegrationTest {
         gcs.listObjectInfo(testBucket, testDir, INCLUDE_PREFIX_LIST_OPTIONS);
 
     assertThat(getObjectNames(listedObjects)).containsExactly(testDir, testDir + "obj");
-    // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             listRequestWithTrailingDelimiter(
@@ -875,11 +856,74 @@ public class GoogleCloudStorageNewIntegrationTest {
         gcs.listObjectInfo(testBucket, testDir, INCLUDE_PREFIX_LIST_OPTIONS);
 
     assertThat(getObjectNames(listedObjects)).containsExactly(testDir, testDir + "dir/");
-    // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             listRequestWithTrailingDelimiter(
                 testBucket, testDir, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
+  public void listObjectInfo_allMetadataFieldsCorrect() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    String testDirName = name.getMethodName() + "/";
+    StorageResourceId objectId =
+        new StorageResourceId(gcsfsIHelper.sharedBucketName1, testDirName + "object");
+
+    // Create gzipped file so Content-Encoding will be not null
+    CreateObjectOptions createOptions =
+        GZIP_CREATE_OPTIONS.toBuilder()
+            .setMetadata(ImmutableMap.of("test-key", "val".getBytes(UTF_8)))
+            .build();
+
+    try (OutputStream os =
+        new GZIPOutputStream(
+            Channels.newOutputStream(gcsfsIHelper.gcs.create(objectId, createOptions)))) {
+      os.write((objectId + "-content").getBytes(UTF_8));
+    }
+
+    List<GoogleCloudStorageItemInfo> listedObjects =
+        gcs.listObjectInfo(objectId.getBucketName(), testDirName);
+
+    assertThat(getObjectNames(listedObjects)).containsExactly(objectId.getObjectName());
+    assertObjectFields(objectId, listedObjects.get(0));
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                objectId.getBucketName(),
+                testDirName,
+                /* maxResults= */ 1024,
+                /* pageToken= */ null));
+  }
+
+  @Test
+  public void getItemInfo_allMetadataFieldsCorrect() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    StorageResourceId objectId =
+        new StorageResourceId(gcsfsIHelper.sharedBucketName1, name.getMethodName());
+
+    // Create gzipped file so Content-Encoding will be not null
+    CreateObjectOptions createOptions =
+        GZIP_CREATE_OPTIONS.toBuilder()
+            .setMetadata(ImmutableMap.of("test-key", "val".getBytes(UTF_8)))
+            .build();
+
+    try (OutputStream os =
+        new GZIPOutputStream(
+            Channels.newOutputStream(gcsfsIHelper.gcs.create(objectId, createOptions)))) {
+      os.write((objectId + "-content").getBytes(UTF_8));
+    }
+
+    GoogleCloudStorageItemInfo object = gcs.getItemInfo(objectId);
+
+    assertObjectFields(objectId, object);
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(getRequestString(objectId.getBucketName(), objectId.getObjectName()));
   }
 
   @Test
@@ -895,7 +939,6 @@ public class GoogleCloudStorageNewIntegrationTest {
         gcs.getItemInfo(new StorageResourceId(testBucket, testDir + "f1"));
 
     assertThat(object.getObjectName()).isEqualTo(testDir + "f1");
-    // Assert that 1 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(getRequestString(testBucket, testDir + "f1"));
   }
@@ -919,7 +962,6 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     assertThat(getObjectNames(objects))
         .containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");
-    // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             batchRequestString(),
@@ -948,7 +990,6 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     assertThat(getObjectNames(objects))
         .containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");
-    // Assert that 3 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             getRequestString(testBucket, testDir + "f1"),
@@ -977,7 +1018,6 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     assertThat(getObjectNames(objects))
         .containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");
-    // Assert that 5 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             batchRequestString(),
@@ -1006,7 +1046,6 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(getObjectNames(updatedObjects)).containsExactly(testDir + "f1");
     assertThat(updatedObjects.get(0).getMetadata().keySet()).isEqualTo(updatedMetadata.keySet());
 
-    // Assert that 2 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(postRequestString(testBucket, testDir + "f1"));
   }
@@ -1039,7 +1078,6 @@ public class GoogleCloudStorageNewIntegrationTest {
         .containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");
     assertThat(updatedObjects.get(0).getMetadata().keySet()).isEqualTo(updatedMetadata.keySet());
 
-    // Assert that 5 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             batchRequestString(),
@@ -1126,8 +1164,8 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             batchRequestString(),
-            getRequestString(testBucket, testDir + "f1"),
-            getRequestString(testBucket, testDir + "f2"),
+            getRequestString(testBucket, testDir + "f1", /* fields= */ "generation"),
+            getRequestString(testBucket, testDir + "f2", /* fields= */ "generation"),
             batchRequestString(),
             deleteRequestString(testBucket, testDir + "f1", /* generationId= */ 1),
             deleteRequestString(testBucket, testDir + "f2", /* generationId= */ 2));
@@ -1154,9 +1192,9 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
-            getRequestString(testBucket, testDir + "f1"),
+            getRequestString(testBucket, testDir + "f1", /* fields= */ "generation"),
             deleteRequestString(testBucket, testDir + "f1", /* generationId= */ 1),
-            getRequestString(testBucket, testDir + "f2"),
+            getRequestString(testBucket, testDir + "f2", /* fields= */ "generation"),
             deleteRequestString(testBucket, testDir + "f2", /* generationId= */ 2));
 
     List<String> listedObjects = getObjectNames(gcs.listObjectInfo(testBucket, testDir));
@@ -1275,6 +1313,37 @@ public class GoogleCloudStorageNewIntegrationTest {
 
   private static String createUniqueBucket(String suffix) throws IOException {
     return gcsfsIHelper.createUniqueBucket(suffix + UUID.randomUUID().toString().substring(0, 8));
+  }
+
+  private static void assertObjectFields(
+      StorageResourceId expectedObjectId, GoogleCloudStorageItemInfo object) throws IOException {
+    Storage storage = ((GoogleCloudStorageImpl) gcsfsIHelper.gcs).storage;
+    StorageObject expectedObject =
+        storage
+            .objects()
+            .get(expectedObjectId.getBucketName(), expectedObjectId.getObjectName())
+            .execute();
+
+    // Use checkNotNull to make sure that all fields have valid values
+    assertThat(object)
+        .isEqualTo(
+            GoogleCloudStorageItemInfo.createObject(
+                checkNotNull(expectedObjectId),
+                checkNotNull(expectedObject.getTimeCreated()).getValue(),
+                checkNotNull(expectedObject.getUpdated()).getValue(),
+                checkNotNull(expectedObject.getSize()).longValue(),
+                checkNotNull(expectedObject.getContentType()),
+                checkNotNull(expectedObject.getContentEncoding()),
+                decodeMetadata(checkNotNull(expectedObject.getMetadata())),
+                checkNotNull(expectedObject.getGeneration()),
+                checkNotNull(expectedObject.getMetageneration()),
+                new VerificationAttributes(
+                    BaseEncoding.base64().decode(checkNotNull(expectedObject.getMd5Hash())),
+                    BaseEncoding.base64().decode(checkNotNull(expectedObject.getCrc32c())))));
+
+    // Verify that bucket-only fields are not set
+    assertThat(object.getLocation()).isNull();
+    assertThat(object.getStorageClass()).isNull();
   }
 
   private String createObjectsInTestDir(String bucketName, String... objects) throws Exception {
