@@ -111,14 +111,6 @@ public class GoogleCloudStorageNewIntegrationTest {
   }
 
   @Test
-  public void listObjectNames_nonExistentBucket_nullPrefix() throws Exception {
-    list_nonExistentBucket_nullPrefix(
-        GoogleCloudStorage::listObjectNames,
-        (bucket, prefix) ->
-            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
-  }
-
-  @Test
   public void listObjectInfo_nonExistentBucket_nullPrefix() throws Exception {
     list_nonExistentBucket_nullPrefix(
         (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
@@ -156,14 +148,6 @@ public class GoogleCloudStorageNewIntegrationTest {
   }
 
   @Test
-  public void listObjectNames_emptyBucket_nullPrefix() throws Exception {
-    list_emptyBucket_nullPrefix(
-        GoogleCloudStorage::listObjectNames,
-        (bucket, prefix) ->
-            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
-  }
-
-  @Test
   public void listObjectInfo_emptyBucket_nullPrefix() throws Exception {
     list_emptyBucket_nullPrefix(
         (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
@@ -198,14 +182,6 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(listResult).isEmpty();
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(requestFn.apply(testBucket, /* prefix= */ null));
-  }
-
-  @Test
-  public void listObjectNames_nonEmptyBucket_nullPrefix_object() throws Exception {
-    list_nonEmptyBucket_nullPrefix_object(
-        GoogleCloudStorage::listObjectNames,
-        (bucket, prefix) ->
-            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
   }
 
   @Test
@@ -247,14 +223,6 @@ public class GoogleCloudStorageNewIntegrationTest {
   }
 
   @Test
-  public void listObjectNames_nonEmptyBucket_nullPrefix_emptyDir() throws Exception {
-    list_nonEmptyBucket_nullPrefix_emptyDir(
-        GoogleCloudStorage::listObjectNames,
-        (bucket, prefix) ->
-            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
-  }
-
-  @Test
   public void listObjectInfo_nonEmptyBucket_nullPrefix_emptyDir() throws Exception {
     list_nonEmptyBucket_nullPrefix_emptyDir(
         (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
@@ -290,14 +258,6 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(listResult).containsExactly("dir/");
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(requestFn.apply(testBucket, /* prefix= */ null));
-  }
-
-  @Test
-  public void listObjectNames_nonEmptyBucket_nullPrefix_subDir() throws Exception {
-    list_nonEmptyBucket_nullPrefix_subDir(
-        GoogleCloudStorage::listObjectNames,
-        (bucket, prefix) ->
-            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
   }
 
   @Test
@@ -339,14 +299,6 @@ public class GoogleCloudStorageNewIntegrationTest {
   }
 
   @Test
-  public void listObjectNames_nonEmptyBucket_nullPrefix_implicitSubDir() throws Exception {
-    list_nonEmptyBucket_nullPrefix_implicitSubDir(
-        GoogleCloudStorage::listObjectNames,
-        (bucket, prefix) ->
-            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
-  }
-
-  @Test
   public void listObjectInfo_nonEmptyBucket_nullPrefix_implicitSubDir() throws Exception {
     list_nonEmptyBucket_nullPrefix_implicitSubDir(
         (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
@@ -382,14 +334,6 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(listResult).containsExactly("subdir/");
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(requestFn.apply(testBucket, /* prefix= */ null));
-  }
-
-  @Test
-  public void listObjectNames_prefix_doesNotExist() throws Exception {
-    list_prefix_doesNotExist(
-        GoogleCloudStorage::listObjectNames,
-        (bucket, prefix) ->
-            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
   }
 
   @Test
@@ -429,14 +373,6 @@ public class GoogleCloudStorageNewIntegrationTest {
     // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(requestFn.apply(testBucket, testDir));
-  }
-
-  @Test
-  public void listObjectName_prefixObject_empty() throws Exception {
-    list_prefixObject_empty(
-        GoogleCloudStorage::listObjectNames,
-        (bucket, prefix) ->
-            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
   }
 
   @Test
@@ -480,14 +416,6 @@ public class GoogleCloudStorageNewIntegrationTest {
   }
 
   @Test
-  public void listObjectName_prefixObject_withObject() throws Exception {
-    list_prefixObject_withObject(
-        GoogleCloudStorage::listObjectNames,
-        (bucket, prefix) ->
-            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
-  }
-
-  @Test
   public void listObjectInfo_prefixObject_withObject() throws Exception {
     list_prefixObject_withObject(
         (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
@@ -527,14 +455,6 @@ public class GoogleCloudStorageNewIntegrationTest {
   }
 
   @Test
-  public void listObjectName_prefixObject_withSubdir() throws Exception {
-    list_prefixObject_withSubdir(
-        GoogleCloudStorage::listObjectNames,
-        (bucket, prefix) ->
-            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
-  }
-
-  @Test
   public void listObjectInfo_prefixObject_withSubdir() throws Exception {
     list_prefixObject_withSubdir(
         (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
@@ -571,14 +491,6 @@ public class GoogleCloudStorageNewIntegrationTest {
     // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(requestFn.apply(testBucket, testDir));
-  }
-
-  @Test
-  public void listObjectName_prefixObject_withImplicitSubdir() throws Exception {
-    list_prefixObject_withImplicitSubdir(
-        GoogleCloudStorage::listObjectNames,
-        (bucket, prefix) ->
-            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
   }
 
   @Test
@@ -622,14 +534,6 @@ public class GoogleCloudStorageNewIntegrationTest {
   }
 
   @Test
-  public void listObjectName_implicitPrefix_withObject() throws Exception {
-    list_implicitPrefix_withObject(
-        GoogleCloudStorage::listObjectNames,
-        (bucket, prefix) ->
-            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
-  }
-
-  @Test
   public void listObjectInfo_implicitPrefix_withObject() throws Exception {
     list_implicitPrefix_withObject(
         (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
@@ -666,14 +570,6 @@ public class GoogleCloudStorageNewIntegrationTest {
     // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(requestFn.apply(testBucket, testDir));
-  }
-
-  @Test
-  public void listObjectName_implicitPrefix_withSubdir() throws Exception {
-    list_implicitPrefix_withSubdir(
-        GoogleCloudStorage::listObjectNames,
-        (bucket, prefix) ->
-            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
   }
 
   @Test
@@ -716,14 +612,6 @@ public class GoogleCloudStorageNewIntegrationTest {
   }
 
   @Test
-  public void listObjectName_implicitPrefix_withImplicitSubdir() throws Exception {
-    list_implicitPrefix_withImplicitSubdir(
-        GoogleCloudStorage::listObjectNames,
-        (bucket, prefix) ->
-            listRequestString(bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
-  }
-
-  @Test
   public void listObjectInfo_implicitPrefix_withImplicitSubdir() throws Exception {
     list_implicitPrefix_withImplicitSubdir(
         (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
@@ -760,77 +648,6 @@ public class GoogleCloudStorageNewIntegrationTest {
     // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(requestFn.apply(testBucket, testDir));
-  }
-
-  @Test
-  public void listObjectNames_withLimit_oneGcsRequest() throws Exception {
-    TrackingHttpRequestInitializer gcsRequestsTracker =
-        new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
-
-    String testBucket = gcsfsIHelper.sharedBucketName1;
-    String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "f3");
-
-    List<String> listedObjects =
-        gcs.listObjectNames(
-            testBucket, testDir, ListObjectOptions.DEFAULT.toBuilder().setMaxResults(1).build());
-
-    assertThat(listedObjects).containsExactly(testDir + "f1");
-    // Assert that only 1 GCS request was sent
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            listRequestString(testBucket, testDir, /* maxResults= */ 2, /* pageToken= */ null));
-  }
-
-  @Test
-  public void listObjectNames_withLimit_multipleGcsRequests() throws Exception {
-    TrackingHttpRequestInitializer gcsRequestsTracker =
-        new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    int maxResultsPerRequest = 1;
-    GoogleCloudStorageOptions options =
-        gcsOptions.toBuilder().setMaxListItemsPerCall(maxResultsPerRequest).build();
-    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(options, gcsRequestsTracker);
-
-    String testBucket = gcsfsIHelper.sharedBucketName1;
-    String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "subdir1/f3", "subdir2/f4");
-
-    List<String> listedObjects =
-        gcs.listObjectNames(
-            testBucket, testDir, ListObjectOptions.DEFAULT.toBuilder().setMaxResults(3).build());
-
-    assertThat(listedObjects).containsExactly(testDir + "f1", testDir + "f2", testDir + "subdir1/");
-    // Assert that 4 GCS requests were sent
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            listRequestString(testBucket, testDir, maxResultsPerRequest, /* pageToken= */ null),
-            listRequestString(testBucket, testDir, maxResultsPerRequest, "token_1"),
-            listRequestString(testBucket, testDir, maxResultsPerRequest, "token_2"),
-            listRequestString(testBucket, testDir, maxResultsPerRequest, "token_3"));
-  }
-
-  @Test
-  public void listObjectNames_withoutLimit() throws Exception {
-    TrackingHttpRequestInitializer gcsRequestsTracker =
-        new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    int maxResultsPerRequest = 1;
-    GoogleCloudStorageOptions options =
-        gcsOptions.toBuilder().setMaxListItemsPerCall(maxResultsPerRequest).build();
-    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(options, gcsRequestsTracker);
-
-    String testBucket = gcsfsIHelper.sharedBucketName1;
-    String testDir = createObjectsInTestDir(testBucket, "f1", "f2", "subdir/f3", "subdir/f4");
-
-    List<String> listedObjects = gcs.listObjectNames(testBucket, testDir);
-
-    assertThat(listedObjects).containsExactly(testDir + "f1", testDir + "f2", testDir + "subdir/");
-    // Assert that 5 GCS requests were sent
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            listRequestString(testBucket, testDir, maxResultsPerRequest, /* pageToken= */ null),
-            listRequestString(testBucket, testDir, maxResultsPerRequest, "token_1"),
-            listRequestString(testBucket, testDir, maxResultsPerRequest, "token_2"),
-            listRequestString(testBucket, testDir, maxResultsPerRequest, "token_3"),
-            listRequestString(testBucket, testDir, maxResultsPerRequest, "token_4"));
   }
 
   @Test
@@ -1256,7 +1073,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             copyRequestString(testBucket1, testDir + "f1", testBucket2, testDir + "f4", "copyTo"),
             copyRequestString(testBucket1, testDir + "f2", testBucket2, testDir + "f5", "copyTo"));
 
-    List<String> listedObjects = gcs.listObjectNames(testBucket2, testDir);
+    List<String> listedObjects = getObjectNames(gcs.listObjectInfo(testBucket2, testDir));
     assertThat(listedObjects).containsExactly(testDir + "f4", testDir + "f5");
   }
 
@@ -1288,7 +1105,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             copyRequestString(
                 testBucket1, testDir + "f2", testBucket2, testDir + "f5", "rewriteTo"));
 
-    List<String> listedObjects = gcs.listObjectNames(testBucket2, testDir);
+    List<String> listedObjects = getObjectNames(gcs.listObjectInfo(testBucket2, testDir));
     assertThat(listedObjects).containsExactly(testDir + "f4", testDir + "f5");
   }
 
@@ -1315,7 +1132,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             deleteRequestString(testBucket, testDir + "f1", /* generationId= */ 1),
             deleteRequestString(testBucket, testDir + "f2", /* generationId= */ 2));
 
-    List<String> listedObjects = gcs.listObjectNames(testBucket, testDir);
+    List<String> listedObjects = getObjectNames(gcs.listObjectInfo(testBucket, testDir));
     assertThat(listedObjects).containsExactly(testDir + "f3");
   }
 
@@ -1342,7 +1159,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             getRequestString(testBucket, testDir + "f2"),
             deleteRequestString(testBucket, testDir + "f2", /* generationId= */ 2));
 
-    List<String> listedObjects = gcs.listObjectNames(testBucket, testDir);
+    List<String> listedObjects = getObjectNames(gcs.listObjectInfo(testBucket, testDir));
     assertThat(listedObjects).containsExactly(testDir + "f3");
   }
 
@@ -1362,7 +1179,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             getRequestString(testBucket, testDir + "f3"),
             composeRequestString(testBucket, testDir + "f3", /* generationId= */ 1));
 
-    List<String> listedObjects = gcs.listObjectNames(testBucket, testDir);
+    List<String> listedObjects = getObjectNames(gcs.listObjectInfo(testBucket, testDir));
     assertThat(listedObjects).containsExactly(testDir + "f1", testDir + "f2", testDir + "f3");
   }
 
