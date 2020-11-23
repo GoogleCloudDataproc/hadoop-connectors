@@ -17,7 +17,6 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.createItemInfoForStorageObject;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -176,7 +175,6 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
     // Initialize metadata if available.
     GoogleCloudStorageItemInfo info = getInitialMetadata();
-
     if (info != null) {
       initMetadata(info);
     }
@@ -237,9 +235,11 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   private GoogleCloudStorageItemInfo fetchInitialMetadata() throws IOException {
     StorageObject object;
     try {
+      // Request only fields that are used for metadata initialization
+      Get getObject = createRequest().setFields("contentEncoding,generation,size");
       object =
           ResilientOperation.retry(
-              ResilientOperation.getGoogleRequestCallable(createRequest()),
+              ResilientOperation.getGoogleRequestCallable(getObject),
               readBackOff.get(),
               RetryDeterminer.SOCKET_ERRORS,
               IOException.class,
@@ -252,7 +252,17 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       Thread.currentThread().interrupt();
       throw new IOException("Thread interrupt received.", e);
     }
-    return createItemInfoForStorageObject(resourceId, object);
+    return GoogleCloudStorageItemInfo.createObject(
+        resourceId,
+        /* creationTime= */ 0,
+        /* modificationTime= */ 0,
+        checkNotNull(object.getSize(), "size can not be null for '%s'", resourceId).longValue(),
+        /* contentType= */ null,
+        object.getContentEncoding(),
+        /* metadata= */ null,
+        checkNotNull(object.getGeneration(), "generation can not be null for '%s'", resourceId),
+        /* metaGeneration= */ 0,
+        /* verificationAttributes= */ null);
   }
 
   /**
@@ -1110,12 +1120,12 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   }
 
   protected Get createRequest() throws IOException {
-    // Start with unset generation and determine what to ask for based on read consistency.
-    Get getObject = gcs.objects().get(resourceId.getBucketName(), resourceId.getObjectName());
     checkState(
         !metadataInitialized || resourceId.hasGenerationId(),
         "Generation should always be included for resource '%s'",
         resourceId);
+    // Start with unset generation and determine what to ask for based on read consistency.
+    Get getObject = gcs.objects().get(resourceId.getBucketName(), resourceId.getObjectName());
     if (resourceId.hasGenerationId()) {
       getObject.setGeneration(resourceId.getGenerationId());
     }

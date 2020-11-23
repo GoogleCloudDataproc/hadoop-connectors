@@ -142,8 +142,8 @@ public class BatchHelperTest {
     assertThat(httpRequestInitializer.getAllRequestStrings())
         .containsExactly(
             batchRequestString(),
-            getRequestString(BUCKET_NAME, objectName1),
-            getRequestString(BUCKET_NAME, objectName2));
+            getRequestString(BUCKET_NAME, objectName1, /* fields= */ null),
+            getRequestString(BUCKET_NAME, objectName2, /* fields= */ null));
 
     // 8. Reset httpRequestInitializer before validating `flush` method
     httpRequestInitializer.reset();
@@ -197,8 +197,8 @@ public class BatchHelperTest {
     assertThat(httpRequestInitializer.getAllRequestStrings())
         .containsExactly(
             batchRequestString(),
-            getRequestString(BUCKET_NAME, objectName1),
-            getRequestString(BUCKET_NAME, objectName2));
+            getRequestString(BUCKET_NAME, objectName1, /* fields= */ null),
+            getRequestString(BUCKET_NAME, objectName2, /* fields= */ null));
   }
 
   @Test
