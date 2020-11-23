@@ -505,13 +505,11 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
             "metadata-key-1",
             new byte[] {116, 101, 115, 116, 45, 109, 101, 116, 97, 100, 97, 116, 97});
     GoogleCloudStorageItemInfo expectedItemInfo =
-        new GoogleCloudStorageItemInfo(
+        GoogleCloudStorageItemInfo.createObject(
             new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
             1560485630007L,
             1560495630123L,
             /* size= */ 9,
-            /* location= */ null,
-            /* storageClass= */ null,
             CONTENT_TYPE,
             "content-encoding",
             expectedMetadata,

@@ -436,11 +436,10 @@ public class PerformanceCachingGoogleCloudStorageTest {
    * @return the generated item.
    */
   public static GoogleCloudStorageItemInfo createBucketItemInfo(String bucketName) {
-    return new GoogleCloudStorageItemInfo(
+    return GoogleCloudStorageItemInfo.createBucket(
         new StorageResourceId(bucketName),
         /* creationTime= */ 0,
         /* modificationTime= */ 0,
-        /* size= */ 0,
         CREATE_BUCKET_OPTIONS.getLocation(),
         CREATE_BUCKET_OPTIONS.getStorageClass());
   }
@@ -472,8 +471,6 @@ public class PerformanceCachingGoogleCloudStorageTest {
         .setCreationTime(0)
         .setModificationTime(0)
         .setSize(0)
-        .setLocation(null)
-        .setStorageClass(null)
         .setContentType(createObjectOptions.getContentType())
         .setContentEncoding(createObjectOptions.getContentEncoding())
         .setMetadata(createObjectOptions.getMetadata())
@@ -492,13 +489,11 @@ public class PerformanceCachingGoogleCloudStorageTest {
 
   private static GoogleCloudStorageItemInfo updateObjectItemInfo(
       GoogleCloudStorageItemInfo object, long metaGeneration) {
-    return new GoogleCloudStorageItemInfo(
+    return GoogleCloudStorageItemInfo.createObject(
         object.getResourceId(),
         object.getCreationTime(),
         object.getModificationTime(),
         object.getSize(),
-        object.getLocation(),
-        object.getStorageClass(),
         object.getContentType(),
         object.getContentEncoding(),
         object.getMetadata(),
