@@ -105,6 +105,8 @@ public class GoogleCloudStorageItemInfo {
       long metaGeneration,
       VerificationAttributes verificationAttributes) {
     checkNotNull(resourceId, "resourceId must not be null.");
+    checkArgument(!resourceId.isRoot(), "expected object or directory but got '%s'", resourceId);
+    checkArgument(!resourceId.isBucket(), "expected object or directory but got '%s'", resourceId);
     return new GoogleCloudStorageItemInfo(
         resourceId,
         creationTime,
@@ -127,6 +129,7 @@ public class GoogleCloudStorageItemInfo {
    */
   public static GoogleCloudStorageItemInfo createInferredDirectory(StorageResourceId resourceId) {
     checkNotNull(resourceId, "resourceId must not be null");
+    checkArgument(resourceId.isDirectory(), "expected directory but got '%s'", resourceId);
     return new GoogleCloudStorageItemInfo(
         resourceId,
         /* creationTime= */ 0,
