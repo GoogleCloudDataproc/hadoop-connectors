@@ -191,11 +191,10 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   protected void validateListFileInfo(
       String bucketName,
       String objectNamePrefix,
-      boolean pathExpectedToExist,
+      boolean expectedToExist,
       String... expectedListedNames)
       throws IOException {
-    boolean childPathsExpectedToExist =
-        pathExpectedToExist && (expectedListedNames != null);
+    boolean childPathsExpectedToExist = expectedToExist && (expectedListedNames != null);
     boolean listRoot = bucketName == null;
 
     // Prepare list of expected paths.
@@ -231,18 +230,18 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     } catch (FileNotFoundException fnfe) {
       fileStatus = null;
       assertWithMessage("Hadoop path %s expected to exist", hadoopPath)
-          .that(pathExpectedToExist)
+          .that(expectedToExist)
           .isFalse();
     }
 
     if (!ghfsFileSystemDescriptor.getScheme().equals("file")) {
       assertWithMessage("Hadoop path %s", hadoopPath)
           .that(fileStatus != null)
-          .isEqualTo(pathExpectedToExist);
+          .isEqualTo(expectedToExist);
     } else {
       // LocalFileSystem -> ChecksumFileSystem will return an empty array instead of null for
       // nonexistent paths.
-      if (!pathExpectedToExist && fileStatus != null) {
+      if (!expectedToExist && fileStatus != null) {
         assertThat(fileStatus).isEmpty();
       }
     }

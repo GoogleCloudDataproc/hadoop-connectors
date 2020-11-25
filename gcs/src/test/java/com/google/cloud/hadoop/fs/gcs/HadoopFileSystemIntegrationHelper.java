@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
+import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -27,7 +28,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelp
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.UriPaths;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
-import com.google.common.base.Strings;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
@@ -378,25 +378,19 @@ public class HadoopFileSystemIntegrationHelper
    * <p>when the bucket-rooted FileSystem creates actual data in the underlying GcsFs.
    */
   protected Path castAsHadoopPath(URI gcsPath) {
+    String authority = gcsPath.getAuthority();
     String childPath = gcsPath.getRawPath();
     if (childPath != null && childPath.startsWith("/")) {
       childPath = childPath.substring(1);
     }
-    String authority = gcsPath.getAuthority();
-    if (Strings.isNullOrEmpty(authority)) {
-      if (Strings.isNullOrEmpty(childPath)) {
-        return ghfsFileSystemDescriptor.getFileSystemRoot();
-      } else {
-        return new Path(ghfsFileSystemDescriptor.getFileSystemRoot(), childPath);
-      }
-    } else {
-      if (Strings.isNullOrEmpty(childPath)) {
-        return new Path(ghfsFileSystemDescriptor.getFileSystemRoot(), authority);
-      } else {
-        return new Path(ghfsFileSystemDescriptor.getFileSystemRoot(), new Path(
-            authority, childPath));
-      }
+    if (isNullOrEmpty(childPath)) {
+      return isNullOrEmpty(authority)
+          ? ghfsFileSystemDescriptor.getFileSystemRoot()
+          : new Path(ghfsFileSystemDescriptor.getFileSystemRoot(), authority);
     }
+    return isNullOrEmpty(authority)
+        ? new Path(ghfsFileSystemDescriptor.getFileSystemRoot(), childPath)
+        : new Path(ghfsFileSystemDescriptor.getFileSystemRoot(), new Path(authority, childPath));
   }
 
   /**

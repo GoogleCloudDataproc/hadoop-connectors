@@ -246,12 +246,11 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   protected void validateListFileInfo(
       String bucketName,
       String objectNamePrefix,
-      boolean pathExpectedToExist,
+      boolean expectedToExist,
       String... expectedListedNames)
       throws IOException {
 
-    boolean childPathsExpectedToExist =
-        pathExpectedToExist && (expectedListedNames != null);
+    boolean childPathsExpectedToExist = expectedToExist && (expectedListedNames != null);
     boolean listRoot = bucketName == null;
 
     // Prepare list of expected paths.
@@ -280,7 +279,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     // Get list of actual paths.
     URI path = gcsiHelper.getPath(bucketName, objectNamePrefix);
     List<FileInfo> fileInfos;
-    if (pathExpectedToExist) {
+    if (expectedToExist) {
       fileInfos = gcsfs.listFileInfo(path);
     } else {
       assertThrows(FileNotFoundException.class, () -> gcsfs.listFileInfo(path));
@@ -388,7 +387,6 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
    */
   @Test
   public void testGetAndListFileInfo() throws Exception {
-
     // Objects created for this test.
     String[] objectNames = {
         "o1",
@@ -407,8 +405,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // -------------------------------------------------------
     // Create test objects.
-    String tempTestBucket = gcsiHelper.createUniqueBucket("list");
-    gcsiHelper.createObjectsWithSubdirs(tempTestBucket, objectNames);
+    String testBucket = gcsiHelper.createUniqueBucket("list");
+    gcsiHelper.createObjectsWithSubdirs(testBucket, objectNames);
 
     // -------------------------------------------------------
     // Tests for getItemInfo().
@@ -416,17 +414,17 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // Verify that getItemInfo() returns correct info for each object.
     for (String objectName : objectNames) {
-      validateGetFileInfo(tempTestBucket, objectName, true);
+      validateGetFileInfo(testBucket, objectName, /* expectedToExist= */ true);
     }
 
     // Verify that getItemInfo() returns correct info for bucket.
-    validateGetFileInfo(tempTestBucket, null, true);
+    validateGetFileInfo(testBucket, null, /* expectedToExist= */ true);
 
     // Verify that getItemInfo() returns correct info for a non-existent object.
-    validateGetFileInfo(tempTestBucket, dirDoesNotExist, false);
+    validateGetFileInfo(testBucket, dirDoesNotExist, /* expectedToExist= */ false);
 
     // Verify that getItemInfo() returns correct info for a non-existent bucket.
-    validateGetFileInfo(tempTestBucket, objDoesNotExist, false);
+    validateGetFileInfo(testBucket, objDoesNotExist, /* expectedToExist= */ false);
 
     // -------------------------------------------------------
     // Tests for listFileInfo().
@@ -435,48 +433,61 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     // Verify that listFileInfo() returns correct result for each case below.
 
     // At root.
-    validateListFileInfo(tempTestBucket, null, true, "o1", "o2", "d0/", "d1/", "d2/");
-    validateListFileInfo(tempTestBucket, "", true, "o1", "o2", "d0/", "d1/", "d2/");
+    validateListFileInfo(
+        testBucket, null, /* expectedToExist= */ true, "o1", "o2", "d0/", "d1/", "d2/");
+    validateListFileInfo(
+        testBucket, "", /* expectedToExist= */ true, "o1", "o2", "d0/", "d1/", "d2/");
 
     // At d0.
-    validateListFileInfo(tempTestBucket, "d0/", true);
+    validateListFileInfo(testBucket, "d0/", /* expectedToExist= */ true);
+    validateListFileInfo(testBucket, "d0", /* expectedToExist= */ true);
 
     // At o1.
-    validateListFileInfo(tempTestBucket, "o1", true, "o1");
-
-    // TODO(user) : bug in GCS? fails only when running gcsfs tests?
-    // validateListFileInfo(bucketName, "d0", true, "d0/");
+    validateListFileInfo(testBucket, "o1", /* expectedToExist= */ true, "o1");
+    if (getClass().equals(GoogleCloudStorageFileSystemIntegrationTest.class)
+        || getClass().equals(GoogleCloudStorageFileSystemTest.class)) {
+      validateListFileInfo(testBucket, "o1/", /* expectedToExist= */ false);
+    } else {
+      validateListFileInfo(testBucket, "o1/", /* expectedToExist= */ true, "o1");
+    }
 
     // At d1.
-    validateListFileInfo(tempTestBucket, "d1/", true, "d1/o11", "d1/o12", "d1/d10/", "d1/d11/");
+    validateListFileInfo(
+        testBucket, "d1/", /* expectedToExist= */ true, "d1/o11", "d1/o12", "d1/d10/", "d1/d11/");
+    validateListFileInfo(
+        testBucket, "d1", /* expectedToExist= */ true, "d1/o11", "d1/o12", "d1/d10/", "d1/d11/");
 
-    // TODO(user) : bug in GCS? fails only when running gcsfs tests?
-    // validateListFileInfo(bucketName, "d1", true, "d1/");
+    // At d1/o12.
+    validateListFileInfo(testBucket, "d1/o12", /* expectedToExist= */ true, "d1/o12");
+    if (getClass().equals(GoogleCloudStorageFileSystemIntegrationTest.class)
+        || getClass().equals(GoogleCloudStorageFileSystemTest.class)) {
+      validateListFileInfo(testBucket, "d1/o12/", /* expectedToExist= */ false);
+    } else {
+      validateListFileInfo(testBucket, "d1/o12/", /* expectedToExist= */ true, "d1/o12");
+    }
 
     // At d1/d11.
-    validateListFileInfo(tempTestBucket, "d1/d11/", true, "d1/d11/o111");
-
-    // TODO(user) : bug in GCS? fails only when running gcsfs tests?
-    // validateListFileInfo(bucketName, "d1/d11", true, "d1/d11/");
+    validateListFileInfo(testBucket, "d1/d11/", /* expectedToExist= */ true, "d1/d11/o111");
+    validateListFileInfo(testBucket, "d1/d11", /* expectedToExist= */ true, "d1/d11/o111");
 
     // At d2.
-    validateListFileInfo(tempTestBucket, "d2/", true, "d2/o21", "d2/o22");
-
-    // TODO(user) : bug in GCS? fails only when running gcsfs tests?
-    // validateListFileInfo(bucketName, "d2", true, "d2/");
+    validateListFileInfo(testBucket, "d2/", /* expectedToExist= */ true, "d2/o21", "d2/o22");
+    validateListFileInfo(testBucket, "d2", /* expectedToExist= */ true, "d2/o21", "d2/o22");
 
     // At non-existent path.
-    validateListFileInfo(tempTestBucket, dirDoesNotExist, false);
-    validateListFileInfo(tempTestBucket, objDoesNotExist, false);
-    validateListFileInfo("gcsio-test-bucket-" + objDoesNotExist, objDoesNotExist, false);
+    validateListFileInfo(testBucket, dirDoesNotExist, /* expectedToExist= */ false);
+    validateListFileInfo(testBucket, objDoesNotExist, /* expectedToExist= */ false);
+    validateListFileInfo(
+        "gcsio-test-bucket-" + objDoesNotExist, objDoesNotExist, /* expectedToExist= */ false);
 
-    validateListFileInfo(null, null, true, sharedBucketName1, sharedBucketName2, tempTestBucket);
+    validateListFileInfo(
+        null, null, /* expectedToExist= */ true, sharedBucketName1, sharedBucketName2, testBucket);
   }
 
   @Test @SuppressWarnings("EqualsIncompatibleType")
   public void testGoogleCloudStorageItemInfoNegativeEquality() {
     // Assert that .equals with an incorrect type returns false and does not throw.
-    assertThat(!GoogleCloudStorageItemInfo.ROOT_INFO.equals("non-item-info")).isTrue();
+    assertThat(GoogleCloudStorageItemInfo.ROOT_INFO.equals("non-item-info")).isFalse();
   }
 
   /**
