@@ -18,8 +18,6 @@ import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHe
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.writeObject;
 import static com.google.common.truth.Truth.assertThat;
 
-import com.google.api.client.auth.oauth2.Credential;
-import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
@@ -72,10 +70,7 @@ public class CsekEncryptionIntegrationTest {
     gcs.createBucket(srcBucketName);
 
     String dstBucketName = BUCKET_HELPER.getUniqueBucketName("rewrite-dst");
-    // Create destination bucket with different location and storage class,
-    // because this is supported by rewrite but not copy requests
-    gcs.createBucket(
-        dstBucketName, CreateBucketOptions.builder().setStorageClass("coldline").build());
+    gcs.createBucket(dstBucketName);
 
     StorageResourceId srcResourceId = new StorageResourceId(srcBucketName, "encryptedObject");
     int partitionsCount = 32;
@@ -92,8 +87,7 @@ public class CsekEncryptionIntegrationTest {
 
   private static GoogleCloudStorageImpl makeStorage(GoogleCloudStorageOptions options)
       throws IOException {
-    Credential credential = GoogleCloudStorageTestHelper.getCredential();
-    return new GoogleCloudStorageImpl(options, credential);
+    return new GoogleCloudStorageImpl(options, GoogleCloudStorageTestHelper.getCredential());
   }
 
   private static GoogleCloudStorageOptions.Builder getCsekStorageOptions() {
