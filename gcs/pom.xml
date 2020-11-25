@@ -68,7 +68,6 @@
             <configuration>
               <excludes>
                 <exclude>**/HadoopFileSystemIntegrationTest.java</exclude>
-                <exclude>**/LocalFileSystemIntegrationTest.java</exclude>
                 <exclude>**/WebHdfsIntegrationTest.java</exclude>
               </excludes>
               <includes>
