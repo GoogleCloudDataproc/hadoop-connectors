@@ -161,7 +161,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     @Override
     public boolean handleResponse(HttpRequest request, HttpResponse response, boolean supportsRetry)
         throws IOException {
-      if (credential.handleResponse(request, response, supportsRetry)) {
+      if (credential != null && credential.handleResponse(request, response, supportsRetry)) {
         // If credential decides it can handle it, the return code or message indicated something
         // specific to authentication, and no backoff is desired.
         return true;
@@ -215,7 +215,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
    * @param options An options that configure {@link RetryHttpInitializer} instance behaviour.
    */
   public RetryHttpInitializer(Credential credential, RetryHttpInitializerOptions options) {
-    this.credential = checkNotNull(credential, "A valid Credential is required");
+    this.credential = credential;
     this.options = options;
     this.sleeperOverride = null;
   }

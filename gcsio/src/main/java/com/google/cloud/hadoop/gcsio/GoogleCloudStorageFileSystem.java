@@ -144,8 +144,6 @@ public class GoogleCloudStorageFileSystem {
       Credential credential, GoogleCloudStorageFileSystemOptions options) throws IOException {
     logger.atFine().log("GoogleCloudStorageFileSystem(options: %s)", options);
 
-    checkNotNull(credential, "credential must not be null");
-
     this.options = checkNotNull(options, "options must not be null");
     this.options.throwIfNotValid();
 
