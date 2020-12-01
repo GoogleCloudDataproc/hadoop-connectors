@@ -889,7 +889,7 @@ public class GoogleCloudStorageFileSystem {
         gcs.listObjectInfo(
             prefixId.getBucketName(),
             prefixId.getObjectName(),
-            updateListFileOptions(listOptions, ListObjectOptions.DEFAULT_FLAT_LIST));
+            updateListObjectOptions(ListObjectOptions.DEFAULT_FLAT_LIST, listOptions));
     List<FileInfo> fileInfos = FileInfo.fromItemInfos(itemInfos);
     fileInfos.sort(FILE_INFO_PATH_COMPARATOR);
     return fileInfos;
@@ -923,7 +923,7 @@ public class GoogleCloudStorageFileSystem {
         gcs.listObjectInfoPage(
             prefixId.getBucketName(),
             prefixId.getObjectName(),
-            updateListFileOptions(listOptions, ListObjectOptions.DEFAULT_FLAT_LIST),
+            updateListObjectOptions(ListObjectOptions.DEFAULT_FLAT_LIST, listOptions),
             pageToken);
     List<FileInfo> fileInfosPage = FileInfo.fromItemInfos(itemInfosPage.getItems());
     fileInfosPage.sort(FILE_INFO_PATH_COMPARATOR);
@@ -940,6 +940,14 @@ public class GoogleCloudStorageFileSystem {
     return prefixId;
   }
 
+  /**
+   * If the given path points to a directory then the information about its children is returned,
+   * otherwise information about the given file is returned.
+   *
+   * @param path Given path.
+   * @return Information about a file or children of a directory.
+   * @throws FileNotFoundException if the given path does not exist.
+   */
   public List<FileInfo> listFileInfo(URI path) throws IOException {
     return listFileInfo(path, ListFileOptions.DEFAULT);
   }
@@ -977,7 +985,7 @@ public class GoogleCloudStorageFileSystem {
             : gcs.listObjectInfo(
                 dirId.getBucketName(),
                 dirId.getObjectName(),
-                updateListFileOptions(listOptions, LIST_FILE_INFO_LIST_OPTIONS));
+                updateListObjectOptions(LIST_FILE_INFO_LIST_OPTIONS, listOptions));
     if (pathId.isStorageObject() && dirItemInfos.isEmpty()) {
       throw new FileNotFoundException("Item not found: " + path);
     }
@@ -1222,8 +1230,8 @@ public class GoogleCloudStorageFileSystem {
     return index < 0 ? objectName : objectName.substring(index + 1);
   }
 
-  private static ListObjectOptions updateListFileOptions(
-      ListFileOptions listFileOptions, ListObjectOptions listObjectOptions) {
+  private static ListObjectOptions updateListObjectOptions(
+      ListObjectOptions listObjectOptions, ListFileOptions listFileOptions) {
     return listObjectOptions.toBuilder().setFields(listFileOptions.getFields()).build();
   }
 

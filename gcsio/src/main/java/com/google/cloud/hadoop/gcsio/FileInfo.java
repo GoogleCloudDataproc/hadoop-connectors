@@ -16,12 +16,12 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import com.google.common.base.Objects;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Contains information about a file or a directory.
@@ -154,12 +154,12 @@ public class FileInfo {
       return false;
     }
     FileInfo fileInfo = (FileInfo) o;
-    return Objects.equal(path, fileInfo.path) && Objects.equal(itemInfo, fileInfo.itemInfo);
+    return Objects.equals(path, fileInfo.path) && Objects.equals(itemInfo, fileInfo.itemInfo);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(path, itemInfo);
+    return Objects.hash(path, itemInfo);
   }
 
   /**
