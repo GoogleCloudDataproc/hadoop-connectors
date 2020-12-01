@@ -331,8 +331,8 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
           .isTrue();
     } else {
       assertWithMessage("Expected to have requested ID: %s", path)
-          .that(gcsfs.getFileInfo(path).getItemInfo().getResourceId())
-          .isEqualTo(StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true));
+          .that(gcsfs.getFileInfo(path).getPath())
+          .isEqualTo(path);
     }
   }
 

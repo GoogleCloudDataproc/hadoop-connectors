@@ -124,7 +124,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           .build();
 
   // Object field that are used in GoogleCloudStorageItemInfo
-  private static final String GET_OBJECT_FIELDS =
+  static final String OBJECT_FIELDS =
       String.join(
           /* delimiter= */ ",",
           "bucket",
@@ -140,8 +140,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           "crc32c",
           "metadata");
 
-  private static final String LIST_OBJECT_FIELDS =
-      String.format("items(%s),prefixes,nextPageToken", GET_OBJECT_FIELDS);
+  private static final String LIST_OBJECT_FIELDS_FORMAT = "items(%s),prefixes,nextPageToken";
 
   // A function to encode metadata map values
   static String encodeMetadataValues(byte[] bytes) {
@@ -1252,6 +1251,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         createListRequest(
             bucketName,
             objectNamePrefix,
+            listOptions.getFields(),
             listOptions.getDelimiter(),
             includeTrailingDelimiter,
             maxResults);
@@ -1361,6 +1361,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private Storage.Objects.List createListRequest(
       String bucketName,
       String objectNamePrefix,
+      String objectFields,
       String delimiter,
       boolean includeTrailingDelimiter,
       long maxResults)
@@ -1392,7 +1393,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     // Request only fields used in GoogleCloudStorageItemInfo:
     // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
-    listObject.setFields(LIST_OBJECT_FIELDS);
+    if (!isNullOrEmpty(objectFields)) {
+      listObject.setFields(String.format(LIST_OBJECT_FIELDS_FORMAT, objectFields));
+    }
 
     return listObject;
   }
@@ -1445,6 +1448,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         createListRequest(
             bucketName,
             objectNamePrefix,
+            listOptions.getFields(),
             listOptions.getDelimiter(),
             /* includeTrailingDelimiter= */ true,
             listOptions.getMaxResults());
@@ -1572,14 +1576,14 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     return GoogleCloudStorageItemInfo.createObject(
         resourceId,
-        object.getTimeCreated().getValue(),
-        object.getUpdated().getValue(),
-        object.getSize().longValue(),
+        object.getTimeCreated() == null ? 0 : object.getTimeCreated().getValue(),
+        object.getUpdated() == null ? 0 : object.getUpdated().getValue(),
+        object.getSize() == null ? 0 : object.getSize().longValue(),
         object.getContentType(),
         object.getContentEncoding(),
         decodedMetadata,
-        object.getGeneration(),
-        object.getMetageneration(),
+        object.getGeneration() == null ? 0 : object.getGeneration(),
+        object.getMetageneration() == null ? 0 : object.getMetageneration(),
         new VerificationAttributes(md5Hash, crc32c));
   }
 
@@ -1663,7 +1667,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             initializeRequest(storage.objects().get(bucketName, objectName), bucketName)
                 // Request only fields used in GoogleCloudStorageItemInfo:
                 // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
-                .setFields(GET_OBJECT_FIELDS),
+                .setFields(OBJECT_FIELDS),
             new JsonBatchCallback<StorageObject>() {
               @Override
               public void onSuccess(StorageObject obj, HttpHeaders responseHeaders) {
@@ -1939,7 +1943,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         initializeRequest(storage.objects().get(bucketName, objectName), bucketName)
             // Request only fields used in GoogleCloudStorageItemInfo:
             // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
-            .setFields(GET_OBJECT_FIELDS);
+            .setFields(OBJECT_FIELDS);
     try {
       return getObject.execute();
     } catch (IOException e) {

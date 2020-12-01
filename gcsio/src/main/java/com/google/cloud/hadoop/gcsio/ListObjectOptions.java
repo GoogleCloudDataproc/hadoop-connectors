@@ -16,6 +16,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.MAX_RESULTS_UNLIMITED;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.OBJECT_FIELDS;
 
 import com.google.auto.value.AutoValue;
 import javax.annotation.Nullable;
@@ -34,7 +35,8 @@ public abstract class ListObjectOptions {
     return new AutoValue_ListObjectOptions.Builder()
         .setDelimiter(PATH_DELIMITER)
         .setIncludePrefix(false)
-        .setMaxResults(MAX_RESULTS_UNLIMITED);
+        .setMaxResults(MAX_RESULTS_UNLIMITED)
+        .setFields(OBJECT_FIELDS);
   }
 
   public abstract Builder toBuilder();
@@ -49,6 +51,16 @@ public abstract class ListObjectOptions {
   /** Maximum number of results to return, unlimited if negative or zero. */
   public abstract long getMaxResults();
 
+  /**
+   * Comma separated list of object fields to include in the list response.
+   *
+   * <p>See <a
+   * href="https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations">
+   * object resource</a> for reference.
+   */
+  @Nullable
+  public abstract String getFields();
+
   /** Builder for {@link ListObjectOptions} */
   @AutoValue.Builder
   public abstract static class Builder {
@@ -57,6 +69,8 @@ public abstract class ListObjectOptions {
     public abstract Builder setIncludePrefix(boolean includePrefix);
 
     public abstract Builder setMaxResults(long maxResults);
+
+    public abstract Builder setFields(String fields);
 
     public abstract ListObjectOptions build();
   }

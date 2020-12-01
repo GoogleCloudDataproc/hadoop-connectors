@@ -16,7 +16,6 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Date;
@@ -43,9 +42,6 @@ public class FileInfo {
   // Information about the underlying GCS item.
   private final GoogleCloudStorageItemInfo itemInfo;
 
-  // Custom file attributes, including those used for storing custom modification times, etc
-  private final Map<String, byte[]> attributes;
-
   /**
    * Constructs an instance of FileInfo.
    *
@@ -56,9 +52,6 @@ public class FileInfo {
 
     // Construct the path once.
     this.path = path;
-    Preconditions.checkArgument(itemInfo.getMetadata() != null);
-
-    this.attributes = itemInfo.getMetadata();
   }
 
   /**
@@ -86,7 +79,7 @@ public class FileInfo {
   /**
    * Gets creation time of this item.
    *
-   * Time is expressed as milliseconds since January 1, 1970 UTC.
+   * <p>Time is expressed as milliseconds since January 1, 1970 UTC.
    */
   public long getCreationTime() {
     return itemInfo.getCreationTime();
@@ -95,19 +88,18 @@ public class FileInfo {
   /**
    * Gets the size of this file or directory.
    *
-   * For files, size is in number of bytes.
-   * For directories size is 0.
-   * For items that do not exist, size is -1.
+   * <p>For files, size is in number of bytes. For directories size is 0. For items that do not
+   * exist, size is -1.
    */
   public long getSize() {
     return itemInfo.getSize();
   }
 
   /**
-   * Gets the modification time of this file if one is set, otherwise the value of
-   * {@link #getCreationTime()} is returned.
+   * Gets the modification time of this file if one is set, otherwise the value of {@link
+   * #getCreationTime()} is returned.
    *
-   * Time is expressed as milliseconds since January 1, 1970 UTC.
+   * <p>Time is expressed as milliseconds since January 1, 1970 UTC.
    */
   public long getModificationTime() {
     return itemInfo.getModificationTime();
@@ -118,7 +110,7 @@ public class FileInfo {
    * @return A map of file attributes
    */
   public Map<String, byte[]> getAttributes() {
-    return attributes;
+    return itemInfo.getMetadata();
   }
 
   /**
@@ -126,6 +118,18 @@ public class FileInfo {
    */
   public boolean exists() {
     return itemInfo.exists();
+  }
+
+  /** Returns CRC32C checksum of the file or {@code null}. */
+  public byte[] getCrc32cChecksum() {
+    VerificationAttributes verificationAttributes = itemInfo.getVerificationAttributes();
+    return verificationAttributes == null ? null : verificationAttributes.getCrc32c();
+  }
+
+  /** Returns MD5 checksum of the file or {@code null}. */
+  public byte[] getMd5Checksum() {
+    VerificationAttributes verificationAttributes = itemInfo.getVerificationAttributes();
+    return verificationAttributes == null ? null : verificationAttributes.getMd5hash();
   }
 
   /**

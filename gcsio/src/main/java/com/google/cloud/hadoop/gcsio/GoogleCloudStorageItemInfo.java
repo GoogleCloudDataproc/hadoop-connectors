@@ -68,7 +68,6 @@ public class GoogleCloudStorageItemInfo {
       long modificationTime,
       String location,
       String storageClass) {
-    checkNotNull(resourceId, "resourceId must not be null.");
     checkArgument(resourceId.isBucket(), "expected bucket but got '%s'", resourceId);
     return new GoogleCloudStorageItemInfo(
         resourceId,
@@ -104,7 +103,6 @@ public class GoogleCloudStorageItemInfo {
       long contentGeneration,
       long metaGeneration,
       VerificationAttributes verificationAttributes) {
-    checkNotNull(resourceId, "resourceId must not be null.");
     checkArgument(!resourceId.isRoot(), "expected object or directory but got '%s'", resourceId);
     checkArgument(!resourceId.isBucket(), "expected object or directory but got '%s'", resourceId);
     return new GoogleCloudStorageItemInfo(
@@ -128,7 +126,6 @@ public class GoogleCloudStorageItemInfo {
    * @param resourceId Resource ID that identifies an inferred directory
    */
   public static GoogleCloudStorageItemInfo createInferredDirectory(StorageResourceId resourceId) {
-    checkNotNull(resourceId, "resourceId must not be null");
     return new GoogleCloudStorageItemInfo(
         resourceId,
         /* creationTime= */ 0,
@@ -150,7 +147,6 @@ public class GoogleCloudStorageItemInfo {
    * @param resourceId Resource ID that identifies an inferred directory
    */
   public static GoogleCloudStorageItemInfo createNotFound(StorageResourceId resourceId) {
-    checkNotNull(resourceId, "resourceId must not be null.");
     return new GoogleCloudStorageItemInfo(
         resourceId,
         /* creationTime= */ 0,
@@ -214,8 +210,7 @@ public class GoogleCloudStorageItemInfo {
       long contentGeneration,
       long metaGeneration,
       VerificationAttributes verificationAttributes) {
-    checkNotNull(resourceId, "resourceId must not be null.");
-    this.resourceId = resourceId;
+    this.resourceId = checkNotNull(resourceId, "resourceId must not be null.");
     this.creationTime = creationTime;
     this.modificationTime = modificationTime;
     this.size = size;
@@ -229,16 +224,12 @@ public class GoogleCloudStorageItemInfo {
     this.verificationAttributes = verificationAttributes;
   }
 
-  /**
-   * Gets bucket name of this item.
-   */
+  /** Gets bucket name of this item. */
   public String getBucketName() {
     return resourceId.getBucketName();
   }
 
-  /**
-   * Gets object name of this item.
-   */
+  /** Gets object name of this item. */
   public String getObjectName() {
     return resourceId.getObjectName();
   }
@@ -253,7 +244,7 @@ public class GoogleCloudStorageItemInfo {
   /**
    * Gets creation time of this item.
    *
-   * Time is expressed as milliseconds since January 1, 1970 UTC.
+   * <p>Time is expressed as milliseconds since January 1, 1970 UTC.
    */
   public long getCreationTime() {
     return creationTime;
@@ -268,10 +259,7 @@ public class GoogleCloudStorageItemInfo {
     return modificationTime;
   }
 
-  /**
-   * Gets size of this item (number of bytes). Returns -1 if the object
-   * does not exist.
-   */
+  /** Gets size of this item (number of bytes). Returns -1 if the object does not exist. */
   public long getSize() {
     return size;
   }
@@ -279,7 +267,7 @@ public class GoogleCloudStorageItemInfo {
   /**
    * Gets location of this item.
    *
-   * Note: Location is only supported for buckets. The value is always null for objects.
+   * <p>Note: Location is only supported for buckets. The value is always null for objects.
    */
   public String getLocation() {
     return location;
@@ -288,7 +276,7 @@ public class GoogleCloudStorageItemInfo {
   /**
    * Gets storage class of this item.
    *
-   * Note: Storage-class is only supported for buckets. The value is always null for objects.
+   * <p>Note: Storage-class is only supported for buckets. The value is always null for objects.
    */
   public String getStorageClass() {
     return storageClass;
@@ -315,7 +303,7 @@ public class GoogleCloudStorageItemInfo {
   /**
    * Gets user-supplied metadata for this item.
    *
-   * Note: metadata is only supported for objects. This value is always an empty map for buckets.
+   * <p>Note: metadata is only supported for objects. This value is always an empty map for buckets.
    */
   public Map<String, byte[]> getMetadata() {
     return metadata;
@@ -328,9 +316,7 @@ public class GoogleCloudStorageItemInfo {
     return resourceId.isBucket();
   }
 
-  /**
-   * Indicates whether this item refers to the GCS root (gs://).
-   */
+  /** Indicates whether this item refers to the GCS root (gs://). */
   public boolean isRoot() {
     return resourceId.isRoot();
   }
@@ -348,32 +334,24 @@ public class GoogleCloudStorageItemInfo {
     return isGlobalRoot() || isBucket() || resourceId.isDirectory();
   }
 
-  /**
-   * Indicates whether this item exists.
-   */
-  public boolean exists() {
-    return size >= 0;
-  }
-
-  /**
-   * Get the content generation of the object.
-   */
+  /** Get the content generation of the object. */
   public long getContentGeneration() {
     return contentGeneration;
   }
 
-  /**
-   * Get the meta generation of the object.
-   */
+  /** Get the meta generation of the object. */
   public long getMetaGeneration() {
     return metaGeneration;
   }
 
-  /**
-   * Get object validation attributes.
-   */
+  /** Get object validation attributes. */
   public VerificationAttributes getVerificationAttributes() {
     return verificationAttributes;
+  }
+
+  /** Indicates whether this item exists. */
+  public boolean exists() {
+    return size >= 0;
   }
 
   /**
@@ -405,9 +383,7 @@ public class GoogleCloudStorageItemInfo {
     return true;
   }
 
-  /**
-   * Gets string representation of this instance.
-   */
+  /** Gets string representation of this instance. */
   @Override
   public String toString() {
     return exists()
@@ -421,6 +397,7 @@ public class GoogleCloudStorageItemInfo {
       GoogleCloudStorageItemInfo other = (GoogleCloudStorageItemInfo) obj;
       return resourceId.equals(other.resourceId)
           && creationTime == other.creationTime
+          && modificationTime == other.modificationTime
           && size == other.size
           && Objects.equals(location, other.location)
           && Objects.equals(storageClass, other.storageClass)
@@ -438,6 +415,7 @@ public class GoogleCloudStorageItemInfo {
     int result = 1;
     result = prime * result + resourceId.hashCode();
     result = prime * result + (int) creationTime;
+    result = prime * result + (int) modificationTime;
     result = prime * result + (int) size;
     result = prime * result + Objects.hashCode(location);
     result = prime * result + Objects.hashCode(storageClass);
