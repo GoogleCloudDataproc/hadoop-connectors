@@ -96,6 +96,9 @@ public class GoogleCloudStorageFileSystem {
   private static final ListObjectOptions LIST_FILE_INFO_LIST_OPTIONS =
       ListObjectOptions.DEFAULT.toBuilder().setIncludePrefix(true).build();
 
+  public static final ListFileOptions DELETE_RENAME_LIST_OPTIONS =
+      ListFileOptions.DEFAULT.toBuilder().setFields("bucket,name,generation").build();
+
   // GCS access instance.
   private GoogleCloudStorage gcs;
 
@@ -339,8 +342,8 @@ public class GoogleCloudStorageFileSystem {
     if (fileInfo.isDirectory()) {
       itemsToDelete =
           recursive
-              ? listAllFileInfoForPrefix(fileInfo.getPath())
-              : listFileInfo(fileInfo.getPath());
+              ? listFileInfoForPrefix(fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS)
+              : listFileInfo(fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS);
       if (!itemsToDelete.isEmpty() && !recursive) {
         throw new DirectoryNotEmptyException("Cannot delete a non-empty directory.");
       }
@@ -733,7 +736,7 @@ public class GoogleCloudStorageFileSystem {
 
     // List of individual paths to rename;
     // we will try to carry out the copies in this list's order.
-    List<FileInfo> srcItemInfos = listAllFileInfoForPrefix(src);
+    List<FileInfo> srcItemInfos = listFileInfoForPrefix(src, DELETE_RENAME_LIST_OPTIONS);
 
     // Create a list of sub-items to copy.
     Pattern markerFilePattern = options.getMarkerFilePattern();
@@ -866,28 +869,53 @@ public class GoogleCloudStorageFileSystem {
    *
    * @param prefix the prefix to use to list all matching objects.
    */
-  public List<FileInfo> listAllFileInfoForPrefix(URI prefix) throws IOException {
-    logger.atFiner().log("listAllFileInfoForPrefixPage(prefix: %s)", prefix);
+  public List<FileInfo> listFileInfoForPrefix(URI prefix) throws IOException {
+    return listFileInfoForPrefix(prefix, ListFileOptions.DEFAULT);
+  }
+
+  /**
+   * Equivalent to a recursive listing of {@code prefix}, except that {@code prefix} doesn't have to
+   * represent an actual object but can just be a partial prefix string. The 'authority' component
+   * of the {@code prefix} <b>must</b> be the complete authority, however; we can only list prefixes
+   * of <b>objects</b>, not buckets.
+   *
+   * @param prefix the prefix to use to list all matching objects.
+   */
+  public List<FileInfo> listFileInfoForPrefix(URI prefix, ListFileOptions listOptions)
+      throws IOException {
+    logger.atFiner().log("listAllFileInfoForPrefix(prefix: %s)", prefix);
     StorageResourceId prefixId = getPrefixId(prefix);
     List<GoogleCloudStorageItemInfo> itemInfos =
         gcs.listObjectInfo(
             prefixId.getBucketName(),
             prefixId.getObjectName(),
-            ListObjectOptions.DEFAULT_FLAT_LIST);
+            updateListObjectOptions(ListObjectOptions.DEFAULT_FLAT_LIST, listOptions));
     List<FileInfo> fileInfos = FileInfo.fromItemInfos(itemInfos);
     fileInfos.sort(FILE_INFO_PATH_COMPARATOR);
     return fileInfos;
   }
 
   /**
-   * Equivalent to {@link #listAllFileInfoForPrefix} but returns {@link FileInfo}s listed by single
+   * Equivalent to {@link #listFileInfoForPrefix} but returns {@link FileInfo}s listed by single
    * request (1 page).
    *
    * @param prefix the prefix to use to list all matching objects.
    * @param pageToken the page token to list
    */
-  public ListPage<FileInfo> listAllFileInfoForPrefixPage(URI prefix, String pageToken)
+  public ListPage<FileInfo> listFileInfoForPrefixPage(URI prefix, String pageToken)
       throws IOException {
+    return listFileInfoForPrefixPage(prefix, ListFileOptions.DEFAULT, pageToken);
+  }
+
+  /**
+   * Equivalent to {@link #listFileInfoForPrefix} but returns {@link FileInfo}s listed by single
+   * request (1 page).
+   *
+   * @param prefix the prefix to use to list all matching objects.
+   * @param pageToken the page token to list
+   */
+  public ListPage<FileInfo> listFileInfoForPrefixPage(
+      URI prefix, ListFileOptions listOptions, String pageToken) throws IOException {
     logger.atFinest().log(
         "listAllFileInfoForPrefixPage(prefix: %s, pageToken:%s)", prefix, pageToken);
     StorageResourceId prefixId = getPrefixId(prefix);
@@ -895,7 +923,7 @@ public class GoogleCloudStorageFileSystem {
         gcs.listObjectInfoPage(
             prefixId.getBucketName(),
             prefixId.getObjectName(),
-            ListObjectOptions.DEFAULT_FLAT_LIST,
+            updateListObjectOptions(ListObjectOptions.DEFAULT_FLAT_LIST, listOptions),
             pageToken);
     List<FileInfo> fileInfosPage = FileInfo.fromItemInfos(itemInfosPage.getItems());
     fileInfosPage.sort(FILE_INFO_PATH_COMPARATOR);
@@ -921,6 +949,18 @@ public class GoogleCloudStorageFileSystem {
    * @throws FileNotFoundException if the given path does not exist.
    */
   public List<FileInfo> listFileInfo(URI path) throws IOException {
+    return listFileInfo(path, ListFileOptions.DEFAULT);
+  }
+
+  /**
+   * If the given path points to a directory then the information about its children is returned,
+   * otherwise information about the given file is returned.
+   *
+   * @param path Given path.
+   * @return Information about a file or children of a directory.
+   * @throws FileNotFoundException if the given path does not exist.
+   */
+  public List<FileInfo> listFileInfo(URI path, ListFileOptions listOptions) throws IOException {
     Preconditions.checkNotNull(path, "path can not be null");
     logger.atFinest().log("listFileInfo(path: %s)", path);
 
@@ -943,7 +983,9 @@ public class GoogleCloudStorageFileSystem {
         dirId.isRoot()
             ? gcs.listBucketInfo()
             : gcs.listObjectInfo(
-                dirId.getBucketName(), dirId.getObjectName(), LIST_FILE_INFO_LIST_OPTIONS);
+                dirId.getBucketName(),
+                dirId.getObjectName(),
+                updateListObjectOptions(LIST_FILE_INFO_LIST_OPTIONS, listOptions));
     if (pathId.isStorageObject() && dirItemInfos.isEmpty()) {
       throw new FileNotFoundException("Item not found: " + path);
     }
@@ -1186,6 +1228,11 @@ public class GoogleCloudStorageFileSystem {
             ? objectName.lastIndexOf(PATH_DELIMITER, objectName.length() - 2)
             : objectName.lastIndexOf(PATH_DELIMITER);
     return index < 0 ? objectName : objectName.substring(index + 1);
+  }
+
+  private static ListObjectOptions updateListObjectOptions(
+      ListObjectOptions listObjectOptions, ListFileOptions listFileOptions) {
+    return listObjectOptions.toBuilder().setFields(listFileOptions.getFields()).build();
   }
 
   /** Retrieve our internal gcs. */

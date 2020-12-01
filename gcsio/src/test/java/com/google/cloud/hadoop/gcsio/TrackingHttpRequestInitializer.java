@@ -34,12 +34,9 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
 
-  private static final String GET_OBJECT_FIELDS =
+  private static final String OBJECT_FIELDS =
       "bucket,name,timeCreated,updated,generation,metageneration,size,contentType,contentEncoding"
           + ",md5Hash,crc32c,metadata";
-
-  private static final String LIST_OBJECTS_FIELDS =
-      String.format("items(%s),prefixes,nextPageToken", GET_OBJECT_FIELDS);
 
   private static final String GET_REQUEST_FORMAT =
       "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o/%s%s";
@@ -89,8 +86,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   private static final String LIST_REQUEST_FORMAT =
       "GET:"
           + GOOGLEAPIS_ENDPOINT
-          + "/storage/v1/b/%s/o?delimiter=/&fields="
-          + LIST_OBJECTS_FIELDS
+          + "/storage/v1/b/%s/o?delimiter=/&fields=items(%s),prefixes,nextPageToken"
           + "&includeTrailingDelimiter=%s&maxResults=%d%s";
 
   private static final String LIST_SIMPLE_REQUEST_FORMAT =
@@ -208,7 +204,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   }
 
   public static String getRequestString(String bucketName, String object) {
-    return getRequestString(bucketName, object, GET_OBJECT_FIELDS);
+    return getRequestString(bucketName, object, OBJECT_FIELDS);
   }
 
   public static String getRequestString(String bucketName, String object, String fields) {
@@ -300,12 +296,12 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     return String.format(DELETE_BUCKET_REQUEST_FORMAT, bucketName);
   }
 
-  public static String deleteRequestString(String bucketName, String object, int generationId) {
+  public static String deleteRequestString(String bucketName, String object, long generationId) {
     return deleteRequestString(bucketName, object, generationId, /* replaceGenerationId */ true);
   }
 
   public static String deleteRequestString(
-      String bucketName, String object, int generationId, boolean replaceGenerationId) {
+      String bucketName, String object, long generationId, boolean replaceGenerationId) {
     return String.format(
         DELETE_REQUEST_FORMAT,
         bucketName,
@@ -349,13 +345,24 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   public static String listRequestString(
       String bucket, String prefix, int maxResults, String pageToken) {
     return listRequestString(
-        bucket, /* includeTrailingDelimiter= */ false, prefix, maxResults, pageToken);
+        bucket,
+        /* includeTrailingDelimiter= */ false,
+        prefix,
+        /* objectFields= */ OBJECT_FIELDS,
+        maxResults,
+        pageToken);
   }
 
   public static String listRequestWithTrailingDelimiter(
       String bucket, String prefix, int maxResults, String pageToken) {
+    return listRequestWithTrailingDelimiter(
+        bucket, prefix, /* objectFields= */ OBJECT_FIELDS, maxResults, pageToken);
+  }
+
+  public static String listRequestWithTrailingDelimiter(
+      String bucket, String prefix, String objectFields, int maxResults, String pageToken) {
     return listRequestString(
-        bucket, /* includeTrailingDelimiter= */ true, prefix, maxResults, pageToken);
+        bucket, /* includeTrailingDelimiter= */ true, prefix, objectFields, maxResults, pageToken);
   }
 
   public static String listRequestString(
@@ -364,10 +371,31 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
       String prefix,
       int maxResults,
       String pageToken) {
+    return listRequestString(
+        bucket,
+        includeTrailingDelimiter,
+        prefix,
+        /* objectFields= */ OBJECT_FIELDS,
+        maxResults,
+        pageToken);
+  }
+
+  public static String listRequestString(
+      String bucket,
+      boolean includeTrailingDelimiter,
+      String prefix,
+      String objectFields,
+      int maxResults,
+      String pageToken) {
     String extraParams = pageToken == null ? "" : "&pageToken=" + pageToken;
     extraParams += prefix == null ? "" : "&prefix=" + prefix;
     return String.format(
-        LIST_REQUEST_FORMAT, bucket, includeTrailingDelimiter, maxResults, extraParams);
+        LIST_REQUEST_FORMAT,
+        bucket,
+        objectFields,
+        includeTrailingDelimiter,
+        maxResults,
+        extraParams);
   }
 
   public static String createBucketRequestString(String projectId) {

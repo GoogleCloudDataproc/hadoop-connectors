@@ -188,11 +188,15 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   private void validateFileInfoInternal(
       String bucketName, String objectName, boolean expectedToExist, FileInfo fileInfo)
       throws IOException {
-    assertThat(fileInfo.exists()).isEqualTo(expectedToExist);
+    assertWithMessage("exists for bucketName '%s' objectName '%s'", bucketName, objectName)
+        .that(fileInfo.exists())
+        .isEqualTo(expectedToExist);
 
     long expectedSize = gcsiHelper.getExpectedObjectSize(objectName, expectedToExist);
     if (expectedSize != Long.MIN_VALUE) {
-      assertThat(fileInfo.getSize()).isEqualTo(expectedSize);
+      assertWithMessage("getSize for bucketName '%s' objectName '%s'", bucketName, objectName)
+          .that(fileInfo.getSize())
+          .isEqualTo(expectedSize);
     }
 
     boolean expectedDirectory = (objectName == null) || StringPaths.isDirectoryPath(objectName);
@@ -202,23 +206,32 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     if (expectedToExist) {
       Instant currentTime = Instant.now();
-      Instant fileCreationTime = Instant.ofEpochMilli(fileInfo.getCreationTime());
+      // Use modification time instead of creation time - by default creation time
+      // not fetched because it's not exposed in HCFS FileSystem interface.
+      Instant fileModificationTime = Instant.ofEpochMilli(fileInfo.getModificationTime());
 
       assertWithMessage(
-              "stale file? testStartTime: %s, fileCreationTime: %s",
-              testStartTime, fileCreationTime)
-          .that(fileCreationTime)
+              "getModificationTime for bucketName '%s' objectName '%s'", bucketName, objectName)
+          .that(fileModificationTime)
           .isAtLeast(testStartTime);
       assertWithMessage(
-              "unexpected creation-time: clock skew? currentTime: %s, fileCreationTime: %s",
-              currentTime, fileCreationTime)
-          .that(fileCreationTime)
+              "getModificationTime for bucketName '%s' objectName '%s'", bucketName, objectName)
+          .that(fileModificationTime)
           .isAtMost(currentTime);
     } else {
-      assertThat(fileInfo.getCreationTime()).isEqualTo(0);
+      assertWithMessage(
+              "getCreationTime for bucketName '%s' objectName '%s'", bucketName, objectName)
+          .that(fileInfo.getCreationTime())
+          .isEqualTo(0);
+      assertWithMessage(
+              "getModificationTime for bucketName '%s' objectName '%s'", bucketName, objectName)
+          .that(fileInfo.getModificationTime())
+          .isEqualTo(0);
     }
 
-    assertThat(fileInfo.toString()).isNotEmpty();
+    assertWithMessage("toString for bucketName '%s' objectName '%s'", bucketName, objectName)
+        .that(fileInfo.toString())
+        .isNotEmpty();
   }
 
   /**

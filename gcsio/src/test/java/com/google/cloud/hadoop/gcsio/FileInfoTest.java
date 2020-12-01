@@ -14,9 +14,11 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.ROOT_INFO;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.testing.EqualsTester;
 import com.google.common.truth.Correspondence;
 import java.net.URI;
 import java.util.Arrays;
@@ -52,5 +54,51 @@ public class FileInfoTest {
         .<byte[], byte[]>comparingValuesUsing(Correspondence.from(Arrays::equals, "Arrays.equals"))
         .containsExactly("foo-meta", new byte[] {5, 66, 56});
     assertThat(fileInfo.getItemInfo()).isEqualTo(itemInfo);
+  }
+
+  @Test
+  public void testEquals() {
+    StorageResourceId testObject = StorageResourceId.fromStringPath("gs://test-bucket/dir/object");
+    new EqualsTester()
+        .addEqualityGroup(FileInfo.fromItemInfo(ROOT_INFO), FileInfo.fromItemInfo(ROOT_INFO))
+        .addEqualityGroup(
+            FileInfo.fromItemInfo(
+                GoogleCloudStorageItemInfo.createObject(
+                    testObject,
+                    /* creationTime= */ 100,
+                    /* modificationTime= */ 1000,
+                    /* size= */ 324,
+                    /* contentType= */ "text",
+                    /* contentEncoding */ "gzip",
+                    /* metadata */ ImmutableMap.of("mkey", new byte[] {1, 6}),
+                    /* contentGeneration= */ 122,
+                    /* metaGeneration= */ 3,
+                    /* verificationAttributes= */ null)))
+        .addEqualityGroup(
+            FileInfo.fromItemInfo(
+                GoogleCloudStorageItemInfo.createObject(
+                    testObject,
+                    /* creationTime= */ 100,
+                    /* modificationTime= */ 1000,
+                    /* size= */ 324,
+                    /* contentType= */ "text",
+                    /* contentEncoding */ "gzip",
+                    /* metadata */ ImmutableMap.of("mky", new byte[] {1, 6}),
+                    /* contentGeneration= */ 122,
+                    /* metaGeneration= */ 3,
+                    /* verificationAttributes= */ null)),
+            FileInfo.fromItemInfo(
+                GoogleCloudStorageItemInfo.createObject(
+                    testObject,
+                    /* creationTime= */ 100,
+                    /* modificationTime= */ 1000,
+                    /* size= */ 324,
+                    /* contentType= */ "text",
+                    /* contentEncoding */ "gzip",
+                    /* metadata */ ImmutableMap.of("mky", new byte[] {1, 6}),
+                    /* contentGeneration= */ 122,
+                    /* metaGeneration= */ 3,
+                    /* verificationAttributes= */ null)))
+        .testEquals();
   }
 }
