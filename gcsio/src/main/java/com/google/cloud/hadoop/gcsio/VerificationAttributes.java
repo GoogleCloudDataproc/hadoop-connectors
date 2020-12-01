@@ -49,7 +49,6 @@ public class VerificationAttributes {
     if (!(o instanceof VerificationAttributes)) {
       return false;
     }
-
     VerificationAttributes that = (VerificationAttributes) o;
     return Arrays.equals(md5hash, that.md5hash) && Arrays.equals(crc32c, that.crc32c);
   }

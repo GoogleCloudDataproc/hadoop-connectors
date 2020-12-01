@@ -467,6 +467,126 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
   }
 
   @Test
+  public void listFileInfo_customFields_required() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource();
+
+    gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "/object");
+
+    List<FileInfo> fileInfos =
+        gcsFs.listFileInfo(
+            bucketUri.resolve(dirObject),
+            ListFileOptions.DEFAULT.toBuilder().setFields("bucket,name").build());
+
+    FileInfo expectedFileInfo =
+        FileInfo.fromItemInfo(
+            GoogleCloudStorageItemInfo.createObject(
+                StorageResourceId.fromUriPath(
+                    bucketUri.resolve(dirObject + "/object"), /* allowEmptyObjectName= */ false),
+                /* creationTime= */ 0,
+                /* modificationTime= */ 0,
+                /* size= */ 0,
+                /* contentType= */ null,
+                /* contentEncoding= */ null,
+                /* metadata= */ null,
+                /* contentGeneration= */ 0,
+                /* metaGeneration= */ 0,
+                new VerificationAttributes(/* md5hash= */ null, /* crc32c= */ null)));
+
+    assertThat(fileInfos).containsExactly(expectedFileInfo);
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(bucketName, dirObject),
+            listRequestWithTrailingDelimiter(
+                bucketName,
+                dirObject + "/",
+                /* objectFields= */ "bucket,name",
+                /* maxResults= */ 1024,
+                /* pageToken= */ null));
+  }
+
+  @Test
+  public void listFileInfo_customFields_some() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource();
+
+    gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "/object");
+
+    List<FileInfo> fileInfos =
+        gcsFs.listFileInfo(
+            bucketUri.resolve(dirObject),
+            ListFileOptions.DEFAULT.toBuilder().setFields("bucket,name,contentType").build());
+
+    FileInfo expectedFileInfo =
+        FileInfo.fromItemInfo(
+            GoogleCloudStorageItemInfo.createObject(
+                StorageResourceId.fromUriPath(
+                    bucketUri.resolve(dirObject + "/object"), /* allowEmptyObjectName= */ false),
+                /* creationTime= */ 0,
+                /* modificationTime= */ 0,
+                /* size= */ 0,
+                /* contentType= */ "application/octet-stream",
+                /* contentEncoding= */ null,
+                /* metadata= */ null,
+                /* contentGeneration= */ 0,
+                /* metaGeneration= */ 0,
+                new VerificationAttributes(/* md5hash= */ null, /* crc32c= */ null)));
+
+    assertThat(fileInfos).containsExactly(expectedFileInfo);
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(bucketName, dirObject),
+            listRequestWithTrailingDelimiter(
+                bucketName,
+                dirObject + "/",
+                /* objectFields= */ "bucket,name,contentType",
+                /* maxResults= */ 1024,
+                /* pageToken= */ null));
+  }
+
+  @Test
+  public void listFileInfo_customFields_fails() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource();
+
+    gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "/object");
+
+    assertThrows(
+        NullPointerException.class,
+        () ->
+            gcsFs.listFileInfo(
+                bucketUri.resolve(dirObject),
+                ListFileOptions.DEFAULT.toBuilder().setFields("bucket").build()));
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(bucketName, dirObject),
+            listRequestWithTrailingDelimiter(
+                bucketName,
+                dirObject + "/",
+                /* objectFields= */ "bucket",
+                /* maxResults= */ 1024,
+                /* pageToken= */ null));
+  }
+
+  @Test
   public void delete_file_sequential() throws Exception {
     GoogleCloudStorageFileSystemOptions gcsFsOptions =
         newGcsFsOptions().setStatusParallelEnabled(false).build();

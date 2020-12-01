@@ -55,6 +55,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.gcsio.ListFileOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
 import com.google.cloud.hadoop.gcsio.UriPaths;
@@ -157,6 +158,13 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   static final String SCHEME = GoogleCloudStorageFileSystem.SCHEME;
+
+  // Request only object fields that are used in Hadoop FileStatus:
+  // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
+  private static final String OBJECT_FIELDS = "bucket,name,size,updated";
+
+  private static final ListFileOptions LIST_OPTIONS =
+      ListFileOptions.DEFAULT.toBuilder().setFields(OBJECT_FIELDS).build();
 
   /**
    * Available types for use with {@link
@@ -758,8 +766,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       throws IOException {
     URI gcsPath = getGcsPath(checkNotNull(hadoopPath, "hadoopPath must not be null"));
     URI parentGcsPath = UriPaths.getParentPath(gcsPath);
-    GoogleCloudStorageItemInfo parentInfo = getGcsFs().getFileInfo(parentGcsPath).getItemInfo();
-    if (!parentInfo.isRoot() && !parentInfo.isBucket() && !parentInfo.exists()) {
+    if (!getGcsFs().getFileInfo(parentGcsPath).exists()) {
       throw new FileNotFoundException(
           String.format(
               "Can not create '%s' file, because parent folder does not exist: %s",
@@ -965,7 +972,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     List<FileStatus> status;
 
     try {
-      List<FileInfo> fileInfos = getGcsFs().listFileInfo(gcsPath);
+      List<FileInfo> fileInfos = getGcsFs().listFileInfo(gcsPath, LIST_OPTIONS);
       status = new ArrayList<>(fileInfos.size());
       String userName = getUgiUserName();
       for (FileInfo fileInfo : fileInfos) {
@@ -1101,7 +1108,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   }
 
   /** Gets FileStatus corresponding to the given FileInfo value. */
-  private FileStatus getFileStatus(FileInfo fileInfo, String userName) throws IOException {
+  private FileStatus getFileStatus(FileInfo fileInfo, String userName) {
     // GCS does not provide modification time. It only provides creation time.
     // It works for objects because they are immutable once created.
     FileStatus status =
@@ -1276,7 +1283,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     List<FileStatus> matchedStatuses = null;
     String pageToken = null;
     do {
-      ListPage<FileInfo> infoPage = getGcsFs().listAllFileInfoForPrefixPage(prefixUri, pageToken);
+      ListPage<FileInfo> infoPage =
+          getGcsFs().listFileInfoForPrefixPage(prefixUri, LIST_OPTIONS, pageToken);
 
       Collection<FileStatus> statusPage =
           toFileStatusesWithImplicitDirectories(infoPage.getItems());
@@ -1833,11 +1841,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       case NONE:
         return null;
       case CRC32C:
-        return new GcsFileChecksum(
-            type, fileInfo.getItemInfo().getVerificationAttributes().getCrc32c());
+        return new GcsFileChecksum(type, fileInfo.getCrc32cChecksum());
       case MD5:
-        return new GcsFileChecksum(
-            type, fileInfo.getItemInfo().getVerificationAttributes().getMd5hash());
+        return new GcsFileChecksum(type, fileInfo.getMd5Checksum());
     }
     throw new IOException("Unrecognized GcsFileChecksumType: " + type);
   }
@@ -1969,7 +1975,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     UpdatableItemInfo updateInfo =
         new UpdatableItemInfo(
-            fileInfo.getItemInfo().getResourceId(),
+            StorageResourceId.fromUriPath(fileInfo.getPath(), /* allowEmptyObjectName= */ false),
             ImmutableMap.of(xAttrKey, getXAttrValue(value)));
     getGcsFs().getGcs().updateItems(ImmutableList.of(updateInfo));
   }
@@ -1985,7 +1991,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     Map<String, byte[]> xAttrToRemove = new HashMap<>();
     xAttrToRemove.put(getXAttrKey(name), null);
     UpdatableItemInfo updateInfo =
-        new UpdatableItemInfo(fileInfo.getItemInfo().getResourceId(), xAttrToRemove);
+        new UpdatableItemInfo(
+            StorageResourceId.fromUriPath(fileInfo.getPath(), /* allowEmptyObjectName= */ false),
+            xAttrToRemove);
     getGcsFs().getGcs().updateItems(ImmutableList.of(updateInfo));
   }
 

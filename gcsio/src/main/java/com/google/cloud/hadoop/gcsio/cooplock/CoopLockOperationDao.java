@@ -119,7 +119,7 @@ public class CoopLockOperationDao {
                         .setResource(resourceId.toString()))));
     List<String> logRecords =
         Streams.concat(itemsToDelete.stream(), bucketsToDelete.stream())
-            .map(i -> i.getItemInfo().getResourceId().toString())
+            .map(i -> i.getPath().toString())
             .collect(toImmutableList());
     writeOperationFile(
         resourceId.getBucketName(),
@@ -362,7 +362,7 @@ public class CoopLockOperationDao {
   private static RenameOperationLogRecord toRenameOperationLogRecord(
       Map.Entry<FileInfo, URI> record) {
     return new RenameOperationLogRecord()
-        .setSrc(record.getKey().getItemInfo().getResourceId().toString())
+        .setSrc(record.getKey().getPath().toString())
         .setDst(record.getValue().toString());
   }
 
