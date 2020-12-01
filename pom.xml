@@ -472,6 +472,12 @@
         <scope>test</scope>
       </dependency>
       <dependency>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava-testlib</artifactId>
+        <version>${google.guava.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
         <groupId>com.google.truth</groupId>
         <artifactId>truth</artifactId>
         <version>${google.truth.version}</version>

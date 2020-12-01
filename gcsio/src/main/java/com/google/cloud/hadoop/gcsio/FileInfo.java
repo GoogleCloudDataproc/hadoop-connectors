@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import com.google.common.base.Objects;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Date;
@@ -132,6 +133,11 @@ public class FileInfo {
     return verificationAttributes == null ? null : verificationAttributes.getMd5hash();
   }
 
+  /** Gets information about the underlying item. */
+  GoogleCloudStorageItemInfo getItemInfo() {
+    return itemInfo;
+  }
+
   /**
    * Gets string representation of this instance.
    */
@@ -139,11 +145,21 @@ public class FileInfo {
     return getPath() + (exists() ? ": created on: " + new Date(getCreationTime()) : ": exists: no");
   }
 
-  /**
-   * Gets information about the underlying item.
-   */
-  public GoogleCloudStorageItemInfo getItemInfo() {
-    return itemInfo;
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof FileInfo)) {
+      return false;
+    }
+    FileInfo fileInfo = (FileInfo) o;
+    return Objects.equal(path, fileInfo.path) && Objects.equal(itemInfo, fileInfo.itemInfo);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(path, itemInfo);
   }
 
   /**

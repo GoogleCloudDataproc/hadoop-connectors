@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Date;
@@ -68,6 +69,7 @@ public class GoogleCloudStorageItemInfo {
       long modificationTime,
       String location,
       String storageClass) {
+    checkNotNull(resourceId, "resourceId must not be null");
     checkArgument(resourceId.isBucket(), "expected bucket but got '%s'", resourceId);
     return new GoogleCloudStorageItemInfo(
         resourceId,
@@ -103,6 +105,7 @@ public class GoogleCloudStorageItemInfo {
       long contentGeneration,
       long metaGeneration,
       VerificationAttributes verificationAttributes) {
+    checkNotNull(resourceId, "resourceId must not be null");
     checkArgument(!resourceId.isRoot(), "expected object or directory but got '%s'", resourceId);
     checkArgument(!resourceId.isBucket(), "expected object or directory but got '%s'", resourceId);
     return new GoogleCloudStorageItemInfo(
@@ -210,7 +213,7 @@ public class GoogleCloudStorageItemInfo {
       long contentGeneration,
       long metaGeneration,
       VerificationAttributes verificationAttributes) {
-    this.resourceId = checkNotNull(resourceId, "resourceId must not be null.");
+    this.resourceId = checkNotNull(resourceId, "resourceId must not be null");
     this.creationTime = creationTime;
     this.modificationTime = modificationTime;
     this.size = size;
@@ -359,6 +362,7 @@ public class GoogleCloudStorageItemInfo {
    * this.metadata and otherMetadata, and then using Arrays.equals to compare contents of
    * corresponding byte arrays.
    */
+  @VisibleForTesting
   public boolean metadataEquals(Map<String, byte[]> otherMetadata) {
     if (metadata == otherMetadata) {
       // Fast-path for common cases where the same actual default metadata instance may be used in
@@ -422,7 +426,11 @@ public class GoogleCloudStorageItemInfo {
     result = prime * result + Objects.hashCode(verificationAttributes);
     result = prime * result + (int) metaGeneration;
     result = prime * result + (int) contentGeneration;
-    result = prime * result + metadata.hashCode();
+    result =
+        prime * result
+            + metadata.entrySet().stream()
+                .mapToInt(e -> Objects.hash(e.getKey()) + Arrays.hashCode(e.getValue()))
+                .sum();
     return result;
   }
 }
