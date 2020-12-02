@@ -21,8 +21,8 @@ import com.google.auto.value.AutoValue;
 import javax.annotation.Nullable;
 
 /**
- * Conditions on which a object write should be allowed to continue. Corresponds to setting
- * {@code IfGenerationMatch} and {@code IfMetaGenerationMatch} in API requests.
+ * Conditions on which a object write should be allowed to continue. Corresponds to setting {@code
+ * IfGenerationMatch} and {@code IfMetaGenerationMatch} in API requests.
  */
 @AutoValue
 public abstract class ObjectWriteConditions {

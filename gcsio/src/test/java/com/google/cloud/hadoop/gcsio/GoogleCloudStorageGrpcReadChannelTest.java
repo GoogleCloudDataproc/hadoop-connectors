@@ -34,8 +34,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;

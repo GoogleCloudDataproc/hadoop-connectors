@@ -13,8 +13,6 @@
  */
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
-
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.channels.WritableByteChannel;
