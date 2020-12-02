@@ -336,11 +336,6 @@ public interface GoogleCloudStorage {
       throws IOException;
 
   /**
-   * Releases resources used by this instance.
-   */
-  void close();
-
-  /**
    * Composes inputs into a single GCS object. This performs a GCS Compose. Objects will be composed
    * according to the order they appear in the input. The destination object, if already present,
    * will be overwritten. Sources and destination are assumed to be in the same bucket.
@@ -365,6 +360,9 @@ public interface GoogleCloudStorage {
   GoogleCloudStorageItemInfo composeObjects(
       List<StorageResourceId> sources, StorageResourceId destination, CreateObjectOptions options)
       throws IOException;
+
+  /** Releases resources used by this instance. */
+  void close();
 
   /** Paged list request response */
   class ListPage<T> {
