@@ -161,9 +161,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
         assertThat(bytesRead).isEqualTo(segmentSize);
         byte[] expectedSegment =
             Arrays.copyOfRange(
-                data,
-                /* from= */ i * segmentSize,
-                /* to= */ i * segmentSize + segmentSize);
+                data, /* from= */ i * segmentSize, /* to= */ i * segmentSize + segmentSize);
         assertWithMessage("Unexpected segment data read.")
             .that(readSegments[i])
             .isEqualTo(expectedSegment);

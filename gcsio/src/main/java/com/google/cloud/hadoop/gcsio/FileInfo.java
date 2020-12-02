@@ -138,9 +138,7 @@ public class FileInfo {
     return itemInfo;
   }
 
-  /**
-   * Gets string representation of this instance.
-   */
+  /** Gets string representation of this instance. */
   public String toString() {
     return getPath() + (exists() ? ": created on: " + new Date(getCreationTime()) : ": exists: no");
   }

@@ -1226,7 +1226,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         listedPrefixes != null && listedPrefixes.isEmpty(),
         "Must provide a non-null empty container for listedPrefixes.");
 
-    // List +1 object if prefix is not included in the result, because GCS always includes prefix object
+    // List +1 object if prefix is not included in the result,
+    // because GCS always includes prefix object
     // in the result if it exists and we filter it out.
     //
     // Example:
@@ -1237,9 +1238,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     //   gs://bucket/a/c
     //
     // In response to `gs://bucket/a/` list request with max results set to `1` GCS will return only
-    // `gs://bucket/a/` object. But this object will be filterred out from response if `isIncludePrefix`
-    // is set to `false`.
-    // 
+    // `gs://bucket/a/` object. But this object will be filterred out from response if
+    // `isIncludePrefix` is set to `false`.
+    //
     // To prevent this situation we increment max results by 1, which will allow to list
     // `gs://bucket/a/b` in the above case.
     long maxResults =
