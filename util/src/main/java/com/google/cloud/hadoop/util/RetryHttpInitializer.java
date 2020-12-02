@@ -15,7 +15,6 @@
  */
 package com.google.cloud.hadoop.util;
 
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static java.util.concurrent.TimeUnit.SECONDS;
 

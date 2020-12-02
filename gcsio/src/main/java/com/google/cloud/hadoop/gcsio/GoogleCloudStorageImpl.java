@@ -240,11 +240,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    */
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Credential credential)
       throws IOException {
-    this(
-        options,
-        new RetryHttpInitializer(
-            credential,
-            options.toRetryHttpInitializerOptions()));
+    this(options, new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()));
   }
 
   @VisibleForTesting

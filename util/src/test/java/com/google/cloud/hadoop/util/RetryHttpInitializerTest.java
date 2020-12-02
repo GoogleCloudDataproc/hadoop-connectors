@@ -15,7 +15,6 @@
 package com.google.cloud.hadoop.util;
 
 import static com.google.common.truth.Truth.assertThat;
-import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -101,8 +100,7 @@ public class RetryHttpInitializerTest {
 
   @Test
   public void testConstructorNullCredential() {
-    assertThrows(
-        NullPointerException.class, () -> new RetryHttpInitializer(null, "foo-user-agent"));
+    new RetryHttpInitializer(/* credential= */ null, "foo-user-agent");
   }
 
   @Test

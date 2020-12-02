@@ -134,10 +134,8 @@ public class GoogleCloudStorageFileSystemTest
     optionsBuilder.setCloudStorageOptions(
         options.getCloudStorageOptions().toBuilder().setAppName("appName").build());
 
-    // Verify that credential == null throws IllegalArgumentException.
-    assertThrows(
-        NullPointerException.class,
-        () -> new GoogleCloudStorageFileSystem((Credential) null, optionsBuilder.build()));
+    // Verify that credential == null works - this is required for unauthenticated access.
+    new GoogleCloudStorageFileSystem((Credential) null, optionsBuilder.build());
 
     // Verify that fake projectId/appName and empty cred does not throw.
     setDefaultValidOptions(optionsBuilder);
