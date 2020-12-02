@@ -295,10 +295,6 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Integer> GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS =
       new HadoopConfigurationProperty<>("fs.gs.outputstream.sync.min.interval.ms", 0);
 
-  /** Configuration key for setting read buffer size. */
-  public static final HadoopConfigurationProperty<Integer> GCS_INPUT_STREAM_BUFFER_SIZE =
-      new HadoopConfigurationProperty<>("fs.gs.inputstream.buffer.size", 0, "fs.gs.io.buffersize");
-
   /**
    * If true, on opening a file we will proactively perform a metadata GET to check whether the
    * object exists, even though the underlying channel will not open a data stream until read() is
@@ -491,7 +487,6 @@ public class GoogleHadoopFileSystemConfiguration {
         .setSupportGzipEncoding(
             GCS_INPUT_STREAM_SUPPORT_GZIP_ENCODING_ENABLE.get(config, config::getBoolean))
         .setInplaceSeekLimit(GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.get(config, config::getLong))
-        .setBufferSize(GCS_INPUT_STREAM_BUFFER_SIZE.get(config, config::getInt))
         .setFadvise(GCS_INPUT_STREAM_FADVISE.get(config, config::getEnum))
         .setMinRangeRequestSize(GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getInt))
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))

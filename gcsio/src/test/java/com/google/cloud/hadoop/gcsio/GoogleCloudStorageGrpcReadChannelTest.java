@@ -168,6 +168,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         GoogleCloudStorageReadOptions.builder()
             .setFadvise(Fadvise.RANDOM)
             .setGrpcChecksumsEnabled(true)
+            .setInplaceSeekLimit(5)
             .build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
@@ -195,6 +196,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         GoogleCloudStorageReadOptions.builder()
             .setFadvise(Fadvise.RANDOM)
             .setGrpcChecksumsEnabled(true)
+            .setInplaceSeekLimit(5)
             .build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
@@ -236,6 +238,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         GoogleCloudStorageReadOptions.builder()
             .setFadvise(Fadvise.RANDOM)
             .setGrpcChecksumsEnabled(true)
+            .setInplaceSeekLimit(5)
             .build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
@@ -292,7 +295,9 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   @Test
   public void readSucceedsAfterSeek() throws Exception {
     fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(100).build());
-    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel();
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder().setInplaceSeekLimit(10).build();
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
     ByteBuffer buffer = ByteBuffer.allocate(10);
     readChannel.position(50);
@@ -688,13 +693,13 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     assertFalse(readChannel.isOpen());
   }
 
+  private GoogleCloudStorageGrpcReadChannel newReadChannel() throws IOException {
+    return newReadChannel(GoogleCloudStorageReadOptions.DEFAULT);
+  }
+
   private GoogleCloudStorageGrpcReadChannel newReadChannel(GoogleCloudStorageReadOptions options)
       throws IOException {
     return GoogleCloudStorageGrpcReadChannel.open(stub, BUCKET_NAME, OBJECT_NAME, options);
-  }
-
-  private GoogleCloudStorageGrpcReadChannel newReadChannel() throws IOException {
-    return newReadChannel(GoogleCloudStorageReadOptions.DEFAULT);
   }
 
   private static class FakeService extends StorageImplBase {
