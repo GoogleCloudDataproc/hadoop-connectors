@@ -447,9 +447,6 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     Configuration config = loadConfig();
 
     // Set up remaining settings to known test values.
-    int bufferSize = 512;
-    config.setInt(
-        GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_BUFFER_SIZE.getKey(), bufferSize);
     long blockSize = 1024;
     config.setLong(GoogleHadoopFileSystemConfiguration.BLOCK_SIZE.getKey(), blockSize);
     String rootBucketName = ghfsHelper.getUniqueBucketName("initialize-root");
@@ -461,7 +458,6 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
         fs.getGcsFs().getOptions().getCloudStorageOptions();
 
     // Verify that config settings were set correctly.
-    assertThat(cloudStorageOptions.getReadChannelOptions().getBufferSize()).isEqualTo(bufferSize);
     assertThat(fs.getDefaultBlockSize()).isEqualTo(blockSize);
     assertThat(fs.initUri).isEqualTo(initUri);
     assertThat(fs.getRootBucketName()).isEqualTo(rootBucketName);

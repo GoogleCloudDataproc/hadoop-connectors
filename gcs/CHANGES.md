@@ -132,6 +132,9 @@
 
 1.  Add `FsBenchmark` tool for benchmarking HCFS.
 
+1.  Remove obsolete `fs.gs.inputstream.buffer.size` property and related
+    functionality.
+
 ### 2.1.1 - 2020-03-11
 
 1.  Add upload cache to support high-level retries of failed uploads. Cache size
