@@ -625,9 +625,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   /**
    * Opens the given file for reading.
    *
-   * <p>Note: This function overrides the given bufferSize value with a higher number unless further
-   * overridden using configuration parameter {@code fs.gs.inputstream.buffer.size}.
-   *
    * @param hadoopPath File to open.
    * @param bufferSize Size of buffer to use for IO.
    * @return A readable stream.

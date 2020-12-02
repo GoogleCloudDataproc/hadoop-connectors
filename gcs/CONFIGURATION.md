@@ -296,10 +296,6 @@ permissions (not authorized) to execute these requests.
 
 ### IO configuration
 
-*   `fs.gs.inputstream.buffer.size` (default: `0`)
-
-    The number of bytes in read buffers.
-
 *   `fs.gs.inputstream.fast.fail.on.not.found.enable` (default: `true`)
 
     If `true`, on opening a file connector will proactively send a Cloud Storage

@@ -80,8 +80,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.list.max.items.per.call", 1024L);
           put("fs.gs.max.wait.for.empty.object.creation.ms", 3_000);
           put("fs.gs.marker.file.pattern", null);
-          put("fs.gs.inputstream.buffer.size", 0);
-          put("fs.gs.io.buffersize", 0);
           put("fs.gs.inputstream.fast.fail.on.not.found.enable", true);
           put("fs.gs.inputstream.support.gzip.encoding.enable", false);
           put("fs.gs.outputstream.buffer.size", 8 * 1024 * 1024);

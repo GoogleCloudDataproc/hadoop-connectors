@@ -42,7 +42,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.flogger.GoogleLogger;
-import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.EOFException;
 import java.io.IOException;
@@ -1013,21 +1012,9 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
     try {
       InputStream contentStream = response.getContent();
-      if (readOptions.getBufferSize() > 0) {
-        int bufferSize = readOptions.getBufferSize();
-        // limit buffer size to the channel end
-        bufferSize =
-            Math.toIntExact(Math.min(bufferSize, contentChannelEnd - contentChannelPosition));
-        logger.atFine().log(
-            "Opened stream from %d position with %s range, %d bytesToRead"
-                + " and %d bytes buffer for '%s'",
-            currentPosition, rangeHeader, bytesToRead, bufferSize, resourceId);
-        contentStream = new BufferedInputStream(contentStream, bufferSize);
-      } else {
-        logger.atFine().log(
-            "Opened stream from %d position with %s range and %d bytesToRead for '%s'",
-            currentPosition, rangeHeader, bytesToRead, resourceId);
-      }
+      logger.atFine().log(
+          "Opened stream from %d position with %s range and %d bytesToRead for '%s'",
+          currentPosition, rangeHeader, bytesToRead, resourceId);
 
       if (contentChannelPosition < currentPosition) {
         long bytesToSkip = currentPosition - contentChannelPosition;

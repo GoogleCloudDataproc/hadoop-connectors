@@ -42,8 +42,7 @@ public abstract class GoogleCloudStorageReadOptions {
   public static final int DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS = 2 * 60 * 1000;
   public static final boolean DEFAULT_FAST_FAIL_ON_NOT_FOUND = true;
   public static final boolean DEFAULT_SUPPORT_GZIP_ENCODING = true;
-  public static final int DEFAULT_BUFFER_SIZE = 0;
-  public static final long DEFAULT_INPLACE_SEEK_LIMIT = 0L;
+  public static final long DEFAULT_INPLACE_SEEK_LIMIT = 8 * 1024 * 1024;
   public static final Fadvise DEFAULT_FADVISE = Fadvise.SEQUENTIAL;
   public static final int DEFAULT_MIN_RANGE_REQUEST_SIZE = 512 * 1024;
   public static final boolean GRPC_CHECKSUMS_ENABLED_DEFAULT = false;
@@ -61,7 +60,6 @@ public abstract class GoogleCloudStorageReadOptions {
         .setBackoffMaxElapsedTimeMillis(DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS)
         .setFastFailOnNotFound(DEFAULT_FAST_FAIL_ON_NOT_FOUND)
         .setSupportGzipEncoding(DEFAULT_SUPPORT_GZIP_ENCODING)
-        .setBufferSize(DEFAULT_BUFFER_SIZE)
         .setInplaceSeekLimit(DEFAULT_INPLACE_SEEK_LIMIT)
         .setFadvise(DEFAULT_FADVISE)
         .setMinRangeRequestSize(DEFAULT_MIN_RANGE_REQUEST_SIZE)
@@ -90,9 +88,6 @@ public abstract class GoogleCloudStorageReadOptions {
 
   /** See {@link Builder#setSupportGzipEncoding}. */
   public abstract boolean getSupportGzipEncoding();
-
-  /** See {@link Builder#setBufferSize}. */
-  public abstract int getBufferSize();
 
   /** See {@link Builder#setInplaceSeekLimit}. */
   public abstract long getInplaceSeekLimit();
@@ -163,14 +158,6 @@ public abstract class GoogleCloudStorageReadOptions {
     public abstract Builder setSupportGzipEncoding(boolean supportGzipEncoding);
 
     /**
-     * If set to a positive value, low-level streams will be wrapped inside a BufferedInputStream of
-     * this size. Otherwise no buffer will be created to wrap the low-level streams. Note that the
-     * low-level streams may or may not have their own additional buffering layers independent of
-     * this setting.
-     */
-    public abstract Builder setBufferSize(int bufferSize);
-
-    /**
      * If seeking to a new position which is within this number of bytes in front of the current
      * position, then we will skip forward by reading and discarding the necessary amount of bytes
      * rather than trying to open a brand-new underlying stream.
@@ -186,7 +173,7 @@ public abstract class GoogleCloudStorageReadOptions {
      *   <li>{@code AUTO} - automatically switches to {@code RANDOM} mode if backward read or
      *       forward read for more than {@link #setInplaceSeekLimit} bytes is detected.
      *   <li>{@code RANDOM} - sends HTTP requests with {@code Range} header set to greater of
-     *       provided reade buffer by user or {@link #setBufferSize}.
+     *       provided reade buffer by user.
      *   <li>{@code SEQUENTIAL} - sends HTTP requests with unbounded {@code Range} header.
      * </ul>
      */
