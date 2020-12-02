@@ -1142,4 +1142,34 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     assertThrows(
         IllegalArgumentException.class, () -> myghfs.getGcsPath(new Path("gs://buck^et/object")));
   }
+
+  @Test
+  public void unauthenticatedAccessToPublicBuckets_fsGsProperties() throws Exception {
+    String publicBucket = "gs://gcp-public-data-landsat";
+
+    Configuration config = new Configuration();
+    config.setBoolean("fs.gs.auth.service.account.enable", false);
+    config.setBoolean("fs.gs.auth.null.enable", true);
+
+    FileSystem fs = FileSystem.get(new URI(publicBucket), config);
+
+    FileStatus[] fileStatuses = fs.listStatus(new Path(publicBucket));
+
+    assertThat(fileStatuses).isNotEmpty();
+  }
+
+  @Test
+  public void unauthenticatedAccessToPublicBuckets_googleCloudProperties() throws Exception {
+    String publicBucket = "gs://gcp-public-data-landsat";
+
+    Configuration config = new Configuration();
+    config.setBoolean("google.cloud.auth.service.account.enable", false);
+    config.setBoolean("google.cloud.auth.null.enable", true);
+
+    FileSystem fs = FileSystem.get(new URI(publicBucket), config);
+
+    FileStatus[] fileStatuses = fs.listStatus(new Path(publicBucket));
+
+    assertThat(fileStatuses).isNotEmpty();
+  }
 }
