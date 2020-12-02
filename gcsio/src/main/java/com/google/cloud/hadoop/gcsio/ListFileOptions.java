@@ -17,6 +17,7 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.OBJECT_FIELDS;
 
 import com.google.auto.value.AutoValue;
+import javax.annotation.Nullable;
 
 /** Options that can be specified when listing files in the {@link GoogleCloudStorageFileSystem}. */
 @AutoValue
@@ -38,6 +39,7 @@ public abstract class ListFileOptions {
    * href="https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations">
    * object resource</a> for reference.
    */
+  @Nullable
   public abstract String getFields();
 
   /** Builder for {@link ListFileOptions} */
