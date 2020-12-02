@@ -91,12 +91,6 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
         /** Perform clean-up once after all tests are turn. */
         @Override
         public void after() {
-          if (ghfs != null) {
-            // For GHFS tests, print the counter values to stdout.
-            // We cannot use ghfs.logCounters() because we disable logging for tests.
-            String countersStr = ((GoogleHadoopFileSystemBase) ghfs).countersToString();
-            System.out.println(countersStr);
-          }
           HadoopFileSystemTestBase.storageResource.after();
         }
       };

@@ -244,8 +244,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
         requestStreamObserver.onNext(insertRequest);
         objectFinalized = insertRequest.getFinishWrite();
 
-        if (responseObserver.hasTransientError()
-            || responseObserver.hasNonTransientError()) {
+        if (responseObserver.hasTransientError() || responseObserver.hasNonTransientError()) {
           requestStreamObserver.onError(
               responseObserver.hasTransientError()
                   ? responseObserver.transientError
@@ -365,7 +364,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
           throw new IOException(
               String.format("Resumable upload failed for '%s'", getResourceString()),
               nonTransientError);
-      }
+        }
         return checkNotNull(response, "Response not present for '%s'", resourceId);
       }
 

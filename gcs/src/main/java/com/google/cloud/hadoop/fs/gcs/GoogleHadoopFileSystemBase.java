@@ -69,13 +69,10 @@ import com.google.cloud.hadoop.util.HadoopCredentialConfiguration;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.PropertyUtil;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.BaseEncoding;
@@ -95,7 +92,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -106,8 +102,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -281,80 +275,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   /** The fixed reported permission of all files. */
   private FsPermission reportedPermissions;
 
-  /** Map of counter values */
-  protected final ImmutableMap<Counter, AtomicLong> counters = createCounterMap();
-
-  protected ImmutableMap<Counter, AtomicLong> createCounterMap() {
-    EnumMap<Counter, AtomicLong> countersMap = new EnumMap<>(Counter.class);
-    for (Counter counter : ALL_COUNTERS) {
-      countersMap.put(counter, new AtomicLong());
-    }
-    return Maps.immutableEnumMap(countersMap);
-  }
-
-  /**
-   * Defines names of counters we track for each operation.
-   *
-   * There are two types of counters:
-   * -- METHOD_NAME      : Number of successful invocations of method METHOD.
-   * -- METHOD_NAME_TIME : Total inclusive time spent in method METHOD.
-   */
-  public enum Counter {
-    APPEND,
-    APPEND_TIME,
-    CREATE,
-    CREATE_TIME,
-    DELETE,
-    DELETE_TIME,
-    GET_FILE_CHECKSUM,
-    GET_FILE_CHECKSUM_TIME,
-    GET_FILE_STATUS,
-    GET_FILE_STATUS_TIME,
-    INIT,
-    INIT_TIME,
-    INPUT_STREAM,
-    INPUT_STREAM_TIME,
-    LIST_STATUS,
-    LIST_STATUS_TIME,
-    MKDIRS,
-    MKDIRS_TIME,
-    OPEN,
-    OPEN_TIME,
-    OUTPUT_STREAM,
-    OUTPUT_STREAM_TIME,
-    READ1,
-    READ1_TIME,
-    READ,
-    READ_TIME,
-    READ_FROM_CHANNEL,
-    READ_FROM_CHANNEL_TIME,
-    READ_CLOSE,
-    READ_CLOSE_TIME,
-    READ_POS,
-    READ_POS_TIME,
-    RENAME,
-    RENAME_TIME,
-    SEEK,
-    SEEK_TIME,
-    SET_WD,
-    SET_WD_TIME,
-    WRITE1,
-    WRITE1_TIME,
-    WRITE,
-    WRITE_TIME,
-    WRITE_CLOSE,
-    WRITE_CLOSE_TIME,
-  }
-
-  /**
-   * Set of all counters.
-   *
-   * <p>It is used for performance optimization instead of `Counter.values`, because
-   * `Counter.values` returns new array on each invocation.
-   */
-  private static final ImmutableSet<Counter> ALL_COUNTERS =
-      Sets.immutableEnumSet(EnumSet.allOf(Counter.class));
-
   /**
    * GCS {@link FileChecksum} which takes constructor parameters to define the return values of the
    * various abstract methods of {@link FileChecksum}.
@@ -515,52 +435,26 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   }
 
   /**
-   * See {@link #initialize(URI, Configuration, boolean)} for details; calls with third arg
-   * defaulting to 'true' for initializing the superclass.
+   * Initializes this file system instance.
+   *
+   * <p>Note: The path passed to this method could be path of any file/directory. It does not matter
+   * because the only thing we check is whether it uses 'gs' scheme. The rest is ignored.
    *
    * @param path URI of a file/directory within this file system.
    * @param config Hadoop configuration.
    */
   @Override
   public void initialize(URI path, Configuration config) throws IOException {
-    initialize(path, config, /* initSuperclass= */ true);
-  }
+    logger.atFine().log("initialize(path: %s, config: %s)", path, config);
 
-  /**
-   * Initializes this file system instance.
-   *
-   * Note:
-   * The path passed to this method could be path of any file/directory.
-   * It does not matter because the only thing we check is whether
-   * it uses 'gs' scheme. The rest is ignored.
-   *
-   * @param path URI of a file/directory within this file system.
-   * @param config Hadoop configuration.
-   * @param initSuperclass if false, doesn't call super.initialize(path, config); avoids
-   *     registering a global Statistics object for this instance.
-   */
-  public void initialize(URI path, Configuration config, boolean initSuperclass)
-      throws IOException {
-    long startTime = System.nanoTime();
-    Preconditions.checkArgument(path != null, "path must not be null");
-    Preconditions.checkArgument(config != null, "config must not be null");
-    Preconditions.checkArgument(path.getScheme() != null, "scheme of path must not be null");
-    if (!path.getScheme().equals(getScheme())) {
-      throw new IllegalArgumentException("URI scheme not supported: " + path);
-    }
+    checkArgument(path != null, "path must not be null");
+    checkArgument(config != null, "config must not be null");
+    checkArgument(path.getScheme() != null, "scheme of path must not be null");
+    checkArgument(path.getScheme().equals(getScheme()), "URI scheme not supported: %s", path);
+
+    super.initialize(path, config);
+
     initUri = path;
-    logger.atFine().log(
-        "initialize(path: %s, config: %s, initSuperclass: %b)", path, config, initSuperclass);
-
-    if (initSuperclass) {
-      super.initialize(path, config);
-    } else {
-      logger.atFiner().log(
-          "Initializing 'statistics' as an instance not attached to the static FileSystem map");
-      // Provide an ephemeral Statistics object to avoid NPE, but still avoid registering a global
-      // statistics object.
-      statistics = new Statistics(getScheme());
-    }
 
     // Set this configuration as the default config for this instance; configure()
     // will perform some file-system-specific adjustments, but the original should
@@ -571,10 +465,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     initializeDelegationTokenSupport(config, path);
 
     configure(config);
-
-    long duration = System.nanoTime() - startTime;
-    increment(Counter.INIT);
-    increment(Counter.INIT_TIME, duration);
   }
 
   /**
@@ -633,8 +523,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public FSDataInputStream open(Path hadoopPath, int bufferSize) throws IOException {
-    long startTime = System.nanoTime();
-    Preconditions.checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
 
@@ -645,9 +534,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     GoogleHadoopFSInputStream in =
         new GoogleHadoopFSInputStream(this, gcsPath, readChannelOptions, statistics);
 
-    long duration = System.nanoTime() - startTime;
-    increment(Counter.OPEN);
-    increment(Counter.OPEN_TIME, duration);
     return new FSDataInputStream(in);
   }
 
@@ -679,13 +565,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       long blockSize,
       Progressable progress)
       throws IOException {
-
-    long startTime = System.nanoTime();
-    Preconditions.checkArgument(hadoopPath != null, "hadoopPath must not be null");
-    Preconditions.checkArgument(
-        replication > 0, "replication must be a positive integer: %s", replication);
-    Preconditions.checkArgument(
-        blockSize > 0, "blockSize must be a positive integer: %s", blockSize);
+    checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    checkArgument(replication > 0, "replication must be a positive integer: %s", replication);
+    checkArgument(blockSize > 0, "blockSize must be a positive integer: %s", blockSize);
 
     checkOpen();
 
@@ -744,9 +626,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 GCS_OUTPUT_STREAM_TYPE.getKey(), type));
     }
 
-    long duration = System.nanoTime() - startTime;
-    increment(Counter.CREATE);
-    increment(Counter.CREATE_TIME, duration);
     return new FSDataOutputStream(out, null);
   }
 
@@ -791,8 +670,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public FSDataOutputStream append(Path hadoopPath, int bufferSize, Progressable progress)
       throws IOException {
-    long startTime = System.nanoTime();
-    Preconditions.checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     logger.atFiner().log(
         "append(hadoopPath: %s, bufferSize: %d [ignored])", hadoopPath, bufferSize);
@@ -813,9 +691,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 this, filePath, statistics, DEFAULT_OVERWRITE, syncableOutputStreamOptions),
             statistics);
 
-    long duration = System.nanoTime() - startTime;
-    increment(Counter.APPEND);
-    increment(Counter.APPEND_TIME, duration);
     return appendStream;
   }
 
@@ -861,8 +736,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
-    Preconditions.checkArgument(src != null, "src must not be null");
-    Preconditions.checkArgument(dst != null, "dst must not be null");
+    checkArgument(src != null, "src must not be null");
+    checkArgument(dst != null, "dst must not be null");
 
     // Even though the underlying GCSFS will also throw an IAE if src is root, since our filesystem
     // root happens to equal the global root, we want to explicitly check it here since derived
@@ -891,10 +766,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * @throws IOException if an error occurs.
    */
   void renameInternal(Path src, Path dst) throws IOException {
-    Preconditions.checkArgument(src != null, "src must not be null");
-    Preconditions.checkArgument(dst != null, "dst must not be null");
-
-    long startTime = System.nanoTime();
+    checkArgument(src != null, "src must not be null");
+    checkArgument(dst != null, "dst must not be null");
 
     checkOpen();
 
@@ -903,9 +776,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     getGcsFs().rename(srcPath, dstPath);
 
-    long duration = System.nanoTime() - startTime;
-    increment(Counter.RENAME);
-    increment(Counter.RENAME_TIME, duration);
     logger.atFiner().log("rename(src: %s, dst: %s): true", src, dst);
   }
 
@@ -921,8 +791,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public boolean delete(Path hadoopPath, boolean recursive) throws IOException {
-    long startTime = System.nanoTime();
-    Preconditions.checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
 
@@ -939,10 +808,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
           "delete(hadoopPath: %s, recursive: %b): false [failed]", hadoopPath, recursive);
       return false;
     }
-
-    long duration = System.nanoTime() - startTime;
-    increment(Counter.DELETE);
-    increment(Counter.DELETE_TIME, duration);
     logger.atFiner().log("delete(hadoopPath: %s, recursive: %b): true", hadoopPath, recursive);
     return true;
   }
@@ -958,8 +823,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public FileStatus[] listStatus(Path hadoopPath)
       throws IOException {
-    long startTime = System.nanoTime();
-    Preconditions.checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
 
@@ -982,10 +846,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                       "listStatus(hadoopPath: %s): '%s' does not exist.", hadoopPath, gcsPath))
               .initCause(fnfe);
     }
-
-    long duration = System.nanoTime() - startTime;
-    increment(Counter.LIST_STATUS);
-    increment(Counter.LIST_STATUS_TIME, duration);
     return status.toArray(new FileStatus[0]);
   }
 
@@ -996,8 +856,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public void setWorkingDirectory(Path hadoopPath) {
-    long startTime = System.nanoTime();
-    Preconditions.checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     URI gcsPath = UriPaths.toDirectory(getGcsPath(hadoopPath));
     Path newPath = getHadoopPath(gcsPath);
@@ -1009,10 +868,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     workingDirectory = newPath;
     logger.atFinest().log("setWorkingDirectory(hadoopPath: %s): %s", hadoopPath, workingDirectory);
-
-    long duration = System.nanoTime() - startTime;
-    increment(Counter.SET_WD);
-    increment(Counter.SET_WD_TIME, duration);
   }
 
   /**
@@ -1038,9 +893,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public boolean mkdirs(Path hadoopPath, FsPermission permission)
       throws IOException {
-
-    long startTime = System.nanoTime();
-    Preconditions.checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
 
@@ -1055,10 +908,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                       "mkdirs(hadoopPath: %s, permission: %s): failed", hadoopPath, permission))
               .initCause(faee);
     }
-
-    long duration = System.nanoTime() - startTime;
-    increment(Counter.MKDIRS);
-    increment(Counter.MKDIRS_TIME, duration);
     logger.atFiner().log("mkdirs(hadoopPath: %s, permission: %s): true", hadoopPath, permission);
     return true;
   }
@@ -1082,9 +931,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public FileStatus getFileStatus(Path hadoopPath)
       throws IOException {
-
-    long startTime = System.nanoTime();
-    Preconditions.checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
 
@@ -1096,12 +943,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
               "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
     }
     String userName = getUgiUserName();
-    FileStatus status = getFileStatus(fileInfo, userName);
-
-    long duration = System.nanoTime() - startTime;
-    increment(Counter.GET_FILE_STATUS);
-    increment(Counter.GET_FILE_STATUS_TIME, duration);
-    return status;
+    return getFileStatus(fileInfo, userName);
   }
 
   /** Gets FileStatus corresponding to the given FileInfo value. */
@@ -1417,59 +1259,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   /** Gets GCS FS instance. */
   public GoogleCloudStorageFileSystem getGcsFs() {
     return gcsFsSupplier.get();
-  }
-
-  /**
-   * Increments by 1 the counter indicated by key.
-   */
-  void increment(Counter key) {
-    increment(key, 1);
-  }
-
-  /**
-   * Adds value to the counter indicated by key.
-   */
-  void increment(Counter key, long value) {
-    counters.get(key).addAndGet(value);
-  }
-
-  /**
-   * Gets value of all counters as a formatted string.
-   */
-  @VisibleForTesting
-  String countersToString() {
-    StringBuilder sb = new StringBuilder();
-    sb.append("\n");
-    double numNanoSecPerSec = TimeUnit.SECONDS.toNanos(1);
-    String timeSuffix = "_TIME";
-    for (Counter c : Counter.values()) {
-      String name = c.toString();
-      if (!name.endsWith(timeSuffix)) {
-        // Log invocation counter.
-        long count = counters.get(c).get();
-        sb.append(String.format("%20s = %d calls\n", name, count));
-
-        // Log duration counter.
-        String timeCounterName = name + timeSuffix;
-        double totalTime =
-            counters.get(Enum.valueOf(Counter.class, timeCounterName)).get()
-                / numNanoSecPerSec;
-        sb.append(String.format("%20s = %.2f sec\n", timeCounterName, totalTime));
-
-        // Compute and log average duration per call (== total duration / num invocations).
-        String avgName = name + " avg.";
-        double avg = totalTime / count;
-        sb.append(String.format("%20s = %.2f sec / call\n\n", avgName, avg));
-      }
-    }
-    return sb.toString();
-  }
-
-  /**
-   * Logs values of all counters.
-   */
-  private void logCounters() {
-    logger.atFine().log("%s", lazy(this::countersToString));
   }
 
   /**
@@ -1791,7 +1580,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       }
       gcsFsSupplier = null;
     }
-    logCounters();
   }
 
   @Override
@@ -1810,8 +1598,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   @Override
   public FileChecksum getFileChecksum(Path hadoopPath) throws IOException {
-    long startTime = System.nanoTime();
-    Preconditions.checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
 
@@ -1825,10 +1612,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     FileChecksum checksum = getFileChecksum(checksumType, fileInfo);
     logger.atFinest().log(
         "getFileChecksum(hadoopPath: %s [gcsPath: %s]): %s", hadoopPath, gcsPath, checksum);
-
-    long duration = System.nanoTime() - startTime;
-    increment(Counter.GET_FILE_CHECKSUM);
-    increment(Counter.GET_FILE_CHECKSUM_TIME, duration);
     return checksum;
   }
 
