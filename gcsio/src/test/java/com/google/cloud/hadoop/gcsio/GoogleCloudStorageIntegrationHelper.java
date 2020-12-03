@@ -48,9 +48,6 @@ import java.util.concurrent.TimeUnit;
 /** Integration tests for GoogleCloudStorage class. */
 public abstract class GoogleCloudStorageIntegrationHelper {
 
-  // Application name for OAuth.
-  public static final String APP_NAME = "GCS-test";
-
   // Prefix used for naming test buckets.
   private static final String TEST_BUCKET_NAME_PREFIX = "gcsio-test";
 

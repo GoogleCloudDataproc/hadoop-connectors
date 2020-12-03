@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -116,9 +117,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
         public void before() throws Throwable {
           if (gcsfs == null) {
             Credential credential = GoogleCloudStorageTestHelper.getCredential();
-            String appName = GoogleCloudStorageIntegrationHelper.APP_NAME;
-            String projectId = TestConfiguration.getInstance().getProjectId();
-            assertThat(projectId).isNotNull();
+            String projectId = checkNotNull(TestConfiguration.getInstance().getProjectId());
 
             GoogleCloudStorageFileSystemOptions.Builder optionsBuilder =
                 GoogleCloudStorageFileSystemOptions.builder()
@@ -128,7 +127,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
                 .setBucketDeleteEnabled(true)
                 .setCloudStorageOptions(
                     GoogleCloudStorageOptions.builder()
-                        .setAppName(appName)
+                        .setAppName(GoogleCloudStorageTestHelper.APP_NAME)
                         .setProjectId(projectId)
                         .setWriteChannelOptions(
                             AsyncWriteChannelOptions.builder()

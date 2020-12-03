@@ -30,6 +30,7 @@ import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
+import com.google.cloud.hadoop.util.CheckedFunction;
 import com.google.cloud.hadoop.util.CredentialFactory;
 import com.google.cloud.hadoop.util.CredentialOptions;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
@@ -85,9 +86,7 @@ public class GoogleCloudStorageTestHelper {
   public static GoogleCloudStorageOptions.Builder getStandardOptionBuilder() {
     return GoogleCloudStorageOptions.builder()
         .setAppName(GoogleCloudStorageTestHelper.APP_NAME)
-        .setProjectId(checkNotNull(TestConfiguration.getInstance().getProjectId()))
-        .setMaxListItemsPerCall(50)
-        .setMaxRequestsPerBatch(2);
+        .setProjectId(checkNotNull(TestConfiguration.getInstance().getProjectId()));
   }
 
   /** More efficient version of checking byte arrays than using Assert.assertArrayEquals. */
@@ -292,18 +291,21 @@ public class GoogleCloudStorageTestHelper {
     }
   }
 
-  public static class TrackingGoogleCloudStorage {
+  public static class TrackingStorageWrapper<T> {
 
     public final TrackingHttpRequestInitializer requestsTracker;
-    public final GoogleCloudStorageImpl gcs;
+    public final T tr;
 
-    public TrackingGoogleCloudStorage(GoogleCloudStorageOptions options) throws IOException {
-      RetryHttpInitializer initializer =
-          new RetryHttpInitializer(
-              GoogleCloudStorageTestHelper.getCredential(),
-              options.toRetryHttpInitializerOptions());
-      this.requestsTracker = new TrackingHttpRequestInitializer(initializer);
-      this.gcs = new GoogleCloudStorageImpl(options, this.requestsTracker);
+    public TrackingStorageWrapper(
+        GoogleCloudStorageOptions options,
+        CheckedFunction<TrackingHttpRequestInitializer, T, IOException> gcsFn)
+        throws IOException {
+      this.requestsTracker =
+          new TrackingHttpRequestInitializer(
+              new RetryHttpInitializer(
+                  GoogleCloudStorageTestHelper.getCredential(),
+                  options.toRetryHttpInitializerOptions()));
+      this.tr = gcsFn.apply(this.requestsTracker);
     }
   }
 }

@@ -29,6 +29,7 @@ import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listR
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.postRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.resumableUploadChunkRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.resumableUploadRequestString;
+import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getStandardOptionBuilder;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -39,7 +40,6 @@ import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
-import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -82,14 +82,10 @@ public class GoogleCloudStorageNewIntegrationTest {
 
   @BeforeClass
   public static void beforeClass() throws Throwable {
-    String projectId =
-        checkNotNull(TestConfiguration.getInstance().getProjectId(), "projectId can not be null");
-    String appName = GoogleCloudStorageIntegrationHelper.APP_NAME;
     Credential credential =
         checkNotNull(GoogleCloudStorageTestHelper.getCredential(), "credential must not be null");
 
-    gcsOptions =
-        GoogleCloudStorageOptions.builder().setAppName(appName).setProjectId(projectId).build();
+    gcsOptions = getStandardOptionBuilder().build();
     httpRequestsInitializer =
         new RetryHttpInitializer(credential, gcsOptions.toRetryHttpInitializerOptions());
 
@@ -941,39 +937,6 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(object.getObjectName()).isEqualTo(testDir + "f1");
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(getRequestString(testBucket, testDir + "f1"));
-  }
-
-  @Test
-  public void getItemInfo_perfCache_multipleCalls_oneGcsListRequest() throws Exception {
-    TrackingHttpRequestInitializer gcsRequestsTracker =
-        new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorage gcs =
-        new PerformanceCachingGoogleCloudStorage(
-            new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker),
-            PerformanceCachingGoogleCloudStorageOptions.DEFAULT.toBuilder()
-                .setMaxEntryAgeMillis(10_000)
-                .build());
-
-    String testBucket = gcsfsIHelper.sharedBucketName1;
-    String testDir = createObjectsInTestDir(testBucket, "f1");
-
-    GoogleCloudStorageItemInfo object1 =
-        gcs.getItemInfo(new StorageResourceId(testBucket, testDir + "f1"));
-
-    GoogleCloudStorageItemInfo object2 =
-        gcs.getItemInfo(new StorageResourceId(testBucket, testDir + "f1"));
-
-    GoogleCloudStorageItemInfo object3 =
-        gcs.getItemInfo(new StorageResourceId(testBucket, testDir + "f1"));
-
-    assertThat(object1.getObjectName()).isEqualTo(testDir + "f1");
-    assertThat(object1).isSameInstanceAs(object2);
-    assertThat(object1).isSameInstanceAs(object3);
-
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            listRequestWithTrailingDelimiter(
-                testBucket, testDir, /* maxResults= */ 1024, /* pageToken= */ null));
   }
 
   @Test

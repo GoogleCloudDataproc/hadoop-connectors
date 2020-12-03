@@ -46,9 +46,7 @@ public class GoogleHadoopSyncableOutputStreamIntegrationTest {
 
   @BeforeClass
   public static void beforeClass() throws Exception {
-    gcsFsIHelper =
-        GoogleCloudStorageFileSystemIntegrationHelper.create(
-            GoogleHadoopFileSystemIntegrationHelper.APP_NAME);
+    gcsFsIHelper = GoogleCloudStorageFileSystemIntegrationHelper.create();
     gcsFsIHelper.beforeAllTests();
   }
 
