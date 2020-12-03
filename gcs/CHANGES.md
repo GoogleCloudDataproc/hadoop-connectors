@@ -163,6 +163,9 @@
     fs.gs.copy.max.requests.per.batch
     ```
 
+1.  Change default value of `fs.gs.inputstream.min.range.request.size` property
+    from `524288` to `2097152`.
+
 ### 2.1.1 - 2020-03-11
 
 1.  Add upload cache to support high-level retries of failed uploads. Cache size

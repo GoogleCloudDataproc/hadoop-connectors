@@ -251,7 +251,12 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     buffer = ByteBuffer.allocate(GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE + 1);
     readChannel.position(0);
     readChannel.read(buffer);
-    assertArrayEquals(fakeService.data.substring(0, 524289).toByteArray(), buffer.array());
+    assertArrayEquals(
+        fakeService
+            .data
+            .substring(0, GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE + 1)
+            .toByteArray(),
+        buffer.array());
 
     GetObjectMediaRequest firstExpectedRequest =
         GetObjectMediaRequest.newBuilder()

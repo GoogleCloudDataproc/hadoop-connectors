@@ -85,7 +85,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.inputstream.fadvise", Fadvise.AUTO);
           put("fs.gs.inputstream.fast.fail.on.not.found.enable", true);
           put("fs.gs.inputstream.inplace.seek.limit", 8 * 1024 * 1024L);
-          put("fs.gs.inputstream.min.range.request.size", 512 * 1024);
+          put("fs.gs.inputstream.min.range.request.size", 2 * 1024 * 1024);
           put("fs.gs.inputstream.support.gzip.encoding.enable", false);
           put("fs.gs.io.buffersize.write", 64 * 1024 * 1024);
           put("fs.gs.lazy.init.enable", false);

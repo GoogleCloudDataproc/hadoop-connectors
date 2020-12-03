@@ -457,7 +457,7 @@ permissions (not authorized) to execute these requests.
     are performed by reading and discarding bytes in-place rather than opening a
     new underlying stream.
 
-*   `fs.gs.inputstream.min.range.request.size` (default: `524288`)
+*   `fs.gs.inputstream.min.range.request.size` (default: `2097152`)
 
     Minimum size in bytes of the read range for Cloud Storage request when
     opening a new stream to read an object.
