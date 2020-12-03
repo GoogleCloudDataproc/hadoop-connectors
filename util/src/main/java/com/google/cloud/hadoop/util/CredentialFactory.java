@@ -44,6 +44,8 @@ import com.google.api.client.util.PemReader;
 import com.google.api.client.util.PemReader.Section;
 import com.google.api.client.util.SecurityUtils;
 import com.google.api.services.storage.StorageScopes;
+import com.google.auth.Credentials;
+import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.hadoop.util.HttpTransportFactory.HttpTransportType;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
@@ -61,6 +63,7 @@ import java.security.PrivateKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.List;
+import javax.annotation.Nullable;
 
 /** Miscellaneous helper methods for getting a {@code Credential} from various sources. */
 public class CredentialFactory {
@@ -68,6 +71,24 @@ public class CredentialFactory {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   static final String CREDENTIAL_ENV_VAR = "GOOGLE_APPLICATION_CREDENTIALS";
+
+  public static class CredentialWrapper {
+    private final Credential credential;
+    private final Credentials credentials;
+
+    public CredentialWrapper(Credential credential, @Nullable Credentials credentials) {
+      this.credential = credential;
+      this.credentials = credentials;
+    }
+
+    public Credential getCredential() {
+      return credential;
+    }
+
+    public Credentials getCredentials() {
+      return credentials;
+    }
+  }
 
   /**
    * Simple HttpRequestInitializer that retries requests that result in 5XX response codes and IO
@@ -283,8 +304,23 @@ public class CredentialFactory {
         options.getTokenServerUrl());
   }
 
+  /** Get credentials listed in a JSON file. */
+  public Credentials getCredentialsFromJsonKeyFile() throws IOException {
+    if (isNullOrEmpty(options.getServiceAccountJsonKeyFile())) {
+      return null;
+    }
+
+    logger.atFine().log(
+        "getCredentialFromJsonKeyFile() from '%s'", options.getServiceAccountJsonKeyFile());
+
+    HttpTransport transport = getTransport();
+    try (FileInputStream fis = new FileInputStream(options.getServiceAccountJsonKeyFile())) {
+      return GoogleCredentials.fromStream(fis, () -> transport);
+    }
+  }
+
   /**
-   * Get credentials listed in a JSON file.
+   * Get credential listed in a JSON file.
    *
    * @param scopes The OAuth scopes that the credential should be valid for.
    * @param transport The HttpTransport used for authorization

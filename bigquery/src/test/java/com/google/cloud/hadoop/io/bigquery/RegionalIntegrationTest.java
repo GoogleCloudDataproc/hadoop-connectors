@@ -180,7 +180,8 @@ public class RegionalIntegrationTest {
         new Storage.Builder(
                 HTTP_TRANSPORT,
                 JSON_FACTORY,
-                new RetryHttpInitializer(GoogleCloudStorageTestHelper.getCredential(), BQC_ID))
+                new RetryHttpInitializer(
+                    GoogleCloudStorageTestHelper.getCredentialWrapper().getCredential(), BQC_ID))
             .setApplicationName(BQC_ID)
             .build();
     GoogleCloudStorageFileSystem gcsFs =

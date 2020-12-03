@@ -31,6 +31,7 @@ import static org.junit.Assert.assertThrows;
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
+import com.google.cloud.hadoop.util.CredentialFactory;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.collect.ImmutableList;
 import java.io.FileNotFoundException;
@@ -66,7 +67,9 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
         checkNotNull(TestConfiguration.getInstance().getProjectId(), "projectId can not be null");
     String appName = GoogleCloudStorageIntegrationHelper.APP_NAME;
     Credential credential =
-        checkNotNull(GoogleCloudStorageTestHelper.getCredential(), "credential must not be null");
+        checkNotNull(
+            GoogleCloudStorageTestHelper.getCredentialWrapper().getCredential(),
+            "credential must not be null");
 
     gcsOptions =
         GoogleCloudStorageOptions.builder().setAppName(appName).setProjectId(projectId).build();
@@ -75,7 +78,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
 
     GoogleCloudStorageFileSystem gcsfs =
         new GoogleCloudStorageFileSystem(
-            credential,
+            new CredentialFactory.CredentialWrapper(credential, null),
             GoogleCloudStorageFileSystemOptions.builder()
                 .setBucketDeleteEnabled(true)
                 .setCloudStorageOptions(gcsOptions)

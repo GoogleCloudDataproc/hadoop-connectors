@@ -26,7 +26,6 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static java.lang.Math.toIntExact;
 
-import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.batch.json.JsonBatchCallback;
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
@@ -58,6 +57,7 @@ import com.google.cloud.hadoop.gcsio.authorization.StorageRequestAuthorizer;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
+import com.google.cloud.hadoop.util.CredentialFactory.CredentialWrapper;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
@@ -235,23 +235,26 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
    *
-   * @param credential OAuth2 credential that allows access to GCS
+   * @param credentialWrapper OAuth2 credential wrapper that allows access to GCS
    * @throws IOException on IO error
    */
-  public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Credential credential)
-      throws IOException {
+  public GoogleCloudStorageImpl(
+      GoogleCloudStorageOptions options, CredentialWrapper credentialWrapper) throws IOException {
     this(
         options,
-        new RetryHttpInitializer(
-            checkNotNull(credential, "credential must not be null"),
-            options.toRetryHttpInitializerOptions()));
+        createStorage(
+            options,
+            new RetryHttpInitializer(
+                checkNotNull(credentialWrapper.getCredential(), "credential must not be null"),
+                options.toRetryHttpInitializerOptions())),
+        credentialWrapper);
   }
 
   @VisibleForTesting
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer)
       throws IOException {
-    this(options, createStorage(options, httpRequestInitializer));
+    this(options, createStorage(options, httpRequestInitializer), null);
   }
 
   /**
@@ -260,7 +263,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param storage {@link Storage} to use for I/O.
    */
   @VisibleForTesting
-  GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage storage) {
+  GoogleCloudStorageImpl(
+      GoogleCloudStorageOptions options,
+      Storage storage,
+      @Nullable CredentialWrapper credentialWrapper) {
     logger.atFine().log("GCS(options: %s)", options);
 
     this.storageOptions = checkNotNull(options, "options must not be null");
@@ -277,7 +283,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     if (this.storageOptions.isGrpcEnabled()) {
       this.storageStubProvider =
           new StorageStubProvider(
-              this.storageOptions.getReadChannelOptions(), this.backgroundTasksThreadPool);
+              this.storageOptions.getReadChannelOptions(),
+              this.backgroundTasksThreadPool,
+              credentialWrapper.getCredentials());
     }
 
     this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);

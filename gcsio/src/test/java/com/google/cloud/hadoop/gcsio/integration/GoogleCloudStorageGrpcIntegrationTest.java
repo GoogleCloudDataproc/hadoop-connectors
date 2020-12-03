@@ -33,7 +33,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   private static GoogleCloudStorage createGoogleCloudStorage() throws IOException {
     return new GoogleCloudStorageImpl(
         GoogleCloudStorageTestHelper.getStandardOptionBuilder().setGrpcEnabled(true).build(),
-        GoogleCloudStorageTestHelper.getCredential());
+        GoogleCloudStorageTestHelper.getCredentialWrapper());
   }
 
   @BeforeClass

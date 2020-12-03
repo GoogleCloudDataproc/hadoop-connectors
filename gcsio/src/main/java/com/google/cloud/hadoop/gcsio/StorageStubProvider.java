@@ -3,6 +3,7 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.ClientProto;
+import com.google.auth.Credentials;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.google.storage.v1.StorageGrpc;
@@ -18,10 +19,11 @@ import io.grpc.Context;
 import io.grpc.ForwardingClientCall.SimpleForwardingClientCall;
 import io.grpc.ForwardingClientCallListener.SimpleForwardingClientCallListener;
 import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 import io.grpc.Metadata;
 import io.grpc.MethodDescriptor;
 import io.grpc.Status;
-import io.grpc.alts.GoogleDefaultChannelBuilder;
+import io.grpc.auth.MoreCallCredentials;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -52,6 +54,7 @@ public class StorageStubProvider {
   private final GoogleCloudStorageReadOptions readOptions;
   private final ExecutorService backgroundTasksThreadPool;
   private final List<ChannelAndRequestCounter> mediaChannelPool;
+  private final Credentials credentials;
 
   // An interceptor that can be added around a gRPC channel which keeps a count of the number
   // of requests that are active at any given moment.
@@ -130,16 +133,19 @@ public class StorageStubProvider {
   }
 
   public StorageStubProvider(
-      GoogleCloudStorageReadOptions readOptions, ExecutorService backgroundTasksThreadPool) {
+      GoogleCloudStorageReadOptions readOptions,
+      ExecutorService backgroundTasksThreadPool,
+      Credentials credentials) {
     this.readOptions = readOptions;
     this.backgroundTasksThreadPool = backgroundTasksThreadPool;
     this.mediaChannelPool = new ArrayList<>();
+    this.credentials = credentials;
   }
 
   private ChannelAndRequestCounter buildManagedChannel() {
     ActiveRequestCounter counter = new ActiveRequestCounter();
     ManagedChannel channel =
-        GoogleDefaultChannelBuilder.forTarget(
+        ManagedChannelBuilder.forTarget(
                 isNullOrEmpty(readOptions.getGrpcServerAddress())
                     ? DEFAULT_GCS_GRPC_SERVER_ADDRESS
                     : readOptions.getGrpcServerAddress())
@@ -151,11 +157,22 @@ public class StorageStubProvider {
   }
 
   public StorageBlockingStub getBlockingStub() {
-    return StorageGrpc.newBlockingStub(getManagedChannel());
+    StorageBlockingStub blockingStub = StorageGrpc.newBlockingStub(getManagedChannel());
+    if (credentials != null) {
+      blockingStub = blockingStub.withCallCredentials(MoreCallCredentials.from(credentials));
+    }
+    return blockingStub;
   }
 
   public StorageStub getAsyncStub() {
-    return StorageGrpc.newStub(getManagedChannel()).withExecutor(backgroundTasksThreadPool);
+    StorageStub asyncStub = StorageGrpc.newStub(getManagedChannel());
+    if (credentials != null) {
+      asyncStub =
+          asyncStub
+              .withCallCredentials(MoreCallCredentials.from(credentials))
+              .withExecutor(backgroundTasksThreadPool);
+    }
+    return asyncStub.withExecutor(backgroundTasksThreadPool);
   }
 
   private synchronized ManagedChannel getManagedChannel() {

@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.gcsio.integration;
 
+import static com.google.cloud.hadoop.util.CredentialFactory.CredentialWrapper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -21,7 +22,6 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.fail;
 
-import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
@@ -61,22 +61,24 @@ public class GoogleCloudStorageTestHelper {
 
   public static GoogleCloudStorage createGoogleCloudStorage() {
     try {
-      return new GoogleCloudStorageImpl(getStandardOptionBuilder().build(), getCredential());
+      return new GoogleCloudStorageImpl(getStandardOptionBuilder().build(), getCredentialWrapper());
     } catch (IOException e) {
       throw new RuntimeException("Failed to create GoogleCloudStorage instance", e);
     }
   }
 
-  public static Credential getCredential() throws IOException {
+  public static CredentialWrapper getCredentialWrapper() throws IOException {
     CredentialOptions credentialOptions =
         CredentialOptions.builder()
-            .setServiceAccountEmail(TestConfiguration.getInstance().getServiceAccount())
-            .setServiceAccountKeyFile(TestConfiguration.getInstance().getPrivateKeyFile())
+            .setServiceAccountJsonKeyFile(
+                TestConfiguration.getInstance().getServiceAccountJsonKeyFile())
             .build();
     CredentialFactory credentialFactory = new CredentialFactory(credentialOptions);
 
     try {
-      return credentialFactory.getCredential(CredentialFactory.DEFAULT_SCOPES);
+      return new CredentialFactory.CredentialWrapper(
+          credentialFactory.getCredential(CredentialFactory.DEFAULT_SCOPES),
+          credentialFactory.getCredentialsFromJsonKeyFile());
     } catch (GeneralSecurityException e) {
       throw new IOException("Failed to create test credentials", e);
     }
@@ -300,7 +302,7 @@ public class GoogleCloudStorageTestHelper {
     public TrackingGoogleCloudStorage(GoogleCloudStorageOptions options) throws IOException {
       RetryHttpInitializer initializer =
           new RetryHttpInitializer(
-              GoogleCloudStorageTestHelper.getCredential(),
+              GoogleCloudStorageTestHelper.getCredentialWrapper().getCredential(),
               options.toRetryHttpInitializerOptions());
       this.requestsTracker = new TrackingHttpRequestInitializer(initializer);
       this.gcs = new GoogleCloudStorageImpl(options, this.requestsTracker);

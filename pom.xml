@@ -438,6 +438,16 @@
         <artifactId>guava-retrying</artifactId>
         <version>${guava.retrying.version}</version>
       </dependency>
+      <dependency>
+        <groupId>com.google.auth</groupId>
+        <artifactId>google-auth-library-credentials</artifactId>
+        <version>${google.auth.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.auth</groupId>
+        <artifactId>google-auth-library-oauth2-http</artifactId>
+        <version>${google.auth.version}</version>
+      </dependency>
 
       <!-- Test dependencies -->
       <dependency>

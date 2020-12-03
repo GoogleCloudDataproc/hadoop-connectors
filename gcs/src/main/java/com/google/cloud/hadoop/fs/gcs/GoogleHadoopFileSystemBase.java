@@ -29,6 +29,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT;
 import static com.google.cloud.hadoop.gcsio.CreateFileOptions.DEFAULT_OVERWRITE;
+import static com.google.cloud.hadoop.util.CredentialFactory.CredentialWrapper;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
@@ -1478,7 +1479,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * build a credential with access token provided by this provider; Otherwise obtain credential
    * through {@link HadoopCredentialConfiguration#getCredentialFactory(Configuration, String...)}.
    */
-  private Credential getCredential(
+  private CredentialWrapper getCredential(
       Configuration config, GoogleCloudStorageFileSystemOptions gcsFsOptions)
       throws IOException, GeneralSecurityException {
     Credential credential = null;
@@ -1512,7 +1513,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     // If impersonation service account exists, then use current credential to request access token
     // for the impersonating service account.
-    return getImpersonatedCredential(config, gcsFsOptions, credential).orElse(credential);
+    return new CredentialWrapper(
+        getImpersonatedCredential(config, gcsFsOptions, credential).orElse(credential),
+        HadoopCredentialConfiguration.getCredentialFactory(config, GCS_CONFIG_PREFIX)
+            .getCredentialsFromJsonKeyFile());
   }
 
   /**
@@ -1640,14 +1644,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     GoogleCloudStorageFileSystemOptions gcsFsOptions =
         GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
 
-    Credential credential;
+    CredentialWrapper credentialWrapper;
     try {
-      credential = getCredential(config, gcsFsOptions);
+      credentialWrapper = getCredential(config, gcsFsOptions);
     } catch (GeneralSecurityException e) {
       throw new RuntimeException(e);
     }
 
-    return new GoogleCloudStorageFileSystem(credential, gcsFsOptions);
+    return new GoogleCloudStorageFileSystem(credentialWrapper, gcsFsOptions);
   }
 
   /**

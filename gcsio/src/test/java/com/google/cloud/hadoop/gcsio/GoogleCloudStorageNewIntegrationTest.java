@@ -86,7 +86,9 @@ public class GoogleCloudStorageNewIntegrationTest {
         checkNotNull(TestConfiguration.getInstance().getProjectId(), "projectId can not be null");
     String appName = GoogleCloudStorageIntegrationHelper.APP_NAME;
     Credential credential =
-        checkNotNull(GoogleCloudStorageTestHelper.getCredential(), "credential must not be null");
+        checkNotNull(
+            GoogleCloudStorageTestHelper.getCredentialWrapper().getCredential(),
+            "credential must not be null");
 
     gcsOptions =
         GoogleCloudStorageOptions.builder().setAppName(appName).setProjectId(projectId).build();
@@ -95,7 +97,7 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     GoogleCloudStorageFileSystem gcsfs =
         new GoogleCloudStorageFileSystem(
-            credential,
+            GoogleCloudStorageTestHelper.getCredentialWrapper(),
             GoogleCloudStorageFileSystemOptions.builder()
                 .setBucketDeleteEnabled(true)
                 .setCloudStorageOptions(gcsOptions)

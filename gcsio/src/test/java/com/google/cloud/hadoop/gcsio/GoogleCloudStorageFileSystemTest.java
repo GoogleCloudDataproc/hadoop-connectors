@@ -14,10 +14,10 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.util.CredentialFactory.CredentialWrapper;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
-import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
@@ -105,11 +105,11 @@ public class GoogleCloudStorageFileSystemTest
     // Verify that projectId == null or empty does not throw.
     optionsBuilder.setCloudStorageOptions(
         options.getCloudStorageOptions().toBuilder().setProjectId(null).build());
-    new GoogleCloudStorageFileSystem(cred, optionsBuilder.build());
+    new GoogleCloudStorageFileSystem(new CredentialWrapper(cred, null), optionsBuilder.build());
 
     optionsBuilder.setCloudStorageOptions(
         options.getCloudStorageOptions().toBuilder().setProjectId("").build());
-    new GoogleCloudStorageFileSystem(cred, optionsBuilder.build());
+    new GoogleCloudStorageFileSystem(new CredentialWrapper(cred, null), optionsBuilder.build());
 
     optionsBuilder.setCloudStorageOptions(
         options.getCloudStorageOptions().toBuilder()
@@ -123,13 +123,17 @@ public class GoogleCloudStorageFileSystemTest
         options.getCloudStorageOptions().toBuilder().setAppName(null).build());
     assertThrows(
         IllegalArgumentException.class,
-        () -> new GoogleCloudStorageFileSystem(cred, optionsBuilder.build()));
+        () ->
+            new GoogleCloudStorageFileSystem(
+                new CredentialWrapper(cred, null), optionsBuilder.build()));
 
     optionsBuilder.setCloudStorageOptions(
         options.getCloudStorageOptions().toBuilder().setAppName("").build());
     assertThrows(
         IllegalArgumentException.class,
-        () -> new GoogleCloudStorageFileSystem(cred, optionsBuilder.build()));
+        () ->
+            new GoogleCloudStorageFileSystem(
+                new CredentialWrapper(cred, null), optionsBuilder.build()));
 
     optionsBuilder.setCloudStorageOptions(
         options.getCloudStorageOptions().toBuilder().setAppName("appName").build());
@@ -137,13 +141,13 @@ public class GoogleCloudStorageFileSystemTest
     // Verify that credential == null throws IllegalArgumentException.
     assertThrows(
         NullPointerException.class,
-        () -> new GoogleCloudStorageFileSystem((Credential) null, optionsBuilder.build()));
+        () -> new GoogleCloudStorageFileSystem((CredentialWrapper) null, optionsBuilder.build()));
 
     // Verify that fake projectId/appName and empty cred does not throw.
     setDefaultValidOptions(optionsBuilder);
 
     GoogleCloudStorageFileSystem tmpGcsFs =
-        new GoogleCloudStorageFileSystem(cred, optionsBuilder.build());
+        new GoogleCloudStorageFileSystem(new CredentialWrapper(cred, null), optionsBuilder.build());
 
     // White-box testing; check a few internal outcomes of our options.
     assertThat(tmpGcsFs.getGcs()).isInstanceOf(GoogleCloudStorageImpl.class);

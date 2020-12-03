@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
+import static com.google.cloud.hadoop.util.CredentialFactory.CredentialWrapper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -28,7 +29,6 @@ import static java.lang.Math.min;
 import static java.util.Comparator.comparing;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
-import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationDelete;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationRename;
@@ -135,21 +135,22 @@ public class GoogleCloudStorageFileSystem {
   /**
    * Constructs an instance of GoogleCloudStorageFileSystem.
    *
-   * @param credential OAuth2 credential that allows access to GCS.
+   * @param credentialWarpper OAuth2 credential wrapper that allows access to GCS.
    * @param options Options for how this filesystem should operate and configure its underlying
    *     storage.
    * @throws IOException
    */
   public GoogleCloudStorageFileSystem(
-      Credential credential, GoogleCloudStorageFileSystemOptions options) throws IOException {
+      CredentialWrapper credentialWarpper, GoogleCloudStorageFileSystemOptions options)
+      throws IOException {
     logger.atFine().log("GoogleCloudStorageFileSystem(options: %s)", options);
 
-    checkNotNull(credential, "credential must not be null");
+    checkNotNull(credentialWarpper.getCredential(), "credential must not be null");
 
     this.options = checkNotNull(options, "options must not be null");
     this.options.throwIfNotValid();
 
-    this.gcs = new GoogleCloudStorageImpl(this.options.getCloudStorageOptions(), credential);
+    this.gcs = new GoogleCloudStorageImpl(this.options.getCloudStorageOptions(), credentialWarpper);
 
     if (options.isPerformanceCacheEnabled()) {
       this.gcs =

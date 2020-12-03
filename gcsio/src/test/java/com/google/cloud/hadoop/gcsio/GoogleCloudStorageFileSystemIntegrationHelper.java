@@ -44,7 +44,7 @@ public class GoogleCloudStorageFileSystemIntegrationHelper
             .build();
 
     return new GoogleCloudStorageFileSystem(
-        GoogleCloudStorageTestHelper.getCredential(),
+        GoogleCloudStorageTestHelper.getCredentialWrapper(),
         GoogleCloudStorageFileSystemOptions.builder()
             .setBucketDeleteEnabled(true)
             .setCloudStorageOptions(gcsOptions)
