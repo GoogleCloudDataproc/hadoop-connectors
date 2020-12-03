@@ -137,6 +137,9 @@
 
 1.  Fix unauthenticated access support (`fs.gs.auth.null.enable=true`).
 
+1.  Improve cache hit ratio when `fs.gs.performance.cache.list.caching.enable`
+    property is set to `true`. 
+
 ### 2.1.1 - 2020-03-11
 
 1.  Add upload cache to support high-level retries of failed uploads. Cache size

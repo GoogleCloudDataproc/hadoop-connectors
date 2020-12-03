@@ -944,6 +944,39 @@ public class GoogleCloudStorageNewIntegrationTest {
   }
 
   @Test
+  public void getItemInfo_perfCache_multipleCalls_oneGcsListRequest() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs =
+        new PerformanceCachingGoogleCloudStorage(
+            new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker),
+            PerformanceCachingGoogleCloudStorageOptions.DEFAULT.toBuilder()
+                .setMaxEntryAgeMillis(10_000)
+                .build());
+
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    String testDir = createObjectsInTestDir(testBucket, "f1");
+
+    GoogleCloudStorageItemInfo object1 =
+        gcs.getItemInfo(new StorageResourceId(testBucket, testDir + "f1"));
+
+    GoogleCloudStorageItemInfo object2 =
+        gcs.getItemInfo(new StorageResourceId(testBucket, testDir + "f1"));
+
+    GoogleCloudStorageItemInfo object3 =
+        gcs.getItemInfo(new StorageResourceId(testBucket, testDir + "f1"));
+
+    assertThat(object1.getObjectName()).isEqualTo(testDir + "f1");
+    assertThat(object1).isSameInstanceAs(object2);
+    assertThat(object1).isSameInstanceAs(object3);
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                testBucket, testDir, /* maxResults= */ 1024, /* pageToken= */ null));
+  }
+
+  @Test
   public void getItemInfos_withoutLimits() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
