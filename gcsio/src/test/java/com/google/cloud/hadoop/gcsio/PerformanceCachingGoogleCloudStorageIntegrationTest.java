@@ -73,9 +73,9 @@ public class PerformanceCachingGoogleCloudStorageIntegrationTest {
 
     helperGcs.createEmptyObject(resourceId);
 
-    GoogleCloudStorageItemInfo object1 = trackingGcs.tr.getItemInfo(resourceId);
-    GoogleCloudStorageItemInfo object2 = trackingGcs.tr.getItemInfo(resourceId);
-    GoogleCloudStorageItemInfo object3 = trackingGcs.tr.getItemInfo(resourceId);
+    GoogleCloudStorageItemInfo object1 = trackingGcs.delegate.getItemInfo(resourceId);
+    GoogleCloudStorageItemInfo object2 = trackingGcs.delegate.getItemInfo(resourceId);
+    GoogleCloudStorageItemInfo object3 = trackingGcs.delegate.getItemInfo(resourceId);
 
     assertThat(object1.getResourceId()).isEqualTo(resourceId);
     assertThat(object1).isSameInstanceAs(object2);

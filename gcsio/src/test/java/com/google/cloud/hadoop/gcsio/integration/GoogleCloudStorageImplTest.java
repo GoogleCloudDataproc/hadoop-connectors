@@ -96,7 +96,7 @@ public class GoogleCloudStorageImplTest {
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
 
-    try (SeekableByteChannel readChannel = trackingGcs.tr.open(resourceId, readOptions)) {
+    try (SeekableByteChannel readChannel = trackingGcs.delegate.open(resourceId, readOptions)) {
       assertThat(readChannel.size()).isEqualTo(expectedSize);
     }
 
@@ -119,7 +119,10 @@ public class GoogleCloudStorageImplTest {
     int partitionsCount = 32;
     byte[] partition =
         writeObject(
-            trackingGcs.tr, resourceId, /* partitionSize= */ 5 * 1024 * 1024, partitionsCount);
+            trackingGcs.delegate,
+            resourceId,
+            /* partitionSize= */ 5 * 1024 * 1024,
+            partitionsCount);
 
     assertObjectContent(helperGcs, resourceId, partition, partitionsCount);
 
@@ -140,7 +143,8 @@ public class GoogleCloudStorageImplTest {
 
     int partitionsCount = 17;
     byte[] partition =
-        writeObject(trackingGcs.tr, resourceId, /* partitionSize= */ 1024 * 1024, partitionsCount);
+        writeObject(
+            trackingGcs.delegate, resourceId, /* partitionSize= */ 1024 * 1024, partitionsCount);
 
     assertObjectContent(helperGcs, resourceId, partition, partitionsCount);
 
@@ -161,12 +165,12 @@ public class GoogleCloudStorageImplTest {
     GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
 
     WritableByteChannel channel1 =
-        trackingGcs.tr.create(resourceId, CreateObjectOptions.DEFAULT_NO_OVERWRITE);
+        trackingGcs.delegate.create(resourceId, CreateObjectOptions.DEFAULT_NO_OVERWRITE);
     channel1.write(ByteBuffer.wrap(bytesToWrite));
 
     // Creating this channel should succeed. Only when we close will an error bubble up.
     WritableByteChannel channel2 =
-        trackingGcs.tr.create(resourceId, CreateObjectOptions.DEFAULT_NO_OVERWRITE);
+        trackingGcs.delegate.create(resourceId, CreateObjectOptions.DEFAULT_NO_OVERWRITE);
 
     channel1.close();
 
@@ -209,7 +213,7 @@ public class GoogleCloudStorageImplTest {
     TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
 
-    trackingGcs.tr.createEmptyObject(resourceId);
+    trackingGcs.delegate.createEmptyObject(resourceId);
 
     // Verify that explicit directory object does not exist
     GoogleCloudStorageItemInfo itemInfo =
@@ -241,14 +245,14 @@ public class GoogleCloudStorageImplTest {
     TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
 
-    trackingGcs.tr.createEmptyObject(
+    trackingGcs.delegate.createEmptyObject(
         resourceId1, CreateObjectOptions.builder().setContentType("text/plain").build());
     trackingGcs
-        .tr
+        .delegate
         .create(resourceId2, CreateObjectOptions.builder().setContentType("image/png").build())
         .close();
     // default content-type: "application/octet-stream"
-    trackingGcs.tr.create(resourceId3).close();
+    trackingGcs.delegate.create(resourceId3).close();
 
     assertThat(
             helperGcs.getItemInfos(ImmutableList.of(resourceId1, resourceId2, resourceId3)).stream()
@@ -312,7 +316,7 @@ public class GoogleCloudStorageImplTest {
     byte[] partition =
         writeObject(helperGcs, resourceId, /* partitionSize= */ 64 * 1024 * 1024, partitionsCount);
 
-    trackingGcs.tr.copy(
+    trackingGcs.delegate.copy(
         srcBucketName, ImmutableList.of(resourceId.getObjectName()),
         dstBucketName, ImmutableList.of(copiedResourceId.getObjectName()));
 
@@ -360,7 +364,7 @@ public class GoogleCloudStorageImplTest {
             "key", "value1".getBytes(StandardCharsets.UTF_8),
             "key2", "value2".getBytes(StandardCharsets.UTF_8));
 
-    trackingGcs.tr.createEmptyObject(
+    trackingGcs.delegate.createEmptyObject(
         resourceId, CreateObjectOptions.builder().setMetadata(expectedMetadata).build());
 
     GoogleCloudStorageItemInfo itemInfo = helperGcs.getItemInfo(resourceId);

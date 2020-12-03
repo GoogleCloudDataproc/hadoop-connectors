@@ -77,9 +77,9 @@ public class GoogleCloudStorageFileSystemPerformanceCacheIntegrationTest {
     TrackingStorageWrapper<GoogleCloudStorageFileSystem> trackingGcsfs =
         newTrackingGoogleCloudStorageFileSystem(GCSFS_OPTIONS);
 
-    FileInfo dirInfo1 = trackingGcsfs.tr.getFileInfo(fileUri);
-    FileInfo dirInfo2 = trackingGcsfs.tr.getFileInfo(fileUri);
-    FileInfo dirInfo3 = trackingGcsfs.tr.getFileInfo(fileUri);
+    FileInfo dirInfo1 = trackingGcsfs.delegate.getFileInfo(fileUri);
+    FileInfo dirInfo2 = trackingGcsfs.delegate.getFileInfo(fileUri);
+    FileInfo dirInfo3 = trackingGcsfs.delegate.getFileInfo(fileUri);
 
     assertThat(dirInfo1.exists()).isFalse();
     assertThat(dirInfo1.getPath()).isEqualTo(fileUri);
@@ -116,9 +116,9 @@ public class GoogleCloudStorageFileSystemPerformanceCacheIntegrationTest {
 
     helperGcs.createEmptyObject(new StorageResourceId(TEST_BUCKET, parentDir + "/"));
 
-    FileInfo dirInfo1 = trackingGcsfs.tr.getFileInfo(fileUri);
-    FileInfo dirInfo2 = trackingGcsfs.tr.getFileInfo(fileUri);
-    FileInfo dirInfo3 = trackingGcsfs.tr.getFileInfo(fileUri);
+    FileInfo dirInfo1 = trackingGcsfs.delegate.getFileInfo(fileUri);
+    FileInfo dirInfo2 = trackingGcsfs.delegate.getFileInfo(fileUri);
+    FileInfo dirInfo3 = trackingGcsfs.delegate.getFileInfo(fileUri);
 
     assertThat(dirInfo1.exists()).isFalse();
     assertThat(dirInfo1.getPath()).isEqualTo(fileUri);
@@ -155,9 +155,9 @@ public class GoogleCloudStorageFileSystemPerformanceCacheIntegrationTest {
 
     helperGcs.createEmptyObject(new StorageResourceId(TEST_BUCKET, file + "_sibling"));
 
-    FileInfo dirInfo1 = trackingGcsfs.tr.getFileInfo(fileUri);
-    FileInfo dirInfo2 = trackingGcsfs.tr.getFileInfo(fileUri);
-    FileInfo dirInfo3 = trackingGcsfs.tr.getFileInfo(fileUri);
+    FileInfo dirInfo1 = trackingGcsfs.delegate.getFileInfo(fileUri);
+    FileInfo dirInfo2 = trackingGcsfs.delegate.getFileInfo(fileUri);
+    FileInfo dirInfo3 = trackingGcsfs.delegate.getFileInfo(fileUri);
 
     assertThat(dirInfo1.exists()).isFalse();
     assertThat(dirInfo1.getPath()).isEqualTo(fileUri);
@@ -190,9 +190,9 @@ public class GoogleCloudStorageFileSystemPerformanceCacheIntegrationTest {
 
     helperGcs.createEmptyObject(new StorageResourceId(TEST_BUCKET, file));
 
-    FileInfo fileInfo1 = trackingGcsfs.tr.getFileInfo(fileUri);
-    FileInfo fileInfo2 = trackingGcsfs.tr.getFileInfo(fileUri);
-    FileInfo fileInfo3 = trackingGcsfs.tr.getFileInfo(fileUri);
+    FileInfo fileInfo1 = trackingGcsfs.delegate.getFileInfo(fileUri);
+    FileInfo fileInfo2 = trackingGcsfs.delegate.getFileInfo(fileUri);
+    FileInfo fileInfo3 = trackingGcsfs.delegate.getFileInfo(fileUri);
 
     assertThat(fileInfo1.exists()).isTrue();
     assertThat(fileInfo1.getPath()).isEqualTo(fileUri);
@@ -218,9 +218,9 @@ public class GoogleCloudStorageFileSystemPerformanceCacheIntegrationTest {
     TrackingStorageWrapper<GoogleCloudStorageFileSystem> trackingGcsfs =
         newTrackingGoogleCloudStorageFileSystem(GCSFS_OPTIONS);
 
-    FileInfo dirInfo1 = trackingGcsfs.tr.getFileInfo(dirUri);
-    FileInfo dirInfo2 = trackingGcsfs.tr.getFileInfo(dirUri);
-    FileInfo dirInfo3 = trackingGcsfs.tr.getFileInfo(dirUri);
+    FileInfo dirInfo1 = trackingGcsfs.delegate.getFileInfo(dirUri);
+    FileInfo dirInfo2 = trackingGcsfs.delegate.getFileInfo(dirUri);
+    FileInfo dirInfo3 = trackingGcsfs.delegate.getFileInfo(dirUri);
 
     assertThat(dirInfo1.exists()).isFalse();
     assertThat(dirInfo1.getPath()).isEqualTo(dirUri);
@@ -262,9 +262,9 @@ public class GoogleCloudStorageFileSystemPerformanceCacheIntegrationTest {
     helperGcs.createEmptyObject(new StorageResourceId(TEST_BUCKET, dir + "/file1"));
     helperGcs.createEmptyObject(new StorageResourceId(TEST_BUCKET, dir + "/file2"));
 
-    FileInfo dirInfo1 = trackingGcsfs.tr.getFileInfo(dirUri);
-    FileInfo dirInfo2 = trackingGcsfs.tr.getFileInfo(dirUri);
-    FileInfo dirInfo3 = trackingGcsfs.tr.getFileInfo(dirUri);
+    FileInfo dirInfo1 = trackingGcsfs.delegate.getFileInfo(dirUri);
+    FileInfo dirInfo2 = trackingGcsfs.delegate.getFileInfo(dirUri);
+    FileInfo dirInfo3 = trackingGcsfs.delegate.getFileInfo(dirUri);
 
     assertThat(dirInfo1.exists()).isTrue();
     assertThat(dirInfo1.getPath().toString()).isEqualTo(dirUri + "/");

@@ -294,18 +294,18 @@ public class GoogleCloudStorageTestHelper {
   public static class TrackingStorageWrapper<T> {
 
     public final TrackingHttpRequestInitializer requestsTracker;
-    public final T tr;
+    public final T delegate;
 
     public TrackingStorageWrapper(
         GoogleCloudStorageOptions options,
-        CheckedFunction<TrackingHttpRequestInitializer, T, IOException> gcsFn)
+        CheckedFunction<TrackingHttpRequestInitializer, T, IOException> delegateStorageFn)
         throws IOException {
       this.requestsTracker =
           new TrackingHttpRequestInitializer(
               new RetryHttpInitializer(
                   GoogleCloudStorageTestHelper.getCredential(),
                   options.toRetryHttpInitializerOptions()));
-      this.tr = gcsFn.apply(this.requestsTracker);
+      this.delegate = delegateStorageFn.apply(this.requestsTracker);
     }
   }
 }

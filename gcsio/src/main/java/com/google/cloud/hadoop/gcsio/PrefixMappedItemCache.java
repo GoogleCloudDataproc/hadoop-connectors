@@ -119,7 +119,7 @@ public class PrefixMappedItemCache {
   }
 
   /**
-   * Checks where items with specified prefix are in the cache.
+   * Checks whether any items with specified prefix are in the cache.
    *
    * @param id the prefix resource id of the cached items to check.
    * @return true if items with provided prefix are cached, false otherwise.
