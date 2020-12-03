@@ -31,9 +31,11 @@ import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier;
+import org.apache.hadoop.service.AbstractService;
+import org.apache.hadoop.service.ServiceOperations;
 
 /** Manages delegation tokens for files system */
-public class GcsDelegationTokens {
+public class GcsDelegationTokens extends AbstractService {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
@@ -56,10 +58,11 @@ public class GcsDelegationTokens {
   private Token<DelegationTokenIdentifier> boundDT = null;
 
   public GcsDelegationTokens() throws IOException {
+    super("GCSDelegationTokens");
     user = UserGroupInformation.getCurrentUser();
   }
 
-  public void init(Configuration conf) {
+  public void serviceInit(final Configuration conf) throws Exception {
     String tokenBindingImpl = conf.get(DELEGATION_TOKEN_BINDING_CLASS.getKey());
 
     checkState(tokenBindingImpl != null, "Delegation Tokens are not configured");
@@ -69,13 +72,33 @@ public class GcsDelegationTokens {
       AbstractDelegationTokenBinding binding =
           (AbstractDelegationTokenBinding) bindingClass.getDeclaredConstructor().newInstance();
       binding.bindToFileSystem(fileSystem, getService());
+      binding.init(conf);
       tokenBinding = binding;
       logger.atFine().log(
           "Filesystem %s is using delegation tokens of kind %s",
           getService(), tokenBinding.getKind());
-      bindToAnyDelegationToken();
     } catch (Exception e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  protected void serviceStart() throws Exception {
+    super.serviceStart();
+    tokenBinding.start();
+    bindToAnyDelegationToken();
+    logger.atFine().log("GCS Delegation support token %s with %s",
+                        (isBoundToDT() ? getBoundDT().decodeIdentifier().toString() : "none"),
+                        tokenBinding.getService().toString());
+  }
+
+  @Override
+  protected void serviceStop() throws Exception {
+    logger.atFine().log("Stopping GCS delegation tokens");
+    try {
+      super.serviceStop();
+    } finally {
+      ServiceOperations.stopQuietly(tokenBinding);
     }
   }
 
