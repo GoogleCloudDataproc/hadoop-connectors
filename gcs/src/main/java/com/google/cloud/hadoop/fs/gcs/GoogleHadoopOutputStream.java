@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.common.flogger.GoogleLogger;
 import java.io.BufferedOutputStream;
@@ -41,7 +42,7 @@ class GoogleHadoopOutputStream extends OutputStream {
   private OutputStream out;
 
   // Path of the file to write to.
-  private URI gcsPath;
+  private final URI gcsPath;
 
   // Statistics tracker provided by the parent GoogleHadoopFileSystemBase for recording
   // numbers of bytes written.
@@ -62,22 +63,23 @@ class GoogleHadoopOutputStream extends OutputStream {
       CreateFileOptions createFileOptions)
       throws IOException {
     logger.atFine().log(
-        "GoogleHadoopOutputStream(gcsPath:%s, createFileOptions: %s)", gcsPath, createFileOptions);
+        "GoogleHadoopOutputStream(gcsPath: %s, createFileOptions: %s)", gcsPath, createFileOptions);
     this.gcsPath = gcsPath;
     this.statistics = statistics;
-    this.channel = createChannel(ghfs, gcsPath, createFileOptions);
-    this.out =
-        createOutputStream(this.channel, ghfs.getGcsFs().getOptions().getCloudStorageOptions());
+    GoogleCloudStorageFileSystem gcsfs = ghfs.getGcsFs();
+    this.channel = createChannel(gcsfs, gcsPath, createFileOptions);
+    this.out = createOutputStream(this.channel, gcsfs.getOptions().getCloudStorageOptions());
   }
 
   private static WritableByteChannel createChannel(
-      GoogleHadoopFileSystemBase ghfs, URI gcsPath, CreateFileOptions options) throws IOException {
+      GoogleCloudStorageFileSystem gcsfs, URI gcsPath, CreateFileOptions options)
+      throws IOException {
     try {
-      return ghfs.getGcsFs().create(gcsPath, options);
+      return gcsfs.create(gcsPath, options);
     } catch (java.nio.file.FileAlreadyExistsException e) {
-      // Need to convert to the Hadoop flavor of FileAlreadyExistsException.
       throw (FileAlreadyExistsException)
-          new FileAlreadyExistsException("'" + gcsPath + "' already exists").initCause(e);
+          new FileAlreadyExistsException(String.format("'%s' already exists", gcsPath))
+              .initCause(e);
     }
   }
 
@@ -111,11 +113,10 @@ class GoogleHadoopOutputStream extends OutputStream {
   /** Closes this output stream and releases any system resources associated with this stream. */
   @Override
   public void close() throws IOException {
+    logger.atFine().log("close(%s)", gcsPath);
     if (out != null) {
       try {
-        long startTime = System.nanoTime();
         out.close();
-        logger.atFine().log("close(%s)", gcsPath);
       } finally {
         out = null;
         channel = null;

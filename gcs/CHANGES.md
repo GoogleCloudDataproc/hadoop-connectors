@@ -148,6 +148,14 @@
     fs.gs.auth.client.secret
     ```
 
+1.  Add a property that allows to disable HCFS semantic enforcement. If set to
+    `false` GSC connector will not check if directory with same name already
+    exists when creating a new file and vise versa.
+
+    ```
+    fs.gs.create.items.conflict.check.enable (default: true)
+    ```
+
 ### 2.1.1 - 2020-03-11
 
 1.  Add upload cache to support high-level retries of failed uploads. Cache size
