@@ -172,14 +172,14 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
             bucketName, directoryName, ListObjectOptions.DEFAULT, /* pageToken= */ null);
 
         item = cache.getItem(resourceId);
-
-        // If item is not in the cache but directory item is, then item does not exist.
-        if (item == null
-            && !resourceId.isDirectory()
-            && cache.getItem(resourceId.toDirectoryId()) != null) {
-          return GoogleCloudStorageItemInfo.createNotFound(resourceId);
-        }
       }
+    }
+
+    // If item is not in the cache but directory item is in it, then item does not exist.
+    if (item == null
+        && !resourceId.isDirectory()
+        && cache.getItem(resourceId.toDirectoryId()) != null) {
+        return GoogleCloudStorageItemInfo.createNotFound(resourceId);
     }
 
     // If it wasn't in the cache and wasn't cached in directory list request
