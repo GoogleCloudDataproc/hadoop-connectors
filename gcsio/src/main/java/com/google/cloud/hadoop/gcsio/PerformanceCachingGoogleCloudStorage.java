@@ -179,7 +179,7 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
     if (item == null
         && !resourceId.isDirectory()
         && cache.getItem(resourceId.toDirectoryId()) != null) {
-        return GoogleCloudStorageItemInfo.createNotFound(resourceId);
+      return GoogleCloudStorageItemInfo.createNotFound(resourceId);
     }
 
     // If it wasn't in the cache and wasn't cached in directory list request
