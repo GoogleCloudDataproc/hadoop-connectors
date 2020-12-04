@@ -142,18 +142,11 @@ public class GoogleCloudStorageFileSystem {
    */
   public GoogleCloudStorageFileSystem(
       Credential credential, GoogleCloudStorageFileSystemOptions options) throws IOException {
+    this(
+        new GoogleCloudStorageImpl(
+            checkNotNull(options, "options must not be null").getCloudStorageOptions(), credential),
+        options);
     logger.atFine().log("GoogleCloudStorageFileSystem(options: %s)", options);
-
-    this.options = checkNotNull(options, "options must not be null");
-    this.options.throwIfNotValid();
-
-    this.gcs = new GoogleCloudStorageImpl(this.options.getCloudStorageOptions(), credential);
-
-    if (options.isPerformanceCacheEnabled()) {
-      this.gcs =
-          new PerformanceCachingGoogleCloudStorage(
-              this.gcs, this.options.getPerformanceCacheOptions());
-    }
   }
 
   /**
@@ -165,7 +158,19 @@ public class GoogleCloudStorageFileSystem {
       CheckedFunction<GoogleCloudStorageOptions, GoogleCloudStorage, IOException> gcsFn,
       GoogleCloudStorageFileSystemOptions options)
       throws IOException {
-    this.gcs = gcsFn.apply(options.getCloudStorageOptions());
+    this(gcsFn.apply(options.getCloudStorageOptions()), options);
+  }
+
+  private GoogleCloudStorageFileSystem(
+      GoogleCloudStorage gcs, GoogleCloudStorageFileSystemOptions options) {
+    checkArgument(
+        gcs.getOptions() == options.getCloudStorageOptions(),
+        "gcs and gcsfs should use the same options");
+    options.throwIfNotValid();
+    this.gcs =
+        options.isPerformanceCacheEnabled()
+            ? new PerformanceCachingGoogleCloudStorage(gcs, options.getPerformanceCacheOptions())
+            : gcs;
     this.options = options;
   }
 
