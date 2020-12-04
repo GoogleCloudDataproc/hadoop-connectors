@@ -14,6 +14,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.channels.WritableByteChannel;
 import java.time.Duration;
@@ -112,9 +113,15 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions)
       throws IOException {
-    List<GoogleCloudStorageItemInfo> result;
-
-    result = super.listObjectInfo(bucketName, objectNamePrefix, listOptions);
+    if (listOptions.getMaxResults() == 1 && listOptions.isIncludePrefix()) {
+      GoogleCloudStorageItemInfo item =
+          cache.getItem(new StorageResourceId(bucketName, objectNamePrefix));
+      if (item != null) {
+        return ImmutableList.of(item);
+      }
+    }
+    List<GoogleCloudStorageItemInfo> result =
+        super.listObjectInfo(bucketName, objectNamePrefix, listOptions);
     for (GoogleCloudStorageItemInfo item : result) {
       cache.putItem(item);
     }
@@ -140,18 +147,39 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
     // Get the item from cache.
     GoogleCloudStorageItemInfo item = cache.getItem(resourceId);
 
+    // If item is not in the cache but directory item is, then item does not exist.
+    if (item == null
+        && resourceId.isStorageObject()
+        && !resourceId.isDirectory()
+        && cache.getItem(resourceId.toDirectoryId()) != null) {
+      return GoogleCloudStorageItemInfo.createNotFound(resourceId);
+    }
+
     // If it wasn't in the cache, list all the objects in the parent directory and cache them
     // and then retrieve it from the cache.
     if (item == null && resourceId.isStorageObject()) {
       String bucketName = resourceId.getBucketName();
       String objectName = resourceId.getObjectName();
-      int lastSlashIndex = objectName.lastIndexOf(PATH_DELIMITER);
+      int lastDelimiterIndex = objectName.lastIndexOf(PATH_DELIMITER);
       String directoryName =
-          lastSlashIndex >= 0 ? objectName.substring(0, lastSlashIndex + 1) : null;
-      // make just 1 request to prefetch only 1 page of directory items
-      listObjectInfoPage(
-          bucketName, directoryName, ListObjectOptions.DEFAULT, /* pageToken= */ null);
-      item = cache.getItem(resourceId);
+          lastDelimiterIndex >= 0 ? objectName.substring(0, lastDelimiterIndex + 1) : null;
+      // make just 1 request to prefetch only 1 page of directory items if it's not yet cached
+      if (!cache.isPrefixCached(
+          directoryName == null
+              ? new StorageResourceId(bucketName)
+              : new StorageResourceId(bucketName, directoryName))) {
+        listObjectInfoPage(
+            bucketName, directoryName, ListObjectOptions.DEFAULT, /* pageToken= */ null);
+
+        item = cache.getItem(resourceId);
+      }
+    }
+
+    // If item is not in the cache but directory item is in it, then item does not exist.
+    if (item == null
+        && !resourceId.isDirectory()
+        && cache.getItem(resourceId.toDirectoryId()) != null) {
+      return GoogleCloudStorageItemInfo.createNotFound(resourceId);
     }
 
     // If it wasn't in the cache and wasn't cached in directory list request

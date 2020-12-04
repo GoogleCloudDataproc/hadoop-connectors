@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
@@ -59,6 +60,7 @@ public class GoogleCloudStorageFileSystemTest
                 new GoogleCloudStorageFileSystem(
                     InMemoryGoogleCloudStorage::new,
                     GoogleCloudStorageFileSystemOptions.builder()
+                        .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
                         .setMarkerFilePattern("_(FAILURE|SUCCESS)")
                         .build());
             gcs = gcsfs.getGcs();
