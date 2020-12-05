@@ -68,8 +68,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.cooperative.locking.enable", false);
           put("fs.gs.cooperative.locking.expiration.timeout.ms", 120_000L);
           put("fs.gs.cooperative.locking.max.concurrent.operations", 20);
-          put("fs.gs.copy.batch.threads", 15);
-          put("fs.gs.copy.max.requests.per.batch", 15L);
           put("fs.gs.copy.with.rewrite.enable", true);
           put("fs.gs.create.items.conflict.check.enable", true);
           put("fs.gs.delegation.token.binding", null);
