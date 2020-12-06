@@ -232,7 +232,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       Get getObject = createRequest().setFields("contentEncoding,generation,size");
       object =
           ResilientOperation.retry(
-              ResilientOperation.getGoogleRequestCallable(getObject),
+              getObject::execute,
               readBackOff.get(),
               RetryDeterminer.SOCKET_ERRORS,
               IOException.class,
