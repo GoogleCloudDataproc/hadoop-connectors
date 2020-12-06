@@ -36,7 +36,7 @@ import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.InputStreamContent;
 import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.util.BackOff;
 import com.google.api.client.util.Data;
 import com.google.api.client.util.ExponentialBackOff;
@@ -111,7 +111,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // JSON factory used for formatting GCS JSON API payloads.
-  private static final JsonFactory JSON_FACTORY = new JacksonFactory();
+  private static final JsonFactory JSON_FACTORY = new GsonFactory();
 
   // Maximum number of times to retry deletes in the case of precondition failures.
   private static final int MAXIMUM_PRECONDITION_FAILURES_IN_DELETE = 4;

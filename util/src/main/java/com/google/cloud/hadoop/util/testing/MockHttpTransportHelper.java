@@ -36,7 +36,8 @@ import com.google.api.client.http.LowLevelHttpRequest;
 import com.google.api.client.http.LowLevelHttpResponse;
 import com.google.api.client.json.GenericJson;
 import com.google.api.client.json.Json;
-import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.json.JsonFactory;
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.testing.http.HttpTesting;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.testing.http.MockLowLevelHttpRequest;
@@ -110,7 +111,7 @@ public final class MockHttpTransportHelper {
 
   private static final int UNKNOWN_CONTENT_LENGTH = -1;
 
-  public static final JacksonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
+  public static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
 
   private MockHttpTransportHelper() {}
 

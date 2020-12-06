@@ -222,26 +222,6 @@ exist at the same path on all nodes
     The PKCS12 (p12) certificate file of the service account used for GCS access
     when `fs.gs.auth.service.account.enable` is `true`.
 
-#### Client secret authentication
-
-The following properties are required when `fs.gs.auth.service.account.enable`
-is `false`.
-
-*   `fs.gs.auth.client.id` (not set by default)
-
-    The client ID for GCS access in the OAuth 2.0 installed application flow
-    (when `fs.gs.auth.service.account.enable` is `false`).
-
-*   `fs.gs.auth.client.secret` (not set by default)
-
-    The client secret for GCS access in the OAuth 2.0 installed application flow
-    (when `fs.gs.auth.service.account.enable` is `false`).
-
-*   `fs.gs.auth.client.file` (not set by default)
-
-    The client credential file for GCS access in the OAuth 2.0 installed
-    application flow (when `fs.gs.auth.service.account.enable` is `false`).
-
 #### Service account impersonation
 
 Service account impersonation can be configured for a specific user name and a

@@ -66,11 +66,12 @@
         </dependency>
         <dependency>
           <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-client-runtime</artifactId>
+          <artifactId>hadoop-mapreduce-client</artifactId>
+          <type>pom</type>
         </dependency>
         <dependency>
           <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-mapreduce-client-common</artifactId>
+          <artifactId>hadoop-client-runtime</artifactId>
         </dependency>
       </dependencies>
     </profile>
@@ -79,11 +80,7 @@
   <dependencies>
     <dependency>
       <groupId>com.google.http-client</groupId>
-      <artifactId>google-http-client</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.google.http-client</groupId>
-      <artifactId>google-http-client-jackson2</artifactId>
+      <artifactId>google-http-client-gson</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.apis</groupId>
@@ -100,6 +97,7 @@
     <dependency>
       <groupId>com.google.code.gson</groupId>
       <artifactId>gson</artifactId>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>com.google.protobuf</groupId>
@@ -112,10 +110,6 @@
     <dependency>
       <groupId>com.google.oauth-client</groupId>
       <artifactId>google-oauth-client</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.avro</groupId>
-      <artifactId>avro</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.cloud.bigdataoss</groupId>
