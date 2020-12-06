@@ -1518,7 +1518,7 @@ public class GoogleCloudStorageTest {
     IOException exception = assertThrows(IOException.class, () -> gcs.createBucket(BUCKET_NAME));
     assertThat(exception)
         .hasMessageThat()
-        .contains("\"code\" : " + ErrorResponses.GONE.getErrorCode());
+        .contains("\"code\": " + ErrorResponses.GONE.getErrorCode());
 
     assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
         .containsExactly(createBucketRequestString(PROJECT_ID))

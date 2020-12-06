@@ -11,7 +11,8 @@ import static org.mockito.Mockito.verify;
 
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.json.JsonFactory;
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.Bucket;
 import com.google.api.services.storage.model.ComposeRequest;
@@ -36,7 +37,7 @@ import org.mockito.junit.MockitoRule;
 public class StorageRequestAuthorizerTest {
 
   public static final HttpTransport HTTP_TRANSPORT = new NetHttpTransport();
-  public static final JacksonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
+  public static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
 
   private static final String PROJECT = "test-project";
   private static final String BUCKET_NAME = "test-bucket-name";
