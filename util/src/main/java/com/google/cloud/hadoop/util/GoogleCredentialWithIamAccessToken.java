@@ -8,7 +8,7 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.client.util.Clock;
 import com.google.api.services.iamcredentials.v1.IAMCredentials;
 import com.google.api.services.iamcredentials.v1.IAMCredentials.Projects.ServiceAccounts.GenerateAccessToken;
@@ -22,7 +22,7 @@ import java.time.Instant;
 /** A {@code Credential} to generate or refresh IAM access token. */
 public class GoogleCredentialWithIamAccessToken extends GoogleCredential {
 
-  private static final JsonFactory JSON_FACTORY = new GsonFactory();
+  private static final JsonFactory JSON_FACTORY = new JacksonFactory();
 
   private static final String DEFAULT_ACCESS_TOKEN_LIFETIME = "3600s";
   private static final String DEFAULT_SERVICE_ACCOUNT_NAME_PREFIX = "projects/-/serviceAccounts/";

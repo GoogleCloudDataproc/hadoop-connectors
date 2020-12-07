@@ -26,12 +26,14 @@ import java.io.IOException;
 import java.util.Optional;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnit4.class)
@@ -91,7 +93,7 @@ public class BigQueryOutputConfigurationTest {
 
   /** Sample malformed serialized version of TEST_TABLE_SCHEMA. */
   private static final String TEST_BAD_TABLE_SCHEMA_STRING =
-      "[{\"name\":\"A\",\"type\":\"STRING\"},{\"name\":\"B\"\"type\":\"INTEGER\"}]";
+      "[{\"name\":\"A\",\"type\":\"STRING\"},{'name':\"B\",\"type\":\"INTEGER\"}]";
 
   /** The Job Configuration for testing. */
   private static Configuration conf;

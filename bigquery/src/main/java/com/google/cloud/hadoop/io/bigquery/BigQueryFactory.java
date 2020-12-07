@@ -20,7 +20,7 @@ import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.bigquery.Bigquery;
 import com.google.api.services.bigquery.BigqueryScopes;
 import com.google.cloud.hadoop.util.CredentialFromAccessTokenProviderClassFactory;
@@ -79,7 +79,7 @@ public class BigQueryFactory {
 
   // Objects for handling HTTP transport and JSON formatting of API calls
   private static final HttpTransport HTTP_TRANSPORT = new NetHttpTransport();
-  private static final JsonFactory JSON_FACTORY = new GsonFactory();
+  private static final JsonFactory JSON_FACTORY = new JacksonFactory();
 
   /**
    * Construct credentials from the passed Configuration.
