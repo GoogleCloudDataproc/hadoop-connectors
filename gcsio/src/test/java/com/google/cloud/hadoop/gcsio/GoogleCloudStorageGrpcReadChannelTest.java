@@ -12,6 +12,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import com.google.api.client.util.BackOff;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.common.hash.Hashing;
 import com.google.google.storage.v1.ChecksummedData;
@@ -431,7 +432,6 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     assertThat(thrown)
         .hasCauseThat()
         .hasCauseThat()
-        .hasCauseThat()
         .hasMessageThat()
         .contains("Custom error message.");
   }
@@ -449,7 +449,6 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     assertThat(thrown)
         .hasCauseThat()
         .hasCauseThat()
-        .hasCauseThat()
         .hasMessageThat()
         .contains("Custom error message.");
   }
@@ -464,7 +463,11 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
     ByteBuffer buffer = ByteBuffer.allocate(10);
     IOException thrown = assertThrows(IOException.class, () -> readChannel.read(buffer));
-    assertThat(thrown).hasCauseThat().hasMessageThat().contains("Retrying failed to complete");
+    assertThat(thrown)
+        .hasCauseThat()
+        .hasCauseThat()
+        .hasMessageThat()
+        .contains("Custom error message");
   }
 
   @Test
@@ -634,7 +637,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(true).build();
 
     Throwable throwable = assertThrows(IOException.class, () -> newReadChannel(options));
-    assertThat(throwable).hasCauseThat().hasCauseThat().hasMessageThat().contains("Item not found");
+    assertThat(throwable).hasCauseThat().hasMessageThat().contains("Item not found");
   }
 
   @Test
@@ -645,8 +648,8 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
     // If the user hasn't mandated fail fast, it is permissible for either open() or read() to
     // raise this exception.
-    Throwable throwable = assertThrows(IOException.class, () -> newReadChannel(options));
-    assertThat(throwable).hasCauseThat().hasCauseThat().hasMessageThat().contains("Item not found");
+    IOException thrown = assertThrows(IOException.class, () -> newReadChannel(options));
+    assertThat(thrown).hasCauseThat().hasMessageThat().contains("Item not found");
   }
 
   @Test
@@ -697,7 +700,8 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
   private GoogleCloudStorageGrpcReadChannel newReadChannel(GoogleCloudStorageReadOptions options)
       throws IOException {
-    return GoogleCloudStorageGrpcReadChannel.open(stub, BUCKET_NAME, OBJECT_NAME, options);
+    return GoogleCloudStorageGrpcReadChannel.open(
+        stub, new StorageResourceId(BUCKET_NAME, OBJECT_NAME), options, () -> BackOff.STOP_BACKOFF);
   }
 
   private static class FakeService extends StorageImplBase {

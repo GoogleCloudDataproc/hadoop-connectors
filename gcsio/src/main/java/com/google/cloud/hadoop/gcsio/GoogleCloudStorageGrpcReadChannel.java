@@ -16,13 +16,12 @@ package com.google.cloud.hadoop.gcsio;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static java.util.concurrent.TimeUnit.SECONDS;
 
-import com.github.rholder.retry.Retryer;
-import com.github.rholder.retry.RetryerBuilder;
-import com.github.rholder.retry.StopStrategies;
-import com.github.rholder.retry.WaitStrategies;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.BackOffFactory;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
+import com.google.cloud.hadoop.util.ResilientOperation;
+import com.google.cloud.hadoop.util.RetryDeterminer;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
@@ -51,59 +50,62 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private static final Duration READ_STREAM_TIMEOUT = Duration.ofMinutes(20);
   private static final Duration READ_OBJECT_METADATA_TIMEOUT = Duration.ofMinutes(1);
-  private static final int READ_RETRIES = 5;
 
-  // Context of the request that returned resIterator.
-  @Nullable CancellableContext requestContext;
-  Fadvise readStrategy;
-  // GCS gRPC stub.
   private final StorageBlockingStub stub;
-  // Name of the bucket containing the object being read.
-  private final String bucketName;
-  // Name of the object being read.
-  private final String objectName;
+
+  private final StorageResourceId resourceId;
+
   // We read from a specific generation, to maintain consistency between read() calls.
   private final long objectGeneration;
+
   // The size of this object generation, in bytes.
   private final long objectSize;
+
   // True if this channel is open, false otherwise.
   private boolean channelIsOpen = true;
+
   // Current position in the object.
   private long position = 0;
+
   // If a user seeks forwards by a configurably small amount, we continue reading from where
   // we are instead of starting a new connection. The user's intended read position is
   // position + bytesToSkipBeforeReading.
   private long bytesToSkipBeforeReading = 0;
+
   // The user may have read less data than we received from the server. If that's the case, we keep
   // the most recently received content and a reference to how much of it we've returned so far.
   @Nullable private ByteString bufferedContent = null;
+
   private int bufferedContentReadOffset = 0;
+
   // The streaming read operation. If null, there is not an in-flight read in progress.
   @Nullable private Iterator<GetObjectMediaResponse> resIterator = null;
+
   // Fine-grained options.
   private final GoogleCloudStorageReadOptions readOptions;
 
-  private GoogleCloudStorageGrpcReadChannel(
-      StorageBlockingStub gcsGrpcBlockingStub,
-      String bucketName,
-      String objectName,
-      long objectGeneration,
-      long objectSize,
-      GoogleCloudStorageReadOptions readOptions) {
-    this.stub = gcsGrpcBlockingStub;
-    this.bucketName = bucketName;
-    this.objectName = objectName;
-    this.objectGeneration = objectGeneration;
-    this.objectSize = objectSize;
-    this.readOptions = readOptions;
-    this.readStrategy = readOptions.getFadvise();
-  }
+  private final BackOffFactory backOffFactory;
+
+  // Context of the request that returned resIterator.
+  @Nullable CancellableContext requestContext;
+
+  Fadvise readStrategy;
+  // GCS gRPC stub.
 
   public static GoogleCloudStorageGrpcReadChannel open(
       StorageBlockingStub stub,
-      String bucketName,
-      String objectName,
+      StorageResourceId resourceId,
       GoogleCloudStorageReadOptions readOptions)
+      throws IOException {
+    return open(stub, resourceId, readOptions, BackOffFactory.DEFAULT);
+  }
+
+  @VisibleForTesting
+  static GoogleCloudStorageGrpcReadChannel open(
+      StorageBlockingStub stub,
+      StorageResourceId resourceId,
+      GoogleCloudStorageReadOptions readOptions,
+      BackOffFactory backOffFactory)
       throws IOException {
     // The gRPC API's GetObjectMedia call does not provide a generation number, so to ensure
     // consistent reads, we need to begin by checking the current generation number with a separate
@@ -112,54 +114,69 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     //      That will save about 40ms per read.
     // TODO(b/136088557): If we add metadata to a read, we can also use that first call to
     //      implement footer prefetch.
-    Retryer<GoogleCloudStorageGrpcReadChannel> retryer = getRetryer();
     try {
-      return retryer.call(
+      return ResilientOperation.retry(
           () -> {
-            com.google.google.storage.v1.Object getObjectResult;
+            com.google.google.storage.v1.Object storageObject;
             try {
               // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
-              getObjectResult =
+              storageObject =
                   stub.withDeadlineAfter(READ_OBJECT_METADATA_TIMEOUT.toMillis(), MILLISECONDS)
                       .getObject(
                           GetObjectRequest.newBuilder()
-                              .setBucket(bucketName)
-                              .setObject(objectName)
+                              .setBucket(resourceId.getBucketName())
+                              .setObject(resourceId.getObjectName())
                               .build());
             } catch (StatusRuntimeException e) {
-              throw convertError(e, bucketName, objectName);
+              throw convertError(e, resourceId);
             }
             // The non-gRPC read channel has special support for gzip. This channel doesn't
             // decompress gzip-encoded objects on the fly, so best to fail fast rather than return
             // gibberish unexpectedly.
-            if (getObjectResult.getContentEncoding().contains("gzip")) {
+            if (storageObject.getContentEncoding().contains("gzip")) {
               throw new IOException(
                   "Can't read GZIP encoded files - content encoding support is disabled.");
             }
 
             return new GoogleCloudStorageGrpcReadChannel(
                 stub,
-                bucketName,
-                objectName,
-                getObjectResult.getGeneration(),
-                getObjectResult.getSize(),
-                readOptions);
-          });
+                resourceId,
+                storageObject.getGeneration(),
+                storageObject.getSize(),
+                readOptions,
+                backOffFactory);
+          },
+          backOffFactory.newBackOff(),
+          RetryDeterminer.ALL_ERRORS,
+          IOException.class);
     } catch (Exception e) {
-      throw new IOException(
-          String.format("Error reading '%s'", StringPaths.fromComponents(bucketName, objectName)),
-          e);
+      throw new IOException(String.format("Error reading '%s'", resourceId), e);
     }
   }
 
+  private GoogleCloudStorageGrpcReadChannel(
+      StorageBlockingStub gcsGrpcBlockingStub,
+      StorageResourceId resourceId,
+      long objectGeneration,
+      long objectSize,
+      GoogleCloudStorageReadOptions readOptions,
+      BackOffFactory backOffFactory) {
+    this.stub = gcsGrpcBlockingStub;
+    this.resourceId = resourceId;
+    this.objectGeneration = objectGeneration;
+    this.objectSize = objectSize;
+    this.readOptions = readOptions;
+    this.backOffFactory = backOffFactory;
+    this.readStrategy = readOptions.getFadvise();
+  }
+
   private static IOException convertError(
-      StatusRuntimeException error, String bucketName, String objectName) {
-    String msg =
-        String.format("Error reading '%s'", StringPaths.fromComponents(bucketName, objectName));
+      StatusRuntimeException error, StorageResourceId resourceId) {
+    String msg = String.format("Error reading '%s'", resourceId);
     switch (Status.fromThrowable(error).getCode()) {
       case NOT_FOUND:
         return GoogleCloudStorageExceptions.createFileNotFoundException(
-            bucketName, objectName, new IOException(msg, error));
+            resourceId.getBucketName(), resourceId.getObjectName(), new IOException(msg, error));
       case OUT_OF_RANGE:
         return (IOException) new EOFException(msg).initCause(error);
       default:
@@ -206,8 +223,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   @Override
   public int read(ByteBuffer byteBuffer) throws IOException {
     logger.atFine().log(
-        "GCS gRPC read request for up to %d bytes at offset %d from object %s",
-        byteBuffer.remaining(), position(), objectName);
+        "GCS gRPC read request for up to %d bytes at offset %d from object '%s'",
+        byteBuffer.remaining(), position(), resourceId);
 
     if (!isOpen()) {
       throw new ClosedChannelException();
@@ -255,7 +272,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
           throw new IOException(
               String.format(
                   "Message checksum (%s) didn't match expected checksum (%s) for '%s'",
-                  expectedChecksum, calculatedChecksum, resourceIdString()));
+                  expectedChecksum, calculatedChecksum, resourceId));
         }
       }
 
@@ -277,17 +294,16 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   private void requestObjectMedia(@Nullable Integer bytesToRead) throws IOException {
     GetObjectMediaRequest.Builder requestBuilder =
         GetObjectMediaRequest.newBuilder()
-            .setBucket(bucketName)
-            .setObject(objectName)
+            .setBucket(resourceId.getBucketName())
+            .setObject(resourceId.getObjectName())
             .setGeneration(objectGeneration)
             .setReadOffset(position);
     if (bytesToRead != null) {
       requestBuilder.setReadLimit(bytesToRead);
     }
     GetObjectMediaRequest request = requestBuilder.build();
-    Retryer<Boolean> retryer = getRetryer();
     try {
-      retryer.call(
+      ResilientOperation.retry(
           () -> {
             try {
               requestContext = Context.current().withCancellation();
@@ -300,12 +316,15 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
                 requestContext.detach(toReattach);
               }
             } catch (StatusRuntimeException e) {
-              throw convertError(e, bucketName, objectName);
+              throw convertError(e, resourceId);
             }
             return null;
-          });
+          },
+          backOffFactory.newBackOff(),
+          RetryDeterminer.ALL_ERRORS,
+          IOException.class);
     } catch (Exception e) {
-      throw new IOException(String.format("Error reading '%s'", resourceIdString()), e);
+      throw new IOException(String.format("Error reading '%s'", resourceId), e);
     }
   }
 
@@ -330,33 +349,26 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       return false;
     }
 
-    Retryer<Boolean> retryer = getRetryer();
     try {
-      return retryer.call(
+      return ResilientOperation.retry(
           () -> {
             try {
               boolean moreDataAvailable = resIterator.hasNext();
               if (!moreDataAvailable) {
                 cancelCurrentRequest();
               }
-
               return moreDataAvailable;
             } catch (StatusRuntimeException e) {
-              throw convertError(e, bucketName, objectName);
+              throw convertError(e, resourceId);
             }
-          });
+          },
+          backOffFactory.newBackOff(),
+          RetryDeterminer.ALL_ERRORS,
+          IOException.class);
     } catch (Exception e) {
       cancelCurrentRequest();
-      throw new IOException(String.format("Error reading '%s'", resourceIdString()), e);
+      throw new IOException(String.format("Error reading '%s'", resourceId), e);
     }
-  }
-
-  private static <T> Retryer<T> getRetryer() {
-    return RetryerBuilder.<T>newBuilder()
-        .retryIfExceptionOfType(IOException.class)
-        .withWaitStrategy(WaitStrategies.exponentialWait(2, 20, SECONDS))
-        .withStopStrategy(StopStrategies.stopAfterAttempt(READ_RETRIES))
-        .build();
   }
 
   @Override
@@ -372,10 +384,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     // Our real position is tracked in "position," but if the user is skipping forwards a bit, we
     // pretend we're at the new position already.
     return position + bytesToSkipBeforeReading;
-  }
-
-  private String resourceIdString() {
-    return StringPaths.fromComponents(bucketName, objectName);
   }
 
   @Override
@@ -422,7 +430,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     if (!isOpen()) {
       throw new ClosedChannelException();
     }
-
     return objectSize;
   }
 
@@ -445,8 +452,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this)
-        .add("bucketName", bucketName)
-        .add("objectName", objectName)
+        .add("resourceId", resourceId)
         .add("generation", objectGeneration)
         .toString();
   }
