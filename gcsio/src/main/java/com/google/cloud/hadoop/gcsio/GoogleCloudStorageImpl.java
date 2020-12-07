@@ -60,6 +60,7 @@ import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.ResilientOperation;
+import com.google.cloud.hadoop.util.RetryBoundedBackOff;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.annotations.VisibleForTesting;
@@ -159,7 +160,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   /** A factory for producing BackOff objects. */
   public interface BackOffFactory {
-    BackOffFactory DEFAULT = ExponentialBackOff::new;
+    BackOffFactory DEFAULT =
+        () -> new RetryBoundedBackOff(new ExponentialBackOff(), /* maxRetries= */ 10);
 
     BackOff newBackOff();
   }
@@ -226,8 +228,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private BackOffFactory backOffFactory = BackOffFactory.DEFAULT;
 
   // Determine if a given IOException is due to rate-limiting.
-  private RetryDeterminer<IOException> rateLimitedRetryDeterminer =
-      RetryDeterminer.createRateLimitedRetryDeterminer(errorExtractor);
+  private RetryDeterminer<IOException> rateLimitedRetryDeterminer = errorExtractor::rateLimited;
 
   // Authorization Handler instance.
   private final StorageRequestAuthorizer storageRequestAuthorizer;
@@ -330,8 +331,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @VisibleForTesting
   void setErrorExtractor(ApiErrorExtractor errorExtractor) {
     this.errorExtractor = errorExtractor;
-    this.rateLimitedRetryDeterminer =
-        RetryDeterminer.createRateLimitedRetryDeterminer(errorExtractor);
+    this.rateLimitedRetryDeterminer = errorExtractor::rateLimited;
   }
 
   @VisibleForTesting
@@ -405,7 +405,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                 writeConditions,
                 requesterShouldPay(resourceId.getBucketName())
                     ? storageOptions.getRequesterPaysOptions().getProjectId()
-                    : null)
+                    : null,
+                BackOffFactory.DEFAULT)
             : new GoogleCloudStorageWriteChannel(
                 storage,
                 clientRequestHelper,
@@ -456,7 +457,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // want to throw org.apache.commons.io.FileExistsException for 409 here.
     try {
       ResilientOperation.retry(
-          ResilientOperation.getGoogleRequestCallable(insertBucket),
+          insertBucket::execute,
           backOffFactory.newBackOff(),
           rateLimitedRetryDeterminer,
           IOException.class,
@@ -621,10 +622,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     if (storageOptions.isGrpcEnabled()) {
       return GoogleCloudStorageGrpcReadChannel.open(
-          storageStubProvider.getBlockingStub(),
-          resourceId.getBucketName(),
-          resourceId.getObjectName(),
-          readOptions);
+          storageStubProvider.getBlockingStub(), resourceId, readOptions);
     }
 
     // The underlying channel doesn't initially read data, which means that we won't see a
@@ -678,7 +676,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
       try {
         ResilientOperation.retry(
-            ResilientOperation.getGoogleRequestCallable(deleteBucket),
+            deleteBucket::execute,
             backOffFactory.newBackOff(),
             rateLimitedRetryDeterminer,
             IOException.class,

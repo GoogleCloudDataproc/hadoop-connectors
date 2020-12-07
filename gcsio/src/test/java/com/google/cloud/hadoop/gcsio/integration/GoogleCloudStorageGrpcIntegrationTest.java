@@ -119,7 +119,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
             () ->
                 rawStorage.open(
                     new StorageResourceId(BUCKET_NAME, "testOpenNonExistentItem_Object")));
-    assertThat(throwable).hasCauseThat().hasCauseThat().hasMessageThat().contains("Item not found");
+    assertThat(throwable).hasCauseThat().hasMessageThat().contains("Item not found");
   }
 
   @Test

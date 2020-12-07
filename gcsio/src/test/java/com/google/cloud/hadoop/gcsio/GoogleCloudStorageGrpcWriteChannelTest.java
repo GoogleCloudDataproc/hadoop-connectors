@@ -12,6 +12,8 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import com.google.api.client.util.BackOff;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.BackOffFactory;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -54,6 +56,7 @@ import org.mockito.ArgumentCaptor;
 
 @RunWith(JUnit4.class)
 public final class GoogleCloudStorageGrpcWriteChannelTest {
+
   private static final int GCS_MINIMUM_CHUNK_SIZE = 256 * 1024;
   private static final String BUCKET_NAME = "bucket-name";
   private static final String OBJECT_NAME = "object-name";
@@ -362,7 +365,8 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
         AsyncWriteChannelOptions.builder().setUploadChunkSize(GCS_MINIMUM_CHUNK_SIZE).build();
     ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
+        newWriteChannel(
+            options, writeConditions, /* requesterPaysProject= */ null, () -> BackOff.ZERO_BACKOFF);
     fakeService.setInsertObjectExceptions(
         ImmutableList.of(new StatusException(Status.DEADLINE_EXCEEDED)));
     fakeService.setQueryWriteStatusResponses(
@@ -441,9 +445,10 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
 
     writeChannel.initialize();
     writeChannel.write(chunk.asReadOnlyByteBuffer());
-    assertThat(assertThrows(IOException.class, writeChannel::close).getCause().getCause())
-        .hasMessageThat()
-        .contains("after 5 attempts");
+
+    assertThrows(IOException.class, writeChannel::close);
+
+    // TODO: assert number of retires;
   }
 
   @Test
@@ -559,6 +564,15 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
       AsyncWriteChannelOptions options,
       ObjectWriteConditions writeConditions,
       String requesterPaysProject) {
+    return newWriteChannel(
+        options, writeConditions, requesterPaysProject, () -> BackOff.STOP_BACKOFF);
+  }
+
+  private GoogleCloudStorageGrpcWriteChannel newWriteChannel(
+      AsyncWriteChannelOptions options,
+      ObjectWriteConditions writeConditions,
+      String requesterPaysProject,
+      BackOffFactory backOffFactory) {
     return new GoogleCloudStorageGrpcWriteChannel(
         stub,
         executor,
@@ -566,7 +580,8 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
         new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
         CreateObjectOptions.DEFAULT_NO_OVERWRITE.toBuilder().setContentType(CONTENT_TYPE).build(),
         writeConditions,
-        requesterPaysProject);
+        requesterPaysProject,
+        backOffFactory);
   }
 
   private GoogleCloudStorageGrpcWriteChannel newWriteChannel() {

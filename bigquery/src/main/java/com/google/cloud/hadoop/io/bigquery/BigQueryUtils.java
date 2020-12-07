@@ -91,7 +91,7 @@ public class BigQueryUtils {
 
       Job pollJob =
           ResilientOperation.retry(
-              ResilientOperation.getGoogleRequestCallable(get),
+              get::execute,
               operationBackOff,
               RetryDeterminer.RATE_LIMIT_ERRORS,
               IOException.class,

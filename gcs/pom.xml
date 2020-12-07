@@ -257,7 +257,6 @@
               <artifactSet>
                 <includes>
                   <include>com.fasterxml.jackson.core:jackson-core</include>
-                  <include>com.github.rholder</include>
                   <include>com.google.api-client</include>
                   <include>com.google.api.grpc</include>
                   <include>com.google.apis</include>
@@ -283,7 +282,6 @@
                   <shadedPattern>com.google.cloud.hadoop.repackaged.gcs.com</shadedPattern>
                   <includes>
                     <include>com.fasterxml.**</include>
-                    <include>com.github.rholder.retry.**</include>
                     <include>com.google.api.**</include>
                     <include>com.google.auth.**</include>
                     <include>com.google.cloud.audit.**</include>
