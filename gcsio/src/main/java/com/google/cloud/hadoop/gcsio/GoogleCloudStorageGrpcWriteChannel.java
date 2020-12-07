@@ -15,20 +15,16 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.encodeMetadata;
-import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.google.storage.v1.ServiceConstants.Values.MAX_WRITE_CHUNK_BYTES;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toMap;
 
-import com.github.rholder.retry.RetryException;
-import com.github.rholder.retry.Retryer;
-import com.github.rholder.retry.RetryerBuilder;
-import com.github.rholder.retry.StopStrategies;
-import com.github.rholder.retry.WaitStrategies;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.BackOffFactory;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
+import com.google.cloud.hadoop.util.ResilientOperation;
+import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
@@ -64,7 +60,6 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 
 /** Implements WritableByteChannel to provide write access to GCS via gRPC. */
@@ -75,9 +70,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
   private static final Duration START_RESUMABLE_WRITE_TIMEOUT = Duration.ofMinutes(1);
   private static final Duration QUERY_WRITE_STATUS_TIMEOUT = Duration.ofMinutes(1);
   private static final Duration WRITE_STREAM_TIMEOUT = Duration.ofMinutes(10);
-  // Maximum number of automatic retries for each data chunk
-  // when writing to underlying channel raises error.
-  private static final int UPLOAD_RETRIES = 5;
 
   // Number of insert requests to retain, in case we need to rewind and resume an upload. Using too
   // small of a number could risk being unable to resume the write if the resume point is an
@@ -96,6 +88,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
   private final CreateObjectOptions createOptions;
   private final ObjectWriteConditions writeConditions;
   private final String requesterPaysProject;
+  private final BackOffFactory backOffFactory;
 
   private GoogleCloudStorageItemInfo completedItemInfo = null;
 
@@ -106,13 +99,15 @@ public final class GoogleCloudStorageGrpcWriteChannel
       StorageResourceId resourceId,
       CreateObjectOptions createOptions,
       ObjectWriteConditions writeConditions,
-      String requesterPaysProject) {
+      String requesterPaysProject,
+      BackOffFactory backOffFactory) {
     super(threadPool, channelOptions);
     this.stub = stub;
     this.resourceId = resourceId;
     this.createOptions = createOptions;
     this.writeConditions = writeConditions;
     this.requesterPaysProject = requesterPaysProject;
+    this.backOffFactory = backOffFactory;
   }
 
   @Override
@@ -122,19 +117,16 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
   @Override
   public void handleResponse(Object response) {
-    checkArgument(
-        !response.getBucket().isEmpty(),
-        "Got response from service with empty/missing bucketName: %s",
-        response);
     Map<String, byte[]> metadata =
         response.getMetadataMap().entrySet().stream()
             .collect(
                 toMap(Map.Entry::getKey, entry -> BaseEncoding.base64().decode(entry.getValue())));
 
     byte[] md5Hash =
-        response.getMd5Hash().length() > 0
+        !response.getMd5Hash().isEmpty()
             ? BaseEncoding.base64().decode(response.getMd5Hash())
             : null;
+
     byte[] crc32c =
         response.hasCrc32C()
             ? ByteBuffer.allocate(4).putInt(response.getCrc32C().getValue()).array()
@@ -142,7 +134,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
     completedItemInfo =
         GoogleCloudStorageItemInfo.createObject(
-            new StorageResourceId(response.getBucket(), response.getName()),
+            resourceId,
             Timestamps.toMillis(response.getTimeCreated()),
             Timestamps.toMillis(response.getUpdated()),
             response.getSize(),
@@ -192,16 +184,20 @@ public final class GoogleCloudStorageGrpcWriteChannel
       // the writer at the other end will not hang indefinitely.
       // Send the initial StartResumableWrite request to get an uploadId.
       uploadId = startResumableUpload();
-      Retryer<Object> retryer = getRetryer();
       try (InputStream ignore = pipeSource) {
-        return retryer.call(this::doResumableUpload);
-      } catch (ExecutionException | RetryException e) {
+        return ResilientOperation.retry(
+            this::doResumableUpload,
+            backOffFactory.newBackOff(),
+            RetryDeterminer.ALL_ERRORS,
+            IOException.class);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         throw new IOException(
-            String.format("Resumable upload failed for '%s'", getResourceString()), e);
+            String.format("Interrupted resumable upload failed for '%s'", resourceId), e);
       }
     }
 
-    private Object doResumableUpload() throws IOException, InterruptedException {
+    private Object doResumableUpload() throws IOException {
       // Only request committed size for the first insert request.
       if (writeOffset > 0) {
         writeOffset = getCommittedWriteSize(uploadId);
@@ -219,8 +215,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
         Thread.currentThread().interrupt();
         throw new IOException(
             String.format(
-                "Streaming RPC failed to become ready for resumable upload for '%s'",
-                getResourceString()),
+                "Streaming RPC failed to become ready for resumable upload for '%s'", resourceId),
             e);
       }
 
@@ -255,7 +250,14 @@ public final class GoogleCloudStorageGrpcWriteChannel
         }
       }
 
-      responseObserver.done.await();
+      try {
+        responseObserver.done.await();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IOException(
+            String.format("Interrupted while awaiting response during upload of '%s'", resourceId),
+            e);
+      }
       if (responseObserver.hasTransientError()) {
         throw new IOException(responseObserver.transientError);
       }
@@ -362,8 +364,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       public Object getResponseOrThrow() throws IOException {
         if (hasNonTransientError()) {
           throw new IOException(
-              String.format("Resumable upload failed for '%s'", getResourceString()),
-              nonTransientError);
+              String.format("Resumable upload failed for '%s'", resourceId), nonTransientError);
         }
         return checkNotNull(response, "Response not present for '%s'", resourceId);
       }
@@ -448,21 +449,32 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       SimpleResponseObserver<StartResumableWriteResponse> responseObserver =
           new SimpleResponseObserver<>();
-      Retryer<Void> retryer = getRetryer();
       try {
-        retryer.call(
+        ResilientOperation.retry(
             () -> {
               stub.withDeadlineAfter(START_RESUMABLE_WRITE_TIMEOUT.toMillis(), MILLISECONDS)
                   .startResumableWrite(request, responseObserver);
-              responseObserver.done.await();
+              try {
+                responseObserver.done.await();
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException(
+                    String.format(
+                        "Interrupted while awaiting response during upload of '%s'", resourceId),
+                    e);
+              }
               if (responseObserver.hasError()) {
                 throw new IOException(responseObserver.getError());
               }
               return null;
-            });
-      } catch (ExecutionException | RetryException e) {
+            },
+            backOffFactory.newBackOff(),
+            RetryDeterminer.ALL_ERRORS,
+            IOException.class);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         throw new IOException(
-            String.format("Failed to start resumable upload for '%s'", getResourceString()), e);
+            String.format("Failed to start resumable upload for '%s'", resourceId), e);
       }
 
       return responseObserver.getResponse().getUploadId();
@@ -475,21 +487,32 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       SimpleResponseObserver<QueryWriteStatusResponse> responseObserver =
           new SimpleResponseObserver<>();
-      Retryer<Void> retryer = getRetryer();
       try {
-        retryer.call(
+        ResilientOperation.retry(
             () -> {
               stub.withDeadlineAfter(QUERY_WRITE_STATUS_TIMEOUT.toMillis(), MILLISECONDS)
                   .queryWriteStatus(request, responseObserver);
-              responseObserver.done.await();
+              try {
+                responseObserver.done.await();
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException(
+                    String.format(
+                        "Interrupted while awaiting response during upload of '%s'", resourceId),
+                    e);
+              }
               if (responseObserver.hasError()) {
                 throw new IOException(responseObserver.getError());
               }
               return null;
-            });
-      } catch (ExecutionException | RetryException e) {
+            },
+            backOffFactory.newBackOff(),
+            RetryDeterminer.ALL_ERRORS,
+            IOException.class);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         throw new IOException(
-            String.format("Failed to get committed write size for '%s'", getResourceString()), e);
+            String.format("Failed to get committed write size for '%s'", resourceId), e);
       }
 
       return responseObserver.getResponse().getCommittedSize();
@@ -543,14 +566,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
    */
   @Override
   public GoogleCloudStorageItemInfo getItemInfo() {
-    return this.completedItemInfo;
-  }
-
-  private static <T> Retryer<T> getRetryer() {
-    return RetryerBuilder.<T>newBuilder()
-        .retryIfExceptionOfType(IOException.class)
-        .withWaitStrategy(WaitStrategies.exponentialWait(2, 20, SECONDS))
-        .withStopStrategy(StopStrategies.stopAfterAttempt(UPLOAD_RETRIES))
-        .build();
+    return completedItemInfo;
   }
 }

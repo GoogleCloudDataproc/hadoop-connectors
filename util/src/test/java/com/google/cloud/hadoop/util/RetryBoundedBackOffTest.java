@@ -33,7 +33,7 @@ public class RetryBoundedBackOffTest {
   public void testValidCallHasNoRetries() throws Exception {
     IllegalArgumentException thrown =
         assertThrows(
-            IllegalArgumentException.class, () -> new RetryBoundedBackOff(-7, new BackOffTester()));
+            IllegalArgumentException.class, () -> new RetryBoundedBackOff(new BackOffTester(), -7));
     assertThat(thrown)
         .hasMessageThat()
         .contains("Maximum number of retries must not be less than 0.");
@@ -41,7 +41,7 @@ public class RetryBoundedBackOffTest {
 
   @Test
   public void stopsAfterAttempts() throws Exception {
-    BackOff backoff = new RetryBoundedBackOff(5, new BackOffTester());
+    BackOff backoff = new RetryBoundedBackOff(new BackOffTester(), 5);
     for (int i = 0; i < 5; i++) {
       assertThat(i + 1).isEqualTo(backoff.nextBackOffMillis());
     }
@@ -51,7 +51,7 @@ public class RetryBoundedBackOffTest {
 
   @Test
   public void resetsCorrectly() throws Exception {
-    BackOff backoff = new RetryBoundedBackOff(5, new BackOffTester());
+    BackOff backoff = new RetryBoundedBackOff(new BackOffTester(), 5);
     for (int i = 0; i < 5; i++) {
       assertThat(i + 1).isEqualTo(backoff.nextBackOffMillis());
     }

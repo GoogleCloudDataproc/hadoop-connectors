@@ -22,13 +22,9 @@ import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.HttpStatusCodes;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import java.io.IOError;
 import java.io.IOException;
-import java.net.SocketException;
-import java.net.SocketTimeoutException;
 import java.util.List;
 import javax.annotation.Nullable;
-import javax.net.ssl.SSLException;
 
 /**
  * Translates exceptions from API calls into higher-level meaning, while allowing injectability for
@@ -85,7 +81,7 @@ public class ApiErrorExtractor {
             || badRequest(jsonException)
             || internalServerError(jsonException)
             || rateLimited(jsonException)
-            || socketError(jsonException)
+            || IoExceptionHelper.isSocketError(jsonException)
             || unauthorized(jsonException));
   }
 
@@ -225,46 +221,6 @@ public class ApiErrorExtractor {
     return jsonError != null
         && jsonError.getCode() == HttpStatusCodes.STATUS_CODE_BAD_REQUEST
         && USER_PROJECT_MISSING_MESSAGE.equals(jsonError.getMessage());
-  }
-
-  /**
-   * Determines if a given Throwable is caused by an IO error. Recursively checks getCause() if
-   * outer exception isn't an instance of the correct class.
-   *
-   * @param throwable The Throwable to check.
-   * @return True if the Throwable is a result of an IO error.
-   */
-  public boolean ioError(Throwable throwable) {
-    if (throwable instanceof IOException || throwable instanceof IOError) {
-      return true;
-    }
-    Throwable cause = throwable.getCause();
-    return cause != null && ioError(cause);
-  }
-
-  /**
-   * Determines if a given Throwable is caused by a socket error. Recursively checks getCause() if
-   * outer exception isn't an instance of the correct class.
-   *
-   * @param throwable The Throwable to check.
-   * @return True if the Throwable is a result of a socket error.
-   */
-  public boolean socketError(Throwable throwable) {
-    if (throwable instanceof SocketException || throwable instanceof SocketTimeoutException) {
-      return true;
-    }
-    Throwable cause = throwable.getCause();
-    // Subset of SSL exceptions that are caused by IO errors (e.g. SSLHandshakeException due to
-    // unexpected connection closure) is also a socket error.
-    if (throwable instanceof SSLException && cause != null && ioError(cause)) {
-      return true;
-    }
-    return cause != null && socketError(cause);
-  }
-
-  /** True if the exception is a "read timed out". */
-  public boolean readTimedOut(IOException e) {
-    return e instanceof SocketTimeoutException && e.getMessage().equals("Read timed out");
   }
 
   /** Extracts the error message. */

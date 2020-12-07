@@ -102,7 +102,6 @@
     <google.oauth-client.version>1.31.0</google.oauth-client.version>
     <google.protobuf.version>3.13.0</google.protobuf.version>
     <grpc.version>1.32.2</grpc.version>
-    <guava.retrying.version>2.0.0</guava.retrying.version>
     <hadoop.two.version>2.10.1</hadoop.two.version>
     <hadoop.three.version>3.2.1</hadoop.three.version>
 
@@ -422,11 +421,6 @@
         <artifactId>flogger-system-backend</artifactId>
         <version>${google.flogger.version}</version>
         <scope>runtime</scope>
-      </dependency>
-      <dependency>
-        <groupId>com.github.rholder</groupId>
-        <artifactId>guava-retrying</artifactId>
-        <version>${guava.retrying.version}</version>
       </dependency>
 
       <!-- Test dependencies -->

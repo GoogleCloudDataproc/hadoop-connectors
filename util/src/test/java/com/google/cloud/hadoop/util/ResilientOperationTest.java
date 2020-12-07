@@ -21,10 +21,10 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.testing.util.MockSleeper;
 import com.google.api.client.util.BackOff;
-import com.google.cloud.hadoop.util.ResilientOperation.CheckedCallable;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
+import java.util.concurrent.Callable;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -35,8 +35,8 @@ public class ResilientOperationTest {
   @Test
   public void testValidCallHasNoRetries() throws Exception {
     MockSleeper sleeper = new MockSleeper();
-    CallableTester<Exception> callTester = new CallableTester<>(new ArrayList<Exception>());
-    BackOff backoff = new RetryBoundedBackOff(3, new BackOffTester());
+    CallableTester callTester = new CallableTester(new ArrayList<>());
+    BackOff backoff = new RetryBoundedBackOff(new BackOffTester(), 3);
     ResilientOperation.retry(callTester, backoff, RetryDeterminer.DEFAULT, Exception.class,
         sleeper);
     assertThat(callTester.timesCalled()).isEqualTo(1);
@@ -48,8 +48,8 @@ public class ResilientOperationTest {
     MockSleeper sleeper = new MockSleeper();
     ArrayList<Exception> exceptions = new ArrayList<>();
     exceptions.add(new IllegalArgumentException("FakeException"));
-    CallableTester<Exception> callTester = new CallableTester<>(exceptions);
-    BackOff backoff = new RetryBoundedBackOff(3, new BackOffTester());
+    CallableTester callTester = new CallableTester(exceptions);
+    BackOff backoff = new RetryBoundedBackOff(new BackOffTester(), 3);
 
     IllegalArgumentException thrown =
         assertThrows(
@@ -70,8 +70,8 @@ public class ResilientOperationTest {
     exceptions.add(new SocketTimeoutException("socket"));
     exceptions.add(new SocketTimeoutException("socket"));
     exceptions.add(new IllegalArgumentException("FakeException"));
-    CallableTester<Exception> callTester = new CallableTester<>(exceptions);
-    BackOff backoff = new RetryBoundedBackOff(5, new BackOffTester());
+    CallableTester callTester = new CallableTester(exceptions);
+    BackOff backoff = new RetryBoundedBackOff(new BackOffTester(), 5);
 
     IllegalArgumentException thrown =
         assertThrows(
@@ -88,12 +88,12 @@ public class ResilientOperationTest {
   @Test
   public void testCallRetriesAndFailsWithSocketErrors() throws Exception {
     MockSleeper sleeper = new MockSleeper();
-    ArrayList<IOException> exceptions = new ArrayList<>();
+    ArrayList<Exception> exceptions = new ArrayList<>();
     exceptions.add(new SocketTimeoutException("socket"));
     exceptions.add(new SocketTimeoutException("socket"));
     exceptions.add(new IOException("FakeException"));
-    CallableTester<IOException> callTester = new CallableTester<>(exceptions);
-    BackOff backoff = new RetryBoundedBackOff(5, new BackOffTester());
+    CallableTester callTester = new CallableTester(exceptions);
+    BackOff backoff = new RetryBoundedBackOff(new BackOffTester(), 5);
 
     IOException thrown =
         assertThrows(
@@ -126,8 +126,8 @@ public class ResilientOperationTest {
     exceptions.add(new SocketTimeoutException("socket"));
     exceptions.add(new SocketTimeoutException("socket2"));
     exceptions.add(new SocketTimeoutException("socket3"));
-    CallableTester<Exception> callTester = new CallableTester<>(exceptions);
-    BackOff backoff = new RetryBoundedBackOff(2, new BackOffTester());
+    CallableTester callTester = new CallableTester(exceptions);
+    BackOff backoff = new RetryBoundedBackOff(new BackOffTester(), 2);
 
     SocketTimeoutException thrown =
         assertThrows(
@@ -148,8 +148,8 @@ public class ResilientOperationTest {
     exceptions.add(new SocketTimeoutException("socket"));
     exceptions.add(new SocketTimeoutException("socket2"));
     exceptions.add(new SocketTimeoutException("socket3"));
-    CallableTester<Exception> callTester = new CallableTester<>(exceptions);
-    BackOff backoff = new RetryBoundedBackOff(3, new BackOffTester());
+    CallableTester callTester = new CallableTester(exceptions);
+    BackOff backoff = new RetryBoundedBackOff(new BackOffTester(), 3);
     assertThat(
             ResilientOperation.retry(
                 callTester, backoff, RetryDeterminer.DEFAULT, Exception.class, sleeper))
@@ -158,16 +158,16 @@ public class ResilientOperationTest {
     verifySleeper(sleeper, 3);
   }
 
-  private class CallableTester<X extends Exception> implements CheckedCallable<Integer, X> {
+  private class CallableTester implements Callable<Integer> {
     int called = 0;
-    ArrayList<X> exceptions = null;
+    ArrayList<Exception> exceptions = null;
 
-    public CallableTester(ArrayList<X> exceptions) {
+    public CallableTester(ArrayList<Exception> exceptions) {
       this.exceptions = exceptions;
     }
 
     @Override
-    public Integer call() throws X {
+    public Integer call() throws Exception {
       if (called < exceptions.size()) {
         throw exceptions.get(called++);
       }

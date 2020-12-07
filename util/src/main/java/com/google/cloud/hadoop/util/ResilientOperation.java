@@ -18,7 +18,6 @@ package com.google.cloud.hadoop.util;
 
 import static com.google.api.client.util.Preconditions.checkNotNull;
 
-import com.google.api.client.googleapis.services.AbstractGoogleClientRequest;
 import com.google.api.client.util.BackOff;
 import com.google.api.client.util.Sleeper;
 import com.google.common.flogger.GoogleLogger;
@@ -38,7 +37,7 @@ public class ResilientOperation {
    *
    * <p>Does not support unchecked exceptions that are not instances of RuntimeException.
    *
-   * @param callable CheckedCallable to retry execution of
+   * @param callable Callable to retry execution of
    * @param backoff BackOff to determine how long to sleep for
    * @param retryDet RetryDeterminer to determine when to retry
    * @param classType class type of X
@@ -50,7 +49,7 @@ public class ResilientOperation {
    */
   @SuppressWarnings("unchecked")
   public static <T, X extends Exception> T retry(
-      CheckedCallable<T, X> callable,
+      Callable<T> callable,
       BackOff backoff,
       RetryDeterminer<? super X> retryDet,
       Class<X> classType,
@@ -88,7 +87,7 @@ public class ResilientOperation {
    * Retries the given executable function in the case of transient errors defined by the
    * RetryDeterminer and uses default sleeper.
    *
-   * @param callable CheckedCallable to retry execution of
+   * @param callable Callable to retry execution of
    * @param backoff BackOff to determine how long to sleep for
    * @param retryDet RetryDeterminer to determine when to retry
    * @param classType class type of X
@@ -98,7 +97,7 @@ public class ResilientOperation {
    * @throws InterruptedException - Exception thrown from sleep
    */
   public static <T, X extends Exception> T retry(
-      CheckedCallable<T, X> callable,
+      Callable<T> callable,
       BackOff backoff,
       RetryDeterminer<? super X> retryDet,
       Class<X> classType)
@@ -129,46 +128,5 @@ public class ResilientOperation {
         "Transient exception caught. Sleeping for %d, then retrying.", backOffTime);
     sleeper.sleep(backOffTime);
     return true;
-  }
-
-  /**
-   * Interface that allows a call that can throw an exception X.
-   *
-   * @param <T> Type of object returned by the call.
-   * @param <X> Type of exception thrown by the call.
-   */
-  // TODO: Replace with Guava's CheckedCallable when not in beta.
-  public interface CheckedCallable<T, X extends Exception> extends Callable<T> {
-    @Override
-    T call() throws X;
-  }
-
-  /**
-   * Returns a {@link CheckedCallable} that encompasses a {@link AbstractGoogleClientRequest} and
-   * can be used to retry the execution for an AbstractGoogleClientRequest.
-   *
-   * @param request The AbstractGoogleClientRequest to turn into a {@link CheckedCallable}.
-   * @return a CheckedCallable object that attempts a AbstractGoogleClientRequest
-   */
-  public static <V> CheckedCallable<V, IOException> getGoogleRequestCallable(
-      AbstractGoogleClientRequest<V> request) {
-    return new AbstractGoogleClientRequestExecutor<>(request);
-  }
-
-  /**
-   * Simple class to create a {@link CheckedCallable} from a {@link AbstractGoogleClientRequest}.
-   */
-  private static class AbstractGoogleClientRequestExecutor<T>
-      implements CheckedCallable<T, IOException> {
-    private final AbstractGoogleClientRequest<T> request;
-
-    private AbstractGoogleClientRequestExecutor(AbstractGoogleClientRequest<T> request) {
-      this.request = request;
-    }
-
-    @Override
-    public T call() throws IOException {
-      return request.execute();
-    }
   }
 }
