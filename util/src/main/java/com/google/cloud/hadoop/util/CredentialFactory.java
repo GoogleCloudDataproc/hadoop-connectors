@@ -21,13 +21,8 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.auth.oauth2.TokenRequest;
 import com.google.api.client.auth.oauth2.TokenResponse;
-import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
-import com.google.api.client.extensions.java6.auth.oauth2.FileCredentialStore;
-import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
-import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.compute.ComputeCredential;
-import com.google.api.client.googleapis.extensions.java6.auth.oauth2.GooglePromptReceiver;
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpBackOffIOExceptionHandler;
 import com.google.api.client.http.HttpBackOffUnsuccessfulResponseHandler;
@@ -318,45 +313,6 @@ public class CredentialFactory {
   }
 
   /**
-   * Initialized OAuth2 credential for the "installed application" flow; where the credential
-   * typically represents an actual end user (instead of a service account), and is stored as a
-   * refresh token in a local FileCredentialStore.
-   *
-   * @param scopes list of well-formed scopes desired in the credential
-   * @param transport The HttpTransport used for authorization
-   * @return credential with desired scopes, possibly obtained from loading {@code filePath}.
-   * @throws IOException on IO error
-   */
-  private Credential getCredentialFromFileCredentialStoreForInstalledApp(
-      List<String> scopes, HttpTransport transport) throws IOException {
-    logger.atFine().log(
-        "getCredentialFromFileCredentialStoreForInstalledApp(%s, %s) from '%s'",
-        scopes, transport, options.getOAuthCredentialFile());
-
-    // Initialize client secrets.
-    GoogleClientSecrets.Details details =
-        new GoogleClientSecrets.Details()
-            .setClientId(options.getClientId().value())
-            .setClientSecret(options.getClientSecret().value());
-    GoogleClientSecrets clientSecrets = new GoogleClientSecrets().setInstalled(details);
-
-    // Set up file credential store.
-    FileCredentialStore credentialStore =
-        new FileCredentialStore(new File(options.getOAuthCredentialFile()), JSON_FACTORY);
-
-    // Set up authorization code flow.
-    GoogleAuthorizationCodeFlow flow =
-        new GoogleAuthorizationCodeFlow.Builder(transport, JSON_FACTORY, clientSecrets, scopes)
-            .setCredentialStore(credentialStore)
-            .setRequestInitializer(new CredentialHttpRetryInitializer())
-            .setTokenServerUrl(new GenericUrl(options.getTokenServerUrl()))
-            .build();
-
-    // Authorize access.
-    return new AuthorizationCodeInstalledApp(flow, new GooglePromptReceiver()).authorize("user");
-  }
-
-  /**
    * Determines whether Application Default Credentials have been configured as an evironment
    * variable.
    *
@@ -448,8 +404,6 @@ public class CredentialFactory {
       if (isApplicationDefaultCredentialsConfigured()) {
         return getApplicationDefaultCredentials(scopes, getTransport());
       }
-    } else if (options.getClientId() != null) {
-      return getCredentialFromFileCredentialStoreForInstalledApp(scopes, getTransport());
     } else if (options.isNullCredentialEnabled()) {
       logger.atWarning().log(
           "Allowing null credentials for unit testing. This should not be used in production");
