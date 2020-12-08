@@ -59,11 +59,11 @@
   <dependencies>
     <dependency>
       <groupId>com.google.http-client</groupId>
-      <artifactId>google-http-client-gson</artifactId>
+      <artifactId>google-http-client-jackson2</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.api-client</groupId>
-      <artifactId>google-api-client-gson</artifactId>
+      <artifactId>google-api-client-jackson2</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.apis</groupId>
@@ -137,10 +137,6 @@
       <groupId>com.google.cloud.bigdataoss</groupId>
       <artifactId>util</artifactId>
       <version>${bigdataoss.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>com.google.code.gson</groupId>
-      <artifactId>gson</artifactId>
     </dependency>
 
     <!-- Test dependencies -->
