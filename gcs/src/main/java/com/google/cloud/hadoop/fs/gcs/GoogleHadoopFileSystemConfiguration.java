@@ -16,7 +16,6 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.HTTP_TRANSPORT_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_ADDRESS_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_PASSWORD_SUFFIX;
@@ -172,7 +171,9 @@ public class GoogleHadoopFileSystemConfiguration {
    * inside delete and rename calls.
    */
   public static final HadoopConfigurationProperty<Boolean> GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.implicit.dir.repair.enable", true);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.implicit.dir.repair.enable",
+          GoogleCloudStorageOptions.AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT);
 
   /**
    * Configuration key for enabling check to ensure that conflicting directories do not exist when
