@@ -296,13 +296,17 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>("fs.gs.outputstream.sync.min.interval.ms", 0);
 
   /**
-   * If true, on opening a file we will proactively perform a metadata GET to check whether the
-   * object exists, even though the underlying channel will not open a data stream until read() is
-   * actually called so that streams can seek to nonzero file positions without incurring an extra
-   * stream creation. This is necessary to technically match the expected behavior of Hadoop
-   * filesystems, but incurs extra latency overhead on open(). If the calling code can handle late
-   * failures on not-found errors, or has independently already ensured that a file exists before
-   * calling open(), then set this to false for more efficient reads.
+   * If {@code true}, on opening a file we will proactively perform a metadata {@code GET} to check
+   * whether the object exists, even though the underlying channel will not open a data stream until
+   * {@code read()} is actually called. This is necessary to technically match the expected behavior
+   * of Hadoop filesystems, but incurs an extra latency overhead on {@code open()}. If the calling
+   * code can handle late failures on not-found errors, or has independently already ensured that a
+   * file exists before calling {@code open()}, then you can set this to {@code false} for more
+   * efficient reads.
+   *
+   * <p>Note, this is known to not work with YARN {@code CommonNodeLabelsManager} and potentially
+   * other Hadoop components. That's why it's not recommended to set this property to {@code false}
+   * cluster-wide, instead set it for a specific job/application that is compatible with it.
    */
   public static final HadoopConfigurationProperty<Boolean>
       GCS_INPUT_STREAM_FAST_FAIL_ON_NOT_FOUND_ENABLE =
