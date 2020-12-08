@@ -16,11 +16,8 @@ package com.google.cloud.hadoop.util;
 
 import static com.github.stefanbirkner.systemlambda.SystemLambda.withEnvironmentVariable;
 import static com.google.cloud.hadoop.util.CredentialFactory.CREDENTIAL_ENV_VAR;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.CLIENT_ID_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.CLIENT_SECRET_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_NULL_CREDENTIAL_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.OAUTH_CLIENT_FILE_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_KEYFILE_SUFFIX;
@@ -61,11 +58,6 @@ public class HadoopCredentialConfigurationTest {
       new HashMap<String, Object>() {
         {
           put(".auth.access.token.provider.impl", null);
-          put(".auth.client.file", USER_HOME.value() + "/.credentials/storage.json");
-          put(".auth.client.id", null);
-          put(".client.id", null);
-          put(".auth.client.secret", null);
-          put(".client.secret", null);
           put(".auth.null.enable", false);
           put(".auth.service.account.email", null);
           put(".service.account.auth.email", null);
@@ -208,22 +200,6 @@ public class HadoopCredentialConfigurationTest {
 
     assertThat(credential.getServiceAccountId()).isEqualTo("foo@example.com");
     assertThat(credential.getServiceAccountPrivateKeyId()).isEqualTo("privatekey");
-  }
-
-  @Test
-  public void installedAppWorkflowUsedWhenConfigured() throws Exception {
-    configuration.setBoolean(getConfigKey(ENABLE_SERVICE_ACCOUNTS_SUFFIX), false);
-    configuration.set(getConfigKey(CLIENT_ID_SUFFIX), "aClientId");
-    configuration.set(getConfigKey(CLIENT_SECRET_SUFFIX), "aClientSecret");
-    configuration.set(
-        getConfigKey(OAUTH_CLIENT_FILE_SUFFIX), getStringPath("test-client-credential.json"));
-
-    CredentialFactory credentialFactory = getCredentialFactory();
-
-    Credential credential = credentialFactory.getCredential(TEST_SCOPES);
-
-    assertThat(credential.getAccessToken()).isEqualTo("test-client-access-token");
-    assertThat(credential.getRefreshToken()).isEqualTo("test-client-refresh-token");
   }
 
   @Test

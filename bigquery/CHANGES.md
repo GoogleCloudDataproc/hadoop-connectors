@@ -6,9 +6,17 @@
 
 1.  Use default logging backend for Google Flogger instead of Slf4j.
 
-1.  Removed unused `mapred.bq.output.buffer.size` configuration property.
+1.  Remove unused `mapred.bq.output.buffer.size` configuration property.
 
 1.  Fix unauthenticated access support (`mapred.bq.auth.null.enable=true`).
+
+1.  Remove obsolete configuration properties and related functionality:
+
+    ```
+    mapred.bq.auth.client.id
+    mapred.bq.auth.client.file
+    mapred.bq.auth.client.secret
+    ```
 
 ### 1.1.1 - 2020-03-11
 

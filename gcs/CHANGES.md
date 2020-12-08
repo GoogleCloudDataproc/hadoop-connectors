@@ -140,6 +140,14 @@
 1.  Improve cache hit ratio when `fs.gs.performance.cache.list.caching.enable`
     property is set to `true`. 
 
+1.  Remove obsolete configuration properties and related functionality:
+
+    ```
+    fs.gs.auth.client.id
+    fs.gs.auth.client.file
+    fs.gs.auth.client.secret
+    ```
+
 ### 2.1.1 - 2020-03-11
 
 1.  Add upload cache to support high-level retries of failed uploads. Cache size
