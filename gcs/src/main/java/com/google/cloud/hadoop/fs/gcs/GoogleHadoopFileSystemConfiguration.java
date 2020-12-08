@@ -116,9 +116,7 @@ public class GoogleHadoopFileSystemConfiguration {
    * authority corresponding to that root path in the process.
    */
   public static final HadoopConfigurationProperty<Boolean> GCE_BUCKET_DELETE_ENABLE =
-      new HadoopConfigurationProperty<>(
-          "fs.gs.bucket.delete.enable",
-          GoogleCloudStorageFileSystemOptions.DEFAULT.isBucketDeleteEnabled());
+      new HadoopConfigurationProperty<>("fs.gs.bucket.delete.enable", false);
 
   /** Configuration key for GCS project ID. Default value: "DISABLED" */
   public static final HadoopConfigurationProperty<RequesterPaysMode> GCS_REQUESTER_PAYS_MODE =
@@ -147,9 +145,7 @@ public class GoogleHadoopFileSystemConfiguration {
    * conjunction with other caching options.
    */
   public static final HadoopConfigurationProperty<Boolean> GCS_PERFORMANCE_CACHE_ENABLE =
-      new HadoopConfigurationProperty<>(
-          "fs.gs.performance.cache.enable",
-          GoogleCloudStorageFileSystemOptions.DEFAULT.isPerformanceCacheEnabled());
+      new HadoopConfigurationProperty<>("fs.gs.performance.cache.enable", false);
 
   /**
    * Configuration key for maximum number of milliseconds a GoogleCloudStorageItemInfo will remain
@@ -165,9 +161,7 @@ public class GoogleHadoopFileSystemConfiguration {
    * parallel to reduce latency.
    */
   public static final HadoopConfigurationProperty<Boolean> GCS_STATUS_PARALLEL_ENABLE =
-      new HadoopConfigurationProperty<>(
-          "fs.gs.status.parallel.enable",
-          GoogleCloudStorageFileSystemOptions.DEFAULT.isStatusParallelEnabled());
+      new HadoopConfigurationProperty<>("fs.gs.status.parallel.enable", true);
 
   /** Configuration key for enabling lazy initialization of GCS FS instance. */
   public static final HadoopConfigurationProperty<Boolean> GCS_LAZY_INITIALIZATION_ENABLE =
@@ -178,17 +172,14 @@ public class GoogleHadoopFileSystemConfiguration {
    * inside delete and rename calls.
    */
   public static final HadoopConfigurationProperty<Boolean> GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE =
-      new HadoopConfigurationProperty<>(
-          "fs.gs.implicit.dir.repair.enable", AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT);
+      new HadoopConfigurationProperty<>("fs.gs.implicit.dir.repair.enable", true);
 
   /**
    * Configuration key for enabling check to ensure that conflicting directories do not exist when
    * creating files and conflicting files do not exist when creating directories.
    */
   public static final HadoopConfigurationProperty<Boolean> GCS_CREATE_ITEMS_CONFLICT_CHECK_ENABLE =
-      new HadoopConfigurationProperty<>(
-          "fs.gs.create.items.conflict.check.enable",
-          GoogleCloudStorageFileSystemOptions.DEFAULT.isEnsureNoConflictingItems());
+      new HadoopConfigurationProperty<>("fs.gs.create.items.conflict.check.enable", true);
 
   /** Configuration key for customizing glob search algorithm. */
   public static final HadoopConfigurationProperty<GlobAlgorithm> GCS_GLOB_ALGORITHM =
@@ -380,9 +371,7 @@ public class GoogleHadoopFileSystemConfiguration {
    * isolation.
    */
   public static final HadoopConfigurationProperty<Boolean> GCS_COOPERATIVE_LOCKING_ENABLE =
-      new HadoopConfigurationProperty<>(
-          "fs.gs.cooperative.locking.enable",
-          GoogleCloudStorageFileSystemOptions.DEFAULT.isCooperativeLockingEnabled());
+      new HadoopConfigurationProperty<>("fs.gs.cooperative.locking.enable", false);
 
   /** Configuration key for lock expiration when using cooperative locking. */
   public static final HadoopConfigurationProperty<Long>
