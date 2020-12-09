@@ -75,6 +75,11 @@
     behavior of the connector or the underlying GCS objects. However it will
     affect the number of splits Hadoop MapReduce uses for a given input.
 
+*   `fs.gs.create.items.conflict.check.enable` (default: `true`)
+
+    Enables a check that ensures that conflicting directories do not exist when
+    creating files and conflicting files do not exist when creating directories.
+
 *   `fs.gs.glob.algorithm` (default: `CONCURRENT`)
 
     Glob search algorithm to use in Hadoop

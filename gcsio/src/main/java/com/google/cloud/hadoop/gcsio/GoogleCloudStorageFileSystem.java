@@ -231,8 +231,14 @@ public class GoogleCloudStorageFileSystem {
               "Cannot create a file whose name looks like a directory: '%s'", resourceId));
     }
 
-    // Before creating a leaf directory we need to check if there are no conflicting files
-    // with the same name as any subdirectory
+    // Because create call should create parent directories too, before creating an actual file
+    // we need to check if there are no conflicting items in the directory tree:
+    // - if there are no conflicting files with the same name as any parent subdirectory
+    // - if there are no conflicting directory with the name as a file
+    //
+    // For example, for a new `gs://bucket/c/d/f` file:
+    // - files `gs://bucket/c` and `gs://bucket/c/d` should not exist
+    // - directory `gs://bucket/c/d/f/` should not exist
     if (options.isEnsureNoConflictingItems()) {
       // Asynchronously check if a directory with the same name exists.
       StorageResourceId dirId = resourceId.toDirectoryId();
@@ -244,7 +250,7 @@ public class GoogleCloudStorageFileSystem {
 
       checkNoFilesConflictingWithDirs(resourceId);
 
-      // Check if a directory of that name exists.
+      // Check if a directory with the same name exists.
       if (getFromFuture(conflictingDirExist)) {
         throw new FileAlreadyExistsException("A directory with that name exists: " + path);
       }
