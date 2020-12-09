@@ -626,7 +626,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 GCS_OUTPUT_STREAM_TYPE.getKey(), type));
     }
 
-    return new FSDataOutputStream(out, null);
+    return new FSDataOutputStream(out, /* stats= */ null);
   }
 
   /** {@inheritDoc} */

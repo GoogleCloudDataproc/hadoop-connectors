@@ -171,7 +171,16 @@ public class GoogleHadoopFileSystemConfiguration {
    * inside delete and rename calls.
    */
   public static final HadoopConfigurationProperty<Boolean> GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.implicit.dir.repair.enable", true);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.implicit.dir.repair.enable",
+          GoogleCloudStorageOptions.AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT);
+
+  /**
+   * Configuration key for enabling check to ensure that conflicting directories do not exist when
+   * creating files and conflicting files do not exist when creating directories.
+   */
+  public static final HadoopConfigurationProperty<Boolean> GCS_CREATE_ITEMS_CONFLICT_CHECK_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.create.items.conflict.check.enable", true);
 
   /** Configuration key for customizing glob search algorithm. */
   public static final HadoopConfigurationProperty<GlobAlgorithm> GCS_GLOB_ALGORITHM =
@@ -411,14 +420,16 @@ public class GoogleHadoopFileSystemConfiguration {
   // @VisibleForTesting
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
+        .setCloudStorageOptions(getGcsOptionsBuilder(config).build())
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))
-        .setMarkerFilePattern(GCS_MARKER_FILE_PATTERN.get(config, config::get))
-        .setPerformanceCacheEnabled(GCS_PERFORMANCE_CACHE_ENABLE.get(config, config::getBoolean))
         .setCooperativeLockingEnabled(
             GCS_COOPERATIVE_LOCKING_ENABLE.get(config, config::getBoolean))
+        .setEnsureNoConflictingItems(
+            GCS_CREATE_ITEMS_CONFLICT_CHECK_ENABLE.get(config, config::getBoolean))
+        .setMarkerFilePattern(GCS_MARKER_FILE_PATTERN.get(config, config::get))
+        .setPerformanceCacheEnabled(GCS_PERFORMANCE_CACHE_ENABLE.get(config, config::getBoolean))
         .setPerformanceCacheOptions(getPerformanceCachingOptions(config))
-        .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean))
-        .setCloudStorageOptions(getGcsOptionsBuilder(config).build());
+        .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean));
   }
 
   @VisibleForTesting
