@@ -66,21 +66,22 @@
         </dependency>
         <dependency>
           <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-client-runtime</artifactId>
+          <artifactId>hadoop-common</artifactId>
         </dependency>
         <dependency>
           <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-mapreduce-client-common</artifactId>
+          <artifactId>hadoop-mapreduce-client</artifactId>
+          <type>pom</type>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-client-runtime</artifactId>
         </dependency>
       </dependencies>
     </profile>
   </profiles>
 
   <dependencies>
-    <dependency>
-      <groupId>com.google.http-client</groupId>
-      <artifactId>google-http-client</artifactId>
-    </dependency>
     <dependency>
       <groupId>com.google.http-client</groupId>
       <artifactId>google-http-client-jackson2</artifactId>
@@ -96,10 +97,14 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-bigquerystorage</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.google.code.gson</groupId>
-      <artifactId>gson</artifactId>
+      <exclusions>
+        <!-- Exclude Gson because we do not shade it and that's why should use
+             Hadoop's version pulled in as a transitive dependency -->
+        <exclusion>
+          <groupId>com.google.code.gson</groupId>
+          <artifactId>gson</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.google.protobuf</groupId>
@@ -112,10 +117,6 @@
     <dependency>
       <groupId>com.google.oauth-client</groupId>
       <artifactId>google-oauth-client</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.avro</groupId>
-      <artifactId>avro</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.cloud.bigdataoss</groupId>
@@ -147,18 +148,42 @@
       <version>${bigdataoss.version}</version>
       <scope>test</scope>
       <type>test-jar</type>
+      <exclusions>
+        <!-- Exclude Gson because we do not shade it and that's why should use
+             Hadoop's version pulled in as a transitive dependency -->
+        <exclusion>
+          <groupId>com.google.code.gson</groupId>
+          <artifactId>gson</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.google.cloud.bigdataoss</groupId>
       <artifactId>gcsio</artifactId>
       <version>${bigdataoss.version}</version>
       <scope>test</scope>
+      <exclusions>
+        <!-- Exclude Gson because we do not shade it and that's why should use
+             Hadoop's version pulled in as a transitive dependency -->
+        <exclusion>
+          <groupId>com.google.code.gson</groupId>
+          <artifactId>gson</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.google.cloud.bigdataoss</groupId>
       <artifactId>gcs-connector</artifactId>
       <version>${hadoop.identifier}-${bigdataoss.version}</version>
       <scope>test</scope>
+      <exclusions>
+        <!-- Exclude Gson because we do not shade it and that's why should use
+             Hadoop's version pulled in as a transitive dependency -->
+        <exclusion>
+          <groupId>com.google.code.gson</groupId>
+          <artifactId>gson</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.google.cloud.bigdataoss</groupId>
@@ -166,6 +191,14 @@
       <version>${hadoop.identifier}-${bigdataoss.version}</version>
       <classifier>tests</classifier>
       <scope>test</scope>
+      <exclusions>
+        <!-- Exclude Gson because we do not shade it and that's why should use
+             Hadoop's version pulled in as a transitive dependency -->
+        <exclusion>
+          <groupId>com.google.code.gson</groupId>
+          <artifactId>gson</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
