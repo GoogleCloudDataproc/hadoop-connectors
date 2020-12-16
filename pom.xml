@@ -97,7 +97,7 @@
     <google.guava.version>29.0-jre</google.guava.version>
     <google.http-client.version>1.37.0</google.http-client.version>
     <google.oauth-client.version>1.31.0</google.oauth-client.version>
-    <google.protobuf.version>3.13.0</google.protobuf.version>
+    <google.protobuf.version>3.14.0</google.protobuf.version>
     <grpc.version>1.32.2</grpc.version>
     <hadoop.two.version>2.10.1</hadoop.two.version>
     <hadoop.three.version>3.2.1</hadoop.three.version>
