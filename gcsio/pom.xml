@@ -138,6 +138,10 @@
       <artifactId>util</artifactId>
       <version>${bigdataoss.version}</version>
     </dependency>
+    <dependency>
+      <groupId>com.google.code.gson</groupId>
+      <artifactId>gson</artifactId>
+    </dependency>
 
     <!-- Test dependencies -->
     <dependency>
