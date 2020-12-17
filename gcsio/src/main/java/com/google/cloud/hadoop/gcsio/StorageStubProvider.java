@@ -3,6 +3,7 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.ClientProto;
+import com.google.cloud.hadoop.util.PropertyUtil;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.google.storage.v1.StorageGrpc;
@@ -52,6 +53,13 @@ public class StorageStubProvider {
   private final GoogleCloudStorageReadOptions readOptions;
   private final ExecutorService backgroundTasksThreadPool;
   private final List<ChannelAndRequestCounter> mediaChannelPool;
+
+  private static final String PROPERTIES_FILE = "gcsio.properties";
+  private static final String VERSION_PROPERTY = "gcsio.version";
+  private static final String UNKNOWN_VERSION = "0.0.0";
+
+  private static final String VERSION = PropertyUtil.getPropertyOrDefault(
+      StorageStubProvider.class, PROPERTIES_FILE, VERSION_PROPERTY, UNKNOWN_VERSION);
 
   // An interceptor that can be added around a gRPC channel which keeps a count of the number
   // of requests that are active at any given moment.
@@ -146,6 +154,7 @@ public class StorageStubProvider {
             .enableRetry()
             .defaultServiceConfig(getGrpcServiceConfig())
             .intercept(counter)
+            .userAgent(VERSION)
             .build();
     return new ChannelAndRequestCounter(channel, counter);
   }
