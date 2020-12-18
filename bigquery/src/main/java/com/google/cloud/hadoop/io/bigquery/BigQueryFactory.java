@@ -79,7 +79,7 @@ public class BigQueryFactory {
 
   // Objects for handling HTTP transport and JSON formatting of API calls
   private static final HttpTransport HTTP_TRANSPORT = new NetHttpTransport();
-  private static final JsonFactory JSON_FACTORY = new JacksonFactory();
+  private static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
 
   /**
    * Construct credentials from the passed Configuration.
