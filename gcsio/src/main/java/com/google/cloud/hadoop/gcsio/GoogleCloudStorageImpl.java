@@ -940,9 +940,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         batchFactory.newBatchHelper(
             httpRequestInitializer,
             storage,
-            storageOptions.getCopyMaxRequestsPerBatch(),
+            storageOptions.getMaxRequestsPerBatch(),
             srcObjectNames.size(),
-            storageOptions.getCopyBatchThreads());
+            storageOptions.getBatchThreads());
 
     for (int i = 0; i < srcObjectNames.size(); i++) {
       if (storageOptions.isCopyWithRewriteEnabled()) {
