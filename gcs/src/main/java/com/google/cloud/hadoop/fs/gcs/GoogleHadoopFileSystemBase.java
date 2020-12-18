@@ -121,6 +121,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.service.ServiceStateException;
 import org.apache.hadoop.util.Progressable;
 
 /**
@@ -482,6 +483,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     dts.bindToFileSystem(this, service);
     try {
       dts.init(config);
+      dts.start();
       delegationTokens = dts;
       if (delegationTokens.isBoundToDT()) {
         logger.atFine().log(
@@ -489,8 +491,18 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 + " using existing delegation token",
             config, path);
       }
-    } catch (IllegalStateException e) {
+    } catch (IllegalStateException | ServiceStateException e) {
       logger.atFiner().withCause(e).log("Failed to initialize delegation token support");
+    }
+  }
+
+  private void stopDelegationTokens() {
+    if (delegationTokens != null) {
+      try {
+        delegationTokens.close();
+      } catch (IOException e) {
+        logger.atSevere().withCause(e).log("Failed to stop delegation tokens support");
+      }
     }
   }
 
@@ -1580,6 +1592,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       }
       gcsFsSupplier = null;
     }
+
+    stopDelegationTokens();
   }
 
   @Override
