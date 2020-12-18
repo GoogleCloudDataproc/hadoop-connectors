@@ -491,7 +491,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 + " using existing delegation token",
             config, path);
       }
-    } catch (ServiceStateException | IllegalStateException e) {
+    } catch (IllegalStateException | ServiceStateException e) {
       logger.atFiner().withCause(e).log("Failed to initialize delegation token support");
     }
   }

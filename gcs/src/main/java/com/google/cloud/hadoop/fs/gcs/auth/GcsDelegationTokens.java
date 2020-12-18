@@ -62,7 +62,8 @@ public class GcsDelegationTokens extends AbstractService {
     user = UserGroupInformation.getCurrentUser();
   }
 
-  public void serviceInit(final Configuration conf) throws Exception {
+  @Override
+  public void serviceInit(Configuration conf) throws Exception {
     String tokenBindingImpl = conf.get(DELEGATION_TOKEN_BINDING_CLASS.getKey());
 
     checkState(tokenBindingImpl != null, "Delegation Tokens are not configured");
@@ -87,9 +88,9 @@ public class GcsDelegationTokens extends AbstractService {
     super.serviceStart();
     tokenBinding.start();
     bindToAnyDelegationToken();
-    logger.atFine().log("GCS Delegation support token %s with %s",
-                        (isBoundToDT() ? getBoundDT().decodeIdentifier().toString() : "none"),
-                        tokenBinding.getService().toString());
+    logger.atFine().log(
+        "GCS Delegation support token %s with %s",
+        isBoundToDT() ? getBoundDT().decodeIdentifier() : "none", tokenBinding.getService());
   }
 
   @Override
