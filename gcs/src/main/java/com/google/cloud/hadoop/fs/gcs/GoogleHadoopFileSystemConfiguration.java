@@ -198,14 +198,6 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Integer> GCS_BATCH_THREADS =
       new HadoopConfigurationProperty<>("fs.gs.batch.threads", 15);
 
-  /** Configuration key for a max number of GCS RPCs in batch request for copy operations. */
-  public static final HadoopConfigurationProperty<Long> GCS_COPY_MAX_REQUESTS_PER_BATCH =
-      new HadoopConfigurationProperty<>("fs.gs.copy.max.requests.per.batch", 15L);
-
-  /** Configuration key for a number of threads to execute batch requests for copy operations. */
-  public static final HadoopConfigurationProperty<Integer> GCS_COPY_BATCH_THREADS =
-      new HadoopConfigurationProperty<>("fs.gs.copy.batch.threads", 15);
-
   /**
    * Configuration key for enabling the use of Rewrite requests for copy operations. Rewrite request
    * has the same effect as Copy request, but it can handle moving large objects that may
@@ -442,8 +434,6 @@ public class GoogleHadoopFileSystemConfiguration {
             GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.get(config, config::getBoolean))
         .setCopyWithRewriteEnabled(GCS_COPY_WITH_REWRITE_ENABLE.get(config, config::getBoolean))
         .setMaxBytesRewrittenPerCall(GCS_REWRITE_MAX_BYTES_PER_CALL.get(config, config::getLong))
-        .setCopyMaxRequestsPerBatch(GCS_COPY_MAX_REQUESTS_PER_BATCH.get(config, config::getLong))
-        .setCopyBatchThreads(GCS_COPY_BATCH_THREADS.get(config, config::getInt))
         .setTransportType(
             HTTP_TRANSPORT_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::getEnum))
         .setProxyAddress(
