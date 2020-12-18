@@ -27,11 +27,14 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier;
+import org.apache.hadoop.service.AbstractService;
 
 /** Binds file system with service and access token provider */
-public abstract class AbstractDelegationTokenBinding {
+public abstract class AbstractDelegationTokenBinding extends AbstractService {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
+  private static final String SERVICE_NAME = "DelegationTokenBinding";
 
   private final Text kind;
 
@@ -45,6 +48,11 @@ public abstract class AbstractDelegationTokenBinding {
   private GoogleHadoopFileSystemBase fileSystem;
 
   protected AbstractDelegationTokenBinding(Text kind) {
+    this(SERVICE_NAME, kind);
+  }
+
+  protected AbstractDelegationTokenBinding(String name, Text kind) {
+    super(name);
     this.kind = kind;
   }
 
