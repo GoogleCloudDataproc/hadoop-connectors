@@ -77,12 +77,6 @@ public abstract class GoogleCloudStorageOptions {
   /** Default setting for max number of bytes rewritten per rewrite request/call. */
   public static final int MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT = 0;
 
-  /** Default setting for maximum number of requests per GCS batch for copy operations. */
-  public static final long COPY_MAX_REQUESTS_PER_BATCH_DEFAULT = MAX_REQUESTS_PER_BATCH_DEFAULT;
-
-  /** Default setting for number of threads to execute GCS batch requests for copy operations. */
-  public static final int COPY_BATCH_THREADS_DEFAULT = BATCH_THREADS_DEFAULT;
-
   /** Default setting for GCS HTTP request headers. */
   public static final ImmutableMap<String, String> HTTP_REQUEST_HEADERS_DEFAULT = ImmutableMap.of();
 
@@ -112,8 +106,6 @@ public abstract class GoogleCloudStorageOptions {
         .setTransportType(HttpTransportFactory.DEFAULT_TRANSPORT_TYPE)
         .setCopyWithRewriteEnabled(COPY_WITH_REWRITE_DEFAULT)
         .setMaxBytesRewrittenPerCall(MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT)
-        .setCopyMaxRequestsPerBatch(COPY_MAX_REQUESTS_PER_BATCH_DEFAULT)
-        .setCopyBatchThreads(COPY_BATCH_THREADS_DEFAULT)
         .setReadChannelOptions(GoogleCloudStorageReadOptions.DEFAULT)
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
         .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
@@ -146,10 +138,6 @@ public abstract class GoogleCloudStorageOptions {
   public abstract long getMaxRequestsPerBatch();
 
   public abstract int getBatchThreads();
-
-  public abstract long getCopyMaxRequestsPerBatch();
-
-  public abstract int getCopyBatchThreads();
 
   public abstract int getMaxHttpRequestRetries();
 
@@ -253,10 +241,6 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setCopyWithRewriteEnabled(boolean copyWithRewrite);
 
     public abstract Builder setMaxBytesRewrittenPerCall(long bytes);
-
-    public abstract Builder setCopyMaxRequestsPerBatch(long copyMaxRequestsPerBatch);
-
-    public abstract Builder setCopyBatchThreads(int copyBatchThreads);
 
     public abstract Builder setReadChannelOptions(GoogleCloudStorageReadOptions readChannelOptions);
 

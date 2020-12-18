@@ -107,16 +107,6 @@
 
     Maximum number of threads used to execute batch requests in parallel.
 
-*   `fs.gs.copy.max.requests.per.batch` (default: `15`)
-
-    Maximum number of Cloud Storage requests that could be sent in a single
-    batch request for copy operations.
-
-*   `fs.gs.copy.batch.threads` (default: `15`)
-
-    Maximum number of threads used to execute batch requests in parallel for
-    copy operations.
-
 *   `fs.gs.list.max.items.per.call` (default: `1024`)
 
     Maximum number of items to return in response for list Cloud Storage
