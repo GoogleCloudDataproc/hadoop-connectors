@@ -211,9 +211,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     Exception exception =
         assertThrows(
             GoogleJsonResponseException.class,
-            () -> {
-              ghfs.initialize(gsUri, config);
-            });
+            () -> ghfs.initialize(gsUri, config));
     assertThat(exception).hasMessageThat().startsWith("401 Unauthorized");
   }
 

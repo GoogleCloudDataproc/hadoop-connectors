@@ -64,7 +64,7 @@ public class GcsDelegationTokens extends AbstractService {
 
   @Override
   public void serviceInit(Configuration conf) throws Exception {
-    String tokenBindingImpl = conf.get(DELEGATION_TOKEN_BINDING_CLASS.getKey());
+    String tokenBindingImpl = DELEGATION_TOKEN_BINDING_CLASS.get(conf, conf::get);
 
     checkState(tokenBindingImpl != null, "Delegation Tokens are not configured");
 

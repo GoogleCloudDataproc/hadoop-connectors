@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType.FLUSHABLE_COMPOSITE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.CONFIG_KEY_PREFIXES;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_OVERRIDE_FILE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE;
@@ -121,7 +122,6 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.service.ServiceStateException;
 import org.apache.hadoop.util.Progressable;
 
 /**
@@ -478,21 +478,20 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   private void initializeDelegationTokenSupport(Configuration config, URI path) throws IOException {
     logger.atFine().log("initializeDelegationTokenSupport(config: %s, path: %s)", config, path);
     // Load delegation token binding, if support is configured
+    if (isNullOrEmpty(DELEGATION_TOKEN_BINDING_CLASS.get(config, config::get))) {
+      return;
+    }
+
     GcsDelegationTokens dts = new GcsDelegationTokens();
     Text service = new Text(getScheme() + "://" + path.getAuthority());
     dts.bindToFileSystem(this, service);
-    try {
-      dts.init(config);
-      dts.start();
-      delegationTokens = dts;
-      if (delegationTokens.isBoundToDT()) {
-        logger.atFine().log(
-            "initializeDelegationTokenSupport(config: %s, path: %s):"
-                + " using existing delegation token",
-            config, path);
-      }
-    } catch (IllegalStateException | ServiceStateException e) {
-      logger.atFiner().withCause(e).log("Failed to initialize delegation token support");
+    dts.init(config);
+    dts.start();
+    delegationTokens = dts;
+    if (delegationTokens.isBoundToDT()) {
+      logger.atFine().log(
+          "initializeDelegationTokenSupport(config: %s, path: %s): using existing delegation token",
+          config, path);
     }
   }
 
