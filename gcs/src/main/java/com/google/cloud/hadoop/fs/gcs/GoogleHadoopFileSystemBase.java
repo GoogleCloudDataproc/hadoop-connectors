@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType.FLUSHABLE_COMPOSITE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.CONFIG_KEY_PREFIXES;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_OVERRIDE_FILE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE;
@@ -79,7 +80,6 @@ import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.DataInput;
 import java.io.DataOutput;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -1389,7 +1389,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   private synchronized void configure(Configuration config) throws IOException {
     logger.atFine().log("GHFS_ID=%s: configure(config: %s)", GHFS_ID, config);
 
-    overrideConfigFromFile(config);
     // Set this configuration as the default config for this instance.
     setConf(config);
 
@@ -1423,17 +1422,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     } else {
       configureBuckets(getGcsFs());
       configureWorkingDirectory(config);
-    }
-  }
-
-  /**
-   * If overrides file configured, update properties from override file into {@link Configuration}
-   * object
-   */
-  private void overrideConfigFromFile(Configuration config) throws IOException {
-    String configFile = GCS_CONFIG_OVERRIDE_FILE.get(config, config::get);
-    if (configFile != null) {
-      config.addResource(new FileInputStream(configFile));
     }
   }
 
