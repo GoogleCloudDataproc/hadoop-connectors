@@ -159,6 +159,7 @@
 1.  Remove redundant properties:
 
     ```
+    fs.gs.config.override.file
     fs.gs.copy.batch.threads
     fs.gs.copy.max.requests.per.batch
     ```

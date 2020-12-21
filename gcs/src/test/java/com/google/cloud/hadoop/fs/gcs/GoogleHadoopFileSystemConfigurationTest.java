@@ -64,7 +64,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.block.size", 64 * 1024 * 1024L);
           put("fs.gs.bucket.delete.enable", false);
           put("fs.gs.checksum.type", GcsFileChecksumType.NONE);
-          put("fs.gs.config.override.file", null);
           put("fs.gs.cooperative.locking.enable", false);
           put("fs.gs.cooperative.locking.expiration.timeout.ms", 120_000L);
           put("fs.gs.cooperative.locking.max.concurrent.operations", 20);
