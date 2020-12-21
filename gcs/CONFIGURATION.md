@@ -27,12 +27,6 @@
     Maximum number of bytes rewritten in a single rewrite request when
     `fs.gs.copy.with.rewrite.enable` is set to `true`.
 
-*   `fs.gs.config.override.file` (not set by default)
-
-    Override configuration file path. Properties defined in this file overrides
-    the properties defined in `core-site.xml` and values passed from command
-    line.
-
 *   `fs.gs.reported.permissions` (default: `700`)
 
     Permissions that are reported for a file or directory to have regardless of
