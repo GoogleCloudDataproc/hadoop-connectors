@@ -355,10 +355,6 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<String> GCS_GRPC_SERVER_ADDRESS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.server.address");
 
-  /** Override configuration file path. This file must be a valid Hadoop configuration file. */
-  public static final HadoopConfigurationProperty<String> GCS_CONFIG_OVERRIDE_FILE =
-      new HadoopConfigurationProperty<>("fs.gs.config.override.file", null);
-
   /**
    * Configuration key for using cooperative locking to achieve a directory mutation operations
    * isolation.
