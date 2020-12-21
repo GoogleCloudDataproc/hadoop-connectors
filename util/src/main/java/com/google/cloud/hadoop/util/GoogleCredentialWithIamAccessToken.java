@@ -22,7 +22,7 @@ import java.time.Instant;
 /** A {@code Credential} to generate or refresh IAM access token. */
 public class GoogleCredentialWithIamAccessToken extends GoogleCredential {
 
-  private static final JsonFactory JSON_FACTORY = new JacksonFactory();
+  private static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
 
   private static final String DEFAULT_ACCESS_TOKEN_LIFETIME = "3600s";
   private static final String DEFAULT_SERVICE_ACCOUNT_NAME_PREFIX = "projects/-/serviceAccounts/";
