@@ -14,7 +14,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listRequestWithTrailingDelimiter;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getStandardOptionBuilder;
 import static com.google.common.truth.Truth.assertThat;
 
@@ -64,9 +64,9 @@ public class PerformanceCachingGoogleCloudStorageIntegrationTest {
   }
 
   @Test
-  public void getItemInfo_multipleCalls_oneGcsListRequest() throws Exception {
-    String parentDirName = name.getMethodName();
-    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, parentDirName + "/object");
+  public void getItemInfo_multipleCalls_oneGcsGetRequest() throws Exception {
+    String objectName = name.getMethodName() + "/object";
+    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, objectName);
 
     TrackingStorageWrapper<PerformanceCachingGoogleCloudStorage> trackingGcs =
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
@@ -82,9 +82,7 @@ public class PerformanceCachingGoogleCloudStorageIntegrationTest {
     assertThat(object1).isSameInstanceAs(object3);
 
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
-        .containsExactly(
-            listRequestWithTrailingDelimiter(
-                TEST_BUCKET, parentDirName + "/", /* maxResults= */ 1024, /* pageToken= */ null));
+        .containsExactly(getRequestString(TEST_BUCKET, objectName));
   }
 
   private static TrackingStorageWrapper<PerformanceCachingGoogleCloudStorage>
