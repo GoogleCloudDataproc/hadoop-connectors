@@ -159,9 +159,9 @@
 1.  Remove redundant properties:
 
     ```
+    fs.gs.config.override.file
     fs.gs.copy.batch.threads
     fs.gs.copy.max.requests.per.batch
-    fs.gs.config.override.file
     ```
 
 ### 2.1.1 - 2020-03-11
