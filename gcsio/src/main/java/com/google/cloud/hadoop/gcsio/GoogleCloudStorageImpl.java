@@ -112,7 +112,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // JSON factory used for formatting GCS JSON API payloads.
-  private static final JsonFactory JSON_FACTORY = new JacksonFactory();
+  private static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
 
   // Maximum number of times to retry deletes in the case of precondition failures.
   private static final int MAXIMUM_PRECONDITION_FAILURES_IN_DELETE = 4;
