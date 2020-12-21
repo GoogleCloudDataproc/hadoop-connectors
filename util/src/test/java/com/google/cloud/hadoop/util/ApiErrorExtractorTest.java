@@ -471,7 +471,7 @@ public class ApiErrorExtractorTest {
 
   private static GoogleJsonResponseException googleJsonResponseException(
       int status, ErrorInfo errorInfo, String httpStatusString) throws IOException {
-    JsonFactory jsonFactory = new JacksonFactory();
+    JsonFactory jsonFactory = JacksonFactory.getDefaultInstance();
     HttpTransport transport =
         new MockHttpTransport() {
           @Override
