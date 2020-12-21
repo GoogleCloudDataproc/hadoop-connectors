@@ -14,8 +14,6 @@
 
 package com.google.cloud.hadoop.util;
 
-import static com.google.common.base.StandardSystemProperty.USER_HOME;
-
 import com.google.cloud.hadoop.util.HttpTransportFactory.HttpTransportType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
