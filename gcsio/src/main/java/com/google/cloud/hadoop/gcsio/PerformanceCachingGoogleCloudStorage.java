@@ -113,6 +113,7 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions)
       throws IOException {
+    listOptions = getListObjectOptionsWithAllFields(listOptions);
     if (listOptions.getMaxResults() == 1 && listOptions.isIncludePrefix()) {
       GoogleCloudStorageItemInfo item =
           cache.getItem(new StorageResourceId(bucketName, objectNamePrefix));
@@ -133,6 +134,7 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
   public ListPage<GoogleCloudStorageItemInfo> listObjectInfoPage(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions, String pageToken)
       throws IOException {
+    listOptions = getListObjectOptionsWithAllFields(listOptions);
     ListPage<GoogleCloudStorageItemInfo> result =
         super.listObjectInfoPage(bucketName, objectNamePrefix, listOptions, pageToken);
     for (GoogleCloudStorageItemInfo item : result.getItems()) {
@@ -222,14 +224,6 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
   }
 
   @Override
-  public void close() {
-    super.close();
-
-    // Respect close and empty the cache.
-    cache.invalidateAll();
-  }
-
-  @Override
   public GoogleCloudStorageItemInfo composeObjects(
       List<StorageResourceId> sources, StorageResourceId destination, CreateObjectOptions options)
       throws IOException {
@@ -241,8 +235,26 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
     return item;
   }
 
+  @Override
+  public void close() {
+    super.close();
+
+    // Respect close and empty the cache.
+    cache.invalidateAll();
+  }
+
   @VisibleForTesting
   public void invalidateCache() {
     cache.invalidateAll();
+  }
+
+  // Resets requested object fields in list request to return all support object fields because we
+  // initialize cache with objects returned in list response and they can be retrieve for non-list
+  // request responses that need access to any supported fields
+  private static ListObjectOptions getListObjectOptionsWithAllFields(
+      ListObjectOptions listOptions) {
+    return GoogleCloudStorageImpl.OBJECT_FIELDS.equals(listOptions.getFields())
+        ? listOptions
+        : listOptions.toBuilder().setFields(GoogleCloudStorageImpl.OBJECT_FIELDS).build();
   }
 }
