@@ -1322,28 +1322,38 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   private static Optional<Credential> getImpersonatedCredential(
       Configuration config, GoogleCloudStorageFileSystemOptions gcsFsOptions, Credential credential)
       throws IOException {
-    GoogleCloudStorageOptions options = gcsFsOptions.getCloudStorageOptions();
+    Map<String, String> userImpersonationServiceAccounts =
+        USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
+            .withPrefixes(CONFIG_KEY_PREFIXES)
+            .getPropsWithPrefix(config);
+    Map<String, String> groupImpersonationServiceAccounts =
+        GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
+            .withPrefixes(CONFIG_KEY_PREFIXES)
+            .getPropsWithPrefix(config);
+    String impersonationServiceAccount =
+        IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
+            .withPrefixes(CONFIG_KEY_PREFIXES)
+            .get(config, config::get);
+
+    // Exit early if impersonation is not configured
+    if (userImpersonationServiceAccounts.isEmpty()
+        && groupImpersonationServiceAccounts.isEmpty()
+        && isNullOrEmpty(impersonationServiceAccount)) {
+      return Optional.empty();
+    }
+
     UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
     Optional<String> serviceAccountToImpersonate =
         Stream.of(
                 () ->
                     getServiceAccountToImpersonateForUserGroup(
-                        USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
-                            .withPrefixes(CONFIG_KEY_PREFIXES)
-                            .getPropsWithPrefix(config),
+                        userImpersonationServiceAccounts,
                         ImmutableList.of(currentUser.getShortUserName())),
                 () ->
                     getServiceAccountToImpersonateForUserGroup(
-                        GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
-                            .withPrefixes(CONFIG_KEY_PREFIXES)
-                            .getPropsWithPrefix(config),
+                        groupImpersonationServiceAccounts,
                         ImmutableList.copyOf(currentUser.getGroupNames())),
-                (Supplier<Optional<String>>)
-                    () ->
-                        Optional.ofNullable(
-                            IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
-                                .withPrefixes(CONFIG_KEY_PREFIXES)
-                                .get(config, config::get)))
+                (Supplier<Optional<String>>) () -> Optional.ofNullable(impersonationServiceAccount))
             .map(Supplier::get)
             .filter(Optional::isPresent)
             .map(Optional::get)
@@ -1351,6 +1361,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
             .findFirst();
 
     if (serviceAccountToImpersonate.isPresent()) {
+      GoogleCloudStorageOptions options = gcsFsOptions.getCloudStorageOptions();
       HttpTransport httpTransport =
           HttpTransportFactory.createHttpTransport(
               options.getTransportType(),
