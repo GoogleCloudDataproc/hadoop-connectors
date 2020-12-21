@@ -146,49 +146,26 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
   public GoogleCloudStorageItemInfo getItemInfo(StorageResourceId resourceId) throws IOException {
     // Get the item from cache.
     GoogleCloudStorageItemInfo item = cache.getItem(resourceId);
+    if (item != null) {
+      return item;
+    }
 
     // If item is not in the cache but directory item is, then item does not exist.
-    if (item == null
-        && resourceId.isStorageObject()
+    if (resourceId.isStorageObject()
         && !resourceId.isDirectory()
         && cache.getItem(resourceId.toDirectoryId()) != null) {
       return GoogleCloudStorageItemInfo.createNotFound(resourceId);
     }
 
-    // If it wasn't in the cache, list all the objects in the parent directory and cache them
-    // and then retrieve it from the cache.
-    if (item == null && resourceId.isStorageObject()) {
-      String bucketName = resourceId.getBucketName();
-      String objectName = resourceId.getObjectName();
-      int lastDelimiterIndex = objectName.lastIndexOf(PATH_DELIMITER);
-      String directoryName =
-          lastDelimiterIndex >= 0 ? objectName.substring(0, lastDelimiterIndex + 1) : null;
-      // make just 1 request to prefetch only 1 page of directory items if it's not yet cached
-      if (!cache.isPrefixCached(
-          directoryName == null
-              ? new StorageResourceId(bucketName)
-              : new StorageResourceId(bucketName, directoryName))) {
-        listObjectInfoPage(
-            bucketName, directoryName, ListObjectOptions.DEFAULT, /* pageToken= */ null);
-
-        item = cache.getItem(resourceId);
-      }
-    }
-
     // If item is not in the cache but directory item is in it, then item does not exist.
-    if (item == null
-        && !resourceId.isDirectory()
-        && cache.getItem(resourceId.toDirectoryId()) != null) {
+    if (!resourceId.isDirectory() && cache.getItem(resourceId.toDirectoryId()) != null) {
       return GoogleCloudStorageItemInfo.createNotFound(resourceId);
     }
 
     // If it wasn't in the cache and wasn't cached in directory list request
     // then request and cache it directly.
-    if (item == null) {
-      item = super.getItemInfo(resourceId);
-      cache.putItem(item);
-    }
-
+    item = super.getItemInfo(resourceId);
+    cache.putItem(item);
     return item;
   }
 

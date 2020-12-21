@@ -92,12 +92,6 @@ public class GoogleCloudStorageFileSystemPerformanceCacheIntegrationTest {
             getRequestString(TEST_BUCKET, file),
             getRequestString(TEST_BUCKET, file),
             listRequestWithTrailingDelimiter(
-                TEST_BUCKET, parentDir + "/", /* maxResults= */ 1024, /* pageToken= */ null),
-            listRequestWithTrailingDelimiter(
-                TEST_BUCKET, parentDir + "/", /* maxResults= */ 1024, /* pageToken= */ null),
-            listRequestWithTrailingDelimiter(
-                TEST_BUCKET, parentDir + "/", /* maxResults= */ 1024, /* pageToken= */ null),
-            listRequestWithTrailingDelimiter(
                 TEST_BUCKET, file + "/", /* maxResults= */ 1, /* pageToken= */ null),
             listRequestWithTrailingDelimiter(
                 TEST_BUCKET, file + "/", /* maxResults= */ 1, /* pageToken= */ null),
@@ -130,12 +124,6 @@ public class GoogleCloudStorageFileSystemPerformanceCacheIntegrationTest {
             getRequestString(TEST_BUCKET, file),
             getRequestString(TEST_BUCKET, file),
             getRequestString(TEST_BUCKET, file),
-            listRequestWithTrailingDelimiter(
-                TEST_BUCKET, parentDir + "/", /* maxResults= */ 1024, /* pageToken= */ null),
-            listRequestWithTrailingDelimiter(
-                TEST_BUCKET, parentDir + "/", /* maxResults= */ 1024, /* pageToken= */ null),
-            listRequestWithTrailingDelimiter(
-                TEST_BUCKET, parentDir + "/", /* maxResults= */ 1024, /* pageToken= */ null),
             listRequestWithTrailingDelimiter(
                 TEST_BUCKET, file + "/", /* maxResults= */ 1, /* pageToken= */ null),
             listRequestWithTrailingDelimiter(
@@ -170,8 +158,6 @@ public class GoogleCloudStorageFileSystemPerformanceCacheIntegrationTest {
             getRequestString(TEST_BUCKET, file),
             getRequestString(TEST_BUCKET, file),
             listRequestWithTrailingDelimiter(
-                TEST_BUCKET, parentDir + "/", /* maxResults= */ 1024, /* pageToken= */ null),
-            listRequestWithTrailingDelimiter(
                 TEST_BUCKET, file + "/", /* maxResults= */ 1, /* pageToken= */ null),
             listRequestWithTrailingDelimiter(
                 TEST_BUCKET, file + "/", /* maxResults= */ 1, /* pageToken= */ null),
@@ -203,8 +189,7 @@ public class GoogleCloudStorageFileSystemPerformanceCacheIntegrationTest {
 
     assertThat(trackingGcsfs.requestsTracker.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                TEST_BUCKET, parentDir + "/", /* maxResults= */ 1024, /* pageToken= */ null),
+            getRequestString(TEST_BUCKET, file),
             listRequestWithTrailingDelimiter(
                 TEST_BUCKET, file + "/", /* maxResults= */ 1, /* pageToken= */ null));
   }
@@ -274,8 +259,7 @@ public class GoogleCloudStorageFileSystemPerformanceCacheIntegrationTest {
 
     assertThat(trackingGcsfs.requestsTracker.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                TEST_BUCKET, parentDir + "/", /* maxResults= */ 1024, /* pageToken= */ null),
+            getRequestString(TEST_BUCKET, dir),
             listRequestWithTrailingDelimiter(
                 TEST_BUCKET, dir + "/", /* maxResults= */ 1, /* pageToken= */ null));
   }
