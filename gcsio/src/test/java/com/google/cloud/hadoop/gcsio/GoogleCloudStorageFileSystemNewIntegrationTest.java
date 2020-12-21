@@ -333,12 +333,37 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     List<FileInfo> fileInfos = gcsFs.listFileInfo(fileObjectUri);
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(getRequestString(bucketName, fileObject));
+        .containsExactly(
+            getRequestString(bucketName, fileObject),
+            listRequestWithTrailingDelimiter(
+                bucketName, fileObject + "/", /* maxResults= */ 1024, /* pageToken= */ null));
 
     assertThat(fileInfos).hasSize(1);
     FileInfo fileInfo = fileInfos.get(0);
     assertThat(fileInfo.exists()).isTrue();
     assertThat(fileInfo.getPath()).isEqualTo(fileObjectUri);
+  }
+
+  @Test
+  public void listFileInfo_file_directoryPath() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    String fileObject = getTestResource();
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    URI fileObjectUri = bucketUri.resolve(fileObject);
+
+    gcsfsIHelper.createObjectsWithSubdirs(bucketName, fileObject);
+
+    assertThrows(
+        FileNotFoundException.class, () -> gcsFs.listFileInfo(bucketUri.resolve(fileObject + "/")));
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                bucketName, fileObject + "/", /* maxResults= */ 1024, /* pageToken= */ null));
   }
 
   @Test
@@ -369,7 +394,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
   }
 
   @Test
-  public void listFileInfo_directoryPath() throws Exception {
+  public void listFileInfo_directory_directoryPath() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
     GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
@@ -564,12 +589,15 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
 
     gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "/object");
 
-    assertThrows(
-        NullPointerException.class,
-        () ->
-            gcsFs.listFileInfo(
-                bucketUri.resolve(dirObject),
-                ListFileOptions.DEFAULT.toBuilder().setFields("bucket").build()));
+    IOException thrown =
+        assertThrows(
+            IOException.class,
+            () ->
+                gcsFs.listFileInfo(
+                    bucketUri.resolve(dirObject),
+                    ListFileOptions.DEFAULT.toBuilder().setFields("bucket").build()));
+
+    assertThat(thrown).hasCauseThat().hasCauseThat().isInstanceOf(NullPointerException.class);
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
