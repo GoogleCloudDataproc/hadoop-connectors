@@ -198,7 +198,7 @@ public class CredentialFactory {
       ImmutableList.of(StorageScopes.CLOUD_PLATFORM);
 
   // JSON factory used for formatting credential-handling payloads.
-  private static final JsonFactory JSON_FACTORY = new JacksonFactory();
+  private static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
 
   // HTTP transport used for created credentials to perform token-refresh handshakes with remote
   // credential servers. Initialized lazily to move the possibility of throwing
