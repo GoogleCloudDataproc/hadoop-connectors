@@ -44,7 +44,7 @@ public abstract class GoogleCloudStorageReadOptions {
   public static final boolean DEFAULT_SUPPORT_GZIP_ENCODING = true;
   public static final long DEFAULT_INPLACE_SEEK_LIMIT = 8 * 1024 * 1024;
   public static final Fadvise DEFAULT_FADVISE = Fadvise.SEQUENTIAL;
-  public static final int DEFAULT_MIN_RANGE_REQUEST_SIZE = 512 * 1024;
+  public static final int DEFAULT_MIN_RANGE_REQUEST_SIZE = 2 * 1024 * 1024;
   public static final boolean GRPC_CHECKSUMS_ENABLED_DEFAULT = false;
 
   // Default builder should be initialized after default values,
