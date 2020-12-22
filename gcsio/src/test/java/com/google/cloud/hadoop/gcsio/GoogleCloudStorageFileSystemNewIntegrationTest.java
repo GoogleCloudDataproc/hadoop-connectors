@@ -355,7 +355,6 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     String bucketName = gcsfsIHelper.sharedBucketName1;
     String fileObject = getTestResource();
     URI bucketUri = new URI("gs://" + bucketName + "/");
-    URI fileObjectUri = bucketUri.resolve(fileObject);
 
     gcsfsIHelper.createObjectsWithSubdirs(bucketName, fileObject);
 
@@ -699,8 +698,10 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
             getRequestString(bucketName, dirObject + "/"),
             listRequestWithTrailingDelimiter(
                 bucketName, dirObject + "/d1/", /* maxResults= */ 1, /* pageToken= */ null),
-            listRequestWithTrailingDelimiter(
+            listRequestString(
                 bucketName,
+                /* flatList= */ true,
+                /* includeTrailingDelimiter= */ null,
                 dirObject + "/d1/",
                 "bucket,name,generation",
                 /* maxResults= */ 1024,
@@ -735,8 +736,6 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
                 bucketName, dirObject + "/f2/", /* maxResults= */ 1, /* pageToken= */ null),
             listRequestWithTrailingDelimiter(
                 bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/f2/", /* maxResults= */ 1, /* pageToken= */ null),
             getRequestString(bucketName, dirObject + "/"),
             copyRequestString(
                 bucketName, dirObject + "/f1", bucketName, dirObject + "/f2", "copyTo"),
@@ -771,8 +770,6 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
             listRequestWithTrailingDelimiter(
                 bucketName, dirObject + "/f1/", /* maxResults= */ 1, /* pageToken= */ null),
             getRequestString(bucketName, dirObject + "/f2"),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/f2/", /* maxResults= */ 1, /* pageToken= */ null),
             listRequestWithTrailingDelimiter(
                 bucketName, dirObject + "/f2/", /* maxResults= */ 1, /* pageToken= */ null),
             getRequestString(bucketName, dirObject + "/"),
@@ -827,14 +824,6 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
                 bucketName, dirObject + "/dstParent/", /* maxResults= */ 1, /* pageToken= */ null),
             // Check if src directory parent object exists
             getRequestString(bucketName, dirObject + "/srcParent/"),
-            // Create dst directory
-            listRequestWithTrailingDelimiter(
-                bucketName,
-                dirObject + "/dstParent/dstDir/",
-                /* maxResults= */ 1,
-                /* pageToken= */ null),
-            uploadRequestString(
-                bucketName, dirObject + "/dstParent/dstDir/", /* generationId= */ null),
             // List files that need to be renamed in src directory
             listRequestString(
                 bucketName,
@@ -904,14 +893,6 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
                 bucketName, dirObject + "/dstParent/", /* maxResults= */ 1, /* pageToken= */ null),
             // Check if src directory parent object exists
             getRequestString(bucketName, dirObject + "/srcParent/"),
-            // Create dst directory
-            listRequestWithTrailingDelimiter(
-                bucketName,
-                dirObject + "/dstParent/dstDir/",
-                /* maxResults= */ 1,
-                /* pageToken= */ null),
-            uploadRequestString(
-                bucketName, dirObject + "/dstParent/dstDir/", /* generationId= */ null),
             // List files that need to be renamed in src directory
             listRequestString(
                 bucketName,
