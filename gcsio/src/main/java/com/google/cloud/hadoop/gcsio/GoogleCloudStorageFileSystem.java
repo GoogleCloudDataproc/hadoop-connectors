@@ -352,7 +352,11 @@ public class GoogleCloudStorageFileSystem {
       itemsToDelete =
           recursive
               ? listFileInfoForPrefix(fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS)
-              : listFileInfo(fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS);
+              // TODO: optimize by listing just one object instead of whole page
+              //  (up to 1024 objects now)
+              : listFileInfoForPrefixPage(
+                      fileInfo.getPath(), DELETE_RENAME_LIST_OPTIONS, /* pageToken= */ null)
+                  .getItems();
       if (!itemsToDelete.isEmpty() && !recursive) {
         throw new DirectoryNotEmptyException("Cannot delete a non-empty directory.");
       }
@@ -653,7 +657,6 @@ public class GoogleCloudStorageFileSystem {
       // rather than 'mv foo bar/'.
       if (!dstInfo.isDirectory()) {
         dst = UriPaths.toDirectory(dst);
-        dstInfo = getFileInfo(dst);
       }
 
       // Throw if renaming directory to self - this is forbidden
@@ -689,14 +692,6 @@ public class GoogleCloudStorageFileSystem {
           throw new IOException("Cannot rename because path does not exist: " + dstInfo.getPath());
         } else {
           dst = dst.resolve(srcItemName);
-        }
-      } else {
-        // Destination is a file.
-        // See if there is a directory of that name.
-        URI dstDir = UriPaths.toDirectory(dst);
-        FileInfo dstDirInfo = getFileInfo(dstDir);
-        if (dstDirInfo.exists()) {
-          dst = dstDir.resolve(srcItemName);
         }
       }
     }
@@ -763,8 +758,12 @@ public class GoogleCloudStorageFileSystem {
     coopLockOp.ifPresent(
         o -> o.persistAndScheduleRenewal(srcToDstItemNames, srcToDstMarkerItemNames));
     try {
-      // Create the destination directory.
-      mkdir(dst);
+      // Create the destination directory in case Cooperative Locking
+      // is enabled - this is necessary because it uses parent directory
+      // as a marker during recovery of failed rename operations.
+      if (coopLockOp.isPresent()) {
+        mkdir(dst);
+      }
 
       // First, copy all items except marker items
       copyInternal(srcToDstItemNames);
