@@ -86,8 +86,8 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   private static final String LIST_REQUEST_FORMAT =
       "GET:"
           + GOOGLEAPIS_ENDPOINT
-          + "/storage/v1/b/%s/o?delimiter=/&fields=items(%s),prefixes,nextPageToken"
-          + "&includeTrailingDelimiter=%s&maxResults=%d%s";
+          + "/storage/v1/b/%s/o?%sfields=items(%s),prefixes,nextPageToken"
+          + "%s&maxResults=%d%s";
 
   private static final String LIST_SIMPLE_REQUEST_FORMAT =
       "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o?maxResults=%d&prefix=%s";
@@ -382,7 +382,25 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
 
   public static String listRequestString(
       String bucket,
-      boolean includeTrailingDelimiter,
+      Boolean includeTrailingDelimiter,
+      String prefix,
+      String objectFields,
+      int maxResults,
+      String pageToken) {
+    return listRequestString(
+        bucket,
+        /* flatList= */ false,
+        includeTrailingDelimiter,
+        prefix,
+        objectFields,
+        maxResults,
+        pageToken);
+  }
+
+  public static String listRequestString(
+      String bucket,
+      boolean flatList,
+      Boolean includeTrailingDelimiter,
       String prefix,
       String objectFields,
       int maxResults,
@@ -392,8 +410,11 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     return String.format(
         LIST_REQUEST_FORMAT,
         bucket,
+        flatList ? "" : "delimiter=/&",
         objectFields,
-        includeTrailingDelimiter,
+        includeTrailingDelimiter == null
+            ? ""
+            : "&includeTrailingDelimiter=" + includeTrailingDelimiter,
         maxResults,
         extraParams);
   }
