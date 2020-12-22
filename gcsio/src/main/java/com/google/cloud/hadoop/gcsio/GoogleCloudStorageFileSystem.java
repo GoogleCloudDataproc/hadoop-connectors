@@ -761,6 +761,9 @@ public class GoogleCloudStorageFileSystem {
       // Create the destination directory in case Cooperative Locking
       // is enabled - this is necessary because it uses parent directory
       // as a marker during recovery of failed rename operations.
+      // It is not necessary to crete this directory explicitly in other cases,
+      // because parent destination directory will be automatically inferred
+      // when child objects will be renamed.
       if (coopLockOp.isPresent()) {
         mkdir(dst);
       }
