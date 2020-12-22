@@ -222,7 +222,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   @Override
   public int read(ByteBuffer byteBuffer) throws IOException {
-    logger.atFine().log(
+    logger.atFiner().log(
         "GCS gRPC read request for up to %d bytes at offset %d from object '%s'",
         byteBuffer.remaining(), position(), resourceId);
 

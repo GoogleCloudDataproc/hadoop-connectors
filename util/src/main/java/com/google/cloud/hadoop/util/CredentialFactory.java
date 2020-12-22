@@ -238,7 +238,7 @@ public class CredentialFactory {
    */
   public static Credential getCredentialFromMetadataServiceAccount()
       throws IOException, GeneralSecurityException {
-    logger.atFine().log("Getting service account credentials from meta data service.");
+    logger.atFine().log("Getting service account credentials from metadata service.");
     Credential cred =
         new ComputeCredentialWithRetry(
             new ComputeCredential.Builder(getStaticHttpTransport(), JSON_FACTORY)

@@ -414,7 +414,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     }
 
     Path result = new Path(uri.getScheme(), uri.getAuthority(), strippedPath);
-    logger.atFinest().log("makeQualified(path: %s): %s", path, result);
+    logger.atFiner().log("makeQualified(path: %s): %s", path, result);
     return result;
   }
 
@@ -444,7 +444,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public void initialize(URI path, Configuration config) throws IOException {
-    logger.atFine().log("initialize(path: %s, config: %s)", path, config);
+    logger.atFiner().log("initialize(path: %s, config: %s)", path, config);
 
     checkArgument(path != null, "path must not be null");
     checkArgument(config != null, "config must not be null");
@@ -474,7 +474,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * @throws IOException
    */
   private void initializeDelegationTokenSupport(Configuration config, URI path) throws IOException {
-    logger.atFine().log("initializeDelegationTokenSupport(config: %s, path: %s)", config, path);
+    logger.atFiner().log("initializeDelegationTokenSupport(config: %s, path: %s)", config, path);
     // Load delegation token binding, if support is configured
     if (isNullOrEmpty(DELEGATION_TOKEN_BINDING_CLASS.get(config, config::get))) {
       return;
@@ -517,7 +517,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   protected int getDefaultPort() {
     int result = -1;
-    logger.atFinest().log("getDefaultPort(): %d", result);
+    logger.atFiner().log("getDefaultPort(): %d", result);
     return result;
   }
 
@@ -723,7 +723,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     List<List<URI>> partitions =
         Lists.partition(srcPaths, GoogleCloudStorage.MAX_COMPOSE_OBJECTS - 1);
-    logger.atFinest().log("concat(tgt: %s, %d partitions: %s)", tgt, partitions.size(), partitions);
+    logger.atFiner().log("concat(tgt: %s, %d partitions: %s)", tgt, partitions.size(), partitions);
     for (List<URI> partition : partitions) {
       // We need to include the target in the list of sources to compose since
       // the GCS FS compose operation will overwrite the target, whereas the Hadoop
@@ -836,7 +836,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     checkOpen();
 
-    logger.atFinest().log("listStatus(hadoopPath: %s)", hadoopPath);
+    logger.atFiner().log("listStatus(hadoopPath: %s)", hadoopPath);
 
     URI gcsPath = getGcsPath(hadoopPath);
     List<FileStatus> status;
@@ -876,7 +876,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     // better performance.
 
     workingDirectory = newPath;
-    logger.atFinest().log("setWorkingDirectory(hadoopPath: %s): %s", hadoopPath, workingDirectory);
+    logger.atFiner().log("setWorkingDirectory(hadoopPath: %s): %s", hadoopPath, workingDirectory);
   }
 
   /**
@@ -886,7 +886,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public Path getWorkingDirectory() {
-    logger.atFinest().log("getWorkingDirectory(): %s", workingDirectory);
+    logger.atFiner().log("getWorkingDirectory(): %s", workingDirectory);
     return workingDirectory;
   }
 
@@ -971,7 +971,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
             /* owner= */ userName,
             /* group= */ userName,
             getHadoopPath(fileInfo.getPath()));
-    logger.atFinest().log(
+    logger.atFiner().log(
         "getFileStatus(path: %s, userName: %s): %s",
         fileInfo.getPath(), userName, lazy(() -> fileStatusToString(status)));
     return status;
@@ -987,7 +987,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     // Only works for filesystems where the base Hadoop Path scheme matches the underlying URI
     // scheme for GCS.
     if (!getUri().getScheme().equals(SCHEME)) {
-      logger.atFinest().log(
+      logger.atFine().log(
           "Flat glob is on, but doesn't work for scheme '%s', using default behavior.",
           getUri().getScheme());
       return false;
@@ -996,14 +996,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     // The full pattern should have a wildcard, otherwise there's no point doing the flat glob.
     GlobPattern fullPattern = new GlobPattern(fixedPath.toString());
     if (!fullPattern.hasWildcard()) {
-      logger.atFinest().log(
+      logger.atFine().log(
           "Flat glob is on, but Path '%s' has no wildcard, using default behavior.", fixedPath);
       return false;
     }
 
     // To use a flat glob, there must be an authority defined.
     if (isNullOrEmpty(fixedPath.toUri().getAuthority())) {
-      logger.atFinest().log(
+      logger.atFine().log(
           "Flat glob is on, but Path '%s' has a empty authority, using default behavior.",
           fixedPath);
       return false;
@@ -1012,7 +1012,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     // And the authority must not contain a wildcard.
     GlobPattern authorityPattern = new GlobPattern(fixedPath.toUri().getAuthority());
     if (authorityPattern.hasWildcard()) {
-      logger.atFinest().log(
+      logger.atFine().log(
           "Flat glob is on, but Path '%s' has a wildcard authority, using default behavior.",
           fixedPath);
       return false;
@@ -1078,7 +1078,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     Path encodedFixedPath = getHadoopPath(getGcsPath(encodedPath));
     // Decode URI-encoded path back into a glob path.
     Path fixedPath = new Path(URI.create(encodedFixedPath.toString()));
-    logger.atFinest().log("fixed path pattern: %s => %s", pathPattern, fixedPath);
+    logger.atFiner().log("fixed path pattern: %s => %s", pathPattern, fixedPath);
 
     if (globAlgorithm == GlobAlgorithm.CONCURRENT && couldUseFlatGlob(fixedPath)) {
       return concurrentGlobInternal(fixedPath, filter);
@@ -1127,7 +1127,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     }
 
     // Get everything matching the non-glob prefix.
-    logger.atFinest().log("Listing everything with '%s' prefix", prefixUri);
+    logger.atFiner().log("Listing everything with '%s' prefix", prefixUri);
     List<FileStatus> matchedStatuses = null;
     String pageToken = null;
     do {
@@ -1197,7 +1197,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       URI parentPath = UriPaths.getParentPath(fileInfo.getPath());
       while (parentPath != null && !parentPath.equals(GoogleCloudStorageFileSystem.GCS_ROOT)) {
         if (!filePaths.contains(parentPath)) {
-          logger.atFinest().log("Adding fake entry for missing parent path '%s'", parentPath);
+          logger.atFiner().log("Adding fake entry for missing parent path '%s'", parentPath);
           StorageResourceId id = StorageResourceId.fromUriPath(parentPath, true);
 
           GoogleCloudStorageItemInfo fakeItemInfo =
@@ -1229,7 +1229,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public Path getHomeDirectory() {
     Path result = new Path(getFileSystemRoot(), getHomeDirectorySubpath());
-    logger.atFinest().log("getHomeDirectory(): %s", result);
+    logger.atFiner().log("getHomeDirectory(): %s", result);
     return result;
   }
 
@@ -1261,7 +1261,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     if (delegationTokens != null) {
       service = delegationTokens.getService().toString();
     }
-    logger.atFinest().log("getCanonicalServiceName(): %s", service);
+    logger.atFiner().log("getCanonicalServiceName(): %s", service);
     return service;
   }
 
@@ -1395,7 +1395,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * @param config Hadoop configuration object.
    */
   private synchronized void configure(Configuration config) throws IOException {
-    logger.atFine().log("GHFS_ID=%s: configure(config: %s)", GHFS_ID, config);
+    logger.atFiner().log("GHFS_ID=%s: configure(config: %s)", GHFS_ID, config);
 
     // Set this configuration as the default config for this instance.
     setConf(config);
@@ -1474,7 +1474,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     // Use the public method to ensure proper behavior of normalizing and resolving the new
     // working directory relative to the initial filesystem-root directory.
     setWorkingDirectory(newWorkingDirectory);
-    logger.atFinest().log(
+    logger.atFiner().log(
         "Configured working directory: %s = %s",
         GCS_WORKING_DIRECTORY.getKey(), getWorkingDirectory());
   }
@@ -1508,14 +1508,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   @Override
   protected void processDeleteOnExit() {
-    logger.atFinest().log("processDeleteOnExit()");
+    logger.atFiner().log("processDeleteOnExit()");
     super.processDeleteOnExit();
   }
 
   @Override
   public ContentSummary getContentSummary(Path f) throws IOException {
     ContentSummary result = super.getContentSummary(f);
-    logger.atFinest().log("getContentSummary(path: %s): %b", f, result);
+    logger.atFiner().log("getContentSummary(path: %s): %b", f, result);
     return result;
   }
 
@@ -1576,7 +1576,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   @Override
   public void close() throws IOException {
-    logger.atFinest().log("close()");
+    logger.atFiner().log("close()");
     super.close();
 
     // NB: We must *first* have the superclass close() before we close the underlying gcsFsSupplier
@@ -1595,14 +1595,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public long getUsed() throws IOException {
     long result = super.getUsed();
-    logger.atFinest().log("getUsed(): %s", result);
+    logger.atFiner().log("getUsed(): %s", result);
     return result;
   }
 
   @Override
   public long getDefaultBlockSize() {
     long result = defaultBlockSize;
-    logger.atFinest().log("getDefaultBlockSize(): %d", result);
+    logger.atFiner().log("getDefaultBlockSize(): %d", result);
     return result;
   }
 
@@ -1620,7 +1620,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
               "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
     }
     FileChecksum checksum = getFileChecksum(checksumType, fileInfo);
-    logger.atFinest().log(
+    logger.atFiner().log(
         "getFileChecksum(hadoopPath: %s [gcsPath: %s]): %s", hadoopPath, gcsPath, checksum);
     return checksum;
   }
@@ -1640,26 +1640,25 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   @Override
   public void setVerifyChecksum(boolean verifyChecksum) {
-    logger.atFinest().log("setVerifyChecksum(verifyChecksum: %s)", verifyChecksum);
+    logger.atFiner().log("setVerifyChecksum(verifyChecksum: %s)", verifyChecksum);
     super.setVerifyChecksum(verifyChecksum);
   }
 
   @Override
   public void setPermission(Path p, FsPermission permission) throws IOException {
-    logger.atFinest().log("setPermission(path: %s, permission: %s)", p, permission);
+    logger.atFiner().log("setPermission(path: %s, permission: %s)", p, permission);
     super.setPermission(p, permission);
   }
 
   @Override
   public void setOwner(Path p, String username, String groupname) throws IOException {
-    logger.atFinest().log(
-        "setOwner(path: %s, username: %s, groupname: %s)", p, username, groupname);
+    logger.atFiner().log("setOwner(path: %s, username: %s, groupname: %s)", p, username, groupname);
     super.setOwner(p, username, groupname);
   }
 
   @Override
   public void setTimes(Path p, long mtime, long atime) throws IOException {
-    logger.atFinest().log("setTimes(path: %s, mtime: %d, atime: %d)", p, mtime, atime);
+    logger.atFiner().log("setTimes(path: %s, mtime: %d, atime: %d)", p, mtime, atime);
     super.setTimes(p, mtime, atime);
   }
 

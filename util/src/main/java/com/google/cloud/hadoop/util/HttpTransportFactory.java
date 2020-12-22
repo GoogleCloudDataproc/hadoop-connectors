@@ -90,7 +90,7 @@ public class HttpTransportFactory {
       @Nullable RedactedString proxyUsername,
       @Nullable RedactedString proxyPassword)
       throws IOException {
-    logger.atFine().log(
+    logger.atFiner().log(
         "createHttpTransport(%s, %s, %s, %s)", type, proxyAddress, proxyUsername, proxyPassword);
     checkArgument(
         proxyAddress != null || (proxyUsername == null && proxyPassword == null),

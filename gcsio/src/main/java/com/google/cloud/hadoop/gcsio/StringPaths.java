@@ -77,7 +77,7 @@ public final class StringPaths {
    * @param allowEmptyObjectName If true, a missing object name is not considered invalid.
    */
   static String validateObjectName(String objectName, boolean allowEmptyObjectName) {
-    logger.atFine().log("validateObjectName('%s', %s)", objectName, allowEmptyObjectName);
+    logger.atFiner().log("validateObjectName('%s', %s)", objectName, allowEmptyObjectName);
 
     if (isNullOrEmpty(objectName) || objectName.equals(PATH_DELIMITER)) {
       if (allowEmptyObjectName) {
@@ -105,7 +105,7 @@ public final class StringPaths {
       objectName = objectName.substring(1);
     }
 
-    logger.atFine().log("validateObjectName -> '%s'", objectName);
+    logger.atFiner().log("validateObjectName -> '%s'", objectName);
     return objectName;
   }
 

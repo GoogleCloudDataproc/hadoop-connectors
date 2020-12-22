@@ -62,7 +62,7 @@ class GoogleHadoopOutputStream extends OutputStream {
       FileSystem.Statistics statistics,
       CreateFileOptions createFileOptions)
       throws IOException {
-    logger.atFine().log(
+    logger.atFiner().log(
         "GoogleHadoopOutputStream(gcsPath: %s, createFileOptions: %s)", gcsPath, createFileOptions);
     this.gcsPath = gcsPath;
     this.statistics = statistics;
@@ -113,7 +113,7 @@ class GoogleHadoopOutputStream extends OutputStream {
   /** Closes this output stream and releases any system resources associated with this stream. */
   @Override
   public void close() throws IOException {
-    logger.atFine().log("close(%s)", gcsPath);
+    logger.atFiner().log("close(%s)", gcsPath);
     if (out != null) {
       try {
         out.close();
