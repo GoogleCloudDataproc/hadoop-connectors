@@ -367,7 +367,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
 
   public static String listRequestString(
       String bucket,
-      boolean includeTrailingDelimiter,
+      Boolean includeTrailingDelimiter,
       String prefix,
       int maxResults,
       String pageToken) {
