@@ -59,7 +59,7 @@ public class StorageRequestAuthorizer {
    * @throws AccessDeniedException Thrown when access denied by AuthorizationHandler.
    */
   public void authorize(StorageRequest<?> request) throws AccessDeniedException {
-    logger.atFine().log("authorizeStorageRequest(%s)", request);
+    logger.atFiner().log("authorizeStorageRequest(%s)", request);
 
     // Objects
     if (request instanceof Storage.Objects.List) {

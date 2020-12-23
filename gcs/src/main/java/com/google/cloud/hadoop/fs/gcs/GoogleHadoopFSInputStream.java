@@ -62,7 +62,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
       GoogleCloudStorageReadOptions readOptions,
       FileSystem.Statistics statistics)
       throws IOException {
-    logger.atFine().log(
+    logger.atFiner().log(
         "GoogleHadoopFSInputStream(gcsPath: %s, readOptions: %s)", gcsPath, readOptions);
     this.gcsPath = gcsPath;
     this.statistics = statistics;
@@ -161,7 +161,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   @Override
   public synchronized long getPos() throws IOException {
     long pos = channel.position();
-    logger.atFine().log("getPos(): %d", pos);
+    logger.atFiner().log("getPos(): %d", pos);
     return pos;
   }
 
@@ -173,7 +173,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
    */
   @Override
   public synchronized void seek(long pos) throws IOException {
-    logger.atFine().log("seek(%d)", pos);
+    logger.atFiner().log("seek(%d)", pos);
     try {
       channel.position(pos);
     } catch (IllegalArgumentException e) {
@@ -198,9 +198,9 @@ class GoogleHadoopFSInputStream extends FSInputStream {
    */
   @Override
   public synchronized void close() throws IOException {
-    logger.atFinest().log("close(): %s", gcsPath);
+    logger.atFiner().log("close(): %s", gcsPath);
     if (channel != null) {
-      logger.atFine().log("Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
+      logger.atFiner().log("Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
       channel.close();
     }
   }
