@@ -137,8 +137,8 @@
 
 1.  Fix unauthenticated access support (`fs.gs.auth.null.enable=true`).
 
-1.  Improve cache hit ratio when `fs.gs.performance.cache.list.caching.enable`
-    property is set to `true`. 
+1.  Improve cache hit ratio when `fs.gs.performance.cache.enable` property is
+    set to `true`. 
 
 1.  Remove obsolete configuration properties and related functionality:
 
