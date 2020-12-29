@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao.LOCK_DIRECTORY;
+import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getStandardOptionBuilder;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
@@ -25,7 +26,6 @@ import static java.util.stream.Collectors.toList;
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
-import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -53,14 +53,10 @@ public class CoopLockLoadIntegrationTest {
 
   @BeforeClass
   public static void before() throws Throwable {
-    String projectId =
-        checkNotNull(TestConfiguration.getInstance().getProjectId(), "projectId can not be null");
-    String appName = GoogleCloudStorageIntegrationHelper.APP_NAME;
     Credential credential =
         checkNotNull(GoogleCloudStorageTestHelper.getCredential(), "credential must not be null");
 
-    gcsOptions =
-        GoogleCloudStorageOptions.builder().setAppName(appName).setProjectId(projectId).build();
+    gcsOptions = getStandardOptionBuilder().build();
     httpRequestInitializer =
         new RetryHttpInitializer(credential, gcsOptions.toRetryHttpInitializerOptions());
 

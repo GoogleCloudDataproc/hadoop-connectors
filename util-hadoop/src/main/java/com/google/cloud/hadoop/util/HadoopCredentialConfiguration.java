@@ -14,8 +14,6 @@
 
 package com.google.cloud.hadoop.util;
 
-import static com.google.common.base.StandardSystemProperty.USER_HOME;
-
 import com.google.cloud.hadoop.util.HttpTransportFactory.HttpTransportType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -89,30 +87,6 @@ public class HadoopCredentialConfiguration {
    */
   public static final HadoopConfigurationProperty<String> SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX =
       new HadoopConfigurationProperty<>(".auth.service.account.json.keyfile");
-
-  /**
-   * For OAuth-based Installed App authentication, the key suffix specifying the client ID for the
-   * credentials.
-   */
-  public static final HadoopConfigurationProperty<String> CLIENT_ID_SUFFIX =
-      new HadoopConfigurationProperty<>(".auth.client.id", /* defaultValue= */ null, ".client.id");
-
-  /**
-   * For OAuth-based Installed App authentication, the key suffix specifying the client secret for
-   * the credentials.
-   */
-  public static final HadoopConfigurationProperty<String> CLIENT_SECRET_SUFFIX =
-      new HadoopConfigurationProperty<>(
-          ".auth.client.secret", /* defaultValue= */ null, ".client.secret");
-
-  /**
-   * For OAuth-based Installed App authentication, the key suffix specifying the file containing
-   * credentials (JWT). By default we can set this fairly safely (it's only invoked if client ID,
-   * client secret are set and we're not using service accounts).
-   */
-  public static final HadoopConfigurationProperty<String> OAUTH_CLIENT_FILE_SUFFIX =
-      new HadoopConfigurationProperty<>(
-          ".auth.client.file", USER_HOME.value() + "/.credentials/storage.json");
 
   /**
    * For unit-testing, the key suffix allowing null to be returned from credential creation instead
@@ -212,14 +186,6 @@ public class HadoopCredentialConfiguration {
                 SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX
                     .withPrefixes(keyPrefixes)
                     .get(config, config::get))
-            .setClientId(
-                RedactedString.create(
-                    CLIENT_ID_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get)))
-            .setClientSecret(
-                RedactedString.create(
-                    CLIENT_SECRET_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get)))
-            .setOAuthCredentialFile(
-                OAUTH_CLIENT_FILE_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
             .setNullCredentialEnabled(
                 ENABLE_NULL_CREDENTIAL_SUFFIX
                     .withPrefixes(keyPrefixes)

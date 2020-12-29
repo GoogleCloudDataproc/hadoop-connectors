@@ -57,6 +57,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.service.Service;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -192,6 +193,25 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
             IllegalArgumentException.class,
             () -> myGhfs.initialize(incorrectUri, new Configuration()));
     assertThat(exception).hasMessageThat().startsWith("scheme of path must not be null");
+  }
+
+  @Test
+  public void initialize_delegationTokensServiceLifecycle() throws Exception {
+    Configuration config = new Configuration();
+
+    // Token binding config
+    config.set(
+        DELEGATION_TOKEN_BINDING_CLASS.getKey(), TestDelegationTokenBindingImpl.class.getName());
+    config.set(
+        TestDelegationTokenBindingImpl.TestAccessTokenProviderImpl.TOKEN_CONFIG_PROPERTY_NAME,
+        "qWDAWFA3WWFAWFAWFAW3FAWF3AWF3WFAF33GR5G5"); // Bogus auth token
+
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+    fs.initialize(fs.getUri(), config);
+    assertThat(Service.STATE.STARTED).isEqualTo(fs.delegationTokens.getServiceState());
+
+    fs.close();
+    assertThat(Service.STATE.STOPPED).isEqualTo(fs.delegationTokens.getServiceState());
   }
 
   @Test
@@ -1141,5 +1161,35 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     // Validate that authorities can't be crazy:
     assertThrows(
         IllegalArgumentException.class, () -> myghfs.getGcsPath(new Path("gs://buck^et/object")));
+  }
+
+  @Test
+  public void unauthenticatedAccessToPublicBuckets_fsGsProperties() throws Exception {
+    String publicBucket = "gs://gcp-public-data-landsat";
+
+    Configuration config = new Configuration();
+    config.setBoolean("fs.gs.auth.service.account.enable", false);
+    config.setBoolean("fs.gs.auth.null.enable", true);
+
+    FileSystem fs = FileSystem.get(new URI(publicBucket), config);
+
+    FileStatus[] fileStatuses = fs.listStatus(new Path(publicBucket));
+
+    assertThat(fileStatuses).isNotEmpty();
+  }
+
+  @Test
+  public void unauthenticatedAccessToPublicBuckets_googleCloudProperties() throws Exception {
+    String publicBucket = "gs://gcp-public-data-landsat";
+
+    Configuration config = new Configuration();
+    config.setBoolean("google.cloud.auth.service.account.enable", false);
+    config.setBoolean("google.cloud.auth.null.enable", true);
+
+    FileSystem fs = FileSystem.get(new URI(publicBucket), config);
+
+    FileStatus[] fileStatuses = fs.listStatus(new Path(publicBucket));
+
+    assertThat(fileStatuses).isNotEmpty();
   }
 }

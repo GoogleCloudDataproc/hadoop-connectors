@@ -23,6 +23,7 @@ import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationType.DELET
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationType.RENAME;
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao.LOCK_DIRECTORY;
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao.LOCK_PATH;
+import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getStandardOptionBuilder;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_KEYFILE_SUFFIX;
@@ -44,7 +45,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageIntegrationHelper;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecords;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao;
@@ -88,14 +88,10 @@ public class CoopLockRepairIntegrationTest {
 
   @BeforeClass
   public static void before() throws Throwable {
-    String projectId =
-        checkNotNull(TestConfiguration.getInstance().getProjectId(), "projectId can not be null");
-    String appName = GoogleCloudStorageIntegrationHelper.APP_NAME;
     Credential credential =
         checkNotNull(GoogleCloudStorageTestHelper.getCredential(), "credential must not be null");
 
-    gcsOptions =
-        GoogleCloudStorageOptions.builder().setAppName(appName).setProjectId(projectId).build();
+    gcsOptions = getStandardOptionBuilder().build();
     httpRequestInitializer =
         new RetryHttpInitializer(credential, gcsOptions.toRetryHttpInitializerOptions());
 

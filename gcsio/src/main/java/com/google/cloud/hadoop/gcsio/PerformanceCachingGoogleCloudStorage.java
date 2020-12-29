@@ -13,9 +13,8 @@
  */
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
-
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.channels.WritableByteChannel;
 import java.time.Duration;
@@ -114,9 +113,16 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions)
       throws IOException {
-    List<GoogleCloudStorageItemInfo> result;
-
-    result = super.listObjectInfo(bucketName, objectNamePrefix, listOptions);
+    listOptions = getListObjectOptionsWithAllFields(listOptions);
+    if (listOptions.getMaxResults() == 1 && listOptions.isIncludePrefix()) {
+      GoogleCloudStorageItemInfo item =
+          cache.getItem(new StorageResourceId(bucketName, objectNamePrefix));
+      if (item != null) {
+        return ImmutableList.of(item);
+      }
+    }
+    List<GoogleCloudStorageItemInfo> result =
+        super.listObjectInfo(bucketName, objectNamePrefix, listOptions);
     for (GoogleCloudStorageItemInfo item : result) {
       cache.putItem(item);
     }
@@ -128,6 +134,7 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
   public ListPage<GoogleCloudStorageItemInfo> listObjectInfoPage(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions, String pageToken)
       throws IOException {
+    listOptions = getListObjectOptionsWithAllFields(listOptions);
     ListPage<GoogleCloudStorageItemInfo> result =
         super.listObjectInfoPage(bucketName, objectNamePrefix, listOptions, pageToken);
     for (GoogleCloudStorageItemInfo item : result.getItems()) {
@@ -141,28 +148,26 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
   public GoogleCloudStorageItemInfo getItemInfo(StorageResourceId resourceId) throws IOException {
     // Get the item from cache.
     GoogleCloudStorageItemInfo item = cache.getItem(resourceId);
+    if (item != null) {
+      return item;
+    }
 
-    // If it wasn't in the cache, list all the objects in the parent directory and cache them
-    // and then retrieve it from the cache.
-    if (item == null && resourceId.isStorageObject()) {
-      String bucketName = resourceId.getBucketName();
-      String objectName = resourceId.getObjectName();
-      int lastSlashIndex = objectName.lastIndexOf(PATH_DELIMITER);
-      String directoryName =
-          lastSlashIndex >= 0 ? objectName.substring(0, lastSlashIndex + 1) : null;
-      // make just 1 request to prefetch only 1 page of directory items
-      listObjectInfoPage(
-          bucketName, directoryName, ListObjectOptions.DEFAULT, /* pageToken= */ null);
-      item = cache.getItem(resourceId);
+    // If item is not in the cache but directory item is, then item does not exist.
+    if (resourceId.isStorageObject()
+        && !resourceId.isDirectory()
+        && cache.getItem(resourceId.toDirectoryId()) != null) {
+      return GoogleCloudStorageItemInfo.createNotFound(resourceId);
+    }
+
+    // If item is not in the cache but directory item is in it, then item does not exist.
+    if (!resourceId.isDirectory() && cache.getItem(resourceId.toDirectoryId()) != null) {
+      return GoogleCloudStorageItemInfo.createNotFound(resourceId);
     }
 
     // If it wasn't in the cache and wasn't cached in directory list request
     // then request and cache it directly.
-    if (item == null) {
-      item = super.getItemInfo(resourceId);
-      cache.putItem(item);
-    }
-
+    item = super.getItemInfo(resourceId);
+    cache.putItem(item);
     return item;
   }
 
@@ -219,14 +224,6 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
   }
 
   @Override
-  public void close() {
-    super.close();
-
-    // Respect close and empty the cache.
-    cache.invalidateAll();
-  }
-
-  @Override
   public GoogleCloudStorageItemInfo composeObjects(
       List<StorageResourceId> sources, StorageResourceId destination, CreateObjectOptions options)
       throws IOException {
@@ -238,8 +235,26 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
     return item;
   }
 
+  @Override
+  public void close() {
+    super.close();
+
+    // Respect close and empty the cache.
+    cache.invalidateAll();
+  }
+
   @VisibleForTesting
   public void invalidateCache() {
     cache.invalidateAll();
+  }
+
+  // Resets requested object fields in list request to return all support object fields because we
+  // initialize cache with objects returned in list response and they can be retrieve for non-list
+  // request responses that need access to any supported fields
+  private static ListObjectOptions getListObjectOptionsWithAllFields(
+      ListObjectOptions listOptions) {
+    return GoogleCloudStorageImpl.OBJECT_FIELDS.equals(listOptions.getFields())
+        ? listOptions
+        : listOptions.toBuilder().setFields(GoogleCloudStorageImpl.OBJECT_FIELDS).build();
   }
 }

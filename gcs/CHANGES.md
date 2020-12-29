@@ -135,6 +135,38 @@
 1.  Remove obsolete `fs.gs.inputstream.buffer.size` property and related
     functionality.
 
+1.  Fix unauthenticated access support (`fs.gs.auth.null.enable=true`).
+
+1.  Improve cache hit ratio when `fs.gs.performance.cache.enable` property is
+    set to `true`. 
+
+1.  Remove obsolete configuration properties and related functionality:
+
+    ```
+    fs.gs.auth.client.id
+    fs.gs.auth.client.file
+    fs.gs.auth.client.secret
+    ```
+
+1.  Add a property that allows to disable HCFS semantic enforcement. If set to
+    `false` GSC connector will not check if directory with same name already
+    exists when creating a new file and vise versa.
+
+    ```
+    fs.gs.create.items.conflict.check.enable (default: true)
+    ```
+
+1.  Remove redundant properties:
+
+    ```
+    fs.gs.config.override.file
+    fs.gs.copy.batch.threads
+    fs.gs.copy.max.requests.per.batch
+    ```
+
+1.  Change default value of `fs.gs.inputstream.min.range.request.size` property
+    from `524288` to `2097152`.
+
 ### 2.1.1 - 2020-03-11
 
 1.  Add upload cache to support high-level retries of failed uploads. Cache size

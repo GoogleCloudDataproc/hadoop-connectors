@@ -18,9 +18,7 @@ package com.google.cloud.hadoop.util;
 
 import com.google.api.client.util.BackOff;
 import com.google.api.client.util.Preconditions;
-
 import java.io.IOException;
-
 import javax.annotation.concurrent.NotThreadSafe;
 
 /**
@@ -40,7 +38,7 @@ public class RetryBoundedBackOff implements BackOff {
    * @param maxRetries Number of retries to attempt. Must be greater or equal to 0.
    * @param backoff The underlying {@link BackOff} to use.
    */
-  public RetryBoundedBackOff(int maxRetries, BackOff backoff) {
+  public RetryBoundedBackOff(BackOff backoff, int maxRetries) {
     Preconditions.checkArgument(maxRetries >= 0,
         "Maximum number of retries must not be less than 0.");
     this.backoff = backoff;

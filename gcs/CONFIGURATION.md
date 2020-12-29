@@ -27,12 +27,6 @@
     Maximum number of bytes rewritten in a single rewrite request when
     `fs.gs.copy.with.rewrite.enable` is set to `true`.
 
-*   `fs.gs.config.override.file` (not set by default)
-
-    Override configuration file path. Properties defined in this file overrides
-    the properties defined in `core-site.xml` and values passed from command
-    line.
-
 *   `fs.gs.reported.permissions` (default: `700`)
 
     Permissions that are reported for a file or directory to have regardless of
@@ -75,6 +69,11 @@
     behavior of the connector or the underlying GCS objects. However it will
     affect the number of splits Hadoop MapReduce uses for a given input.
 
+*   `fs.gs.create.items.conflict.check.enable` (default: `true`)
+
+    Enables a check that ensures that conflicting directories do not exist when
+    creating files and conflicting files do not exist when creating directories.
+
 *   `fs.gs.glob.algorithm` (default: `CONCURRENT`)
 
     Glob search algorithm to use in Hadoop
@@ -101,16 +100,6 @@
 *   `fs.gs.batch.threads` (default: `15`)
 
     Maximum number of threads used to execute batch requests in parallel.
-
-*   `fs.gs.copy.max.requests.per.batch` (default: `15`)
-
-    Maximum number of Cloud Storage requests that could be sent in a single
-    batch request for copy operations.
-
-*   `fs.gs.copy.batch.threads` (default: `15`)
-
-    Maximum number of threads used to execute batch requests in parallel for
-    copy operations.
 
 *   `fs.gs.list.max.items.per.call` (default: `1024`)
 
@@ -221,26 +210,6 @@ exist at the same path on all nodes
 
     The PKCS12 (p12) certificate file of the service account used for GCS access
     when `fs.gs.auth.service.account.enable` is `true`.
-
-#### Client secret authentication
-
-The following properties are required when `fs.gs.auth.service.account.enable`
-is `false`.
-
-*   `fs.gs.auth.client.id` (not set by default)
-
-    The client ID for GCS access in the OAuth 2.0 installed application flow
-    (when `fs.gs.auth.service.account.enable` is `false`).
-
-*   `fs.gs.auth.client.secret` (not set by default)
-
-    The client secret for GCS access in the OAuth 2.0 installed application flow
-    (when `fs.gs.auth.service.account.enable` is `false`).
-
-*   `fs.gs.auth.client.file` (not set by default)
-
-    The client credential file for GCS access in the OAuth 2.0 installed
-    application flow (when `fs.gs.auth.service.account.enable` is `false`).
 
 #### Service account impersonation
 
@@ -482,7 +451,7 @@ permissions (not authorized) to execute these requests.
     are performed by reading and discarding bytes in-place rather than opening a
     new underlying stream.
 
-*   `fs.gs.inputstream.min.range.request.size` (default: `524288`)
+*   `fs.gs.inputstream.min.range.request.size` (default: `2097152`)
 
     Minimum size in bytes of the read range for Cloud Storage request when
     opening a new stream to read an object.

@@ -171,7 +171,16 @@ public class GoogleHadoopFileSystemConfiguration {
    * inside delete and rename calls.
    */
   public static final HadoopConfigurationProperty<Boolean> GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.implicit.dir.repair.enable", true);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.implicit.dir.repair.enable",
+          GoogleCloudStorageOptions.AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT);
+
+  /**
+   * Configuration key for enabling check to ensure that conflicting directories do not exist when
+   * creating files and conflicting files do not exist when creating directories.
+   */
+  public static final HadoopConfigurationProperty<Boolean> GCS_CREATE_ITEMS_CONFLICT_CHECK_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.create.items.conflict.check.enable", true);
 
   /** Configuration key for customizing glob search algorithm. */
   public static final HadoopConfigurationProperty<GlobAlgorithm> GCS_GLOB_ALGORITHM =
@@ -188,14 +197,6 @@ public class GoogleHadoopFileSystemConfiguration {
   /** Configuration key for a number of threads to execute batch requests. */
   public static final HadoopConfigurationProperty<Integer> GCS_BATCH_THREADS =
       new HadoopConfigurationProperty<>("fs.gs.batch.threads", 15);
-
-  /** Configuration key for a max number of GCS RPCs in batch request for copy operations. */
-  public static final HadoopConfigurationProperty<Long> GCS_COPY_MAX_REQUESTS_PER_BATCH =
-      new HadoopConfigurationProperty<>("fs.gs.copy.max.requests.per.batch", 15L);
-
-  /** Configuration key for a number of threads to execute batch requests for copy operations. */
-  public static final HadoopConfigurationProperty<Integer> GCS_COPY_BATCH_THREADS =
-      new HadoopConfigurationProperty<>("fs.gs.copy.batch.threads", 15);
 
   /**
    * Configuration key for enabling the use of Rewrite requests for copy operations. Rewrite request
@@ -296,13 +297,17 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>("fs.gs.outputstream.sync.min.interval.ms", 0);
 
   /**
-   * If true, on opening a file we will proactively perform a metadata GET to check whether the
-   * object exists, even though the underlying channel will not open a data stream until read() is
-   * actually called so that streams can seek to nonzero file positions without incurring an extra
-   * stream creation. This is necessary to technically match the expected behavior of Hadoop
-   * filesystems, but incurs extra latency overhead on open(). If the calling code can handle late
-   * failures on not-found errors, or has independently already ensured that a file exists before
-   * calling open(), then set this to false for more efficient reads.
+   * If {@code true}, on opening a file we will proactively perform a metadata {@code GET} to check
+   * whether the object exists, even though the underlying channel will not open a data stream until
+   * {@code read()} is actually called. This is necessary to technically match the expected behavior
+   * of Hadoop filesystems, but incurs an extra latency overhead on {@code open()}. If the calling
+   * code can handle late failures on not-found errors, or has independently already ensured that a
+   * file exists before calling {@code open()}, then you can set this to {@code false} for more
+   * efficient reads.
+   *
+   * <p>Note, this is known to not work with YARN {@code CommonNodeLabelsManager} and potentially
+   * other Hadoop components. That's why it's not recommended to set this property to {@code false}
+   * cluster-wide, instead set it for a specific job/application that is compatible with it.
    */
   public static final HadoopConfigurationProperty<Boolean>
       GCS_INPUT_STREAM_FAST_FAIL_ON_NOT_FOUND_ENABLE =
@@ -349,10 +354,6 @@ public class GoogleHadoopFileSystemConfiguration {
   /** Configuration key for the Cloud Storage gRPC server address. */
   public static final HadoopConfigurationProperty<String> GCS_GRPC_SERVER_ADDRESS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.server.address");
-
-  /** Override configuration file path. This file must be a valid Hadoop configuration file. */
-  public static final HadoopConfigurationProperty<String> GCS_CONFIG_OVERRIDE_FILE =
-      new HadoopConfigurationProperty<>("fs.gs.config.override.file", null);
 
   /**
    * Configuration key for using cooperative locking to achieve a directory mutation operations
@@ -407,14 +408,16 @@ public class GoogleHadoopFileSystemConfiguration {
   // @VisibleForTesting
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
+        .setCloudStorageOptions(getGcsOptionsBuilder(config).build())
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))
-        .setMarkerFilePattern(GCS_MARKER_FILE_PATTERN.get(config, config::get))
-        .setPerformanceCacheEnabled(GCS_PERFORMANCE_CACHE_ENABLE.get(config, config::getBoolean))
         .setCooperativeLockingEnabled(
             GCS_COOPERATIVE_LOCKING_ENABLE.get(config, config::getBoolean))
+        .setEnsureNoConflictingItems(
+            GCS_CREATE_ITEMS_CONFLICT_CHECK_ENABLE.get(config, config::getBoolean))
+        .setMarkerFilePattern(GCS_MARKER_FILE_PATTERN.get(config, config::get))
+        .setPerformanceCacheEnabled(GCS_PERFORMANCE_CACHE_ENABLE.get(config, config::getBoolean))
         .setPerformanceCacheOptions(getPerformanceCachingOptions(config))
-        .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean))
-        .setCloudStorageOptions(getGcsOptionsBuilder(config).build());
+        .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean));
   }
 
   @VisibleForTesting
@@ -427,8 +430,6 @@ public class GoogleHadoopFileSystemConfiguration {
             GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.get(config, config::getBoolean))
         .setCopyWithRewriteEnabled(GCS_COPY_WITH_REWRITE_ENABLE.get(config, config::getBoolean))
         .setMaxBytesRewrittenPerCall(GCS_REWRITE_MAX_BYTES_PER_CALL.get(config, config::getLong))
-        .setCopyMaxRequestsPerBatch(GCS_COPY_MAX_REQUESTS_PER_BATCH.get(config, config::getLong))
-        .setCopyBatchThreads(GCS_COPY_BATCH_THREADS.get(config, config::getInt))
         .setTransportType(
             HTTP_TRANSPORT_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::getEnum))
         .setProxyAddress(
@@ -476,7 +477,7 @@ public class GoogleHadoopFileSystemConfiguration {
   private static String getApplicationName(Configuration config) {
     String appNameSuffix = nullToEmpty(GCS_APPLICATION_NAME_SUFFIX.get(config, config::get));
     String applicationName = GoogleHadoopFileSystem.GHFS_ID + appNameSuffix;
-    logger.atFinest().log("getApplicationName(config: %s): %s", config, applicationName);
+    logger.atFiner().log("getApplicationName(config: %s): %s", config, applicationName);
     return applicationName;
   }
 

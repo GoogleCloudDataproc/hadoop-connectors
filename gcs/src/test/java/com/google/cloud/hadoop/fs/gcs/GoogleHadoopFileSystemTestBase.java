@@ -91,12 +91,6 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
         /** Perform clean-up once after all tests are turn. */
         @Override
         public void after() {
-          if (ghfs != null) {
-            // For GHFS tests, print the counter values to stdout.
-            // We cannot use ghfs.logCounters() because we disable logging for tests.
-            String countersStr = ((GoogleHadoopFileSystemBase) ghfs).countersToString();
-            System.out.println(countersStr);
-          }
           HadoopFileSystemTestBase.storageResource.after();
         }
       };
@@ -294,8 +288,8 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     GoogleCloudStorageFileSystem gcsfs = myghfs.getGcsFs();
     GoogleCloudStorage gcs = gcsfs.getGcs();
 
-    URI seedUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
-    Path dirPath = ghfsHelper.castAsHadoopPath(seedUri);
+    Path dirPath =
+        ghfsHelper.castAsHadoopPath(GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath());
     URI dirUri = myghfs.getGcsPath(dirPath);
     Path subDir = new Path(dirPath, "subdir");
     URI subdirUri = myghfs.getGcsPath(subDir);
@@ -313,7 +307,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     assertDirectory(gcsfs, dirUri, /* exists= */ true);
     assertDirectory(gcsfs, subdirUri, /* exists= */ true);
 
-    gcsfs.rename(subdirUri, seedUri.resolve("."));
+    gcsfs.rename(subdirUri, dirUri.resolve("."));
 
     // Implicit directory created after deletion of the sole object in the directory
     assertDirectory(gcsfs, dirUri, /* exists= */ autoRepairImplicitDirectories);

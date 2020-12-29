@@ -30,8 +30,6 @@ public final class GoogleHadoopFileSystemIntegrationHelper {
 
   private static final String ENV_VAR_MSG_FMT = "Environment variable %s should be set";
 
-  public static final String APP_NAME = "GHFS-test";
-
   public static GoogleHadoopFileSystem createGhfs(URI path, Configuration config) throws Exception {
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
     ghfs.initialize(path, config);

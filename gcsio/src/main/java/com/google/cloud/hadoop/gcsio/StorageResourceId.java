@@ -271,7 +271,7 @@ public class StorageResourceId {
    * @return a StorageResourceId that may be the GCS root, a Bucket, or a StorageObject.
    */
   public static StorageResourceId fromUriPath(URI path, boolean allowEmptyObjectName) {
-    logger.atFine().log("fromUriPath('%s', %s)", path, allowEmptyObjectName);
+    logger.atFiner().log("fromUriPath('%s', %s)", path, allowEmptyObjectName);
     checkNotNull(path);
 
     if (!GoogleCloudStorageFileSystem.SCHEME.equals(path.getScheme())) {
