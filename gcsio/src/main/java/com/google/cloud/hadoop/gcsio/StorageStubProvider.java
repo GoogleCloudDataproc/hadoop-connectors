@@ -50,6 +50,7 @@ public class StorageStubProvider {
           .getExtension(ClientProto.defaultHost);
 
   private final GoogleCloudStorageReadOptions readOptions;
+  private final String userAgent;
   private final ExecutorService backgroundTasksThreadPool;
   private final List<ChannelAndRequestCounter> mediaChannelPool;
 
@@ -130,8 +131,9 @@ public class StorageStubProvider {
   }
 
   public StorageStubProvider(
-      GoogleCloudStorageReadOptions readOptions, ExecutorService backgroundTasksThreadPool) {
-    this.readOptions = readOptions;
+      GoogleCloudStorageOptions options, ExecutorService backgroundTasksThreadPool) {
+    this.readOptions = options.getReadChannelOptions();
+    this.userAgent = options.getAppName();
     this.backgroundTasksThreadPool = backgroundTasksThreadPool;
     this.mediaChannelPool = new ArrayList<>();
   }
@@ -146,6 +148,7 @@ public class StorageStubProvider {
             .enableRetry()
             .defaultServiceConfig(getGrpcServiceConfig())
             .intercept(counter)
+            .userAgent(userAgent)
             .build();
     return new ChannelAndRequestCounter(channel, counter);
   }
