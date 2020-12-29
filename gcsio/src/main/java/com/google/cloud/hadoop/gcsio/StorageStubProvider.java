@@ -50,10 +50,9 @@ public class StorageStubProvider {
           .getExtension(ClientProto.defaultHost);
 
   private final GoogleCloudStorageReadOptions readOptions;
+  private final String userAgent;
   private final ExecutorService backgroundTasksThreadPool;
   private final List<ChannelAndRequestCounter> mediaChannelPool;
-
-  private String userAgent;
 
   // An interceptor that can be added around a gRPC channel which keeps a count of the number
   // of requests that are active at any given moment.
