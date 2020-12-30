@@ -241,18 +241,14 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    */
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Credential credential)
       throws IOException {
-    this(
-        options,
-        createStorage(
-            options, new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions())),
-        credential);
+    this(options, new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()));
   }
 
   @VisibleForTesting
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer)
       throws IOException {
-    this(options, createStorage(options, httpRequestInitializer), null);
+    this(options, createStorage(options, httpRequestInitializer));
   }
 
   /**
@@ -261,8 +257,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param storage {@link Storage} to use for I/O.
    */
   @VisibleForTesting
-  GoogleCloudStorageImpl(
-      GoogleCloudStorageOptions options, Storage storage, Credential credential) {
+  GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage storage) {
     logger.atFiner().log("GCS(options: %s)", options);
 
     this.storageOptions = checkNotNull(options, "options must not be null");
@@ -278,7 +273,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
       this.storageStubProvider =
-          new StorageStubProvider(this.storageOptions, this.backgroundTasksThreadPool, credential);
+          new StorageStubProvider(
+              this.storageOptions,
+              this.backgroundTasksThreadPool,
+              ((RetryHttpInitializer) httpRequestInitializer).getCredential());
     }
 
     this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);

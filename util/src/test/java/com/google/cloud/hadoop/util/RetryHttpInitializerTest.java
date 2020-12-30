@@ -110,6 +110,8 @@ public class RetryHttpInitializerTest {
     assertThat(req.getHeaders().getUserAgent()).isEqualTo("foo-user-agent");
     assertThat(req.getHeaders().get("header-key")).isEqualTo("header=value");
     assertThat(req.getInterceptor()).isEqualTo(mockCredential);
+    assertThat(((RetryHttpInitializer) requestFactory.getInitializer()).getCredential())
+        .isEqualTo(mockCredential);
 
     // Simulate the actual behavior of inserting a header for the credential.
     doAnswer(

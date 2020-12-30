@@ -151,7 +151,7 @@ public class GoogleCloudStorageMockitoTest {
    * GoogleCloudStorageImpl as the concrete type, and setting up the proper mocks.
    */
   protected GoogleCloudStorage createTestInstance(GoogleCloudStorageOptions options) {
-    GoogleCloudStorageImpl gcsTestInstance = new GoogleCloudStorageImpl(options, mockStorage, null);
+    GoogleCloudStorageImpl gcsTestInstance = new GoogleCloudStorageImpl(options, mockStorage);
     gcsTestInstance.setBackgroundTasksThreadPool(executorService);
     gcsTestInstance.setErrorExtractor(mockErrorExtractor);
     gcsTestInstance.setClientRequestHelper(mockClientRequestHelper);

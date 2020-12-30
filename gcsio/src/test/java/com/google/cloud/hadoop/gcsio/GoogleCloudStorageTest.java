@@ -3025,14 +3025,14 @@ public class GoogleCloudStorageTest {
 
     Storage storage = new Storage(HTTP_TRANSPORT, JSON_FACTORY, trackingHttpRequestInitializer);
     // Verify that fake projectId/appName and mock storage does not throw.
-    new GoogleCloudStorageImpl(optionsBuilder.build(), storage, null);
+    new GoogleCloudStorageImpl(optionsBuilder.build(), storage);
 
     // Verify that projectId == null or empty does not throw.
     optionsBuilder.setProjectId(null);
-    new GoogleCloudStorageImpl(optionsBuilder.build(), storage, null);
+    new GoogleCloudStorageImpl(optionsBuilder.build(), storage);
 
     optionsBuilder.setProjectId("");
-    new GoogleCloudStorageImpl(optionsBuilder.build(), storage, null);
+    new GoogleCloudStorageImpl(optionsBuilder.build(), storage);
 
     optionsBuilder.setProjectId("projectId");
 
@@ -3041,19 +3041,19 @@ public class GoogleCloudStorageTest {
     optionsBuilder.setAppName(null);
     assertThrows(
         IllegalArgumentException.class,
-        () -> new GoogleCloudStorageImpl(optionsBuilder.build(), storage, null));
+        () -> new GoogleCloudStorageImpl(optionsBuilder.build(), storage));
 
     optionsBuilder.setAppName("");
     assertThrows(
         IllegalArgumentException.class,
-        () -> new GoogleCloudStorageImpl(optionsBuilder.build(), storage, null));
+        () -> new GoogleCloudStorageImpl(optionsBuilder.build(), storage));
 
     optionsBuilder.setAppName("appName");
 
     // Verify that gcs == null throws NullPointerException.
     assertThrows(
         NullPointerException.class,
-        () -> new GoogleCloudStorageImpl(optionsBuilder.build(), (Storage) null, null));
+        () -> new GoogleCloudStorageImpl(optionsBuilder.build(), (Storage) null));
   }
 
   /** Coverage for GoogleCloudStorageItemInfo.metadataEquals. */
@@ -3293,7 +3293,7 @@ public class GoogleCloudStorageTest {
   private GoogleCloudStorage mockedGcs(
       GoogleCloudStorageOptions gcsOptions, HttpTransport transport) {
     Storage storage = new Storage(transport, JSON_FACTORY, trackingHttpRequestInitializer);
-    return new GoogleCloudStorageImpl(gcsOptions, storage, null);
+    return new GoogleCloudStorageImpl(gcsOptions, storage);
   }
 
   static Bucket newBucket(String name) {
