@@ -3,6 +3,10 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.ClientProto;
+import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.google.storage.v1.StorageGrpc;
@@ -18,10 +22,14 @@ import io.grpc.Context;
 import io.grpc.ForwardingClientCall.SimpleForwardingClientCall;
 import io.grpc.ForwardingClientCallListener.SimpleForwardingClientCallListener;
 import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 import io.grpc.Metadata;
 import io.grpc.MethodDescriptor;
 import io.grpc.Status;
-import io.grpc.alts.GoogleDefaultChannelBuilder;
+import io.grpc.auth.MoreCallCredentials;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -53,6 +61,7 @@ public class StorageStubProvider {
   private final String userAgent;
   private final ExecutorService backgroundTasksThreadPool;
   private final List<ChannelAndRequestCounter> mediaChannelPool;
+  private final Credential credential;
 
   // An interceptor that can be added around a gRPC channel which keeps a count of the number
   // of requests that are active at any given moment.
@@ -131,17 +140,20 @@ public class StorageStubProvider {
   }
 
   public StorageStubProvider(
-      GoogleCloudStorageOptions options, ExecutorService backgroundTasksThreadPool) {
+      GoogleCloudStorageOptions options,
+      ExecutorService backgroundTasksThreadPool,
+      Credential credential) {
     this.readOptions = options.getReadChannelOptions();
     this.userAgent = options.getAppName();
     this.backgroundTasksThreadPool = backgroundTasksThreadPool;
     this.mediaChannelPool = new ArrayList<>();
+    this.credential = credential;
   }
 
   private ChannelAndRequestCounter buildManagedChannel() {
     ActiveRequestCounter counter = new ActiveRequestCounter();
     ManagedChannel channel =
-        GoogleDefaultChannelBuilder.forTarget(
+        ManagedChannelBuilder.forTarget(
                 isNullOrEmpty(readOptions.getGrpcServerAddress())
                     ? DEFAULT_GCS_GRPC_SERVER_ADDRESS
                     : readOptions.getGrpcServerAddress())
@@ -153,12 +165,51 @@ public class StorageStubProvider {
     return new ChannelAndRequestCounter(channel, counter);
   }
 
-  public StorageBlockingStub getBlockingStub() {
-    return StorageGrpc.newBlockingStub(getManagedChannel());
+  public StorageBlockingStub getBlockingStub() throws IOException {
+    StorageBlockingStub blockingStub = StorageGrpc.newBlockingStub(getManagedChannel());
+    try {
+      if (credential instanceof GoogleCredential) {
+        GoogleCredential googleCredential = (GoogleCredential) credential;
+        GoogleCredentials credentials =
+            ServiceAccountCredentials.newBuilder()
+                .setPrivateKey(googleCredential.getServiceAccountPrivateKey())
+                .setPrivateKeyId(googleCredential.getServiceAccountPrivateKeyId())
+                .setClientEmail(googleCredential.getServiceAccountId())
+                .setScopes(googleCredential.getServiceAccountScopes())
+                .setTokenServerUri(new URI(googleCredential.getTokenServerEncodedUrl()))
+                .build();
+
+        blockingStub = blockingStub.withCallCredentials(MoreCallCredentials.from(credentials));
+      }
+    } catch (URISyntaxException e) {
+      throw new IOException("Token server URI could not be parsed.", e);
+    }
+    return blockingStub;
   }
 
-  public StorageStub getAsyncStub() {
-    return StorageGrpc.newStub(getManagedChannel()).withExecutor(backgroundTasksThreadPool);
+  public StorageStub getAsyncStub() throws IOException {
+    StorageStub asyncStub = StorageGrpc.newStub(getManagedChannel());
+    try {
+      if (credential instanceof GoogleCredential) {
+        GoogleCredential googleCredential = (GoogleCredential) credential;
+        GoogleCredentials credentials =
+            ServiceAccountCredentials.newBuilder()
+                .setPrivateKey(googleCredential.getServiceAccountPrivateKey())
+                .setPrivateKeyId(googleCredential.getServiceAccountPrivateKeyId())
+                .setClientEmail(googleCredential.getServiceAccountId())
+                .setScopes(googleCredential.getServiceAccountScopes())
+                .setTokenServerUri(new URI(googleCredential.getTokenServerEncodedUrl()))
+                .build();
+
+        asyncStub =
+            asyncStub
+                .withCallCredentials(MoreCallCredentials.from(credentials))
+                .withExecutor(backgroundTasksThreadPool);
+      }
+    } catch (URISyntaxException e) {
+      throw new IOException("Token server URI could not be parsed.", e);
+    }
+    return asyncStub.withExecutor(backgroundTasksThreadPool);
   }
 
   private synchronized ManagedChannel getManagedChannel() {

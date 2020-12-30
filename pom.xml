@@ -427,6 +427,11 @@
         <version>${google.flogger.version}</version>
         <scope>runtime</scope>
       </dependency>
+      <dependency>
+        <groupId>com.google.auth</groupId>
+        <artifactId>google-auth-library-credentials</artifactId>
+        <version>${google.auth.version}</version>
+      </dependency>
 
       <!-- Test dependencies -->
       <dependency>

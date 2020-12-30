@@ -71,8 +71,8 @@ public class GoogleCloudStorageTestHelper {
   public static Credential getCredential() throws IOException {
     CredentialOptions credentialOptions =
         CredentialOptions.builder()
-            .setServiceAccountEmail(TestConfiguration.getInstance().getServiceAccount())
-            .setServiceAccountKeyFile(TestConfiguration.getInstance().getPrivateKeyFile())
+            .setServiceAccountJsonKeyFile(
+                TestConfiguration.getInstance().getServiceAccountJsonKeyFile())
             .build();
     CredentialFactory credentialFactory = new CredentialFactory(credentialOptions);
 

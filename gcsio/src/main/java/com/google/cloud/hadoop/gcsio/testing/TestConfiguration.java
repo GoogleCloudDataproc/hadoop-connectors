@@ -20,6 +20,8 @@ public abstract class TestConfiguration {
   public static final String GCS_TEST_PROJECT_ID = "GCS_TEST_PROJECT_ID";
   public static final String GCS_TEST_SERVICE_ACCOUNT = "GCS_TEST_SERVICE_ACCOUNT";
   public static final String GCS_TEST_PRIVATE_KEYFILE = "GCS_TEST_PRIVATE_KEYFILE";
+  public static final String GCS_TEST_SERVICE_ACCOUNT_JSON_KEYFILE =
+      "GCS_TEST_SERVICE_ACCOUNT_JSON_KEYFILE";
 
   /** Environment-based test configuration. */
   public static class EnvironmentBasedTestConfiguration extends TestConfiguration {
@@ -37,6 +39,11 @@ public abstract class TestConfiguration {
     public String getPrivateKeyFile() {
       return System.getenv(GCS_TEST_PRIVATE_KEYFILE);
     }
+
+    @Override
+    public String getServiceAccountJsonKeyFile() {
+      return System.getenv(GCS_TEST_SERVICE_ACCOUNT_JSON_KEYFILE);
+    }
   }
 
   public static TestConfiguration getInstance() {
@@ -52,4 +59,6 @@ public abstract class TestConfiguration {
   public abstract String getServiceAccount();
 
   public abstract String getPrivateKeyFile();
+
+  public abstract String getServiceAccountJsonKeyFile();
 }
