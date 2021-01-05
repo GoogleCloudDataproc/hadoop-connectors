@@ -84,9 +84,15 @@ public class GoogleCloudStorageTestHelper {
   }
 
   public static GoogleCloudStorageOptions.Builder getStandardOptionBuilder() {
+    CredentialOptions credentialOptions =
+        CredentialOptions.builder()
+            .setServiceAccountJsonKeyFile(
+                TestConfiguration.getInstance().getServiceAccountJsonKeyFile())
+            .build();
     return GoogleCloudStorageOptions.builder()
         .setAppName(GoogleCloudStorageTestHelper.APP_NAME)
-        .setProjectId(checkNotNull(TestConfiguration.getInstance().getProjectId()));
+        .setProjectId(checkNotNull(TestConfiguration.getInstance().getProjectId()))
+        .setCredentialOptions(credentialOptions);
   }
 
   /** More efficient version of checking byte arrays than using Assert.assertArrayEquals. */

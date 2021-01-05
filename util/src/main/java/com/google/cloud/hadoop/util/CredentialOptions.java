@@ -35,6 +35,10 @@ public abstract class CredentialOptions {
 
   static final String TOKEN_SERVER_URL_DEFAULT = GoogleOAuthConstants.TOKEN_SERVER_URL;
 
+  // Default builder should be initialized after default values,
+  // otherwise it will access not initialized default values.
+  public static final CredentialOptions DEFAULT = builder().build();
+
   public static Builder builder() {
     return new AutoValue_CredentialOptions.Builder()
         .setServiceAccountEnabled(SERVICE_ACCOUNT_ENABLED_DEFAULT)

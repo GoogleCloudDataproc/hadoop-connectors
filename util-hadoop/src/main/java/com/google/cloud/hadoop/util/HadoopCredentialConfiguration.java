@@ -161,6 +161,12 @@ public class HadoopCredentialConfiguration {
 
   public static CredentialFactory getCredentialFactory(
       Configuration config, String... keyPrefixesVararg) {
+    CredentialOptions credentialOptions = getCredentialOptions(config, keyPrefixesVararg);
+    return new CredentialFactory(credentialOptions);
+  }
+
+  public static CredentialOptions getCredentialOptions(
+      Configuration config, String... keyPrefixesVararg) {
     List<String> keyPrefixes = getConfigKeyPrefixes(keyPrefixesVararg);
     CredentialOptions credentialOptions =
         CredentialOptions.builder()
@@ -203,7 +209,7 @@ public class HadoopCredentialConfiguration {
                 RedactedString.create(
                     PROXY_PASSWORD_SUFFIX.withPrefixes(keyPrefixes).getPassword(config)))
             .build();
-    return new CredentialFactory(credentialOptions);
+    return credentialOptions;
   }
 
   public static Class<? extends AccessTokenProvider> getAccessTokenProviderImplClass(

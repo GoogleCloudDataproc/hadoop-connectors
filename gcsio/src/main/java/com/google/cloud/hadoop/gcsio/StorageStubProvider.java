@@ -7,6 +7,7 @@ import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
+import com.google.cloud.hadoop.util.CredentialFactory;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.google.storage.v1.StorageGrpc;
@@ -62,6 +63,7 @@ public class StorageStubProvider {
   private final ExecutorService backgroundTasksThreadPool;
   private final List<ChannelAndRequestCounter> mediaChannelPool;
   private final Credential credential;
+  private final CredentialFactory credentialFactory;
 
   // An interceptor that can be added around a gRPC channel which keeps a count of the number
   // of requests that are active at any given moment.
@@ -148,6 +150,7 @@ public class StorageStubProvider {
     this.backgroundTasksThreadPool = backgroundTasksThreadPool;
     this.mediaChannelPool = new ArrayList<>();
     this.credential = credential;
+    this.credentialFactory = new CredentialFactory(options.getCredentialOptions());
   }
 
   private ChannelAndRequestCounter buildManagedChannel() {
@@ -168,7 +171,7 @@ public class StorageStubProvider {
   public StorageBlockingStub getBlockingStub() throws IOException {
     StorageBlockingStub blockingStub = StorageGrpc.newBlockingStub(getManagedChannel());
     try {
-      if (credential instanceof GoogleCredential) {
+      if (!credentialFactory.useMetadataService()) {
         GoogleCredential googleCredential = (GoogleCredential) credential;
         GoogleCredentials credentials =
             ServiceAccountCredentials.newBuilder()
@@ -190,7 +193,7 @@ public class StorageStubProvider {
   public StorageStub getAsyncStub() throws IOException {
     StorageStub asyncStub = StorageGrpc.newStub(getManagedChannel());
     try {
-      if (credential instanceof GoogleCredential) {
+      if (!credentialFactory.useMetadataService()) {
         GoogleCredential googleCredential = (GoogleCredential) credential;
         GoogleCredentials credentials =
             ServiceAccountCredentials.newBuilder()

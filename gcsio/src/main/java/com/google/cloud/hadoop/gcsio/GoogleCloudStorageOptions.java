@@ -22,6 +22,7 @@ import com.google.auto.value.AutoValue;
 import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
 import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.cloud.hadoop.util.CredentialOptions;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
@@ -112,7 +113,8 @@ public abstract class GoogleCloudStorageOptions {
         .setCooperativeLockingOptions(CooperativeLockingOptions.DEFAULT)
         .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT)
         .setAuthorizationHandlerImplClass(AUTHORIZATION_HANDLER_IMPL_CLASS_DEFAULT)
-        .setAuthorizationHandlerProperties(AUTHORIZATION_HANDLER_PROPERTIES_DEFAULT);
+        .setAuthorizationHandlerProperties(AUTHORIZATION_HANDLER_PROPERTIES_DEFAULT)
+        .setCredentialOptions(CredentialOptions.DEFAULT);
   }
 
   public abstract Builder toBuilder();
@@ -169,6 +171,8 @@ public abstract class GoogleCloudStorageOptions {
   public abstract CooperativeLockingOptions getCooperativeLockingOptions();
 
   public abstract ImmutableMap<String, String> getHttpRequestHeaders();
+
+  public abstract CredentialOptions getCredentialOptions();
 
   @Nullable
   public abstract String getEncryptionAlgorithm();
@@ -263,6 +267,8 @@ public abstract class GoogleCloudStorageOptions {
         Class<? extends AuthorizationHandler> authorizationHandlerImpl);
 
     public abstract Builder setAuthorizationHandlerProperties(Map<String, String> properties);
+
+    public abstract Builder setCredentialOptions(CredentialOptions credentialOptions);
 
     abstract GoogleCloudStorageOptions autoBuild();
 

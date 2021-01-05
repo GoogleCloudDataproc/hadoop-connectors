@@ -413,7 +413,7 @@ public class CredentialFactory {
     throw new IllegalStateException("No valid credential configuration discovered: " + this);
   }
 
-  private boolean useMetadataService() {
+  public boolean useMetadataService() {
     return isNullOrEmpty(options.getServiceAccountKeyFile())
         && isNullOrEmpty(options.getServiceAccountJsonKeyFile())
         && options.getServiceAccountPrivateKey() == null
