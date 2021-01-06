@@ -170,49 +170,48 @@ public class StorageStubProvider {
 
   public StorageBlockingStub getBlockingStub() throws IOException {
     StorageBlockingStub blockingStub = StorageGrpc.newBlockingStub(getManagedChannel());
+    if (credentialFactory.useMetadataService()) {
+      return blockingStub.withExecutor(backgroundTasksThreadPool);
+    }
     try {
-      if (!credentialFactory.useMetadataService()) {
-        GoogleCredential googleCredential = (GoogleCredential) credential;
-        GoogleCredentials credentials =
-            ServiceAccountCredentials.newBuilder()
-                .setPrivateKey(googleCredential.getServiceAccountPrivateKey())
-                .setPrivateKeyId(googleCredential.getServiceAccountPrivateKeyId())
-                .setClientEmail(googleCredential.getServiceAccountId())
-                .setScopes(googleCredential.getServiceAccountScopes())
-                .setTokenServerUri(new URI(googleCredential.getTokenServerEncodedUrl()))
-                .build();
+      GoogleCredential googleCredential = (GoogleCredential) credential;
+      GoogleCredentials credentials =
+          ServiceAccountCredentials.newBuilder()
+              .setPrivateKey(googleCredential.getServiceAccountPrivateKey())
+              .setPrivateKeyId(googleCredential.getServiceAccountPrivateKeyId())
+              .setClientEmail(googleCredential.getServiceAccountId())
+              .setScopes(googleCredential.getServiceAccountScopes())
+              .setTokenServerUri(new URI(googleCredential.getTokenServerEncodedUrl()))
+              .build();
 
-        blockingStub = blockingStub.withCallCredentials(MoreCallCredentials.from(credentials));
-      }
+      return blockingStub.withCallCredentials(MoreCallCredentials.from(credentials));
     } catch (URISyntaxException e) {
       throw new IOException("Token server URI could not be parsed.", e);
     }
-    return blockingStub;
   }
 
   public StorageStub getAsyncStub() throws IOException {
     StorageStub asyncStub = StorageGrpc.newStub(getManagedChannel());
+    if (credentialFactory.useMetadataService()) {
+      return asyncStub.withExecutor(backgroundTasksThreadPool);
+    }
     try {
-      if (!credentialFactory.useMetadataService()) {
-        GoogleCredential googleCredential = (GoogleCredential) credential;
-        GoogleCredentials credentials =
-            ServiceAccountCredentials.newBuilder()
-                .setPrivateKey(googleCredential.getServiceAccountPrivateKey())
-                .setPrivateKeyId(googleCredential.getServiceAccountPrivateKeyId())
-                .setClientEmail(googleCredential.getServiceAccountId())
-                .setScopes(googleCredential.getServiceAccountScopes())
-                .setTokenServerUri(new URI(googleCredential.getTokenServerEncodedUrl()))
-                .build();
+      GoogleCredential googleCredential = (GoogleCredential) credential;
+      GoogleCredentials credentials =
+          ServiceAccountCredentials.newBuilder()
+              .setPrivateKey(googleCredential.getServiceAccountPrivateKey())
+              .setPrivateKeyId(googleCredential.getServiceAccountPrivateKeyId())
+              .setClientEmail(googleCredential.getServiceAccountId())
+              .setScopes(googleCredential.getServiceAccountScopes())
+              .setTokenServerUri(new URI(googleCredential.getTokenServerEncodedUrl()))
+              .build();
 
-        asyncStub =
-            asyncStub
-                .withCallCredentials(MoreCallCredentials.from(credentials))
-                .withExecutor(backgroundTasksThreadPool);
-      }
+      return asyncStub
+          .withCallCredentials(MoreCallCredentials.from(credentials))
+          .withExecutor(backgroundTasksThreadPool);
     } catch (URISyntaxException e) {
       throw new IOException("Token server URI could not be parsed.", e);
     }
-    return asyncStub.withExecutor(backgroundTasksThreadPool);
   }
 
   private synchronized ManagedChannel getManagedChannel() {
