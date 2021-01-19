@@ -1,5 +1,7 @@
 ### 2.2.3 - 2021-XX-XX
 
+1.  Update all dependencies to latest versions.
+
 ### 2.2.2 - 2021-06-25
 
 1. Add support for footer prefetch over gRPC channel
@@ -16,7 +18,7 @@
 
 1.  Fix proxy configuration for Apache HTTP transport.
 
-2. Update gRPC dependency to latest version
+1. Update gRPC dependency to latest version
 
 ### 2.2.0 - 2021-01-06
 

@@ -37,14 +37,16 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import com.google.common.flogger.GoogleLogger;
-import com.google.common.flogger.LoggerConfig;
 import com.google.gson.JsonObject;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -86,6 +88,8 @@ public abstract class AbstractBigQueryIoIntegrationTestBase<T> {
       new BigQueryTableSchema().setFields(ImmutableList.of(COMPANY_NAME_FIELD, MARKET_CAP_FIELD));
 
   private static final Text EMPTY_KEY = new Text("");
+
+  private static final Set<Logger> configuredLoggers = new HashSet<>();
 
   // Populated by command-line projectId and falls back to env.
   private String projectIdValue;
@@ -168,9 +172,10 @@ public abstract class AbstractBigQueryIoIntegrationTestBase<T> {
       throws IOException, GeneralSecurityException {
     MockitoAnnotations.initMocks(this);
 
-    LoggerConfig.getConfig(GsonBigQueryInputFormat.class).setLevel(Level.FINE);
-    LoggerConfig.getConfig(BigQueryUtils.class).setLevel(Level.FINE);
-    LoggerConfig.getConfig(GsonRecordReader.class).setLevel(Level.FINE);
+    configuredLoggers.add(Logger.getLogger(GsonBigQueryInputFormat.class.getName()));
+    configuredLoggers.add(Logger.getLogger(BigQueryUtils.class.getName()));
+    configuredLoggers.add(Logger.getLogger(GsonRecordReader.class.getName()));
+    configuredLoggers.forEach(l -> l.setLevel(Level.FINE));
 
     bucketHelper = new TestBucketHelper("bq_integration_test");
     // A unique per-setUp String to avoid collisions between test runs.
