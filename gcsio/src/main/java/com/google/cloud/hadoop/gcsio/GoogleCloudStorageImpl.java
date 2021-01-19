@@ -272,8 +272,15 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
+      checkArgument(
+          httpRequestInitializer instanceof RetryHttpInitializer,
+          "request initializer must be an instance of the RetryHttpInitializer class"
+              + " when gRPC API enabled");
       this.storageStubProvider =
-          new StorageStubProvider(this.storageOptions, this.backgroundTasksThreadPool);
+          new StorageStubProvider(
+              this.storageOptions,
+              this.backgroundTasksThreadPool,
+              ((RetryHttpInitializer) httpRequestInitializer).getCredential());
     }
 
     this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);

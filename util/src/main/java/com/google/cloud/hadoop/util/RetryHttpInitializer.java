@@ -262,6 +262,10 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     request.getHeaders().putAll(options.getHttpHeaders());
   }
 
+  public Credential getCredential() {
+    return credential;
+  }
+
   private static BackOff getDefaultBackOff() {
     return new ExponentialBackOff.Builder()
         // Set initial timeout to 1.25 seconds to have a 1 second minimum initial interval

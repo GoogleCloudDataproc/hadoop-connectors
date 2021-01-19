@@ -694,13 +694,11 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
             .setSyncOnFlushEnabled(
                 GCS_OUTPUT_STREAM_TYPE.get(getConf(), getConf()::getEnum) == FLUSHABLE_COMPOSITE)
             .build();
-    FSDataOutputStream appendStream =
-        new FSDataOutputStream(
-            new GoogleHadoopSyncableOutputStream(
-                this, filePath, statistics, DEFAULT_OVERWRITE, syncableOutputStreamOptions),
-            statistics);
 
-    return appendStream;
+    return new FSDataOutputStream(
+        new GoogleHadoopSyncableOutputStream(
+            this, filePath, statistics, DEFAULT_OVERWRITE, syncableOutputStreamOptions),
+        statistics);
   }
 
   /**
