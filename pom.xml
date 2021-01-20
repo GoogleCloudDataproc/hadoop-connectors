@@ -316,6 +316,11 @@
         <version>${google.oauth-client.version}</version>
       </dependency>
       <dependency>
+        <groupId>com.google.auth</groupId>
+        <artifactId>google-auth-library-oauth2-http</artifactId>
+        <version>${google.auth.version}</version>
+      </dependency>
+      <dependency>
         <groupId>com.google.apis</groupId>
         <artifactId>google-api-services-bigquery</artifactId>
         <version>${google.api-bigquery.version}</version>

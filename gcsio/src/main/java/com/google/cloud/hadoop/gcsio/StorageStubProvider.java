@@ -1,8 +1,11 @@
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.ClientProto;
+import com.google.api.client.auth.oauth2.Credential;
+import com.google.cloud.hadoop.util.CredentialAdapter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.google.storage.v1.StorageGrpc;
@@ -18,10 +21,11 @@ import io.grpc.Context;
 import io.grpc.ForwardingClientCall.SimpleForwardingClientCall;
 import io.grpc.ForwardingClientCallListener.SimpleForwardingClientCallListener;
 import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 import io.grpc.Metadata;
 import io.grpc.MethodDescriptor;
 import io.grpc.Status;
-import io.grpc.alts.GoogleDefaultChannelBuilder;
+import io.grpc.auth.MoreCallCredentials;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -32,7 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 
 /** Provides gRPC stubs for accessing the Storage gRPC API. */
-public class StorageStubProvider {
+class StorageStubProvider {
 
   // The maximum number of times to automatically retry gRPC requests.
   private static final double GRPC_MAX_RETRY_ATTEMPTS = 10;
@@ -53,6 +57,7 @@ public class StorageStubProvider {
   private final String userAgent;
   private final ExecutorService backgroundTasksThreadPool;
   private final List<ChannelAndRequestCounter> mediaChannelPool;
+  private final Credential credential;
 
   // An interceptor that can be added around a gRPC channel which keeps a count of the number
   // of requests that are active at any given moment.
@@ -69,7 +74,7 @@ public class StorageStubProvider {
     public <ReqT, RespT> ClientCall<ReqT, RespT> interceptCall(
         MethodDescriptor<ReqT, RespT> methodDescriptor, CallOptions callOptions, Channel channel) {
       ClientCall<ReqT, RespT> newCall = channel.newCall(methodDescriptor, callOptions);
-      final AtomicBoolean countedCancel = new AtomicBoolean(false);
+      AtomicBoolean countedCancel = new AtomicBoolean(false);
 
       // A streaming call might be terminated in one of several possible ways:
       // * The call completes normally -> onClose() will be invoked.
@@ -87,7 +92,7 @@ public class StorageStubProvider {
               },
               backgroundTasksThreadPool);
 
-      return new SimpleForwardingClientCall(newCall) {
+      return new SimpleForwardingClientCall<ReqT, RespT>(newCall) {
         @Override
         public void cancel(@Nullable String message, @Nullable Throwable cause) {
           if (countedCancel.compareAndSet(false, true)) {
@@ -97,11 +102,11 @@ public class StorageStubProvider {
         }
 
         @Override
-        public void start(Listener responseListener, Metadata headers) {
+        public void start(Listener<RespT> responseListener, Metadata headers) {
           ongoingRequestCount.incrementAndGet();
           this.delegate()
               .start(
-                  new SimpleForwardingClientCallListener(responseListener) {
+                  new SimpleForwardingClientCallListener<RespT>(responseListener) {
                     @Override
                     public void onClose(Status status, Metadata trailers) {
                       if (countedCancel.compareAndSet(false, true)) {
@@ -130,18 +135,21 @@ public class StorageStubProvider {
     }
   }
 
-  public StorageStubProvider(
-      GoogleCloudStorageOptions options, ExecutorService backgroundTasksThreadPool) {
+  StorageStubProvider(
+      GoogleCloudStorageOptions options,
+      ExecutorService backgroundTasksThreadPool,
+      Credential credential) {
     this.readOptions = options.getReadChannelOptions();
     this.userAgent = options.getAppName();
     this.backgroundTasksThreadPool = backgroundTasksThreadPool;
     this.mediaChannelPool = new ArrayList<>();
+    this.credential = checkNotNull(credential, "credential can not be null");
   }
 
   private ChannelAndRequestCounter buildManagedChannel() {
     ActiveRequestCounter counter = new ActiveRequestCounter();
     ManagedChannel channel =
-        GoogleDefaultChannelBuilder.forTarget(
+        ManagedChannelBuilder.forTarget(
                 isNullOrEmpty(readOptions.getGrpcServerAddress())
                     ? DEFAULT_GCS_GRPC_SERVER_ADDRESS
                     : readOptions.getGrpcServerAddress())
@@ -154,11 +162,14 @@ public class StorageStubProvider {
   }
 
   public StorageBlockingStub getBlockingStub() {
-    return StorageGrpc.newBlockingStub(getManagedChannel());
+    return StorageGrpc.newBlockingStub(getManagedChannel())
+        .withCallCredentials(MoreCallCredentials.from(new CredentialAdapter(credential)));
   }
 
   public StorageStub getAsyncStub() {
-    return StorageGrpc.newStub(getManagedChannel()).withExecutor(backgroundTasksThreadPool);
+    return StorageGrpc.newStub(getManagedChannel())
+        .withCallCredentials(MoreCallCredentials.from(new CredentialAdapter(credential)))
+        .withExecutor(backgroundTasksThreadPool);
   }
 
   private synchronized ManagedChannel getManagedChannel() {
