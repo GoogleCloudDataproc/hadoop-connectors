@@ -395,13 +395,11 @@ public class GoogleCloudStorageFileSystem {
       List<StorageResourceId> objectsToDelete = new ArrayList<>(itemsToDelete.size());
       for (FileInfo fileInfo : itemsToDelete) {
         // TODO(b/110833109): populate generation ID in StorageResourceId when listing infos?
-        if (!fileInfo.isInferredDirectory()) {
-          objectsToDelete.add(
-              new StorageResourceId(
-                  fileInfo.getItemInfo().getBucketName(),
-                  fileInfo.getItemInfo().getObjectName(),
-                  fileInfo.getItemInfo().getContentGeneration()));
-        }
+        objectsToDelete.add(
+            new StorageResourceId(
+                fileInfo.getItemInfo().getBucketName(),
+                fileInfo.getItemInfo().getObjectName(),
+                fileInfo.getItemInfo().getContentGeneration()));
       }
       gcs.deleteObjects(objectsToDelete);
     }
