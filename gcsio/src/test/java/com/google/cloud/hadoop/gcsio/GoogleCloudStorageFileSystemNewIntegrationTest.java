@@ -33,6 +33,7 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
+import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.collect.ImmutableList;
 import java.io.FileNotFoundException;
@@ -675,6 +676,83 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
   @Test
   public void delete_directory_parallel() throws Exception {
     delete_directory(/* parallelStatus= */ true);
+  }
+
+  @Test
+  public void delete_inferred_directory() throws Exception {
+    GoogleCloudStorageOptions gcsOptions = GoogleCloudStorageOptions.builder()
+        .setAppName(GoogleCloudStorageTestHelper.APP_NAME)
+        .setAutoRepairImplicitDirectoriesEnabled(false)
+        .setProjectId(checkNotNull(TestConfiguration.getInstance().getProjectId())).build();
+
+    GoogleCloudStorageFileSystemOptions gcsFsOptions =
+        GoogleCloudStorageFileSystemOptions.builder().setCloudStorageOptions(gcsOptions)
+            .setStatusParallelEnabled(false).build();
+
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource();
+
+    gcsfsIHelper.createObjects(bucketName, dirObject + "/d1/d2");
+
+    gcsFs.delete(bucketUri.resolve(dirObject + "/d1/"), /* recursive= */ true);
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                bucketName, dirObject + "/d1/", /* maxResults= */ 1, /* pageToken= */ null),
+            listRequestString(
+                bucketName,
+                /* flatList= */ true,
+                /* includeTrailingDelimiter= */ null,
+                dirObject + "/d1/",
+                "bucket,name,generation",
+                /* maxResults= */ 1024,
+                /* pageToken= */ null),
+            deleteRequestString(bucketName, dirObject + "/d1/d2", /* generationId= */ 1));
+  }
+
+  @Test
+  public void delete_inferred_directory_with_parent() throws Exception {
+    GoogleCloudStorageFileSystemOptions gcsFsOptions =
+        newGcsFsOptions().setStatusParallelEnabled(false).build();
+
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource();
+
+    gcsfsIHelper.createObjects(bucketName, dirObject + "/d1/d2/d3");
+
+    gcsFs.delete(bucketUri.resolve(dirObject + "/d1/d2"), /* recursive= */ true);
+
+    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/d1/"))).isTrue();
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(bucketName, dirObject + "/d1/d2"),
+            getRequestString(bucketName, dirObject + "/d1/"),
+            uploadRequestString(bucketName, dirObject + "/d1/", /* generationId= */ null),
+            listRequestWithTrailingDelimiter(
+                bucketName, dirObject + "/d1/d2/", /* maxResults= */ 1, /* pageToken= */ null),
+            listRequestWithTrailingDelimiter(
+                bucketName, dirObject + "/d1/", /* maxResults= */ 1, /* pageToken= */ null),
+            listRequestString(
+                bucketName,
+                /* flatList= */ true,
+                /* includeTrailingDelimiter= */ null,
+                dirObject + "/d1/d2/",
+                "bucket,name,generation",
+                /* maxResults= */ 1024,
+                /* pageToken= */ null),
+            deleteRequestString(bucketName, dirObject + "/d1/d2/d3", /* generationId= */ 1));
   }
 
   private void delete_directory(boolean parallelStatus) throws Exception {
