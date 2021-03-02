@@ -5,6 +5,7 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.ClientProto;
 import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.client.googleapis.compute.ComputeCredential;
 import com.google.cloud.hadoop.util.CredentialAdapter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -25,6 +26,7 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.Metadata;
 import io.grpc.MethodDescriptor;
 import io.grpc.Status;
+import io.grpc.alts.ComputeEngineChannelBuilder;
 import io.grpc.auth.MoreCallCredentials;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -148,17 +150,29 @@ class StorageStubProvider {
 
   private ChannelAndRequestCounter buildManagedChannel() {
     ActiveRequestCounter counter = new ActiveRequestCounter();
-    ManagedChannel channel =
-        ManagedChannelBuilder.forTarget(
-                isNullOrEmpty(readOptions.getGrpcServerAddress())
-                    ? DEFAULT_GCS_GRPC_SERVER_ADDRESS
-                    : readOptions.getGrpcServerAddress())
-            .enableRetry()
-            .defaultServiceConfig(getGrpcServiceConfig())
-            .intercept(counter)
-            .userAgent(userAgent)
-            .build();
-    return new ChannelAndRequestCounter(channel, counter);
+    ManagedChannelBuilder<?> builder;
+    if (credential instanceof ComputeCredential) {
+      builder =
+          ComputeEngineChannelBuilder.forTarget(
+                  isNullOrEmpty(readOptions.getGrpcServerAddress())
+                      ? DEFAULT_GCS_GRPC_SERVER_ADDRESS
+                      : readOptions.getGrpcServerAddress())
+              .enableRetry()
+              .defaultServiceConfig(getGrpcServiceConfig())
+              .intercept(counter)
+              .userAgent(userAgent);
+    } else {
+      builder =
+          ManagedChannelBuilder.forTarget(
+                  isNullOrEmpty(readOptions.getGrpcServerAddress())
+                      ? DEFAULT_GCS_GRPC_SERVER_ADDRESS
+                      : readOptions.getGrpcServerAddress())
+              .enableRetry()
+              .defaultServiceConfig(getGrpcServiceConfig())
+              .intercept(counter)
+              .userAgent(userAgent);
+    }
+    return new ChannelAndRequestCounter(builder.build(), counter);
   }
 
   public StorageBlockingStub getBlockingStub() {

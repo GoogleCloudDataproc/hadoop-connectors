@@ -83,7 +83,12 @@ public final class GoogleCloudStorageGrpcWriteChannel
       ImmutableSet.of(
           Code.DEADLINE_EXCEEDED, Code.RESOURCE_EXHAUSTED, Code.INTERNAL, Code.UNAVAILABLE);
 
-  private final StorageStub stub;
+  private static final ImmutableSet<Code> CHANNEL_SWITCH_ELIGIBLE_ERROR_CODES =
+      ImmutableSet.of(Code.UNAVAILABLE, Code.DEADLINE_EXCEEDED);
+
+  private StorageStub stub;
+
+  private final StorageStubProvider stubProvider;
   private final StorageResourceId resourceId;
   private final CreateObjectOptions createOptions;
   private final ObjectWriteConditions writeConditions;
@@ -93,7 +98,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
   private GoogleCloudStorageItemInfo completedItemInfo = null;
 
   GoogleCloudStorageGrpcWriteChannel(
-      StorageStub stub,
+      StorageStubProvider stubProvider,
       ExecutorService threadPool,
       AsyncWriteChannelOptions channelOptions,
       StorageResourceId resourceId,
@@ -102,7 +107,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
       String requesterPaysProject,
       BackOffFactory backOffFactory) {
     super(threadPool, channelOptions);
-    this.stub = stub;
+    this.stubProvider = stubProvider;
+    this.stub = stubProvider.getAsyncStub();
     this.resourceId = resourceId;
     this.createOptions = createOptions;
     this.writeConditions = writeConditions;
@@ -392,7 +398,11 @@ public final class GoogleCloudStorageGrpcWriteChannel
               t.getClass() == StatusException.class
                   ? ((StatusException) t).getStatus().getCode()
                   : ((StatusRuntimeException) t).getStatus().getCode();
-          if (TRANSIENT_ERRORS.contains(code)) {
+          // If this is channel switch eligible error then consider it as a transient error for now.
+          if (CHANNEL_SWITCH_ELIGIBLE_ERROR_CODES.contains(code)) {
+            stub = stubProvider.getAsyncStub();
+            transientError = t;
+          } else if (TRANSIENT_ERRORS.contains(code)) {
             transientError = t;
           }
         }
@@ -549,6 +559,15 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       @Override
       public void onError(Throwable t) {
+        if (t.getClass() == StatusException.class || t.getClass() == StatusRuntimeException.class) {
+          Code code =
+              t.getClass() == StatusException.class
+                  ? ((StatusException) t).getStatus().getCode()
+                  : ((StatusRuntimeException) t).getStatus().getCode();
+          if (CHANNEL_SWITCH_ELIGIBLE_ERROR_CODES.contains(code)) {
+            stub = stubProvider.getAsyncStub();
+          }
+        }
         error = new IOException(String.format("Caught exception for '%s'", resourceId), t);
         done.countDown();
       }

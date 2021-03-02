@@ -12,6 +12,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.util.BackOff;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.BackOffFactory;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
@@ -53,6 +54,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnit4.class)
 public final class GoogleCloudStorageGrpcWriteChannelTest {
@@ -78,9 +81,11 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   private StorageStub stub;
   private FakeService fakeService;
   private ExecutorService executor = Executors.newCachedThreadPool();
+  @Mock private Credential mockCredential;
 
   @Before
   public void setUp() throws Exception {
+    MockitoAnnotations.initMocks(this);
     fakeService = spy(new FakeService());
     String serverName = InProcessServerBuilder.generateName();
     InProcessServerBuilder.forName(serverName)
@@ -574,7 +579,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
       String requesterPaysProject,
       BackOffFactory backOffFactory) {
     return new GoogleCloudStorageGrpcWriteChannel(
-        stub,
+        new FakeStubProvider(mockCredential),
         executor,
         options,
         new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
@@ -608,6 +613,18 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     }
 
     return ByteString.copyFrom(result);
+  }
+
+  private class FakeStubProvider extends StorageStubProvider {
+
+    FakeStubProvider(Credential credential) {
+      super(GoogleCloudStorageOptions.DEFAULT, null, credential);
+    }
+
+    @Override
+    public StorageStub getAsyncStub() {
+      return stub;
+    }
   }
 
   private static class FakeService extends StorageImplBase {
