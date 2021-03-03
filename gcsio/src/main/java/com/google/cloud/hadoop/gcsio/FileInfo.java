@@ -69,9 +69,7 @@ public class FileInfo {
     return itemInfo.isDirectory();
   }
 
-  /**
-   * Indicates whether this item is an inferred directory.
-   */
+  /** Indicates whether this item is an inferred directory. */
   public boolean isInferredDirectory() {
     return itemInfo.isInferredDirectory();
   }

@@ -33,7 +33,6 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
-import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.collect.ImmutableList;
 import java.io.FileNotFoundException;
