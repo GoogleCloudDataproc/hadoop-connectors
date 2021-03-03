@@ -337,15 +337,13 @@ public class GoogleCloudStorageItemInfo {
     return isGlobalRoot() || isBucket() || resourceId.isDirectory();
   }
 
-  /**
-   *  Indicates whether {@code itemInfo} is an inferred directory
-   */
+  /** Indicates whether {@code itemInfo} is an inferred directory */
   public boolean isInferredDirectory() {
-    return creationTime == 0 &&
-        modificationTime == 0 &&
-        size == 0 &&
-        contentGeneration == 0 &&
-        metaGeneration == 0;
+    return creationTime == 0
+        && modificationTime == 0
+        && size == 0
+        && contentGeneration == 0
+        && metaGeneration == 0;
   }
 
   /** Get the content generation of the object. */
