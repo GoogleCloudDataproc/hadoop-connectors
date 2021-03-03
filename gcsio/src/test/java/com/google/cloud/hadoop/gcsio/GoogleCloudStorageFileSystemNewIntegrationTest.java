@@ -762,11 +762,10 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
 
     gcsfsIHelper.createObjects(bucketName, dirObject + "/d1/d2/d3");
 
-    gcsFs.delete(bucketUri.resolve(dirObject + "/d1/d2"), /* recursive= */ true);
+    gcsFs.delete(bucketUri.resolve(dirObject + "/d1/d2/"), /* recursive= */ true);
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
-            getRequestString(bucketName, dirObject + "/d1/d2"),
             listRequestWithTrailingDelimiter(
                 bucketName, dirObject + "/d1/d2/", /* maxResults= */ 1, /* pageToken= */ null),
             listRequestString(
