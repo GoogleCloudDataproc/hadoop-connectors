@@ -748,43 +748,6 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
   }
 
   @Test
-  public void delete_inferred_directory_with_parent() throws Exception {
-    GoogleCloudStorageFileSystemOptions gcsFsOptions =
-        newGcsFsOptions().setStatusParallelEnabled(false).build();
-
-    TrackingHttpRequestInitializer gcsRequestsTracker =
-        new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
-
-    String bucketName = gcsfsIHelper.sharedBucketName1;
-    URI bucketUri = new URI("gs://" + bucketName + "/");
-    String dirObject = getTestResource();
-
-    gcsfsIHelper.createObjects(bucketName, dirObject + "/d1/d2/d3");
-
-    gcsFs.delete(bucketUri.resolve(dirObject + "/d1/d2/"), /* recursive= */ true);
-
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/d1/d2/", /* maxResults= */ 1, /* pageToken= */ null),
-            listRequestString(
-                bucketName,
-                /* flatList= */ true,
-                /* includeTrailingDelimiter= */ null,
-                dirObject + "/d1/d2/",
-                "bucket,name,generation",
-                /* maxResults= */ 1024,
-                /* pageToken= */ null),
-            getRequestString(bucketName, dirObject + "/d1/"),
-            uploadRequestString(bucketName, dirObject + "/d1/", /* generationId= */ null),
-            deleteRequestString(bucketName, dirObject + "/d1/d2/d3", /* generationId= */ 1));
-    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/d1/"))).isTrue();
-    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/d1/d2/"))).isFalse();
-    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/d1/d2/d3/"))).isFalse();
-  }
-
-  @Test
   public void rename_file_sequential() throws Exception {
     GoogleCloudStorageFileSystemOptions gcsFsOptions =
         newGcsFsOptions().setStatusParallelEnabled(false).build();
