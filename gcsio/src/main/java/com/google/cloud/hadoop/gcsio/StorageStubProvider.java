@@ -5,9 +5,11 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.ClientProto;
 import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.client.googleapis.compute.ComputeCredential;
 import com.google.cloud.hadoop.util.CredentialAdapter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.google.storage.v1.StorageGrpc;
 import com.google.google.storage.v1.StorageGrpc.StorageBlockingStub;
 import com.google.google.storage.v1.StorageGrpc.StorageStub;
@@ -25,6 +27,7 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.Metadata;
 import io.grpc.MethodDescriptor;
 import io.grpc.Status;
+import io.grpc.alts.ComputeEngineChannelBuilder;
 import io.grpc.auth.MoreCallCredentials;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -45,6 +48,9 @@ class StorageStubProvider {
   // requested, the provider will reuse existing ones, favoring the one with the fewest ongoing
   // requests.
   private static final int MEDIA_CHANNEL_MAX_POOL_SIZE = 12;
+
+  private static final ImmutableSet<Status.Code> STUB_RECREATE_ERROR_CODES =
+      ImmutableSet.of(Status.Code.DEADLINE_EXCEEDED, Status.Code.UNAVAILABLE);
 
   // The GCS gRPC server address.
   private static final String DEFAULT_GCS_GRPC_SERVER_ADDRESS =
@@ -148,11 +154,14 @@ class StorageStubProvider {
 
   private ChannelAndRequestCounter buildManagedChannel() {
     ActiveRequestCounter counter = new ActiveRequestCounter();
+    String target =
+        isNullOrEmpty(readOptions.getGrpcServerAddress())
+            ? DEFAULT_GCS_GRPC_SERVER_ADDRESS
+            : readOptions.getGrpcServerAddress();
     ManagedChannel channel =
-        ManagedChannelBuilder.forTarget(
-                isNullOrEmpty(readOptions.getGrpcServerAddress())
-                    ? DEFAULT_GCS_GRPC_SERVER_ADDRESS
-                    : readOptions.getGrpcServerAddress())
+        (credential instanceof ComputeCredential
+                ? ComputeEngineChannelBuilder.forTarget(target)
+                : ManagedChannelBuilder.forTarget(target))
             .enableRetry()
             .defaultServiceConfig(getGrpcServiceConfig())
             .intercept(counter)
@@ -166,10 +175,19 @@ class StorageStubProvider {
         .withCallCredentials(MoreCallCredentials.from(new CredentialAdapter(credential)));
   }
 
+  public StorageBlockingStub recreateBlockingStubOnError(
+      StorageBlockingStub stub, Status.Code statusCode) {
+    return STUB_RECREATE_ERROR_CODES.contains(statusCode) ? getBlockingStub() : stub;
+  }
+
   public StorageStub getAsyncStub() {
     return StorageGrpc.newStub(getManagedChannel())
         .withCallCredentials(MoreCallCredentials.from(new CredentialAdapter(credential)))
         .withExecutor(backgroundTasksThreadPool);
+  }
+
+  public StorageStub recreateAsyncStubOnError(StorageStub stub, Status.Code statusCode) {
+    return STUB_RECREATE_ERROR_CODES.contains(statusCode) ? getAsyncStub() : stub;
   }
 
   private synchronized ManagedChannel getManagedChannel() {

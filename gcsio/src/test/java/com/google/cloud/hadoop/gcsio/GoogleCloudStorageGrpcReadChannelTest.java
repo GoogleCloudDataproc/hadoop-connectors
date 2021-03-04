@@ -12,6 +12,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.util.BackOff;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.common.hash.Hashing;
@@ -41,6 +42,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnit4.class)
 public final class GoogleCloudStorageGrpcReadChannelTest {
@@ -70,9 +73,11 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   @Rule public final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
   private StorageBlockingStub stub;
   private FakeService fakeService;
+  @Mock private Credential mockCredential;
 
   @Before
   public void setUp() throws Exception {
+    MockitoAnnotations.initMocks(this);
     fakeService = spy(new FakeService());
     String serverName = InProcessServerBuilder.generateName();
     grpcCleanup.register(
@@ -706,7 +711,22 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   private GoogleCloudStorageGrpcReadChannel newReadChannel(GoogleCloudStorageReadOptions options)
       throws IOException {
     return GoogleCloudStorageGrpcReadChannel.open(
-        stub, new StorageResourceId(BUCKET_NAME, OBJECT_NAME), options, () -> BackOff.STOP_BACKOFF);
+        new FakeStubProvider(mockCredential),
+        new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+        options,
+        () -> BackOff.STOP_BACKOFF);
+  }
+
+  private class FakeStubProvider extends StorageStubProvider {
+
+    FakeStubProvider(Credential credential) {
+      super(GoogleCloudStorageOptions.DEFAULT, null, credential);
+    }
+
+    @Override
+    public StorageBlockingStub getBlockingStub() {
+      return stub;
+    }
   }
 
   private static class FakeService extends StorageImplBase {

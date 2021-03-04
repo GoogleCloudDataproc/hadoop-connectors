@@ -403,7 +403,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     BaseAbstractGoogleAsyncWriteChannel<?> channel =
         storageOptions.isGrpcEnabled()
             ? new GoogleCloudStorageGrpcWriteChannel(
-                storageStubProvider.getAsyncStub(),
+                storageStubProvider,
                 backgroundTasksThreadPool,
                 storageOptions.getWriteChannelOptions(),
                 resourceId,
@@ -627,8 +627,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
 
     if (storageOptions.isGrpcEnabled()) {
-      return GoogleCloudStorageGrpcReadChannel.open(
-          storageStubProvider.getBlockingStub(), resourceId, readOptions);
+      return GoogleCloudStorageGrpcReadChannel.open(storageStubProvider, resourceId, readOptions);
     }
 
     // The underlying channel doesn't initially read data, which means that we won't see a
