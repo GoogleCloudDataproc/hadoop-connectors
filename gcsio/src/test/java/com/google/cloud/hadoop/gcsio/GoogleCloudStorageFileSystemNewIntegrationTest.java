@@ -743,6 +743,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
                 /* pageToken= */ null),
             deleteRequestString(bucketName, dirObject + "/d1/f1", /* generationId= */ 1),
             getRequestString(bucketName, dirObject + "/"));
+
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/d1/"))).isFalse();
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/d1/f1"))).isFalse();
   }
