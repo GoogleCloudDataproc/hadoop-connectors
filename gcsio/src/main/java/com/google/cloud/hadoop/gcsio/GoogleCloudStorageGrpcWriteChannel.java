@@ -45,9 +45,6 @@ import com.google.protobuf.Int64Value;
 import com.google.protobuf.UInt32Value;
 import com.google.protobuf.util.Timestamps;
 import io.grpc.Status;
-import io.grpc.Status.Code;
-import io.grpc.StatusException;
-import io.grpc.StatusRuntimeException;
 import io.grpc.stub.ClientCallStreamObserver;
 import io.grpc.stub.ClientResponseObserver;
 import io.grpc.stub.StreamObserver;
@@ -79,11 +76,16 @@ public final class GoogleCloudStorageGrpcWriteChannel
   // penalty.
   private static final int NUMBER_OF_REQUESTS_TO_RETAIN = 5;
   // A set that defines all transient errors on which retry can be attempted.
-  private static final ImmutableSet<Code> TRANSIENT_ERRORS =
+  private static final ImmutableSet<Status.Code> TRANSIENT_ERRORS =
       ImmutableSet.of(
-          Code.DEADLINE_EXCEEDED, Code.RESOURCE_EXHAUSTED, Code.INTERNAL, Code.UNAVAILABLE);
+          Status.Code.DEADLINE_EXCEEDED,
+          Status.Code.INTERNAL,
+          Status.Code.RESOURCE_EXHAUSTED,
+          Status.Code.UNAVAILABLE);
 
-  private final StorageStub stub;
+  private StorageStub stub;
+
+  private final StorageStubProvider stubProvider;
   private final StorageResourceId resourceId;
   private final CreateObjectOptions createOptions;
   private final ObjectWriteConditions writeConditions;
@@ -93,7 +95,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
   private GoogleCloudStorageItemInfo completedItemInfo = null;
 
   GoogleCloudStorageGrpcWriteChannel(
-      StorageStub stub,
+      StorageStubProvider stubProvider,
       ExecutorService threadPool,
       AsyncWriteChannelOptions channelOptions,
       StorageResourceId resourceId,
@@ -102,7 +104,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
       String requesterPaysProject,
       BackOffFactory backOffFactory) {
     super(threadPool, channelOptions);
-    this.stub = stub;
+    this.stubProvider = stubProvider;
+    this.stub = stubProvider.getAsyncStub();
     this.resourceId = resourceId;
     this.createOptions = createOptions;
     this.writeConditions = writeConditions;
@@ -384,17 +387,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       @Override
       public void onError(Throwable t) {
-        Status s = Status.fromThrowable(t);
-        String statusDesc = s == null ? "" : s.getDescription();
-
-        if (t.getClass() == StatusException.class || t.getClass() == StatusRuntimeException.class) {
-          Code code =
-              t.getClass() == StatusException.class
-                  ? ((StatusException) t).getStatus().getCode()
-                  : ((StatusRuntimeException) t).getStatus().getCode();
-          if (TRANSIENT_ERRORS.contains(code)) {
-            transientError = t;
-          }
+        Status status = Status.fromThrowable(t);
+        stub = stubProvider.recreateAsyncStubOnError(stub, status.getCode());
+        if (TRANSIENT_ERRORS.contains(status.getCode())) {
+          transientError = t;
         }
         if (transientError == null) {
           nonTransientError =
@@ -402,7 +398,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
                   String.format(
                       "Caught exception for '%s', while uploading to uploadId %s at writeOffset %d."
                           + " Status: %s",
-                      resourceId, uploadId, writeOffset, statusDesc),
+                      resourceId, uploadId, writeOffset, status.getDescription()),
                   t);
         }
         done.countDown();
@@ -549,6 +545,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       @Override
       public void onError(Throwable t) {
+        stub = stubProvider.recreateAsyncStubOnError(stub, Status.fromThrowable(t).getCode());
         error = new IOException(String.format("Caught exception for '%s'", resourceId), t);
         done.countDown();
       }
