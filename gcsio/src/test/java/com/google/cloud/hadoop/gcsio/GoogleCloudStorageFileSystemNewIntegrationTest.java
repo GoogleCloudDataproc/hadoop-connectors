@@ -712,7 +712,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
   }
 
   @Test
-  public void delete_inferred_directory() throws Exception {
+  public void delete_inferredDirectory() throws Exception {
     GoogleCloudStorageFileSystemOptions gcsFsOptions =
         newGcsFsOptions().setStatusParallelEnabled(false).build();
 
@@ -724,7 +724,8 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     URI bucketUri = new URI("gs://" + bucketName + "/");
     String dirObject = getTestResource();
 
-    gcsfsIHelper.createObjects(bucketName, dirObject + "/d1/d2");
+    gcsfsIHelper.createObjects(bucketName, dirObject + "/");
+    gcsfsIHelper.createObjects(bucketName, dirObject + "/d1/f1");
 
     gcsFs.delete(bucketUri.resolve(dirObject + "/d1/"), /* recursive= */ true);
 
@@ -740,11 +741,10 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
                 "bucket,name,generation",
                 /* maxResults= */ 1024,
                 /* pageToken= */ null),
-            deleteRequestString(bucketName, dirObject + "/d1/d2", /* generationId= */ 1),
-            getRequestString(bucketName, dirObject + "/"),
-            uploadRequestString(bucketName, dirObject + "/", /* generationId= */ null));
+            deleteRequestString(bucketName, dirObject + "/d1/f1", /* generationId= */ 1),
+            getRequestString(bucketName, dirObject + "/"));
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/d1/"))).isFalse();
-    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/d1/d2"))).isFalse();
+    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/d1/f1"))).isFalse();
   }
 
   @Test
