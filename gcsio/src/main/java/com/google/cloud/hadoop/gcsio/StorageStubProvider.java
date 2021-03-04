@@ -154,29 +154,20 @@ class StorageStubProvider {
 
   private ChannelAndRequestCounter buildManagedChannel() {
     ActiveRequestCounter counter = new ActiveRequestCounter();
-    ManagedChannelBuilder<?> builder;
-    if (credential instanceof ComputeCredential) {
-      builder =
-          ComputeEngineChannelBuilder.forTarget(
-                  isNullOrEmpty(readOptions.getGrpcServerAddress())
-                      ? DEFAULT_GCS_GRPC_SERVER_ADDRESS
-                      : readOptions.getGrpcServerAddress())
-              .enableRetry()
-              .defaultServiceConfig(getGrpcServiceConfig())
-              .intercept(counter)
-              .userAgent(userAgent);
-    } else {
-      builder =
-          ManagedChannelBuilder.forTarget(
-                  isNullOrEmpty(readOptions.getGrpcServerAddress())
-                      ? DEFAULT_GCS_GRPC_SERVER_ADDRESS
-                      : readOptions.getGrpcServerAddress())
-              .enableRetry()
-              .defaultServiceConfig(getGrpcServiceConfig())
-              .intercept(counter)
-              .userAgent(userAgent);
-    }
-    return new ChannelAndRequestCounter(builder.build(), counter);
+    String target =
+        isNullOrEmpty(readOptions.getGrpcServerAddress())
+            ? DEFAULT_GCS_GRPC_SERVER_ADDRESS
+            : readOptions.getGrpcServerAddress();
+    ManagedChannel channel =
+        (credential instanceof ComputeCredential
+                ? ComputeEngineChannelBuilder.forTarget(target)
+                : ManagedChannelBuilder.forTarget(target))
+            .enableRetry()
+            .defaultServiceConfig(getGrpcServiceConfig())
+            .intercept(counter)
+            .userAgent(userAgent)
+            .build();
+    return new ChannelAndRequestCounter(channel, counter);
   }
 
   public StorageBlockingStub getBlockingStub() {
