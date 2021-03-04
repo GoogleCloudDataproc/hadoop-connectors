@@ -69,6 +69,11 @@ public class FileInfo {
     return itemInfo.isDirectory();
   }
 
+  /** Indicates whether this item is an inferred directory. */
+  public boolean isInferredDirectory() {
+    return itemInfo.isInferredDirectory();
+  }
+
   /**
    * Indicates whether this instance has information about the unique, shared root of the
    * underlying storage system.

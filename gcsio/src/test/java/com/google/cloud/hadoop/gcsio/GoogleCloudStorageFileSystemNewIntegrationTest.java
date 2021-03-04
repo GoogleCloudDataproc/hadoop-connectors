@@ -712,6 +712,43 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
   }
 
   @Test
+  public void delete_inferredDirectory() throws Exception {
+    GoogleCloudStorageFileSystemOptions gcsFsOptions =
+        newGcsFsOptions().setStatusParallelEnabled(false).build();
+
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource();
+
+    gcsfsIHelper.createObjects(bucketName, dirObject + "/");
+    gcsfsIHelper.createObjects(bucketName, dirObject + "/d1/f1");
+
+    gcsFs.delete(bucketUri.resolve(dirObject + "/d1/"), /* recursive= */ true);
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            listRequestWithTrailingDelimiter(
+                bucketName, dirObject + "/d1/", /* maxResults= */ 1, /* pageToken= */ null),
+            listRequestString(
+                bucketName,
+                /* flatList= */ true,
+                /* includeTrailingDelimiter= */ null,
+                dirObject + "/d1/",
+                "bucket,name,generation",
+                /* maxResults= */ 1024,
+                /* pageToken= */ null),
+            deleteRequestString(bucketName, dirObject + "/d1/f1", /* generationId= */ 1),
+            getRequestString(bucketName, dirObject + "/"));
+
+    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/d1/"))).isFalse();
+    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/d1/f1"))).isFalse();
+  }
+
+  @Test
   public void rename_file_sequential() throws Exception {
     GoogleCloudStorageFileSystemOptions gcsFsOptions =
         newGcsFsOptions().setStatusParallelEnabled(false).build();
