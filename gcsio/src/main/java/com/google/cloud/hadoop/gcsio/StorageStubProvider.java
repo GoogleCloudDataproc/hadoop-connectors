@@ -9,6 +9,7 @@ import com.google.api.client.googleapis.compute.ComputeCredential;
 import com.google.cloud.hadoop.util.CredentialAdapter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.google.storage.v1.StorageGrpc;
 import com.google.google.storage.v1.StorageGrpc.StorageBlockingStub;
 import com.google.google.storage.v1.StorageGrpc.StorageStub;
@@ -47,6 +48,9 @@ class StorageStubProvider {
   // requested, the provider will reuse existing ones, favoring the one with the fewest ongoing
   // requests.
   private static final int MEDIA_CHANNEL_MAX_POOL_SIZE = 12;
+
+  private static final ImmutableSet<Status.Code> STUB_RECREATE_ERROR_CODES =
+      ImmutableSet.of(Status.Code.DEADLINE_EXCEEDED, Status.Code.UNAVAILABLE);
 
   // The GCS gRPC server address.
   private static final String DEFAULT_GCS_GRPC_SERVER_ADDRESS =
@@ -180,10 +184,19 @@ class StorageStubProvider {
         .withCallCredentials(MoreCallCredentials.from(new CredentialAdapter(credential)));
   }
 
+  public StorageBlockingStub recreateBlockingStubOnError(
+      StorageBlockingStub stub, Status.Code statusCode) {
+    return STUB_RECREATE_ERROR_CODES.contains(statusCode) ? getBlockingStub() : stub;
+  }
+
   public StorageStub getAsyncStub() {
     return StorageGrpc.newStub(getManagedChannel())
         .withCallCredentials(MoreCallCredentials.from(new CredentialAdapter(credential)))
         .withExecutor(backgroundTasksThreadPool);
+  }
+
+  public StorageStub recreateAsyncStubOnError(StorageStub stub, Status.Code statusCode) {
+    return STUB_RECREATE_ERROR_CODES.contains(statusCode) ? getAsyncStub() : stub;
   }
 
   private synchronized ManagedChannel getManagedChannel() {

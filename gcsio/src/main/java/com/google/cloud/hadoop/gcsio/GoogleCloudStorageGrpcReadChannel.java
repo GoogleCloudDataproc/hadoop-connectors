@@ -24,7 +24,6 @@ import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.hash.Hashing;
 import com.google.google.storage.v1.GetObjectMediaRequest;
@@ -35,7 +34,6 @@ import com.google.protobuf.ByteString;
 import io.grpc.Context;
 import io.grpc.Context.CancellableContext;
 import io.grpc.Status;
-import io.grpc.Status.Code;
 import io.grpc.StatusRuntimeException;
 import java.io.EOFException;
 import java.io.IOException;
@@ -52,9 +50,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private static final Duration READ_STREAM_TIMEOUT = Duration.ofMinutes(20);
   private static final Duration READ_OBJECT_METADATA_TIMEOUT = Duration.ofMinutes(1);
-
-  private static final ImmutableSet<Status.Code> CHANNEL_SWITCH_ELIGIBLE_ERROR_CODES =
-      ImmutableSet.of(Code.UNAVAILABLE, Code.DEADLINE_EXCEEDED);
 
   private StorageBlockingStub stub;
 
@@ -97,7 +92,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   @Nullable CancellableContext requestContext;
 
   Fadvise readStrategy;
-  // GCS gRPC stub.
 
   public static GoogleCloudStorageGrpcReadChannel open(
       StorageStubProvider stubProvider,
@@ -196,9 +190,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   }
 
   private void switchChannelOnError(StatusRuntimeException error) {
-    if (CHANNEL_SWITCH_ELIGIBLE_ERROR_CODES.contains(Status.fromThrowable(error).getCode())) {
-      stub = stubProvider.getBlockingStub();
-    }
+    stub = stubProvider.recreateBlockingStubOnError(stub, Status.fromThrowable(error).getCode());
   }
 
   /** Writes part of a ByteString into a ByteBuffer with as little copying as possible */
