@@ -1969,7 +1969,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // 500 ISE and 503 Service Unavailable tend to be raised when spamming GCS with create requests:
     if (errorExtractor.rateLimited(exceptionOnCreate)
         || errorExtractor.internalServerError(exceptionOnCreate)
-        || errorExtractor.preconditionNotMet(exceptionOnCreate)) {
+        || (resourceId.isDirectory() && errorExtractor.preconditionNotMet(exceptionOnCreate))) {
       // We know that this is an error that is most often associated with trying to create an empty
       // object from multiple workers at the same time. We perform the following assuming that we
       // will eventually succeed and find an existing object. This will add up to a user-defined

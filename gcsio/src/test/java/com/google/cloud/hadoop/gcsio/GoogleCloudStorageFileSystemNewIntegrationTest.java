@@ -103,8 +103,9 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
 
     gcsFs.mkdir(dirObjectUri);
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(uploadRequestString(bucketName, dirObject + "/", /* generationId= */ 1));
+    assertThat(gcsRequestsTracker.getAllRawRequestStrings())
+        .containsExactly(
+            uploadRequestString(bucketName, dirObject + "/", /* generationId= */ 0, false));
 
     assertThat(gcsFs.exists(dirObjectUri)).isTrue();
     assertThat(gcsFs.getFileInfo(dirObjectUri).isDirectory()).isTrue();
@@ -120,14 +121,15 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     String dirObject = getTestResource();
     URI dirObjectUri = new URI("gs://" + bucketName).resolve(dirObject);
 
-    gcsfsIHelper.mkdir(
-        bucketName, dirObject); // create directory before hand without tracking requests
+    // create directory before hand without tracking requests
+    gcsfsIHelper.mkdir(bucketName, dirObject);
     gcsFs.mkdir(dirObjectUri);
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
+    assertThat(gcsRequestsTracker.getAllRawRequestStrings())
         .containsExactly(
-            uploadRequestString(bucketName, dirObject + "/", /* generationId= */ 1),
-            getRequestString(bucketName, dirObject + "/")); // verifies directory exists
+            uploadRequestString(bucketName, dirObject + "/", /* generationId= */ 0, false),
+            // verifies directory exists
+            getRequestString(bucketName, dirObject + "/"));
 
     assertThat(gcsFs.exists(dirObjectUri)).isTrue();
     assertThat(gcsFs.getFileInfo(dirObjectUri).isDirectory()).isTrue();
@@ -145,12 +147,12 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
 
     gcsFs.mkdirs(dirObjectUri);
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
+    assertThat(gcsRequestsTracker.getAllRawRequestStrings())
         .containsExactly(
             batchRequestString(),
             getRequestString(bucketName, dirObject),
             getRequestString(bucketName, dirObject + "/d1"),
-            uploadRequestString(bucketName, dirObject + "/d1/", /* generationId= */ 1));
+            uploadRequestString(bucketName, dirObject + "/d1/", /* generationId= */ 0, false));
 
     assertThat(gcsFs.exists(dirObjectUri)).isTrue();
     assertThat(gcsFs.getFileInfo(dirObjectUri).isDirectory()).isTrue();
@@ -166,15 +168,16 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     String dirObject = getTestResource();
     URI dirObjectUri = new URI("gs://" + bucketName).resolve(dirObject + "/d1/");
 
-    gcsfsIHelper.mkdirs(dirObjectUri); // create directory before hand without tracking requests
+    // create directory before hand without tracking requests
+    gcsfsIHelper.mkdirs(dirObjectUri);
     gcsFs.mkdirs(dirObjectUri);
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
+    assertThat(gcsRequestsTracker.getAllRawRequestStrings())
         .containsExactly(
             batchRequestString(),
             getRequestString(bucketName, dirObject),
             getRequestString(bucketName, dirObject + "/d1"),
-            uploadRequestString(bucketName, dirObject + "/d1/", /* generationId= */ 1),
+            uploadRequestString(bucketName, dirObject + "/d1/", /* generationId= */ 0, false),
             getRequestString(bucketName, dirObject + "/d1/")); // verifies directory exists
 
     assertThat(gcsFs.exists(dirObjectUri)).isTrue();
