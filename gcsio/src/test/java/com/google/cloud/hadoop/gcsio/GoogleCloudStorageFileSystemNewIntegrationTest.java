@@ -178,7 +178,9 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
             getRequestString(bucketName, dirObject),
             getRequestString(bucketName, dirObject + "/d1"),
             uploadRequestString(bucketName, dirObject + "/d1/", /* generationId= */ 0, false),
-            getRequestString(bucketName, dirObject + "/d1/")); // verifies directory exists
+            // verifies directory exists
+            getRequestString(bucketName, dirObject + "/d1/"));
+
 
     assertThat(gcsFs.exists(dirObjectUri)).isTrue();
     assertThat(gcsFs.getFileInfo(dirObjectUri).isDirectory()).isTrue();
