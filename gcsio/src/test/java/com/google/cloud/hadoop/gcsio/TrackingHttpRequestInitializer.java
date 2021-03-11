@@ -56,7 +56,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   private static final String UPLOAD_REQUEST_FORMAT =
       "POST:"
           + GOOGLEAPIS_ENDPOINT
-          + "/upload/storage/v1/b/%s/o?ifGenerationMatch=generationId_%d&uploadType=multipart:%s";
+          + "/upload/storage/v1/b/%s/o?ifGenerationMatch=%s&uploadType=multipart:%s";
 
   private static final String RESUMABLE_UPLOAD_REQUEST_FORMAT =
       "POST:"
@@ -166,6 +166,12 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         .collect(toImmutableList());
   }
 
+  public ImmutableList<String> getAllRawRequestStrings() {
+    return requests.stream()
+        .map(GoogleCloudStorageIntegrationHelper::requestToString)
+        .collect(toImmutableList());
+  }
+
   private String replacePageTokenWithId(String request, AtomicLong pageTokenId) {
     return replaceRequestParams
         ? replaceWithId(request, PAGE_TOKEN_PARAM_PATTERN, "pageToken=token_", pageTokenId)
@@ -257,7 +263,17 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   }
 
   public static String uploadRequestString(String bucketName, String object, Integer generationId) {
-    String request = String.format(UPLOAD_REQUEST_FORMAT, bucketName, generationId, object);
+    return uploadRequestString(bucketName, object, generationId, true);
+  }
+
+  public static String uploadRequestString(
+      String bucketName, String object, Integer generationId, boolean replaceGenerationId) {
+    String request =
+        String.format(
+            UPLOAD_REQUEST_FORMAT,
+            bucketName,
+            replaceGenerationId ? "generationId_" + generationId : generationId,
+            object);
     return generationId == null ? request.replaceAll("ifGenerationMatch=[^&]+&", "") : request;
   }
 
