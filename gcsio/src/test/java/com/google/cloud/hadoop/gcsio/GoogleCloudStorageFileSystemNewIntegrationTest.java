@@ -105,7 +105,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
 
     assertThat(gcsRequestsTracker.getAllRawRequestStrings())
         .containsExactly(
-            uploadRequestString(bucketName, dirObject + "/", /* generationId= */ 0, false));
+            uploadRequestString(bucketName, dirObject + "/", /* generationId= */ 0, /* replaceGenerationId= */false));
 
     assertThat(gcsFs.exists(dirObjectUri)).isTrue();
     assertThat(gcsFs.getFileInfo(dirObjectUri).isDirectory()).isTrue();
@@ -127,7 +127,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
 
     assertThat(gcsRequestsTracker.getAllRawRequestStrings())
         .containsExactly(
-            uploadRequestString(bucketName, dirObject + "/", /* generationId= */ 0, false),
+            uploadRequestString(bucketName, dirObject + "/", /* generationId= */ 0, /* replaceGenerationId= */false),
             // verifies directory exists
             getRequestString(bucketName, dirObject + "/"));
 
@@ -152,7 +152,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
             batchRequestString(),
             getRequestString(bucketName, dirObject),
             getRequestString(bucketName, dirObject + "/d1"),
-            uploadRequestString(bucketName, dirObject + "/d1/", /* generationId= */ 0, false));
+            uploadRequestString(bucketName, dirObject + "/d1/", /* generationId= */ 0, /* replaceGenerationId= */false));
 
     assertThat(gcsFs.exists(dirObjectUri)).isTrue();
     assertThat(gcsFs.getFileInfo(dirObjectUri).isDirectory()).isTrue();
@@ -177,7 +177,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
             batchRequestString(),
             getRequestString(bucketName, dirObject),
             getRequestString(bucketName, dirObject + "/d1"),
-            uploadRequestString(bucketName, dirObject + "/d1/", /* generationId= */ 0, false),
+            uploadRequestString(bucketName, dirObject + "/d1/", /* generationId= */ 0, /* replaceGenerationId= */ false),
             // verifies directory exists
             getRequestString(bucketName, dirObject + "/d1/"));
 
