@@ -1188,7 +1188,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     if (resourceId.hasGenerationId()) {
       insertObject.setIfGenerationMatch(resourceId.getGenerationId());
-    } else if (!createObjectOptions.isOverwriteExisting()) {
+    } else if (resourceId.isDirectory() || !createObjectOptions.isOverwriteExisting()) {
       insertObject.setIfGenerationMatch(0L);
     }
     return insertObject;
@@ -1965,10 +1965,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private boolean canIgnoreExceptionForEmptyObject(
       IOException exceptionOnCreate, StorageResourceId resourceId, CreateObjectOptions options)
       throws IOException {
-    // TODO(user): Maybe also add 409 and even 412 errors if they pop up in this use case.
+    // TODO(user): Maybe also add 409 errors if they pop up in this use case.
     // 500 ISE and 503 Service Unavailable tend to be raised when spamming GCS with create requests:
     if (errorExtractor.rateLimited(exceptionOnCreate)
-        || errorExtractor.internalServerError(exceptionOnCreate)) {
+        || errorExtractor.internalServerError(exceptionOnCreate)
+        || (resourceId.isDirectory() && errorExtractor.preconditionNotMet(exceptionOnCreate))) {
       // We know that this is an error that is most often associated with trying to create an empty
       // object from multiple workers at the same time. We perform the following assuming that we
       // will eventually succeed and find an existing object. This will add up to a user-defined

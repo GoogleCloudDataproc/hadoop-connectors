@@ -92,7 +92,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
   }
 
   @Test
-  public void mkdirs_shouldCreateNewDirectory() throws Exception {
+  public void mkdir_shouldCreateNewDirectory() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
     GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
@@ -103,9 +103,99 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
 
     gcsFs.mkdir(dirObjectUri);
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
+    assertThat(gcsRequestsTracker.getAllRawRequestStrings())
         .containsExactly(
-            uploadRequestString(bucketName, dirObject + "/", /* generationId= */ null));
+            uploadRequestString(
+                bucketName,
+                dirObject + "/",
+                /* generationId= */ 0,
+                /* replaceGenerationId= */ false));
+
+    assertThat(gcsFs.exists(dirObjectUri)).isTrue();
+    assertThat(gcsFs.getFileInfo(dirObjectUri).isDirectory()).isTrue();
+  }
+
+  @Test
+  public void mkdir_shouldFailSilentlyIfDirectoryExists() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    String dirObject = getTestResource();
+    URI dirObjectUri = new URI("gs://" + bucketName).resolve(dirObject);
+
+    // create directory before hand without tracking requests
+    gcsfsIHelper.mkdir(bucketName, dirObject);
+    gcsFs.mkdir(dirObjectUri);
+
+    assertThat(gcsRequestsTracker.getAllRawRequestStrings())
+        .containsExactly(
+            uploadRequestString(
+                bucketName,
+                dirObject + "/",
+                /* generationId= */ 0,
+                /* replaceGenerationId= */ false),
+            // verifies directory exists
+            getRequestString(bucketName, dirObject + "/"));
+
+    assertThat(gcsFs.exists(dirObjectUri)).isTrue();
+    assertThat(gcsFs.getFileInfo(dirObjectUri).isDirectory()).isTrue();
+  }
+
+  @Test
+  public void mkdirs_shouldCreateNewDirectory() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    String dirObject = getTestResource();
+    URI dirObjectUri = new URI("gs://" + bucketName).resolve(dirObject + "/d1/");
+
+    gcsFs.mkdirs(dirObjectUri);
+
+    assertThat(gcsRequestsTracker.getAllRawRequestStrings())
+        .containsExactly(
+            batchRequestString(),
+            getRequestString(bucketName, dirObject),
+            getRequestString(bucketName, dirObject + "/d1"),
+            uploadRequestString(
+                bucketName,
+                dirObject + "/d1/",
+                /* generationId= */ 0,
+                /* replaceGenerationId= */ false));
+
+    assertThat(gcsFs.exists(dirObjectUri)).isTrue();
+    assertThat(gcsFs.getFileInfo(dirObjectUri).isDirectory()).isTrue();
+  }
+
+  @Test
+  public void mkdirs_shouldFailSilentlyIfDirectoryExists() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorageFileSystem gcsFs = newGcsFs(newGcsFsOptions().build(), gcsRequestsTracker);
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    String dirObject = getTestResource();
+    URI dirObjectUri = new URI("gs://" + bucketName).resolve(dirObject + "/d1/");
+
+    // create directory before hand without tracking requests
+    gcsfsIHelper.mkdirs(dirObjectUri);
+    gcsFs.mkdirs(dirObjectUri);
+
+    assertThat(gcsRequestsTracker.getAllRawRequestStrings())
+        .containsExactly(
+            batchRequestString(),
+            getRequestString(bucketName, dirObject),
+            getRequestString(bucketName, dirObject + "/d1"),
+            uploadRequestString(
+                bucketName,
+                dirObject + "/d1/",
+                /* generationId= */ 0,
+                /* replaceGenerationId= */ false),
+            // verifies directory exists
+            getRequestString(bucketName, dirObject + "/d1/"));
 
     assertThat(gcsFs.exists(dirObjectUri)).isTrue();
     assertThat(gcsFs.getFileInfo(dirObjectUri).isDirectory()).isTrue();
