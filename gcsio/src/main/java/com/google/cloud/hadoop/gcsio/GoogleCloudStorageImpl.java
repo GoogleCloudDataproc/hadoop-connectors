@@ -257,7 +257,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param storage {@link Storage} to use for I/O.
    */
   @VisibleForTesting
-  GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage storage) {
+  public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage storage) {
     logger.atFiner().log("GCS(options: %s)", options);
 
     this.storageOptions = checkNotNull(options, "options must not be null");
