@@ -27,7 +27,7 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.Metadata;
 import io.grpc.MethodDescriptor;
 import io.grpc.Status;
-import io.grpc.alts.ComputeEngineChannelBuilder;
+import io.grpc.alts.GoogleDefaultChannelBuilder;
 import io.grpc.auth.MoreCallCredentials;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -159,8 +159,8 @@ class StorageStubProvider {
             ? DEFAULT_GCS_GRPC_SERVER_ADDRESS
             : readOptions.getGrpcServerAddress();
     ManagedChannel channel =
-        (credential instanceof ComputeCredential
-                ? ComputeEngineChannelBuilder.forTarget(target)
+        (isComputeCredential()
+                ? GoogleDefaultChannelBuilder.forTarget(target)
                 : ManagedChannelBuilder.forTarget(target))
             .enableRetry()
             .defaultServiceConfig(getGrpcServiceConfig())
@@ -171,8 +171,10 @@ class StorageStubProvider {
   }
 
   public StorageBlockingStub getBlockingStub() {
-    return StorageGrpc.newBlockingStub(getManagedChannel())
-        .withCallCredentials(MoreCallCredentials.from(new CredentialAdapter(credential)));
+    StorageBlockingStub stub = StorageGrpc.newBlockingStub(getManagedChannel());
+    return isComputeCredential()
+        ? stub
+        : stub.withCallCredentials(MoreCallCredentials.from(new CredentialAdapter(credential)));
   }
 
   public StorageBlockingStub recreateBlockingStubOnError(
@@ -181,13 +183,19 @@ class StorageStubProvider {
   }
 
   public StorageStub getAsyncStub() {
-    return StorageGrpc.newStub(getManagedChannel())
-        .withCallCredentials(MoreCallCredentials.from(new CredentialAdapter(credential)))
-        .withExecutor(backgroundTasksThreadPool);
+    StorageStub stub =
+        StorageGrpc.newStub(getManagedChannel()).withExecutor(backgroundTasksThreadPool);
+    return isComputeCredential()
+        ? stub
+        : stub.withCallCredentials(MoreCallCredentials.from(new CredentialAdapter(credential)));
   }
 
   public StorageStub recreateAsyncStubOnError(StorageStub stub, Status.Code statusCode) {
     return STUB_RECREATE_ERROR_CODES.contains(statusCode) ? getAsyncStub() : stub;
+  }
+
+  private boolean isComputeCredential() {
+    return credential instanceof ComputeCredential;
   }
 
   private synchronized ManagedChannel getManagedChannel() {
