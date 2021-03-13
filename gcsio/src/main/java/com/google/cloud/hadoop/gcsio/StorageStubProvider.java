@@ -49,7 +49,7 @@ class StorageStubProvider {
   // requests.
   private static final int MEDIA_CHANNEL_MAX_POOL_SIZE = 12;
 
-  private static final ImmutableSet<Status.Code> STUB_RECREATE_ERROR_CODES =
+  private static final ImmutableSet<Status.Code> STUB_BROKEN_ERROR_CODES =
       ImmutableSet.of(Status.Code.DEADLINE_EXCEEDED, Status.Code.UNAVAILABLE);
 
   // The GCS gRPC server address.
@@ -170,16 +170,15 @@ class StorageStubProvider {
     return new ChannelAndRequestCounter(channel, counter);
   }
 
+  public boolean isStubBroken(Status.Code statusCode) {
+    return STUB_BROKEN_ERROR_CODES.contains(statusCode);
+  }
+
   public StorageBlockingStub getBlockingStub() {
     StorageBlockingStub stub = StorageGrpc.newBlockingStub(getManagedChannel());
     return isComputeCredential()
         ? stub
         : stub.withCallCredentials(MoreCallCredentials.from(new CredentialAdapter(credential)));
-  }
-
-  public StorageBlockingStub recreateBlockingStubOnError(
-      StorageBlockingStub stub, Status.Code statusCode) {
-    return STUB_RECREATE_ERROR_CODES.contains(statusCode) ? getBlockingStub() : stub;
   }
 
   public StorageStub getAsyncStub() {
@@ -188,10 +187,6 @@ class StorageStubProvider {
     return isComputeCredential()
         ? stub
         : stub.withCallCredentials(MoreCallCredentials.from(new CredentialAdapter(credential)));
-  }
-
-  public StorageStub recreateAsyncStubOnError(StorageStub stub, Status.Code statusCode) {
-    return STUB_RECREATE_ERROR_CODES.contains(statusCode) ? getAsyncStub() : stub;
   }
 
   private boolean isComputeCredential() {

@@ -83,7 +83,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
           Status.Code.RESOURCE_EXHAUSTED,
           Status.Code.UNAVAILABLE);
 
-  private StorageStub stub;
+  private volatile StorageStub stub;
 
   private final StorageStubProvider stubProvider;
   private final StorageResourceId resourceId;
@@ -340,6 +340,12 @@ public final class GoogleCloudStorageGrpcWriteChannel
       return request;
     }
 
+    private void recreateStub(Status.Code statusCode) {
+      if (stubProvider.isStubBroken(statusCode)) {
+        stub = stubProvider.getAsyncStub();
+      }
+    }
+
     /** Handler for responses from the Insert streaming RPC. */
     private class InsertChunkResponseObserver
         implements ClientResponseObserver<InsertObjectRequest, Object> {
@@ -388,8 +394,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
       @Override
       public void onError(Throwable t) {
         Status status = Status.fromThrowable(t);
-        stub = stubProvider.recreateAsyncStubOnError(stub, status.getCode());
-        if (TRANSIENT_ERRORS.contains(status.getCode())) {
+        Status.Code statusCode = status.getCode();
+        recreateStub(statusCode);
+        if (TRANSIENT_ERRORS.contains(statusCode)) {
           transientError = t;
         }
         if (transientError == null) {
@@ -545,7 +552,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       @Override
       public void onError(Throwable t) {
-        stub = stubProvider.recreateAsyncStubOnError(stub, Status.fromThrowable(t).getCode());
+        recreateStub(Status.fromThrowable(t).getCode());
         error = new IOException(String.format("Caught exception for '%s'", resourceId), t);
         done.countDown();
       }
