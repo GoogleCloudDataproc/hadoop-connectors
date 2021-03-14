@@ -385,6 +385,37 @@ public class GoogleCloudStorageTest {
   }
 
   @Test
+  public void upload_failure_runtimeException() throws Exception {
+    byte[] testData = new byte[MediaHttpUploader.MINIMUM_CHUNK_SIZE];
+    new Random().nextBytes(testData);
+
+    RuntimeException uploadException = new RuntimeException("upload RuntimeException");
+
+    MockHttpTransport transport =
+        mockTransport(
+            emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
+            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
+            uploadException);
+
+    GoogleCloudStorage gcs = mockedGcs(GCS_OPTIONS, transport);
+
+    WritableByteChannel writeChannel = gcs.create(RESOURCE_ID);
+    writeChannel.write(ByteBuffer.wrap(testData));
+
+    IOException thrown = assertThrows(IOException.class, writeChannel::close);
+
+    assertThat(thrown).hasCauseThat().isSameInstanceAs(uploadException);
+
+    assertThat(trackingHttpRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            resumableUploadRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
+            resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 1))
+        .inOrder();
+  }
+
+  @Test
   public void reupload_success_singleWrite_multipleUploadChunks() throws Exception {
     byte[] testData = new byte[2 * MediaHttpUploader.MINIMUM_CHUNK_SIZE];
     new Random().nextBytes(testData);
