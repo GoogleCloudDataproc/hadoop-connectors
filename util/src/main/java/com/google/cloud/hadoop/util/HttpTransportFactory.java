@@ -140,10 +140,13 @@ public class HttpTransportFactory {
         proxyUri != null || proxyCredentials == null,
         "if proxyUri is null than proxyCredentials should be null too");
 
-    HttpClientBuilder httpClientBuilder =
-        ApacheHttpTransport.newDefaultHttpClientBuilder()
-            .setProxy(
-                proxyUri == null ? null : new HttpHost(proxyUri.getHost(), proxyUri.getPort()));
+    HttpClientBuilder httpClientBuilder = ApacheHttpTransport.newDefaultHttpClientBuilder();
+
+    if (proxyUri != null) {
+      httpClientBuilder
+          .setRoutePlanner(null)
+          .setProxy(new HttpHost(proxyUri.getHost(), proxyUri.getPort()));
+    }
 
     if (proxyCredentials != null) {
       CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
