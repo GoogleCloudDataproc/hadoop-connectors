@@ -95,6 +95,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -105,7 +106,6 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonPathCapabilities;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -117,7 +117,6 @@ import org.apache.hadoop.fs.GlobPattern;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.XAttrSetFlag;
-import org.apache.hadoop.fs.impl.PathCapabilitiesSupport;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -523,15 +522,21 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     return result;
   }
 
-  @Override
   public boolean hasPathCapability(Path path, String capability) throws IOException {
-    switch (PathCapabilitiesSupport.validatePathCapabilityArgs(path, capability)) {
-      case CommonPathCapabilities.FS_APPEND:
-      case CommonPathCapabilities.FS_CONCAT:
+    switch (validatePathCapabilityArgs(path, capability)) {
+      case "fs.capability.paths.append":
+      case "fs.capability.paths.concat":
         return true;
       default:
-        return super.hasPathCapability(path, capability);
+        return false;
     }
+  }
+
+  public static String validatePathCapabilityArgs(final Path path, final String capability) {
+    checkArgument(path != null, "null path");
+    checkArgument(capability != null, "capability parameter is null");
+    checkArgument(!capability.isEmpty(), "capability parameter is empty string");
+    return capability.toLowerCase(Locale.ENGLISH);
   }
 
   /**

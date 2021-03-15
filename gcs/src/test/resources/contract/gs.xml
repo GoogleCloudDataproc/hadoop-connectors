@@ -94,13 +94,4 @@
     <value>false</value>
   </property>
 
-  <property>
-    <name>fs.capability.paths.append</name>
-    <value>true</value>
-  </property>
-
-  <property>
-    <name>fs.capability.paths.concat</name>
-    <value>true</value>
-  </property>
 </configuration>
