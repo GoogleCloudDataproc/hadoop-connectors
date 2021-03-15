@@ -1105,7 +1105,11 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       if (e instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
-      throw new IOException("Concurrent glob execution failed", e);
+      throw new IOException(
+          String.format(
+              "Concurrent glob execution failed: %s",
+              e instanceof ExecutionException ? e.getCause() : e),
+          e);
     } finally {
       globExecutor.shutdownNow();
     }
