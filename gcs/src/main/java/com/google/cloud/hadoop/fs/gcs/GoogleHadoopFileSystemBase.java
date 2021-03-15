@@ -105,6 +105,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonPathCapabilities;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -116,6 +117,7 @@ import org.apache.hadoop.fs.GlobPattern;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.XAttrSetFlag;
+import org.apache.hadoop.fs.impl.PathCapabilitiesSupport;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -519,6 +521,17 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     int result = -1;
     logger.atFiner().log("getDefaultPort(): %d", result);
     return result;
+  }
+
+  @Override
+  public boolean hasPathCapability(Path path, String capability) throws IOException {
+    switch (PathCapabilitiesSupport.validatePathCapabilityArgs(path, capability)) {
+      case CommonPathCapabilities.FS_APPEND:
+      case CommonPathCapabilities.FS_CONCAT:
+        return true;
+      default:
+        return super.hasPathCapability(path, capability);
+    }
   }
 
   /**
