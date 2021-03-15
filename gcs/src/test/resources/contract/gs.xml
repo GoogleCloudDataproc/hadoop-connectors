@@ -93,5 +93,4 @@
     <name>fs.contract.rename-overwrites-dest</name>
     <value>false</value>
   </property>
-
 </configuration>
