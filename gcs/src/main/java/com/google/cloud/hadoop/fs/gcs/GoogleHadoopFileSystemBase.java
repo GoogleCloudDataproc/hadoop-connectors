@@ -1120,11 +1120,11 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
           ImmutableList.of(
               () -> flatGlobInternal(fixedPath, filter),
               () -> super.globStatus(fixedPath, filter)));
-    } catch (ExecutionException | InterruptedException e) {
-      if (e instanceof InterruptedException) {
-        Thread.currentThread().interrupt();
-      }
-      throw new IOException("Concurrent glob execution failed", e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IOException(String.format("Concurrent glob execution failed: %s", e), e);
+    } catch (ExecutionException e) {
+      throw new IOException(String.format("Concurrent glob execution failed: %s", e.getCause()), e);
     } finally {
       globExecutor.shutdownNow();
     }
