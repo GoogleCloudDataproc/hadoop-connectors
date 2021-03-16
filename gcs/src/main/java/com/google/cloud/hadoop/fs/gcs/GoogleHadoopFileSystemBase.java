@@ -534,7 +534,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     }
   }
 
-  public static String validatePathCapabilityArgs(Path path, String capability) {
+  private static String validatePathCapabilityArgs(Path path, String capability) {
     checkNotNull(path);
     checkArgument(!isNullOrEmpty(capability), "capability parameter is empty string");
     return Ascii.toLowerCase(capability);
