@@ -69,6 +69,7 @@ import com.google.cloud.hadoop.util.HadoopCredentialConfiguration;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.PropertyUtil;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Ascii;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -95,7 +96,6 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -524,6 +524,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   public boolean hasPathCapability(Path path, String capability) throws IOException {
     switch (validatePathCapabilityArgs(path, capability)) {
+      // TODO: remove string literals in favor of Constants in CommonPathCapabilities.java
+      // from Hadoop3 when Hadoop2 is no longer supported
       case "fs.capability.paths.append":
       case "fs.capability.paths.concat":
         return true;
@@ -532,11 +534,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     }
   }
 
-  public static String validatePathCapabilityArgs(final Path path, final String capability) {
-    checkArgument(path != null, "null path");
-    checkArgument(capability != null, "capability parameter is null");
-    checkArgument(!capability.isEmpty(), "capability parameter is empty string");
-    return capability.toLowerCase(Locale.ENGLISH);
+  public static String validatePathCapabilityArgs(Path path, String capability) {
+    checkNotNull(path);
+    checkArgument(!isNullOrEmpty(capability), "capability parameter is empty string");
+    return Ascii.toLowerCase(capability);
   }
 
   /**
