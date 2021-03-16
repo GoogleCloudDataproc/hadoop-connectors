@@ -525,7 +525,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   public boolean hasPathCapability(Path path, String capability) throws IOException {
     switch (validatePathCapabilityArgs(path, capability)) {
       // TODO: remove string literals in favor of Constants in CommonPathCapabilities.java
-      // from Hadoop3 when Hadoop2 is no longer supported
+      // from Hadoop 3 when Hadoop 2 is no longer supported
       case "fs.capability.paths.append":
       case "fs.capability.paths.concat":
         return true;
