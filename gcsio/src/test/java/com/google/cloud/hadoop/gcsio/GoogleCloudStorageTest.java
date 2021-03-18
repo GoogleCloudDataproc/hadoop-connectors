@@ -123,7 +123,7 @@ public class GoogleCloudStorageTest {
   private static final StorageResourceId RESOURCE_ID =
       new StorageResourceId(BUCKET_NAME, OBJECT_NAME);
 
-  private static final int HTTP_PERMANENT_REDIRECT = 308;
+  private static final int STATUS_CODE_RESUME_INCOMPLETE = 308;
 
   private static final ImmutableList<String[]> ILLEGAL_OBJECTS =
       ImmutableList.copyOf(
@@ -353,7 +353,7 @@ public class GoogleCloudStorageTest {
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
             new IOException("upload IOException"),
             // "308 Resume Incomplete" - failed to upload anything (no "Range" header)
-            emptyResponse(HTTP_PERMANENT_REDIRECT),
+            emptyResponse(STATUS_CODE_RESUME_INCOMPLETE),
             jsonDataResponse(
                 newStorageObject(BUCKET_NAME, OBJECT_NAME)
                     .setSize(BigInteger.valueOf(testData.length))));
@@ -429,12 +429,12 @@ public class GoogleCloudStorageTest {
             emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
             // "308 Resume Incomplete" - successfully uploaded 1st chunk
-            emptyResponse(HTTP_PERMANENT_REDIRECT)
+            emptyResponse(STATUS_CODE_RESUME_INCOMPLETE)
                 .addHeader("Range", "bytes=0-" + (uploadChunkSize - 1)),
             jsonErrorResponse(ErrorResponses.GONE),
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
             // "308 Resume Incomplete" - successfully uploaded 1st chunk
-            emptyResponse(HTTP_PERMANENT_REDIRECT)
+            emptyResponse(STATUS_CODE_RESUME_INCOMPLETE)
                 .addHeader("Range", "bytes=0-" + (uploadChunkSize - 1)),
             jsonDataResponse(
                 newStorageObject(BUCKET_NAME, OBJECT_NAME)
@@ -539,16 +539,16 @@ public class GoogleCloudStorageTest {
             emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
             // "308 Resume Incomplete" - successfully uploaded 1st chunk
-            emptyResponse(HTTP_PERMANENT_REDIRECT)
+            emptyResponse(STATUS_CODE_RESUME_INCOMPLETE)
                 .addHeader("Range", "bytes=0-" + (uploadChunkSize - 1)),
             jsonErrorResponse(ErrorResponses.GONE),
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
             // "308 Resume Incomplete" - successfully uploaded 3 chunks
-            emptyResponse(HTTP_PERMANENT_REDIRECT)
+            emptyResponse(STATUS_CODE_RESUME_INCOMPLETE)
                 .addHeader("Range", "bytes=0-" + (uploadChunkSize - 1)),
-            emptyResponse(HTTP_PERMANENT_REDIRECT)
+            emptyResponse(STATUS_CODE_RESUME_INCOMPLETE)
                 .addHeader("Range", "bytes=0-" + (2 * uploadChunkSize - 1)),
-            emptyResponse(HTTP_PERMANENT_REDIRECT)
+            emptyResponse(STATUS_CODE_RESUME_INCOMPLETE)
                 .addHeader("Range", "bytes=0-" + (3 * uploadChunkSize - 1)),
             jsonDataResponse(
                 newStorageObject(BUCKET_NAME, OBJECT_NAME)
