@@ -51,7 +51,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   private static final Duration READ_STREAM_TIMEOUT = Duration.ofMinutes(20);
   private static final Duration READ_OBJECT_METADATA_TIMEOUT = Duration.ofMinutes(1);
 
-  private StorageBlockingStub stub;
+  private volatile StorageBlockingStub stub;
 
   private final StorageStubProvider stubProvider;
 
@@ -118,7 +118,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     try {
       return ResilientOperation.retry(
           () -> {
-            StorageBlockingStub stub = stubProvider.getBlockingStub();
+            StorageBlockingStub stub = stubProvider.newBlockingStub();
             com.google.google.storage.v1.Object storageObject;
             try {
               // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
@@ -187,10 +187,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       default:
         return new IOException(msg, error);
     }
-  }
-
-  private void switchChannelOnError(StatusRuntimeException error) {
-    stub = stubProvider.recreateBlockingStubOnError(stub, Status.fromThrowable(error).getCode());
   }
 
   /** Writes part of a ByteString into a ByteBuffer with as little copying as possible */
@@ -325,7 +321,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
                 requestContext.detach(toReattach);
               }
             } catch (StatusRuntimeException e) {
-              switchChannelOnError(e);
+              recreateStub(e);
               throw convertError(e, resourceId);
             }
             return null;
@@ -369,7 +365,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
               }
               return moreDataAvailable;
             } catch (StatusRuntimeException e) {
-              switchChannelOnError(e);
+              recreateStub(e);
               throw convertError(e, resourceId);
             }
           },
@@ -379,6 +375,12 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     } catch (Exception e) {
       cancelCurrentRequest();
       throw new IOException(String.format("Error reading '%s'", resourceId), e);
+    }
+  }
+
+  private void recreateStub(StatusRuntimeException e) {
+    if (stubProvider.isStubBroken(Status.fromThrowable(e).getCode())) {
+      stub = stubProvider.newBlockingStub();
     }
   }
 
