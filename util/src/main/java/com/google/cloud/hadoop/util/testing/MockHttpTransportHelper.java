@@ -141,17 +141,24 @@ public final class MockHttpTransportHelper {
     return request.execute();
   }
 
-  public static MockHttpTransport mockTransport(LowLevelHttpResponse... responsesIn) {
+  public static MockHttpTransport mockTransport(Object... responsesIn) {
     return new MockHttpTransport() {
       int responsesIndex = 0;
-      final LowLevelHttpResponse[] responses = responsesIn;
+      final Object[] responses = responsesIn;
 
       @Override
       public LowLevelHttpRequest buildRequest(String method, String url) {
         return new MockLowLevelHttpRequest() {
           @Override
-          public LowLevelHttpResponse execute() {
-            return responses[responsesIndex++];
+          public LowLevelHttpResponse execute() throws IOException {
+            Object response = responses[responsesIndex++];
+            if (response instanceof IOException) {
+              throw (IOException) response;
+            }
+            if (response instanceof RuntimeException) {
+              throw (RuntimeException) response;
+            }
+            return (LowLevelHttpResponse) response;
           }
         };
       }

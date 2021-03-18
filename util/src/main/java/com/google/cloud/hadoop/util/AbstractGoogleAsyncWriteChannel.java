@@ -45,10 +45,11 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
   @Override
   public void startUpload(InputStream pipeSource) throws IOException {
     // Connect pipe-source to the stream used by uploader.
-    InputStreamContent objectContentStream = new InputStreamContent(getContentType(), pipeSource);
-    // Indicate that we do not know length of file in advance.
-    objectContentStream.setLength(-1);
-    objectContentStream.setCloseInputStream(false);
+    InputStreamContent objectContentStream =
+        new InputStreamContent(getContentType(), pipeSource)
+            // Indicate that we do not know length of file in advance.
+            .setLength(-1)
+            .setCloseInputStream(false);
 
     T request = createRequest(objectContentStream);
     request.setDisableGZipContent(true);
