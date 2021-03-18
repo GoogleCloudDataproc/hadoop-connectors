@@ -622,7 +622,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     }
 
     @Override
-    public StorageStub getAsyncStub() {
+    public StorageStub newAsyncStub() {
       return stub;
     }
   }
