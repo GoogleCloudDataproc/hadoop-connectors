@@ -105,7 +105,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       BackOffFactory backOffFactory) {
     super(threadPool, channelOptions);
     this.stubProvider = stubProvider;
-    this.stub = stubProvider.getAsyncStub();
+    this.stub = stubProvider.newAsyncStub();
     this.resourceId = resourceId;
     this.createOptions = createOptions;
     this.writeConditions = writeConditions;
@@ -342,7 +342,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
     private void recreateStub(Status.Code statusCode) {
       if (stubProvider.isStubBroken(statusCode)) {
-        stub = stubProvider.getAsyncStub();
+        stub = stubProvider.newAsyncStub();
       }
     }
 

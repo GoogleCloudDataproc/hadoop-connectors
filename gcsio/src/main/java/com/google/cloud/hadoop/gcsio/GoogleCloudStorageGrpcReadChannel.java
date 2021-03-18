@@ -118,7 +118,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     try {
       return ResilientOperation.retry(
           () -> {
-            StorageBlockingStub stub = stubProvider.getBlockingStub();
+            StorageBlockingStub stub = stubProvider.newBlockingStub();
             com.google.google.storage.v1.Object storageObject;
             try {
               // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
@@ -380,7 +380,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private void recreateStub(StatusRuntimeException e) {
     if (stubProvider.isStubBroken(Status.fromThrowable(e).getCode())) {
-      stub = stubProvider.getBlockingStub();
+      stub = stubProvider.newBlockingStub();
     }
   }
 

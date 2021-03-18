@@ -170,18 +170,18 @@ class StorageStubProvider {
     return new ChannelAndRequestCounter(channel, counter);
   }
 
-  public boolean isStubBroken(Status.Code statusCode) {
+  public static boolean isStubBroken(Status.Code statusCode) {
     return STUB_BROKEN_ERROR_CODES.contains(statusCode);
   }
 
-  public StorageBlockingStub getBlockingStub() {
+  public StorageBlockingStub newBlockingStub() {
     StorageBlockingStub stub = StorageGrpc.newBlockingStub(getManagedChannel());
     return isComputeCredential()
         ? stub
         : stub.withCallCredentials(MoreCallCredentials.from(new CredentialAdapter(credential)));
   }
 
-  public StorageStub getAsyncStub() {
+  public StorageStub newAsyncStub() {
     StorageStub stub =
         StorageGrpc.newStub(getManagedChannel()).withExecutor(backgroundTasksThreadPool);
     return isComputeCredential()
