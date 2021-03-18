@@ -191,7 +191,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // GCS access instance.
   @VisibleForTesting Storage storage;
 
-  // Utility for building and caching storager channels and stubs.
+  // Utility for building and caching storage channels and stubs.
   private StorageStubProvider storageStubProvider;
 
   // Thread-pool used for background tasks.
