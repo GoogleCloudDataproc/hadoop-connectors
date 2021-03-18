@@ -144,6 +144,7 @@ public class HttpTransportFactory {
 
     if (proxyUri != null) {
       httpClientBuilder
+          // Set route planner to null because it overrides proxy configuration.
           .setRoutePlanner(null)
           .setProxy(new HttpHost(proxyUri.getHost(), proxyUri.getPort()));
     }
