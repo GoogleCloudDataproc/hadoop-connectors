@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -190,7 +191,9 @@ class StorageStubProvider {
   }
 
   private boolean isComputeCredential() {
-    return credential instanceof ComputeCredential;
+    return credential != null
+        && Objects.equals(
+            credential.getTokenServerEncodedUrl(), ComputeCredential.TOKEN_SERVER_ENCODED_URL);
   }
 
   private synchronized ManagedChannel getManagedChannel() {
