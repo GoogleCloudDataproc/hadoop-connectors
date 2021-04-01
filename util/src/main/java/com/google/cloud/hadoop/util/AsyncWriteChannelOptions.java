@@ -57,7 +57,7 @@ public abstract class AsyncWriteChannelOptions {
   public static final boolean GRPC_CHECKSUMS_ENABLED_DEFAULT = false;
 
   /** Default timeout for grpc write stream. */
-  public static final long DEFAULT_GRPC_WRITE_STREAM_TIMEOUT = 10 * 60 * 100;
+  public static final long DEFAULT_GRPC_WRITE_STREAM_TIMEOUT = 10 * 60 * 1000;
 
   public static final PipeType PIPE_TYPE_DEFAULT = PipeType.IO_STREAM_PIPE;
 
