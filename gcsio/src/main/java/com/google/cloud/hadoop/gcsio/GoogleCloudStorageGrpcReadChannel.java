@@ -48,9 +48,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  private static final Duration READ_STREAM_TIMEOUT = Duration.ofMinutes(20);
-  private static final Duration READ_OBJECT_METADATA_TIMEOUT = Duration.ofMinutes(1);
-
   private volatile StorageBlockingStub stub;
 
   private final StorageStubProvider stubProvider;
@@ -123,7 +120,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
             try {
               // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
               storageObject =
-                  stub.withDeadlineAfter(READ_OBJECT_METADATA_TIMEOUT.toMillis(), MILLISECONDS)
+                  stub.withDeadlineAfter(readOptions.getGrpcReadStreamTimeoutMillis(), MILLISECONDS)
                       .getObject(
                           GetObjectRequest.newBuilder()
                               .setBucket(resourceId.getBucketName())
@@ -315,7 +312,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
               Context toReattach = requestContext.attach();
               try {
                 resIterator =
-                    stub.withDeadlineAfter(READ_STREAM_TIMEOUT.toMillis(), MILLISECONDS)
+                    stub.withDeadlineAfter(readOptions.getGrpcReadStreamTimeoutMillis(), MILLISECONDS)
                         .getObjectMedia(request);
               } finally {
                 requestContext.detach(toReattach);
