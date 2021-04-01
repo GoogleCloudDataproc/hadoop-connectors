@@ -356,13 +356,13 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>("fs.gs.grpc.server.address");
 
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_STREAM_TIMEOUT_MS =
-      new HadoopConfigurationProperty<Long>("fs.gs.grpc.read.timeout.ms", (long) (20 * 60 * 1000));
+      new HadoopConfigurationProperty<>("fs.gs.grpc.read.timeout.ms", 20 * 60 * 1000L);
 
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_METADATA_TIMEOUT_MS =
-      new HadoopConfigurationProperty<Long>("fs.gs.grpc.read.metadata.timeout.ms", (long) (60 * 1000));
+      new HadoopConfigurationProperty<>("fs.gs.grpc.read.metadata.timeout.ms", 60 * 1000L);
 
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_WRITE_STREAM_TIMEOUT_MS =
-      new HadoopConfigurationProperty<Long>("fs.gs.grpc.write.timeout.ms", (long) (10 * 60 * 1000));
+      new HadoopConfigurationProperty<>("fs.gs.grpc.write.timeout.ms", 10 * 60 * 1000L);
 
   /**
    * Configuration key for using cooperative locking to achieve a directory mutation operations

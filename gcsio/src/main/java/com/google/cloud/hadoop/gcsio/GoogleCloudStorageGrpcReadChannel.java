@@ -120,7 +120,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
             try {
               // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
               storageObject =
-                  stub.withDeadlineAfter(readOptions.getGrpcReadStreamTimeoutMillis(), MILLISECONDS)
+                  stub.withDeadlineAfter(readOptions.getGrpcReadMetadataTimeoutMillis(), MILLISECONDS)
                       .getObject(
                           GetObjectRequest.newBuilder()
                               .setBucket(resourceId.getBucketName())

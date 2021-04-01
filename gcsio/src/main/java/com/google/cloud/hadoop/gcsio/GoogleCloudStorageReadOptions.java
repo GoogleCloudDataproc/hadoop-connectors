@@ -111,10 +111,10 @@ public abstract class GoogleCloudStorageReadOptions {
   public abstract String getGrpcServerAddress();
 
   /** See {@link Builder#setGrpcReadStreamTimeoutMillis}. */
-  public abstract Long getGrpcReadStreamTimeoutMillis();
+  public abstract long getGrpcReadStreamTimeoutMillis();
 
   /** See {@link Builder#setGrpcReadMetadataTimeoutMillis}. */
-  public abstract Long getGrpcReadMetadataTimeoutMillis();
+  public abstract long getGrpcReadMetadataTimeoutMillis();
 
   /** Mutable builder for GoogleCloudStorageReadOptions. */
   @AutoValue.Builder
@@ -209,10 +209,10 @@ public abstract class GoogleCloudStorageReadOptions {
     public abstract Builder setGrpcServerAddress(String grpcServerAddress);
 
     /** Sets the property to override the default GCS gRPC read stream timeout. */
-    public abstract Builder setGrpcReadStreamTimeoutMillis(Long grpcReadStreamTimeoutMillis);
+    public abstract Builder setGrpcReadStreamTimeoutMillis(long grpcReadStreamTimeoutMillis);
 
     /** Sets the property to override the default timeout for GCS metadata reads from gRPC. */
-    public abstract Builder setGrpcReadMetadataTimeoutMillis(Long grpcReadMetadataTimeoutMillis);
+    public abstract Builder setGrpcReadMetadataTimeoutMillis(long grpcReadMetadataTimeoutMillis);
 
     abstract GoogleCloudStorageReadOptions autoBuild();
 
