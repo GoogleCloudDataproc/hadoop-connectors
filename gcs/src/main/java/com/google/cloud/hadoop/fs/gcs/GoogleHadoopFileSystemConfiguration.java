@@ -355,13 +355,13 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<String> GCS_GRPC_SERVER_ADDRESS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.server.address");
 
-  public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_STREAM_TIMEOUT_MS =
+  public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_TIMEOUT_MS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.read.timeout.ms", 20 * 60 * 1000L);
 
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_METADATA_TIMEOUT_MS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.read.metadata.timeout.ms", 60 * 1000L);
 
-  public static final HadoopConfigurationProperty<Long> GCS_GRPC_WRITE_STREAM_TIMEOUT_MS =
+  public static final HadoopConfigurationProperty<Long> GCS_GRPC_WRITE_TIMEOUT_MS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.write.timeout.ms", 10 * 60 * 1000L);
 
   /**
@@ -501,7 +501,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setMinRangeRequestSize(GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getInt))
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
         .setGrpcServerAddress(GCS_GRPC_SERVER_ADDRESS.get(config, config::get))
-        .setGrpcReadStreamTimeoutMillis(GCS_GRPC_READ_STREAM_TIMEOUT_MS.get(config, config::getLong))
+        .setGrpcReadTimeoutMillis(GCS_GRPC_READ_TIMEOUT_MS.get(config, config::getLong))
         .setGrpcReadMetadataTimeoutMillis(GCS_GRPC_READ_METADATA_TIMEOUT_MS.get(config, config::getLong))
         .build();
   }
@@ -516,7 +516,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setDirectUploadEnabled(
             GCS_OUTPUT_STREAM_DIRECT_UPLOAD_ENABLE.get(config, config::getBoolean))
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
-        .setGrpcWriteStreamTimeout(GCS_GRPC_WRITE_STREAM_TIMEOUT_MS.get(config, config::getLong))
+        .setGrpcWriteTimeout(GCS_GRPC_WRITE_TIMEOUT_MS.get(config, config::getLong))
         .build();
   }
 

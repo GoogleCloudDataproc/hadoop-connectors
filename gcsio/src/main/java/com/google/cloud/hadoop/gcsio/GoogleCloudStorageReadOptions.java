@@ -19,7 +19,6 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.google.auto.value.AutoValue;
-import java.time.Duration;
 import javax.annotation.Nullable;
 
 /**
@@ -47,7 +46,7 @@ public abstract class GoogleCloudStorageReadOptions {
   public static final Fadvise DEFAULT_FADVISE = Fadvise.SEQUENTIAL;
   public static final int DEFAULT_MIN_RANGE_REQUEST_SIZE = 2 * 1024 * 1024;
   public static final boolean GRPC_CHECKSUMS_ENABLED_DEFAULT = false;
-  public static final long DEFAULT_GRPC_READ_STREAM_TIMEOUT_MILLIS = 20 * 60 * 1000;
+  public static final long DEFAULT_GRPC_READ_TIMEOUT_MILLIS = 20 * 60 * 1000;
   public static final long DEFAULT_GRPC_READ_METADATA_TIMEOUT_MILLIS = 60 * 1000;
 
   // Default builder should be initialized after default values,
@@ -67,7 +66,7 @@ public abstract class GoogleCloudStorageReadOptions {
         .setFadvise(DEFAULT_FADVISE)
         .setMinRangeRequestSize(DEFAULT_MIN_RANGE_REQUEST_SIZE)
         .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT)
-        .setGrpcReadStreamTimeoutMillis(DEFAULT_GRPC_READ_STREAM_TIMEOUT_MILLIS)
+        .setGrpcReadTimeoutMillis(DEFAULT_GRPC_READ_TIMEOUT_MILLIS)
         .setGrpcReadMetadataTimeoutMillis(DEFAULT_GRPC_READ_METADATA_TIMEOUT_MILLIS);
   }
 
@@ -110,8 +109,8 @@ public abstract class GoogleCloudStorageReadOptions {
   @Nullable
   public abstract String getGrpcServerAddress();
 
-  /** See {@link Builder#setGrpcReadStreamTimeoutMillis}. */
-  public abstract long getGrpcReadStreamTimeoutMillis();
+  /** See {@link Builder#setGrpcReadTimeoutMillis}. */
+  public abstract long getGrpcReadTimeoutMillis();
 
   /** See {@link Builder#setGrpcReadMetadataTimeoutMillis}. */
   public abstract long getGrpcReadMetadataTimeoutMillis();
@@ -209,7 +208,7 @@ public abstract class GoogleCloudStorageReadOptions {
     public abstract Builder setGrpcServerAddress(String grpcServerAddress);
 
     /** Sets the property to override the default GCS gRPC read stream timeout. */
-    public abstract Builder setGrpcReadStreamTimeoutMillis(long grpcReadStreamTimeoutMillis);
+    public abstract Builder setGrpcReadTimeoutMillis(long grpcReadTimeoutMillis);
 
     /** Sets the property to override the default timeout for GCS metadata reads from gRPC. */
     public abstract Builder setGrpcReadMetadataTimeoutMillis(long grpcReadMetadataTimeoutMillis);

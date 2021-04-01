@@ -207,7 +207,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       responseObserver = new InsertChunkResponseObserver(uploadId, writeOffset);
       // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
       StreamObserver<InsertObjectRequest> requestStreamObserver =
-          stub.withDeadlineAfter(channelOptions.getGrpcWriteStreamTimeout(), MILLISECONDS)
+          stub.withDeadlineAfter(channelOptions.getGrpcWriteTimeout(), MILLISECONDS)
               .insertObject(responseObserver);
 
       // Wait for streaming RPC to become ready for upload.

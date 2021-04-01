@@ -40,7 +40,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
-import java.time.Duration;
 import java.util.Iterator;
 import javax.annotation.Nullable;
 
@@ -312,7 +311,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
               Context toReattach = requestContext.attach();
               try {
                 resIterator =
-                    stub.withDeadlineAfter(readOptions.getGrpcReadStreamTimeoutMillis(), MILLISECONDS)
+                    stub.withDeadlineAfter(readOptions.getGrpcReadTimeoutMillis(), MILLISECONDS)
                         .getObjectMedia(request);
               } finally {
                 requestContext.detach(toReattach);
