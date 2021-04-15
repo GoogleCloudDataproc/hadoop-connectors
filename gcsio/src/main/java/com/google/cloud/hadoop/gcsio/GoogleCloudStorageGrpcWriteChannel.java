@@ -66,7 +66,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
   private static final Duration START_RESUMABLE_WRITE_TIMEOUT = Duration.ofMinutes(1);
   private static final Duration QUERY_WRITE_STATUS_TIMEOUT = Duration.ofMinutes(1);
-  private static final Duration WRITE_STREAM_TIMEOUT = Duration.ofMinutes(10);
 
   // Number of insert requests to retain, in case we need to rewind and resume an upload. Using too
   // small of a number could risk being unable to resume the write if the resume point is an
@@ -208,7 +207,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       responseObserver = new InsertChunkResponseObserver(uploadId, writeOffset);
       // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
       StreamObserver<InsertObjectRequest> requestStreamObserver =
-          stub.withDeadlineAfter(WRITE_STREAM_TIMEOUT.toMillis(), MILLISECONDS)
+          stub.withDeadlineAfter(channelOptions.getGrpcWriteTimeout(), MILLISECONDS)
               .insertObject(responseObserver);
 
       // Wait for streaming RPC to become ready for upload.
