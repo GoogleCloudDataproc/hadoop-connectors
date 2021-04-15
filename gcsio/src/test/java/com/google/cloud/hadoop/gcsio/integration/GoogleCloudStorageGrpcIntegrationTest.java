@@ -9,8 +9,10 @@ import static org.junit.Assert.assertThrows;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
+import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
@@ -33,6 +35,14 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   private static GoogleCloudStorage createGoogleCloudStorage() throws IOException {
     return new GoogleCloudStorageImpl(
         GoogleCloudStorageTestHelper.getStandardOptionBuilder().setGrpcEnabled(true).build(),
+        GoogleCloudStorageTestHelper.getCredential());
+  }
+
+  private static GoogleCloudStorage createGoogleCloudStorage(
+      AsyncWriteChannelOptions asyncWriteChannelOptions) throws IOException {
+    return new GoogleCloudStorageImpl(
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setWriteChannelOptions(asyncWriteChannelOptions).setGrpcEnabled(true).build(),
         GoogleCloudStorageTestHelper.getCredential());
   }
 
@@ -141,6 +151,36 @@ public class GoogleCloudStorageGrpcIntegrationTest {
         writeObject(rawStorage, resourceId, /* partitionSize= */ 10 * 1024 * 1024, partitionsCount);
 
     assertObjectContent(rawStorage, resourceId, partition, partitionsCount);
+  }
+
+  @Test
+  public void testOpenObjectWithChecksum() throws IOException {
+    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder()
+        .setGrpcChecksumsEnabled(true).build();
+    GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
+    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME,
+        "testOpenObjectWithChecksum_Object");
+    byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
+
+    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder()
+        .setGrpcChecksumsEnabled(true).build();
+    assertObjectContent(rawStorage, objectToCreate, readOptions, objectBytes);
+  }
+
+  @Test
+  public void testOpenObjectWithSeek() throws IOException {
+    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder()
+        .setGrpcChecksumsEnabled(true).build();
+    GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
+    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME,
+        "testOpenObjectWithSeek_Object");
+    byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
+    int offset = 10;
+    byte[] trimmedObjectBytes = Arrays.copyOfRange(objectBytes, offset, objectBytes.length);
+    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder()
+        .setGrpcChecksumsEnabled(true).build();
+    assertObjectContent(rawStorage, objectToCreate, readOptions,
+        trimmedObjectBytes, /* expectedBytesCount= */1, offset);
   }
 
   @Test
