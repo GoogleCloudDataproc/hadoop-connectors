@@ -10,6 +10,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
@@ -176,6 +177,22 @@ public class GoogleCloudStorageGrpcIntegrationTest {
         "testOpenObjectWithSeek_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
     int offset = 10;
+    byte[] trimmedObjectBytes = Arrays.copyOfRange(objectBytes, offset, objectBytes.length);
+    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder()
+        .setGrpcChecksumsEnabled(true).build();
+    assertObjectContent(rawStorage, objectToCreate, readOptions,
+        trimmedObjectBytes, /* expectedBytesCount= */1, offset);
+  }
+
+  @Test
+  public void testOpenObjectWithSeekOverBounds() throws IOException {
+    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder()
+        .setGrpcChecksumsEnabled(true).build();
+    GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
+    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME,
+        "testOpenObjectWithSeekOverBounds_Object");
+    byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 4 * 1024 * 1024);
+    int offset = 3 * 1024 * 1024;
     byte[] trimmedObjectBytes = Arrays.copyOfRange(objectBytes, offset, objectBytes.length);
     GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder()
         .setGrpcChecksumsEnabled(true).build();

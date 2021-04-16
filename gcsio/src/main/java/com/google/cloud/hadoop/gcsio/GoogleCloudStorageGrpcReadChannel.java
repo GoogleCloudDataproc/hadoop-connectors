@@ -261,7 +261,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         position += bytesToSkipBeforeReading;
         bytesToSkipBeforeReading = 0;
       } else if (bytesToSkipBeforeReading >= content.size()) {
-        position += bytesToSkipBeforeReading;
+        position += content.size();
         bytesToSkipBeforeReading -= content.size();
         continue;
       }
