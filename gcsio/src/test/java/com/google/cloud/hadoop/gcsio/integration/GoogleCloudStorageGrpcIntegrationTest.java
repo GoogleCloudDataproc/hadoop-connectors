@@ -201,6 +201,23 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   }
 
   @Test
+  public void testOpenObjectWithSeekLimits() throws IOException {
+    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder()
+        .setGrpcChecksumsEnabled(true).build();
+    GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
+    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME,
+        "testOpenObjectWithSeekOverBounds_Object");
+    byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */  1024);
+    int offset = 100;
+    byte[] trimmedObjectBytes = Arrays.copyOfRange(objectBytes, offset, objectBytes.length);
+    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder()
+        .setInplaceSeekLimit(50)
+        .setGrpcChecksumsEnabled(true).build();
+    assertObjectContent(rawStorage, objectToCreate, readOptions,
+        trimmedObjectBytes, /* expectedBytesCount= */1, offset);
+  }
+
+  @Test
   public void testPartialRead() throws IOException {
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     int segmentSize = 553;
