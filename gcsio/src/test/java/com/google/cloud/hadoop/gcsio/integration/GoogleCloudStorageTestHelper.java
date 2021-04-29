@@ -26,6 +26,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
@@ -39,7 +40,7 @@ import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
@@ -120,7 +121,15 @@ public class GoogleCloudStorageTestHelper {
   }
 
   public static void assertObjectContent(
-      GoogleCloudStorage gcs, StorageResourceId id, byte[] expectedBytes, int expectedBytesCount)
+      GoogleCloudStorage gcs, StorageResourceId resourceId,
+      GoogleCloudStorageReadOptions readOptions, byte[] expectedBytes)
+      throws IOException {
+    assertObjectContent(gcs, resourceId, readOptions, expectedBytes, /* expectedBytesCount= */ 1);
+  }
+
+  public static void assertObjectContent(
+      GoogleCloudStorage gcs, StorageResourceId id, GoogleCloudStorageReadOptions readOptions,
+      byte[] expectedBytes, int expectedBytesCount, int offset)
       throws IOException {
     checkArgument(expectedBytesCount > 0, "expectedBytesCount should be greater than 0");
 
@@ -128,7 +137,10 @@ public class GoogleCloudStorageTestHelper {
     long expectedBytesTotalLength = (long) expectedBytesLength * expectedBytesCount;
     ByteBuffer buffer = ByteBuffer.allocate(Math.min(BUFFER_SIZE_MAX_BYTES, expectedBytesLength));
     long totalRead = 0;
-    try (ReadableByteChannel channel = gcs.open(id)) {
+    try (SeekableByteChannel channel = gcs.open(id, readOptions)) {
+      if (offset > 0) {
+        channel.position(offset);
+      }
       int read = channel.read(buffer);
       while (read > 0) {
         totalRead += read;
@@ -145,6 +157,20 @@ public class GoogleCloudStorageTestHelper {
     }
 
     assertWithMessage("Bytes read mismatch").that(totalRead).isEqualTo(expectedBytesTotalLength);
+  }
+
+  public static void assertObjectContent(
+      GoogleCloudStorage gcs, StorageResourceId id, GoogleCloudStorageReadOptions readOptions,
+      byte[] expectedBytes, int expectedBytesCount)
+      throws IOException {
+    assertObjectContent(gcs, id, readOptions, expectedBytes, expectedBytesCount, /* offset= */ 0);
+  }
+
+  public static void assertObjectContent(
+      GoogleCloudStorage gcs, StorageResourceId id, byte[] expectedBytes, int expectedBytesCount)
+      throws IOException {
+    assertObjectContent(gcs, id, GoogleCloudStorageReadOptions.DEFAULT, expectedBytes,
+        expectedBytesCount);
   }
 
   private static byte[] getExpectedBytesRead(byte[] expectedBytes, long totalRead, int read) {
