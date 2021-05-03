@@ -12,8 +12,8 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.util.BackOff;
+import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.BackOffFactory;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.common.collect.ImmutableList;
@@ -37,8 +37,10 @@ import com.google.protobuf.Timestamp;
 import com.google.protobuf.UInt32Value;
 import io.grpc.Status;
 import io.grpc.StatusException;
+import io.grpc.ManagedChannelBuilder;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
+import io.grpc.stub.AbstractStub;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -56,7 +58,6 @@ import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-
 @RunWith(JUnit4.class)
 public final class GoogleCloudStorageGrpcWriteChannelTest {
 
@@ -81,7 +82,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   private StorageStub stub;
   private FakeService fakeService;
   private ExecutorService executor = Executors.newCachedThreadPool();
-  @Mock private Credential mockCredential;
+  @Mock private Credentials mockCredentials;
 
   @Before
   public void setUp() throws Exception {
@@ -579,7 +580,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
       String requesterPaysProject,
       BackOffFactory backOffFactory) {
     return new GoogleCloudStorageGrpcWriteChannel(
-        new FakeStubProvider(mockCredential),
+        new FakeStubProvider(mockCredentials),
         executor,
         options,
         new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
@@ -615,10 +616,21 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     return ByteString.copyFrom(result);
   }
 
-  private class FakeStubProvider extends StorageStubProvider {
+  private static class FakeGrpcDecorator implements StorageStubProvider.GrpcDecorator {
+    @Override
+    public ManagedChannelBuilder<?> createChannelBuilder(String target) {
+      return null;
+    }
 
-    FakeStubProvider(Credential credential) {
-      super(GoogleCloudStorageOptions.DEFAULT, null, credential);
+    @Override
+    public AbstractStub<?> applyCallOption(AbstractStub<?> stub) {
+      return stub;
+    }
+  }
+
+  private class FakeStubProvider extends StorageStubProvider {
+    FakeStubProvider(Credentials credentials) {
+      super(GoogleCloudStorageOptions.DEFAULT, null, new FakeGrpcDecorator());
     }
 
     @Override

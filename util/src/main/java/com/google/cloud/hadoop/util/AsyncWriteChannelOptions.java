@@ -56,6 +56,9 @@ public abstract class AsyncWriteChannelOptions {
   /** Default of whether to enabled checksums for gRPC. */
   public static final boolean GRPC_CHECKSUMS_ENABLED_DEFAULT = false;
 
+  /** Default timeout for grpc write stream. */
+  public static final long DEFAULT_GRPC_WRITE_TIMEOUT = 10 * 60 * 1000;
+
   public static final PipeType PIPE_TYPE_DEFAULT = PipeType.IO_STREAM_PIPE;
 
   public static final AsyncWriteChannelOptions DEFAULT = builder().build();
@@ -68,7 +71,8 @@ public abstract class AsyncWriteChannelOptions {
         .setUploadChunkSize(UPLOAD_CHUNK_SIZE_DEFAULT)
         .setUploadCacheSize(UPLOAD_CACHE_SIZE_DEFAULT)
         .setDirectUploadEnabled(DIRECT_UPLOAD_ENABLED_DEFAULT)
-        .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT);
+        .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT)
+        .setGrpcWriteTimeout(DEFAULT_GRPC_WRITE_TIMEOUT);
   }
 
   public abstract Builder toBuilder();
@@ -87,6 +91,8 @@ public abstract class AsyncWriteChannelOptions {
 
   public abstract boolean isGrpcChecksumsEnabled();
 
+  public abstract long getGrpcWriteTimeout();
+
   /** Mutable builder for the GoogleCloudStorageWriteChannelOptions class. */
   @AutoValue.Builder
   public abstract static class Builder {
@@ -102,6 +108,8 @@ public abstract class AsyncWriteChannelOptions {
     public abstract Builder setUploadCacheSize(int uploadCacheSize);
 
     public abstract Builder setDirectUploadEnabled(boolean directUploadEnabled);
+
+    public abstract Builder setGrpcWriteTimeout(long grpcWriteTimeout);
 
     /**
      * Enable gRPC checksumming. On by default. It is strongly recommended to leave this enabled, to
