@@ -40,16 +40,12 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
-import java.time.Duration;
 import java.util.Iterator;
 import javax.annotation.Nullable;
 
 public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-
-  private static final Duration READ_STREAM_TIMEOUT = Duration.ofMinutes(20);
-  private static final Duration READ_OBJECT_METADATA_TIMEOUT = Duration.ofMinutes(1);
 
   private volatile StorageBlockingStub stub;
 
@@ -123,7 +119,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
             try {
               // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
               storageObject =
-                  stub.withDeadlineAfter(READ_OBJECT_METADATA_TIMEOUT.toMillis(), MILLISECONDS)
+                  stub.withDeadlineAfter(readOptions.getGrpcReadMetadataTimeoutMillis(), MILLISECONDS)
                       .getObject(
                           GetObjectRequest.newBuilder()
                               .setBucket(resourceId.getBucketName())
@@ -262,8 +258,10 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       ByteString content = res.getChecksummedData().getContent();
       if (bytesToSkipBeforeReading >= 0 && bytesToSkipBeforeReading < content.size()) {
         content = res.getChecksummedData().getContent().substring((int) bytesToSkipBeforeReading);
+        position += bytesToSkipBeforeReading;
         bytesToSkipBeforeReading = 0;
       } else if (bytesToSkipBeforeReading >= content.size()) {
+        position += content.size();
         bytesToSkipBeforeReading -= content.size();
         continue;
       }
@@ -315,7 +313,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
               Context toReattach = requestContext.attach();
               try {
                 resIterator =
-                    stub.withDeadlineAfter(READ_STREAM_TIMEOUT.toMillis(), MILLISECONDS)
+                    stub.withDeadlineAfter(readOptions.getGrpcReadTimeoutMillis(), MILLISECONDS)
                         .getObjectMedia(request);
               } finally {
                 requestContext.detach(toReattach);
