@@ -41,9 +41,6 @@ import com.google.api.client.util.BackOff;
 import com.google.api.client.util.Data;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.Sleeper;
-import com.google.api.services.storage.Storage;
-import com.google.api.services.storage.Storage.Objects.Insert;
-import com.google.api.services.storage.StorageRequest;
 import com.google.api.services.storage.model.Bucket;
 import com.google.api.services.storage.model.Bucket.Lifecycle;
 import com.google.api.services.storage.model.Bucket.Lifecycle.Rule;
@@ -54,6 +51,10 @@ import com.google.api.services.storage.model.ComposeRequest;
 import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.RewriteResponse;
 import com.google.api.services.storage.model.StorageObject;
+import com.google.api.services.storage.Storage;
+import com.google.api.services.storage.Storage.Objects.Insert;
+import com.google.api.services.storage.StorageRequest;
+import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.authorization.StorageRequestAuthorizer;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
@@ -244,7 +245,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     this(options, new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()));
   }
 
-  @VisibleForTesting
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer)
       throws IOException {
@@ -256,8 +256,17 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    *
    * @param storage {@link Storage} to use for I/O.
    */
-  @VisibleForTesting
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage storage) {
+    this(options, storage, null);
+  }
+
+  /**
+   * Constructs an instance of GoogleCloudStorageImpl.
+   *
+   * @param storage {@link Storage} to use for I/O.
+   * @param credentials OAuth2 credentials that allows access to GCS
+   */
+  public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage storage, Credentials credentials) {
     logger.atFiner().log("GCS(options: %s)", options);
 
     this.storageOptions = checkNotNull(options, "options must not be null");
@@ -272,12 +281,16 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
-      checkArgument(
+      if (credentials != null) {
+        this.storageStubProvider = StorageStubProvider.newInstance(this.storageOptions, this.backgroundTasksThreadPool, credentials);
+      } else {
+        checkArgument(
           httpRequestInitializer instanceof RetryHttpInitializer,
           "request initializer must be an instance of the RetryHttpInitializer class"
               + " when gRPC API enabled");
-      Credential credential = ((RetryHttpInitializer) httpRequestInitializer).getCredential();
-      this.storageStubProvider = StorageStubProvider.newInstance(this.storageOptions, this.backgroundTasksThreadPool, credential);
+        Credential credential = ((RetryHttpInitializer) httpRequestInitializer).getCredential();
+        this.storageStubProvider = StorageStubProvider.newInstance(this.storageOptions, this.backgroundTasksThreadPool, credential);
+      }
     }
 
     this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);
@@ -356,6 +369,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @VisibleForTesting
   void setBackOffFactory(BackOffFactory factory) {
     backOffFactory = factory;
+  }
+
+  @VisibleForTesting
+  StorageStubProvider getStorageStubProvider() {
+    return storageStubProvider;
   }
 
   @Override
