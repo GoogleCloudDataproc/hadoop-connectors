@@ -1,6 +1,8 @@
-### 2.2.1 - 2021-XX-XX
+### 2.2.1 - 2021-05-04
 
 1.  Fix proxy configuration for Apache HTTP transport.
+
+2. Update gRPC dependency to latest version
 
 ### 2.2.0 - 2021-01-06
 
