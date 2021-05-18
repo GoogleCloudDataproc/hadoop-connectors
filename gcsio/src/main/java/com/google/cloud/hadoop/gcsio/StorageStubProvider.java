@@ -1,7 +1,7 @@
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.ClientProto;
 import com.google.api.client.auth.oauth2.Credential;
@@ -175,15 +175,13 @@ class StorageStubProvider {
 
   public StorageBlockingStub newBlockingStub() {
     StorageBlockingStub stub = StorageGrpc.newBlockingStub(getManagedChannel());
-    grpcDecorator.applyCallOption(stub);
-    return stub;
+    return (StorageBlockingStub) grpcDecorator.applyCallOption(stub);
   }
 
   public StorageStub newAsyncStub() {
     StorageStub stub =
         StorageGrpc.newStub(getManagedChannel()).withExecutor(backgroundTasksThreadPool);
-    grpcDecorator.applyCallOption(stub);
-    return stub;
+    return (StorageStub) grpcDecorator.applyCallOption(stub);
   }
 
   private synchronized ManagedChannel getManagedChannel() {
