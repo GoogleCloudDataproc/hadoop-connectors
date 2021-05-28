@@ -1,3 +1,5 @@
+### 2.2.2 - 2021-XX-XX
+
 ### 2.2.1 - 2021-05-04
 
 1.  Fix proxy configuration for Apache HTTP transport.
