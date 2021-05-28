@@ -80,7 +80,7 @@
 
     <gpg.skip>true</gpg.skip>
 
-    <bigdataoss.version>2.2.1</bigdataoss.version>
+    <bigdataoss.version>2.2.2-SNAPSHOT</bigdataoss.version>
     <bigquery-connector.version>1.2.1-SNAPSHOT</bigquery-connector.version>
 
     <apache.httpclient.version>4.5.13</apache.httpclient.version>
