@@ -123,8 +123,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
           () -> {
             StorageBlockingStub stub = stubProvider.newBlockingStub();
             com.google.google.storage.v1.Object storageObject;
-            long footerOffset;
-            long footerSize;
+            long footerOffset = 0;
+            long footerSize = 0;
             ByteString footerContent = null;
             try {
               // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
@@ -157,8 +157,14 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
                       .setObject(resourceId.getObjectName())
                       .setReadLimit(readOptions.getMinRangeRequestSize())
                       .build());
-              if (footerContentResponse.hasNext()) {
-                footerContent = footerContentResponse.next().getChecksummedData().getContent();
+
+              while (footerContentResponse.hasNext()) {
+                GetObjectMediaResponse objectMediaResponse = footerContentResponse.next();
+                ByteString content = objectMediaResponse.getChecksummedData().getContent();
+                if (footerContent == null) {
+                  footerContent = content;
+                } else
+                  footerContent = footerContent.concat(content);
               }
             } catch (StatusRuntimeException e) {
               throw convertError(e, resourceId);
@@ -284,31 +290,32 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     }
 
     // read request content overlaps with cached footer data
-    if ((position + bytesToSkipBeforeReading )>= footerStartOffset) {
+    if ((position + bytesToSkipBeforeReading) >= footerStartOffset) {
       position += bytesToSkipBeforeReading;
       bytesToSkipBeforeReading = 0;
       // copy footer data to byte buffer
-      int bytesToWrite = Math.toIntExact(min(byteBuffer.remaining(), footerSize));
+      int bytesToWrite = Math.toIntExact(min(byteBuffer.remaining(), footerSize - (position - footerStartOffset)));
       put(footerContent, Math.toIntExact(position - footerStartOffset), bytesToWrite, byteBuffer);
       position += bytesToWrite;
       bytesRead += bytesToWrite;
-
-    } else if ( (position + bytesToSkipBeforeReading + readOptions.getMinRangeRequestSize()) >= footerStartOffset) {
-      position += bytesToSkipBeforeReading;
-      bytesToSkipBeforeReading = 0;
-      Integer bytesToRead = Math.toIntExact(footerStartOffset - position);
-      requestObjectMedia(bytesToRead);
-      if(resIterator != null && resIterator.hasNext()) {
-        GetObjectMediaResponse response = resIterator.next();
-        ByteString content = response.getChecksummedData().getContent();
-        int bytesToWrite = content.size();
-        put(content, 0, bytesToWrite, byteBuffer);
-        bytesToWrite += byteBuffer.remaining();
-        put(footerContent, 0, byteBuffer.remaining(), byteBuffer);
-        bytesRead += bytesToWrite;
-        position += bytesRead;
-      }
     }
+    // else if ((position + bytesToSkipBeforeReading + byteBuffer.remaining())
+    //     >= footerStartOffset) {
+    //   position += bytesToSkipBeforeReading;
+    //   bytesToSkipBeforeReading = 0;
+    //   Integer bytesToRead = Math.toIntExact(footerStartOffset - position);
+    //   requestObjectMedia(bytesToRead);
+    //   if (resIterator != null && resIterator.hasNext()) {
+    //     GetObjectMediaResponse response = resIterator.next();
+    //     ByteString content = response.getChecksummedData().getContent();
+    //     int bytesToWrite = content.size();
+    //     put(content, 0, bytesToWrite, byteBuffer);
+    //     bytesToWrite += Math.min(byteBuffer.remaining(), footerContent.size());
+    //     put(footerContent, 0, bytesToWrite, byteBuffer);
+    //     bytesRead += bytesToWrite;
+    //     position += bytesRead;
+    //   }
+    // }
     // if cached response fills the buffer, return immediately
     if (!byteBuffer.hasRemaining()) {
       return bytesRead;
@@ -319,9 +326,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
           readStrategy == Fadvise.RANDOM
               ? max(byteBuffer.remaining(), readOptions.getMinRangeRequestSize())
               : null;
-      if ((bytesToRead != null) && ((bytesToRead + position) > footerStartOffset)) {
-        bytesToRead = Math.max(0, Math.toIntExact(footerSize - position));
-      }
       requestObjectMedia(bytesToRead);
     }
     while (moreServerContent() && byteBuffer.hasRemaining()) {
@@ -362,14 +366,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         bufferedContent = content;
         bufferedContentReadOffset = bytesToWrite;
       }
-    }
-
-    if (position >= footerStartOffset) {
-      // copy footer data to byte buffer
-      int bytesToWrite = Math.toIntExact(min(byteBuffer.remaining(), footerSize));
-      put(footerContent, Math.toIntExact(position - footerStartOffset), bytesToWrite, byteBuffer);
-      position += bytesToWrite;
-      bytesRead += bytesToWrite;
     }
 
     return bytesRead;

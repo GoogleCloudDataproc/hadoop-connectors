@@ -97,37 +97,59 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
   @Test
   public void readSingleChunkSucceeds() throws Exception {
-    fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(100).build());
-    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel();
+    fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(FakeService.CHUNK_SIZE).build());
+    verify(fakeService, times(1)).setObject(any());
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(4).build();
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
     ByteBuffer buffer = ByteBuffer.allocate(100);
     readChannel.read(buffer);
 
     verify(fakeService, times(1)).getObject(eq(GET_OBJECT_REQUEST), any());
     verify(fakeService, times(1)).getObjectMedia(eq(GET_OBJECT_MEDIA_REQUEST), any());
+    verify(fakeService, times(1)).getObjectMedia(eq(GetObjectMediaRequest.newBuilder()
+        .setBucket(BUCKET_NAME)
+        .setObject(OBJECT_NAME)
+        .setReadOffset((FakeService.CHUNK_SIZE) - 2)
+        .setReadLimit(4)
+        .build()), any());
     assertArrayEquals(fakeService.data.substring(0, 100).toByteArray(), buffer.array());
+    verifyNoMoreInteractions(fakeService);
   }
 
   @Test
   public void readMultipleChunksSucceeds() throws Exception {
     // Enough to require multiple chunks.
     fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(FakeService.CHUNK_SIZE * 2).build());
-    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel();
+    verify(fakeService, times(1)).setObject(any());
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(4).build();
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
     ByteBuffer buffer = ByteBuffer.allocate(FakeService.CHUNK_SIZE * 2);
     readChannel.read(buffer);
 
     verify(fakeService, times(1)).getObject(eq(GET_OBJECT_REQUEST), any());
     verify(fakeService, times(1)).getObjectMedia(eq(GET_OBJECT_MEDIA_REQUEST), any());
+    verify(fakeService, times(1)).getObjectMedia(eq(GetObjectMediaRequest.newBuilder()
+        .setBucket(BUCKET_NAME)
+        .setObject(OBJECT_NAME)
+        .setReadOffset((FakeService.CHUNK_SIZE * 2) - 2)
+        .setReadLimit(4)
+        .build()), any());
     assertArrayEquals(
         fakeService.data.substring(0, FakeService.CHUNK_SIZE * 2).toByteArray(), buffer.array());
+    verifyNoMoreInteractions(fakeService);
   }
 
   @Test
   public void readAfterRepositioningAfterSkippingSucceeds() throws Exception {
     fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(100).build());
+    verify(fakeService, times(1)).setObject(any());
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setInplaceSeekLimit(10).build();
+        GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(4).setInplaceSeekLimit(10)
+            .build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
     ByteBuffer bufferAtBeginning = ByteBuffer.allocate(20);
@@ -143,20 +165,37 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     readChannel.read(bufferFromReposition);
 
     verify(fakeService, times(1)).getObject(eq(GET_OBJECT_REQUEST), any());
-    verify(fakeService, times(1)).getObjectMedia(eq(GET_OBJECT_MEDIA_REQUEST), any());
     assertArrayEquals(fakeService.data.substring(0, 20).toByteArray(), bufferAtBeginning.array());
+    verify(fakeService, times(1)).getObjectMedia(eq(GetObjectMediaRequest.newBuilder()
+        .setBucket(BUCKET_NAME)
+        .setObject(OBJECT_NAME)
+        .setReadOffset(98)
+        .setReadLimit(4)
+        .build()), any());
+    verify(fakeService, times(1)).getObjectMedia(eq(GET_OBJECT_MEDIA_REQUEST), any());
+    verify(fakeService, times(1)).getObjectMedia(eq(GetObjectMediaRequest.newBuilder()
+        .setBucket(BUCKET_NAME)
+        .setObject(OBJECT_NAME)
+        .setGeneration(OBJECT_GENERATION)
+        .setReadOffset(1)
+        .build()), any());
     assertArrayEquals(
         fakeService.data.substring(25, 30).toByteArray(), bufferFromSkippedSection1.array());
     assertArrayEquals(
         fakeService.data.substring(40, 50).toByteArray(), bufferFromSkippedSection2.array());
     assertArrayEquals(
         fakeService.data.substring(1, 11).toByteArray(), bufferFromReposition.array());
+    verifyNoMoreInteractions(fakeService);
   }
 
   @Test
   public void multipleSequentialReads() throws Exception {
     fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(100).build());
-    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel();
+    verify(fakeService, times(1)).setObject(any());
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(4).setInplaceSeekLimit(10)
+            .build();
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
     ByteBuffer first_buffer = ByteBuffer.allocate(10);
     ByteBuffer second_buffer = ByteBuffer.allocate(20);
@@ -167,6 +206,13 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     verify(fakeService, times(1)).getObjectMedia(eq(GET_OBJECT_MEDIA_REQUEST), any());
     assertArrayEquals(fakeService.data.substring(0, 10).toByteArray(), first_buffer.array());
     assertArrayEquals(fakeService.data.substring(10, 30).toByteArray(), second_buffer.array());
+    verify(fakeService, times(1)).getObjectMedia(eq(GetObjectMediaRequest.newBuilder()
+        .setBucket(BUCKET_NAME)
+        .setObject(OBJECT_NAME)
+        .setReadOffset(98)
+        .setReadLimit(4)
+        .build()), any());
+    verifyNoMoreInteractions(fakeService);
   }
 
   @Test
@@ -291,7 +337,10 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   @Test
   public void readToBufferWithArrayOffset() throws Exception {
     fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(100).build());
-    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel();
+    verify(fakeService, times(1)).setObject(any());
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(4).build();
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
     byte[] array = new byte[200];
     // `slice` generates a ByteBuffer with a non-zero `arrayOffset`.
@@ -301,14 +350,23 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     verify(fakeService, times(1)).getObject(eq(GET_OBJECT_REQUEST), any());
     verify(fakeService, times(1)).getObjectMedia(eq(GET_OBJECT_MEDIA_REQUEST), any());
     byte[] expected = ByteString.copyFrom(array, 50, 100).toByteArray();
+    verify(fakeService, times(1)).getObjectMedia(eq(GetObjectMediaRequest.newBuilder()
+        .setBucket(BUCKET_NAME)
+        .setObject(OBJECT_NAME)
+        .setReadOffset(98)
+        .setReadLimit(4)
+        .build()), any());
     assertArrayEquals(fakeService.data.substring(0, 100).toByteArray(), expected);
+    verifyNoMoreInteractions(fakeService);
   }
 
   @Test
   public void readSucceedsAfterSeek() throws Exception {
     fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(100).build());
+    verify(fakeService, times(1)).setObject(any());
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setInplaceSeekLimit(10).build();
+        GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(4).setInplaceSeekLimit(10)
+            .build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
     ByteBuffer buffer = ByteBuffer.allocate(10);
@@ -318,7 +376,14 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     verify(fakeService, times(1)).getObject(eq(GET_OBJECT_REQUEST), any());
     verify(fakeService, times(1))
         .getObjectMedia(eq(GET_OBJECT_MEDIA_REQUEST.toBuilder().setReadOffset(50).build()), any());
+    verify(fakeService, times(1)).getObjectMedia(eq(GetObjectMediaRequest.newBuilder()
+        .setBucket(BUCKET_NAME)
+        .setObject(OBJECT_NAME)
+        .setReadOffset(98)
+        .setReadLimit(4)
+        .build()), any());
     assertArrayEquals(fakeService.data.substring(50, 60).toByteArray(), buffer.array());
+    verifyNoMoreInteractions(fakeService);
   }
 
   @Test
@@ -451,11 +516,11 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
   @Test
   public void readHandlesGetMediaError() throws Exception {
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel();
     fakeService.setGetMediaException(
         Status.fromCode(Status.Code.INTERNAL)
             .withDescription("Custom error message.")
             .asException());
-    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel();
 
     ByteBuffer buffer = ByteBuffer.allocate(10);
     IOException thrown = assertThrows(IOException.class, () -> readChannel.read(buffer));
@@ -468,11 +533,11 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
   @Test
   public void retryGetMediaError() throws Exception {
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel();
     fakeService.setGetMediaException(
         Status.fromCode(Status.Code.INTERNAL)
             .withDescription("Custom error message.")
             .asException());
-    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel();
 
     ByteBuffer buffer = ByteBuffer.allocate(10);
     IOException thrown = assertThrows(IOException.class, () -> readChannel.read(buffer));
@@ -495,7 +560,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   @Test
   public void readWithStrictGenerationReadConsistencySucceeds() throws Exception {
     fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(100).setGeneration(1).build());
-    GoogleCloudStorageReadOptions options = GoogleCloudStorageReadOptions.builder().build();
+    GoogleCloudStorageReadOptions options = GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(4).build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
     ByteBuffer buffer = ByteBuffer.allocate(10);
@@ -516,13 +581,13 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     ArgumentCaptor<GetObjectMediaRequest> requestCaptor =
         ArgumentCaptor.forClass(GetObjectMediaRequest.class);
     verify(fakeService, times(1)).getObject(eq(GET_OBJECT_REQUEST), any());
-    verify(fakeService, times(2)).getObjectMedia(requestCaptor.capture(), any());
+    verify(fakeService, times(3)).getObjectMedia(requestCaptor.capture(), any());
   }
 
   @Test
   public void readWithLatestGenerationReadConsistencySucceeds() throws Exception {
     fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(100).setGeneration(1).build());
-    GoogleCloudStorageReadOptions options = GoogleCloudStorageReadOptions.builder().build();
+    GoogleCloudStorageReadOptions options = GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(4).build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
     ByteBuffer buffer = ByteBuffer.allocate(10);
@@ -539,14 +604,18 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     ArgumentCaptor<GetObjectMediaRequest> requestCaptor =
         ArgumentCaptor.forClass(GetObjectMediaRequest.class);
     verify(fakeService, times(1)).getObject(eq(GET_OBJECT_REQUEST), any());
-    verify(fakeService, times(2)).getObjectMedia(requestCaptor.capture(), any());
+    verify(fakeService, times(3)).getObjectMedia(requestCaptor.capture(), any());
   }
 
   @Test
   public void seekUnderInplaceSeekLimitReadsCorrectBufferedData() throws Exception {
     fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(100).build());
+    // verify data setup on mock to ensure this interaction does not conflict with `verify`calls
+    verify(fakeService, times(1)).setObject(any());
+    int minRangeRequestSize = 10;
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setInplaceSeekLimit(10).build();
+        GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(minRangeRequestSize)
+            .setInplaceSeekLimit(10).build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
     ByteBuffer buffer = ByteBuffer.allocate(20);
@@ -557,7 +626,14 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
     verify(fakeService, times(1)).getObject(eq(GET_OBJECT_REQUEST), any());
     verify(fakeService, times(1)).getObjectMedia(eq(GET_OBJECT_MEDIA_REQUEST), any());
+    verify(fakeService, times(1)).getObjectMedia(eq(GetObjectMediaRequest.newBuilder()
+        .setBucket(BUCKET_NAME)
+        .setObject(OBJECT_NAME)
+        .setReadOffset(95)
+        .setReadLimit(minRangeRequestSize)
+        .build()), any());
     assertArrayEquals(fakeService.data.substring(25, 45).toByteArray(), buffer.array());
+    verifyNoMoreInteractions(fakeService);
   }
 
   @Test
@@ -582,10 +658,13 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   @Test
   public void seekBeyondInplaceSeekLimitReadsNoBufferedData() throws Exception {
     fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(100).build());
+    verify(fakeService, times(1)).setObject(any());
+    int minRangeRequestSize = 10;
     GoogleCloudStorageReadOptions options =
         GoogleCloudStorageReadOptions.builder()
             .setInplaceSeekLimit(10)
             .setFadvise(Fadvise.AUTO)
+            .setMinRangeRequestSize(minRangeRequestSize)
             .build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
@@ -597,7 +676,21 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
     verify(fakeService, times(1)).getObject(eq(GET_OBJECT_REQUEST), any());
     verify(fakeService, times(1)).getObjectMedia(eq(GET_OBJECT_MEDIA_REQUEST), any());
+    verify(fakeService, times(1)).getObjectMedia(eq(GetObjectMediaRequest.newBuilder()
+        .setBucket(BUCKET_NAME)
+        .setObject(OBJECT_NAME)
+        .setReadOffset(95)
+        .setReadLimit(minRangeRequestSize)
+        .build()), any());
+    verify(fakeService, times(1)).getObjectMedia(eq(GetObjectMediaRequest.newBuilder()
+        .setBucket(BUCKET_NAME)
+        .setObject(OBJECT_NAME)
+        .setGeneration(OBJECT_GENERATION)
+        .setReadOffset(35)
+        .setReadLimit(20)
+        .build()), any());
     assertArrayEquals(fakeService.data.substring(35, 55).toByteArray(), buffer.array());
+    verifyNoMoreInteractions(fakeService);
   }
 
   @Test
