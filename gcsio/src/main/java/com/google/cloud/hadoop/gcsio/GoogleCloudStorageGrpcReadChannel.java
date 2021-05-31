@@ -26,6 +26,7 @@ import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.hash.Hashing;
+import com.google.google.storage.v1.ChecksummedData;
 import com.google.google.storage.v1.GetObjectMediaRequest;
 import com.google.google.storage.v1.GetObjectMediaResponse;
 import com.google.google.storage.v1.GetObjectRequest;
@@ -282,6 +283,35 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     if (position == objectSize) {
       return bytesRead > 0 ? bytesRead : -1;
     }
+
+    // read request content overlaps with cached footer data
+    if ((position + bytesToSkipBeforeReading )>= footerStartOffset) {
+      position += bytesToSkipBeforeReading;
+      bytesToSkipBeforeReading = 0;
+      // copy footer data to byte buffer
+      int bytesToWrite = Math.toIntExact(min(byteBuffer.remaining(), footerSize));
+      put(footerContent, Math.toIntExact(position - footerStartOffset), bytesToWrite, byteBuffer);
+      position += bytesToWrite;
+      bytesRead += bytesToWrite;
+
+    } else if ( (position + bytesToSkipBeforeReading + readOptions.getMinRangeRequestSize()) >= footerStartOffset) {
+      position += bytesToSkipBeforeReading;
+      bytesToSkipBeforeReading = 0;
+      Integer bytesToRead = Math.toIntExact(footerStartOffset - position);
+      requestObjectMedia(bytesToRead);
+      if(resIterator != null && resIterator.hasNext()) {
+        GetObjectMediaResponse response = resIterator.next();
+        ByteString content = response.getChecksummedData().getContent();
+        int bytesToWrite = content.size();
+        put(content, 0, bytesToWrite, byteBuffer);
+        put(footerContent, 0 , byteBuffer.remaining(), byteBuffer);
+      }
+    }
+    // if cached response fills the buffer, return immediately
+    if (!byteBuffer.hasRemaining()) {
+      return bytesRead;
+    }
+
     if (resIterator == null) {
       Integer bytesToRead =
           readStrategy == Fadvise.RANDOM

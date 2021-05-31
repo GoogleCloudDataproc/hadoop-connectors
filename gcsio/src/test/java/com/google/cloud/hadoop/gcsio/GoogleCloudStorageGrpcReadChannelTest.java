@@ -11,6 +11,7 @@ import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import com.google.api.client.util.BackOff;
 import com.google.auth.Credentials;
@@ -26,10 +27,10 @@ import com.google.google.storage.v1.StorageGrpc.StorageBlockingStub;
 import com.google.google.storage.v1.StorageGrpc.StorageImplBase;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UInt32Value;
+import io.grpc.ManagedChannelBuilder;
+import io.grpc.Status;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
-import io.grpc.Status;
-import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.AbstractStub;
 import io.grpc.stub.StreamObserver;
 import io.grpc.testing.GrpcCleanupRule;
@@ -597,6 +598,168 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     verify(fakeService, times(1)).getObject(eq(GET_OBJECT_REQUEST), any());
     verify(fakeService, times(1)).getObjectMedia(eq(GET_OBJECT_MEDIA_REQUEST), any());
     assertArrayEquals(fakeService.data.substring(35, 55).toByteArray(), buffer.array());
+  }
+
+  @Test
+  public void testReadPrefetchedFooter() throws Exception {
+    fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(100).build());
+    verify(fakeService, times(1)).setObject(any());
+    int minRangeRequestSize = 2 * 1024;
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder()
+            .setMinRangeRequestSize(minRangeRequestSize)
+            .build();
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
+    ByteBuffer buffer = ByteBuffer.allocate(20);
+    readChannel.position(80);
+    readChannel.read(buffer);
+
+    verify(fakeService, times(1)).getObject(eq(GET_OBJECT_REQUEST), any());
+    // footerSize is bigger than object size, footer content essential is entire object content
+    verify(fakeService, times(1)).getObjectMedia(eq(GetObjectMediaRequest.newBuilder()
+        .setBucket(BUCKET_NAME)
+        .setObject(OBJECT_NAME)
+        .setReadOffset(0)
+        .setReadLimit(minRangeRequestSize)
+        .build()), any());
+    assertArrayEquals(fakeService.data.substring(80).toByteArray(), buffer.array());
+    verifyNoMoreInteractions(fakeService);
+  }
+
+  @Test
+  public void testReadCachedFooter() throws Exception {
+    fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(8 * 1024).build());
+    // verify data setup on mock to ensure this interaction does not conflict with `verify`calls
+    verify(fakeService, times(1)).setObject(any());
+    int minRangeRequestSize = 2 * 1024;
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder()
+            .setMinRangeRequestSize(minRangeRequestSize)
+            .setInplaceSeekLimit(2 * 1024)
+            .build();
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
+    ByteBuffer buffer = ByteBuffer.allocate(1024);
+    readChannel.read(buffer);
+    verify(fakeService, times(1)).getObject(eq(GET_OBJECT_REQUEST), any());
+
+    int footerOffset = 7 * 1024;
+    verify(fakeService, times(1)).getObjectMedia(eq(GetObjectMediaRequest.newBuilder()
+        .setBucket(BUCKET_NAME)
+        .setObject(OBJECT_NAME)
+        .setReadOffset(footerOffset)
+        .setReadLimit(minRangeRequestSize)
+        .build()), any());
+    verify(fakeService, times(1)).getObjectMedia(eq(GET_OBJECT_MEDIA_REQUEST), any());
+
+    buffer.clear();
+    readChannel.position(footerOffset);
+    readChannel.read(buffer);
+
+    assertArrayEquals(fakeService.data.substring(footerOffset).toByteArray(), buffer.array());
+
+    // reading the footer twice to ensure there are no additional calls to GCS
+    buffer.clear();
+    readChannel.position(footerOffset);
+    readChannel.read(buffer);
+
+    assertArrayEquals(fakeService.data.substring(footerOffset).toByteArray(), buffer.array());
+    verifyNoMoreInteractions(fakeService);
+  }
+
+  @Test
+  public void testReadCachedFooterPartially() throws Exception {
+    fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(16 * 1024).build());
+    // verify data setup on mock to ensure this interaction does not conflict with `verify`calls
+    verify(fakeService, times(1)).setObject(any());
+    int minRangeRequestSize = 4 * 1024;
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder()
+            .setMinRangeRequestSize(minRangeRequestSize)
+            .setInplaceSeekLimit(512)
+            .build();
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
+    ByteBuffer buffer = ByteBuffer.allocate(2 * 1024);
+    readChannel.read(buffer);
+    verify(fakeService, times(1)).getObject(eq(GET_OBJECT_REQUEST), any());
+
+    int footerOffset = 14 * 1024;
+    verify(fakeService, times(1)).getObjectMedia(eq(GetObjectMediaRequest.newBuilder()
+        .setBucket(BUCKET_NAME)
+        .setObject(OBJECT_NAME)
+        .setReadOffset(footerOffset)
+        .setReadLimit(minRangeRequestSize)
+        .build()), any());
+    verify(fakeService, times(1)).getObjectMedia(eq(GET_OBJECT_MEDIA_REQUEST), any());
+
+    buffer.clear();
+    int readOffset = 13 * 1024;
+    readChannel.position(readOffset);
+    readChannel.read(buffer);
+
+    verify(fakeService, times(1)).getObjectMedia(eq(GetObjectMediaRequest.newBuilder()
+        .setBucket(BUCKET_NAME)
+        .setObject(OBJECT_NAME)
+        .setGeneration(OBJECT_GENERATION)
+        .setReadOffset(readOffset)
+        .setReadLimit(1024)
+        .build()), any());
+    assertArrayEquals(fakeService.data.substring(readOffset, readOffset + (2 * 1024)).toByteArray(), buffer.array());
+
+    // reading the footer twice to ensure there are no additional calls to GCS
+    buffer.clear();
+    readChannel.position(footerOffset);
+    readChannel.read(buffer);
+
+    assertArrayEquals(fakeService.data.substring(footerOffset).toByteArray(), buffer.array());
+    verifyNoMoreInteractions(fakeService);
+  }
+
+  @Test
+  public void testReadCachedFooterPartiallyWithInplaceSeek() throws Exception {
+    fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(16 * 1024).build());
+    // verify data setup on mock to ensure this interaction does not conflict with `verify`calls
+    verify(fakeService, times(1)).setObject(any());
+    int minRangeRequestSize = 4 * 1024;
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder()
+            .setMinRangeRequestSize(minRangeRequestSize)
+            .setInplaceSeekLimit(2 * 1024)
+            .build();
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
+    ByteBuffer buffer = ByteBuffer.allocate(2 * 1024);
+    readChannel.read(buffer);
+    verify(fakeService, times(1)).getObject(eq(GET_OBJECT_REQUEST), any());
+
+    int footerOffset = 14 * 1024;
+    verify(fakeService, times(1)).getObjectMedia(eq(GetObjectMediaRequest.newBuilder()
+        .setBucket(BUCKET_NAME)
+        .setObject(OBJECT_NAME)
+        .setReadOffset(footerOffset)
+        .setReadLimit(minRangeRequestSize)
+        .build()), any());
+    verify(fakeService, times(1)).getObjectMedia(eq(GET_OBJECT_MEDIA_REQUEST), any());
+
+    buffer.clear();
+    int readOffset = 13 * 1024;
+    readChannel.position(readOffset);
+    readChannel.read(buffer);
+
+    verify(fakeService, times(1)).getObjectMedia(eq(GetObjectMediaRequest.newBuilder()
+        .setBucket(BUCKET_NAME)
+        .setObject(OBJECT_NAME)
+        .setGeneration(OBJECT_GENERATION)
+        .setReadOffset(readOffset)
+        .setReadLimit(1024)
+        .build()), any());
+    assertArrayEquals(fakeService.data.substring(readOffset, readOffset + (2 * 1024)).toByteArray(), buffer.array());
+
+    // reading the footer twice to ensure there are no additional calls to GCS
+    buffer.clear();
+    readChannel.position(footerOffset);
+    readChannel.read(buffer);
+
+    assertArrayEquals(fakeService.data.substring(footerOffset).toByteArray(), buffer.array());
+    verifyNoMoreInteractions(fakeService);
   }
 
   @Test
