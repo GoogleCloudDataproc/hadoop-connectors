@@ -26,7 +26,6 @@ import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.hash.Hashing;
-import com.google.google.storage.v1.ChecksummedData;
 import com.google.google.storage.v1.GetObjectMediaRequest;
 import com.google.google.storage.v1.GetObjectMediaResponse;
 import com.google.google.storage.v1.GetObjectRequest;
@@ -304,7 +303,10 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         ByteString content = response.getChecksummedData().getContent();
         int bytesToWrite = content.size();
         put(content, 0, bytesToWrite, byteBuffer);
-        put(footerContent, 0 , byteBuffer.remaining(), byteBuffer);
+        bytesToWrite += byteBuffer.remaining();
+        put(footerContent, 0, byteBuffer.remaining(), byteBuffer);
+        bytesRead += bytesToWrite;
+        position += bytesRead;
       }
     }
     // if cached response fills the buffer, return immediately
