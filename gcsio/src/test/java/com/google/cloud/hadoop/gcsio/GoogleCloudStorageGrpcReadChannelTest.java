@@ -572,19 +572,22 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   }
 
   @Test
-  public void readHandlesGetError() {
+  public void testOpenThrowsIOExceptionOnGetError() {
     GoogleCloudStorageReadOptions options =
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
     fakeService.setGetException(
         Status.fromCode(Status.Code.INTERNAL)
             .withDescription("Custom error message.")
             .asException());
+    verify(fakeService).setGetException(any());
     IOException thrown = assertThrows(IOException.class, () -> newReadChannel(options));
     assertThat(thrown)
         .hasCauseThat()
         .hasCauseThat()
         .hasMessageThat()
         .contains("Custom error message.");
+    verify(fakeService).getObject(eq(GET_OBJECT_REQUEST), any());
+    verifyNoMoreInteractions(fakeService);
   }
 
   @Test
@@ -602,6 +605,24 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         .hasCauseThat()
         .hasMessageThat()
         .contains("Custom error message.");
+  }
+
+  @Test
+  public void testOpenThrowsIOExceptionOnGetMediaError() {
+    fakeService.setGetMediaException(
+        Status.fromCode(Status.Code.INTERNAL)
+            .withDescription("Custom error message.")
+            .asException());
+    verify(fakeService).setGetMediaException(any());
+    IOException thrown = assertThrows(IOException.class, this::newReadChannel);
+    assertThat(thrown)
+        .hasCauseThat()
+        .hasCauseThat()
+        .hasMessageThat()
+        .contains("Custom error message.");
+    verify(fakeService).getObject(eq(GET_OBJECT_REQUEST), any());
+    verify(fakeService).getObjectMedia(any(), any());
+    verifyNoMoreInteractions(fakeService);
   }
 
   @Test

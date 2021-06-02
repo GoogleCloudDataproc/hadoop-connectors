@@ -136,6 +136,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     com.google.google.storage.v1.Object storageObject = getObjectMetadata(resourceId, readOptions,
         stub);
 
+    Preconditions.checkArgument(storageObject != null, "object metadata cannot be null");
     long footerOffset = Math
         .max(0, (storageObject.getSize() - (readOptions.getMinRangeRequestSize() / 2)));
     long footerSize = Math
@@ -195,11 +196,13 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       ByteString footerContent = null;
       while (footerContentResponse.hasNext()) {
         GetObjectMediaResponse objectMediaResponse = footerContentResponse.next();
-        ByteString content = objectMediaResponse.getChecksummedData().getContent();
-        if (footerContent == null) {
-          footerContent = content;
-        } else {
-          footerContent = footerContent.concat(content);
+        if (objectMediaResponse.hasChecksummedData()) {
+          ByteString content = objectMediaResponse.getChecksummedData().getContent();
+          if (footerContent == null) {
+            footerContent = content;
+          } else {
+            footerContent = footerContent.concat(content);
+          }
         }
       }
       return footerContent;
