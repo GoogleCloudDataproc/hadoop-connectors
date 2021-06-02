@@ -41,6 +41,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.util.Iterator;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
@@ -90,11 +91,12 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   Fadvise readStrategy;
 
-  private ByteString footerContent;
+  @Nullable
+  private final ByteString footerContent;
 
-  private long footerStartOffset;
+  private final long footerStartOffset;
 
-  private long footerSize;
+  private final long footerSize;
 
   public static GoogleCloudStorageGrpcReadChannel open(
       StorageStubProvider stubProvider,
@@ -114,79 +116,95 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     // The gRPC API's GetObjectMedia call does not provide a generation number, so to ensure
     // consistent reads, we need to begin by checking the current generation number with a separate
     // call.
-    // TODO(b/135138893): We can avoid this call by adding metadata to a read request.
-    //      That will save about 40ms per read.
-    // TODO(b/136088557): If we add metadata to a read, we can also use that first call to
-    //      implement footer prefetch.
     try {
       return ResilientOperation.retry(
-          () -> {
-            StorageBlockingStub stub = stubProvider.newBlockingStub();
-            com.google.google.storage.v1.Object storageObject;
-            long footerOffset = 0;
-            long footerSize = 0;
-            ByteString footerContent = null;
-            try {
-              // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
-              storageObject =
-                  stub.withDeadlineAfter(readOptions.getGrpcReadMetadataTimeoutMillis(),
-                      MILLISECONDS)
-                      .getObject(
-                          GetObjectRequest.newBuilder()
-                              .setBucket(resourceId.getBucketName())
-                              .setObject(resourceId.getObjectName())
-                              .build());
-              // The non-gRPC read channel has special support for gzip. This channel doesn't
-              // decompress gzip-encoded objects on the fly, so best to fail fast rather than return
-              // gibberish unexpectedly.
-              if (storageObject.getContentEncoding().contains("gzip")) {
-                throw new IOException(
-                    "Can't read GZIP encoded files - content encoding support is disabled.");
-              }
-
-              // todo-prsagar : handle file not exists case
-              footerOffset = Math
-                  .max(0, storageObject.getSize() - readOptions.getMinRangeRequestSize() / 2);
-              footerSize = Math
-                  .min(storageObject.getSize(), readOptions.getMinRangeRequestSize() / 2);
-              Iterator<GetObjectMediaResponse> footerContentResponse = stub
-                  .withDeadlineAfter(readOptions.getGrpcReadTimeoutMillis(), MILLISECONDS)
-                  .getObjectMedia(GetObjectMediaRequest.newBuilder()
-                      .setReadOffset(footerOffset)
-                      .setBucket(resourceId.getBucketName())
-                      .setObject(resourceId.getObjectName())
-                      .setReadLimit(readOptions.getMinRangeRequestSize())
-                      .build());
-
-              while (footerContentResponse.hasNext()) {
-                GetObjectMediaResponse objectMediaResponse = footerContentResponse.next();
-                ByteString content = objectMediaResponse.getChecksummedData().getContent();
-                if (footerContent == null) {
-                  footerContent = content;
-                } else
-                  footerContent = footerContent.concat(content);
-              }
-            } catch (StatusRuntimeException e) {
-              throw convertError(e, resourceId);
-            }
-
-            return new GoogleCloudStorageGrpcReadChannel(
-                stub,
-                stubProvider,
-                resourceId,
-                storageObject.getGeneration(),
-                storageObject.getSize(),
-                footerOffset,
-                footerSize,
-                footerContent,
-                readOptions,
-                backOffFactory);
-          },
+          () -> openChannel(stubProvider, resourceId, readOptions, backOffFactory),
           backOffFactory.newBackOff(),
           RetryDeterminer.ALL_ERRORS,
           IOException.class);
     } catch (Exception e) {
       throw new IOException(String.format("Error reading '%s'", resourceId), e);
+    }
+  }
+
+  private static GoogleCloudStorageGrpcReadChannel openChannel(StorageStubProvider stubProvider,
+      StorageResourceId resourceId, GoogleCloudStorageReadOptions readOptions,
+      BackOffFactory backOffFactory) throws IOException {
+    StorageBlockingStub stub = stubProvider.newBlockingStub();
+    // TODO(b/135138893): We can avoid this call by adding metadata to a read request.
+    //      That will save about 40ms per read.
+    com.google.google.storage.v1.Object storageObject = getObjectMetadata(resourceId, readOptions,
+        stub);
+    long footerOffset = Math
+        .max(0, storageObject.getSize() - readOptions.getMinRangeRequestSize() / 2);
+    long footerSize = Math
+        .min(storageObject.getSize(), readOptions.getMinRangeRequestSize() / 2);
+    ByteString footerContent = getFooterContent(resourceId, readOptions, stub, footerOffset);
+    return new GoogleCloudStorageGrpcReadChannel(
+        stub,
+        stubProvider,
+        resourceId,
+        storageObject.getGeneration(),
+        storageObject.getSize(),
+        footerOffset,
+        footerSize,
+        footerContent,
+        readOptions,
+        backOffFactory);
+  }
+
+  private static com.google.google.storage.v1.Object getObjectMetadata(StorageResourceId resourceId,
+      GoogleCloudStorageReadOptions readOptions, StorageBlockingStub stub) throws IOException {
+    com.google.google.storage.v1.Object storageObject;
+    try {
+      // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
+      storageObject =
+          stub.withDeadlineAfter(readOptions.getGrpcReadMetadataTimeoutMillis(),
+              MILLISECONDS)
+              .getObject(
+                  GetObjectRequest.newBuilder()
+                      .setBucket(resourceId.getBucketName())
+                      .setObject(resourceId.getObjectName())
+                      .build());
+      // The non-gRPC read channel has special support for gzip. This channel doesn't
+      // decompress gzip-encoded objects on the fly, so best to fail fast rather than return
+      // gibberish unexpectedly.
+      if (storageObject.getContentEncoding().contains("gzip")) {
+        throw new IOException(
+            "Can't read GZIP encoded files - content encoding support is disabled.");
+      }
+    } catch (StatusRuntimeException e) {
+      throw convertError(e, resourceId);
+    }
+    return storageObject;
+  }
+
+  private static ByteString getFooterContent(StorageResourceId resourceId,
+      GoogleCloudStorageReadOptions readOptions, StorageBlockingStub stub, long footerOffset)
+      throws IOException {
+    try {
+      Iterator<GetObjectMediaResponse> footerContentResponse = stub
+          .withDeadlineAfter(readOptions.getGrpcReadTimeoutMillis(), MILLISECONDS)
+          .getObjectMedia(GetObjectMediaRequest.newBuilder()
+              .setReadOffset(footerOffset)
+              .setBucket(resourceId.getBucketName())
+              .setObject(resourceId.getObjectName())
+              .setReadLimit(readOptions.getMinRangeRequestSize())
+              .build());
+
+      ByteString footerContent = null;
+      while (footerContentResponse.hasNext()) {
+        GetObjectMediaResponse objectMediaResponse = footerContentResponse.next();
+        ByteString content = objectMediaResponse.getChecksummedData().getContent();
+        if (footerContent == null) {
+          footerContent = content;
+        } else {
+          footerContent = footerContent.concat(content);
+        }
+      }
+      return footerContent;
+    } catch (StatusRuntimeException e) {
+      throw convertError(e, resourceId);
     }
   }
 
@@ -290,29 +308,20 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     }
 
     // read request content overlaps with cached footer data
-    if ((position + bytesToSkipBeforeReading) >= footerStartOffset) {
-      position += bytesToSkipBeforeReading;
-      bytesToSkipBeforeReading = 0;
-      // copy footer data to byte buffer
-      int bytesToWrite = Math.toIntExact(min(byteBuffer.remaining(), footerSize - (position - footerStartOffset)));
-      put(footerContent, Math.toIntExact(position - footerStartOffset), bytesToWrite, byteBuffer);
-      position += bytesToWrite;
-      bytesRead += bytesToWrite;
+    if ((footerContent != null) && (position + bytesToSkipBeforeReading) >= footerStartOffset) {
+      bytesRead += readFooterContentIntoBuffer(footerContent, byteBuffer);
     }
-   
+
     // if cached response fills the buffer, return immediately
     if (!byteBuffer.hasRemaining()) {
       return bytesRead;
     }
 
     if (resIterator == null) {
-      Integer bytesToRead =
-          readStrategy == Fadvise.RANDOM
-              ? max(byteBuffer.remaining(), readOptions.getMinRangeRequestSize())
-              : null;
-      bytesToRead = Math.min(bytesToRead == null ? Integer.MAX_VALUE : bytesToRead, Math.toIntExact(footerStartOffset - position));
+      Integer bytesToRead = getBytesToRead(byteBuffer);
       requestObjectMedia(bytesToRead);
     }
+
     while (moreServerContent() && byteBuffer.hasRemaining()) {
       GetObjectMediaResponse res = resIterator.next();
 
@@ -352,16 +361,42 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         bufferedContentReadOffset = bytesToWrite;
       }
     }
-    if (position >= footerStartOffset && byteBuffer.hasRemaining()) {
-      // copy footer data to byte buffer
+
+    if (footerContent != null && position >= footerStartOffset && byteBuffer.hasRemaining()) {
       int bytesToWrite = Math.toIntExact(min(byteBuffer.remaining(), footerSize));
       put(footerContent, Math.toIntExact(position - footerStartOffset), bytesToWrite, byteBuffer);
       position += bytesToWrite;
       bytesRead += bytesToWrite;
     }
 
-
     return bytesRead;
+  }
+
+  private Integer getBytesToRead(ByteBuffer byteBuffer) {
+    Integer bytesToRead =
+        readStrategy == Fadvise.RANDOM
+            ? max(byteBuffer.remaining(), readOptions.getMinRangeRequestSize())
+            : null;
+    if (footerContent != null) {
+      long bytesToFooterOffset = footerStartOffset - position;
+      if (bytesToRead == null) {
+        bytesToRead = Math.toIntExact(bytesToFooterOffset);
+      } else {
+        bytesToRead = Math.toIntExact(min(bytesToRead, bytesToFooterOffset));
+      }
+    }
+    return bytesToRead;
+  }
+
+  private int readFooterContentIntoBuffer(@Nonnull ByteString footerContent,
+      ByteBuffer byteBuffer) {
+    position += bytesToSkipBeforeReading;
+    bytesToSkipBeforeReading = 0;
+    int bytesToWrite = Math
+        .toIntExact(min(byteBuffer.remaining(), footerSize - (position - footerStartOffset)));
+    put(footerContent, Math.toIntExact(position - footerStartOffset), bytesToWrite, byteBuffer);
+    position += bytesToWrite;
+    return bytesToWrite;
   }
 
   private void requestObjectMedia(@Nullable Integer bytesToRead) throws IOException {
