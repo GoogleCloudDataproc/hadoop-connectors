@@ -299,23 +299,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       position += bytesToWrite;
       bytesRead += bytesToWrite;
     }
-    // else if ((position + bytesToSkipBeforeReading + byteBuffer.remaining())
-    //     >= footerStartOffset) {
-    //   position += bytesToSkipBeforeReading;
-    //   bytesToSkipBeforeReading = 0;
-    //   Integer bytesToRead = Math.toIntExact(footerStartOffset - position);
-    //   requestObjectMedia(bytesToRead);
-    //   if (resIterator != null && resIterator.hasNext()) {
-    //     GetObjectMediaResponse response = resIterator.next();
-    //     ByteString content = response.getChecksummedData().getContent();
-    //     int bytesToWrite = content.size();
-    //     put(content, 0, bytesToWrite, byteBuffer);
-    //     bytesToWrite += Math.min(byteBuffer.remaining(), footerContent.size());
-    //     put(footerContent, 0, bytesToWrite, byteBuffer);
-    //     bytesRead += bytesToWrite;
-    //     position += bytesRead;
-    //   }
-    // }
+   
     // if cached response fills the buffer, return immediately
     if (!byteBuffer.hasRemaining()) {
       return bytesRead;
@@ -326,6 +310,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
           readStrategy == Fadvise.RANDOM
               ? max(byteBuffer.remaining(), readOptions.getMinRangeRequestSize())
               : null;
+      bytesToRead = Math.min(bytesToRead == null ? Integer.MAX_VALUE : bytesToRead, Math.toIntExact(footerStartOffset - position));
       requestObjectMedia(bytesToRead);
     }
     while (moreServerContent() && byteBuffer.hasRemaining()) {
@@ -367,6 +352,14 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         bufferedContentReadOffset = bytesToWrite;
       }
     }
+    if (position >= footerStartOffset && byteBuffer.hasRemaining()) {
+      // copy footer data to byte buffer
+      int bytesToWrite = Math.toIntExact(min(byteBuffer.remaining(), footerSize));
+      put(footerContent, Math.toIntExact(position - footerStartOffset), bytesToWrite, byteBuffer);
+      position += bytesToWrite;
+      bytesRead += bytesToWrite;
+    }
+
 
     return bytesRead;
   }
