@@ -135,11 +135,13 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     //      That will save about 40ms per read.
     com.google.google.storage.v1.Object storageObject = getObjectMetadata(resourceId, readOptions,
         stub);
+
     long footerOffset = Math
-        .max(0, (storageObject.getSize() - readOptions.getMinRangeRequestSize() / 2));
+        .max(0, (storageObject.getSize() - (readOptions.getMinRangeRequestSize() / 2)));
     long footerSize = Math
         .min(storageObject.getSize(), (readOptions.getMinRangeRequestSize() / 2));
     ByteString footerContent = getFooterContent(resourceId, readOptions, stub, footerOffset);
+
     return new GoogleCloudStorageGrpcReadChannel(
         stub,
         stubProvider,
@@ -155,16 +157,15 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private static com.google.google.storage.v1.Object getObjectMetadata(StorageResourceId resourceId,
       GoogleCloudStorageReadOptions readOptions, StorageBlockingStub stub) throws IOException {
-    com.google.google.storage.v1.Object storageObject;
     try {
       // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
       GetObjectRequest getObjectRequest = GetObjectRequest.newBuilder()
           .setBucket(resourceId.getBucketName())
           .setObject(resourceId.getObjectName())
           .build();
-      storageObject =
-          stub.withDeadlineAfter(readOptions.getGrpcReadMetadataTimeoutMillis(), MILLISECONDS)
-              .getObject(getObjectRequest);
+      com.google.google.storage.v1.Object storageObject = stub
+          .withDeadlineAfter(readOptions.getGrpcReadMetadataTimeoutMillis(), MILLISECONDS)
+          .getObject(getObjectRequest);
       // The non-gRPC read channel has special support for gzip. This channel doesn't
       // decompress gzip-encoded objects on the fly, so best to fail fast rather than return
       // gibberish unexpectedly.
@@ -172,10 +173,10 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         throw new IOException(
             "Can't read GZIP encoded files - content encoding support is disabled.");
       }
+      return storageObject;
     } catch (StatusRuntimeException e) {
       throw convertError(e, resourceId);
     }
-    return storageObject;
   }
 
   private static ByteString getFooterContent(StorageResourceId resourceId,
