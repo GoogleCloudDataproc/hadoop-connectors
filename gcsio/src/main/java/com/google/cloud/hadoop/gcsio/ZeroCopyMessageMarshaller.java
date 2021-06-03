@@ -74,8 +74,7 @@ class ZeroCopyMessageMarshaller<T extends MessageLite> implements PrototypeMarsh
     try {
       if (stream instanceof KnownLength) {
         int size = stream.available();
-        if (stream instanceof Detachable
-            && stream instanceof HasByteBuffer
+        if (stream instanceof Detachable && stream instanceof HasByteBuffer
             && ((HasByteBuffer) stream).byteBufferSupported()) {
           // Stream is now detached here and should be closed later.
           stream = ((Detachable) stream).detach();
@@ -102,15 +101,14 @@ class ZeroCopyMessageMarshaller<T extends MessageLite> implements PrototypeMarsh
       try {
         message = parseFrom(cis);
       } catch (InvalidProtocolBufferException ipbe) {
-        throw Status.INTERNAL.withDescription("Invalid protobuf byte sequence")
-            .withCause(ipbe).asRuntimeException();
+        throw Status.INTERNAL.withDescription("Invalid protobuf byte sequence").withCause(ipbe).asRuntimeException();
       }
       unclosedStreams.put(message, stream);
-      return message;      
+      return message;
     } else {
       // slow path
       return baseMarshaller.parse(stream);
-    }   
+    }
   }
 
   private T parseFrom(CodedInputStream stream) throws InvalidProtocolBufferException {
@@ -128,5 +126,5 @@ class ZeroCopyMessageMarshaller<T extends MessageLite> implements PrototypeMarsh
   // call stream.close() function to return it to the pool.
   public InputStream popStream(T message) {
     return unclosedStreams.remove(message);
-  }  
+  }
 }
