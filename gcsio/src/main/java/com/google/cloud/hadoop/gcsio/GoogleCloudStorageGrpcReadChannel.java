@@ -41,7 +41,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.util.Iterator;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
@@ -307,7 +306,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     // read request content overlaps with cached footer data
     if ((footerContent != null) && ((position + bytesToSkipBeforeReading)
         >= footerStartOffsetInBytes)) {
-      bytesRead += readFooterContentIntoBuffer(footerContent, byteBuffer);
+      bytesRead += readFooterContentIntoBuffer(byteBuffer);
       return bytesRead;
     }
 
@@ -387,8 +386,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     return bytesToRead;
   }
 
-  private int readFooterContentIntoBuffer(@Nonnull ByteString footerContent,
-      ByteBuffer byteBuffer) {
+  private int readFooterContentIntoBuffer(ByteBuffer byteBuffer) {
     position += bytesToSkipBeforeReading;
     bytesToSkipBeforeReading = 0;
     long bytesToSkipFromFooter = position - footerStartOffsetInBytes;
