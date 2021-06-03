@@ -1,16 +1,19 @@
 /*
  * Copyright 2021 Google Inc. All Rights Reserved.
  *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software distributed under the
- * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing permissions and
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.google.cloud.hadoop.gcsio;
 
 import com.google.protobuf.ByteString;
@@ -76,7 +79,7 @@ class ZeroCopyMessageMarshaller<T extends MessageLite> implements PrototypeMarsh
             && ((HasByteBuffer) stream).byteBufferSupported()) {
           // Stream is now detached here and should be closed later.
           stream = ((Detachable) stream).detach();
-          // This mark call is to keep buffer while travelsing buffers using skip.
+          // This mark call is to keep buffer while traversing buffers using skip.
           stream.mark(size);
           List<ByteString> byteStrings = new ArrayList<>();
           while (stream.available() != 0) {
