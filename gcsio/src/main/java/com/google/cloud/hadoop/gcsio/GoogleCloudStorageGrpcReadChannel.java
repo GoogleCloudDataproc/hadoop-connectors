@@ -169,6 +169,9 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         throw new IOException(
             "Can't read GZIP encoded files - content encoding support is disabled.");
       }
+      logger.atFiner().log(
+          "Initialized metadata (size=%s, generation=%s) for '%s'",
+          storageObject.getSize(), storageObject.getGeneration(), resourceId);
       return storageObject;
     } catch (StatusRuntimeException e) {
       throw convertError(e, resourceId);
@@ -198,6 +201,13 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
             footerContent = footerContent.concat(content);
           }
         }
+      }
+      if (footerContent == null) {
+        logger.atFiner()
+            .log("Prefetched footer content is null for resource '%s'", resourceId);
+      } else {
+        logger.atFiner()
+            .log("Prefetched %s bytes footer for '%s'", footerContent.size(), resourceId);
       }
       return footerContent;
     } catch (StatusRuntimeException e) {
@@ -305,6 +315,9 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     // read request content overlaps with cached footer data
     if ((footerContent != null) && ((position + bytesToSkipBeforeReading)
         >= footerStartOffsetInBytes)) {
+      logger.atFiner()
+          .log("Read request responded with footer content at position '%s'",
+              (position + bytesToSkipBeforeReading));
       bytesRead += readFooterContentIntoBuffer(byteBuffer);
       return bytesRead;
     }
