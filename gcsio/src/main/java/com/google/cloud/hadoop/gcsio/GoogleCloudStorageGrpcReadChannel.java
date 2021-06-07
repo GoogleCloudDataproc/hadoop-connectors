@@ -185,7 +185,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
               .setReadOffset(footerOffset)
               .setBucket(resourceId.getBucketName())
               .setObject(resourceId.getObjectName())
-              .setReadLimit(readOptions.getMinRangeRequestSize())
               .build());
 
       ByteString footerContent = null;
