@@ -48,6 +48,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.UInt32Value;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Status;
+import io.grpc.Status.Code;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.AbstractStub;
@@ -670,6 +671,26 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     verify(fakeService).setGetMediaException(any());
     IOException thrown = assertThrows(IOException.class, this::newReadChannel);
     assertThat(thrown)
+        .hasCauseThat()
+        .hasCauseThat()
+        .hasMessageThat()
+        .contains("Custom error message.");
+    verify(get).setFields(METADATA_FIELDS);
+    verify(get).execute();
+    verify(fakeService).getObjectMedia(any(), any());
+    verifyNoMoreInteractions(fakeService);
+  }
+
+  @Test
+  public void testOpenThrowsIOExceptionOnGetMediaFileNotFound() throws IOException {
+    fakeService.setGetMediaException(
+        Status.fromCode(Code.NOT_FOUND)
+            .withDescription("Custom error message.")
+            .asException());
+    verify(fakeService).setGetMediaException(any());
+    IOException thrown = assertThrows(IOException.class, this::newReadChannel);
+    assertThat(thrown)
+        .hasCauseThat()
         .hasCauseThat()
         .hasCauseThat()
         .hasMessageThat()
