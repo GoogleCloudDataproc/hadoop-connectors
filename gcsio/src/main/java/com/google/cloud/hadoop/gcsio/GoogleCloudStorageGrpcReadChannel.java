@@ -13,12 +13,19 @@
  */
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
+import com.google.api.client.util.Sleeper;
+import com.google.api.services.storage.Storage;
+import com.google.api.services.storage.Storage.Objects.Get;
+import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.BackOffFactory;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
+import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.common.annotations.VisibleForTesting;
@@ -28,7 +35,6 @@ import com.google.common.flogger.GoogleLogger;
 import com.google.common.hash.Hashing;
 import com.google.google.storage.v1.GetObjectMediaRequest;
 import com.google.google.storage.v1.GetObjectMediaResponse;
-import com.google.google.storage.v1.GetObjectRequest;
 import com.google.google.storage.v1.StorageGrpc.StorageBlockingStub;
 import com.google.protobuf.ByteString;
 import io.grpc.Context;
@@ -46,6 +52,7 @@ import javax.annotation.Nullable;
 public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+  protected static final String METADATA_FIELDS = "contentEncoding,generation,size";
 
   private volatile StorageBlockingStub stub;
 
@@ -97,15 +104,20 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   public static GoogleCloudStorageGrpcReadChannel open(
       StorageStubProvider stubProvider,
+      Storage storage,
+      ApiErrorExtractor errorExtractor,
       StorageResourceId resourceId,
       GoogleCloudStorageReadOptions readOptions)
       throws IOException {
-    return open(stubProvider, resourceId, readOptions, BackOffFactory.DEFAULT);
+    return open(stubProvider, storage, errorExtractor, resourceId, readOptions,
+        BackOffFactory.DEFAULT);
   }
 
   @VisibleForTesting
   static GoogleCloudStorageGrpcReadChannel open(
       StorageStubProvider stubProvider,
+      Storage storage,
+      ApiErrorExtractor errorExtractor,
       StorageResourceId resourceId,
       GoogleCloudStorageReadOptions readOptions,
       BackOffFactory backOffFactory)
@@ -115,7 +127,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     // call.
     try {
       return ResilientOperation.retry(
-          () -> openChannel(stubProvider, resourceId, readOptions, backOffFactory),
+          () -> openChannel(stubProvider, storage, errorExtractor, resourceId, readOptions,
+              backOffFactory),
           backOffFactory.newBackOff(),
           RetryDeterminer.ALL_ERRORS,
           IOException.class);
@@ -126,18 +139,29 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private static GoogleCloudStorageGrpcReadChannel openChannel(
       StorageStubProvider stubProvider,
+      Storage storage,
+      ApiErrorExtractor errorExtractor,
       StorageResourceId resourceId,
       GoogleCloudStorageReadOptions readOptions,
       BackOffFactory backOffFactory) throws IOException {
     StorageBlockingStub stub = stubProvider.newBlockingStub();
     // TODO(b/135138893): We can avoid this call by adding metadata to a read request.
     //      That will save about 40ms per read.
-    com.google.google.storage.v1.Object storageObject = getObjectMetadata(resourceId, readOptions,
-        stub);
+    Preconditions.checkArgument(storage != null, "GCS json client cannot be null");
+    GoogleCloudStorageItemInfo itemInfo = getObjectMetadata(resourceId,
+        errorExtractor, backOffFactory, storage);
+    Preconditions.checkArgument(itemInfo != null, "object metadata cannot be null");
+    // The non-gRPC read channel has special support for gzip. This channel doesn't
+    // decompress gzip-encoded objects on the fly, so best to fail fast rather than return
+    // gibberish unexpectedly.
+    String contentEncoding = itemInfo.getContentEncoding();
+    if (contentEncoding != null && contentEncoding.contains("gzip")) {
+      throw new IOException(
+          "Can't read GZIP encoded files - content encoding support is disabled.");
+    }
 
-    Preconditions.checkArgument(storageObject != null, "object metadata cannot be null");
     int prefetchSizeInBytes = readOptions.getMinRangeRequestSize() / 2;
-    long footerOffsetInBytes = Math.max(0, (storageObject.getSize() - prefetchSizeInBytes));
+    long footerOffsetInBytes = Math.max(0, (itemInfo.getSize() - prefetchSizeInBytes));
 
     ByteString footerContent = getFooterContent(resourceId, readOptions, stub, footerOffsetInBytes);
 
@@ -145,39 +169,58 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         stub,
         stubProvider,
         resourceId,
-        storageObject.getGeneration(),
-        storageObject.getSize(),
+        itemInfo.getContentGeneration(),
+        itemInfo.getSize(),
         footerOffsetInBytes,
         footerContent,
         readOptions,
         backOffFactory);
   }
 
-  private static com.google.google.storage.v1.Object getObjectMetadata(StorageResourceId resourceId,
-      GoogleCloudStorageReadOptions readOptions, StorageBlockingStub stub) throws IOException {
+  private static GoogleCloudStorageItemInfo getObjectMetadata(
+      StorageResourceId resourceId,
+      ApiErrorExtractor errorExtractor,
+      BackOffFactory backOffFactory,
+      Storage gcs) throws IOException {
+    StorageObject object;
     try {
-      // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
-      GetObjectRequest getObjectRequest = GetObjectRequest.newBuilder()
-          .setBucket(resourceId.getBucketName())
-          .setObject(resourceId.getObjectName())
-          .build();
-      com.google.google.storage.v1.Object storageObject = stub
-          .withDeadlineAfter(readOptions.getGrpcReadMetadataTimeoutMillis(), MILLISECONDS)
-          .getObject(getObjectRequest);
-      // The non-gRPC read channel has special support for gzip. This channel doesn't
-      // decompress gzip-encoded objects on the fly, so best to fail fast rather than return
-      // gibberish unexpectedly.
-      if (storageObject.getContentEncoding().contains("gzip")) {
-        throw new IOException(
-            "Can't read GZIP encoded files - content encoding support is disabled.");
-      }
-      logger.atFiner().log(
-          "Initialized metadata (size=%s, generation=%s) for '%s'",
-          storageObject.getSize(), storageObject.getGeneration(), resourceId);
-      return storageObject;
-    } catch (StatusRuntimeException e) {
-      throw convertError(e, resourceId);
+      // Request only fields that are used for metadata initialization
+      Get metadataRequest = getMetadataRequest(gcs, resourceId).setFields(METADATA_FIELDS);
+      object =
+          ResilientOperation.retry(
+              metadataRequest::execute,
+              backOffFactory.newBackOff(),
+              RetryDeterminer.SOCKET_ERRORS,
+              IOException.class,
+              Sleeper.DEFAULT);
+    } catch (IOException e) {
+      throw errorExtractor.itemNotFound(e)
+          ? createFileNotFoundException(resourceId, e)
+          : new IOException("Error reading " + resourceId, e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IOException("Thread interrupt received.", e);
     }
+    return GoogleCloudStorageItemInfo.createObject(
+        resourceId,
+        /* creationTime= */ 0,
+        /* modificationTime= */ 0,
+        checkNotNull(object.getSize(), "size can not be null for '%s'", resourceId).longValue(),
+        /* contentType= */ null,
+        object.getContentEncoding(),
+        /* metadata= */ null,
+        checkNotNull(object.getGeneration(), "generation can not be null for '%s'", resourceId),
+        /* metaGeneration= */ 0,
+        /* verificationAttributes= */ null);
+  }
+
+  private static Get getMetadataRequest(Storage gcs, StorageResourceId resourceId)
+      throws IOException {
+    Get getObject = gcs.objects().get(resourceId.getBucketName(), resourceId.getObjectName());
+    if (resourceId.hasGenerationId()) {
+      getObject.setGeneration(resourceId.getGenerationId());
+    }
+    return getObject;
   }
 
   private static ByteString getFooterContent(StorageResourceId resourceId,

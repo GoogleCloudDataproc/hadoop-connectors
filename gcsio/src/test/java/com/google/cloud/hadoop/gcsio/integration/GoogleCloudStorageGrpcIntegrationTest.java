@@ -27,7 +27,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   // Prefix this name with the prefix used in other gcs io integrate tests once it's whitelisted by
   // GCS to access gRPC API.
-  private static final String BUCKET_NAME_PREFIX = "gcs-grpc-team-dataproc-it";
+  private static final String BUCKET_NAME_PREFIX = "dataproc-gcs-grpc";
 
   private static final TestBucketHelper BUCKET_HELPER = new TestBucketHelper(BUCKET_NAME_PREFIX);
 
