@@ -2,10 +2,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageGrpcReadChannel.METADATA_FIELDS;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTest.newStorageObject;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.BUCKET_NAME;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.JSON_FACTORY;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.OBJECT_NAME;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.createReadChannel;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonDataResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonErrorResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
@@ -627,6 +624,23 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   }
 
   @Test
+  public void testOpenReadsMetadata() throws IOException {
+    int objectSize = 8 * 1024;
+    fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(objectSize).build());
+    storageObject.setSize(BigInteger.valueOf(objectSize));
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder().build();
+    StorageResourceId storageResourceId = new StorageResourceId(BUCKET_NAME, OBJECT_NAME,
+        OBJECT_GENERATION);
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(storageResourceId, options);
+
+    assertTrue(readChannel.isOpen());
+    assertEquals(objectSize, readChannel.size());
+    verify(get).setFields(METADATA_FIELDS);
+    verify(get).execute();
+  }
+
+  @Test
   public void testOpenThrowsIOExceptionOnGetError() throws IOException {
     MockHttpTransport transport = mockTransport(jsonErrorResponse(ErrorResponses.SERVER_ERROR));
 
@@ -1239,7 +1253,20 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         () -> BackOff.STOP_BACKOFF);
   }
 
+  private GoogleCloudStorageGrpcReadChannel newReadChannel(StorageResourceId storageResourceId,
+      GoogleCloudStorageReadOptions options)
+      throws IOException {
+    return GoogleCloudStorageGrpcReadChannel.open(
+        new FakeStubProvider(mockCredentials),
+        storage,
+        errorExtractor,
+        storageResourceId,
+        options,
+        () -> BackOff.STOP_BACKOFF);
+  }
+
   private static class FakeGrpcDecorator implements StorageStubProvider.GrpcDecorator {
+
     @Override
     public ManagedChannelBuilder<?> createChannelBuilder(String target) {
       return null;
