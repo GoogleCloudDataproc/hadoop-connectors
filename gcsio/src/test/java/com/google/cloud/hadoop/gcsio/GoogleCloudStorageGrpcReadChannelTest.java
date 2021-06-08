@@ -691,10 +691,11 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     Storage storage = new Storage(transport, JSON_FACTORY, r -> {});
 
     GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder().setSupportGzipEncoding(false).build();
+        GoogleCloudStorageReadOptions.builder().build();
 
-    IOException e = assertThrows(IOException.class, () -> createReadChannel(storage, readOptions));
+    IOException e = assertThrows(IOException.class, () -> newReadChannel(storage, readOptions));
     assertThat(e)
+        .hasCauseThat()
         .hasMessageThat()
         .isEqualTo("Cannot read GZIP encoded files - content encoding support is disabled.");
   }

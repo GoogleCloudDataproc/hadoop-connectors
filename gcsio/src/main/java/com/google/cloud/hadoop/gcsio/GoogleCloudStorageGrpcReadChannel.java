@@ -157,7 +157,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     String contentEncoding = itemInfo.getContentEncoding();
     if (contentEncoding != null && contentEncoding.contains("gzip")) {
       throw new IOException(
-          "Can't read GZIP encoded files - content encoding support is disabled.");
+          "Cannot read GZIP encoded files - content encoding support is disabled.");
     }
 
     int prefetchSizeInBytes = readOptions.getMinRangeRequestSize() / 2;
