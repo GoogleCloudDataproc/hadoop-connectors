@@ -368,7 +368,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     }
 
     if (resIterator == null) {
-      Integer bytesToRead = getBytesToRead(byteBuffer);
+      long bytesToRead = getBytesToRead(byteBuffer);
       requestObjectMedia(bytesToRead);
     }
 
@@ -429,18 +429,19 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         byteBuffer.hasRemaining();
   }
 
-  private Integer getBytesToRead(ByteBuffer byteBuffer) {
-    Integer bytesToRead =
-        readStrategy == Fadvise.RANDOM
-            ? max(byteBuffer.remaining(), readOptions.getMinRangeRequestSize())
-            : null;
+  private Long getBytesToRead(ByteBuffer byteBuffer) {
+    long bytesToRead = 0L; // bytesToRead = 0 indicates read till EOF
+    if (readStrategy == Fadvise.RANDOM) {
+      bytesToRead = max(byteBuffer.remaining(), readOptions.getMinRangeRequestSize());
+    }
+
     if (footerContent == null) {
       return bytesToRead;
     }
 
     long bytesToFooterOffset = footerStartOffsetInBytes - position;
-    return bytesToRead == null ? Math.toIntExact(bytesToFooterOffset)
-        : Math.toIntExact(min(bytesToRead, bytesToFooterOffset));
+    return bytesToRead == 0 ? bytesToFooterOffset
+        : min(bytesToRead, bytesToFooterOffset);
   }
 
   private int readFooterContentIntoBuffer(ByteBuffer byteBuffer) {
@@ -454,14 +455,14 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     return bytesToWrite;
   }
 
-  private void requestObjectMedia(@Nullable Integer bytesToRead) throws IOException {
+  private void requestObjectMedia(long bytesToRead) throws IOException {
     GetObjectMediaRequest.Builder requestBuilder =
         GetObjectMediaRequest.newBuilder()
             .setBucket(resourceId.getBucketName())
             .setObject(resourceId.getObjectName())
             .setGeneration(objectGeneration)
             .setReadOffset(position);
-    if (bytesToRead != null) {
+    if (bytesToRead != 0) {
       requestBuilder.setReadLimit(bytesToRead);
     }
     GetObjectMediaRequest request = requestBuilder.build();
