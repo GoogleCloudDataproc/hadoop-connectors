@@ -47,7 +47,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.util.Iterator;
-import java.util.Optional;
+import java.util.OptionalLong;
 import javax.annotation.Nullable;
 
 public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
@@ -369,7 +369,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     }
 
     if (resIterator == null) {
-      Optional<Long> bytesToRead = getBytesToRead(byteBuffer);
+      OptionalLong bytesToRead = getBytesToRead(byteBuffer);
       requestObjectMedia(bytesToRead);
     }
 
@@ -430,10 +430,10 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         byteBuffer.hasRemaining();
   }
 
-  private Optional<Long> getBytesToRead(ByteBuffer byteBuffer) {
-    Optional<Long> optionalBytesToRead = Optional.empty();
+  private OptionalLong getBytesToRead(ByteBuffer byteBuffer) {
+    OptionalLong optionalBytesToRead = OptionalLong.empty();
     if (readStrategy == Fadvise.RANDOM) {
-      optionalBytesToRead = Optional
+      optionalBytesToRead = OptionalLong
           .of(max((long) byteBuffer.remaining(), (long) readOptions.getMinRangeRequestSize()));
     }
 
@@ -442,9 +442,10 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     }
 
     long bytesToFooterOffset = footerStartOffsetInBytes - position;
-    return optionalBytesToRead
-        .map(bytesToRead -> Optional.of(min(bytesToRead, bytesToFooterOffset)))
-        .orElseGet(() -> Optional.of(bytesToFooterOffset));
+    if (optionalBytesToRead.isPresent()) {
+      return OptionalLong.of(min(optionalBytesToRead.getAsLong(), bytesToFooterOffset));
+    }
+    return OptionalLong.of(bytesToFooterOffset);
   }
 
   private int readFooterContentIntoBuffer(ByteBuffer byteBuffer) {
@@ -458,7 +459,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     return bytesToWrite;
   }
 
-  private void requestObjectMedia(Optional<Long> bytesToRead) throws IOException {
+  private void requestObjectMedia(OptionalLong bytesToRead) throws IOException {
     GetObjectMediaRequest.Builder requestBuilder =
         GetObjectMediaRequest.newBuilder()
             .setBucket(resourceId.getBucketName())
