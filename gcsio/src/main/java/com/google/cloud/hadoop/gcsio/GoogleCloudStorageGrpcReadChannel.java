@@ -47,6 +47,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.util.Iterator;
+import java.util.OptionalLong;
 import javax.annotation.Nullable;
 
 public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
@@ -368,7 +369,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     }
 
     if (resIterator == null) {
-      Integer bytesToRead = getBytesToRead(byteBuffer);
+      OptionalLong bytesToRead = getBytesToRead(byteBuffer);
       requestObjectMedia(bytesToRead);
     }
 
@@ -429,18 +430,22 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         byteBuffer.hasRemaining();
   }
 
-  private Integer getBytesToRead(ByteBuffer byteBuffer) {
-    Integer bytesToRead =
-        readStrategy == Fadvise.RANDOM
-            ? max(byteBuffer.remaining(), readOptions.getMinRangeRequestSize())
-            : null;
+  private OptionalLong getBytesToRead(ByteBuffer byteBuffer) {
+    OptionalLong optionalBytesToRead = OptionalLong.empty();
+    if (readStrategy == Fadvise.RANDOM) {
+      optionalBytesToRead = OptionalLong
+          .of(max((long) byteBuffer.remaining(), (long) readOptions.getMinRangeRequestSize()));
+    }
+
     if (footerContent == null) {
-      return bytesToRead;
+      return optionalBytesToRead;
     }
 
     long bytesToFooterOffset = footerStartOffsetInBytes - position;
-    return bytesToRead == null ? Math.toIntExact(bytesToFooterOffset)
-        : Math.toIntExact(min(bytesToRead, bytesToFooterOffset));
+    if (optionalBytesToRead.isPresent()) {
+      return OptionalLong.of(min(optionalBytesToRead.getAsLong(), bytesToFooterOffset));
+    }
+    return OptionalLong.of(bytesToFooterOffset);
   }
 
   private int readFooterContentIntoBuffer(ByteBuffer byteBuffer) {
@@ -454,16 +459,14 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     return bytesToWrite;
   }
 
-  private void requestObjectMedia(@Nullable Integer bytesToRead) throws IOException {
+  private void requestObjectMedia(OptionalLong bytesToRead) throws IOException {
     GetObjectMediaRequest.Builder requestBuilder =
         GetObjectMediaRequest.newBuilder()
             .setBucket(resourceId.getBucketName())
             .setObject(resourceId.getObjectName())
             .setGeneration(objectGeneration)
             .setReadOffset(position);
-    if (bytesToRead != null) {
-      requestBuilder.setReadLimit(bytesToRead);
-    }
+    bytesToRead.ifPresent(requestBuilder::setReadLimit);
     GetObjectMediaRequest request = requestBuilder.build();
     try {
       ResilientOperation.retry(
