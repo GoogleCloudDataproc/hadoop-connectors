@@ -41,6 +41,9 @@ import com.google.api.client.util.BackOff;
 import com.google.api.client.util.Data;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.Sleeper;
+import com.google.api.services.storage.Storage;
+import com.google.api.services.storage.Storage.Objects.Insert;
+import com.google.api.services.storage.StorageRequest;
 import com.google.api.services.storage.model.Bucket;
 import com.google.api.services.storage.model.Bucket.Lifecycle;
 import com.google.api.services.storage.model.Bucket.Lifecycle.Rule;
@@ -51,9 +54,6 @@ import com.google.api.services.storage.model.ComposeRequest;
 import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.RewriteResponse;
 import com.google.api.services.storage.model.StorageObject;
-import com.google.api.services.storage.Storage;
-import com.google.api.services.storage.Storage.Objects.Insert;
-import com.google.api.services.storage.StorageRequest;
 import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.authorization.StorageRequestAuthorizer;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
@@ -507,8 +507,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       insertObject.execute();
     } catch (IOException e) {
       if (canIgnoreExceptionForEmptyObject(e, resourceId, options)) {
-        logger.atInfo().withCause(e).log(
-            "Ignoring exception; verified object already exists with desired state.");
+        logger.atInfo().log(
+            "Ignoring exception of type %s; verified object already exists with desired state.",
+            e.getClass().getSimpleName());
+        logger.atFine().withCause(e).log("Ignored exception while creating empty object");
       } else {
         if (ApiErrorExtractor.INSTANCE.itemAlreadyExists(e)) {
           throw (FileAlreadyExistsException)
@@ -598,8 +600,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                     new IOException("Error re-fetching after rate-limit error: " + resourceId, e));
               }
               if (canIgnoreException) {
-                logger.atInfo().withCause(ioe).log(
-                    "Ignoring exception; verified object already exists with desired state.");
+                logger.atInfo().log(
+                    "Ignoring exception of type %s; verified object already exists with desired state.",
+                    ioe.getClass().getSimpleName());
+                logger.atFine().withCause(ioe).log("Ignored exception while creating empty object");
               } else {
                 innerExceptions.add(new IOException("Error inserting " + resourceId, ioe));
               }
