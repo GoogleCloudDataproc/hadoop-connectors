@@ -185,6 +185,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       Storage gcs) throws IOException {
     StorageObject object;
     try {
+      // TODO(b/190617054) : Migrate to gRPC requests for metadata when available
       // Request only fields that are used for metadata initialization
       Get metadataRequest = getMetadataRequest(gcs, resourceId).setFields(METADATA_FIELDS);
       object =
