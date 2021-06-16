@@ -185,6 +185,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       Storage gcs) throws IOException {
     StorageObject object;
     try {
+      // TODO(b/190617054) : Migrate to gRPC requests for metadata when available
       // Request only fields that are used for metadata initialization
       Get metadataRequest = getMetadataRequest(gcs, resourceId).setFields(METADATA_FIELDS);
       object =
@@ -373,6 +374,21 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       requestObjectMedia(bytesToRead);
     }
 
+    bytesRead += readObjectContentFromGCS(byteBuffer);
+
+    if (hasMoreFooterContentToRead(byteBuffer)) {
+      int bytesToWrite = min(byteBuffer.remaining(), footerContent.size());
+      int bytesToSkipInFooter = (int) (position - footerStartOffsetInBytes);
+      put(footerContent, bytesToSkipInFooter, bytesToWrite, byteBuffer);
+      position += bytesToWrite;
+      bytesRead += bytesToWrite;
+    }
+
+    return bytesRead;
+  }
+
+  private int readObjectContentFromGCS(ByteBuffer byteBuffer) throws IOException {
+    int bytesRead = 0;
     while (moreServerContent() && byteBuffer.hasRemaining()) {
       GetObjectMediaResponse res = resIterator.next();
 
@@ -388,16 +404,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       }
 
       if (readOptions.isGrpcChecksumsEnabled() && res.getChecksummedData().hasCrc32C()) {
-        // TODO: Concatenate all these hashes together and compare the result at the end.
-        int calculatedChecksum =
-            Hashing.crc32c().hashBytes(res.getChecksummedData().getContent().toByteArray()).asInt();
-        int expectedChecksum = res.getChecksummedData().getCrc32C().getValue();
-        if (calculatedChecksum != expectedChecksum) {
-          throw new IOException(
-              String.format(
-                  "Message checksum (%s) didn't match expected checksum (%s) for '%s'",
-                  expectedChecksum, calculatedChecksum, resourceId));
-        }
+        validateChecksum(res);
       }
 
       boolean responseSizeLargerThanRemainingBuffer = content.size() > byteBuffer.remaining();
@@ -412,16 +419,20 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         bufferedContentReadOffset = bytesToWrite;
       }
     }
-
-    if (hasMoreFooterContentToRead(byteBuffer)) {
-      int bytesToWrite = min(byteBuffer.remaining(), footerContent.size());
-      int bytesToSkipInFooter = (int) (position - footerStartOffsetInBytes);
-      put(footerContent, bytesToSkipInFooter, bytesToWrite, byteBuffer);
-      position += bytesToWrite;
-      bytesRead += bytesToWrite;
-    }
-
     return bytesRead;
+  }
+
+  private void validateChecksum(GetObjectMediaResponse res) throws IOException {
+    // TODO: Concatenate all these hashes together and compare the result at the end.
+    int calculatedChecksum =
+        Hashing.crc32c().hashBytes(res.getChecksummedData().getContent().toByteArray()).asInt();
+    int expectedChecksum = res.getChecksummedData().getCrc32C().getValue();
+    if (calculatedChecksum != expectedChecksum) {
+      throw new IOException(
+          String.format(
+              "Message checksum (%s) didn't match expected checksum (%s) for '%s'",
+              expectedChecksum, calculatedChecksum, this.resourceId));
+    }
   }
 
   private boolean hasMoreFooterContentToRead(ByteBuffer byteBuffer) {
