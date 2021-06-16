@@ -444,8 +444,10 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   private OptionalLong getBytesToRead(ByteBuffer byteBuffer) {
     OptionalLong optionalBytesToRead = OptionalLong.empty();
     if (readStrategy == Fadvise.RANDOM) {
+      long rangeRequestSize = Math
+          .max(readOptions.getInplaceSeekLimit(), readOptions.getMinRangeRequestSize());
       optionalBytesToRead = OptionalLong
-          .of(max((long) byteBuffer.remaining(), (long) readOptions.getMinRangeRequestSize()));
+          .of(max((long) byteBuffer.remaining(), rangeRequestSize));
     }
 
     if (footerContent == null) {

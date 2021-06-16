@@ -1,9 +1,11 @@
 package com.google.cloud.hadoop.gcsio.integration;
 
+import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.assertByteArrayEquals;
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.assertObjectContent;
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.writeObject;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
@@ -391,6 +393,38 @@ public class GoogleCloudStorageGrpcIntegrationTest {
             .isEqualTo(expectedSegment);
       }
     }
+  }
+
+  @Test
+  public void testReadSeekToOffsetGreaterThanMinRangeRequestSize() throws IOException {
+    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder()
+        .build();
+    GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
+    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME,
+        "testReadSeekToOffsetGreaterThanMinRangeRequestSize_Object");
+    int objectSize = 20 * 1024;
+    int inPlaceSeekLimit = 8 * 1024;
+    int minRangeRequestSize = 4 * 1024;
+    byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ objectSize);
+    int totalBytes = 1;
+    byte[] readArray = new byte[totalBytes];
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder()
+            .setInplaceSeekLimit(inPlaceSeekLimit)
+            .setMinRangeRequestSize(minRangeRequestSize)
+            .setGrpcChecksumsEnabled(false)
+            .setFadvise(Fadvise.RANDOM).build();
+    SeekableByteChannel readableByteChannel = rawStorage.open(objectToCreate, readOptions);
+    int newPosition = 7 * 1024;
+    readableByteChannel.position(newPosition);
+    ByteBuffer readBuffer = ByteBuffer.wrap(readArray);
+    int bytesRead = readableByteChannel.read(readBuffer);
+    byte[] trimmedObjectBytes = Arrays
+        .copyOfRange(objectBytes, newPosition, newPosition + totalBytes);
+    byte[] readBufferByteArray = Arrays.copyOf(readBuffer.array(), readBuffer.limit());
+
+    assertEquals(totalBytes, bytesRead);
+    assertByteArrayEquals(trimmedObjectBytes, readBufferByteArray);
   }
 
   @Test
