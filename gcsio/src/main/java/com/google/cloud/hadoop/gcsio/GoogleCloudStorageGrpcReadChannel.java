@@ -431,7 +431,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       throw new IOException(
           String.format(
               "Message checksum (%s) didn't match expected checksum (%s) for '%s'",
-              expectedChecksum, calculatedChecksum, resourceId));
+              expectedChecksum, calculatedChecksum, this.resourceId));
     }
   }
 
