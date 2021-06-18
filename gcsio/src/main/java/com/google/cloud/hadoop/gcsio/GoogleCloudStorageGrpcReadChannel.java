@@ -350,7 +350,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     int bytesRead = 0;
 
     if (resIterator != null && isByteBufferBeyondCurrentRequestRange(byteBuffer)) {
-      position = position + bytesToSkipBeforeReading;
+      position += bytesToSkipBeforeReading;
       cancelCurrentRequest();
       bufferedContent = null;
       bufferedContentReadOffset = 0;
@@ -382,7 +382,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
     if (resIterator == null) {
       OptionalLong bytesToRead = getBytesToRead(byteBuffer);
-      position = position + bytesToSkipBeforeReading;
+      position += bytesToSkipBeforeReading;
       bytesToSkipBeforeReading = 0;
       requestObjectMedia(bytesToRead);
       if (bytesToRead.isPresent()) {
@@ -409,10 +409,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     if (contentChannelEndOffset == -1) {
       return false;
     }
-    if ((effectivePosition + byteBuffer.remaining()) > (contentChannelEndOffset)) {
-      return true;
-    }
-    return false;
+    return (effectivePosition + byteBuffer.remaining()) > (contentChannelEndOffset);
   }
 
   private int readObjectContentFromGCS(ByteBuffer byteBuffer) throws IOException {
