@@ -347,11 +347,15 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.grpc.enable", false);
 
-  /** Configuration key for enabling checksum validation for the gRPC API. */
+  /**
+   * Configuration key for enabling checksum validation for the gRPC API.
+   */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_CHECKSUMS_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.grpc.checksums.enable", false);
 
-  /** Configuration key for the Cloud Storage gRPC server address. */
+  /**
+   * Configuration key for the Cloud Storage gRPC server address.
+   */
   public static final HadoopConfigurationProperty<String> GCS_GRPC_SERVER_ADDRESS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.server.address");
 
@@ -361,15 +365,21 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_TIMEOUT_MS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.read.timeout.ms", 20 * 60 * 1000L);
 
-  /** Configuration key for the connect timeout (in millisecond) for gRPC metadata requests to GCS. */
+  /**
+   * Configuration key for the connect timeout (in millisecond) for gRPC metadata requests to GCS.
+   */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_METADATA_TIMEOUT_MS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.read.metadata.timeout.ms", 60 * 1000L);
 
-  /** Configuration key for the connect timeout (in millisecond) for gRPC write requests to GCS. */
+  /**
+   * Configuration key for the connect timeout (in millisecond) for gRPC write requests to GCS.
+   */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_WRITE_TIMEOUT_MS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.write.timeout.ms", 10 * 60 * 1000L);
 
-  /** Configuration key for the number of requests to be buffered for uploads to GCS. */
+  /**
+   * Configuration key for the number of requests to be buffered for uploads to GCS.
+   */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_UPLOAD_BUFFERED_REQUESTS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.write.buffered.requests", 20L);
 
