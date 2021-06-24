@@ -225,7 +225,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
               ByteString.readFrom(
                   ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE), MAX_BYTES_PER_MESSAGE);
           dataChunkMap.put(writeOffset, data);
-          if (dataChunkMap.size() >= channelOptions.getNumberOfRequestsBuffered()) {
+          if (dataChunkMap.size() >= channelOptions.getNumberOfBufferedRequests()) {
             dataChunkMap.remove(dataChunkMap.firstKey());
           }
           insertRequest = buildInsertRequest(writeOffset, data, false);

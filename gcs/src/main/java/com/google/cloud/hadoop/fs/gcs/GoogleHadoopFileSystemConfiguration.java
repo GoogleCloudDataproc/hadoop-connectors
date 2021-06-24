@@ -528,7 +528,7 @@ public class GoogleHadoopFileSystemConfiguration {
             GCS_OUTPUT_STREAM_DIRECT_UPLOAD_ENABLE.get(config, config::getBoolean))
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
         .setGrpcWriteTimeout(GCS_GRPC_WRITE_TIMEOUT_MS.get(config, config::getLong))
-        .setNumberOfRequestsBuffered(GCS_GRPC_UPLOAD_BUFFERED_REQUESTS.get(config, config::getLong))
+        .setNumberOfBufferedRequests(GCS_GRPC_UPLOAD_BUFFERED_REQUESTS.get(config, config::getLong))
         .build();
   }
 

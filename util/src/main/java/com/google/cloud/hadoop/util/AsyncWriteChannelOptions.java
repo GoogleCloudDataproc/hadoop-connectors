@@ -98,7 +98,7 @@ public abstract class AsyncWriteChannelOptions {
         .setDirectUploadEnabled(DIRECT_UPLOAD_ENABLED_DEFAULT)
         .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT)
         .setGrpcWriteTimeout(DEFAULT_GRPC_WRITE_TIMEOUT)
-        .setNumberOfRequestsBuffered(DEFAULT_NUM_REQUESTS_BUFFERED_GRPC);
+        .setNumberOfBufferedRequests(DEFAULT_NUM_REQUESTS_BUFFERED_GRPC);
   }
 
   public abstract Builder toBuilder();
@@ -119,7 +119,7 @@ public abstract class AsyncWriteChannelOptions {
 
   public abstract long getGrpcWriteTimeout();
 
-  public abstract long getNumberOfRequestsBuffered();
+  public abstract long getNumberOfBufferedRequests();
 
   /**
    * Mutable builder for the GoogleCloudStorageWriteChannelOptions class.
@@ -141,7 +141,7 @@ public abstract class AsyncWriteChannelOptions {
 
     public abstract Builder setGrpcWriteTimeout(long grpcWriteTimeout);
 
-    public abstract Builder setNumberOfRequestsBuffered(long numberOfRequestsBuffered);
+    public abstract Builder setNumberOfBufferedRequests(long numberOfBufferedRequests);
 
     /**
      * Enable gRPC checksumming. On by default. It is strongly recommended to leave this enabled, to
