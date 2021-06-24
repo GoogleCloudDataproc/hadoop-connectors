@@ -80,7 +80,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.grpc.read.timeout.ms", 20 * 60 * 1000L);
           put("fs.gs.grpc.read.metadata.timeout.ms", 60 * 1000L);
           put("fs.gs.grpc.write.timeout.ms", 10 * 60 * 1000L);
-          put("fs.gs.grpc.write.requests.buffered", 20L);
+          put("fs.gs.grpc.write.buffered.requests", 20L);
           put("fs.gs.http.connect-timeout", 20_000);
           put("fs.gs.http.max.retry", 10);
           put("fs.gs.http.read-timeout", 20_000);
