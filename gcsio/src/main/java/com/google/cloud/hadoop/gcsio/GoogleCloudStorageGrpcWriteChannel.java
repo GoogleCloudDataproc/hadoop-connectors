@@ -73,7 +73,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
   // more complex implementation that periodically queries the service to find out the last
   // committed offset, to determine what's safe to discard, but that would also impose a performance
   // penalty.
-  private static final int NUMBER_OF_REQUESTS_TO_RETAIN = 5;
+  private static final int NUMBER_OF_REQUESTS_TO_RETAIN = 20;
   // A set that defines all transient errors on which retry can be attempted.
   private static final ImmutableSet<Status.Code> TRANSIENT_ERRORS =
       ImmutableSet.of(
@@ -320,7 +320,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
       InsertObjectRequest request = null;
       if (dataChunkMap.size() > 0 && dataChunkMap.firstKey() <= writeOffset) {
         for (Map.Entry<Long, ByteString> entry : dataChunkMap.entrySet()) {
-          if (entry.getKey() + entry.getValue().size() > writeOffset) {
+          if (entry.getKey() + entry.getValue().size() > writeOffset
+              || entry.getKey() == writeOffset) {
             Long writeOffsetToResume = entry.getKey();
             ByteString chunkData = entry.getValue();
             request = buildInsertRequest(writeOffsetToResume, chunkData, true);
