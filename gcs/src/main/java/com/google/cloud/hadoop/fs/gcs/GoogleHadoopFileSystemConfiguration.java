@@ -370,7 +370,7 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>("fs.gs.grpc.write.timeout.ms", 10 * 60 * 1000L);
 
   /** Configuration key for the number of requests to be buffered for uploads to GCS. */
-  public static final HadoopConfigurationProperty<Long> GCS_GRPC_UPLOAD_REQUESTS_BUFFER =
+  public static final HadoopConfigurationProperty<Long> GCS_GRPC_UPLOAD_BUFFERED_REQUESTS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.write.buffered.requests", 20L);
 
   /**
@@ -528,7 +528,7 @@ public class GoogleHadoopFileSystemConfiguration {
             GCS_OUTPUT_STREAM_DIRECT_UPLOAD_ENABLE.get(config, config::getBoolean))
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
         .setGrpcWriteTimeout(GCS_GRPC_WRITE_TIMEOUT_MS.get(config, config::getLong))
-        .setNumberOfRequestsBuffered(GCS_GRPC_UPLOAD_REQUESTS_BUFFER.get(config, config::getLong))
+        .setNumberOfRequestsBuffered(GCS_GRPC_UPLOAD_BUFFERED_REQUESTS.get(config, config::getLong))
         .build();
   }
 
