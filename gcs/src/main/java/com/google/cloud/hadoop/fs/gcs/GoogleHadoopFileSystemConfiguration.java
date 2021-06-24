@@ -381,7 +381,7 @@ public class GoogleHadoopFileSystemConfiguration {
    * Configuration key for the number of requests to be buffered for uploads to GCS.
    */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_UPLOAD_BUFFERED_REQUESTS =
-      new HadoopConfigurationProperty<>("fs.gs.outputstream.grpc.buffered.requests", 20L);
+      new HadoopConfigurationProperty<>("fs.gs.grpc.outputstream.buffered.requests", 20L);
 
   /**
    * Configuration key for using cooperative locking to achieve a directory mutation operations
