@@ -372,16 +372,16 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>("fs.gs.grpc.read.metadata.timeout.ms", 60 * 1000L);
 
   /**
+   * Configuration key for the number of requests to be buffered for uploads to GCS.
+   */
+  public static final HadoopConfigurationProperty<Long> GCS_GRPC_UPLOAD_BUFFERED_REQUESTS =
+      new HadoopConfigurationProperty<>("fs.gs.grpc.write.buffered.requests", 20L);
+
+  /**
    * Configuration key for the connect timeout (in millisecond) for gRPC write requests to GCS.
    */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_WRITE_TIMEOUT_MS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.write.timeout.ms", 10 * 60 * 1000L);
-
-  /**
-   * Configuration key for the number of requests to be buffered for uploads to GCS.
-   */
-  public static final HadoopConfigurationProperty<Long> GCS_GRPC_UPLOAD_BUFFERED_REQUESTS =
-      new HadoopConfigurationProperty<>("fs.gs.grpc.outputstream.buffered.requests", 20L);
 
   /**
    * Configuration key for using cooperative locking to achieve a directory mutation operations
