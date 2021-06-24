@@ -67,13 +67,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
   private static final Duration START_RESUMABLE_WRITE_TIMEOUT = Duration.ofMinutes(1);
   private static final Duration QUERY_WRITE_STATUS_TIMEOUT = Duration.ofMinutes(1);
 
-  // Number of insert requests to retain, in case we need to rewind and resume an upload. Using too
-  // small of a number could risk being unable to resume the write if the resume point is an
-  // already-discarded buffer; and setting the value too high wastes RAM. Note: We could have a
-  // more complex implementation that periodically queries the service to find out the last
-  // committed offset, to determine what's safe to discard, but that would also impose a performance
-  // penalty.
-  private static final int NUMBER_OF_REQUESTS_TO_RETAIN = 20;
   // A set that defines all transient errors on which retry can be attempted.
   private static final ImmutableSet<Status.Code> TRANSIENT_ERRORS =
       ImmutableSet.of(
@@ -232,7 +225,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
               ByteString.readFrom(
                   ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE), MAX_BYTES_PER_MESSAGE);
           dataChunkMap.put(writeOffset, data);
-          if (dataChunkMap.size() >= NUMBER_OF_REQUESTS_TO_RETAIN) {
+          if (dataChunkMap.size() >= channelOptions.getNumberOfRequestsBuffered()) {
             dataChunkMap.remove(dataChunkMap.firstKey());
           }
           insertRequest = buildInsertRequest(writeOffset, data, false);

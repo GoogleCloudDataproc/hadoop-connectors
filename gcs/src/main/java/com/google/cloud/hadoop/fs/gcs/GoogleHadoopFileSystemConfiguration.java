@@ -364,6 +364,9 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_WRITE_TIMEOUT_MS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.write.timeout.ms", 10 * 60 * 1000L);
 
+  public static final HadoopConfigurationProperty<Long> GCS_GRPC_UPLOAD_REQUESTS_BUFFER =
+      new HadoopConfigurationProperty<>("fs.gs.grpc.write.requests.buffered", 20L);
+
   /**
    * Configuration key for using cooperative locking to achieve a directory mutation operations
    * isolation.
@@ -371,7 +374,9 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_COOPERATIVE_LOCKING_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.cooperative.locking.enable", false);
 
-  /** Configuration key for lock expiration when using cooperative locking. */
+  /**
+   * Configuration key for lock expiration when using cooperative locking.
+   */
   public static final HadoopConfigurationProperty<Long>
       GCS_COOPERATIVE_LOCKING_EXPIRATION_TIMEOUT_MS =
           new HadoopConfigurationProperty<>(
@@ -517,6 +522,7 @@ public class GoogleHadoopFileSystemConfiguration {
             GCS_OUTPUT_STREAM_DIRECT_UPLOAD_ENABLE.get(config, config::getBoolean))
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
         .setGrpcWriteTimeout(GCS_GRPC_WRITE_TIMEOUT_MS.get(config, config::getLong))
+        .setNumberOfRequestsBuffered(GCS_GRPC_UPLOAD_REQUESTS_BUFFER.get(config, config::getLong))
         .build();
   }
 
