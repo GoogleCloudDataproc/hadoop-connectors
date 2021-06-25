@@ -20,9 +20,7 @@ import com.google.api.client.googleapis.media.MediaHttpUploader;
 import com.google.auto.value.AutoValue;
 import com.google.common.flogger.GoogleLogger;
 
-/**
- * Options for the {@link AbstractGoogleAsyncWriteChannel}.
- */
+/** Options for the {@link AbstractGoogleAsyncWriteChannel}. */
 @AutoValue
 public abstract class AsyncWriteChannelOptions {
 
