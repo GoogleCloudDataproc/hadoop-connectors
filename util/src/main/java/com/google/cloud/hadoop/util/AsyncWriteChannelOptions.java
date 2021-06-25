@@ -28,60 +28,40 @@ public abstract class AsyncWriteChannelOptions {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  /**
-   * Pipe used for output stream.
-   */
+  /** Pipe used for output stream. */
   public enum PipeType {
     NIO_CHANNEL_PIPE,
     IO_STREAM_PIPE,
   }
 
-  /**
-   * Default upload buffer size.
-   */
+  /** Default upload buffer size. */
   public static final int BUFFER_SIZE_DEFAULT = 8 * 1024 * 1024;
 
-  /**
-   * Default pipe buffer size.
-   */
+  /** Default pipe buffer size. */
   public static final int PIPE_BUFFER_SIZE_DEFAULT = 1024 * 1024;
 
-  /**
-   * Upload chunk size granularity
-   */
+  /** Upload chunk size granularity */
   public static final int UPLOAD_CHUNK_SIZE_GRANULARITY = 8 * 1024 * 1024;
 
-  /**
-   * Default upload chunk size.
-   */
+  /** Default upload chunk size. */
   public static final int UPLOAD_CHUNK_SIZE_DEFAULT =
       Runtime.getRuntime().maxMemory() < 512 * 1024 * 1024
           ? UPLOAD_CHUNK_SIZE_GRANULARITY
           : 8 * UPLOAD_CHUNK_SIZE_GRANULARITY;
 
-  /**
-   * Default upload cache size.
-   */
+  /** Default upload cache size. */
   public static final int UPLOAD_CACHE_SIZE_DEFAULT = 0;
 
-  /**
-   * Default of whether to use direct upload.
-   */
+  /** Default of whether to use direct upload. */
   public static final boolean DIRECT_UPLOAD_ENABLED_DEFAULT = false;
 
-  /**
-   * Default of whether to enabled checksums for gRPC.
-   */
+  /** Default of whether to enabled checksums for gRPC. */
   public static final boolean GRPC_CHECKSUMS_ENABLED_DEFAULT = false;
 
-  /**
-   * Default timeout for grpc write stream.
-   */
+  /** Default timeout for grpc write stream. */
   public static final long DEFAULT_GRPC_WRITE_TIMEOUT = 10 * 60 * 1000;
 
-  /**
-   * Default number of insert requests to retain, in case we need to rewind and resume an upload
-   */
+  /** Default number of insert requests to retain, in case we need to rewind and resume an upload */
   public static final long DEFAULT_NUM_REQUESTS_BUFFERED_GRPC = 20;
 
   public static final PipeType PIPE_TYPE_DEFAULT = PipeType.IO_STREAM_PIPE;
@@ -121,9 +101,7 @@ public abstract class AsyncWriteChannelOptions {
 
   public abstract long getNumberOfBufferedRequests();
 
-  /**
-   * Mutable builder for the GoogleCloudStorageWriteChannelOptions class.
-   */
+  /** Mutable builder for the GoogleCloudStorageWriteChannelOptions class. */
   @AutoValue.Builder
   public abstract static class Builder {
 
