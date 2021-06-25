@@ -33,7 +33,6 @@ import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_U
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.cloud.hadoop.util.testing.HadoopConfigurationUtils.getDefaultProperties;
 import static com.google.common.truth.Truth.assertThat;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksumType;
@@ -345,11 +344,12 @@ public class GoogleHadoopFileSystemConfigurationTest {
     GoogleCloudStorageOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
 
-    assertEquals(options.getReadChannelOptions().getGrpcReadTimeoutMillis(), grpcReadTimeout);
-    assertEquals(options.getReadChannelOptions().getGrpcReadMetadataTimeoutMillis(),
+    assertThat(options.getReadChannelOptions().getGrpcReadTimeoutMillis())
+        .isEqualTo(grpcReadTimeout);
+    assertThat(options.getReadChannelOptions().getGrpcReadMetadataTimeoutMillis()).isEqualTo(
         grpcReadMetadataTimeout);
-    assertEquals(options.getWriteChannelOptions().getGrpcWriteTimeout(), grpcWriteTimeout);
-    assertEquals(options.getWriteChannelOptions().getNumberOfBufferedRequests(),
+    assertThat(options.getWriteChannelOptions().getGrpcWriteTimeout()).isEqualTo(grpcWriteTimeout);
+    assertThat(options.getWriteChannelOptions().getNumberOfBufferedRequests()).isEqualTo(
         grpcUploadBufferedRequests);
   }
 }
