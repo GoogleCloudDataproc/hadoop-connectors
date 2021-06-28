@@ -59,6 +59,9 @@ public abstract class AsyncWriteChannelOptions {
   /** Default timeout for grpc write stream. */
   public static final long DEFAULT_GRPC_WRITE_TIMEOUT = 10 * 60 * 1000;
 
+  /** Default number of insert requests to retain, in case we need to rewind and resume an upload */
+  public static final long DEFAULT_NUM_REQUESTS_BUFFERED_GRPC = 20;
+
   public static final PipeType PIPE_TYPE_DEFAULT = PipeType.IO_STREAM_PIPE;
 
   public static final AsyncWriteChannelOptions DEFAULT = builder().build();
@@ -72,7 +75,8 @@ public abstract class AsyncWriteChannelOptions {
         .setUploadCacheSize(UPLOAD_CACHE_SIZE_DEFAULT)
         .setDirectUploadEnabled(DIRECT_UPLOAD_ENABLED_DEFAULT)
         .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT)
-        .setGrpcWriteTimeout(DEFAULT_GRPC_WRITE_TIMEOUT);
+        .setGrpcWriteTimeout(DEFAULT_GRPC_WRITE_TIMEOUT)
+        .setNumberOfBufferedRequests(DEFAULT_NUM_REQUESTS_BUFFERED_GRPC);
   }
 
   public abstract Builder toBuilder();
@@ -93,6 +97,8 @@ public abstract class AsyncWriteChannelOptions {
 
   public abstract long getGrpcWriteTimeout();
 
+  public abstract long getNumberOfBufferedRequests();
+
   /** Mutable builder for the GoogleCloudStorageWriteChannelOptions class. */
   @AutoValue.Builder
   public abstract static class Builder {
@@ -110,6 +116,8 @@ public abstract class AsyncWriteChannelOptions {
     public abstract Builder setDirectUploadEnabled(boolean directUploadEnabled);
 
     public abstract Builder setGrpcWriteTimeout(long grpcWriteTimeout);
+
+    public abstract Builder setNumberOfBufferedRequests(long numberOfBufferedRequests);
 
     /**
      * Enable gRPC checksumming. On by default. It is strongly recommended to leave this enabled, to
