@@ -1,24 +1,24 @@
 ### 2.2.3 - 2021-XX-XX
 
-1. Update all dependencies to latest versions.
+1.  Update all dependencies to latest versions.
 
 ### 2.2.2 - 2021-06-25
 
-1. Add support for footer prefetch over gRPC channel
+1.  Support footer prefetch in gRPC read channel.
 
-1. Fix in-place seek functionality for gRPC read channel
+1.  Fix in-place seek functionality in gRPC read channel.
 
-1. Add option to buffer requests for resumable upload over gRPC
+1.  Add option to buffer requests for resumable upload over gRPC:
 
     ```
-   fs.gs.grpc.write.buffered.requests (default : 20)
+    fs.gs.grpc.write.buffered.requests (default : 20)
     ```
 
 ### 2.2.1 - 2021-05-04
 
 1.  Fix proxy configuration for Apache HTTP transport.
 
-1. Update gRPC dependency to latest version
+1.  Update gRPC dependency to latest version.
 
 ### 2.2.0 - 2021-01-06
 
@@ -160,7 +160,7 @@
 1.  Fix unauthenticated access support (`fs.gs.auth.null.enable=true`).
 
 1.  Improve cache hit ratio when `fs.gs.performance.cache.enable` property is
-    set to `true`. 
+    set to `true`.
 
 1.  Remove obsolete configuration properties and related functionality:
 
@@ -1236,7 +1236,7 @@
 
 1.  Directory timestamp updating can now be controlled via user-settable
     properties `fs.gs.parent.timestamp.update.enable`,
-    `fs.gs.parent.timestamp.update.substrings.excludes`. and
+    `fs.gs.parent.timestamp.update.substrings.excludes`, and
     `fs.gs.parent.timestamp.update.substrings.includes` in `core-site.xml`. By
     default, timestamp updating is enabled for the YARN done and intermediate
     done directories and excluded for everything else. Strings listed in
