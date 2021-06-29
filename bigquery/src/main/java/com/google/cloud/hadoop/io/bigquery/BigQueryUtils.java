@@ -137,8 +137,7 @@ public class BigQueryUtils {
     logger.atFine().log("getSchemaFromString('%s')", fields);
 
     // Parse the output schema for Json from fields.
-    JsonParser jsonParser = new JsonParser();
-    JsonArray json = jsonParser.parse(fields).getAsJsonArray();
+    JsonArray json = JsonParser.parseString(fields).getAsJsonArray();
     List<TableFieldSchema> fieldsList = new ArrayList<>();
 
     // For each item in the list of fields.
