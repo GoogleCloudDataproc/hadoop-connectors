@@ -133,7 +133,7 @@ public class RetryHttpInitializerTest {
     verify(mockCredential).intercept(eq(req));
     verify(mockLowLevelRequest).addHeader(eq("Authorization"), eq(authHeaderValue));
     verify(mockLowLevelRequest).execute();
-    verify(mockLowLevelResponse).getStatusCode();
+    verify(mockLowLevelResponse, times(2)).getStatusCode();
   }
 
   @Test
@@ -162,6 +162,7 @@ public class RetryHttpInitializerTest {
         .thenReturn(mockLowLevelResponse);
     when(mockLowLevelResponse.getStatusCode())
         .thenReturn(403)
+        .thenReturn(403)
         .thenReturn(200);
     when(mockCredential.handleResponse(eq(req), any(HttpResponse.class), eq(true)))
         .thenReturn(true);
@@ -172,7 +173,7 @@ public class RetryHttpInitializerTest {
     verify(mockCredential, times(2)).intercept(eq(req));
     verify(mockLowLevelRequest, times(2)).addHeader(eq("Authorization"), eq(authHeaderValue));
     verify(mockLowLevelRequest, times(2)).execute();
-    verify(mockLowLevelResponse, times(2)).getStatusCode();
+    verify(mockLowLevelResponse, times(4)).getStatusCode();
     verify(mockCredential).handleResponse(eq(req), any(HttpResponse.class), eq(true));
   }
 
@@ -212,6 +213,7 @@ public class RetryHttpInitializerTest {
         .thenReturn(mockLowLevelResponse);
     when(mockLowLevelResponse.getStatusCode())
         .thenReturn(code)
+        .thenReturn(code)
         .thenReturn(200);
     when(mockCredential.handleResponse(eq(req), any(HttpResponse.class), eq(true)))
         .thenReturn(false);
@@ -222,7 +224,7 @@ public class RetryHttpInitializerTest {
     verify(mockCredential, times(2)).intercept(eq(req));
     verify(mockLowLevelRequest, times(2)).addHeader(eq("Authorization"), eq(authHeaderValue));
     verify(mockLowLevelRequest, times(2)).execute();
-    verify(mockLowLevelResponse, times(2)).getStatusCode();
+    verify(mockLowLevelResponse, times(4)).getStatusCode();
     verify(mockCredential).handleResponse(eq(req), any(HttpResponse.class), eq(true));
     verify(mockSleeper).sleep(anyLong());
   }
@@ -262,7 +264,7 @@ public class RetryHttpInitializerTest {
     verify(mockCredential, times(2)).intercept(eq(req));
     verify(mockLowLevelRequest, times(2)).addHeader(eq("Authorization"), eq(authHeaderValue));
     verify(mockLowLevelRequest, times(2)).execute();
-    verify(mockLowLevelResponse).getStatusCode();
+    verify(mockLowLevelResponse, times(2)).getStatusCode();
     verify(mockSleeper).sleep(anyLong());
   }
 }
