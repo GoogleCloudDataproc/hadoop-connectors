@@ -1170,7 +1170,7 @@
 
 1. Directory timestamp updating can now be controlled via user-settable
    properties `fs.gs.parent.timestamp.update.enable`,
-   `fs.gs.parent.timestamp.update.substrings.excludes`. and
+   `fs.gs.parent.timestamp.update.substrings.excludes`, and
    `fs.gs.parent.timestamp.update.substrings.includes` in `core-site.xml`. By default, timestamp
    updating is enabled for the YARN done and intermediate done directories and excluded for
    everything else. Strings listed in includes take precedence over excludes.
@@ -1186,11 +1186,11 @@
    the `(InMemory)DirectoryListCache`; instead of using an in-memory HashMap to enforce only
    same-process list consistency, the FileSystemBacked version mirrors GCS objects as empty files on
    a local FileSystem, which may itself be an NFS mount for cluster-wide or even potentially
-   cross-cluster consistency groups. This allows a cluster to be configured with a "consistent view"
-   , making it safe to use GCS as the
-   `DEFAULT_FS` for arbitrary multi-stage or even multi-platform workloads. This is now enabled by
-   default for machine-wide consistency, but it is strongly recommended to configure clusters with
-   an NFS directory for cluster-wide strong consistency. Relevant configuration settings:
+   cross-cluster consistency groups. This allows cluster to be configured with a "consistent view",
+   making it safe to use GCS as the `DEFAULT_FS` for arbitrary multi-stage or even multi-platform
+   workloads. This is now enabled by default for machine-wide consistency, but it is strongly
+   recommended to configure clusters with an NFS directory for cluster-wide strong consistency.
+   Relevant configuration settings:
 
    ```
    fs.gs.metadata.cache.enable [default: true]
