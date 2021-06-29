@@ -1,3 +1,5 @@
+### 2.2.3 - 2021-XX-XX
+
 ### 2.2.2 - 2021-06-25
 
 1. Add support for footer prefetch over gRPC channel
