@@ -1,4 +1,14 @@
-### 2.2.2 - 2021-XX-XX
+### 2.2.2 - 2021-06-25
+
+1. Add support for footer prefetch over gRPC channel
+
+1. Fix in-place seek functionality for gRPC read channel
+
+1. Add option to buffer requests for resumable upload over gRPC
+
+    ```
+   fs.gs.grpc.write.buffered.requests (default : 20)
+    ```
 
 ### 2.2.1 - 2021-05-04
 
