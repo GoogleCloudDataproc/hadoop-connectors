@@ -1254,7 +1254,7 @@
     in-memory HashMap to enforce only same-process list consistency, the
     FileSystemBacked version mirrors GCS objects as empty files on a local
     FileSystem, which may itself be an NFS mount for cluster-wide or even
-    potentially cross-cluster consistency groups. This allows cluster to be
+    potentially cross-cluster consistency groups. This allows a cluster to be
     configured with a "consistent view", making it safe to use GCS as the
     `DEFAULT_FS` for arbitrary multi-stage or even multi-platform workloads.
     This is now enabled by default for machine-wide consistency, but it is
