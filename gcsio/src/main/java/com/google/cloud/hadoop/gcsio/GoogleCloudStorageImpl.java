@@ -66,6 +66,7 @@ import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -2098,15 +2099,25 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   <RequestT extends StorageRequest<?>> RequestT initializeRequest(
       RequestT request, String bucketName) throws IOException {
+    String accessToken = null;
     if (storageRequestAuthorizer != null) {
-      storageRequestAuthorizer.authorize(request);
+      try {
+        accessToken = storageRequestAuthorizer.authorize(request);
+      } catch (UnsupportedOperationException e) {
+        // For not supported methods, do nothing.
+        accessToken = null;
+      }
     }
-    return configureRequest(request, bucketName);
+    return configureRequest(request, bucketName, accessToken);
   }
 
   <RequestT extends StorageRequest<?>> RequestT configureRequest(
-      RequestT request, String bucketName) {
+      RequestT request, String bucketName, String accessToken) {
     setRequesterPaysProject(request, bucketName);
+
+    if (!Strings.isNullOrEmpty(accessToken)) {
+      setAuthorizationHeader(request, accessToken);
+    }
 
     if (request instanceof Storage.Objects.Get || request instanceof Storage.Objects.Insert) {
       setEncryptionHeaders(request);
@@ -2162,6 +2173,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             checkNotNull(
                     storageOptions.getEncryptionKeyHash(), "encryption key hash must not be null")
                 .value());
+  }
+
+  private <RequestT extends  StorageRequest<?>> void setAuthorizationHeader(RequestT request, String accessToken) {
+    request.getRequestHeaders()
+        .set("Authorization",
+            String.format("Bearer: %s", checkNotNull(accessToken, "access token must not be null")));
   }
 
   private <RequestT extends StorageRequest<?>> void setRequesterPaysProject(

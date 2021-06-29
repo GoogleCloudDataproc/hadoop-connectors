@@ -2,12 +2,13 @@ package com.google.cloud.hadoop.gcsio.authorization;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
@@ -76,14 +77,15 @@ public class StorageRequestAuthorizerTest {
     // Any StorageRequest will do
     Storage.Objects.List list = newStorage().objects().list(BUCKET_NAME).setPrefix(OBJECT_NAME);
 
-    doNothing().when(mockHandler).handleListObjects(any(URI.class));
+    when(mockHandler.handleListObjects(any(URI.class))).thenReturn("AccessTokenString");
 
     StorageRequestAuthorizer authorizer = new StorageRequestAuthorizer(mockHandler);
 
-    authorizer.authorize(list);
+    String actualToken = authorizer.authorize(list);
 
     // Nothing should happen when access allowed.
     verify(mockHandler).handleListObjects(any(URI.class));
+    assertEquals("AccessTokenString", actualToken);
   }
 
   @Test

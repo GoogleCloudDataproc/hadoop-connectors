@@ -57,18 +57,19 @@ public class StorageRequestAuthorizer {
    *
    * @param request Storage request to be authorized.
    * @throws AccessDeniedException Thrown when access denied by AuthorizationHandler.
+   * @return access token.
    */
-  public void authorize(StorageRequest<?> request) throws AccessDeniedException {
+  public String authorize(StorageRequest<?> request) throws AccessDeniedException {
     logger.atFiner().log("authorizeStorageRequest(%s)", request);
 
     // Objects
     if (request instanceof Storage.Objects.List) {
       Storage.Objects.List listRequest = (Storage.Objects.List) request;
-      authorizationHandler.handleListObjects(
+      return authorizationHandler.handleListObjects(
           getGcsUri(listRequest.getBucket(), listRequest.getPrefix()));
     } else if (request instanceof Storage.Objects.Insert) {
       Storage.Objects.Insert insertRequest = (Storage.Objects.Insert) request;
-      authorizationHandler.handleInsertObject(
+      return authorizationHandler.handleInsertObject(
           getGcsUri(insertRequest.getBucket(), ((StorageObject) getData(request)).getName()));
     } else if (request instanceof Storage.Objects.Compose) {
       Storage.Objects.Compose composeRequest = (Storage.Objects.Compose) request;
@@ -79,44 +80,44 @@ public class StorageRequestAuthorizer {
               .getSourceObjects().stream()
                   .map(source -> getGcsUri(bucket, source.getName()))
                   .collect(toImmutableList());
-      authorizationHandler.handleComposeObject(destination, sources);
+      return authorizationHandler.handleComposeObject(destination, sources);
     } else if (request instanceof Storage.Objects.Get) {
       Storage.Objects.Get getRequest = (Storage.Objects.Get) request;
-      authorizationHandler.handleGetObject(
+      return authorizationHandler.handleGetObject(
           getGcsUri(getRequest.getBucket(), getRequest.getObject()));
     } else if (request instanceof Storage.Objects.Delete) {
       Storage.Objects.Delete deleteRequest = (Storage.Objects.Delete) request;
-      authorizationHandler.handleDeleteObject(
+      return authorizationHandler.handleDeleteObject(
           getGcsUri(deleteRequest.getBucket(), deleteRequest.getObject()));
     } else if (request instanceof Storage.Objects.Rewrite) {
       Storage.Objects.Rewrite rewriteRequest = (Storage.Objects.Rewrite) request;
-      authorizationHandler.handleRewriteObject(
+      return authorizationHandler.handleRewriteObject(
           getGcsUri(rewriteRequest.getSourceBucket(), rewriteRequest.getSourceObject()),
           getGcsUri(rewriteRequest.getDestinationBucket(), rewriteRequest.getDestinationObject()));
 
     } else if (request instanceof Storage.Objects.Copy) {
       Storage.Objects.Copy copyRequest = (Storage.Objects.Copy) request;
-      authorizationHandler.handleCopyObject(
+      return authorizationHandler.handleCopyObject(
           getGcsUri(copyRequest.getSourceBucket(), copyRequest.getSourceObject()),
           getGcsUri(copyRequest.getDestinationBucket(), copyRequest.getDestinationObject()));
     } else if (request instanceof Storage.Objects.Patch) {
       Storage.Objects.Patch patchRequest = (Storage.Objects.Patch) request;
-      authorizationHandler.handlePatchObject(
+      return authorizationHandler.handlePatchObject(
           getGcsUri(patchRequest.getBucket(), patchRequest.getObject()));
     }
 
     // Buckets
     else if (request instanceof Storage.Buckets.List) {
-      authorizationHandler.handleListBuckets(((Storage.Buckets.List) request).getProject());
+      return authorizationHandler.handleListBuckets(((Storage.Buckets.List) request).getProject());
     } else if (request instanceof Storage.Buckets.Insert) {
-      authorizationHandler.handleInsertBucket(
+      return authorizationHandler.handleInsertBucket(
           ((Storage.Buckets.Insert) request).getProject(),
           getGcsUri(((Bucket) getData(request)).getName(), /* objectPath= */ null));
     } else if (request instanceof Storage.Buckets.Get) {
-      authorizationHandler.handleGetBucket(
+      return authorizationHandler.handleGetBucket(
           getGcsUri(((Storage.Buckets.Get) request).getBucket(), /* objectPath= */ null));
     } else if (request instanceof Storage.Buckets.Delete) {
-      authorizationHandler.handleDeleteBucket(
+      return authorizationHandler.handleDeleteBucket(
           getGcsUri(((Storage.Buckets.Delete) request).getBucket(), /* objectPath= */ null));
     }
 

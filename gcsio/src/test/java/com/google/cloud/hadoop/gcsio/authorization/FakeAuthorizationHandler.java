@@ -2,6 +2,7 @@ package com.google.cloud.hadoop.gcsio.authorization;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import com.google.common.collect.ImmutableSet;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
@@ -17,38 +18,67 @@ public class FakeAuthorizationHandler implements AuthorizationHandler {
   }
 
   @Override
-  public void handleListObjects(URI resource) {}
+  public String handleListObjects(URI resource) {
+    return "";
+  }
 
   @Override
-  public void handleInsertObject(URI resource) {}
+  public String handleInsertObject(URI resource)  {
+    return "";
+  }
 
   @Override
-  public void handleComposeObject(URI destinationResource, List<URI> sourceResources) {}
+  public String handleComposeObject(URI destinationResource, List<URI> sourceResources)  {
+    return "";
+  }
 
   @Override
-  public void handleGetObject(URI resource) {}
+  public String handleGetObject(URI resource)  {
+    return "";
+  }
 
   @Override
-  public void handleDeleteObject(URI resource) {}
+  public String handleDeleteObject(URI resource)  {
+    return "";
+  }
 
   @Override
-  public void handleRewriteObject(URI sourceResource, URI destinationResource) {}
+  public String handleRewriteObject(URI sourceResource, URI destinationResource)  {
+    return "";
+  }
 
   @Override
-  public void handleCopyObject(URI sourceResource, URI destinationResource) {}
+  public String handleCopyObject(URI sourceResource, URI destinationResource)  {
+    return "";
+  }
 
   @Override
-  public void handlePatchObject(URI resource) {}
+  public String handlePatchObject(URI resource)  {
+    return "";
+  }
 
   @Override
-  public void handleListBuckets(String project) {}
+  public String handleListBuckets(String project)  {
+    return "";
+  }
 
   @Override
-  public void handleInsertBucket(String project, URI resource) {}
+  public String handleInsertBucket(String project, URI resource)  {
+    return "";
+  }
 
   @Override
-  public void handleGetBucket(URI resource) {}
+  public String handleGetBucket(URI resource)  {
+    return "";
+  }
 
   @Override
-  public void handleDeleteBucket(URI resource) {}
+  public String handleDeleteBucket(URI resource)  {
+    return "";
+  }
+
+  @Override
+  public AuthorizationRequest getAuthorizationRequestByAccessToken(String accessToken) {
+    return new AuthorizationRequest( "test-bucket", "test-object", "test-user", ImmutableSet.of("test-group"));
+  }
 }
