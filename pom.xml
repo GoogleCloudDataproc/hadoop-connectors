@@ -26,7 +26,7 @@
 
   <groupId>com.google.cloud.bigdataoss</groupId>
   <artifactId>bigdataoss-parent</artifactId>
-  <version>2.2.2-SNAPSHOT</version>
+  <version>2.2.3-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <url>https://github.com/GoogleCloudDataproc/hadoop-connectors</url>
@@ -80,34 +80,34 @@
 
     <gpg.skip>true</gpg.skip>
 
-    <bigdataoss.version>2.2.2-SNAPSHOT</bigdataoss.version>
+    <bigdataoss.version>2.2.3-SNAPSHOT</bigdataoss.version>
     <bigquery-connector.version>1.2.1-SNAPSHOT</bigquery-connector.version>
 
     <apache.httpclient.version>4.5.13</apache.httpclient.version>
-    <google.api.grpc.proto-google-iam-v1.version>1.0.5</google.api.grpc.proto-google-iam-v1.version>
-    <google.api-client.version>1.31.3</google.api-client.version>
-    <google.api-client-libraries.version>1.31.0</google.api-client-libraries.version>
-    <google.api-bigquery.version>v2-rev20201030-${google.api-client-libraries.version}</google.api-bigquery.version>
-    <google.api-iamcredentials.version>v1-rev20201022-${google.api-client-libraries.version}</google.api-iamcredentials.version>
-    <google.api-storage.version>v1-rev20201112-${google.api-client-libraries.version}</google.api-storage.version>
-    <google.auth.version>0.22.2</google.auth.version>
-    <google.auto-value.version>1.7.4</google.auto-value.version>
-    <google.cloud-bigquerystorage.version>1.7.2</google.cloud-bigquerystorage.version>
-    <google.flogger.version>0.5.1</google.flogger.version>
-    <google.gson.version>2.8.6</google.gson.version>
-    <google.guava.version>30.1-jre</google.guava.version>
-    <google.http-client.version>1.38.0</google.http-client.version>
-    <google.oauth-client.version>1.31.2</google.oauth-client.version>
-    <google.protobuf.version>3.14.0</google.protobuf.version>
-    <grpc.version>1.37.0</grpc.version>
+    <google.api.grpc.proto-google-iam-v1.version>1.0.14</google.api.grpc.proto-google-iam-v1.version>
+    <google.api-client.version>1.32.1</google.api-client.version>
+    <google.api-client-libraries.version>1.31.5</google.api-client-libraries.version>
+    <google.api-bigquery.version>v2-rev20210617-${google.api-client-libraries.version}</google.api-bigquery.version>
+    <google.api-iamcredentials.version>v1-rev20210326-${google.api-client-libraries.version}</google.api-iamcredentials.version>
+    <google.api-storage.version>v1-rev20210127-${google.api-client-libraries.version}</google.api-storage.version>
+    <google.auth.version>0.26.0</google.auth.version>
+    <google.auto-value.version>1.8.1</google.auto-value.version>
+    <google.cloud-bigquerystorage.version>1.22.5</google.cloud-bigquerystorage.version>
+    <google.flogger.version>0.6</google.flogger.version>
+    <google.gson.version>2.8.7</google.gson.version>
+    <google.guava.version>30.1.1-jre</google.guava.version>
+    <google.http-client.version>1.39.2-sp.1</google.http-client.version>
+    <google.oauth-client.version>1.31.5</google.oauth-client.version>
+    <google.protobuf.version>3.17.3</google.protobuf.version>
+    <grpc.version>1.38.1</grpc.version>
     <hadoop.two.version>2.10.1</hadoop.two.version>
     <hadoop.three.version>3.2.2</hadoop.three.version>
 
     <!-- Test dependencies -->
-    <google.truth.version>1.1</google.truth.version>
-    <junit.version>4.13.1</junit.version>
-    <mockito.version>3.6.28</mockito.version>
-    <system-lambda.version>1.1.1</system-lambda.version>
+    <google.truth.version>1.1.3</google.truth.version>
+    <junit.version>4.13.2</junit.version>
+    <mockito.version>3.11.2</mockito.version>
+    <system-lambda.version>1.2.0</system-lambda.version>
   </properties>
 
   <modules>
@@ -503,7 +503,7 @@
       <plugins>
         <plugin>
           <artifactId>maven-gpg-plugin</artifactId>
-          <version>1.6</version>
+          <version>3.0.1</version>
         </plugin>
         <plugin>
           <artifactId>maven-source-plugin</artifactId>
@@ -511,7 +511,7 @@
         </plugin>
         <plugin>
           <artifactId>maven-javadoc-plugin</artifactId>
-          <version>3.2.0</version>
+          <version>3.3.0</version>
         </plugin>
         <plugin>
           <artifactId>maven-jar-plugin</artifactId>
@@ -550,12 +550,12 @@
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>build-helper-maven-plugin</artifactId>
-          <version>3.1.0</version>
+          <version>3.2.0</version>
         </plugin>
         <plugin>
           <groupId>org.jacoco</groupId>
           <artifactId>jacoco-maven-plugin</artifactId>
-          <version>0.8.5</version>
+          <version>0.8.7</version>
           <executions>
             <execution>
               <goals>
@@ -567,7 +567,7 @@
         <plugin>
           <groupId>kr.motd.maven</groupId>
           <artifactId>os-maven-plugin</artifactId>
-          <version>1.6.2</version>
+          <version>1.7.0</version>
           <executions>
             <execution>
               <phase>initialize</phase>

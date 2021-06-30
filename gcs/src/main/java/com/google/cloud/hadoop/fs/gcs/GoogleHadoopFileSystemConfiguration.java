@@ -355,12 +355,19 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<String> GCS_GRPC_SERVER_ADDRESS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.server.address");
 
+  /** Configuration key for the connect timeout (in millisecond) for gRPC read requests to GCS. */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_TIMEOUT_MS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.read.timeout.ms", 20 * 60 * 1000L);
 
+  /** Configuration key for the connect timeout (in millisecond) for gRPC metadata requests to GCS. */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_METADATA_TIMEOUT_MS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.read.metadata.timeout.ms", 60 * 1000L);
 
+  /** Configuration key for the number of requests to be buffered for uploads to GCS. */
+  public static final HadoopConfigurationProperty<Long> GCS_GRPC_UPLOAD_BUFFERED_REQUESTS =
+      new HadoopConfigurationProperty<>("fs.gs.grpc.write.buffered.requests", 20L);
+
+  /** Configuration key for the connect timeout (in millisecond) for gRPC write requests to GCS. */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_WRITE_TIMEOUT_MS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.write.timeout.ms", 10 * 60 * 1000L);
 
@@ -517,6 +524,7 @@ public class GoogleHadoopFileSystemConfiguration {
             GCS_OUTPUT_STREAM_DIRECT_UPLOAD_ENABLE.get(config, config::getBoolean))
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
         .setGrpcWriteTimeout(GCS_GRPC_WRITE_TIMEOUT_MS.get(config, config::getLong))
+        .setNumberOfBufferedRequests(GCS_GRPC_UPLOAD_BUFFERED_REQUESTS.get(config, config::getLong))
         .build();
   }
 
