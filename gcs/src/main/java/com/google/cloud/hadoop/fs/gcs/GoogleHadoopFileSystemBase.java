@@ -70,6 +70,7 @@ import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.PropertyUtil;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ascii;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -95,6 +96,7 @@ import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -105,6 +107,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -114,8 +118,10 @@ import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.GlobPattern;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.Text;
@@ -159,6 +165,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   private static final ListFileOptions LIST_OPTIONS =
       ListFileOptions.DEFAULT.toBuilder().setFields(OBJECT_FIELDS).build();
+
+  private static final ListFileOptions NON_RECURSIVE_LIST_OPTIONS =
+      ListFileOptions.DEFAULT.toBuilder().setFields(OBJECT_FIELDS).setRecursive(false).build();
 
   /**
    * Available types for use with {@link
@@ -873,6 +882,97 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
               .initCause(fnfe);
     }
     return status.toArray(new FileStatus[0]);
+  }
+
+  class GCSDirectoryListingIterator<T extends FileStatus> implements RemoteIterator<T> {
+    private String nextPageToken;
+    private ListFileOptions listFileOptions;
+    private Path hadoopPath;
+    private Iterator<FileInfo> pageIterator;
+
+    public GCSDirectoryListingIterator(Path hadoopPath, ListFileOptions listFileOptions)
+        throws IOException {
+      this.hadoopPath = hadoopPath;
+      this.nextPageToken = null;
+      this.listFileOptions = listFileOptions;
+      // load first page with token null.
+      loadNextBatch();
+    }
+
+    @Override
+    public boolean hasNext() throws IOException {
+      return pageIterator != null && pageIterator.hasNext();
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public T next() throws IOException {
+      Preconditions.checkState(this.hasNext(), "No more items in iterator");
+      String userName = getUgiUserName();
+      FileStatus currentFile = getFileStatus(pageIterator.next(), userName);
+      if (!pageIterator.hasNext() && nextPageToken != null) {
+        loadNextBatch();
+      }
+      return (T) currentFile;
+    }
+
+    /**
+     * Load next batch with pageToken, in case of token null. it will always return first page
+     *
+     * @throws IOException
+     */
+    private void loadNextBatch() throws IOException {
+      ListPage<FileInfo> currentBatch =
+          getGcsFs()
+              .listFileInfoForPrefixPage(
+                  getGcsPath(hadoopPath), this.listFileOptions, this.nextPageToken);
+      if (!CollectionUtils.isEmpty(currentBatch.getItems())) {
+        this.nextPageToken = currentBatch.getNextPageToken();
+        this.pageIterator = currentBatch.getItems().iterator();
+      }
+    }
+  }
+
+  @Override
+  public RemoteIterator<LocatedFileStatus> listFiles(final Path hadoopPath, final boolean recursive)
+      throws IOException {
+    checkNotNull(hadoopPath, "hadoopPath must not be null");
+    checkOpen();
+    logger.atFiner().log(
+        "listFiles(hadoopPath: %s): with recursive flag '%s'", hadoopPath, recursive);
+    ListFileOptions listFileOptions = recursive ? LIST_OPTIONS : NON_RECURSIVE_LIST_OPTIONS;
+    ListPage<FileInfo> initialBatch =
+        getGcsFs().listFileInfoForPrefixPage(getGcsPath(hadoopPath), listFileOptions, null);
+    return new RemoteIterator<LocatedFileStatus>() {
+      String nextPageToken = initialBatch.getNextPageToken();
+      Iterator<FileInfo> pageIterator = initialBatch.getItems().iterator();
+
+      @Override
+      public boolean hasNext() throws IOException {
+        return pageIterator.hasNext();
+      }
+
+      @Override
+      public LocatedFileStatus next() throws IOException {
+        Preconditions.checkState(this.hasNext(), "No more items in iterator");
+        String userName = getUgiUserName();
+        FileStatus currentFile = getFileStatus(pageIterator.next(), userName);
+        if (!pageIterator.hasNext() && nextPageToken != null) {
+          ListPage<FileInfo> currentBatch =
+              getGcsFs()
+                  .listFileInfoForPrefixPage(
+                      getGcsPath(hadoopPath), listFileOptions, nextPageToken);
+          this.nextPageToken = currentBatch.getNextPageToken();
+          this.pageIterator = currentBatch.getItems().iterator();
+        }
+        return new LocatedFileStatus(currentFile, null);
+      }
+    };
+  }
+
+  public RemoteIterator<FileStatus> listStatusIterator(final Path hadoopPath)
+      throws FileNotFoundException, IOException {
+    return new GCSDirectoryListingIterator<>(hadoopPath, LIST_OPTIONS);
   }
 
   /**
