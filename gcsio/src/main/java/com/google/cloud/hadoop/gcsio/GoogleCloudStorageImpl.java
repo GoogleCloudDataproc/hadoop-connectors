@@ -239,9 +239,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // Access Token Provider for per request access tokens.
   private final StorageAccessTokenProvider accessTokenProvider;
 
-  // Whether to obtain a new access token per-request
-  private final boolean refreshAccessTokenPerRequestEnabled;
-
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
    *
@@ -322,7 +319,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
 
     this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(this.storageOptions);
-    this.refreshAccessTokenPerRequestEnabled = this.storageOptions.getRefreshAccessTokenPerRequestEnabled();
     this.accessTokenProvider = accessTokenProvider;
   }
 
@@ -2129,7 +2125,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @VisibleForTesting
   <RequestT extends StorageRequest<?>> RequestT initializeRequest(
       RequestT request, String bucketName) throws IOException {
-    if (refreshAccessTokenPerRequestEnabled && this.accessTokenProvider != null) {
+    if (this.storageOptions.getRefreshAccessTokenPerRequestEnabled() && this.accessTokenProvider != null) {
       AccessToken accessToken = this.accessTokenProvider.getAccessToken(request);
       request.setOauthToken(accessToken.getToken());
     }

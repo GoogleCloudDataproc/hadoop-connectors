@@ -157,7 +157,8 @@ provider.
 
     Whether to generate a new access token for each GCS request.
     Note: When setting this to true, you have to have an AccessTokenProvider 
-    implementation provided.
+    implementation provided. When using `refresh.access-token.per.request.enable`
+    The low level HTTP retry will be turned off.
     Note: When this flag is set to true, it takes precedency over 
     `fs.gs.authorization.handler.impl`
 
@@ -256,6 +257,8 @@ When configured, a specified authorization handler will be used to authorize
 Cloud Storage API requests before executing them. The handler will throw
 `AccessDeniedException` for rejected requests if user does not have enough
 permissions (not authorized) to execute these requests.
+Note: Using a `AccessTokenProvider` is the preferred way to perform authentication 
+and authorization.
 
 *   `fs.gs.authorization.handler.impl` (not set by default)
 
