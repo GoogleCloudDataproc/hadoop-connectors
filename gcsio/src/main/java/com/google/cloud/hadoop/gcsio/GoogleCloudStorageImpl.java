@@ -55,9 +55,9 @@ import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.RewriteResponse;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.auth.Credentials;
+import com.google.cloud.hadoop.gcsio.authorization.StorageAccessTokenProvider;
+import com.google.cloud.hadoop.gcsio.authorization.StorageAccessTokenProvider.AccessToken;
 import com.google.cloud.hadoop.gcsio.authorization.StorageRequestAuthorizer;
-import com.google.cloud.hadoop.util.AccessTokenProvider;
-import com.google.cloud.hadoop.util.AccessTokenProvider.AccessToken;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
@@ -237,10 +237,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private final StorageRequestAuthorizer storageRequestAuthorizer;
 
   // Access Token Provider for per request access tokens.
-  private final AccessTokenProvider accessTokenProvider;
+  private final StorageAccessTokenProvider accessTokenProvider;
 
-  // Whether to obtain a new access token perequest
-  private final boolean shouldAuthenticationPerRequest;
+  // Whether to obtain a new access token per-request
+  private final boolean refreshAccessTokenPerRequestEnabled;
 
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
@@ -250,13 +250,31 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    */
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Credential credential)
       throws IOException {
-    this(options, new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()));
+    this(options, new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()), /*accessTokenProvider*/ null);
+  }
+
+  /**
+   * Constructs an instance of GoogleCloudStorageImpl.
+   *
+   * @param credential OAuth2 credential that allows access to GCS
+   * @param accessTokenProvider The StorageAccessTokenProvider to be used per request.
+   * @throws IOException on IO error
+   */
+  public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Credential credential, StorageAccessTokenProvider accessTokenProvider)
+      throws IOException {
+    this(options, new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()), accessTokenProvider);
   }
 
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer)
       throws IOException {
-    this(options, createStorage(options, httpRequestInitializer));
+    this(options, createStorage(options, httpRequestInitializer), /*credentials*/null, /*accessTokenProvider*/ null);
+  }
+
+  public GoogleCloudStorageImpl(
+      GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer, StorageAccessTokenProvider accessTokenProvider)
+      throws IOException {
+    this(options, createStorage(options, httpRequestInitializer), /*credentials*/null, accessTokenProvider);
   }
 
   /**
@@ -265,16 +283,18 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param storage {@link Storage} to use for I/O.
    */
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage storage) {
-    this(options, storage, null);
+    this(options, storage, /*credentials*/ null, /*accessTokenProvider*/ null);
   }
 
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
    *
+   * @param options {@link GoogleCloudStorageOptions} to use to initialize the object.
    * @param storage {@link Storage} to use for I/O.
    * @param credentials OAuth2 credentials that allows access to GCS
+   * @param accessTokenProvider The StorageAccessTokenProvider to be used per request.
    */
-  public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage storage, Credentials credentials) {
+  public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage storage, Credentials credentials, StorageAccessTokenProvider accessTokenProvider) {
     logger.atFiner().log("GCS(options: %s)", options);
 
     this.storageOptions = checkNotNull(options, "options must not be null");
@@ -302,17 +322,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
 
     this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(this.storageOptions);
-    this.shouldAuthenticationPerRequest = this.storageOptions.getShouldAuthenticatePerRequest();
-
-    if (this.storageOptions.getAccessTokenProvider() != null) {
-      try {
-        this.accessTokenProvider = this.storageOptions.getAccessTokenProvider().getDeclaredConstructor().newInstance();
-      } catch (ReflectiveOperationException e) {
-        throw new RuntimeException("Can not instantiate access token provider.", e);
-      }
-    } else {
-      this.accessTokenProvider = null;
-    }
+    this.refreshAccessTokenPerRequestEnabled = this.storageOptions.getRefreshAccessTokenPerRequestEnabled();
+    this.accessTokenProvider = accessTokenProvider;
   }
 
   private static Storage createStorage(
@@ -2118,10 +2129,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @VisibleForTesting
   <RequestT extends StorageRequest<?>> RequestT initializeRequest(
       RequestT request, String bucketName) throws IOException {
-    if (shouldAuthenticationPerRequest && this.accessTokenProvider != null) {
+    if (refreshAccessTokenPerRequestEnabled && this.accessTokenProvider != null) {
       AccessToken accessToken = this.accessTokenProvider.getAccessToken(request);
       request.setOauthToken(accessToken.getToken());
-    } else if (storageRequestAuthorizer != null) {
+    }
+    if (storageRequestAuthorizer != null) {
       storageRequestAuthorizer.authorize(request);
     }
     return configureRequest(request, bucketName);

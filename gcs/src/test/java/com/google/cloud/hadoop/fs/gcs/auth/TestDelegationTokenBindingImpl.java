@@ -17,7 +17,6 @@
 package com.google.cloud.hadoop.fs.gcs.auth;
 
 import com.google.cloud.hadoop.util.AccessTokenProvider;
-import com.google.cloud.hadoop.util.AccessTokenProvider.AccessToken;
 import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;

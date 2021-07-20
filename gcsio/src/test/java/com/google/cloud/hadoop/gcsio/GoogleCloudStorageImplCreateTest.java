@@ -41,7 +41,7 @@ public class GoogleCloudStorageImplCreateTest {
   public void create_grpcAndVmComputeEngineCredentials_useDirectpath() throws IOException {
     GoogleCloudStorageImpl gcs = new GoogleCloudStorageImpl(
         GoogleCloudStorageOptions.builder().setAppName("app").setGrpcEnabled(true).build(), createStorage(),
-        ComputeEngineCredentials.newBuilder().build());
+        ComputeEngineCredentials.newBuilder().build(), null);
     assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
         .isInstanceOf(StorageStubProvider.DirectPathGrpcDecorator.class);
   }
@@ -50,7 +50,7 @@ public class GoogleCloudStorageImplCreateTest {
   public void create_grpcAndDisableDirectPathAndVmComputeEngineCredentials_useCloudpath() throws IOException {
     GoogleCloudStorageImpl gcs = new GoogleCloudStorageImpl(GoogleCloudStorageOptions.builder().setAppName("app")
         .setGrpcEnabled(true).setDirectPathPreffered(false).build(), createStorage(),
-        ComputeEngineCredentials.newBuilder().build());
+        ComputeEngineCredentials.newBuilder().build(), null);
     assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
         .isInstanceOf(StorageStubProvider.CloudPathGrpcDecorator.class);
   }

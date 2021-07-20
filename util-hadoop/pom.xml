@@ -80,11 +80,6 @@
       <artifactId>google-oauth-client</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.google.cloud.bigdataoss</groupId>
-      <artifactId>util</artifactId>
-      <version>${bigdataoss.version}</version>
-    </dependency>
-    <dependency>
       <groupId>com.google.flogger</groupId>
       <artifactId>flogger</artifactId>
     </dependency>
@@ -96,6 +91,16 @@
       <groupId>com.google.flogger</groupId>
       <artifactId>flogger-system-backend</artifactId>
       <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud.bigdataoss</groupId>
+      <artifactId>util</artifactId>
+      <version>${bigdataoss.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud.bigdataoss</groupId>
+      <artifactId>gcsio</artifactId>
+      <version>${bigdataoss.version}</version>
     </dependency>
 
     <!-- Test dependencies -->

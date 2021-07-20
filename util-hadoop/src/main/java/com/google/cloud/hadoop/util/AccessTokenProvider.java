@@ -15,33 +15,12 @@
 package com.google.cloud.hadoop.util;
 
 import com.google.api.services.storage.StorageRequest;
+import com.google.cloud.hadoop.gcsio.authorization.StorageAccessTokenProvider;
 import java.io.IOException;
 import org.apache.hadoop.conf.Configurable;
 
 /** A provider to provide access token, and upon access token expiration, the utility to refresh. */
-public interface AccessTokenProvider extends Configurable {
-
-  /** An access token and its expiration time. */
-  class AccessToken {
-
-    private final String token;
-    private final Long expirationTimeMilliSeconds;
-
-    public AccessToken(String token, Long expirationTimeMillis) {
-      this.token = token;
-      this.expirationTimeMilliSeconds = expirationTimeMillis;
-    }
-
-    /** @return the Access Token string. */
-    public String getToken() {
-      return token;
-    }
-
-    /** @return the Time when the token will expire, expressed in milliseconds. */
-    public Long getExpirationTimeMilliSeconds() {
-      return expirationTimeMilliSeconds;
-    }
-  }
+public interface AccessTokenProvider extends Configurable, StorageAccessTokenProvider {
 
   /** @return an access token. */
   AccessToken getAccessToken();

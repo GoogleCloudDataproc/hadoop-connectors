@@ -30,6 +30,7 @@ import static java.util.concurrent.Executors.newFixedThreadPool;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
+import com.google.cloud.hadoop.gcsio.authorization.StorageAccessTokenProvider;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationDelete;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationRename;
 import com.google.cloud.hadoop.util.CheckedFunction;
@@ -145,6 +146,24 @@ public class GoogleCloudStorageFileSystem {
     this(
         new GoogleCloudStorageImpl(
             checkNotNull(options, "options must not be null").getCloudStorageOptions(), credential),
+        options);
+    logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
+  }
+
+  /**
+   * Constructs an instance of GoogleCloudStorageFileSystem.
+   *
+   * @param credential OAuth2 credential that allows access to GCS.
+   * @param accessTokenProvider The StorageAccessTokenProvider to be used per request.
+   * @param options Options for how this filesystem should operate and configure its underlying
+   *     storage.
+   * @throws IOException
+   */
+  public GoogleCloudStorageFileSystem(
+      Credential credential, StorageAccessTokenProvider accessTokenProvider, GoogleCloudStorageFileSystemOptions options) throws IOException {
+    this(
+        new GoogleCloudStorageImpl(
+            checkNotNull(options, "options must not be null").getCloudStorageOptions(), credential, accessTokenProvider),
         options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }
