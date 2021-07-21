@@ -45,7 +45,6 @@ import com.google.common.flogger.GoogleLogger;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.permission.FsPermission;
 
@@ -421,8 +420,9 @@ public class GoogleHadoopFileSystemConfiguration {
               "fs.gs.authorization.handler.properties.", ImmutableMap.of());
 
   /** Configuration for whether to generate a new access token per GCS request. */
-  public static final HadoopConfigurationProperty<Boolean> GCS_REFRESH_ACCESS_TOKEN_PER_REQUEST_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.refresh.access-token.per.request.enable", false);
+  public static final HadoopConfigurationProperty<Boolean>
+      GCS_REFRESH_ACCESS_TOKEN_PER_REQUEST_ENABLE =
+          new HadoopConfigurationProperty<>("fs.gs.refresh.access-token.per.request.enable", false);
 
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
@@ -480,7 +480,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setEncryptionKey(RedactedString.create(GCS_ENCRYPTION_KEY.getPassword(config)))
         .setEncryptionKeyHash(RedactedString.create(GCS_ENCRYPTION_KEY_HASH.getPassword(config)))
         .setGrpcEnabled(GCS_GRPC_ENABLE.get(config, config::getBoolean))
-        .setAuthorizationHandlerImplClass(GCS_AUTHORIZATION_HANDLER_IMPL.get(
+        .setAuthorizationHandlerImplClass(
+            GCS_AUTHORIZATION_HANDLER_IMPL.get(
                 config, (k, d) -> config.getClass(k, d, AuthorizationHandler.class)))
         .setAuthorizationHandlerProperties(
             GCS_AUTHORIZATION_HANDLER_PROPERTIES_PREFIX.getPropsWithPrefix(config))

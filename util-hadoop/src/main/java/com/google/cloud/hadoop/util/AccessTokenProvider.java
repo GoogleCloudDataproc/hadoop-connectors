@@ -29,7 +29,7 @@ public interface AccessTokenProvider extends Configurable, StorageAccessTokenPro
    * @param storageRequest a storage request holding the context.
    * @return an access token.
    */
-  default<RequestT extends StorageRequest<?>> AccessToken getAccessToken(RequestT storageRequest) {
+  default <RequestT extends StorageRequest<?>> AccessToken getAccessToken(RequestT storageRequest) {
     return this.getAccessToken();
   }
 
@@ -46,7 +46,8 @@ public interface AccessTokenProvider extends Configurable, StorageAccessTokenPro
    * @param storageRequest a storage request holding the context.
    * @throws IOException when refresh fails.
    */
-  default<RequestT extends StorageRequest<?>>void refresh(RequestT storageRequest) throws IOException {
+  default <RequestT extends StorageRequest<?>> void refresh(RequestT storageRequest)
+      throws IOException {
     this.refresh();
   }
 }

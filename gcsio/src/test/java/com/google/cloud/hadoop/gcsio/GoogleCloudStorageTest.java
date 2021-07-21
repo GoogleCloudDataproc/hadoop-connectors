@@ -3402,14 +3402,14 @@ public class GoogleCloudStorageTest {
       throws IOException {
     MockHttpTransport transport = mockTransport(jsonDataResponse(newBucket(BUCKET_NAME)));
 
-    GoogleCloudStorageOptions gcsOptions = GCS_OPTIONS.toBuilder()
-        .setRefreshAccessTokenPerRequestEnabled(false)
-        .build();
+    GoogleCloudStorageOptions gcsOptions =
+        GCS_OPTIONS.toBuilder().setRefreshAccessTokenPerRequestEnabled(false).build();
 
     StorageAccessTokenProvider mockAtp = Mockito.mock(StorageAccessTokenProvider.class);
     when(mockAtp.getAccessToken(any())).thenReturn(new AccessToken("FakeAccessToken", 1_000L));
 
-    GoogleCloudStorageImpl gcs = (GoogleCloudStorageImpl)mockedGcs(gcsOptions, transport, null, mockAtp);
+    GoogleCloudStorageImpl gcs =
+        (GoogleCloudStorageImpl) mockedGcs(gcsOptions, transport, null, mockAtp);
 
     Get testGetRequest = gcs.storage.objects().get(BUCKET_NAME, OBJECT_NAME);
     gcs.initializeRequest(testGetRequest, BUCKET_NAME);
@@ -3423,14 +3423,14 @@ public class GoogleCloudStorageTest {
       throws IOException {
     MockHttpTransport transport = mockTransport(jsonDataResponse(newBucket(BUCKET_NAME)));
 
-    GoogleCloudStorageOptions gcsOptions = GCS_OPTIONS.toBuilder()
-        .setRefreshAccessTokenPerRequestEnabled(true)
-        .build();
+    GoogleCloudStorageOptions gcsOptions =
+        GCS_OPTIONS.toBuilder().setRefreshAccessTokenPerRequestEnabled(true).build();
 
     StorageAccessTokenProvider mockAtp = Mockito.mock(StorageAccessTokenProvider.class);
     when(mockAtp.getAccessToken(any())).thenReturn(new AccessToken("FakeAccessToken", 1_000L));
 
-    GoogleCloudStorageImpl gcs = (GoogleCloudStorageImpl)mockedGcs(gcsOptions, transport, null, mockAtp);
+    GoogleCloudStorageImpl gcs =
+        (GoogleCloudStorageImpl) mockedGcs(gcsOptions, transport, null, mockAtp);
 
     Get testGetRequest = gcs.storage.objects().get(BUCKET_NAME, OBJECT_NAME);
     gcs.initializeRequest(testGetRequest, BUCKET_NAME);
@@ -3461,7 +3461,8 @@ public class GoogleCloudStorageTest {
       HttpRequestInitializer requestInitializer,
       StorageAccessTokenProvider accessTokenProvider) {
     Storage storage = new Storage(transport, JSON_FACTORY, requestInitializer);
-    return new GoogleCloudStorageImpl(gcsOptions, storage, /*credentials*/null, accessTokenProvider);
+    return new GoogleCloudStorageImpl(
+        gcsOptions, storage, /*credentials*/ null, accessTokenProvider);
   }
 
   static Bucket newBucket(String name) {

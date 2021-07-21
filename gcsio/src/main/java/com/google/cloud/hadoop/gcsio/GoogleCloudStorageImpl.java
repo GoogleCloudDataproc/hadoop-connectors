@@ -247,7 +247,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    */
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Credential credential)
       throws IOException {
-    this(options, new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()), /*accessTokenProvider*/ null);
+    this(
+        options,
+        new RetryHttpInitializer(
+            credential, options.toRetryHttpInitializerOptions()), /*accessTokenProvider*/
+        null);
   }
 
   /**
@@ -257,21 +261,37 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param accessTokenProvider The StorageAccessTokenProvider to be used per request.
    * @throws IOException on IO error
    */
-  public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Credential credential, StorageAccessTokenProvider accessTokenProvider)
+  public GoogleCloudStorageImpl(
+      GoogleCloudStorageOptions options,
+      Credential credential,
+      StorageAccessTokenProvider accessTokenProvider)
       throws IOException {
-    this(options, new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()), accessTokenProvider);
+    this(
+        options,
+        new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()),
+        accessTokenProvider);
   }
 
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer)
       throws IOException {
-    this(options, createStorage(options, httpRequestInitializer), /*credentials*/null, /*accessTokenProvider*/ null);
+    this(
+        options,
+        createStorage(options, httpRequestInitializer), /*credentials*/
+        null, /*accessTokenProvider*/
+        null);
   }
 
   public GoogleCloudStorageImpl(
-      GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer, StorageAccessTokenProvider accessTokenProvider)
+      GoogleCloudStorageOptions options,
+      HttpRequestInitializer httpRequestInitializer,
+      StorageAccessTokenProvider accessTokenProvider)
       throws IOException {
-    this(options, createStorage(options, httpRequestInitializer), /*credentials*/null, accessTokenProvider);
+    this(
+        options,
+        createStorage(options, httpRequestInitializer), /*credentials*/
+        null,
+        accessTokenProvider);
   }
 
   /**
@@ -291,7 +311,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param credentials OAuth2 credentials that allows access to GCS
    * @param accessTokenProvider The StorageAccessTokenProvider to be used per request.
    */
-  public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage storage, Credentials credentials, StorageAccessTokenProvider accessTokenProvider) {
+  public GoogleCloudStorageImpl(
+      GoogleCloudStorageOptions options,
+      Storage storage,
+      Credentials credentials,
+      StorageAccessTokenProvider accessTokenProvider) {
     logger.atFiner().log("GCS(options: %s)", options);
 
     this.storageOptions = checkNotNull(options, "options must not be null");
@@ -627,7 +651,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               }
               if (canIgnoreException) {
                 logger.atInfo().log(
-                    "Ignoring exception of type %s; verified object already exists with desired state.",
+                    "Ignoring exception of type %s; verified object already exists with desired"
+                        + " state.",
                     ioe.getClass().getSimpleName());
                 logger.atFine().withCause(ioe).log("Ignored exception while creating empty object");
               } else {
@@ -2125,7 +2150,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @VisibleForTesting
   <RequestT extends StorageRequest<?>> RequestT initializeRequest(
       RequestT request, String bucketName) throws IOException {
-    if (this.storageOptions.getRefreshAccessTokenPerRequestEnabled() && this.accessTokenProvider != null) {
+    if (this.storageOptions.getRefreshAccessTokenPerRequestEnabled()
+        && this.accessTokenProvider != null) {
       AccessToken accessToken = this.accessTokenProvider.getAccessToken(request);
       request.setOauthToken(accessToken.getToken());
     }

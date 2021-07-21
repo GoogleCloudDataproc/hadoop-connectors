@@ -160,10 +160,15 @@ public class GoogleCloudStorageFileSystem {
    * @throws IOException
    */
   public GoogleCloudStorageFileSystem(
-      Credential credential, StorageAccessTokenProvider accessTokenProvider, GoogleCloudStorageFileSystemOptions options) throws IOException {
+      Credential credential,
+      StorageAccessTokenProvider accessTokenProvider,
+      GoogleCloudStorageFileSystemOptions options)
+      throws IOException {
     this(
         new GoogleCloudStorageImpl(
-            checkNotNull(options, "options must not be null").getCloudStorageOptions(), credential, accessTokenProvider),
+            checkNotNull(options, "options must not be null").getCloudStorageOptions(),
+            credential,
+            accessTokenProvider),
         options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }

@@ -117,17 +117,12 @@ public class RetryHttpInitializerTest {
         };
     RetryHttpInitializer initializer =
         new RetryHttpInitializer(
-            mockCredential,
-            RetryHttpInitializerOptions.builder()
-                .setIsEnabled(false)
-                .build());
+            mockCredential, RetryHttpInitializerOptions.builder().setIsEnabled(false).build());
     initializer.setSleeperOverride(mockSleeper);
     requestFactory = fakeTransport.createRequestFactory(initializer);
 
-    when(mockLowLevelRequest.execute())
-        .thenReturn(mockLowLevelResponse);
-    when(mockLowLevelResponse.getStatusCode())
-        .thenReturn(200);
+    when(mockLowLevelRequest.execute()).thenReturn(mockLowLevelResponse);
+    when(mockLowLevelResponse.getStatusCode()).thenReturn(200);
 
     final HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
     req.execute();

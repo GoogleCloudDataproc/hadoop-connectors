@@ -60,15 +60,11 @@ public class HadoopCredentialConfiguration {
       new HadoopConfigurationProperty<>(
           ".auth.service.account.email", /* defaultValue= */ null, ".service.account.auth.email");
 
-  /**
-   * Key suffix used to specify private key id for the service account.
-   */
+  /** Key suffix used to specify private key id for the service account. */
   public static final HadoopConfigurationProperty<String> SERVICE_ACCOUNT_PRIVATE_KEY_ID_SUFFIX =
       new HadoopConfigurationProperty<>(".auth.service.account.private.key.id");
 
-  /**
-   * Key suffix used to specify private key for the service account.
-   */
+  /** Key suffix used to specify private key for the service account. */
   public static final HadoopConfigurationProperty<String> SERVICE_ACCOUNT_PRIVATE_KEY_SUFFIX =
       new HadoopConfigurationProperty<>(".auth.service.account.private.key");
 
@@ -100,9 +96,7 @@ public class HadoopCredentialConfiguration {
       new HadoopConfigurationProperty<>(
           ".auth.null.enable", CredentialOptions.NULL_CREDENTIALS_ENABLED_DEFAULT);
 
-  /**
-   * Configuration key for setting a token server URL to use to refresh OAuth token.
-   */
+  /** Configuration key for setting a token server URL to use to refresh OAuth token. */
   public static final HadoopConfigurationProperty<String> TOKEN_SERVER_URL_SUFFIX =
       new HadoopConfigurationProperty<>(
           ".token.server.url", CredentialOptions.TOKEN_SERVER_URL_DEFAULT);
@@ -136,12 +130,10 @@ public class HadoopCredentialConfiguration {
       new HadoopConfigurationProperty<>(
           ".http.transport.type", CredentialOptions.HTTP_TRANSPORT_TYPE_DEFAULT);
 
-  /**
-   * Configuration key for the name of the AccessTokenProvider to use to generate AccessTokens.
-   */
+  /** Configuration key for the name of the AccessTokenProvider to use to generate AccessTokens. */
   public static final HadoopConfigurationProperty<Class<? extends AccessTokenProvider>>
       ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX =
-      new HadoopConfigurationProperty<>(".auth.access.token.provider.impl");
+          new HadoopConfigurationProperty<>(".auth.access.token.provider.impl");
 
   /**
    * Key suffix specifying the impersonating service account with which to call GCS API to get
@@ -156,8 +148,8 @@ public class HadoopCredentialConfiguration {
    */
   public static final HadoopConfigurationProperty<Map<String, String>>
       USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX =
-      new HadoopConfigurationProperty<>(
-          ".auth.impersonation.service.account.for.user.", ImmutableMap.of());
+          new HadoopConfigurationProperty<>(
+              ".auth.impersonation.service.account.for.user.", ImmutableMap.of());
 
   /**
    * Key prefix for the group identifier associated with the service account to impersonate when
@@ -165,8 +157,8 @@ public class HadoopCredentialConfiguration {
    */
   public static final HadoopConfigurationProperty<Map<String, String>>
       GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX =
-      new HadoopConfigurationProperty<>(
-          ".auth.impersonation.service.account.for.group.", ImmutableMap.of());
+          new HadoopConfigurationProperty<>(
+              ".auth.impersonation.service.account.for.group.", ImmutableMap.of());
 
   public static CredentialFactory getCredentialFactory(
       Configuration config, String... keyPrefixesVararg) {
@@ -223,8 +215,7 @@ public class HadoopCredentialConfiguration {
   }
 
   /**
-   * Returns full list of config prefixes that will be resolved based on the order in returned
-   * list.
+   * Returns full list of config prefixes that will be resolved based on the order in returned list.
    */
   public static ImmutableList<String> getConfigKeyPrefixes(String... keyPrefixes) {
     return ImmutableList.<String>builder().add(keyPrefixes).add(BASE_KEY_PREFIX).build();

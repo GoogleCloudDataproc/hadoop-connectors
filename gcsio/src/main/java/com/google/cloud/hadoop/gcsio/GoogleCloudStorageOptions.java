@@ -278,7 +278,8 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setAuthorizationHandlerImplClass(
         Class<? extends AuthorizationHandler> authorizationHandlerImpl);
 
-    public abstract Builder setRefreshAccessTokenPerRequestEnabled(boolean refreshAccessTokenPerRequestEnabled);
+    public abstract Builder setRefreshAccessTokenPerRequestEnabled(
+        boolean refreshAccessTokenPerRequestEnabled);
 
     public abstract Builder setAuthorizationHandlerProperties(Map<String, String> properties);
 

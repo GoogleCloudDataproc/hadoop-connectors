@@ -39,5 +39,5 @@ public interface StorageAccessTokenProvider {
    * @param storageRequest a storage request holding the context.
    * @throws IOException when refresh fails.
    */
-  <RequestT extends StorageRequest<?>>void refresh(RequestT storageRequest) throws IOException;
+  <RequestT extends StorageRequest<?>> void refresh(RequestT storageRequest) throws IOException;
 }

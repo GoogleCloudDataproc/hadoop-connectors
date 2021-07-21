@@ -1291,14 +1291,13 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   }
 
   /**
-   * Load's an {@link AccessTokenProvider} implementation. If the user provided an AbstractDelegationTokenBinding
-   * we get the AccessTokenProvider, otherwise if a class name is provided
-   * (See {@link HadoopCredentialConfiguration#ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX} then we use it,
-   * otherwise it's null.
+   * Load's an {@link AccessTokenProvider} implementation. If the user provided an
+   * AbstractDelegationTokenBinding we get the AccessTokenProvider, otherwise if a class name is
+   * provided (See {@link HadoopCredentialConfiguration#ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX} then we
+   * use it, otherwise it's null.
    */
   private AccessTokenProvider getAccessTokenProvider(
-      Configuration config, GoogleCloudStorageFileSystemOptions gcsFsOptions)
-      throws IOException {
+      Configuration config, GoogleCloudStorageFileSystemOptions gcsFsOptions) throws IOException {
     AccessTokenProvider atp = null;
 
     // Check if delegation token support is configured
@@ -1308,8 +1307,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     } else {
       // If delegation token support is not configured, check if a
       // custom AccessTokenProvider implementation is configured
-      atp = CredentialFromAccessTokenProviderClassFactory.getAccessTokenProvider(
-          config, ImmutableList.of(GCS_CONFIG_PREFIX));
+      atp =
+          CredentialFromAccessTokenProviderClassFactory.getAccessTokenProvider(
+              config, ImmutableList.of(GCS_CONFIG_PREFIX));
     }
 
     if (atp != null) {

@@ -119,7 +119,6 @@ public final class CredentialFromAccessTokenProviderClassFactory {
       throws IOException {
     AccessTokenProvider accessTokenProvider = getAccessTokenProvider(config, keyPrefixes);
     return credential(accessTokenProvider, scopes);
-
   }
 
   /** Creates a {@link Credential} based on information from the access token provider. */
