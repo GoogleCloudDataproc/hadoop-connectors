@@ -55,6 +55,8 @@ import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.RewriteResponse;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.auth.Credentials;
+import com.google.cloud.hadoop.gcsio.authorization.AuthorizationMode;
+import com.google.cloud.hadoop.gcsio.authorization.AuthorizationStorageObjectRequestAdapter;
 import com.google.cloud.hadoop.gcsio.authorization.StorageAccessTokenProvider;
 import com.google.cloud.hadoop.gcsio.authorization.StorageAccessTokenProvider.AccessToken;
 import com.google.cloud.hadoop.gcsio.authorization.StorageRequestAuthorizer;
@@ -277,9 +279,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       throws IOException {
     this(
         options,
-        createStorage(options, httpRequestInitializer), /*credentials*/
-        null, /*accessTokenProvider*/
-        null);
+        createStorage(options, httpRequestInitializer),
+        /* credentials= */null,
+        /* accessTokenProvider= */null);
   }
 
   public GoogleCloudStorageImpl(
@@ -289,8 +291,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       throws IOException {
     this(
         options,
-        createStorage(options, httpRequestInitializer), /*credentials*/
-        null,
+        createStorage(options, httpRequestInitializer),
+        /* credentials= */ null,
         accessTokenProvider);
   }
 
@@ -300,7 +302,21 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param storage {@link Storage} to use for I/O.
    */
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage storage) {
-    this(options, storage, /*credentials*/ null, /*accessTokenProvider*/ null);
+    this(options, storage, /* credentials= */ null, /* accessTokenProvider= */ null);
+  }
+
+  /**
+   * Constructs an instance of GoogleCloudStorageImpl.
+   *
+   * @param options {@link GoogleCloudStorageOptions} to use to initialize the object.
+   * @param storage {@link Storage} to use for I/O.
+   * @param credentials OAuth2 credentials that allows access to GCS
+   */
+  public GoogleCloudStorageImpl(
+      GoogleCloudStorageOptions options,
+      Storage storage,
+      Credentials credentials) {
+    this(options, storage, credentials, /* accessTokenProvider= */ null);
   }
 
   /**
@@ -2150,9 +2166,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @VisibleForTesting
   <RequestT extends StorageRequest<?>> RequestT initializeRequest(
       RequestT request, String bucketName) throws IOException {
-    if (this.storageOptions.getRefreshAccessTokenPerRequestEnabled()
-        && this.accessTokenProvider != null) {
-      AccessToken accessToken = this.accessTokenProvider.getAccessToken(request);
+    if (storageOptions.getAuthorizationMode() == AuthorizationMode.REQUEST_CONTEXT_RELATED
+        && accessTokenProvider != null) {
+      AccessToken accessToken = this.accessTokenProvider.getAccessToken(
+          AuthorizationStorageObjectRequestAdapter.fromStorageObjectRequest(request));
       request.setOauthToken(accessToken.getToken());
     }
     if (storageRequestAuthorizer != null) {

@@ -42,6 +42,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
+import com.google.cloud.hadoop.gcsio.authorization.AuthorizationMode;
 import com.google.cloud.hadoop.gcsio.authorization.FakeAuthorizationHandler;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
 import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
@@ -64,7 +65,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.application.name.suffix", "");
           put("fs.gs.authorization.handler.impl", null);
           put("fs.gs.authorization.handler.properties.", ImmutableMap.of());
-          put("fs.gs.refresh.access-token.per.request.enable", false);
+          put("fs.gs.authorization.mode", AuthorizationMode.GENERIC);
           put("fs.gs.batch.threads", 15);
           put("fs.gs.block.size", 64 * 1024 * 1024L);
           put("fs.gs.bucket.delete.enable", false);

@@ -20,6 +20,7 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import com.google.api.services.storage.Storage;
 import com.google.auto.value.AutoValue;
 import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
+import com.google.cloud.hadoop.gcsio.authorization.AuthorizationMode;
 import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
@@ -88,7 +89,7 @@ public abstract class GoogleCloudStorageOptions {
       AUTHORIZATION_HANDLER_IMPL_CLASS_DEFAULT = null;
 
   /** Default setting for generating new access token per request */
-  public static boolean REFRESH_ACCESS_TOKEN_PER_REQUEST_ENABLED = false;
+  public static AuthorizationMode AUTHORIZATION_MODE_DEFAULT = AuthorizationMode.GENERIC;
 
   /** Default properties for authorization handler. */
   public static final Map<String, String> AUTHORIZATION_HANDLER_PROPERTIES_DEFAULT =
@@ -119,7 +120,7 @@ public abstract class GoogleCloudStorageOptions {
         .setCooperativeLockingOptions(CooperativeLockingOptions.DEFAULT)
         .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT)
         .setAuthorizationHandlerImplClass(AUTHORIZATION_HANDLER_IMPL_CLASS_DEFAULT)
-        .setRefreshAccessTokenPerRequestEnabled(REFRESH_ACCESS_TOKEN_PER_REQUEST_ENABLED)
+        .setAuthorizationMode(AUTHORIZATION_MODE_DEFAULT)
         .setAuthorizationHandlerProperties(AUTHORIZATION_HANDLER_PROPERTIES_DEFAULT);
   }
 
@@ -194,12 +195,11 @@ public abstract class GoogleCloudStorageOptions {
 
   public abstract Map<String, String> getAuthorizationHandlerProperties();
 
-  public abstract boolean getRefreshAccessTokenPerRequestEnabled();
+  public abstract AuthorizationMode getAuthorizationMode();
 
   public RetryHttpInitializerOptions toRetryHttpInitializerOptions() {
     return RetryHttpInitializerOptions.builder()
         // When access tokens are refreshed per request, low level HTTP retry should be disabled.
-        .setIsEnabled(!getRefreshAccessTokenPerRequestEnabled())
         .setDefaultUserAgent(getAppName())
         .setHttpHeaders(getHttpRequestHeaders())
         .setMaxRequestRetries(getMaxHttpRequestRetries())
@@ -278,8 +278,7 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setAuthorizationHandlerImplClass(
         Class<? extends AuthorizationHandler> authorizationHandlerImpl);
 
-    public abstract Builder setRefreshAccessTokenPerRequestEnabled(
-        boolean refreshAccessTokenPerRequestEnabled);
+    public abstract Builder setAuthorizationMode(AuthorizationMode authorizationMode);
 
     public abstract Builder setAuthorizationHandlerProperties(Map<String, String> properties);
 

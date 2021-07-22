@@ -32,6 +32,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
+import com.google.cloud.hadoop.gcsio.authorization.AuthorizationMode;
 import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
@@ -419,10 +420,9 @@ public class GoogleHadoopFileSystemConfiguration {
           new HadoopConfigurationProperty<>(
               "fs.gs.authorization.handler.properties.", ImmutableMap.of());
 
-  /** Configuration for whether to generate a new access token per GCS request. */
-  public static final HadoopConfigurationProperty<Boolean>
-      GCS_REFRESH_ACCESS_TOKEN_PER_REQUEST_ENABLE =
-          new HadoopConfigurationProperty<>("fs.gs.refresh.access-token.per.request.enable", false);
+  /** Configuration for the mode to generate AccessToken. */
+  public static final HadoopConfigurationProperty<AuthorizationMode> GCS_AUTHORIZATION_MODE =
+      new HadoopConfigurationProperty<>("fs.gs.authorization.mode", AuthorizationMode.GENERIC);
 
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
@@ -485,8 +485,7 @@ public class GoogleHadoopFileSystemConfiguration {
                 config, (k, d) -> config.getClass(k, d, AuthorizationHandler.class)))
         .setAuthorizationHandlerProperties(
             GCS_AUTHORIZATION_HANDLER_PROPERTIES_PREFIX.getPropsWithPrefix(config))
-        .setRefreshAccessTokenPerRequestEnabled(
-            GCS_REFRESH_ACCESS_TOKEN_PER_REQUEST_ENABLE.get(config, config::getBoolean));
+        .setAuthorizationMode(GCS_AUTHORIZATION_MODE.get(config, config::getEnum));
   }
 
   private static PerformanceCachingGoogleCloudStorageOptions getPerformanceCachingOptions(

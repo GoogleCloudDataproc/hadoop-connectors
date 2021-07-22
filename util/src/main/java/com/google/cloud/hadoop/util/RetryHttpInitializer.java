@@ -221,10 +221,6 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
   @Override
   public void initialize(HttpRequest request) {
-    if (!this.options.getIsEnabled()) {
-      return;
-    }
-
     // Credential must be the interceptor to fill in accessToken fields.
     request.setInterceptor(credential);
 

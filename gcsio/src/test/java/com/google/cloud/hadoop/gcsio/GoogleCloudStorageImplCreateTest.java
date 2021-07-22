@@ -44,8 +44,7 @@ public class GoogleCloudStorageImplCreateTest {
         new GoogleCloudStorageImpl(
             GoogleCloudStorageOptions.builder().setAppName("app").setGrpcEnabled(true).build(),
             createStorage(),
-            ComputeEngineCredentials.newBuilder().build(),
-            null);
+            ComputeEngineCredentials.newBuilder().build());
     assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
         .isInstanceOf(StorageStubProvider.DirectPathGrpcDecorator.class);
   }

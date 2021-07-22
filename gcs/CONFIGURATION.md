@@ -153,14 +153,13 @@ provider.
     The implementation of the `AccessTokenProvider` interface used for GCS
     Connector.
     
-*   `fs.gs.refresh.access-token.per.request.enable` (default: `false`)
+*   `fs.gs.authorization.mode` (default: `GENERIC`)
 
-    Whether to generate a new access token for each GCS request.
-    Note: When setting this to true, you have to have an AccessTokenProvider 
-    implementation provided. When using `refresh.access-token.per.request.enable`
-    The low level HTTP retry will be turned off.
-    Note: When this flag is set to true, it takes precedency over 
-    `fs.gs.authorization.handler.impl`
+    The mode to define how an Access Token is Generated. Possible values are:
+    `Generic`: Generates a generic token, i.e. not aware of request object.
+    `REQUEST_CONTEXT_RELATED`: Which consider the request's objects and actions
+    while generating the token. When using this mode, an AccessTokenProvider 
+    Should be provided using `fs.gs.auth.access.token.provider.impl` config.
 
 *   `fs.gs.auth.service.account.enable` (default: `true`)
 
