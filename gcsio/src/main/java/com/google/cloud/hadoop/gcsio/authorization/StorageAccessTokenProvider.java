@@ -31,7 +31,7 @@ public interface StorageAccessTokenProvider {
    * @param storageRequest a storage request holding the context.
    * @return an access token.
    */
-  AccessToken getAccessToken(List<GcsResourceAndActions> storageRequest);
+  AccessToken getAccessToken(List<GcsResourceAndAction> storageRequest);
 
   /**
    * Force this provider to refresh its access token.
@@ -39,5 +39,5 @@ public interface StorageAccessTokenProvider {
    * @param storageRequest a storage request holding the context.
    * @throws IOException when refresh fails.
    */
-  void refresh(List<GcsResourceAndActions> storageRequest) throws IOException;
+  void refresh(List<GcsResourceAndAction> storageRequest) throws IOException;
 }

@@ -14,7 +14,7 @@
 
 package com.google.cloud.hadoop.util;
 
-import com.google.cloud.hadoop.gcsio.authorization.GcsResourceAndActions;
+import com.google.cloud.hadoop.gcsio.authorization.GcsResourceAndAction;
 import com.google.cloud.hadoop.gcsio.authorization.StorageAccessTokenProvider;
 import java.io.IOException;
 import java.util.List;
@@ -30,7 +30,7 @@ public interface AccessTokenProvider extends Configurable, StorageAccessTokenPro
    * @param storageRequest a storage request holding the context.
    * @return an access token.
    */
-  default AccessToken getAccessToken(List<GcsResourceAndActions> storageRequest) {
+  default AccessToken getAccessToken(List<GcsResourceAndAction> storageRequest) {
     return this.getAccessToken();
   }
 
@@ -47,7 +47,7 @@ public interface AccessTokenProvider extends Configurable, StorageAccessTokenPro
    * @param storageRequest a storage request holding the context.
    * @throws IOException when refresh fails.
    */
-  default void refresh(List<GcsResourceAndActions> storageRequest)
+  default void refresh(List<GcsResourceAndAction> storageRequest)
       throws IOException {
     this.refresh();
   }

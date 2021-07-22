@@ -2,17 +2,17 @@ package com.google.cloud.hadoop.gcsio.authorization;
 
 import java.util.Objects;
 
-public class GcsResourceAndActions {
+public class GcsResourceAndAction {
 
   private final String bucket;
   private final String objectPath;
   private final String action;
 
-  public GcsResourceAndActions() {
+  public GcsResourceAndAction() {
     this("", "", "");
   }
 
-  public GcsResourceAndActions(String bucket, String objectPath, String action) {
+  public GcsResourceAndAction(String bucket, String objectPath, String action) {
     this.bucket = bucket;
     this.objectPath = objectPath;
     this.action = action;
@@ -38,7 +38,7 @@ public class GcsResourceAndActions {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    GcsResourceAndActions that = (GcsResourceAndActions) o;
+    GcsResourceAndAction that = (GcsResourceAndAction) o;
     return Objects.equals(getBucket(), that.getBucket()) && Objects
         .equals(getObjectPath(), that.getObjectPath()) && Objects
         .equals(getAction(), that.getAction());

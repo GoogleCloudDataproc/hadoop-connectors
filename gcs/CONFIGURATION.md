@@ -155,11 +155,16 @@ provider.
     
 *   `fs.gs.authorization.mode` (default: `GENERIC`)
 
-    The mode to define how an Access Token is Generated. Possible values are:
-    `Generic`: Generates a generic token, i.e. not aware of request object.
-    `REQUEST_CONTEXT_RELATED`: Which consider the request's objects and actions
-    while generating the token. When using this mode, an AccessTokenProvider 
-    Should be provided using `fs.gs.auth.access.token.provider.impl` config.
+    The mode to define how an Access Token is Generated. 
+
+    Valid values:
+    
+    *   `GENERIC`: Generates a generic token, i.e. not aware of request object.
+
+    *   `REQUEST_CONTEXT_RELATED`: Which consider the request's objects and actions
+        while generating the token. When using this mode, an AccessTokenProvider 
+        Should be provided either through a delegation token binding or by 
+        directly setting `fs.gs.auth.access.token.provider.impl` config.
 
 *   `fs.gs.auth.service.account.enable` (default: `true`)
 
