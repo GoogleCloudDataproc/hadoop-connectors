@@ -16,10 +16,16 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import com.google.common.flogger.GoogleLogger;
 import com.google.protobuf.MessageLite;
 import io.grpc.KnownLength;
 
-public class ZeroCopyReadinessChecker {
+/**
+ * Checker to test whether a zero-copy masharller is available from the versions of gRPC and
+ * Protobuf.
+ */
+class ZeroCopyReadinessChecker {
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private static final boolean isZeroCopyReady;
 
   static {
@@ -37,6 +43,7 @@ public class ZeroCopyReadinessChecker {
       Class<?> detachableClass = Class.forName(detachableClassName);
       detachableClassExists = (detachableClass != null);
     } catch (ClassNotFoundException ex) {
+      logger.atFine().withCause(ex).log("io.grpc.Detachable not found");
     }
     // Check whether com.google.protobuf.UnsafeByteOperations exists?
     boolean unsafeByteOperationsClassExists = false;
@@ -49,6 +56,7 @@ public class ZeroCopyReadinessChecker {
       Class<?> unsafeByteOperationsClass = Class.forName(unsafeByteOperationsClassName);
       unsafeByteOperationsClassExists = (unsafeByteOperationsClass != null);
     } catch (ClassNotFoundException ex) {
+      logger.atFine().withCause(ex).log("com.google.protobuf.UnsafeByteOperations not found");
     }
     isZeroCopyReady = detachableClassExists && unsafeByteOperationsClassExists;
   }

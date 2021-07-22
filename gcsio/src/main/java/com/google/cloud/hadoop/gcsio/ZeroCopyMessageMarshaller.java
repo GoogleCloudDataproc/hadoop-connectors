@@ -37,35 +37,37 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 
-// Custom gRPC marshaller to use zero memory copy feature of gRPC when deserializing messages.
-// This achieves zero-copy by deserializing proto messages pointing to the buffers in the input
-// stream to avoid memory copy so stream should live as long as the message can be referenced.
-// Hence, it exposes the input stream to applications (through popStream) and applications are
-// responsible to close it when it's no longer needed. Otherwise, it'd cause memory leak.
+/**
+ * Custom gRPC marshaller to use zero memory copy feature of gRPC when deserializing messages. This
+ * achieves zero-copy by deserializing proto messages pointing to the buffers in the input stream to
+ * avoid memory copy so stream should live as long as the message can be referenced. Hence, it
+ * exposes the input stream to applications (through popStream) and applications are responsible to
+ * close it when it's no longer needed. Otherwise, it'd cause memory leak.
+ */
 class ZeroCopyMessageMarshaller<T extends MessageLite> implements PrototypeMarshaller<T> {
   private Map<T, InputStream> unclosedStreams =
       Collections.synchronizedMap(new IdentityHashMap<>());
   private final Parser<T> parser;
-  private final PrototypeMarshaller<T> baseMarshaller;
+  private final PrototypeMarshaller<T> marshaller;
 
   ZeroCopyMessageMarshaller(T defaultInstance) {
     parser = (Parser<T>) defaultInstance.getParserForType();
-    baseMarshaller = (PrototypeMarshaller<T>) ProtoLiteUtils.marshaller(defaultInstance);
+    marshaller = (PrototypeMarshaller<T>) ProtoLiteUtils.marshaller(defaultInstance);
   }
 
   @Override
   public Class<T> getMessageClass() {
-    return baseMarshaller.getMessageClass();
+    return marshaller.getMessageClass();
   }
 
   @Override
   public T getMessagePrototype() {
-    return baseMarshaller.getMessagePrototype();
+    return marshaller.getMessagePrototype();
   }
 
   @Override
   public InputStream stream(T value) {
-    return baseMarshaller.stream(value);
+    return marshaller.stream(value);
   }
 
   @Override
@@ -111,7 +113,7 @@ class ZeroCopyMessageMarshaller<T extends MessageLite> implements PrototypeMarsh
       return message;
     } else {
       // slow path
-      return baseMarshaller.parse(stream);
+      return marshaller.parse(stream);
     }
   }
 
