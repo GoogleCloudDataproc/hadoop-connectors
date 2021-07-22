@@ -35,7 +35,6 @@ import com.google.common.flogger.GoogleLogger;
 import com.google.common.hash.Hashing;
 import com.google.google.storage.v1.GetObjectMediaRequest;
 import com.google.google.storage.v1.GetObjectMediaResponse;
-import com.google.google.storage.v1.GetObjectRequest;
 import com.google.google.storage.v1.StorageGrpc;
 import com.google.google.storage.v1.StorageGrpc.StorageBlockingStub;
 import com.google.protobuf.ByteString;
@@ -45,8 +44,8 @@ import io.grpc.MethodDescriptor;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import java.io.EOFException;
-import java.io.InputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
@@ -61,12 +60,12 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   // ZeroCopy version of GetObjectMedia Method
   private static final ZeroCopyMessageMarshaller getObjectMediaResponseMarshaller =
-    new ZeroCopyMessageMarshaller(GetObjectMediaResponse.getDefaultInstance());
-  private static final MethodDescriptor<GetObjectMediaRequest, GetObjectMediaResponse> getObjectMediaMethod =
-    StorageGrpc.getGetObjectMediaMethod()
-      .toBuilder()
-      .setResponseMarshaller(getObjectMediaResponseMarshaller)
-      .build();
+      new ZeroCopyMessageMarshaller(GetObjectMediaResponse.getDefaultInstance());
+  private static final MethodDescriptor<GetObjectMediaRequest, GetObjectMediaResponse>
+      getObjectMediaMethod =
+          StorageGrpc.getGetObjectMediaMethod().toBuilder()
+              .setResponseMarshaller(getObjectMediaResponseMarshaller)
+              .build();
   private static final boolean useZeroCopyMarshaller = ZeroCopyReadinessChecker.isReady();
 
   private volatile StorageBlockingStub stub;
@@ -98,7 +97,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private int bufferedContentReadOffset = 0;
 
-  // InputStream that backs bufferedContent. This needs to be closed when bufferedContent is no longer needed.
+  // InputStream that backs bufferedContent. This needs to be closed when bufferedContent is no
+  // longer needed.
   @Nullable private InputStream streamForBufferedContent = null;
 
   // The streaming read operation. If null, there is not an in-flight read in progress.
@@ -541,11 +541,16 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
             try {
               requestContext = Context.current().withCancellation();
               Context toReattach = requestContext.attach();
-              StorageBlockingStub blockingStub = stub.withDeadlineAfter(readOptions.getGrpcReadTimeoutMillis(), MILLISECONDS);
+              StorageBlockingStub blockingStub =
+                  stub.withDeadlineAfter(readOptions.getGrpcReadTimeoutMillis(), MILLISECONDS);
               try {
                 if (useZeroCopyMarshaller) {
-                  resIterator = io.grpc.stub.ClientCalls.blockingServerStreamingCall(
-                    blockingStub.getChannel(), getObjectMediaMethod, blockingStub.getCallOptions(), request);
+                  resIterator =
+                      io.grpc.stub.ClientCalls.blockingServerStreamingCall(
+                          blockingStub.getChannel(),
+                          getObjectMediaMethod,
+                          blockingStub.getCallOptions(),
+                          request);
                 } else {
                   resIterator = blockingStub.getObjectMedia(request);
                 }

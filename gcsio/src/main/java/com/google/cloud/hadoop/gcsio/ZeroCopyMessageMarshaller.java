@@ -26,11 +26,10 @@ import io.grpc.Detachable;
 import io.grpc.HasByteBuffer;
 import io.grpc.KnownLength;
 import io.grpc.MethodDescriptor.PrototypeMarshaller;
-import io.grpc.protobuf.lite.ProtoLiteUtils;
 import io.grpc.Status;
-import io.grpc.MethodDescriptor;
-import java.io.InputStream;
+import io.grpc.protobuf.lite.ProtoLiteUtils;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -44,7 +43,8 @@ import java.util.Map;
 // Hence, it exposes the input stream to applications (through popStream) and applications are
 // responsible to close it when it's no longer needed. Otherwise, it'd cause memory leak.
 class ZeroCopyMessageMarshaller<T extends MessageLite> implements PrototypeMarshaller<T> {
-  private Map<T, InputStream> unclosedStreams = Collections.synchronizedMap(new IdentityHashMap<>());
+  private Map<T, InputStream> unclosedStreams =
+      Collections.synchronizedMap(new IdentityHashMap<>());
   private final Parser<T> parser;
   private final PrototypeMarshaller<T> baseMarshaller;
 
@@ -74,7 +74,8 @@ class ZeroCopyMessageMarshaller<T extends MessageLite> implements PrototypeMarsh
     try {
       if (stream instanceof KnownLength) {
         int size = stream.available();
-        if (stream instanceof Detachable && stream instanceof HasByteBuffer
+        if (stream instanceof Detachable
+            && stream instanceof HasByteBuffer
             && ((HasByteBuffer) stream).byteBufferSupported()) {
           // Stream is now detached here and should be closed later.
           stream = ((Detachable) stream).detach();
@@ -101,7 +102,10 @@ class ZeroCopyMessageMarshaller<T extends MessageLite> implements PrototypeMarsh
       try {
         message = parseFrom(cis);
       } catch (InvalidProtocolBufferException ipbe) {
-        throw Status.INTERNAL.withDescription("Invalid protobuf byte sequence").withCause(ipbe).asRuntimeException();
+        throw Status.INTERNAL
+            .withDescription("Invalid protobuf byte sequence")
+            .withCause(ipbe)
+            .asRuntimeException();
       }
       unclosedStreams.put(message, stream);
       return message;
