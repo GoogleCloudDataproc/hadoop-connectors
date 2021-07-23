@@ -97,6 +97,7 @@ class ZeroCopyMessageMarshaller<T extends MessageLite> implements PrototypeMarsh
         try {
           message = parseFrom(codedInputStream);
         } catch (InvalidProtocolBufferException ipbe) {
+          stream.close();
           throw Status.INTERNAL
               .withDescription("Invalid protobuf byte sequence")
               .withCause(ipbe)
