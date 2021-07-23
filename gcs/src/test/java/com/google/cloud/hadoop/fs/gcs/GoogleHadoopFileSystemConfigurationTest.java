@@ -65,7 +65,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.application.name.suffix", "");
           put("fs.gs.authorization.handler.impl", null);
           put("fs.gs.authorization.handler.properties.", ImmutableMap.of());
-          put("fs.gs.authorization.mode", AuthorizationMode.GENERIC);
+          put("fs.gs.authorization.mode", AuthorizationMode.BASIC);
           put("fs.gs.batch.threads", 15);
           put("fs.gs.block.size", 64 * 1024 * 1024L);
           put("fs.gs.bucket.delete.enable", false);

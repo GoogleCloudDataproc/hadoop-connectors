@@ -422,7 +422,7 @@ public class GoogleHadoopFileSystemConfiguration {
 
   /** Configuration for the mode to generate AccessToken. */
   public static final HadoopConfigurationProperty<AuthorizationMode> GCS_AUTHORIZATION_MODE =
-      new HadoopConfigurationProperty<>("fs.gs.authorization.mode", AuthorizationMode.GENERIC);
+      new HadoopConfigurationProperty<>("fs.gs.authorization.mode", AuthorizationMode.BASIC);
 
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.

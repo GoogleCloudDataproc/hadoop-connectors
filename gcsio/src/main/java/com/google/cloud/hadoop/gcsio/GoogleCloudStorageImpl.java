@@ -252,7 +252,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     this(
         options,
         new RetryHttpInitializer(
-            credential, options.toRetryHttpInitializerOptions()), /*accessTokenProvider*/
+            credential, options.toRetryHttpInitializerOptions()), /*accessTokenProvider=*/
         null);
   }
 

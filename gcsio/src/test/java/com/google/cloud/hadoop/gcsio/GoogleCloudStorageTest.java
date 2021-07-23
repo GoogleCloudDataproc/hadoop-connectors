@@ -76,6 +76,7 @@ import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.authorization.AuthorizationMode;
 import com.google.cloud.hadoop.gcsio.authorization.FakeAuthorizationHandler;
+import com.google.cloud.hadoop.gcsio.authorization.GcsResourceAndAction;
 import com.google.cloud.hadoop.gcsio.authorization.StorageAccessTokenProvider;
 import com.google.cloud.hadoop.gcsio.authorization.StorageAccessTokenProvider.AccessToken;
 import com.google.cloud.hadoop.gcsio.authorization.StorageRequestAuthorizer;
@@ -3402,18 +3403,17 @@ public class GoogleCloudStorageTest {
     MockHttpTransport transport = mockTransport(jsonDataResponse(newBucket(BUCKET_NAME)));
 
     GoogleCloudStorageOptions gcsOptions =
-        GCS_OPTIONS.toBuilder().setAuthorizationMode(AuthorizationMode.GENERIC).build();
+        GCS_OPTIONS.toBuilder().setAuthorizationMode(AuthorizationMode.BASIC).build();
 
-    StorageAccessTokenProvider mockAtp = Mockito.mock(StorageAccessTokenProvider.class);
-    when(mockAtp.getAccessToken(any())).thenReturn(new AccessToken("FakeAccessToken", 1_000L));
+    AccessToken accessToken = new AccessToken("accesstoken_0", 1000L);
+    StorageAccessTokenProvider fakeAtp = new FakeAccessTokenProvider(accessToken);
 
     GoogleCloudStorageImpl gcs =
-        (GoogleCloudStorageImpl) mockedGcs(gcsOptions, transport, null, mockAtp);
+        (GoogleCloudStorageImpl) mockedGcs(gcsOptions, transport, null, fakeAtp);
 
     Get testGetRequest = gcs.storage.objects().get(BUCKET_NAME, OBJECT_NAME);
     gcs.initializeRequest(testGetRequest, BUCKET_NAME);
 
-    verifyNoInteractions(mockAtp);
     assertThat(testGetRequest.getOauthToken()).isNull();
   }
 
@@ -3425,17 +3425,16 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorageOptions gcsOptions =
         GCS_OPTIONS.toBuilder().setAuthorizationMode(AuthorizationMode.REQUEST_CONTEXT_RELATED).build();
 
-    StorageAccessTokenProvider mockAtp = Mockito.mock(StorageAccessTokenProvider.class);
-    when(mockAtp.getAccessToken(any())).thenReturn(new AccessToken("FakeAccessToken", 1_000L));
+    AccessToken accessToken = new AccessToken("accesstoken_0", 1000L);
+    StorageAccessTokenProvider fakeAtp = new FakeAccessTokenProvider(accessToken);
 
     GoogleCloudStorageImpl gcs =
-        (GoogleCloudStorageImpl) mockedGcs(gcsOptions, transport, null, mockAtp);
+        (GoogleCloudStorageImpl) mockedGcs(gcsOptions, transport, null, fakeAtp);
 
     Get testGetRequest = gcs.storage.objects().get(BUCKET_NAME, OBJECT_NAME);
     gcs.initializeRequest(testGetRequest, BUCKET_NAME);
 
-    verify(mockAtp, times(1)).getAccessToken(any());
-    assertThat(testGetRequest.getOauthToken()).isEqualTo("FakeAccessToken");
+    assertThat(testGetRequest.getOauthToken()).isEqualTo(accessToken.getToken());
   }
 
   private GoogleCloudStorage mockedGcs(HttpTransport transport) {
@@ -3461,7 +3460,7 @@ public class GoogleCloudStorageTest {
       StorageAccessTokenProvider accessTokenProvider) {
     Storage storage = new Storage(transport, JSON_FACTORY, requestInitializer);
     return new GoogleCloudStorageImpl(
-        gcsOptions, storage, /*credentials*/ null, accessTokenProvider);
+        gcsOptions, storage, /*credentials=*/ null, accessTokenProvider);
   }
 
   static Bucket newBucket(String name) {
@@ -3515,5 +3514,24 @@ public class GoogleCloudStorageTest {
         return data[position++] & 0xff;
       }
     };
+  }
+}
+
+class FakeAccessTokenProvider implements StorageAccessTokenProvider {
+
+  private final AccessToken accessToken;
+
+  public FakeAccessTokenProvider(AccessToken accessToken) {
+    this.accessToken = accessToken;
+  }
+
+  @Override
+  public AccessToken getAccessToken(List<GcsResourceAndAction> storageRequest) {
+    return accessToken;
+  }
+
+  @Override
+  public void refresh(List<GcsResourceAndAction> storageRequest) throws IOException {
+
   }
 }

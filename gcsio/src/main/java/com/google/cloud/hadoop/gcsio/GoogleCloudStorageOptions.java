@@ -89,7 +89,7 @@ public abstract class GoogleCloudStorageOptions {
       AUTHORIZATION_HANDLER_IMPL_CLASS_DEFAULT = null;
 
   /** Default setting for generating new access token per request */
-  public static AuthorizationMode AUTHORIZATION_MODE_DEFAULT = AuthorizationMode.GENERIC;
+  public static AuthorizationMode AUTHORIZATION_MODE_DEFAULT = AuthorizationMode.BASIC;
 
   /** Default properties for authorization handler. */
   public static final Map<String, String> AUTHORIZATION_HANDLER_PROPERTIES_DEFAULT =

@@ -1301,6 +1301,13 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   private AccessTokenProvider getAccessTokenProvider(
       Configuration config, GoogleCloudStorageFileSystemOptions gcsFsOptions) throws IOException {
+
+    checkArgument(gcsFsOptions.getCloudStorageOptions().getAuthorizationMode()
+            != AuthorizationMode.REQUEST_CONTEXT_RELATED || (
+            HadoopCredentialConfiguration.getNullCredentialEnabled(config, GCS_CONFIG_PREFIX)
+                && HadoopCredentialConfiguration.getServiceAccountEnabled(config, GCS_CONFIG_PREFIX)),
+        "When using AuthorizationMode==REQUEST_CONTEXT_RELATED, `fs.gs.auth.null.enabled` should be true and `fs.gs.auth.service.account.enable` should be false");
+
     // Check if delegation token support is configured
     AccessTokenProvider accessTokenProvider = delegationTokens != null
         // If so, use the delegation token to acquire the Google credentials
@@ -1328,11 +1335,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       throws IOException, GeneralSecurityException {
     Credential credential = null;
 
-    // If the AuthorizationMode is set to `Request_Context_Relate`, Credential will be generated
-    // When GCS requests are created.
     if (gcsFsOptions.getCloudStorageOptions().getAuthorizationMode()
-        != AuthorizationMode.REQUEST_CONTEXT_RELATED) {
-
+        == AuthorizationMode.BASIC) {
       // check if an AccessTokenProvider is configured
       if (accessTokenProvider != null) {
         // if so, try to get the credentials through the access token provider
@@ -1355,8 +1359,13 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                   .getCredential(CredentialFactory.DEFAULT_SCOPES);
         }
       }
-
+    } else if (gcsFsOptions.getCloudStorageOptions().getAuthorizationMode()
+          == AuthorizationMode.REQUEST_CONTEXT_RELATED) {
+      // If the AuthorizationMode is set to `Request_Context_Relate`, Credential will be generated
+      // When GCS requests are created.
+      credential = null;
     }
+
 
     // If impersonation service account exists, then use current credential to request access token
     // for the impersonating service account.
@@ -1486,12 +1495,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   private GoogleCloudStorageFileSystem createGcsFs(Configuration config) throws IOException {
     GoogleCloudStorageFileSystemOptions gcsFsOptions =
         GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
-
-    checkArgument(gcsFsOptions.getCloudStorageOptions().getAuthorizationMode()
-            != AuthorizationMode.REQUEST_CONTEXT_RELATED
-            || (HadoopCredentialConfiguration.getNullCredentialEnabled(config, GCS_CONFIG_PREFIX)
-            && HadoopCredentialConfiguration.getServiceAccountEnabled(config, GCS_CONFIG_PREFIX)),
-        "When using AuthorizationMode==REQUEST_CONTEXT_RELATED, `fs.gs.auth.null.enabled` should be true and `fs.gs.auth.service.account.enable` should be false");
 
     accessTokenProvider = getAccessTokenProvider(config, gcsFsOptions);
 

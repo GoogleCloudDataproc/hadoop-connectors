@@ -50,6 +50,20 @@ public class AuthorizationStorageObjectRequestAdapterTest {
   }
 
   @Test
+  public void testTranslateObjectListRequestWithNullPrefix() throws IOException {
+    Storage.Objects.List request = storage.objects().list(BUCKET_NAME);
+    List<GcsResourceAndAction> results = AuthorizationStorageObjectRequestAdapter
+        .fromStorageObjectRequest(request);
+
+    assertEquals(1, results.size());
+    GcsResourceAndAction resourceAndActions = results.get(0);
+
+    assertEquals(BUCKET_NAME, resourceAndActions.getBucket());
+    assertEquals("/", resourceAndActions.getObjectPath());
+    assertEquals("read", resourceAndActions.getAction());
+  }
+
+  @Test
   public void testTranslateObjectInsertRequest() throws IOException {
     StorageObject object = new StorageObject().setName(OBJECT_NAME);
     Storage.Objects.Insert request = storage.objects().insert(BUCKET_NAME, object);

@@ -153,13 +153,13 @@ provider.
     The implementation of the `AccessTokenProvider` interface used for GCS
     Connector.
     
-*   `fs.gs.authorization.mode` (default: `GENERIC`)
+*   `fs.gs.authorization.mode` (default: `BASIC`)
 
     The mode to define how an Access Token is Generated. 
 
     Valid values:
     
-    *   `GENERIC`: Generates a generic token, i.e. not aware of request object.
+    *   `BASIC`: Generates a generic token, i.e. not aware of request object.
 
     *   `REQUEST_CONTEXT_RELATED`: Which consider the request's objects and actions
         while generating the token. When using this mode, an AccessTokenProvider 
