@@ -72,49 +72,44 @@ class ZeroCopyMessageMarshaller<T extends MessageLite> implements PrototypeMarsh
 
   @Override
   public T parse(InputStream stream) {
-    CodedInputStream cis = null;
     try {
-      if (stream instanceof KnownLength) {
+      if (stream instanceof KnownLength
+          && stream instanceof Detachable
+          && stream instanceof HasByteBuffer
+          && ((HasByteBuffer) stream).byteBufferSupported()) {
         int size = stream.available();
-        if (stream instanceof Detachable
-            && stream instanceof HasByteBuffer
-            && ((HasByteBuffer) stream).byteBufferSupported()) {
-          // Stream is now detached here and should be closed later.
-          stream = ((Detachable) stream).detach();
-          // This mark call is to keep buffer while traversing buffers using skip.
-          stream.mark(size);
-          List<ByteString> byteStrings = new ArrayList<>();
-          while (stream.available() != 0) {
-            ByteBuffer buffer = ((HasByteBuffer) stream).getByteBuffer();
-            byteStrings.add(UnsafeByteOperations.unsafeWrap(buffer));
-            stream.skip(buffer.remaining());
-          }
-          stream.reset();
-          cis = ByteString.copyFrom(byteStrings).newCodedInput();
-          cis.enableAliasing(true);
-          cis.setSizeLimit(Integer.MAX_VALUE);
+        // Stream is now detached here and should be closed later.
+        stream = ((Detachable) stream).detach();
+        // This mark call is to keep buffer while traversing buffers using skip.
+        stream.mark(size);
+        List<ByteString> byteStrings = new ArrayList<>();
+        while (stream.available() != 0) {
+          ByteBuffer buffer = ((HasByteBuffer) stream).getByteBuffer();
+          byteStrings.add(UnsafeByteOperations.unsafeWrap(buffer));
+          stream.skip(buffer.remaining());
         }
+        stream.reset();
+        CodedInputStream codedInputStream = ByteString.copyFrom(byteStrings).newCodedInput();
+        codedInputStream.enableAliasing(true);
+        codedInputStream.setSizeLimit(Integer.MAX_VALUE);
+        // fast path (no memory copy)
+        T message;
+        try {
+          message = parseFrom(codedInputStream);
+        } catch (InvalidProtocolBufferException ipbe) {
+          throw Status.INTERNAL
+              .withDescription("Invalid protobuf byte sequence")
+              .withCause(ipbe)
+              .asRuntimeException();
+        }
+        unclosedStreams.put(message, stream);
+        return message;
       }
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    if (cis != null) {
-      // fast path (no memory copy)
-      T message;
-      try {
-        message = parseFrom(cis);
-      } catch (InvalidProtocolBufferException ipbe) {
-        throw Status.INTERNAL
-            .withDescription("Invalid protobuf byte sequence")
-            .withCause(ipbe)
-            .asRuntimeException();
-      }
-      unclosedStreams.put(message, stream);
-      return message;
-    } else {
-      // slow path
-      return marshaller.parse(stream);
-    }
+    // slow path
+    return marshaller.parse(stream);
   }
 
   private T parseFrom(CodedInputStream stream) throws InvalidProtocolBufferException {

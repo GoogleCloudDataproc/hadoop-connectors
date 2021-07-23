@@ -466,6 +466,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         invalidateBufferedContent();
         bufferedContent = content;
         bufferedContentReadOffset = bytesToWrite;
+        // This is to keep the stream alive for the message backed by this.
         streamForBufferedContent = stream;
       } else {
         if (stream != null) {
