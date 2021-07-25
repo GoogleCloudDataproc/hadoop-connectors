@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -148,6 +149,23 @@ class StorageStubProvider {
     public int activeRequests() {
       return counter.ongoingRequestCount.get();
     }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof ChannelAndRequestCounter)) {
+        return false;
+      }
+      ChannelAndRequestCounter that = (ChannelAndRequestCounter) o;
+      return com.google.common.base.Objects.equal(channel, that.channel);
+    }
+
+    @Override
+    public int hashCode() {
+      return com.google.common.base.Objects.hashCode(channel);
+    }
   }
 
   StorageStubProvider(
@@ -182,6 +200,14 @@ class StorageStubProvider {
   public StorageBlockingStub newBlockingStub() {
     StorageBlockingStub stub = StorageGrpc.newBlockingStub(getManagedChannel());
     return (StorageBlockingStub) grpcDecorator.applyCallOption(stub);
+  }
+
+  public void evictChannelFromPool(Channel channel) {
+    if (channel instanceof ManagedChannel) {
+      ManagedChannel managedChannel = (ManagedChannel) channel;
+      mediaChannelPool.remove(
+          new ChannelAndRequestCounter(managedChannel, new ActiveRequestCounter()));
+    }
   }
 
   public StorageStub newAsyncStub() {
