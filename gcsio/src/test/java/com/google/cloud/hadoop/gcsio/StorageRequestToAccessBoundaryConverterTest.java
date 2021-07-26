@@ -14,9 +14,8 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
@@ -35,6 +34,9 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
+/**
+ * Unit tests for StorageRequestToAccessBoundaryConverter utility class.
+ */
 @RunWith(JUnit4.class)
 public class StorageRequestToAccessBoundaryConverterTest {
 
@@ -60,12 +62,12 @@ public class StorageRequestToAccessBoundaryConverterTest {
     List<AccessBoundary> results =
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
-    assertEquals(1, results.size());
+    assertThat(results.size()).isEqualTo(1);
     AccessBoundary resourceAndActions = results.get(0);
 
-    assertEquals(BUCKET_NAME, resourceAndActions.bucketName());
-    assertEquals(OBJECT_NAME, resourceAndActions.objectName());
-    assertEquals("read", resourceAndActions.action());
+    assertThat(resourceAndActions.bucketName()).isEqualTo(BUCKET_NAME);
+    assertThat(resourceAndActions.objectName()).isEqualTo(OBJECT_NAME);
+    assertThat(resourceAndActions.action()).isEqualTo("read");
   }
 
   @Test
@@ -74,12 +76,12 @@ public class StorageRequestToAccessBoundaryConverterTest {
     List<AccessBoundary> results =
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
-    assertEquals(1, results.size());
+    assertThat(results.size()).isEqualTo(1);
     AccessBoundary resourceAndActions = results.get(0);
 
-    assertEquals(BUCKET_NAME, resourceAndActions.bucketName());
-    assertEquals("/", resourceAndActions.objectName());
-    assertEquals("read", resourceAndActions.action());
+    assertThat(resourceAndActions.bucketName()).isEqualTo(BUCKET_NAME);
+    assertThat(resourceAndActions.objectName()).isEqualTo("/");
+    assertThat(resourceAndActions.action()).isEqualTo("read");
   }
 
   @Test
@@ -89,12 +91,12 @@ public class StorageRequestToAccessBoundaryConverterTest {
     List<AccessBoundary> results =
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
-    assertEquals(1, results.size());
+    assertThat(results.size()).isEqualTo(1);
     AccessBoundary resourceAndActions = results.get(0);
 
-    assertEquals(BUCKET_NAME, resourceAndActions.bucketName());
-    assertEquals(OBJECT_NAME, resourceAndActions.objectName());
-    assertEquals("write", resourceAndActions.action());
+    assertThat(resourceAndActions.bucketName()).isEqualTo(BUCKET_NAME);
+    assertThat(resourceAndActions.objectName()).isEqualTo(OBJECT_NAME);
+    assertThat(resourceAndActions.action()).isEqualTo("write");
   }
 
   @Test
@@ -110,14 +112,14 @@ public class StorageRequestToAccessBoundaryConverterTest {
     List<AccessBoundary> results =
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
-    assertEquals(4, results.size());
+    assertThat(results.size()).isEqualTo(4);
     Stream.of(0, 1, 2)
         .forEach(
             i ->
-                assertTrue(
+                assertThat(
                     results.contains(
                         AccessBoundary.create(BUCKET_NAME, OBJECT_NAME + "-" + i, "read"))));
-    assertTrue(results.contains(AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, "write")));
+    assertThat(results.contains(AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, "write")));
   }
 
   @Test
@@ -126,12 +128,12 @@ public class StorageRequestToAccessBoundaryConverterTest {
     List<AccessBoundary> results =
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
-    assertEquals(1, results.size());
+    assertThat(results.size()).isEqualTo(1);
     AccessBoundary resourceAndActions = results.get(0);
 
-    assertEquals(BUCKET_NAME, resourceAndActions.bucketName());
-    assertEquals(OBJECT_NAME, resourceAndActions.objectName());
-    assertEquals("read", resourceAndActions.action());
+    assertThat(resourceAndActions.bucketName()).isEqualTo(BUCKET_NAME);
+    assertThat(resourceAndActions.objectName()).isEqualTo(OBJECT_NAME);
+    assertThat(resourceAndActions.action()).isEqualTo("read");
   }
 
   @Test
@@ -140,12 +142,12 @@ public class StorageRequestToAccessBoundaryConverterTest {
     List<AccessBoundary> results =
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
-    assertEquals(1, results.size());
+    assertThat(results.size()).isEqualTo(1);
     AccessBoundary resourceAndActions = results.get(0);
 
-    assertEquals(BUCKET_NAME, resourceAndActions.bucketName());
-    assertEquals(OBJECT_NAME, resourceAndActions.objectName());
-    assertEquals("write", resourceAndActions.action());
+    assertThat(resourceAndActions.bucketName()).isEqualTo(BUCKET_NAME);
+    assertThat(resourceAndActions.objectName()).isEqualTo(OBJECT_NAME);
+    assertThat(resourceAndActions.action()).isEqualTo("write");
   }
 
   @Test
@@ -159,9 +161,9 @@ public class StorageRequestToAccessBoundaryConverterTest {
     List<AccessBoundary> results =
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
-    assertEquals(2, results.size());
-    assertTrue(results.contains(AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, "read")));
-    assertTrue(results.contains(AccessBoundary.create(BUCKET_NAME_DST, OBJECT_NAME_DST, "write")));
+    assertThat(results.size()).isEqualTo(2);
+    assertThat(results.contains(AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, "read")));
+    assertThat(results.contains(AccessBoundary.create(BUCKET_NAME_DST, OBJECT_NAME_DST, "write")));
   }
 
   @Test
@@ -173,9 +175,9 @@ public class StorageRequestToAccessBoundaryConverterTest {
     List<AccessBoundary> results =
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
-    assertEquals(2, results.size());
-    assertTrue(results.contains(AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, "read")));
-    assertTrue(results.contains(AccessBoundary.create(BUCKET_NAME_DST, OBJECT_NAME_DST, "write")));
+    assertThat(results.size()).isEqualTo(2);
+    assertThat(results.contains(AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, "read")));
+    assertThat(results.contains(AccessBoundary.create(BUCKET_NAME_DST, OBJECT_NAME_DST, "write")));
   }
 
   @Test
@@ -186,12 +188,12 @@ public class StorageRequestToAccessBoundaryConverterTest {
     List<AccessBoundary> results =
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
-    assertEquals(1, results.size());
+    assertThat(results.size()).isEqualTo(1);
     AccessBoundary resourceAndActions = results.get(0);
 
-    assertEquals(BUCKET_NAME, resourceAndActions.bucketName());
-    assertEquals(OBJECT_NAME, resourceAndActions.objectName());
-    assertEquals("write", resourceAndActions.action());
+    assertThat(resourceAndActions.bucketName()).isEqualTo(BUCKET_NAME);
+    assertThat(resourceAndActions.objectName()).isEqualTo(OBJECT_NAME);
+    assertThat(resourceAndActions.action()).isEqualTo("write");
   }
 
   @Test
@@ -201,12 +203,12 @@ public class StorageRequestToAccessBoundaryConverterTest {
     List<AccessBoundary> results =
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
-    assertEquals(1, results.size());
+    assertThat(results.size()).isEqualTo(1);
     AccessBoundary resourceAndActions = results.get(0);
 
-    assertEquals(BUCKET_NAME, resourceAndActions.bucketName());
-    assertEquals("/", resourceAndActions.objectName());
-    assertEquals("read", resourceAndActions.action());
+    assertThat(resourceAndActions.bucketName()).isEqualTo(BUCKET_NAME);
+    assertThat(resourceAndActions.objectName()).isEqualTo("/");
+    assertThat(resourceAndActions.action()).isEqualTo("read");
   }
 
   @Test
@@ -218,12 +220,12 @@ public class StorageRequestToAccessBoundaryConverterTest {
     List<AccessBoundary> results =
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
-    assertEquals(1, results.size());
+    assertThat(results.size()).isEqualTo(1);
     AccessBoundary resourceAndActions = results.get(0);
 
-    assertEquals(BUCKET_NAME, resourceAndActions.bucketName());
-    assertEquals("/", resourceAndActions.objectName());
-    assertEquals("write", resourceAndActions.action());
+    assertThat(resourceAndActions.bucketName()).isEqualTo(BUCKET_NAME);
+    assertThat(resourceAndActions.objectName()).isEqualTo("/");
+    assertThat(resourceAndActions.action()).isEqualTo("write");
   }
 
   @Test
@@ -233,12 +235,12 @@ public class StorageRequestToAccessBoundaryConverterTest {
     List<AccessBoundary> results =
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
-    assertEquals(1, results.size());
+    assertThat(results.size()).isEqualTo(1);
     AccessBoundary resourceAndActions = results.get(0);
 
-    assertEquals(BUCKET_NAME, resourceAndActions.bucketName());
-    assertEquals("/", resourceAndActions.objectName());
-    assertEquals("write", resourceAndActions.action());
+    assertThat(resourceAndActions.bucketName()).isEqualTo(BUCKET_NAME);
+    assertThat(resourceAndActions.objectName()).isEqualTo("/");
+    assertThat(resourceAndActions.action()).isEqualTo("write");
   }
 
   @Test
@@ -248,12 +250,12 @@ public class StorageRequestToAccessBoundaryConverterTest {
     List<AccessBoundary> results =
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
-    assertEquals(1, results.size());
+    assertThat(results.size()).isEqualTo(1);
     AccessBoundary resourceAndActions = results.get(0);
 
-    assertEquals("", resourceAndActions.bucketName());
-    assertEquals("", resourceAndActions.objectName());
-    assertEquals("", resourceAndActions.action());
+    assertThat(resourceAndActions.bucketName()).isEqualTo("");
+    assertThat(resourceAndActions.objectName()).isEqualTo("");
+    assertThat(resourceAndActions.action()).isEqualTo("");
   }
 
   @Test
@@ -261,14 +263,9 @@ public class StorageRequestToAccessBoundaryConverterTest {
     StorageObject object = new StorageObject().setName(OBJECT_NAME);
     Storage.Objects.Update request = storage.objects().update(BUCKET_NAME, OBJECT_NAME, object);
 
-    try {
-      StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
-      fail();
-    } catch (InvalidParameterException e) {
-      assertEquals(
-          "StorageRequest not used by the connector:"
-              + " com.google.api.services.storage.Storage.Objects.Update",
-          e.getMessage());
-    }
+    InvalidParameterException actualException = assertThrows(
+        InvalidParameterException.class,
+        () -> StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request));
+    assertThat(actualException.getMessage()).isEqualTo("StorageRequest not used by the connector: com.google.api.services.storage.Storage.Objects.Update");
   }
 }

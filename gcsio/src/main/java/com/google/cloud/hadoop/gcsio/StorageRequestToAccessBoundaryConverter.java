@@ -22,11 +22,14 @@ import com.google.api.services.storage.model.ComposeRequest;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import java.security.InvalidParameterException;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * A utility class to convert StorageRequest to a list of AccessBoundary objects.
+ */
 class StorageRequestToAccessBoundaryConverter {
 
   /**
@@ -84,20 +87,20 @@ class StorageRequestToAccessBoundaryConverter {
 
   private static List<AccessBoundary> translateObjectComposeRequest(
       Storage.Objects.Compose request) {
-    List<AccessBoundary> resourceAndActions = new ArrayList<>();
+    ImmutableList.Builder<AccessBoundary> listBuilder = ImmutableList.builder();
     // Read access on all the sources
     ((ComposeRequest) getData(request))
         .getSourceObjects()
         .forEach(
             source ->
-                resourceAndActions.add(
+                listBuilder.add(
                     AccessBoundary.create(
                         request.getDestinationBucket(), source.getName(), "read")));
     // Write access on the destination
-    resourceAndActions.add(
+    listBuilder.add(
         AccessBoundary.create(
             request.getDestinationBucket(), request.getDestinationObject(), "write"));
-    return resourceAndActions;
+    return listBuilder.build();
   }
 
   private static List<AccessBoundary> translateObjectGetRequest(Storage.Objects.Get request) {
@@ -112,23 +115,23 @@ class StorageRequestToAccessBoundaryConverter {
 
   private static List<AccessBoundary> translateObjectRewriteRequest(
       Storage.Objects.Rewrite request) {
-    List<AccessBoundary> resourceAndActions = new ArrayList<>();
-    resourceAndActions.add(
+    ImmutableList.Builder<AccessBoundary> listBuilder = ImmutableList.builder();
+    listBuilder.add(
         AccessBoundary.create(request.getSourceBucket(), request.getSourceObject(), "read"));
-    resourceAndActions.add(
+    listBuilder.add(
         AccessBoundary.create(
             request.getDestinationBucket(), request.getDestinationObject(), "write"));
-    return resourceAndActions;
+    return listBuilder.build();
   }
 
   private static List<AccessBoundary> translateObjectCopyRequest(Storage.Objects.Copy request) {
-    List<AccessBoundary> resourceAndActions = new ArrayList<>();
-    resourceAndActions.add(
+    ImmutableList.Builder<AccessBoundary> listBuilder = ImmutableList.builder();
+    listBuilder.add(
         AccessBoundary.create(request.getSourceBucket(), request.getSourceObject(), "read"));
-    resourceAndActions.add(
+    listBuilder.add(
         AccessBoundary.create(
             request.getDestinationBucket(), request.getDestinationObject(), "write"));
-    return resourceAndActions;
+    return listBuilder.build();
   }
 
   private static List<AccessBoundary> translateObjectPatchRequest(Storage.Objects.Patch request) {
