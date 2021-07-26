@@ -255,7 +255,7 @@ public class StorageRequestToAccessBoundaryConverterTest {
 
     assertThat(resourceAndActions.bucketName()).isEqualTo("");
     assertThat(resourceAndActions.objectName()).isEqualTo("");
-    assertThat(resourceAndActions.action()).isEqualTo("");
+    assertThat(resourceAndActions.action()).isEqualTo("read");
   }
 
   @Test

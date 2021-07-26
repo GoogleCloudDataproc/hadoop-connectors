@@ -153,7 +153,7 @@ class StorageRequestToAccessBoundaryConverter {
   }
 
   private static List<AccessBoundary> translateBucketListRequest(Storage.Buckets.List request) {
-    return Collections.singletonList(AccessBoundary.create("", "", ""));
+    return Collections.singletonList(AccessBoundary.create("", "", "read"));
   }
 
   private static Object getData(StorageRequest<?> request) {
