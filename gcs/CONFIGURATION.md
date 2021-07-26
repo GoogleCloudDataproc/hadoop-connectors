@@ -80,7 +80,7 @@
     [FileSystem.globStatus](https://hadoop.apache.org/docs/r3.3.0/api/org/apache/hadoop/fs/FileSystem.html#globStatus-org.apache.hadoop.fs.Path-)
     method.
 
-    Valid options:
+    Valid values:
 
     *   `FLAT` - fetch potential glob matches in a single list request to
         minimize calls to GCS in nested glob cases.
@@ -150,7 +150,7 @@ provider.
 
 *   `fs.gs.auth.access.token.provider.impl` (not set by default)
 
-    The implementation of the AccessTokenProvider interface used for GCS
+    The implementation of the `AccessTokenProvider` interface used for GCS
     Connector.
 
 *   `fs.gs.auth.service.account.enable` (default: `true`)
@@ -336,7 +336,7 @@ permissions (not authorized) to execute these requests.
     support for advanced features like `hsync()` and different performance
     characteristics.
 
-    Valid options:
+    Valid values:
 
     *   `BASIC` - stream is closest analogue to direct wrapper around low-level
         HTTP stream into GCS.
