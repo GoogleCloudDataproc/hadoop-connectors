@@ -20,7 +20,6 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.util.Clock;
 import com.google.cloud.hadoop.util.AccessTokenProvider.AccessToken;
 import com.google.common.base.Preconditions;
-import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
@@ -77,34 +76,12 @@ public final class CredentialFromAccessTokenProviderClassFactory {
     }
   }
 
-  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-
-  /** Creates an {@link AccessTokenProvider} based on the configuration. */
-  public static AccessTokenProvider getAccessTokenProvider(
-      Configuration config, List<String> keyPrefixes) throws IOException {
-    Class<? extends AccessTokenProvider> clazz =
-        HadoopCredentialConfiguration.getAccessTokenProviderImplClass(
-            config, keyPrefixes.toArray(new String[0]));
-    if (clazz != null) {
-      logger.atFine().log("Using AccessTokenProvider (%s)", clazz.getName());
-      try {
-        AccessTokenProvider accessTokenProvider = clazz.getDeclaredConstructor().newInstance();
-        accessTokenProvider.setConf(config);
-        return accessTokenProvider;
-      } catch (ReflectiveOperationException ex) {
-        throw new IOException("Can't instantiate " + clazz.getName(), ex);
-      }
-    }
-    return null;
-  }
-
   /** Generate the credential from the {@link AccessTokenProvider}. */
   public static Credential credential(
       AccessTokenProvider accessTokenProvider, Collection<String> scopes) {
     if (accessTokenProvider != null) {
       return getCredentialFromAccessTokenProvider(accessTokenProvider, scopes);
     }
-
     return null;
   }
 
@@ -117,7 +94,8 @@ public final class CredentialFromAccessTokenProviderClassFactory {
   public static Credential credential(
       Configuration config, List<String> keyPrefixes, Collection<String> scopes)
       throws IOException {
-    AccessTokenProvider accessTokenProvider = getAccessTokenProvider(config, keyPrefixes);
+    AccessTokenProvider accessTokenProvider =
+        HadoopCredentialConfiguration.getAccessTokenProvider(config, keyPrefixes);
     return credential(accessTokenProvider, scopes);
   }
 

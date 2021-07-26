@@ -1302,7 +1302,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
             ? delegationTokens.getAccessTokenProvider()
             // If delegation token support is not configured, check if a
             // custom AccessTokenProvider implementation is configured
-            : CredentialFromAccessTokenProviderClassFactory.getAccessTokenProvider(
+            : HadoopCredentialConfiguration.getAccessTokenProvider(
                 config, ImmutableList.of(GCS_CONFIG_PREFIX));
 
     if (accessTokenProvider != null) {
@@ -1355,7 +1355,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 .getCredential(CredentialFactory.DEFAULT_SCOPES);
       }
     } else {
-
       switch (accessTokenProvider.getAccessTokenType()) {
         case GENERIC:
           // check if an AccessTokenProvider is configured

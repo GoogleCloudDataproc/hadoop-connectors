@@ -27,9 +27,7 @@ import java.security.InvalidParameterException;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * A utility class to convert StorageRequest to a list of AccessBoundary objects.
- */
+/** A utility class to convert StorageRequest to a list of AccessBoundary objects. */
 class StorageRequestToAccessBoundaryConverter {
 
   /**
