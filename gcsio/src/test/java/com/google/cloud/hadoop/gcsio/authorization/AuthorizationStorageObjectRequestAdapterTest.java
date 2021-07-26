@@ -38,8 +38,8 @@ public class AuthorizationStorageObjectRequestAdapterTest {
   @Test
   public void testTranslateObjectListRequest() throws IOException {
     Storage.Objects.List request = storage.objects().list(BUCKET_NAME).setPrefix(OBJECT_NAME);
-    List<GcsResourceAndAction> results = AuthorizationStorageObjectRequestAdapter
-        .fromStorageObjectRequest(request);
+    List<GcsResourceAndAction> results =
+        AuthorizationStorageObjectRequestAdapter.fromStorageObjectRequest(request);
 
     assertEquals(1, results.size());
     GcsResourceAndAction resourceAndActions = results.get(0);
@@ -52,8 +52,8 @@ public class AuthorizationStorageObjectRequestAdapterTest {
   @Test
   public void testTranslateObjectListRequestWithNullPrefix() throws IOException {
     Storage.Objects.List request = storage.objects().list(BUCKET_NAME);
-    List<GcsResourceAndAction> results = AuthorizationStorageObjectRequestAdapter
-        .fromStorageObjectRequest(request);
+    List<GcsResourceAndAction> results =
+        AuthorizationStorageObjectRequestAdapter.fromStorageObjectRequest(request);
 
     assertEquals(1, results.size());
     GcsResourceAndAction resourceAndActions = results.get(0);
@@ -67,8 +67,8 @@ public class AuthorizationStorageObjectRequestAdapterTest {
   public void testTranslateObjectInsertRequest() throws IOException {
     StorageObject object = new StorageObject().setName(OBJECT_NAME);
     Storage.Objects.Insert request = storage.objects().insert(BUCKET_NAME, object);
-    List<GcsResourceAndAction> results = AuthorizationStorageObjectRequestAdapter
-        .fromStorageObjectRequest(request);
+    List<GcsResourceAndAction> results =
+        AuthorizationStorageObjectRequestAdapter.fromStorageObjectRequest(request);
 
     assertEquals(1, results.size());
     GcsResourceAndAction resourceAndActions = results.get(0);
@@ -80,28 +80,32 @@ public class AuthorizationStorageObjectRequestAdapterTest {
 
   @Test
   public void testTranslateObjectComposeRequest() throws IOException {
-    List<ComposeRequest.SourceObjects> sources = Stream.of(0, 1, 2)
-        .map(i -> new ComposeRequest.SourceObjects().setName(OBJECT_NAME + "-" + i)).collect(
-            Collectors.toList());
+    List<ComposeRequest.SourceObjects> sources =
+        Stream.of(0, 1, 2)
+            .map(i -> new ComposeRequest.SourceObjects().setName(OBJECT_NAME + "-" + i))
+            .collect(Collectors.toList());
     ComposeRequest composeRequest = new ComposeRequest().setSourceObjects(sources);
-    Storage.Objects.Compose request = storage.objects()
-        .compose(BUCKET_NAME, OBJECT_NAME, composeRequest);
+    Storage.Objects.Compose request =
+        storage.objects().compose(BUCKET_NAME, OBJECT_NAME, composeRequest);
 
-    List<GcsResourceAndAction> results = AuthorizationStorageObjectRequestAdapter
-        .fromStorageObjectRequest(request);
+    List<GcsResourceAndAction> results =
+        AuthorizationStorageObjectRequestAdapter.fromStorageObjectRequest(request);
 
     assertEquals(4, results.size());
-    Stream.of(0, 1, 2).forEach(
-        i -> assertTrue(results
-            .contains(new GcsResourceAndAction(BUCKET_NAME, OBJECT_NAME + "-" + i, "read"))));
+    Stream.of(0, 1, 2)
+        .forEach(
+            i ->
+                assertTrue(
+                    results.contains(
+                        new GcsResourceAndAction(BUCKET_NAME, OBJECT_NAME + "-" + i, "read"))));
     assertTrue(results.contains(new GcsResourceAndAction(BUCKET_NAME, OBJECT_NAME, "write")));
   }
 
   @Test
   public void testTranslateObjectGetRequest() throws IOException {
     Storage.Objects.Get request = storage.objects().get(BUCKET_NAME, OBJECT_NAME);
-    List<GcsResourceAndAction> results = AuthorizationStorageObjectRequestAdapter
-        .fromStorageObjectRequest(request);
+    List<GcsResourceAndAction> results =
+        AuthorizationStorageObjectRequestAdapter.fromStorageObjectRequest(request);
 
     assertEquals(1, results.size());
     GcsResourceAndAction resourceAndActions = results.get(0);
@@ -114,8 +118,8 @@ public class AuthorizationStorageObjectRequestAdapterTest {
   @Test
   public void testTranslateObjectDeleteRequest() throws IOException {
     Storage.Objects.Delete request = storage.objects().delete(BUCKET_NAME, OBJECT_NAME);
-    List<GcsResourceAndAction> results = AuthorizationStorageObjectRequestAdapter
-        .fromStorageObjectRequest(request);
+    List<GcsResourceAndAction> results =
+        AuthorizationStorageObjectRequestAdapter.fromStorageObjectRequest(request);
 
     assertEquals(1, results.size());
     GcsResourceAndAction resourceAndActions = results.get(0);
@@ -128,11 +132,13 @@ public class AuthorizationStorageObjectRequestAdapterTest {
   @Test
   public void testTranslateObjectRewriteRequest() throws IOException {
     StorageObject object = new StorageObject().setName(OBJECT_NAME);
-    Storage.Objects.Rewrite request = storage.objects()
-        .rewrite(BUCKET_NAME, OBJECT_NAME, BUCKET_NAME_DST, OBJECT_NAME_DST, object);
+    Storage.Objects.Rewrite request =
+        storage
+            .objects()
+            .rewrite(BUCKET_NAME, OBJECT_NAME, BUCKET_NAME_DST, OBJECT_NAME_DST, object);
 
-    List<GcsResourceAndAction> results = AuthorizationStorageObjectRequestAdapter
-        .fromStorageObjectRequest(request);
+    List<GcsResourceAndAction> results =
+        AuthorizationStorageObjectRequestAdapter.fromStorageObjectRequest(request);
 
     assertEquals(2, results.size());
     assertTrue(results.contains(new GcsResourceAndAction(BUCKET_NAME, OBJECT_NAME, "read")));
@@ -143,11 +149,11 @@ public class AuthorizationStorageObjectRequestAdapterTest {
   @Test
   public void testTranslateObjectCopyRequest() throws IOException {
     StorageObject object = new StorageObject().setName(OBJECT_NAME);
-    Storage.Objects.Copy request = storage.objects()
-        .copy(BUCKET_NAME, OBJECT_NAME, BUCKET_NAME_DST, OBJECT_NAME_DST, object);
+    Storage.Objects.Copy request =
+        storage.objects().copy(BUCKET_NAME, OBJECT_NAME, BUCKET_NAME_DST, OBJECT_NAME_DST, object);
 
-    List<GcsResourceAndAction> results = AuthorizationStorageObjectRequestAdapter
-        .fromStorageObjectRequest(request);
+    List<GcsResourceAndAction> results =
+        AuthorizationStorageObjectRequestAdapter.fromStorageObjectRequest(request);
 
     assertEquals(2, results.size());
     assertTrue(results.contains(new GcsResourceAndAction(BUCKET_NAME, OBJECT_NAME, "read")));
@@ -160,8 +166,8 @@ public class AuthorizationStorageObjectRequestAdapterTest {
     StorageObject object = new StorageObject().setName(OBJECT_NAME);
     Storage.Objects.Patch request = storage.objects().patch(BUCKET_NAME, OBJECT_NAME, object);
 
-    List<GcsResourceAndAction> results = AuthorizationStorageObjectRequestAdapter
-        .fromStorageObjectRequest(request);
+    List<GcsResourceAndAction> results =
+        AuthorizationStorageObjectRequestAdapter.fromStorageObjectRequest(request);
 
     assertEquals(1, results.size());
     GcsResourceAndAction resourceAndActions = results.get(0);
@@ -175,8 +181,8 @@ public class AuthorizationStorageObjectRequestAdapterTest {
   public void testTranslateBucketGetRequest() throws IOException {
     Storage.Buckets.Get request = storage.buckets().get(BUCKET_NAME);
 
-    List<GcsResourceAndAction> results = AuthorizationStorageObjectRequestAdapter
-        .fromStorageObjectRequest(request);
+    List<GcsResourceAndAction> results =
+        AuthorizationStorageObjectRequestAdapter.fromStorageObjectRequest(request);
 
     assertEquals(1, results.size());
     GcsResourceAndAction resourceAndActions = results.get(0);
@@ -192,8 +198,8 @@ public class AuthorizationStorageObjectRequestAdapterTest {
 
     Storage.Buckets.Insert request = storage.buckets().insert("project", bucket);
 
-    List<GcsResourceAndAction> results = AuthorizationStorageObjectRequestAdapter
-        .fromStorageObjectRequest(request);
+    List<GcsResourceAndAction> results =
+        AuthorizationStorageObjectRequestAdapter.fromStorageObjectRequest(request);
 
     assertEquals(1, results.size());
     GcsResourceAndAction resourceAndActions = results.get(0);
@@ -207,8 +213,8 @@ public class AuthorizationStorageObjectRequestAdapterTest {
   public void testTranslateBucketDeleteRequest() throws IOException {
     Storage.Buckets.Delete request = storage.buckets().delete(BUCKET_NAME);
 
-    List<GcsResourceAndAction> results = AuthorizationStorageObjectRequestAdapter
-        .fromStorageObjectRequest(request);
+    List<GcsResourceAndAction> results =
+        AuthorizationStorageObjectRequestAdapter.fromStorageObjectRequest(request);
 
     assertEquals(1, results.size());
     GcsResourceAndAction resourceAndActions = results.get(0);
@@ -222,8 +228,8 @@ public class AuthorizationStorageObjectRequestAdapterTest {
   public void testTranslateBucketListRequest() throws IOException {
     Storage.Buckets.List request = storage.buckets().list("project");
 
-    List<GcsResourceAndAction> results = AuthorizationStorageObjectRequestAdapter
-        .fromStorageObjectRequest(request);
+    List<GcsResourceAndAction> results =
+        AuthorizationStorageObjectRequestAdapter.fromStorageObjectRequest(request);
 
     assertEquals(1, results.size());
     GcsResourceAndAction resourceAndActions = results.get(0);

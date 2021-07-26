@@ -20,8 +20,8 @@ public class AuthorizationStorageObjectRequestAdapter {
    * @param request the {@link StorageRequest} instance
    * @return a list of {@link GcsResourceAndAction} messages corresponding to the request
    */
-  public static <RequestT extends StorageRequest<?>> List<GcsResourceAndAction> fromStorageObjectRequest(
-      RequestT request) {
+  public static <RequestT extends StorageRequest<?>>
+      List<GcsResourceAndAction> fromStorageObjectRequest(RequestT request) {
     if (request instanceof Storage.Objects.List) {
       return translateObjectListRequest((Storage.Objects.List) request);
     } else if (request instanceof Storage.Objects.Insert) {
@@ -60,33 +60,34 @@ public class AuthorizationStorageObjectRequestAdapter {
     if (Strings.isNullOrEmpty(prefix)) {
       prefix = "/";
     }
-    return Collections
-        .singletonList(new GcsResourceAndAction(request.getBucket(), prefix, "read"));
+    return Collections.singletonList(new GcsResourceAndAction(request.getBucket(), prefix, "read"));
   }
 
   private static List<GcsResourceAndAction> translateObjectInsertRequest(
       Storage.Objects.Insert request) {
     String path = ((StorageObject) getData(request)).getName();
-    return Collections.singletonList(
-        new GcsResourceAndAction(request.getBucket(), path, "write"));
+    return Collections.singletonList(new GcsResourceAndAction(request.getBucket(), path, "write"));
   }
 
   private static List<GcsResourceAndAction> translateObjectComposeRequest(
       Storage.Objects.Compose request) {
     List<GcsResourceAndAction> resourceAndActions = new ArrayList<>();
     // Read access on all the sources
-    ((ComposeRequest) getData(request)).getSourceObjects().stream()
-        .forEach(source -> resourceAndActions.add(
-            new GcsResourceAndAction(request.getDestinationBucket(), source.getName(), "read")));
+    ((ComposeRequest) getData(request))
+        .getSourceObjects().stream()
+            .forEach(
+                source ->
+                    resourceAndActions.add(
+                        new GcsResourceAndAction(
+                            request.getDestinationBucket(), source.getName(), "read")));
     // Write access on the destination
     resourceAndActions.add(
-        new GcsResourceAndAction(request.getDestinationBucket(), request.getDestinationObject(),
-            "write"));
+        new GcsResourceAndAction(
+            request.getDestinationBucket(), request.getDestinationObject(), "write"));
     return resourceAndActions;
   }
 
-  private static List<GcsResourceAndAction> translateObjectGetRequest(
-      Storage.Objects.Get request) {
+  private static List<GcsResourceAndAction> translateObjectGetRequest(Storage.Objects.Get request) {
     return Collections.singletonList(
         new GcsResourceAndAction(request.getBucket(), request.getObject(), "read"));
   }
@@ -103,8 +104,8 @@ public class AuthorizationStorageObjectRequestAdapter {
     resourceAndActions.add(
         new GcsResourceAndAction(request.getSourceBucket(), request.getSourceObject(), "read"));
     resourceAndActions.add(
-        new GcsResourceAndAction(request.getDestinationBucket(), request.getDestinationObject(),
-            "write"));
+        new GcsResourceAndAction(
+            request.getDestinationBucket(), request.getDestinationObject(), "write"));
     return resourceAndActions;
   }
 
@@ -114,8 +115,8 @@ public class AuthorizationStorageObjectRequestAdapter {
     resourceAndActions.add(
         new GcsResourceAndAction(request.getSourceBucket(), request.getSourceObject(), "read"));
     resourceAndActions.add(
-        new GcsResourceAndAction(request.getDestinationBucket(), request.getDestinationObject(),
-            "write"));
+        new GcsResourceAndAction(
+            request.getDestinationBucket(), request.getDestinationObject(), "write"));
     return resourceAndActions;
   }
 
@@ -125,23 +126,19 @@ public class AuthorizationStorageObjectRequestAdapter {
         new GcsResourceAndAction(request.getBucket(), request.getObject(), "write"));
   }
 
-  private static List<GcsResourceAndAction> translateBucketGetRequest(
-      Storage.Buckets.Get request) {
-    return Collections.singletonList(
-        new GcsResourceAndAction(request.getBucket(), "/", "read"));
+  private static List<GcsResourceAndAction> translateBucketGetRequest(Storage.Buckets.Get request) {
+    return Collections.singletonList(new GcsResourceAndAction(request.getBucket(), "/", "read"));
   }
 
   private static List<GcsResourceAndAction> translateBucketInsertRequest(
       Storage.Buckets.Insert request) {
     String bucketName = ((Bucket) getData(request)).getName();
-    return Collections.singletonList(
-        new GcsResourceAndAction(bucketName, "/", "write"));
+    return Collections.singletonList(new GcsResourceAndAction(bucketName, "/", "write"));
   }
 
   private static List<GcsResourceAndAction> translateBucketDeleteRequest(
       Storage.Buckets.Delete request) {
-    return Collections.singletonList(
-        new GcsResourceAndAction(request.getBucket(), "/", "write"));
+    return Collections.singletonList(new GcsResourceAndAction(request.getBucket(), "/", "write"));
   }
 
   private static List<GcsResourceAndAction> translateBucketListRequest(

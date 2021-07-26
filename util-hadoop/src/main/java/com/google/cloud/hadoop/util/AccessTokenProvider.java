@@ -47,8 +47,7 @@ public interface AccessTokenProvider extends Configurable, StorageAccessTokenPro
    * @param storageRequest a storage request holding the context.
    * @throws IOException when refresh fails.
    */
-  default void refresh(List<GcsResourceAndAction> storageRequest)
-      throws IOException {
+  default void refresh(List<GcsResourceAndAction> storageRequest) throws IOException {
     this.refresh();
   }
 }

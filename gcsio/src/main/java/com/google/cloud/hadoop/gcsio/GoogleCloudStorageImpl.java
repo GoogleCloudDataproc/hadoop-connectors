@@ -251,9 +251,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       throws IOException {
     this(
         options,
-        new RetryHttpInitializer(
-            credential, options.toRetryHttpInitializerOptions()), /*accessTokenProvider=*/
-        null);
+        new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()),
+        /*accessTokenProvider=*/ null);
   }
 
   /**
@@ -280,8 +279,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     this(
         options,
         createStorage(options, httpRequestInitializer),
-        /* credentials= */null,
-        /* accessTokenProvider= */null);
+        /* credentials= */ null,
+        /* accessTokenProvider= */ null);
   }
 
   public GoogleCloudStorageImpl(
@@ -313,9 +312,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param credentials OAuth2 credentials that allows access to GCS
    */
   public GoogleCloudStorageImpl(
-      GoogleCloudStorageOptions options,
-      Storage storage,
-      Credentials credentials) {
+      GoogleCloudStorageOptions options, Storage storage, Credentials credentials) {
     this(options, storage, credentials, /* accessTokenProvider= */ null);
   }
 
@@ -2168,8 +2165,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       RequestT request, String bucketName) throws IOException {
     if (storageOptions.getAuthorizationMode() == AuthorizationMode.REQUEST_CONTEXT_RELATED
         && accessTokenProvider != null) {
-      AccessToken accessToken = this.accessTokenProvider.getAccessToken(
-          AuthorizationStorageObjectRequestAdapter.fromStorageObjectRequest(request));
+      AccessToken accessToken =
+          this.accessTokenProvider.getAccessToken(
+              AuthorizationStorageObjectRequestAdapter.fromStorageObjectRequest(request));
       request.setOauthToken(accessToken.getToken());
     }
     if (storageRequestAuthorizer != null) {

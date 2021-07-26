@@ -34,7 +34,8 @@ public class GcsResourceAndActionTest {
 
   @Test
   public void hashCode_expectedValue() {
-    GcsResourceAndAction actualObject = new GcsResourceAndAction("testBucket", "testObject", "read");
+    GcsResourceAndAction actualObject =
+        new GcsResourceAndAction("testBucket", "testObject", "read");
 
     // hard coding the expected hash value to detect any changes in the hashcode function
     assertThat(actualObject.hashCode()).isEqualTo(1357278144);

@@ -39,9 +39,9 @@ public class GcsResourceAndAction {
       return false;
     }
     GcsResourceAndAction that = (GcsResourceAndAction) o;
-    return Objects.equals(getBucket(), that.getBucket()) && Objects
-        .equals(getObjectPath(), that.getObjectPath()) && Objects
-        .equals(getAction(), that.getAction());
+    return Objects.equals(getBucket(), that.getBucket())
+        && Objects.equals(getObjectPath(), that.getObjectPath())
+        && Objects.equals(getAction(), that.getAction());
   }
 
   @Override

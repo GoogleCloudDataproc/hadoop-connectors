@@ -46,13 +46,9 @@ import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockT
 import static com.google.common.net.HttpHeaders.CONTENT_LENGTH;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
@@ -118,7 +114,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.mockito.Mockito;
 
 /**
  * Unit tests for GoogleCloudStorage class. The underlying GCS HTTP requests are mocked, in order to
@@ -3423,7 +3418,9 @@ public class GoogleCloudStorageTest {
     MockHttpTransport transport = mockTransport(jsonDataResponse(newBucket(BUCKET_NAME)));
 
     GoogleCloudStorageOptions gcsOptions =
-        GCS_OPTIONS.toBuilder().setAuthorizationMode(AuthorizationMode.REQUEST_CONTEXT_RELATED).build();
+        GCS_OPTIONS.toBuilder()
+            .setAuthorizationMode(AuthorizationMode.REQUEST_CONTEXT_RELATED)
+            .build();
 
     AccessToken accessToken = new AccessToken("accesstoken_0", 1000L);
     StorageAccessTokenProvider fakeAtp = new FakeAccessTokenProvider(accessToken);
@@ -3531,7 +3528,5 @@ class FakeAccessTokenProvider implements StorageAccessTokenProvider {
   }
 
   @Override
-  public void refresh(List<GcsResourceAndAction> storageRequest) throws IOException {
-
-  }
+  public void refresh(List<GcsResourceAndAction> storageRequest) throws IOException {}
 }
