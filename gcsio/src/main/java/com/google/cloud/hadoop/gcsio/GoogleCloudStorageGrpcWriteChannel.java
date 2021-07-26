@@ -16,7 +16,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.encodeMetadata;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.google.storage.v1.ServiceConstants.Values.MAX_WRITE_CHUNK_BYTES;
+import static com.google.storage.v2.ServiceConstants.Values.MAX_WRITE_CHUNK_BYTES;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.stream.Collectors.toMap;
 
@@ -30,20 +30,21 @@ import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
 import com.google.common.io.BaseEncoding;
 import com.google.common.io.ByteStreams;
-import com.google.google.storage.v1.ChecksummedData;
-import com.google.google.storage.v1.InsertObjectRequest;
-import com.google.google.storage.v1.InsertObjectSpec;
-import com.google.google.storage.v1.Object;
-import com.google.google.storage.v1.ObjectChecksums;
-import com.google.google.storage.v1.QueryWriteStatusRequest;
-import com.google.google.storage.v1.QueryWriteStatusResponse;
-import com.google.google.storage.v1.StartResumableWriteRequest;
-import com.google.google.storage.v1.StartResumableWriteResponse;
-import com.google.google.storage.v1.StorageGrpc.StorageStub;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.Int64Value;
-import com.google.protobuf.UInt32Value;
 import com.google.protobuf.util.Timestamps;
+import com.google.storage.v2.ChecksummedData;
+import com.google.storage.v2.CommonRequestParams;
+import com.google.storage.v2.CommonRequestParams.Builder;
+import com.google.storage.v2.Object;
+import com.google.storage.v2.ObjectChecksums;
+import com.google.storage.v2.QueryWriteStatusRequest;
+import com.google.storage.v2.QueryWriteStatusResponse;
+import com.google.storage.v2.StartResumableWriteRequest;
+import com.google.storage.v2.StartResumableWriteResponse;
+import com.google.storage.v2.StorageGrpc.StorageStub;
+import com.google.storage.v2.WriteObjectRequest;
+import com.google.storage.v2.WriteObjectResponse;
+import com.google.storage.v2.WriteObjectSpec;
 import io.grpc.Status;
 import io.grpc.stub.ClientCallStreamObserver;
 import io.grpc.stub.ClientResponseObserver;
@@ -61,7 +62,7 @@ import java.util.concurrent.ExecutorService;
 
 /** Implements WritableByteChannel to provide write access to GCS via gRPC. */
 public final class GoogleCloudStorageGrpcWriteChannel
-    extends BaseAbstractGoogleAsyncWriteChannel<Object>
+    extends BaseAbstractGoogleAsyncWriteChannel<WriteObjectResponse>
     implements GoogleCloudStorageItemInfo.Provider {
 
   private static final Duration START_RESUMABLE_WRITE_TIMEOUT = Duration.ofMinutes(1);
@@ -111,33 +112,39 @@ public final class GoogleCloudStorageGrpcWriteChannel
   }
 
   @Override
-  public void handleResponse(Object response) {
+  public void handleResponse(WriteObjectResponse response) {
+    Object resource = response.getResource();
     Map<String, byte[]> metadata =
-        response.getMetadataMap().entrySet().stream()
+        resource.getMetadataMap().entrySet().stream()
             .collect(
                 toMap(Map.Entry::getKey, entry -> BaseEncoding.base64().decode(entry.getValue())));
 
-    byte[] md5Hash =
-        !response.getMd5Hash().isEmpty()
-            ? BaseEncoding.base64().decode(response.getMd5Hash())
-            : null;
+    byte[] md5Hash = null;
+    byte[] crc32c = null;
 
-    byte[] crc32c =
-        response.hasCrc32C()
-            ? ByteBuffer.allocate(4).putInt(response.getCrc32C().getValue()).array()
-            : null;
+    if (resource.hasChecksums()) {
+      md5Hash =
+          !resource.getChecksums().getMd5Hash().isEmpty()
+              ? resource.getChecksums().getMd5Hash().toByteArray()
+              : null;
+
+      crc32c =
+          resource.getChecksums().hasCrc32C()
+              ? ByteBuffer.allocate(4).putInt(resource.getChecksums().getCrc32C()).array()
+              : null;
+    }
 
     completedItemInfo =
         GoogleCloudStorageItemInfo.createObject(
             resourceId,
-            Timestamps.toMillis(response.getTimeCreated()),
-            Timestamps.toMillis(response.getUpdated()),
-            response.getSize(),
-            response.getContentType(),
-            response.getContentEncoding(),
+            Timestamps.toMillis(resource.getCreateTime()),
+            Timestamps.toMillis(resource.getUpdateTime()),
+            resource.getSize(),
+            resource.getContentType(),
+            resource.getContentEncoding(),
             metadata,
-            response.getGeneration(),
-            response.getMetageneration(),
+            resource.getGeneration(),
+            resource.getMetageneration(),
             new VerificationAttributes(md5Hash, crc32c));
   }
 
@@ -152,7 +159,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     }
   }
 
-  private class UploadOperation implements Callable<Object> {
+  private class UploadOperation implements Callable<WriteObjectResponse> {
 
     // Read end of the pipe.
     private final BufferedInputStream pipeSource;
@@ -162,7 +169,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
     private String uploadId;
     private long writeOffset = 0;
     private InsertChunkResponseObserver responseObserver;
-    // Holds list of most recent number of NUMBER_OF_REQUESTS_TO_RETAIN requests, so upload can be
+    // Holds list of most recent number of NUMBER_OF_REQUESTS_TO_RETAIN requests, so upload can
+    // be
     // rewound and re-sent upon transient errors.
     private final TreeMap<Long, ByteString> dataChunkMap = new TreeMap<>();
 
@@ -174,7 +182,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     }
 
     @Override
-    public Object call() throws IOException {
+    public WriteObjectResponse call() throws IOException {
       // Try-with-resource will close this end of the pipe so that
       // the writer at the other end will not hang indefinitely.
       // Send the initial StartResumableWrite request to get an uploadId.
@@ -192,16 +200,16 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
     }
 
-    private Object doResumableUpload() throws IOException {
+    private WriteObjectResponse doResumableUpload() throws IOException {
       // Only request committed size for the first insert request.
       if (writeOffset > 0) {
         writeOffset = getCommittedWriteSize(uploadId);
       }
       responseObserver = new InsertChunkResponseObserver(uploadId, writeOffset);
       // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
-      StreamObserver<InsertObjectRequest> requestStreamObserver =
+      StreamObserver<WriteObjectRequest> requestStreamObserver =
           stub.withDeadlineAfter(channelOptions.getGrpcWriteTimeout(), MILLISECONDS)
-              .insertObject(responseObserver);
+              .writeObject(responseObserver);
 
       // Wait for streaming RPC to become ready for upload.
       try {
@@ -216,7 +224,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       boolean objectFinalized = false;
       while (!objectFinalized) {
-        InsertObjectRequest insertRequest;
+        WriteObjectRequest insertRequest;
         if (dataChunkMap.size() > 0 && dataChunkMap.lastKey() >= writeOffset) {
           insertRequest = buildRequestFromBufferedDataChunk(dataChunkMap, writeOffset);
           writeOffset += insertRequest.getChecksummedData().getContent().size();
@@ -260,10 +268,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
       return responseObserver.getResponseOrThrow();
     }
 
-    private InsertObjectRequest buildInsertRequest(
+    private WriteObjectRequest buildInsertRequest(
         long writeOffset, ByteString dataChunk, boolean resumeFromFailedInsert) {
-      InsertObjectRequest.Builder requestBuilder =
-          InsertObjectRequest.newBuilder().setUploadId(uploadId).setWriteOffset(writeOffset);
+      WriteObjectRequest.Builder requestBuilder =
+          WriteObjectRequest.newBuilder().setUploadId(uploadId).setWriteOffset(writeOffset);
 
       if (dataChunk.size() > 0) {
         ChecksummedData.Builder requestDataBuilder =
@@ -272,7 +280,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
           if (!resumeFromFailedInsert) {
             updateObjectHash(dataChunk);
           }
-          requestDataBuilder.setCrc32C(UInt32Value.newBuilder().setValue(getChunkHash(dataChunk)));
+          requestDataBuilder.setCrc32C(getChunkHash(dataChunk));
         }
         requestBuilder.setChecksummedData(requestDataBuilder);
       }
@@ -281,8 +289,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
         requestBuilder.setFinishWrite(true);
         if (channelOptions.isGrpcChecksumsEnabled()) {
           requestBuilder.setObjectChecksums(
-              ObjectChecksums.newBuilder()
-                  .setCrc32C(UInt32Value.newBuilder().setValue(objectHasher.hash().asInt())));
+              ObjectChecksums.newBuilder().setCrc32C(objectHasher.hash().asInt()));
         }
       }
 
@@ -306,11 +313,11 @@ public final class GoogleCloudStorageGrpcWriteChannel
     // Handles the case when a writeOffset of data read previously is being processed.
     // This happens if a transient failure happens while uploading, and can be resumed by
     // querying the current committed offset.
-    private InsertObjectRequest buildRequestFromBufferedDataChunk(
+    private WriteObjectRequest buildRequestFromBufferedDataChunk(
         TreeMap<Long, ByteString> dataChunkMap, long writeOffset) throws IOException {
       // Resume will only work if the first request builder in the cache carries an offset
       // not greater than the current writeOffset.
-      InsertObjectRequest request = null;
+      WriteObjectRequest request = null;
       if (dataChunkMap.size() > 0 && dataChunkMap.firstKey() <= writeOffset) {
         for (Map.Entry<Long, ByteString> entry : dataChunkMap.entrySet()) {
           if (entry.getKey() + entry.getValue().size() > writeOffset
@@ -342,18 +349,19 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
     /** Handler for responses from the Insert streaming RPC. */
     private class InsertChunkResponseObserver
-        implements ClientResponseObserver<InsertObjectRequest, Object> {
+        implements ClientResponseObserver<WriteObjectRequest, WriteObjectResponse> {
 
       private final long writeOffset;
       private final String uploadId;
       // The response from the server, populated at the end of a successful streaming RPC.
-      private Object response;
+      private WriteObjectResponse response;
       // The last transient error to occur during the streaming RPC.
       public Throwable transientError = null;
       // The last non-transient error to occur during the streaming RPC.
       public Throwable nonTransientError = null;
 
-      // CountDownLatch tracking completion of the streaming RPC. Set on error, or once the request
+      // CountDownLatch tracking completion of the streaming RPC. Set on error, or once the
+      // request
       // stream is closed.
       final CountDownLatch done = new CountDownLatch(1);
       // CountDownLatch tracking readiness of the streaming RPC.
@@ -364,7 +372,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
         this.writeOffset = writeOffset;
       }
 
-      public Object getResponseOrThrow() throws IOException {
+      public WriteObjectResponse getResponseOrThrow() throws IOException {
         if (hasNonTransientError()) {
           throw new IOException(
               String.format("Resumable upload failed for '%s'", resourceId), nonTransientError);
@@ -381,7 +389,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
 
       @Override
-      public void onNext(Object response) {
+      public void onNext(WriteObjectResponse response) {
         this.response = response;
       }
 
@@ -412,37 +420,42 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       @Override
       public void beforeStart(
-          ClientCallStreamObserver<InsertObjectRequest> clientCallStreamObserver) {
+          ClientCallStreamObserver<WriteObjectRequest> clientCallStreamObserver) {
         clientCallStreamObserver.setOnReadyHandler(ready::countDown);
       }
     }
 
     /** Send a StartResumableWriteRequest and return the uploadId of the resumable write. */
     private String startResumableUpload() throws IOException {
-      InsertObjectSpec.Builder insertObjectSpecBuilder =
-          InsertObjectSpec.newBuilder()
+      WriteObjectSpec.Builder insertObjectSpecBuilder =
+          WriteObjectSpec.newBuilder()
               .setResource(
                   Object.newBuilder()
-                      .setBucket(resourceId.getBucketName())
+                      .setBucket(StringPaths.toV2BucketName(resourceId.getBucketName()))
                       .setName(resourceId.getObjectName())
                       .setContentType(createOptions.getContentType())
                       .putAllMetadata(encodeMetadata(createOptions.getMetadata()))
                       .build());
       if (writeConditions.hasContentGenerationMatch()) {
-        insertObjectSpecBuilder.setIfGenerationMatch(
-            Int64Value.newBuilder().setValue(writeConditions.getContentGenerationMatch()));
+        insertObjectSpecBuilder.setIfGenerationMatch(writeConditions.getContentGenerationMatch());
       }
       if (writeConditions.hasMetaGenerationMatch()) {
-        insertObjectSpecBuilder.setIfMetagenerationMatch(
-            Int64Value.newBuilder().setValue(writeConditions.getMetaGenerationMatch()));
+        insertObjectSpecBuilder.setIfMetagenerationMatch(writeConditions.getMetaGenerationMatch());
       }
+
+      Builder commonRequestParamsBuilder = null;
       if (requesterPaysProject != null) {
-        insertObjectSpecBuilder.setUserProject(requesterPaysProject);
+        commonRequestParamsBuilder = CommonRequestParams.newBuilder();
+        commonRequestParamsBuilder.setUserProject(requesterPaysProject);
       }
-      StartResumableWriteRequest request =
-          StartResumableWriteRequest.newBuilder()
-              .setInsertObjectSpec(insertObjectSpecBuilder)
-              .build();
+
+      StartResumableWriteRequest.Builder startResumableWriteRequestBuilder =
+          StartResumableWriteRequest.newBuilder();
+      startResumableWriteRequestBuilder.setWriteObjectSpec(insertObjectSpecBuilder);
+      if (commonRequestParamsBuilder != null) {
+        startResumableWriteRequestBuilder.setCommonRequestParams(commonRequestParamsBuilder);
+      }
+      StartResumableWriteRequest request = startResumableWriteRequestBuilder.build();
 
       SimpleResponseObserver<StartResumableWriteResponse> responseObserver =
           new SimpleResponseObserver<>();

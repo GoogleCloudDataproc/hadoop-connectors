@@ -184,6 +184,7 @@
         <groupId>org.xolstice.maven.plugins</groupId>
         <artifactId>protobuf-maven-plugin</artifactId>
         <configuration>
+          <protoSourceRoot>googleapis/google/storage/v2</protoSourceRoot>
           <protocArtifact>
             com.google.protobuf:protoc:${google.protobuf.version}:exe:${os.detected.classifier}
           </protocArtifact>

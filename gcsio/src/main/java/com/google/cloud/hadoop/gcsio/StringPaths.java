@@ -20,6 +20,7 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.common.base.CharMatcher;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.flogger.GoogleLogger;
 
@@ -27,6 +28,8 @@ import com.google.common.flogger.GoogleLogger;
 public final class StringPaths {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
+  static final String V2_BUCKET_NAME_PREFIX = "projects/_/buckets/";
 
   private StringPaths() {}
 
@@ -168,5 +171,15 @@ public final class StringPaths {
     return Strings.isNullOrEmpty(path) || isDirectoryPath(path)
         ? path
         : path + GoogleCloudStorage.PATH_DELIMITER;
+  }
+
+  /**
+   * @param bucketName name of the bucket
+   * @return bucket name in to GCS v2 bucket name format
+   */
+  static String toV2BucketName(String bucketName) {
+    Preconditions.checkArgument(
+        !Strings.isNullOrEmpty(bucketName), "bucketName cannot be null or empty");
+    return V2_BUCKET_NAME_PREFIX + bucketName;
   }
 }
