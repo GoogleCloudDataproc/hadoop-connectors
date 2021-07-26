@@ -59,8 +59,8 @@ import com.google.cloud.hadoop.gcsio.ListFileOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
 import com.google.cloud.hadoop.gcsio.UriPaths;
-import com.google.cloud.hadoop.gcsio.authorization.AuthorizationMode;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
+import com.google.cloud.hadoop.util.AccessTokenProvider.AccessTokenType;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.CredentialFactory;
 import com.google.cloud.hadoop.util.CredentialFactory.CredentialHttpRetryInitializer;
@@ -253,9 +253,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   /** Delegation token support */
   protected GcsDelegationTokens delegationTokens = null;
-
-  /** Access token provider support */
-  protected AccessTokenProvider accessTokenProvider = null;
 
   /** Underlying GCS file system object. */
   private Supplier<GoogleCloudStorageFileSystem> gcsFsSupplier;
@@ -1292,23 +1289,12 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   }
 
   /**
-   * Load's an {@link AccessTokenProvider} implementation. If the user provided an
+   * Loads an {@link AccessTokenProvider} implementation. If the user provided an
    * AbstractDelegationTokenBinding we get the AccessTokenProvider, otherwise if a class name is
    * provided (See {@link HadoopCredentialConfiguration#ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX} then we
    * use it, otherwise it's null.
    */
-  private AccessTokenProvider getAccessTokenProvider(
-      Configuration config, GoogleCloudStorageFileSystemOptions gcsFsOptions) throws IOException {
-
-    checkArgument(
-        gcsFsOptions.getCloudStorageOptions().getAuthorizationMode()
-                != AuthorizationMode.REQUEST_CONTEXT_RELATED
-            || (HadoopCredentialConfiguration.getNullCredentialEnabled(config, GCS_CONFIG_PREFIX)
-                && HadoopCredentialConfiguration.getServiceAccountEnabled(
-                    config, GCS_CONFIG_PREFIX)),
-        "When using AuthorizationMode==REQUEST_CONTEXT_RELATED, `fs.gs.auth.null.enabled` should"
-            + " be true and `fs.gs.auth.service.account.enable` should be false");
-
+  private AccessTokenProvider getAccessTokenProvider(Configuration config) throws IOException {
     // Check if delegation token support is configured
     AccessTokenProvider accessTokenProvider =
         delegationTokens != null
@@ -1320,6 +1306,20 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 config, ImmutableList.of(GCS_CONFIG_PREFIX));
 
     if (accessTokenProvider != null) {
+      if (accessTokenProvider.getAccessTokenType() == AccessTokenType.DOWNSCOPED) {
+        checkArgument(
+            HadoopCredentialConfiguration.ENABLE_NULL_CREDENTIAL_SUFFIX
+                    .withPrefixes(
+                        HadoopCredentialConfiguration.getConfigKeyPrefixes(GCS_CONFIG_PREFIX))
+                    .get(config, config::getBoolean)
+                && !HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX
+                    .withPrefixes(
+                        HadoopCredentialConfiguration.getConfigKeyPrefixes(GCS_CONFIG_PREFIX))
+                    .get(config, config::getBoolean),
+            "When using DOWNSCOPED access token, `fs.gs.auth.null.enabled` should"
+                + " be set to true and `fs.gs.auth.service.account.enable` should be set to false");
+      }
+
       accessTokenProvider.setConf(config);
     }
 
@@ -1333,40 +1333,48 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * through {@link HadoopCredentialConfiguration#getCredentialFactory(Configuration, String...)}.
    */
   private Credential getCredential(
-      Configuration config, GoogleCloudStorageFileSystemOptions gcsFsOptions)
+      Configuration config,
+      GoogleCloudStorageFileSystemOptions gcsFsOptions,
+      AccessTokenProvider accessTokenProvider)
       throws IOException, GeneralSecurityException {
-    Credential credential = null;
+    Credential credential;
 
-    if (gcsFsOptions.getCloudStorageOptions().getAuthorizationMode() == AuthorizationMode.BASIC) {
-      // check if an AccessTokenProvider is configured
-      if (accessTokenProvider != null) {
-        // if so, try to get the credentials through the access token provider
-        credential =
-            CredentialFromAccessTokenProviderClassFactory.credential(
-                accessTokenProvider, CredentialFactory.DEFAULT_SCOPES);
-      } else {
-        // If delegation token support is not configured, check if a
-        // custom AccessTokenProvider implementation is configured, and attempt
-        // to acquire the Google credentials using it
-        credential =
-            CredentialFromAccessTokenProviderClassFactory.credential(
-                config, ImmutableList.of(GCS_CONFIG_PREFIX), CredentialFactory.DEFAULT_SCOPES);
+    if (accessTokenProvider == null) {
+      // If delegation token support is not configured, check if a
+      // custom AccessTokenProvider implementation is configured, and attempt
+      // to acquire the Google credentials using it
+      credential =
+          CredentialFromAccessTokenProviderClassFactory.credential(
+              config, ImmutableList.of(GCS_CONFIG_PREFIX), CredentialFactory.DEFAULT_SCOPES);
 
-        if (credential == null) {
-          // Finally, if no credentials have been acquired at this point, employ
-          // the default mechanism.
-          credential =
-              HadoopCredentialConfiguration.getCredentialFactory(config, GCS_CONFIG_PREFIX)
-                  .getCredential(CredentialFactory.DEFAULT_SCOPES);
-        }
+      if (credential == null) {
+        // Finally, if no credentials have been acquired at this point, employ
+        // the default mechanism.
+        credential =
+            HadoopCredentialConfiguration.getCredentialFactory(config, GCS_CONFIG_PREFIX)
+                .getCredential(CredentialFactory.DEFAULT_SCOPES);
       }
-    } else if (gcsFsOptions.getCloudStorageOptions().getAuthorizationMode()
-        == AuthorizationMode.REQUEST_CONTEXT_RELATED) {
-      // If the AuthorizationMode is set to `Request_Context_Relate`, Credential will be generated
-      // When GCS requests are created.
-      credential = null;
-    }
+    } else {
 
+      switch (accessTokenProvider.getAccessTokenType()) {
+        case GENERIC:
+          // check if an AccessTokenProvider is configured
+          // if so, try to get the credentials through the access token provider
+          credential =
+              CredentialFromAccessTokenProviderClassFactory.credential(
+                  accessTokenProvider, CredentialFactory.DEFAULT_SCOPES);
+          break;
+        case DOWNSCOPED:
+          // If the AccessTokenType is set to DOWNSCOPED`, Credential will be generated
+          // when GCS requests are created.
+          credential = null;
+          break;
+        default:
+          throw new IllegalStateException(
+              String.format(
+                  "Unknown AccessTokenType: %s", accessTokenProvider.getAccessTokenType()));
+      }
+    }
 
     // If impersonation service account exists, then use current credential to request access token
     // for the impersonating service account.
@@ -1497,16 +1505,22 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     GoogleCloudStorageFileSystemOptions gcsFsOptions =
         GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
 
-    accessTokenProvider = getAccessTokenProvider(config, gcsFsOptions);
+    AccessTokenProvider accessTokenProvider = getAccessTokenProvider(config);
 
     Credential credential;
     try {
-      credential = getCredential(config, gcsFsOptions);
+      credential = getCredential(config, gcsFsOptions, accessTokenProvider);
     } catch (GeneralSecurityException e) {
       throw new RuntimeException(e);
     }
 
-    return new GoogleCloudStorageFileSystem(credential, accessTokenProvider, gcsFsOptions);
+    return new GoogleCloudStorageFileSystem(
+        credential,
+        accessTokenProvider != null
+                && accessTokenProvider.getAccessTokenType() == AccessTokenType.DOWNSCOPED
+            ? accessBoundaries -> accessTokenProvider.getAccessToken(accessBoundaries).getToken()
+            : null,
+        gcsFsOptions);
   }
 
   /**

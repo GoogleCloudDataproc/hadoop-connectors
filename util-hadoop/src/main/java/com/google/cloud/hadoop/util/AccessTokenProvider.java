@@ -14,24 +14,58 @@
 
 package com.google.cloud.hadoop.util;
 
-import com.google.cloud.hadoop.gcsio.authorization.GcsResourceAndAction;
-import com.google.cloud.hadoop.gcsio.authorization.StorageAccessTokenProvider;
 import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.conf.Configurable;
 
 /** A provider to provide access token, and upon access token expiration, the utility to refresh. */
-public interface AccessTokenProvider extends Configurable, StorageAccessTokenProvider {
+public interface AccessTokenProvider extends Configurable {
+
+  /** Supported access token types. */
+  enum AccessTokenType {
+    /** The same access token generated for all the GCS requests. */
+    GENERIC,
+
+    /** A downscoped access token generated for each request. */
+    DOWNSCOPED;
+  }
+
+  /** An access token and its expiration time. */
+  class AccessToken {
+
+    private final String token;
+    private final Long expirationTimeMilliSeconds;
+
+    public AccessToken(String token, Long expirationTimeMillis) {
+      this.token = token;
+      this.expirationTimeMilliSeconds = expirationTimeMillis;
+    }
+
+    /** @return the Access Token string. */
+    public String getToken() {
+      return token;
+    }
+
+    /** @return the Time when the token will expire, expressed in milliseconds. */
+    public Long getExpirationTimeMilliSeconds() {
+      return expirationTimeMilliSeconds;
+    }
+  }
+
+  /** @return an access token type. */
+  default AccessTokenType getAccessTokenType() {
+    return AccessTokenType.GENERIC;
+  }
 
   /** @return an access token. */
   AccessToken getAccessToken();
 
   /**
-   * @param storageRequest a storage request holding the context.
+   * @param accessBoundaries access boundaries used to generate a downscoped access token.
    * @return an access token.
    */
-  default AccessToken getAccessToken(List<GcsResourceAndAction> storageRequest) {
-    return this.getAccessToken();
+  default AccessToken getAccessToken(List<AccessBoundary> accessBoundaries) {
+    throw new UnsupportedOperationException("Downscoped access tokens are not supported");
   }
 
   /**
@@ -40,14 +74,4 @@ public interface AccessTokenProvider extends Configurable, StorageAccessTokenPro
    * @throws IOException when refresh fails.
    */
   void refresh() throws IOException;
-
-  /**
-   * Force this provider to refresh its access token.
-   *
-   * @param storageRequest a storage request holding the context.
-   * @throws IOException when refresh fails.
-   */
-  default void refresh(List<GcsResourceAndAction> storageRequest) throws IOException {
-    this.refresh();
-  }
 }

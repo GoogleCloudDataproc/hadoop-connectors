@@ -152,19 +152,6 @@ provider.
 
     The implementation of the `AccessTokenProvider` interface used for GCS
     Connector.
-    
-*   `fs.gs.authorization.mode` (default: `BASIC`)
-
-    The mode to define how an Access Token is Generated. 
-
-    Valid values:
-    
-    *   `BASIC`: Generates a generic token, i.e. not aware of request object.
-
-    *   `REQUEST_CONTEXT_RELATED`: Which consider the request's objects and actions
-        while generating the token. When using this mode, an AccessTokenProvider 
-        Should be provided either through a delegation token binding or by 
-        directly setting `fs.gs.auth.access.token.provider.impl` config.
 
 *   `fs.gs.auth.service.account.enable` (default: `true`)
 
@@ -261,8 +248,6 @@ When configured, a specified authorization handler will be used to authorize
 Cloud Storage API requests before executing them. The handler will throw
 `AccessDeniedException` for rejected requests if user does not have enough
 permissions (not authorized) to execute these requests.
-Note: Using a `AccessTokenProvider` is the preferred way to perform authentication 
-and authorization.
 
 *   `fs.gs.authorization.handler.impl` (not set by default)
 

@@ -2,6 +2,8 @@
 
 1.  Update all dependencies to latest versions.
 
+1.  Add support for downscoped tokens in `AccessTokenProvider`.
+
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.
@@ -434,7 +436,7 @@
     fs.gs.checksum.type (default: NONE)
     ```
 
-    Valid property values: `NONE`, `CRC32C`, `MD5`.
+    Valid values: `NONE`, `CRC32C`, `MD5`.
 
     CRC32c checksum is compatible with
     [HDFS-13056](https://issues.apache.org/jira/browse/HDFS-13056).

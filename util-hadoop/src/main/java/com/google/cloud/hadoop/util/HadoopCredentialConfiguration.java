@@ -207,18 +207,6 @@ public class HadoopCredentialConfiguration {
     return new CredentialFactory(credentialOptions);
   }
 
-  public static boolean getNullCredentialEnabled(Configuration config, String... keyPrefixes) {
-    return ENABLE_NULL_CREDENTIAL_SUFFIX
-        .withPrefixes(getConfigKeyPrefixes(keyPrefixes))
-        .get(config, (k, d) -> config.getBoolean(k, d));
-  }
-
-  public static boolean getServiceAccountEnabled(Configuration config, String... keyPrefixes) {
-    return ENABLE_SERVICE_ACCOUNTS_SUFFIX
-        .withPrefixes(getConfigKeyPrefixes(keyPrefixes))
-        .get(config, (k, d) -> config.getBoolean(k, d));
-  }
-
   public static Class<? extends AccessTokenProvider> getAccessTokenProviderImplClass(
       Configuration config, String... keyPrefixes) {
     return ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX
