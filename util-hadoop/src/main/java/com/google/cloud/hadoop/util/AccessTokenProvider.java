@@ -22,7 +22,7 @@ import org.apache.hadoop.conf.Configurable;
 public interface AccessTokenProvider extends Configurable {
 
   /** Supported access token types. */
-  enum AccessTokenType {
+  public enum AccessTokenType {
     /** The same access token generated for all the GCS requests. */
     GENERIC,
 
