@@ -21,44 +21,56 @@ import com.google.api.services.storage.Storage;
 import com.google.auth.oauth2.ComputeEngineCredentials;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
-import com.google.cloud.hadoop.gcsio.StorageStubProvider;
 import java.io.IOException;
-import org.junit.Rule;
+import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.junit.Test;
 
 /** Tests that require a particular configuration of GoogleCloudStorageImpl. */
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageImplCreateTest {
   private Storage createStorage() throws IOException {
     return new Storage.Builder(
-        HttpTransportFactory.createHttpTransport(HttpTransportFactory.HttpTransportType.JAVA_NET),
-        JacksonFactory.getDefaultInstance(), new RetryHttpInitializer(null, "foo-user-agent")).build();
+            HttpTransportFactory.createHttpTransport(
+                HttpTransportFactory.HttpTransportType.JAVA_NET),
+            JacksonFactory.getDefaultInstance(),
+            new RetryHttpInitializer(null, "foo-user-agent"))
+        .build();
   }
 
   @Test
   public void create_grpcAndVmComputeEngineCredentials_useDirectpath() throws IOException {
-    GoogleCloudStorageImpl gcs = new GoogleCloudStorageImpl(
-        GoogleCloudStorageOptions.builder().setAppName("app").setGrpcEnabled(true).build(), createStorage(),
-        ComputeEngineCredentials.newBuilder().build());
+    GoogleCloudStorageImpl gcs =
+        new GoogleCloudStorageImpl(
+            GoogleCloudStorageOptions.builder().setAppName("app").setGrpcEnabled(true).build(),
+            createStorage(),
+            ComputeEngineCredentials.newBuilder().build());
     assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
         .isInstanceOf(StorageStubProvider.DirectPathGrpcDecorator.class);
   }
 
   @Test
   public void create_grpcAndDisableDirectPathAndVmComputeEngineCredentials_useCloudpath() throws IOException {
-    GoogleCloudStorageImpl gcs = new GoogleCloudStorageImpl(GoogleCloudStorageOptions.builder().setAppName("app")
-        .setGrpcEnabled(true).setDirectPathPreffered(false).build(), createStorage(),
-        ComputeEngineCredentials.newBuilder().build());
+    GoogleCloudStorageImpl gcs =
+        new GoogleCloudStorageImpl(
+            GoogleCloudStorageOptions.builder()
+                .setAppName("app")
+                .setGrpcEnabled(true)
+                .setDirectPathPreffered(false)
+                .build(),
+            createStorage(),
+            ComputeEngineCredentials.newBuilder().build(),
+            null);
     assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
         .isInstanceOf(StorageStubProvider.CloudPathGrpcDecorator.class);
   }
 
   @Test
   public void create_grpcAndNonComputeEngineCredentials_useCloudpath() throws IOException {
-    GoogleCloudStorageImpl gcs = new GoogleCloudStorageImpl(
-        GoogleCloudStorageOptions.builder().setAppName("app").setGrpcEnabled(true).build(), createStorage());
+    GoogleCloudStorageImpl gcs =
+        new GoogleCloudStorageImpl(
+            GoogleCloudStorageOptions.builder().setAppName("app").setGrpcEnabled(true).build(),
+            createStorage());
     assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
         .isInstanceOf(StorageStubProvider.CloudPathGrpcDecorator.class);
   }

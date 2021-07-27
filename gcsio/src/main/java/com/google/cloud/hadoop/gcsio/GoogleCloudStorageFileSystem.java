@@ -32,6 +32,7 @@ import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationDelete;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationRename;
+import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.CheckedFunction;
 import com.google.cloud.hadoop.util.LazyExecutorService;
 import com.google.common.annotations.VisibleForTesting;
@@ -63,6 +64,7 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 
@@ -145,6 +147,29 @@ public class GoogleCloudStorageFileSystem {
     this(
         new GoogleCloudStorageImpl(
             checkNotNull(options, "options must not be null").getCloudStorageOptions(), credential),
+        options);
+    logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
+  }
+
+  /**
+   * Constructs an instance of GoogleCloudStorageFileSystem.
+   *
+   * @param credential OAuth2 credential that allows access to GCS.
+   * @param downscopedAccessTokenFn Function that generates downscoped access token.
+   * @param options Options for how this filesystem should operate and configure its underlying
+   *     storage.
+   * @throws IOException
+   */
+  public GoogleCloudStorageFileSystem(
+      Credential credential,
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
+      GoogleCloudStorageFileSystemOptions options)
+      throws IOException {
+    this(
+        new GoogleCloudStorageImpl(
+            checkNotNull(options, "options must not be null").getCloudStorageOptions(),
+            credential,
+            downscopedAccessTokenFn),
         options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }
