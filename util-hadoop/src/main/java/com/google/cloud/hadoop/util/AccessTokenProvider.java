@@ -15,10 +15,20 @@
 package com.google.cloud.hadoop.util;
 
 import java.io.IOException;
+import java.util.List;
 import org.apache.hadoop.conf.Configurable;
 
 /** A provider to provide access token, and upon access token expiration, the utility to refresh. */
 public interface AccessTokenProvider extends Configurable {
+
+  /** Supported access token types. */
+  enum AccessTokenType {
+    /** The same access token generated for all the GCS requests. */
+    GENERIC,
+
+    /** A downscoped access token generated for each request. */
+    DOWNSCOPED;
+  }
 
   /** An access token and its expiration time. */
   class AccessToken {
@@ -42,8 +52,21 @@ public interface AccessTokenProvider extends Configurable {
     }
   }
 
+  /** @return an access token type. */
+  default AccessTokenType getAccessTokenType() {
+    return AccessTokenType.GENERIC;
+  }
+
   /** @return an access token. */
   AccessToken getAccessToken();
+
+  /**
+   * @param accessBoundaries access boundaries used to generate a downscoped access token.
+   * @return an access token.
+   */
+  default AccessToken getAccessToken(List<AccessBoundary> accessBoundaries) {
+    throw new UnsupportedOperationException("Downscoped access tokens are not supported");
+  }
 
   /**
    * Force this provider to refresh its access token.

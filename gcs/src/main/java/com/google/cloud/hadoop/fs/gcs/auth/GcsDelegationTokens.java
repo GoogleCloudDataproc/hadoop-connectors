@@ -52,10 +52,10 @@ public class GcsDelegationTokens extends AbstractService {
   /** Dynamically loaded token binding; lifecycle matches this object. */
   private AbstractDelegationTokenBinding tokenBinding;
 
-  private AccessTokenProvider accessTokenProvider = null;
+  private AccessTokenProvider accessTokenProvider;
 
   /** Active Delegation token. */
-  private Token<DelegationTokenIdentifier> boundDT = null;
+  private Token<DelegationTokenIdentifier> boundDT;
 
   public GcsDelegationTokens() throws IOException {
     super("GCSDelegationTokens");
