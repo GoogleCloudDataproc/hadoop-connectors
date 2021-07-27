@@ -56,6 +56,7 @@ import com.google.api.services.storage.model.RewriteResponse;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.authorization.StorageRequestAuthorizer;
+import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
@@ -99,6 +100,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 
 /**
@@ -234,6 +236,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // Authorization Handler instance.
   private final StorageRequestAuthorizer storageRequestAuthorizer;
 
+  // Function that generates downscoped access token.
+  private final Function<List<AccessBoundary>, String> downscopedAccessTokenFn;
+
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
    *
@@ -242,13 +247,50 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    */
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Credential credential)
       throws IOException {
-    this(options, new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()));
+    this(
+        options,
+        new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()),
+        /* downscopedAccessTokenFn= */ null);
+  }
+
+  /**
+   * Constructs an instance of GoogleCloudStorageImpl.
+   *
+   * @param credential OAuth2 credential that allows access to GCS
+   * @param downscopedAccessTokenFn Function that generates downscoped access token.
+   * @throws IOException on IO error
+   */
+  public GoogleCloudStorageImpl(
+      GoogleCloudStorageOptions options,
+      Credential credential,
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
+      throws IOException {
+    this(
+        options,
+        new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()),
+        downscopedAccessTokenFn);
   }
 
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer)
       throws IOException {
-    this(options, createStorage(options, httpRequestInitializer));
+    this(
+        options,
+        createStorage(options, httpRequestInitializer),
+        /* credentials= */ null,
+        /* accessTokenProvider= */ null);
+  }
+
+  public GoogleCloudStorageImpl(
+      GoogleCloudStorageOptions options,
+      HttpRequestInitializer httpRequestInitializer,
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
+      throws IOException {
+    this(
+        options,
+        createStorage(options, httpRequestInitializer),
+        /* credentials= */ null,
+        downscopedAccessTokenFn);
   }
 
   /**
@@ -257,16 +299,34 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param storage {@link Storage} to use for I/O.
    */
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage storage) {
-    this(options, storage, null);
+    this(options, storage, /* credentials= */ null, /* downscopedAccessTokenFn= */ null);
   }
 
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
    *
+   * @param options {@link GoogleCloudStorageOptions} to use to initialize the object.
    * @param storage {@link Storage} to use for I/O.
    * @param credentials OAuth2 credentials that allows access to GCS
    */
-  public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage storage, Credentials credentials) {
+  public GoogleCloudStorageImpl(
+      GoogleCloudStorageOptions options, Storage storage, Credentials credentials) {
+    this(options, storage, credentials, /* downscopedAccessTokenFn= */ null);
+  }
+
+  /**
+   * Constructs an instance of GoogleCloudStorageImpl.
+   *
+   * @param options {@link GoogleCloudStorageOptions} to use to initialize the object.
+   * @param storage {@link Storage} to use for I/O.
+   * @param credentials OAuth2 credentials that allows access to GCS
+   * @param downscopedAccessTokenFn Function that generates downscoped access token.
+   */
+  public GoogleCloudStorageImpl(
+      GoogleCloudStorageOptions options,
+      Storage storage,
+      Credentials credentials,
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
     logger.atFiner().log("GCS(options: %s)", options);
 
     this.storageOptions = checkNotNull(options, "options must not be null");
@@ -294,6 +354,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
 
     this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);
+    this.downscopedAccessTokenFn = downscopedAccessTokenFn;
   }
 
   private static Storage createStorage(
@@ -601,7 +662,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               }
               if (canIgnoreException) {
                 logger.atInfo().log(
-                    "Ignoring exception of type %s; verified object already exists with desired state.",
+                    "Ignoring exception of type %s; verified object already exists with desired"
+                        + " state.",
                     ioe.getClass().getSimpleName());
                 logger.atFine().withCause(ioe).log("Ignored exception while creating empty object");
               } else {
@@ -2096,8 +2158,14 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     return compositeInfo;
   }
 
+  @VisibleForTesting
   <RequestT extends StorageRequest<?>> RequestT initializeRequest(
       RequestT request, String bucketName) throws IOException {
+    if (downscopedAccessTokenFn != null) {
+      List<AccessBoundary> accessBoundaries =
+          StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
+      request.setOauthToken(downscopedAccessTokenFn.apply(accessBoundaries));
+    }
     if (storageRequestAuthorizer != null) {
       storageRequestAuthorizer.authorize(request);
     }

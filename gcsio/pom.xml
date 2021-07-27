@@ -28,7 +28,7 @@
 
   <name>gcsio</name>
   <description>
-    An implementation of org.apache.hadoop.fs.FileSystem targeting Google Cloud Storage
+    An implementation of File System-like interface targeting Google Cloud Storage.
   </description>
 
   <artifactId>gcsio</artifactId>

@@ -71,6 +71,7 @@ import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.authorization.FakeAuthorizationHandler;
 import com.google.cloud.hadoop.gcsio.authorization.StorageRequestAuthorizer;
+import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
@@ -103,6 +104,7 @@ import java.util.Random;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Function;
 import java.util.zip.GZIPOutputStream;
 import javax.net.ssl.SSLException;
 import org.junit.Before;
@@ -3387,6 +3389,41 @@ public class GoogleCloudStorageTest {
     assertThat(authorizer).isNotNull();
   }
 
+  @Test
+  public void initializeRequest_withAccessTokenProviderNotUsingNewTokenPerRequest()
+      throws IOException {
+    MockHttpTransport transport = mockTransport(jsonDataResponse(newBucket(BUCKET_NAME)));
+
+    GoogleCloudStorageImpl gcs =
+        mockedGcs(
+            GCS_OPTIONS,
+            transport,
+            /* requestInitializer= */ null,
+            /* downscopedAccessTokenFn= */ null);
+
+    Storage.Objects.Get testGetRequest = gcs.storage.objects().get(BUCKET_NAME, OBJECT_NAME);
+    gcs.initializeRequest(testGetRequest, BUCKET_NAME);
+
+    assertThat(testGetRequest.getOauthToken()).isNull();
+  }
+
+  @Test
+  public void initializeRequest_withDownscopedAccessToken() throws IOException {
+    MockHttpTransport transport = mockTransport(jsonDataResponse(newBucket(BUCKET_NAME)));
+
+    GoogleCloudStorageImpl gcs =
+        mockedGcs(
+            GCS_OPTIONS,
+            transport,
+            /* requestInitializer= */ null,
+            /* downscopedAccessTokenFn= */ ignore -> "testDownscopedAccessToken");
+
+    Storage.Objects.Get testGetRequest = gcs.storage.objects().get(BUCKET_NAME, OBJECT_NAME);
+    gcs.initializeRequest(testGetRequest, BUCKET_NAME);
+
+    assertThat(testGetRequest.getOauthToken()).isEqualTo("testDownscopedAccessToken");
+  }
+
   private GoogleCloudStorage mockedGcs(HttpTransport transport) {
     return mockedGcs(GCS_OPTIONS, transport);
   }
@@ -3400,8 +3437,18 @@ public class GoogleCloudStorageTest {
       GoogleCloudStorageOptions gcsOptions,
       HttpTransport transport,
       HttpRequestInitializer requestInitializer) {
+    return mockedGcs(
+        gcsOptions, transport, requestInitializer, /* downscopedAccessTokenFn= */ null);
+  }
+
+  private GoogleCloudStorageImpl mockedGcs(
+      GoogleCloudStorageOptions gcsOptions,
+      HttpTransport transport,
+      HttpRequestInitializer requestInitializer,
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
     Storage storage = new Storage(transport, JSON_FACTORY, requestInitializer);
-    return new GoogleCloudStorageImpl(gcsOptions, storage);
+    return new GoogleCloudStorageImpl(
+        gcsOptions, storage, /* credentials= */ null, downscopedAccessTokenFn);
   }
 
   static Bucket newBucket(String name) {
