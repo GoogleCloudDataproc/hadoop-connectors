@@ -310,6 +310,7 @@
                   <excludes>
                     <exclude>com.google.cloud.hadoop.util.AccessTokenProvider</exclude>
                     <exclude>com.google.cloud.hadoop.util.AccessTokenProvider$AccessToken</exclude>
+                    <exclude>com.google.cloud.hadoop.util.AccessTokenProvider$AccessTokenType</exclude>
                   </excludes>
                 </relocation>
                 <!-- Take special care of grpc-netty-shaded, it uses the package
