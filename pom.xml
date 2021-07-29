@@ -108,6 +108,7 @@
     <junit.version>4.13.2</junit.version>
     <mockito.version>3.11.2</mockito.version>
     <system-lambda.version>1.2.0</system-lambda.version>
+    <!-- TODO: remove AssertJ dependency when Hadoop will fix transitive test dependencies -->
     <assertj.version>3.12.2</assertj.version>
   </properties>
 
