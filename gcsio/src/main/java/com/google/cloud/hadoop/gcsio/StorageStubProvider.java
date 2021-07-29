@@ -159,12 +159,12 @@ class StorageStubProvider {
         return false;
       }
       ChannelAndRequestCounter that = (ChannelAndRequestCounter) o;
-      return com.google.common.base.Objects.equal(channel, that.channel);
+      return Objects.equals(channel, that.channel);
     }
 
     @Override
     public int hashCode() {
-      return com.google.common.base.Objects.hashCode(channel);
+      return Objects.hash(channel);
     }
   }
 
