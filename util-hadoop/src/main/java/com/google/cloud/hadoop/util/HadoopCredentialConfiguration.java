@@ -17,6 +17,7 @@ package com.google.cloud.hadoop.util;
 import com.google.cloud.hadoop.util.HttpTransportFactory.HttpTransportType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
@@ -130,6 +131,7 @@ public class HadoopCredentialConfiguration {
       new HadoopConfigurationProperty<>(
           ".http.transport.type", CredentialOptions.HTTP_TRANSPORT_TYPE_DEFAULT);
 
+  /** Configuration key for the name of the AccessTokenProvider to use to generate AccessTokens. */
   public static final HadoopConfigurationProperty<Class<? extends AccessTokenProvider>>
       ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX =
           new HadoopConfigurationProperty<>(".auth.access.token.provider.impl");
@@ -204,6 +206,21 @@ public class HadoopCredentialConfiguration {
                     PROXY_PASSWORD_SUFFIX.withPrefixes(keyPrefixes).getPassword(config)))
             .build();
     return new CredentialFactory(credentialOptions);
+  }
+
+  /** Creates an {@link AccessTokenProvider} based on the configuration. */
+  public static AccessTokenProvider getAccessTokenProvider(
+      Configuration config, List<String> keyPrefixes) throws IOException {
+    Class<? extends AccessTokenProvider> clazz =
+        getAccessTokenProviderImplClass(config, keyPrefixes.toArray(new String[0]));
+    if (clazz == null) {
+      return null;
+    }
+    try {
+      return clazz.getDeclaredConstructor().newInstance();
+    } catch (ReflectiveOperationException ex) {
+      throw new IOException("Can't instantiate " + clazz.getName(), ex);
+    }
   }
 
   public static Class<? extends AccessTokenProvider> getAccessTokenProviderImplClass(

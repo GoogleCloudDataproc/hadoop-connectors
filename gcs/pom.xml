@@ -303,6 +303,7 @@
                     <exclude>com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler</exclude>
                     <exclude>com.google.cloud.hadoop.util.AccessTokenProvider</exclude>
                     <exclude>com.google.cloud.hadoop.util.AccessTokenProvider$AccessToken</exclude>
+                    <exclude>com.google.cloud.hadoop.util.AccessTokenProvider$AccessTokenType</exclude>
                   </excludes>
                 </relocation>
                 <relocation>

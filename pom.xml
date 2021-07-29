@@ -99,7 +99,7 @@
     <google.http-client.version>1.39.2-sp.1</google.http-client.version>
     <google.oauth-client.version>1.31.5</google.oauth-client.version>
     <google.protobuf.version>3.17.3</google.protobuf.version>
-    <grpc.version>1.38.1</grpc.version>
+    <grpc.version>1.39.0</grpc.version>
     <hadoop.two.version>2.10.1</hadoop.two.version>
     <hadoop.three.version>3.2.2</hadoop.three.version>
 
