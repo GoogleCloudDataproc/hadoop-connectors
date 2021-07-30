@@ -1,6 +1,6 @@
 ### 2.0.0 - 2022-XX-XX
 
-1.  Update all dependencies to latest versions.
+1.  Update all dependencies to the latest versions.
 
 ### 1.2.0 - 2021-01-06
 
