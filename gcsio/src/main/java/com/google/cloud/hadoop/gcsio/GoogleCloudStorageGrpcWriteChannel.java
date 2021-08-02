@@ -335,6 +335,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
     private void recreateStub(Status.Code statusCode) {
       if (stubProvider.isStubBroken(statusCode)) {
+        stubProvider.evictChannelFromPool(stub.getChannel());
         stub = stubProvider.newAsyncStub();
       }
     }
