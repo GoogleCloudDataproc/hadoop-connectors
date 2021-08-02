@@ -1,6 +1,6 @@
-### 2.2.3 - 2021-XX-XX
+### 3.0.0 - 2022-XX-XX
 
-1.  Update all dependencies to latest versions.
+1.  Update all dependencies to the latest versions.
 
 1.  Add support for downscoped tokens in `AccessTokenProvider`.
 
