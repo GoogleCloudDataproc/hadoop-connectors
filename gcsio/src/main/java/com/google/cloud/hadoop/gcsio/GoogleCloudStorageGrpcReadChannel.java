@@ -619,6 +619,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private void recreateStub(StatusRuntimeException e) {
     if (stubProvider.isStubBroken(Status.fromThrowable(e).getCode())) {
+      stubProvider.evictChannelFromPool(stub.getChannel());
       stub = stubProvider.newBlockingStub();
     }
   }
