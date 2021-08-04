@@ -52,9 +52,7 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
   }
 
   @VisibleForTesting
-  PerformanceCachingGoogleCloudStorage(
-      GoogleCloudStorage delegate,
-      PrefixMappedItemCache cache) {
+  PerformanceCachingGoogleCloudStorage(GoogleCloudStorage delegate, PrefixMappedItemCache cache) {
     super(delegate);
     this.cache = cache;
   }
@@ -178,7 +176,8 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
     List<GoogleCloudStorageItemInfo> result = new ArrayList<>(resourceIds.size());
     List<StorageResourceId> request = new ArrayList<>(resourceIds.size());
 
-    // Populate the result list with items in the cache, and the request list with resources that
+    // Populate the result list with items in the cache, and the request list with resources
+    // that
     // still need to be resolved. Null items are added to the result list to preserve ordering.
     for (StorageResourceId resourceId : resourceIds) {
       GoogleCloudStorageItemInfo item = cache.getItem(resourceId);
@@ -188,14 +187,16 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
       result.add(item);
     }
 
-    // Resolve all the resources which were not cached, cache them, and add them to the result list.
+    // Resolve all the resources which were not cached, cache them, and add them to the result
+    // list.
     // Null entries in the result list are replaced by the fresh entries from the underlying
     // GoogleCloudStorage.
     if (!request.isEmpty()) {
       List<GoogleCloudStorageItemInfo> response = super.getItemInfos(request);
       Iterator<GoogleCloudStorageItemInfo> responseIterator = response.iterator();
 
-      // Iterate through the result set, replacing the null entries added previously with entries
+      // Iterate through the result set, replacing the null entries added previously with
+      // entries
       // from the response.
       for (int i = 0; i < result.size() && responseIterator.hasNext(); i++) {
         if (result.get(i) == null) {

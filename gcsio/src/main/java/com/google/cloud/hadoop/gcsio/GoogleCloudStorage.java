@@ -25,8 +25,8 @@ import java.util.List;
  * Interface for exposing the Google Cloud Storage API behavior in a way more amenable to writing
  * filesystem semantics on top of it, without having to deal with API-specific considerations such
  * as HttpTransports, credentials, network errors, batching, etc.
- * <p>
- * Please read the following document to get familiarity with basic GCS concepts:
+ *
+ * <p>Please read the following document to get familiarity with basic GCS concepts:
  * https://developers.google.com/storage/docs/concepts-techniques
  */
 public interface GoogleCloudStorage {
@@ -109,10 +109,10 @@ public interface GoogleCloudStorage {
   void createEmptyObject(StorageResourceId resourceId) throws IOException;
 
   /**
-   * Creates an empty object, useful for placeholders representing, for example, directories.
-   * The bucket must already exist. If the object already exists, it is overwritten.
-   * See {@link #create(StorageResourceId)} for the behavior if StorageResourceId.getGenerationId()
-   * is explicitly set.
+   * Creates an empty object, useful for placeholders representing, for example, directories. The
+   * bucket must already exist. If the object already exists, it is overwritten. See {@link
+   * #create(StorageResourceId)} for the behavior if StorageResourceId.getGenerationId() is
+   * explicitly set.
    *
    * @param resourceId identifies a StorageObject
    * @param options options to use when creating the object
@@ -122,21 +122,18 @@ public interface GoogleCloudStorage {
       throws IOException;
 
   /**
-   * Creates a list of empty objects; see {@link #createEmptyObject(StorageResourceId)} for
-   * the single-item version of this method. Implementations may use different flow than the
-   * single-item version for greater efficiency.
-   * See {@link #create(StorageResourceId)} for the behavior if StorageResourceId.getGenerationId()
-   * is explicitly set.
+   * Creates a list of empty objects; see {@link #createEmptyObject(StorageResourceId)} for the
+   * single-item version of this method. Implementations may use different flow than the single-item
+   * version for greater efficiency. See {@link #create(StorageResourceId)} for the behavior if
+   * StorageResourceId.getGenerationId() is explicitly set.
    */
-  void createEmptyObjects(List<StorageResourceId> resourceIds)
-      throws IOException;
+  void createEmptyObjects(List<StorageResourceId> resourceIds) throws IOException;
 
   /**
-   * Creates a list of empty objects; see {@link #createEmptyObject(StorageResourceId)} for
-   * the single-item version of this method. Implementations may use different flow than the
-   * single-item version for greater efficiency.
-   * See {@link #create(StorageResourceId)} for the behavior if StorageResourceId.getGenerationId()
-   * is explicitly set.
+   * Creates a list of empty objects; see {@link #createEmptyObject(StorageResourceId)} for the
+   * single-item version of this method. Implementations may use different flow than the single-item
+   * version for greater efficiency. See {@link #create(StorageResourceId)} for the behavior if
+   * StorageResourceId.getGenerationId() is explicitly set.
    */
   void createEmptyObjects(List<StorageResourceId> resourceIds, CreateObjectOptions options)
       throws IOException;
@@ -203,19 +200,15 @@ public interface GoogleCloudStorage {
       List<String> dstObjectNames)
       throws IOException;
 
-  /**
-   * Gets a list of names of buckets in this project.
-   */
-  List<String> listBucketNames()
-      throws IOException;
+  /** Gets a list of names of buckets in this project. */
+  List<String> listBucketNames() throws IOException;
 
   /**
    * Gets a list of GoogleCloudStorageItemInfo for all buckets of this project. This is no more
-   * expensive than calling listBucketNames(), since the list API for buckets already retrieves
-   * all the relevant bucket metadata.
+   * expensive than calling listBucketNames(), since the list API for buckets already retrieves all
+   * the relevant bucket metadata.
    */
-  List<GoogleCloudStorageItemInfo> listBucketInfo()
-      throws IOException;
+  List<GoogleCloudStorageItemInfo> listBucketInfo() throws IOException;
 
   /**
    * Lists {@link GoogleCloudStorageItemInfo} of objects contained in the given bucket and whose
@@ -312,8 +305,7 @@ public interface GoogleCloudStorage {
    * @return information about the given item
    * @throws IOException on IO error
    */
-  GoogleCloudStorageItemInfo getItemInfo(StorageResourceId resourceId)
-      throws IOException;
+  GoogleCloudStorageItemInfo getItemInfo(StorageResourceId resourceId) throws IOException;
 
   /**
    * Gets information about multiple objects and/or buckets. Items that are "not found" will still
@@ -329,6 +321,7 @@ public interface GoogleCloudStorage {
 
   /**
    * Attempt to update metadata of the objects referenced within the passed itemInfo objects.
+   *
    * @return Updated GoogleCloudStorageItemInfo objects for the referenced objects.
    * @throws IOException on IO error
    */
@@ -353,9 +346,9 @@ public interface GoogleCloudStorage {
    * Composes inputs into a single GCS object. This performs a GCS Compose. Objects will be composed
    * according to the order they appear in the input. The destination object will have metadata set
    * according to {@code options}. Overwrite semantics for the destination object will follow the
-   * same semantics as {@link #create(StorageResourceId, CreateObjectOptions)}.
-   * See {@link #create(StorageResourceId)} for the behavior if StorageResourceId.getGenerationId()
-   * is explicitly set. The bucket must be the same for all sources and the destination.
+   * same semantics as {@link #create(StorageResourceId, CreateObjectOptions)}. See {@link
+   * #create(StorageResourceId)} for the behavior if StorageResourceId.getGenerationId() is
+   * explicitly set. The bucket must be the same for all sources and the destination.
    */
   GoogleCloudStorageItemInfo composeObjects(
       List<StorageResourceId> sources, StorageResourceId destination, CreateObjectOptions options)

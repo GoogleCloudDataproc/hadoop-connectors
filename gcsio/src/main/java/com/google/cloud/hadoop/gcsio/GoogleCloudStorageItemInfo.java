@@ -165,7 +165,8 @@ public class GoogleCloudStorageItemInfo {
         /* verificationAttributes= */ null);
   }
 
-  // The Bucket and maybe StorageObject names of the GCS "item" referenced by this object. Not null.
+  // The Bucket and maybe StorageObject names of the GCS "item" referenced by this object. Not
+  // null.
   private final StorageResourceId resourceId;
 
   // Creation time of this item.
@@ -288,7 +289,7 @@ public class GoogleCloudStorageItemInfo {
   /**
    * Gets the content-type of this item, or null if unknown or inapplicable.
    *
-   * Note: content-type is only supported for objects, and will always be null for buckets.
+   * <p>Note: content-type is only supported for objects, and will always be null for buckets.
    */
   public String getContentType() {
     return contentType;
@@ -312,9 +313,7 @@ public class GoogleCloudStorageItemInfo {
     return metadata;
   }
 
-  /**
-   * Indicates whether this item is a bucket. Root is not considered to be a bucket.
-   */
+  /** Indicates whether this item is a bucket. Root is not considered to be a bucket. */
   public boolean isBucket() {
     return resourceId.isBucket();
   }
@@ -374,7 +373,8 @@ public class GoogleCloudStorageItemInfo {
   @VisibleForTesting
   public boolean metadataEquals(Map<String, byte[]> otherMetadata) {
     if (metadata == otherMetadata) {
-      // Fast-path for common cases where the same actual default metadata instance may be used in
+      // Fast-path for common cases where the same actual default metadata instance may be
+      // used in
       // multiple different item infos.
       return true;
     }
