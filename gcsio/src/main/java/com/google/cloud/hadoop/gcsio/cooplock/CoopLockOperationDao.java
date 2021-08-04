@@ -68,7 +68,8 @@ public class CoopLockOperationDao {
   private static final String OPERATION_LOCK_FILE_FORMAT = "%s_%s_%s.lock";
 
   private static final CreateObjectOptions CREATE_OBJECT_OPTIONS =
-      CreateObjectOptions.DEFAULT_NO_OVERWRITE.toBuilder()
+      CreateObjectOptions.DEFAULT_NO_OVERWRITE
+          .toBuilder()
           .setContentType("application/text")
           .build();
   private static final CreateObjectOptions UPDATE_OBJECT_OPTIONS =
