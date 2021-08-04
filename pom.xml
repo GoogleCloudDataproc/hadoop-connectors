@@ -99,6 +99,7 @@
     <google.http-client.version>1.39.2-sp.1</google.http-client.version>
     <google.oauth-client.version>1.31.5</google.oauth-client.version>
     <google.protobuf.version>3.17.3</google.protobuf.version>
+    <spotless.version>2.12.2</spotless.version>
     <grpc.version>1.39.0</grpc.version>
     <hadoop.two.version>2.10.1</hadoop.two.version>
     <hadoop.three.version>3.2.2</hadoop.three.version>
@@ -481,6 +482,11 @@
         <version>${google.flogger.version}</version>
         <scope>runtime</scope>
       </dependency>
+      <dependency>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>${spotless.version}</version>
+      </dependency>
 
       <!-- Test dependencies -->
       <dependency>
@@ -698,6 +704,45 @@
             </path>
           </annotationProcessorPaths>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>${spotless.version}</version>
+        <configuration>
+          <ratchetFrom>master</ratchetFrom>
+          <formats>
+            <!-- you can define as many formats as you want, each is independent -->
+            <format>
+              <!-- define the files to apply to -->
+              <includes>
+                <include>*.md</include>
+                <include>.gitignore</include>
+              </includes>
+              <!-- define the steps to apply to those files -->
+              <trimTrailingWhitespace/>
+              <endWithNewline/>
+              <indent>
+                <tabs>true</tabs>
+                <spacesPerTab>4</spacesPerTab>
+              </indent>
+            </format>
+          </formats>
+          <java>
+            <googleJavaFormat>
+              <version>1.7</version>
+              <style>AOSP</style>
+            </googleJavaFormat>
+          </java>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <phase>compile</phase>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
