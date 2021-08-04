@@ -53,7 +53,8 @@ import java.util.TreeSet;
 public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
   private static final CreateObjectOptions EMPTY_OBJECT_CREATE_OPTIONS =
-      CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
+      CreateObjectOptions.DEFAULT_OVERWRITE
+          .toBuilder()
           .setEnsureEmptyObjectsMetadataMatch(false)
           .build();
 
@@ -187,9 +188,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
   @Override
   public synchronized void createEmptyObjects(
-      List<StorageResourceId> resourceIds,
-      CreateObjectOptions options)
-      throws IOException {
+      List<StorageResourceId> resourceIds, CreateObjectOptions options) throws IOException {
     for (StorageResourceId resourceId : resourceIds) {
       createEmptyObject(resourceId, options);
     }
@@ -266,7 +265,8 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   public synchronized void deleteBuckets(List<String> bucketNames) throws IOException {
     boolean hasError = false;
     for (String bucketName : bucketNames) {
-      // TODO(user): Enforcement of not being able to delete non-empty buckets should probably also
+      // TODO(user): Enforcement of not being able to delete non-empty buckets should probably
+      // also
       // be in here, but gcsfs handles it explicitly when it calls listObjectInfo.
       if (bucketLookup.containsKey(bucketName)) {
         bucketLookup.remove(bucketName);
@@ -297,11 +297,12 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
       if (fullObjectName.hasGenerationId()) {
         GoogleCloudStorageItemInfo existingInfo = getItemInfo(fullObjectName);
         if (existingInfo.getContentGeneration() != fullObjectName.getGenerationId()) {
-          throw new IOException(String.format(
-            "Required generationId '%d' doesn't match existing '%d' for '%s'",
-            fullObjectName.getGenerationId(),
-            existingInfo.getContentGeneration(),
-            fullObjectName));
+          throw new IOException(
+              String.format(
+                  "Required generationId '%d' doesn't match existing '%d' for '%s'",
+                  fullObjectName.getGenerationId(),
+                  existingInfo.getContentGeneration(),
+                  fullObjectName));
         }
       }
       bucketLookup.get(bucketName).remove(objectName);
@@ -309,11 +310,14 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public synchronized void copy(String srcBucketName, List<String> srcObjectNames,
-      String dstBucketName, List<String> dstObjectNames)
+  public synchronized void copy(
+      String srcBucketName,
+      List<String> srcObjectNames,
+      String dstBucketName,
+      List<String> dstObjectNames)
       throws IOException {
-    GoogleCloudStorageImpl.validateCopyArguments(srcBucketName, srcObjectNames,
-        dstBucketName, dstObjectNames, this);
+    GoogleCloudStorageImpl.validateCopyArguments(
+        srcBucketName, srcObjectNames, dstBucketName, dstObjectNames, this);
 
     // Gather FileNotFoundExceptions for individual objects, but only throw a single combined
     // exception at the end.
@@ -323,8 +327,10 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
     // Perform the copy operations.
     for (int i = 0; i < srcObjectNames.size(); i++) {
-      // Due to the metadata-copy semantics of GCS, we copy the object container, but not the byte[]
-      // contents; the write-once constraint means this behavior is indistinguishable from a deep
+      // Due to the metadata-copy semantics of GCS, we copy the object container, but not the
+      // byte[]
+      // contents; the write-once constraint means this behavior is indistinguishable from a
+      // deep
       // copy, but the behavior might have to become complicated if GCS ever supports appends.
       if (!getItemInfo(new StorageResourceId(srcBucketName, srcObjectNames.get(i))).exists()) {
         innerExceptions.add(
@@ -332,10 +338,10 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
         continue;
       }
 
-      InMemoryObjectEntry srcObject =
-          bucketLookup.get(srcBucketName).get(srcObjectNames.get(i));
-      bucketLookup.get(dstBucketName).add(
-          srcObject.getShallowCopy(dstBucketName, dstObjectNames.get(i)));
+      InMemoryObjectEntry srcObject = bucketLookup.get(srcBucketName).get(srcObjectNames.get(i));
+      bucketLookup
+          .get(dstBucketName)
+          .add(srcObject.getShallowCopy(dstBucketName, dstObjectNames.get(i)));
     }
 
     if (innerExceptions.size() > 0) {
@@ -344,14 +350,12 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public synchronized List<String> listBucketNames()
-      throws IOException {
+  public synchronized List<String> listBucketNames() throws IOException {
     return new ArrayList<>(bucketLookup.keySet());
   }
 
   @Override
-  public synchronized List<GoogleCloudStorageItemInfo> listBucketInfo()
-      throws IOException {
+  public synchronized List<GoogleCloudStorageItemInfo> listBucketInfo() throws IOException {
     List<GoogleCloudStorageItemInfo> bucketInfos = new ArrayList<>();
     for (InMemoryBucketEntry entry : bucketLookup.values()) {
       bucketInfos.add(entry.getInfo());
@@ -487,8 +491,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public void close() {
-  }
+  public void close() {}
 
   @Override
   public void compose(
@@ -508,7 +511,8 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
       throws IOException {
     checkArgument(
         sources.size() <= MAX_COMPOSE_OBJECTS,
-        "Can not compose more than %s sources", MAX_COMPOSE_OBJECTS);
+        "Can not compose more than %s sources",
+        MAX_COMPOSE_OBJECTS);
     ByteArrayOutputStream tempOutput = new ByteArrayOutputStream();
     for (StorageResourceId sourceId : sources) {
       // TODO(user): If we change to also set generationIds for source objects in the base

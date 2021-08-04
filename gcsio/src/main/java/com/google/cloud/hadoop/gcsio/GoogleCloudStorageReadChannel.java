@@ -307,7 +307,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       checkState(
           contentChannelPosition == currentPosition,
           "contentChannelPosition (%s) should be equal to currentPosition (%s) after lazy seek",
-          contentChannelPosition, currentPosition);
+          contentChannelPosition,
+          currentPosition);
 
       try {
         int numBytesRead = contentChannel.read(buffer);
@@ -319,9 +320,12 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
             size = currentPosition;
             contentChannelEnd = currentPosition;
           }
-          // Check that we didn't get a premature End of Stream signal by checking the number of
-          // bytes read against the stream size. Unfortunately we don't have information about the
-          // actual size of the data stream when stream compression is used, so we can only ignore
+          // Check that we didn't get a premature End of Stream signal by checking the
+          // number of
+          // bytes read against the stream size. Unfortunately we don't have information
+          // about the
+          // actual size of the data stream when stream compression is used, so we can
+          // only ignore
           // this case here.
           checkIOPrecondition(
               currentPosition == contentChannelEnd || currentPosition == size,
@@ -348,7 +352,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
               contentChannelPosition == currentPosition,
               "contentChannelPosition (%s) should be equal to currentPosition (%s)"
                   + " after successful read",
-              contentChannelPosition, currentPosition);
+              contentChannelPosition,
+              currentPosition);
         }
 
         if (retriesAttempted != 0) {
@@ -373,7 +378,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
           currentPosition += partialRead;
         }
 
-        // TODO(user): Refactor any reusable logic for retries into a separate RetryHelper class.
+        // TODO(user): Refactor any reusable logic for retries into a separate RetryHelper
+        // class.
         if (retriesAttempted == maxRetries) {
           logger.atSevere().log(
               "Throwing exception after reaching max read retries (%s) for '%s'.",
@@ -382,7 +388,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         }
 
         if (retriesAttempted == 0) {
-          // If this is the first of a series of retries, we also want to reset the readBackOff
+          // If this is the first of a series of retries, we also want to reset the
+          // readBackOff
           // to have fresh initial values.
           readBackOff.get().reset();
         }
@@ -422,9 +429,12 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     // return the number of bytes read.
     boolean isEndOfStream = (totalBytesRead == 0);
     if (isEndOfStream) {
-      // Check that we didn't get a premature End of Stream signal by checking the number of bytes
-      // read against the stream size. Unfortunately we don't have information about the actual size
-      // of the data stream when stream compression is used, so we can only ignore this case here.
+      // Check that we didn't get a premature End of Stream signal by checking the number of
+      // bytes
+      // read against the stream size. Unfortunately we don't have information about the
+      // actual size
+      // of the data stream when stream compression is used, so we can only ignore this case
+      // here.
       checkIOPrecondition(
           currentPosition == size,
           String.format(
@@ -597,7 +607,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         contentChannel == null || contentChannelPosition == currentPosition,
         "contentChannelPosition (%s) should be equal to currentPosition (%s)"
             + " after successful in-place skip",
-        contentChannelPosition, currentPosition);
+        contentChannelPosition,
+        currentPosition);
   }
 
   /**
@@ -922,7 +933,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       // TODO(b/110832992): validate response range header against expected/request range
     } catch (IOException e) {
       if (!metadataInitialized && errorExtractor.rangeNotSatisfiable(e) && currentPosition == 0) {
-        // We don't know the size yet (metadataInitialized == false) and we're seeking to byte 0,
+        // We don't know the size yet (metadataInitialized == false) and we're seeking to
+        // byte 0,
         // but got 'range not satisfiable'; the object must be empty.
         logger.atInfo().log(
             "Got 'range not satisfiable' for reading '%s' at position 0; assuming empty.",
@@ -942,8 +954,10 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         return new ByteArrayInputStream(new byte[0]);
       }
       if (gzipEncoded) {
-        // Initialize `contentChannelEnd` to `size` (initialized to Long.MAX_VALUE in `initMetadata`
-        // method for gzipped objetcs) because value of HTTP Content-Length header is usually
+        // Initialize `contentChannelEnd` to `size` (initialized to Long.MAX_VALUE in
+        // `initMetadata`
+        // method for gzipped objetcs) because value of HTTP Content-Length header is
+        // usually
         // smaller than decompressed object size.
         if (currentPosition == 0) {
           contentChannelEnd = size;
@@ -996,7 +1010,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
           }
           try {
             response = getObject.executeMedia();
-            // TODO(b/110832992): validate response range header against expected/request range.
+            // TODO(b/110832992): validate response range header against
+            // expected/request range.
           } catch (IOException e) {
             response = handleExecuteMediaException(e);
           }

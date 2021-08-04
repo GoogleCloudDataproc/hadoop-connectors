@@ -139,7 +139,8 @@ public class BatchHelper {
         new ThreadPoolExecutor(
             /* corePoolSize= */ numThreads,
             /* maximumPoolSize= */ numThreads,
-            /* keepAliveTime= */ 5, TimeUnit.SECONDS,
+            /* keepAliveTime= */ 5,
+            TimeUnit.SECONDS,
             new LinkedBlockingQueue<>(numThreads * 20),
             THREAD_FACTORY);
     // Prevents memory leaks in case flush() method was not called.
@@ -259,7 +260,8 @@ public class BatchHelper {
 
   /** Awaits until all sent requests are completed. Should be serialized */
   private void awaitRequestsCompletion() throws IOException {
-    // Don't wait until all requests will be completed if enough requests are pending for full batch
+    // Don't wait until all requests will be completed if enough requests are pending for full
+    // batch
     while (!responseFutures.isEmpty() && pendingRequests.size() < maxRequestsPerBatch) {
       getFromFuture(responseFutures.remove());
     }

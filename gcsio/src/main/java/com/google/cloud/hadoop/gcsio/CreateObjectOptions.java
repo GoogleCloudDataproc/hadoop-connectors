@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkArgument;
