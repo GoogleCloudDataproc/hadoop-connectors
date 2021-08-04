@@ -52,9 +52,7 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
   }
 
   @VisibleForTesting
-  PerformanceCachingGoogleCloudStorage(
-      GoogleCloudStorage delegate,
-      PrefixMappedItemCache cache) {
+  PerformanceCachingGoogleCloudStorage(GoogleCloudStorage delegate, PrefixMappedItemCache cache) {
     super(delegate);
     this.cache = cache;
   }

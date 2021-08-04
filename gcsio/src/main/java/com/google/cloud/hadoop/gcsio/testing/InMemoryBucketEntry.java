@@ -23,9 +23,9 @@ import java.util.Set;
 import java.util.TreeMap;
 
 /**
- * InMemoryBucketEntry represents a GCS bucket in-memory by containing mappings to objects in
- * the bucket alongside bucket-level metadata including storage location, storage class, etc.
- * It is intended to be used only internally by the InMemoryGoogleCloudStorage class.
+ * InMemoryBucketEntry represents a GCS bucket in-memory by containing mappings to objects in the
+ * bucket alongside bucket-level metadata including storage location, storage class, etc. It is
+ * intended to be used only internally by the InMemoryGoogleCloudStorage class.
  */
 public class InMemoryBucketEntry {
   // Mapping from objectName to InMemoryObjectEntries which hold byte contents, metadata, and write
@@ -62,9 +62,7 @@ public class InMemoryBucketEntry {
     objectLookup.put(obj.getObjectName(), obj);
   }
 
-  /**
-   * Retrieves a previously inserted {@code InMemoryObjectEntry}, or null if it doesn't exist.
-   */
+  /** Retrieves a previously inserted {@code InMemoryObjectEntry}, or null if it doesn't exist. */
   public synchronized InMemoryObjectEntry get(String objectName) {
     return objectLookup.get(objectName);
   }
@@ -78,23 +76,19 @@ public class InMemoryBucketEntry {
   }
 
   /**
-   * Gets the {@code GoogleCloudStorageItemInfo} associated with this BucketEntry; the 'size'
-   * of a bucket is always 0.
+   * Gets the {@code GoogleCloudStorageItemInfo} associated with this BucketEntry; the 'size' of a
+   * bucket is always 0.
    */
   public synchronized GoogleCloudStorageItemInfo getInfo() {
     return info;
   }
 
-  /**
-   * Returns the Set containing all objectNames previously inserted into this bucket.
-   */
+  /** Returns the Set containing all objectNames previously inserted into this bucket. */
   public synchronized Set<String> getObjectNames() {
     return objectLookup.keySet();
   }
 
-  /**
-   * Returns the number of objects in this bucket.
-   */
+  /** Returns the number of objects in this bucket. */
   public synchronized int size() {
     return objectLookup.size();
   }

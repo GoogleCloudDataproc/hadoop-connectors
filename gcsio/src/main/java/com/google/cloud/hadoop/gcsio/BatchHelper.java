@@ -139,7 +139,8 @@ public class BatchHelper {
         new ThreadPoolExecutor(
             /* corePoolSize= */ numThreads,
             /* maximumPoolSize= */ numThreads,
-            /* keepAliveTime= */ 5, TimeUnit.SECONDS,
+            /* keepAliveTime= */ 5,
+            TimeUnit.SECONDS,
             new LinkedBlockingQueue<>(numThreads * 20),
             THREAD_FACTORY);
     // Prevents memory leaks in case flush() method was not called.

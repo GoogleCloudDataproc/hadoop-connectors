@@ -185,11 +185,13 @@ class StorageStubProvider {
         isNullOrEmpty(readOptions.getGrpcServerAddress())
             ? DEFAULT_GCS_GRPC_SERVER_ADDRESS
             : readOptions.getGrpcServerAddress();
-    ManagedChannel channel = grpcDecorator.createChannelBuilder(target)
-        .enableRetry()
-        .intercept(counter)
-        .userAgent(userAgent)
-        .build();
+    ManagedChannel channel =
+        grpcDecorator
+            .createChannelBuilder(target)
+            .enableRetry()
+            .intercept(counter)
+            .userAgent(userAgent)
+            .build();
     return new ChannelAndRequestCounter(channel, counter);
   }
 
@@ -235,6 +237,7 @@ class StorageStubProvider {
 
   interface GrpcDecorator {
     ManagedChannelBuilder<?> createChannelBuilder(String target);
+
     AbstractStub<?> applyCallOption(AbstractStub<?> stub);
   }
 
@@ -262,7 +265,8 @@ class StorageStubProvider {
     }
 
     public ManagedChannelBuilder<?> createChannelBuilder(String target) {
-      return GoogleDefaultChannelBuilder.forTarget(target).defaultServiceConfig(getGrpcServiceConfig());
+      return GoogleDefaultChannelBuilder.forTarget(target)
+          .defaultServiceConfig(getGrpcServiceConfig());
     }
 
     public AbstractStub<?> applyCallOption(AbstractStub<?> stub) {
@@ -272,15 +276,23 @@ class StorageStubProvider {
     private Map<String, Object> getGrpcServiceConfig() {
       Map<String, Object> name = ImmutableMap.of("service", "google.storage.v1.Storage");
 
-      Map<String, Object> retryPolicy = ImmutableMap.<String, Object>builder()
-          .put("maxAttempts", GRPC_MAX_RETRY_ATTEMPTS)
-          .put("initialBackoff",
-              Durations.toString(Durations.fromMillis(readOptions.getBackoffInitialIntervalMillis())))
-          .put("maxBackoff", Durations.toString(Durations.fromMillis(readOptions.getBackoffMaxIntervalMillis())))
-          .put("backoffMultiplier", readOptions.getBackoffMultiplier())
-          .put("retryableStatusCodes", ImmutableList.of("UNAVAILABLE", "RESOURCE_EXHAUSTED")).build();
+      Map<String, Object> retryPolicy =
+          ImmutableMap.<String, Object>builder()
+              .put("maxAttempts", GRPC_MAX_RETRY_ATTEMPTS)
+              .put(
+                  "initialBackoff",
+                  Durations.toString(
+                      Durations.fromMillis(readOptions.getBackoffInitialIntervalMillis())))
+              .put(
+                  "maxBackoff",
+                  Durations.toString(
+                      Durations.fromMillis(readOptions.getBackoffMaxIntervalMillis())))
+              .put("backoffMultiplier", readOptions.getBackoffMultiplier())
+              .put("retryableStatusCodes", ImmutableList.of("UNAVAILABLE", "RESOURCE_EXHAUSTED"))
+              .build();
 
-      Map<String, Object> methodConfig = ImmutableMap.of("name", ImmutableList.of(name), "retryPolicy", retryPolicy);
+      Map<String, Object> methodConfig =
+          ImmutableMap.of("name", ImmutableList.of(name), "retryPolicy", retryPolicy);
 
       // When channel pooling is enabled, force the pick_first grpclb strategy.
       // This is necessary to avoid the multiplicative effect of creating channel pool
@@ -292,29 +304,47 @@ class StorageStubProvider {
       // https://github.com/grpc/grpc-proto/blob/master/grpc/service_config/service_config.proto#L182
       Map<String, Object> pickFirstStrategy = ImmutableMap.of("pick_first", ImmutableMap.of());
 
-      Map<String, Object> childPolicy = ImmutableMap.of("childPolicy", ImmutableList.of(pickFirstStrategy));
+      Map<String, Object> childPolicy =
+          ImmutableMap.of("childPolicy", ImmutableList.of(pickFirstStrategy));
 
       Map<String, Object> grpcLbPolicy = ImmutableMap.of("grpclb", childPolicy);
 
-      return ImmutableMap.of("methodConfig", ImmutableList.of(methodConfig), "loadBalancingConfig",
+      return ImmutableMap.of(
+          "methodConfig",
+          ImmutableList.of(methodConfig),
+          "loadBalancingConfig",
           ImmutableList.of(grpcLbPolicy));
     }
   }
 
-  public static StorageStubProvider newInstance(GoogleCloudStorageOptions options, ExecutorService backgroundTasksThreadPool,
+  public static StorageStubProvider newInstance(
+      GoogleCloudStorageOptions options,
+      ExecutorService backgroundTasksThreadPool,
       Credential credential) {
-    boolean useDirectpath = options.isDirectPathPreffered() && credential != null
-        && java.util.Objects.equals(credential.getTokenServerEncodedUrl(), ComputeCredential.TOKEN_SERVER_ENCODED_URL);
-    return new StorageStubProvider(options, backgroundTasksThreadPool,
-        useDirectpath ? new DirectPathGrpcDecorator(options.getReadChannelOptions())
+    boolean useDirectpath =
+        options.isDirectPathPreffered()
+            && credential != null
+            && java.util.Objects.equals(
+                credential.getTokenServerEncodedUrl(), ComputeCredential.TOKEN_SERVER_ENCODED_URL);
+    return new StorageStubProvider(
+        options,
+        backgroundTasksThreadPool,
+        useDirectpath
+            ? new DirectPathGrpcDecorator(options.getReadChannelOptions())
             : new CloudPathGrpcDecorator(new CredentialAdapter(credential)));
   }
 
-  public static StorageStubProvider newInstance(GoogleCloudStorageOptions options, ExecutorService backgroundTasksThreadPool,
+  public static StorageStubProvider newInstance(
+      GoogleCloudStorageOptions options,
+      ExecutorService backgroundTasksThreadPool,
       Credentials credentials) {
-    boolean useDirectpath = options.isDirectPathPreffered() && credentials instanceof ComputeEngineCredentials;
-    return new StorageStubProvider(options, backgroundTasksThreadPool,
-        useDirectpath ? new DirectPathGrpcDecorator(options.getReadChannelOptions())
+    boolean useDirectpath =
+        options.isDirectPathPreffered() && credentials instanceof ComputeEngineCredentials;
+    return new StorageStubProvider(
+        options,
+        backgroundTasksThreadPool,
+        useDirectpath
+            ? new DirectPathGrpcDecorator(options.getReadChannelOptions())
             : new CloudPathGrpcDecorator(credentials));
   }
 }

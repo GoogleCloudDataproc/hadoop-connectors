@@ -307,7 +307,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       checkState(
           contentChannelPosition == currentPosition,
           "contentChannelPosition (%s) should be equal to currentPosition (%s) after lazy seek",
-          contentChannelPosition, currentPosition);
+          contentChannelPosition,
+          currentPosition);
 
       try {
         int numBytesRead = contentChannel.read(buffer);
@@ -348,7 +349,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
               contentChannelPosition == currentPosition,
               "contentChannelPosition (%s) should be equal to currentPosition (%s)"
                   + " after successful read",
-              contentChannelPosition, currentPosition);
+              contentChannelPosition,
+              currentPosition);
         }
 
         if (retriesAttempted != 0) {
@@ -597,7 +599,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         contentChannel == null || contentChannelPosition == currentPosition,
         "contentChannelPosition (%s) should be equal to currentPosition (%s)"
             + " after successful in-place skip",
-        contentChannelPosition, currentPosition);
+        contentChannelPosition,
+        currentPosition);
   }
 
   /**

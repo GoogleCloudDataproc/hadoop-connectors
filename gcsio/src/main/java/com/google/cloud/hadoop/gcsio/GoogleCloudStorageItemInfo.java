@@ -288,7 +288,7 @@ public class GoogleCloudStorageItemInfo {
   /**
    * Gets the content-type of this item, or null if unknown or inapplicable.
    *
-   * Note: content-type is only supported for objects, and will always be null for buckets.
+   * <p>Note: content-type is only supported for objects, and will always be null for buckets.
    */
   public String getContentType() {
     return contentType;
@@ -312,9 +312,7 @@ public class GoogleCloudStorageItemInfo {
     return metadata;
   }
 
-  /**
-   * Indicates whether this item is a bucket. Root is not considered to be a bucket.
-   */
+  /** Indicates whether this item is a bucket. Root is not considered to be a bucket. */
   public boolean isBucket() {
     return resourceId.isBucket();
   }
