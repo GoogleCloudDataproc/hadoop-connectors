@@ -22,54 +22,53 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 
 /** Contains helper methods for standardizing String-matching algorithms specific to GCS. */
 public class GoogleCloudStorageStrings {
-    /**
-     * Helper that mimics the GCS API behavior for taking an existing objectName and checking if it
-     * matches a user-supplied prefix with an optional directory "delimiter". If it matches, either
-     * the full objectName will be returned unmodified, or the return value will be a String that is
-     * a prefix of the objectName inclusive of the matching prefix but truncating any suffix past
-     * the first appearance of the delimiter after the full prefix. The returned prefix includes the
-     * delimiter String at which the objectName was truncated.
-     *
-     * @param objectNamePrefix The prefix that {@code objectName} must match to be returned in any
-     *     form. May be null; then an objectName will always be returned, just possibly truncated.
-     * @param objectName The name to attempt to match against the prefix and delimiter.
-     * @param listOptions List object options to match list prefix.
-     * @return A substring of objectName or the full unaltered objectName after applying GCS
-     *     matching logic, or null if the supply objectName does not match the provided prefix.
-     */
-    public static String matchListPrefix(
-            String objectNamePrefix, String objectName, ListObjectOptions listOptions) {
-        checkArgument(
-                !isNullOrEmpty(objectName),
-                "matchListPrefix(%s, %s, %s): objectName must not be null or empty.",
-                objectNamePrefix,
-                objectName,
-                listOptions);
+  /**
+   * Helper that mimics the GCS API behavior for taking an existing objectName and checking if it
+   * matches a user-supplied prefix with an optional directory "delimiter". If it matches, either
+   * the full objectName will be returned unmodified, or the return value will be a String that is a
+   * prefix of the objectName inclusive of the matching prefix but truncating any suffix past the
+   * first appearance of the delimiter after the full prefix. The returned prefix includes the
+   * delimiter String at which the objectName was truncated.
+   *
+   * @param objectNamePrefix The prefix that {@code objectName} must match to be returned in any
+   *     form. May be null; then an objectName will always be returned, just possibly truncated.
+   * @param objectName The name to attempt to match against the prefix and delimiter.
+   * @param listOptions List object options to match list prefix.
+   * @return A substring of objectName or the full unaltered objectName after applying GCS matching
+   *     logic, or null if the supply objectName does not match the provided prefix.
+   */
+  public static String matchListPrefix(
+      String objectNamePrefix, String objectName, ListObjectOptions listOptions) {
+    checkArgument(
+        !isNullOrEmpty(objectName),
+        "matchListPrefix(%s, %s, %s): objectName must not be null or empty.",
+        objectNamePrefix,
+        objectName,
+        listOptions);
 
-        // The suffix that we'll use to check for the delimiter is just the whole name if no prefix
-        // was supplied.
-        String suffix = objectName;
-        int suffixIndex = 0;
-        if (objectNamePrefix != null) {
-            // The underlying GCS API does return objectName when it equals the prefix, but our
-            // GoogleCloudStorage wrapper filters this case if the objectName also ends with
-            // PATH_DELIMITER.
-            if (!objectName.startsWith(objectNamePrefix)
-                    || (objectName.equals(objectNamePrefix)
-                            && objectNamePrefix.endsWith(PATH_DELIMITER)
-                            && !listOptions.isIncludePrefix())) {
-                return null;
-            }
-            suffixIndex = objectNamePrefix.length();
-            suffix = objectName.substring(suffixIndex);
-        }
-
-        String delimiter = listOptions.getDelimiter();
-        return !isNullOrEmpty(delimiter) && suffix.contains(delimiter)
-                // Return the full prefix and suffix up through first occurrence of delimiter after
-                // the prefix, inclusive of the delimiter.
-                ? objectName.substring(
-                        0, objectName.indexOf(delimiter, suffixIndex) + delimiter.length())
-                : objectName;
+    // The suffix that we'll use to check for the delimiter is just the whole name if no prefix
+    // was supplied.
+    String suffix = objectName;
+    int suffixIndex = 0;
+    if (objectNamePrefix != null) {
+      // The underlying GCS API does return objectName when it equals the prefix, but our
+      // GoogleCloudStorage wrapper filters this case if the objectName also ends with
+      // PATH_DELIMITER.
+      if (!objectName.startsWith(objectNamePrefix)
+          || (objectName.equals(objectNamePrefix)
+              && objectNamePrefix.endsWith(PATH_DELIMITER)
+              && !listOptions.isIncludePrefix())) {
+        return null;
+      }
+      suffixIndex = objectNamePrefix.length();
+      suffix = objectName.substring(suffixIndex);
     }
+
+    String delimiter = listOptions.getDelimiter();
+    return !isNullOrEmpty(delimiter) && suffix.contains(delimiter)
+        // Return the full prefix and suffix up through first occurrence of delimiter after
+        // the prefix, inclusive of the delimiter.
+        ? objectName.substring(0, objectName.indexOf(delimiter, suffixIndex) + delimiter.length())
+        : objectName;
+  }
 }
