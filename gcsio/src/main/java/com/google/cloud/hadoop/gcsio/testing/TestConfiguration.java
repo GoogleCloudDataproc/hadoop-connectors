@@ -16,39 +16,39 @@ package com.google.cloud.hadoop.gcsio.testing;
 
 /** Access to test configurations values. */
 public abstract class TestConfiguration {
-  public static final String GCS_TEST_PROJECT_ID = "GCS_TEST_PROJECT_ID";
-  public static final String GCS_TEST_SERVICE_ACCOUNT = "GCS_TEST_SERVICE_ACCOUNT";
-  public static final String GCS_TEST_PRIVATE_KEYFILE = "GCS_TEST_PRIVATE_KEYFILE";
+    public static final String GCS_TEST_PROJECT_ID = "GCS_TEST_PROJECT_ID";
+    public static final String GCS_TEST_SERVICE_ACCOUNT = "GCS_TEST_SERVICE_ACCOUNT";
+    public static final String GCS_TEST_PRIVATE_KEYFILE = "GCS_TEST_PRIVATE_KEYFILE";
 
-  /** Environment-based test configuration. */
-  public static class EnvironmentBasedTestConfiguration extends TestConfiguration {
-    @Override
-    public String getProjectId() {
-      return System.getenv(GCS_TEST_PROJECT_ID);
+    /** Environment-based test configuration. */
+    public static class EnvironmentBasedTestConfiguration extends TestConfiguration {
+        @Override
+        public String getProjectId() {
+            return System.getenv(GCS_TEST_PROJECT_ID);
+        }
+
+        @Override
+        public String getServiceAccount() {
+            return System.getenv(GCS_TEST_SERVICE_ACCOUNT);
+        }
+
+        @Override
+        public String getPrivateKeyFile() {
+            return System.getenv(GCS_TEST_PRIVATE_KEYFILE);
+        }
     }
 
-    @Override
-    public String getServiceAccount() {
-      return System.getenv(GCS_TEST_SERVICE_ACCOUNT);
+    public static TestConfiguration getInstance() {
+        return LazyHolder.INSTANCE;
     }
 
-    @Override
-    public String getPrivateKeyFile() {
-      return System.getenv(GCS_TEST_PRIVATE_KEYFILE);
+    private static class LazyHolder {
+        private static final TestConfiguration INSTANCE = new EnvironmentBasedTestConfiguration();
     }
-  }
 
-  public static TestConfiguration getInstance() {
-    return LazyHolder.INSTANCE;
-  }
+    public abstract String getProjectId();
 
-  private static class LazyHolder {
-    private static final TestConfiguration INSTANCE = new EnvironmentBasedTestConfiguration();
-  }
+    public abstract String getServiceAccount();
 
-  public abstract String getProjectId();
-
-  public abstract String getServiceAccount();
-
-  public abstract String getPrivateKeyFile();
+    public abstract String getPrivateKeyFile();
 }

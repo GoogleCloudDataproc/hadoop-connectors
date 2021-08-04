@@ -27,48 +27,48 @@ import javax.annotation.Nullable;
 @AutoValue
 public abstract class ObjectWriteConditions {
 
-  /** No conditions for completing the write. */
-  public static final ObjectWriteConditions NONE = builder().build();
+    /** No conditions for completing the write. */
+    public static final ObjectWriteConditions NONE = builder().build();
 
-  public static Builder builder() {
-    return new AutoValue_ObjectWriteConditions.Builder()
-        .setMetaGenerationMatch(null)
-        .setContentGenerationMatch(null);
-  }
-
-  public abstract Builder toBuilder();
-
-  @Nullable
-  public abstract Long getMetaGenerationMatch();
-
-  public boolean hasMetaGenerationMatch() {
-    return getMetaGenerationMatch() != null;
-  }
-
-  @Nullable
-  public abstract Long getContentGenerationMatch();
-
-  public boolean hasContentGenerationMatch() {
-    return getContentGenerationMatch() != null;
-  }
-
-  /** Apply the conditions represented by this object to an Insert operation. */
-  public void apply(Insert objectToInsert) {
-    if (hasContentGenerationMatch()) {
-      objectToInsert.setIfGenerationMatch(getContentGenerationMatch());
+    public static Builder builder() {
+        return new AutoValue_ObjectWriteConditions.Builder()
+                .setMetaGenerationMatch(null)
+                .setContentGenerationMatch(null);
     }
 
-    if (hasMetaGenerationMatch()) {
-      objectToInsert.setIfMetagenerationMatch(getMetaGenerationMatch());
+    public abstract Builder toBuilder();
+
+    @Nullable
+    public abstract Long getMetaGenerationMatch();
+
+    public boolean hasMetaGenerationMatch() {
+        return getMetaGenerationMatch() != null;
     }
-  }
 
-  @AutoValue.Builder
-  public abstract static class Builder {
-    public abstract Builder setMetaGenerationMatch(Long metaGenerationMatch);
+    @Nullable
+    public abstract Long getContentGenerationMatch();
 
-    public abstract Builder setContentGenerationMatch(Long contentGenerationMatch);
+    public boolean hasContentGenerationMatch() {
+        return getContentGenerationMatch() != null;
+    }
 
-    public abstract ObjectWriteConditions build();
-  }
+    /** Apply the conditions represented by this object to an Insert operation. */
+    public void apply(Insert objectToInsert) {
+        if (hasContentGenerationMatch()) {
+            objectToInsert.setIfGenerationMatch(getContentGenerationMatch());
+        }
+
+        if (hasMetaGenerationMatch()) {
+            objectToInsert.setIfMetagenerationMatch(getMetaGenerationMatch());
+        }
+    }
+
+    @AutoValue.Builder
+    public abstract static class Builder {
+        public abstract Builder setMetaGenerationMatch(Long metaGenerationMatch);
+
+        public abstract Builder setContentGenerationMatch(Long contentGenerationMatch);
+
+        public abstract ObjectWriteConditions build();
+    }
 }

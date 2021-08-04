@@ -20,23 +20,23 @@ import java.util.Map;
 /** Item information that can be updated without re-writing an entire object. */
 public class UpdatableItemInfo {
 
-  private final StorageResourceId storageResourceId;
-  private final Map<String, byte[]> metadata;
+    private final StorageResourceId storageResourceId;
+    private final Map<String, byte[]> metadata;
 
-  /**
-   * @param storageResourceId The StorageResourceId for which these records pertain
-   * @param metadata The object metadata for this object.
-   */
-  public UpdatableItemInfo(StorageResourceId storageResourceId, Map<String, byte[]> metadata) {
-    this.storageResourceId = storageResourceId;
-    this.metadata = metadata;
-  }
+    /**
+     * @param storageResourceId The StorageResourceId for which these records pertain
+     * @param metadata The object metadata for this object.
+     */
+    public UpdatableItemInfo(StorageResourceId storageResourceId, Map<String, byte[]> metadata) {
+        this.storageResourceId = storageResourceId;
+        this.metadata = metadata;
+    }
 
-  public StorageResourceId getStorageResourceId() {
-    return storageResourceId;
-  }
+    public StorageResourceId getStorageResourceId() {
+        return storageResourceId;
+    }
 
-  public Map<String, byte[]> getMetadata() {
-    return metadata;
-  }
+    public Map<String, byte[]> getMetadata() {
+        return metadata;
+    }
 }
