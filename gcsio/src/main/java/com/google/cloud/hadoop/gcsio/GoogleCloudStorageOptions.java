@@ -91,7 +91,6 @@ public abstract class GoogleCloudStorageOptions {
   public static final Map<String, String> AUTHORIZATION_HANDLER_PROPERTIES_DEFAULT =
       ImmutableMap.of();
 
-
   public static final GoogleCloudStorageOptions DEFAULT = builder().build();
 
   public static Builder builder() {
