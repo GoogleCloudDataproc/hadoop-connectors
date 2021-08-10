@@ -261,7 +261,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
               .readObject(
                   ReadObjectRequest.newBuilder()
                       .setReadOffset(footerOffset)
-                      .setBucket(StringPaths.toV2BucketName(resourceId.getBucketName()))
+                      .setBucket(GrpcChannelUtils.toV2BucketName(resourceId.getBucketName()))
                       .setObject(resourceId.getObjectName())
                       .build());
 
@@ -537,7 +537,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   private void requestObjectMedia(OptionalLong bytesToRead) throws IOException {
     ReadObjectRequest.Builder requestBuilder =
         ReadObjectRequest.newBuilder()
-            .setBucket(StringPaths.toV2BucketName(resourceId.getBucketName()))
+            .setBucket(GrpcChannelUtils.toV2BucketName(resourceId.getBucketName()))
             .setObject(resourceId.getObjectName())
             .setGeneration(objectGeneration)
             .setReadOffset(positionInGrpcStream);

@@ -170,8 +170,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     private long writeOffset = 0;
     private InsertChunkResponseObserver responseObserver;
     // Holds list of most recent number of NUMBER_OF_REQUESTS_TO_RETAIN requests, so upload can
-    // be
-    // rewound and re-sent upon transient errors.
+    // be rewound and re-sent upon transient errors.
     private final TreeMap<Long, ByteString> dataChunkMap = new TreeMap<>();
 
     UploadOperation(InputStream pipeSource) {
@@ -361,8 +360,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       public Throwable nonTransientError = null;
 
       // CountDownLatch tracking completion of the streaming RPC. Set on error, or once the
-      // request
-      // stream is closed.
+      // request stream is closed.
       final CountDownLatch done = new CountDownLatch(1);
       // CountDownLatch tracking readiness of the streaming RPC.
       final CountDownLatch ready = new CountDownLatch(1);
@@ -431,7 +429,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
           WriteObjectSpec.newBuilder()
               .setResource(
                   Object.newBuilder()
-                      .setBucket(StringPaths.toV2BucketName(resourceId.getBucketName()))
+                      .setBucket(GrpcChannelUtils.toV2BucketName(resourceId.getBucketName()))
                       .setName(resourceId.getObjectName())
                       .setContentType(createOptions.getContentType())
                       .putAllMetadata(encodeMetadata(createOptions.getMetadata()))
@@ -445,13 +443,12 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       Builder commonRequestParamsBuilder = null;
       if (requesterPaysProject != null) {
-        commonRequestParamsBuilder = CommonRequestParams.newBuilder();
-        commonRequestParamsBuilder.setUserProject(requesterPaysProject);
+        commonRequestParamsBuilder =
+            CommonRequestParams.newBuilder().setUserProject(requesterPaysProject);
       }
 
       StartResumableWriteRequest.Builder startResumableWriteRequestBuilder =
-          StartResumableWriteRequest.newBuilder();
-      startResumableWriteRequestBuilder.setWriteObjectSpec(insertObjectSpecBuilder);
+          StartResumableWriteRequest.newBuilder().setWriteObjectSpec(insertObjectSpecBuilder);
       if (commonRequestParamsBuilder != null) {
         startResumableWriteRequestBuilder.setCommonRequestParams(commonRequestParamsBuilder);
       }
