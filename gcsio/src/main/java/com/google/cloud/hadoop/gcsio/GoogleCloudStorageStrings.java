@@ -20,9 +20,7 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
-/**
- * Contains helper methods for standardizing String-matching algorithms specific to GCS.
- */
+/** Contains helper methods for standardizing String-matching algorithms specific to GCS. */
 public class GoogleCloudStorageStrings {
   /**
    * Helper that mimics the GCS API behavior for taking an existing objectName and checking if it

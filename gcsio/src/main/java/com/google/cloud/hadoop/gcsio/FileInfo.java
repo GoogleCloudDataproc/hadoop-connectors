@@ -26,9 +26,8 @@ import java.util.Objects;
 /**
  * Contains information about a file or a directory.
  *
- * Note:
- * This class wraps GoogleCloudStorageItemInfo, adds file system specific information and hides
- * bucket/object specific information. The wrapped type should not be visible to callers of
+ * <p>Note: This class wraps GoogleCloudStorageItemInfo, adds file system specific information and
+ * hides bucket/object specific information. The wrapped type should not be visible to callers of
  * GoogleCloudStorageFileSystem because it exposes non-file system information (eg, buckets).
  */
 public class FileInfo {
@@ -55,16 +54,12 @@ public class FileInfo {
     this.path = path;
   }
 
-  /**
-   * Gets the path of this file or directory.
-   */
+  /** Gets the path of this file or directory. */
   public URI getPath() {
     return path;
   }
 
-  /**
-   * Indicates whether this item is a directory.
-   */
+  /** Indicates whether this item is a directory. */
   public boolean isDirectory() {
     return itemInfo.isDirectory();
   }
@@ -75,8 +70,8 @@ public class FileInfo {
   }
 
   /**
-   * Indicates whether this instance has information about the unique, shared root of the
-   * underlying storage system.
+   * Indicates whether this instance has information about the unique, shared root of the underlying
+   * storage system.
    */
   public boolean isGlobalRoot() {
     return itemInfo.isGlobalRoot();
@@ -113,15 +108,14 @@ public class FileInfo {
 
   /**
    * Retrieve file attributes for this file.
+   *
    * @return A map of file attributes
    */
   public Map<String, byte[]> getAttributes() {
     return itemInfo.getMetadata();
   }
 
-  /**
-   * Indicates whether this file or directory exists.
-   */
+  /** Indicates whether this file or directory exists. */
   public boolean exists() {
     return itemInfo.exists();
   }

@@ -28,17 +28,18 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Data struct representing either a GCS StorageObject, a GCS Bucket or the GCS root (gs://).
- * If both bucketName and objectName are null, the StorageResourceId refers to GCS root (gs://).
- * If bucketName is non-null, and objectName is null, then this refers to a GCS Bucket. Otherwise,
- * if bucketName and objectName are both non-null, this refers to a GCS StorageObject.
+ * Data struct representing either a GCS StorageObject, a GCS Bucket or the GCS root (gs://). If
+ * both bucketName and objectName are null, the StorageResourceId refers to GCS root (gs://). If
+ * bucketName is non-null, and objectName is null, then this refers to a GCS Bucket. Otherwise, if
+ * bucketName and objectName are both non-null, this refers to a GCS StorageObject.
  */
 public class StorageResourceId {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // The generationId used to denote "unknown"; if given to a method expecting generationId
-  // constraints, the method may perform extra low-level GETs to determine an existing generationId
+  // constraints, the method may perform extra low-level GETs to determine an existing
+  // generationId
   // if idempotency constraints require doing so.
   public static final long UNKNOWN_GENERATION_ID = -1L;
 
@@ -70,8 +71,8 @@ public class StorageResourceId {
   private final long generationId;
 
   /**
-   * Constructor for a StorageResourceId that refers to the GCS root (gs://). Private because
-   * all external users should just use the singleton StorageResourceId.ROOT.
+   * Constructor for a StorageResourceId that refers to the GCS root (gs://). Private because all
+   * external users should just use the singleton StorageResourceId.ROOT.
    */
   private StorageResourceId() {
     this.bucketName = null;
@@ -87,8 +88,7 @@ public class StorageResourceId {
    * @param bucketName The bucket name of the resource. Must be non-empty and non-null.
    */
   public StorageResourceId(String bucketName) {
-    checkArgument(!Strings.isNullOrEmpty(bucketName),
-        "bucketName must not be null or empty");
+    checkArgument(!Strings.isNullOrEmpty(bucketName), "bucketName must not be null or empty");
 
     this.bucketName = bucketName;
     this.objectName = null;
@@ -97,17 +97,15 @@ public class StorageResourceId {
   }
 
   /**
-   * Constructor for a StorageResourceId representing a full StorageObject, including bucketName
-   * and objectName.
+   * Constructor for a StorageResourceId representing a full StorageObject, including bucketName and
+   * objectName.
    *
    * @param bucketName The bucket name of the resource. Must be non-empty and non-null.
    * @param objectName The object name of the resource. Must be non-empty and non-null.
    */
   public StorageResourceId(String bucketName, String objectName) {
-    checkArgument(!Strings.isNullOrEmpty(bucketName),
-        "bucketName must not be null or empty");
-    checkArgument(!Strings.isNullOrEmpty(objectName),
-        "objectName must not be null or empty");
+    checkArgument(!Strings.isNullOrEmpty(bucketName), "bucketName must not be null or empty");
+    checkArgument(!Strings.isNullOrEmpty(objectName), "objectName must not be null or empty");
 
     this.bucketName = bucketName;
     this.objectName = objectName;
@@ -116,19 +114,17 @@ public class StorageResourceId {
   }
 
   /**
-   * Constructor for a StorageResourceId representing a full StorageObject, including bucketName
-   * and objectName.
+   * Constructor for a StorageResourceId representing a full StorageObject, including bucketName and
+   * objectName.
    *
    * @param bucketName The bucket name of the resource. Must be non-empty and non-null.
    * @param objectName The object name of the resource. Must be non-empty and non-null.
-   * @param generationId The generationId to be used with precondition checks when using
-   *     this StorageResourceId as an identifier for mutation requests.
+   * @param generationId The generationId to be used with precondition checks when using this
+   *     StorageResourceId as an identifier for mutation requests.
    */
   public StorageResourceId(String bucketName, String objectName, long generationId) {
-    checkArgument(!Strings.isNullOrEmpty(bucketName),
-        "bucketName must not be null or empty");
-    checkArgument(!Strings.isNullOrEmpty(objectName),
-        "objectName must not be null or empty");
+    checkArgument(!Strings.isNullOrEmpty(bucketName), "bucketName must not be null or empty");
+    checkArgument(!Strings.isNullOrEmpty(objectName), "objectName must not be null or empty");
 
     this.bucketName = bucketName;
     this.objectName = objectName;
@@ -137,8 +133,8 @@ public class StorageResourceId {
   }
 
   /**
-   * Returns true if this StorageResourceId represents a GCS StorageObject; if true, both
-   * {@code getBucketName} and {@code getObjectName} will be non-empty and non-null.
+   * Returns true if this StorageResourceId represents a GCS StorageObject; if true, both {@code
+   * getBucketName} and {@code getObjectName} will be non-empty and non-null.
    */
   public boolean isStorageObject() {
     return bucketName != null && objectName != null;
@@ -153,48 +149,42 @@ public class StorageResourceId {
   }
 
   /**
-   * Returns true if this StorageResourceId represents the GCS root (gs://); if true, then
-   * both {@code getBucketName} and {@code getObjectName} will be null.
+   * Returns true if this StorageResourceId represents the GCS root (gs://); if true, then both
+   * {@code getBucketName} and {@code getObjectName} will be null.
    */
   public boolean isRoot() {
     return bucketName == null && objectName == null;
   }
 
   /**
-   * Indicates if this StorageResourceId corresponds to a 'directory'; similar to
-   * {@link FileInfo#isDirectory} except deals entirely with pathnames instead of also checking
-   * for exists() to be true on a corresponding GoogleCloudStorageItemInfo.
+   * Indicates if this StorageResourceId corresponds to a 'directory'; similar to {@link
+   * FileInfo#isDirectory} except deals entirely with pathnames instead of also checking for
+   * exists() to be true on a corresponding GoogleCloudStorageItemInfo.
    */
   public boolean isDirectory() {
     return isRoot() || isBucket() || StringPaths.isDirectoryPath(objectName);
   }
 
-  /**
-   * Gets the bucket name component of this resource identifier.
-   */
+  /** Gets the bucket name component of this resource identifier. */
   public String getBucketName() {
     return bucketName;
   }
 
-  /**
-   * Gets the object name component of this resource identifier.
-   */
+  /** Gets the object name component of this resource identifier. */
   public String getObjectName() {
     return objectName;
   }
 
   /**
-   * The generationId to be used with precondition checks when using this StorageResourceId as
-   * an identifier for mutation requests. The generationId is *not* used when determining
-   * equals() or hashCode().
+   * The generationId to be used with precondition checks when using this StorageResourceId as an
+   * identifier for mutation requests. The generationId is *not* used when determining equals() or
+   * hashCode().
    */
   public long getGenerationId() {
     return generationId;
   }
 
-  /**
-   * Returns true if generationId is not UNKNOWN_GENERATION_ID.
-   */
+  /** Returns true if generationId is not UNKNOWN_GENERATION_ID. */
   public boolean hasGenerationId() {
     return generationId != UNKNOWN_GENERATION_ID;
   }

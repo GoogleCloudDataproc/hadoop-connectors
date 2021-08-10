@@ -52,9 +52,7 @@ public abstract class ObjectWriteConditions {
     return getContentGenerationMatch() != null;
   }
 
-  /**
-   * Apply the conditions represented by this object to an Insert operation.
-   */
+  /** Apply the conditions represented by this object to an Insert operation. */
   public void apply(Insert objectToInsert) {
     if (hasContentGenerationMatch()) {
       objectToInsert.setIfGenerationMatch(getContentGenerationMatch());

@@ -17,9 +17,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import java.util.Map;
 
-/**
- * Item information that can be updated without re-writing an entire object.
- */
+/** Item information that can be updated without re-writing an entire object. */
 public class UpdatableItemInfo {
 
   private final StorageResourceId storageResourceId;
