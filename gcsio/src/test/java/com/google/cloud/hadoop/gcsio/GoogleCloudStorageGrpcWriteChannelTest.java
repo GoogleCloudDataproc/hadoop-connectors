@@ -709,8 +709,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
 
     public void setInsertObjectExceptions(List<Throwable> insertObjectExceptions) {
       // Make a copy so caller can pass in an immutable list (this implementation needs to
-      // update
-      // the list).
+      // update the list).
       this.insertObjectExceptions = Lists.newArrayList(insertObjectExceptions);
     }
 
