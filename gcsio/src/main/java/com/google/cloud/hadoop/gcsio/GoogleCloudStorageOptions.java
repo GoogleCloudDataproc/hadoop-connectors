@@ -91,6 +91,8 @@ public abstract class GoogleCloudStorageOptions {
   public static final Map<String, String> AUTHORIZATION_HANDLER_PROPERTIES_DEFAULT =
       ImmutableMap.of();
 
+  public static final boolean ENABLE_DEBUG_LOGGING_DEFAULT = false;
+
   public static final GoogleCloudStorageOptions DEFAULT = builder().build();
 
   public static Builder builder() {
@@ -114,6 +116,7 @@ public abstract class GoogleCloudStorageOptions {
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
         .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
         .setCooperativeLockingOptions(CooperativeLockingOptions.DEFAULT)
+        .setEnableDebugLogging(ENABLE_DEBUG_LOGGING_DEFAULT)
         .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT)
         .setAuthorizationHandlerImplClass(AUTHORIZATION_HANDLER_IMPL_CLASS_DEFAULT)
         .setAuthorizationHandlerProperties(AUTHORIZATION_HANDLER_PROPERTIES_DEFAULT);
@@ -167,6 +170,8 @@ public abstract class GoogleCloudStorageOptions {
   public abstract long getMaxBytesRewrittenPerCall();
 
   public abstract GoogleCloudStorageReadOptions getReadChannelOptions();
+
+  public abstract boolean isEnableDebugLogging();
 
   public abstract AsyncWriteChannelOptions getWriteChannelOptions();
 
@@ -258,6 +263,8 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setCooperativeLockingOptions(
         CooperativeLockingOptions cooperativeLockingOptions);
+
+    public abstract Builder setEnableDebugLogging(boolean enableDebugLogging);
 
     public abstract Builder setHttpRequestHeaders(Map<String, String> httpRequestHeaders);
 

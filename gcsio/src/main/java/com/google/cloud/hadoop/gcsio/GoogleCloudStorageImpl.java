@@ -101,6 +101,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
 /**
@@ -239,6 +241,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // Function that generates downscoped access token.
   private final Function<List<AccessBoundary>, String> downscopedAccessTokenFn;
 
+  // Google root logger, logger that spans over the <package_shading_prefix>.com.google.* coverage.
+  private static final Logger googleLogger = Logger.getLogger(
+      GoogleLogger.class.getName().replaceAll("(com\\.google).*", "$1"));
+
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
    *
@@ -355,6 +361,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
+
+    // Set GSC connector logging-level based on the passed debug logging option.
+    if (googleLogger.getLevel() == null) {
+      googleLogger.setLevel(this.storageOptions.isEnableDebugLogging() ? Level.CONFIG : Level.INFO);
+    }
   }
 
   private static Storage createStorage(
