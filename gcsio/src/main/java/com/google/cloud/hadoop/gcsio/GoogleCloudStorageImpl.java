@@ -243,8 +243,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private final Function<List<AccessBoundary>, String> downscopedAccessTokenFn;
 
   // Google root logger, logger that spans over the <package_shading_prefix>.com.google.* coverage.
-  private static final Logger googleLogger = Logger.getLogger(
-      GoogleLogger.class.getName().replaceAll("(com\\.google).*", "$1"));
+  private static final Logger googleLogger =
+      Logger.getLogger(GoogleLogger.class.getName().replaceAll("(com\\.google).*", "$1"));
 
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
