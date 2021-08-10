@@ -243,7 +243,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private final Function<List<AccessBoundary>, String> downscopedAccessTokenFn;
 
   // Google root logger, logger that spans over the <package_shading_prefix>.com.google.* coverage.
-  private static final Logger googleLogger =
+  @VisibleForTesting
+  protected static final Logger googleLogger =
       Logger.getLogger(GoogleLogger.class.getName().replaceAll("(com\\.google).*", "$1"));
 
   /**
@@ -367,8 +368,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
 
-    if (googleLogger.getLevel() == null) {
-      googleLogger.setLevel(this.storageOptions.isEnableDebugLogging() ? Level.CONFIG : Level.INFO);
+    boolean isDebugLoggingEnabled = this.storageOptions.isEnableDebugLogging();
+    if (googleLogger.getLevel() == null ||
+        isDebugLoggingEnabled != googleLogger.isLoggable(Level.CONFIG)) {
+      googleLogger.setLevel(isDebugLoggingEnabled ? Level.CONFIG : Level.INFO);
     }
   }
 
