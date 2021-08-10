@@ -367,7 +367,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
 
-    // Set GSC connector logging-level based on the passed debug logging option.
     if (googleLogger.getLevel() == null) {
       googleLogger.setLevel(this.storageOptions.isEnableDebugLogging() ? Level.CONFIG : Level.INFO);
     }

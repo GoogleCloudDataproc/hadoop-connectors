@@ -213,7 +213,7 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Long> GCS_REWRITE_MAX_BYTES_PER_CALL =
       new HadoopConfigurationProperty<>("fs.gs.rewrite.max.bytes.per.call", 512 * 1024 * 1024L);
 
-  /** Configuration key for enabling gcs debug logging. */
+  /** Configuration key for enabling the debug logging under the com.google package. */
   public static final HadoopConfigurationProperty<Boolean> GCS_ENABLE_DEBUG_LOGGING =
       new HadoopConfigurationProperty<>("fs.gs.debug.logging.enable", false);
 
