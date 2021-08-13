@@ -642,8 +642,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       throw new ClosedChannelException();
     }
     // Our real position is tracked in "positionInGrpcStream," but if the user is skipping
-    // forwards
-    // a bit, we pretend we're at the new position already.
+    // forwards a bit, we pretend we're at the new position already.
     return positionInGrpcStream + bytesToSkipBeforeReading;
   }
 

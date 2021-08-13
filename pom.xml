@@ -93,13 +93,13 @@
     <google.auth.version>0.26.0</google.auth.version>
     <google.auto-value.version>1.8.1</google.auto-value.version>
     <google.cloud-bigquerystorage.version>1.22.5</google.cloud-bigquerystorage.version>
+    <google.cloud-storage.grpc.version>2.0.1-alpha</google.cloud-storage.grpc.version>
     <google.flogger.version>0.6</google.flogger.version>
     <google.gson.version>2.8.7</google.gson.version>
     <google.guava.version>30.1.1-jre</google.guava.version>
     <google.http-client.version>1.39.2-sp.1</google.http-client.version>
     <google.oauth-client.version>1.31.5</google.oauth-client.version>
     <google.protobuf.version>3.17.3</google.protobuf.version>
-    <google.cloud.storage.grpc.version>2.0.1-alpha</google.cloud.storage.grpc.version>
     <grpc.version>1.39.0</grpc.version>
     <hadoop.two.version>2.10.1</hadoop.two.version>
     <hadoop.three.version>3.2.2</hadoop.three.version>
@@ -484,13 +484,8 @@
       </dependency>
       <dependency>
         <groupId>com.google.api.grpc</groupId>
-        <artifactId>proto-google-cloud-storage-v2</artifactId>
-        <version>${google.cloud.storage.grpc.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.api.grpc</groupId>
         <artifactId>grpc-google-cloud-storage-v2</artifactId>
-        <version>${google.cloud.storage.grpc.version}</version>
+        <version>${google.cloud-storage.grpc.version}</version>
       </dependency>
 
       <!-- Test dependencies -->
@@ -629,24 +624,6 @@
               </goals>
             </execution>
           </executions>
-        </plugin>
-        <plugin>
-          <groupId>kr.motd.maven</groupId>
-          <artifactId>os-maven-plugin</artifactId>
-          <version>1.7.0</version>
-          <executions>
-            <execution>
-              <phase>initialize</phase>
-              <goals>
-                <goal>detect</goal>
-              </goals>
-            </execution>
-          </executions>
-        </plugin>
-        <plugin>
-          <groupId>org.xolstice.maven.plugins</groupId>
-          <artifactId>protobuf-maven-plugin</artifactId>
-          <version>0.6.1</version>
         </plugin>
       </plugins>
     </pluginManagement>

@@ -4,7 +4,9 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
 /** Utility methods for gRPC channel */
-public class GrpcChannelUtils {
+final class GrpcChannelUtils {
+
+  private GrpcChannelUtils() {}
 
   static final String V2_BUCKET_NAME_PREFIX = "projects/_/buckets/";
 
