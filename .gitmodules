@@ -1,3 +1,0 @@
-[submodule "gcsio/googleapis"]
-	path = gcsio/googleapis
-	url = https://github.com/googleapis/googleapis
