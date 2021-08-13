@@ -1,16 +1,10 @@
 steps:
-  # 1. Clone git repo with submodules
-  - name: gcr.io/cloud-builders/git
-    id: 'git-clone'
-    args: [ 'submodule', 'update', '--init', '--recursive' ]
-
-  # 2. Create a Docker image containing hadoop-connectors repo
+  # 1. Create a Docker image containing hadoop-connectors repo
   - name: 'gcr.io/cloud-builders/docker'
     id: 'docker-build'
     args: ['build', '--tag=gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit', '-f', 'cloudbuild/Dockerfile', '.']
-    waitFor: ['git-clone']
 
-  # 3. Run Hadoop 2 unit tests concurrently
+  # 2. Run Hadoop 2 unit tests concurrently
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
     id: 'unit-tests-hadoop2'
     waitFor: ['docker-build']
@@ -23,7 +17,7 @@ steps:
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
 
-  # 4. Run Hadoop 3 unit tests concurrently
+  # 3. Run Hadoop 3 unit tests concurrently
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
     id: 'unit-tests-hadoop3'
     waitFor: ['docker-build']
@@ -36,7 +30,7 @@ steps:
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
 
-  # 5. Run Hadoop 2 integration tests concurrently with Hadoop 2 and Hadoop 3 unit tests
+  # 4. Run Hadoop 2 integration tests concurrently with Hadoop 2 and Hadoop 3 unit tests
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
     id: 'integration-tests-hadoop2'
     waitFor: ['docker-build']
@@ -50,7 +44,7 @@ steps:
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
 
-  # 6. Run Hadoop 3 integration tests concurrently with Hadoop 2 integration tests
+  # 5. Run Hadoop 3 integration tests concurrently with Hadoop 2 integration tests
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
     id: 'integration-tests-hadoop3'
     waitFor: ['unit-tests-hadoop2', 'unit-tests-hadoop3']
