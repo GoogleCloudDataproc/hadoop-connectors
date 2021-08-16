@@ -251,7 +251,7 @@
                 <include>**/*IntegrationTest.java</include>
               </includes>
               <excludes>
-                <exclude>**/GoogleCloudStorageGrpcIntegrationTest.java</exclude>
+                <exclude>**/*GrpcIntegrationTest.java</exclude>
               </excludes>
               <reuseForks>false</reuseForks>
               <forkCount>4</forkCount>
