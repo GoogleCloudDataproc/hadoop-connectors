@@ -11,6 +11,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.io.Files;
 import com.google.google.storage.v1.StorageGrpc;
 import com.google.google.storage.v1.StorageGrpc.StorageBlockingStub;
 import com.google.google.storage.v1.StorageGrpc.StorageStub;
@@ -31,6 +32,9 @@ import io.grpc.Status;
 import io.grpc.alts.GoogleDefaultChannelBuilder;
 import io.grpc.auth.MoreCallCredentials;
 import io.grpc.stub.AbstractStub;
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -61,6 +65,10 @@ class StorageStubProvider {
           .findServiceByName("Storage")
           .getOptions()
           .getExtension(ClientProto.defaultHost);
+
+  // GCE product names
+  private static final String GCE_PRODUCTION_NAME_PRIOR_2016 = "Google";
+  private static final String GCE_PRODUCTION_NAME_AFTER_2016 = "Google Compute Engine";
 
   private final GoogleCloudStorageReadOptions readOptions;
   private final String userAgent;
@@ -321,7 +329,7 @@ class StorageStubProvider {
       GoogleCloudStorageOptions options,
       ExecutorService backgroundTasksThreadPool,
       Credential credential) {
-    boolean useDirectpath = options.isDirectPathPreffered();
+    boolean useDirectpath = options.isDirectPathPreffered() && isOnComputeEngine();
     return new StorageStubProvider(
         options,
         backgroundTasksThreadPool,
@@ -334,12 +342,28 @@ class StorageStubProvider {
       GoogleCloudStorageOptions options,
       ExecutorService backgroundTasksThreadPool,
       Credentials credentials) {
-    boolean useDirectpath = options.isDirectPathPreffered();
+    boolean useDirectpath = options.isDirectPathPreffered() && isOnComputeEngine();
     return new StorageStubProvider(
         options,
         backgroundTasksThreadPool,
         useDirectpath
             ? new DirectPathGrpcDecorator(options.getReadChannelOptions())
             : new CloudPathGrpcDecorator(credentials));
+  }
+
+  private static boolean isOnComputeEngine() {
+    String osName = System.getProperty("os.name");
+    if ("Linux".equals(osName)) {
+      try {
+        String result =
+            Files.asCharSource(new File("/sys/class/dmi/id/product_name"), StandardCharsets.UTF_8)
+                .readFirstLine();
+        return result.contains(GCE_PRODUCTION_NAME_PRIOR_2016)
+            || result.contains(GCE_PRODUCTION_NAME_AFTER_2016);
+      } catch (IOException ignored) {
+        return false;
+      }
+    }
+    return false;
   }
 }
