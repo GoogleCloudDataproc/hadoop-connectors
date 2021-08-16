@@ -5,9 +5,7 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.ClientProto;
 import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.googleapis.compute.ComputeCredential;
 import com.google.auth.Credentials;
-import com.google.auth.oauth2.ComputeEngineCredentials;
 import com.google.cloud.hadoop.util.CredentialAdapter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -323,11 +321,7 @@ class StorageStubProvider {
       GoogleCloudStorageOptions options,
       ExecutorService backgroundTasksThreadPool,
       Credential credential) {
-    boolean useDirectpath =
-        options.isDirectPathPreffered()
-            && credential != null
-            && java.util.Objects.equals(
-                credential.getTokenServerEncodedUrl(), ComputeCredential.TOKEN_SERVER_ENCODED_URL);
+    boolean useDirectpath = options.isDirectPathPreffered();
     return new StorageStubProvider(
         options,
         backgroundTasksThreadPool,
@@ -340,8 +334,7 @@ class StorageStubProvider {
       GoogleCloudStorageOptions options,
       ExecutorService backgroundTasksThreadPool,
       Credentials credentials) {
-    boolean useDirectpath =
-        options.isDirectPathPreffered() && credentials instanceof ComputeEngineCredentials;
+    boolean useDirectpath = options.isDirectPathPreffered();
     return new StorageStubProvider(
         options,
         backgroundTasksThreadPool,
