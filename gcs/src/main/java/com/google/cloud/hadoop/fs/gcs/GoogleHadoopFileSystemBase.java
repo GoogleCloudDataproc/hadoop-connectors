@@ -40,7 +40,10 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.flogger.LazyArgs.lazy;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.Executors.newFixedThreadPool;
-
+//Bhagyaa-s
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CompletableFuture;
+//Bhagyaa-e
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.http.HttpTransport;
@@ -103,10 +106,17 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
+//Bhagyaa-s
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.LinkedBlockingQueue;
+//Bhagyaa-e
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.conf.Configuration;
+//Bhagyaa-s
+import org.apache.hadoop.fs.impl.AbstractFSBuilderImpl;
+//Bhagyaa-e
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -118,11 +128,18 @@ import org.apache.hadoop.fs.GlobPattern;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.XAttrSetFlag;
+//Bhagyaa-s
+import org.apache.hadoop.fs.impl.OpenFileParameters;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
+//Bhagyaa-s
+import org.apache.hadoop.util.BlockingThreadPoolExecutorService;
+import org.apache.hadoop.util.LambdaUtils;
+import com.google.common.util.concurrent.ForwardingExecutorService;
+//Bhagyaa-e
 
 /**
  * This class provides a Hadoop compatible File System on top of Google Cloud Storage (GCS).
@@ -160,6 +177,11 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   private static final ListFileOptions LIST_OPTIONS =
       ListFileOptions.DEFAULT.toBuilder().setFields(OBJECT_FIELDS).build();
+  /** Bhagyaa-s**/
+  private static final int DEFAULT_MAX_THREADS = 64; //16
+//  public static final String MAX_THREADS = "fs.gcs.threads.max";
+  private int executorCapacity;
+  /**Bhagyaa-e**/
 
   /**
    * Available types for use with {@link
@@ -272,10 +294,11 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * mappers are used to process a given file.
    */
   protected long defaultBlockSize = BLOCK_SIZE.getDefault();
-
   /** The fixed reported permission of all files. */
   private FsPermission reportedPermissions;
-
+  //Bhagyaa-s
+  private ThreadPoolExecutor unboundedThreadPool;
+  //Bhagyaa-e
   /**
    * GCS {@link FileChecksum} which takes constructor parameters to define the return values of the
    * various abstract methods of {@link FileChecksum}.
@@ -463,7 +486,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     // Initialize the delegation token support, if it is configured
     initializeDelegationTokenSupport(config, path);
-
+    //Bhagyaa-s
+    initThreadPools(config);
+    //Bhagyaa-e
     configure(config);
   }
 
@@ -560,7 +585,42 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     return new FSDataInputStream(in);
   }
-
+  /**Bhagyaa-s**/
+  //Conf not used in the method for sometime, as some changes need to be made for laters
+  private void initThreadPools(Configuration conf){
+    int maxThreads=DEFAULT_MAX_THREADS;
+    //commenting below block as we already hard-coded the value
+//    if (maxThreads < 2) {
+//      LOG.warn("MAX_THREADS or DEFAULT_MAX_THREAD must be at least 2: forcing to 2.");
+//      maxThreads = 2;
+//    }
+    //int totalTasks=32; //commenting as it is used only in select feature of s3
+    int keepAliveTime=60;
+    unboundedThreadPool=new ThreadPoolExecutor(maxThreads,Integer.MAX_VALUE,
+            keepAliveTime,TimeUnit.SECONDS, new LinkedBlockingQueue<>(),
+            BlockingThreadPoolExecutorService.newDaemonThreadFactory("gcs-transfer-unbounded"));
+    unboundedThreadPool.allowCoreThreadTimeOut(true);
+    executorCapacity=16;
+  }
+  @Override
+  public CompletableFuture<FSDataInputStream> openFileWithOptions(final Path rawPath, final OpenFileParameters parameters) throws IOException{
+    final Path path=makeQualified(rawPath);
+    Configuration options=parameters.getOptions();
+    Set<String> mandatoryKeys=parameters.getMandatoryKeys();
+    AbstractFSBuilderImpl.rejectUnknownMandatoryKeys(mandatoryKeys,Collections.emptySet(),"for "+path);
+    FileStatus providedStatus=parameters.getStatus();
+    if(providedStatus!=null){
+      checkArgument(path.equals(providedStatus.getPath()),"FileStatus parameter is not for the path %s: %s",path,providedStatus);
+    }
+    else{
+      LOG.debug("Ignoring file status");
+    }
+    Optional<FileStatus> ost=Optional.ofNullable(providedStatus);
+    CompletableFuture<FSDataInputStream> result=new CompletableFuture<>();
+    unboundedThreadPool.submit(()->LambdaUtils.eval(result,()->open(path,parameters.getBufferSize())));
+    return result;
+  }
+  /**Bhagyaa-e**/
   /**
    * Opens the given file for writing.
    *
