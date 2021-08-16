@@ -3220,7 +3220,8 @@ public class GoogleCloudStorageTest {
 
     gcs.createEmptyObject(
         RESOURCE_ID,
-        CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
+        CreateObjectOptions.DEFAULT_OVERWRITE
+            .toBuilder()
             .setMetadata(ImmutableMap.of("foo", new byte[0]))
             .build());
 
@@ -3243,7 +3244,8 @@ public class GoogleCloudStorageTest {
 
     StorageResourceId resourceId = RESOURCE_ID;
     CreateObjectOptions createOptions =
-        CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
+        CreateObjectOptions.DEFAULT_OVERWRITE
+            .toBuilder()
             .setMetadata(ImmutableMap.of("foo", new byte[0]))
             .build();
 
@@ -3404,7 +3406,7 @@ public class GoogleCloudStorageTest {
     Storage.Objects.Get testGetRequest = gcs.storage.objects().get(BUCKET_NAME, OBJECT_NAME);
     gcs.initializeRequest(testGetRequest, BUCKET_NAME);
 
-    assertThat(testGetRequest.getOauthToken()).isNull();
+    assertThat(testGetRequest.getRequestHeaders().getAuthorization()).isNull();
   }
 
   @Test
@@ -3421,7 +3423,8 @@ public class GoogleCloudStorageTest {
     Storage.Objects.Get testGetRequest = gcs.storage.objects().get(BUCKET_NAME, OBJECT_NAME);
     gcs.initializeRequest(testGetRequest, BUCKET_NAME);
 
-    assertThat(testGetRequest.getOauthToken()).isEqualTo("testDownscopedAccessToken");
+    assertThat(testGetRequest.getRequestHeaders().getAuthorization())
+        .isEqualTo("Bearer testDownscopedAccessToken");
   }
 
   private GoogleCloudStorage mockedGcs(HttpTransport transport) {
