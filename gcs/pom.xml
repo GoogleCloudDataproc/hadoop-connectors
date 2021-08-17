@@ -298,6 +298,7 @@
                     <include>com.google.protobuf.**</include>
                     <include>com.google.thirdparty.**</include>
                     <include>com.google.type.**</include>
+                    <include>com.google.storage.**</include>
                   </includes>
                   <excludes>
                     <exclude>com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler</exclude>
