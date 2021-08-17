@@ -467,6 +467,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     // Initialize the delegation token support, if it is configured
     initializeDelegationTokenSupport(config, path);
 
+    instrumentation = new GHFSInstrumentation(path);
+
     configure(config);
   }
 
