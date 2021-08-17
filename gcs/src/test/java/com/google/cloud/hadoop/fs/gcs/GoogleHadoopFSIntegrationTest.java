@@ -15,7 +15,7 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
-import static com.google.common.truth.Truth.assertThat; 
+import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
