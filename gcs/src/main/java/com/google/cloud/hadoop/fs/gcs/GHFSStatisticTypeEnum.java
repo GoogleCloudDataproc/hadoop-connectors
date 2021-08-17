@@ -1,6 +1,6 @@
-package com.google.cloud.hadoop.fs.gcs.auth;
+package com.google.cloud.hadoop.fs.gcs;
 
-public enum GHFStatisticTypeEnum {
+public enum GHFSStatisticTypeEnum {
     /**
      * Counter.
      */
