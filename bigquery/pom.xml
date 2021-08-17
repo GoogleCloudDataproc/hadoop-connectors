@@ -307,6 +307,7 @@
                     <include>com.google.longrunning.**</include>
                     <include>com.google.protobuf.**</include>
                     <include>com.google.rpc.**</include>
+                    <include>com.google.storage.**</include>
                   </includes>
                   <excludes>
                     <exclude>com.google.cloud.hadoop.util.AccessTokenProvider</exclude>
