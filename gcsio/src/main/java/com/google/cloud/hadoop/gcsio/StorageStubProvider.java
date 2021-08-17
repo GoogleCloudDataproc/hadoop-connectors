@@ -13,11 +13,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.google.storage.v1.StorageGrpc;
-import com.google.google.storage.v1.StorageGrpc.StorageBlockingStub;
-import com.google.google.storage.v1.StorageGrpc.StorageStub;
-import com.google.google.storage.v1.StorageOuterClass;
 import com.google.protobuf.util.Durations;
+import com.google.storage.v2.StorageGrpc;
+import com.google.storage.v2.StorageGrpc.StorageBlockingStub;
+import com.google.storage.v2.StorageGrpc.StorageStub;
+import com.google.storage.v2.StorageProto;
 import io.grpc.CallOptions;
 import io.grpc.Channel;
 import io.grpc.ClientCall;
@@ -59,7 +59,7 @@ class StorageStubProvider {
 
   // The GCS gRPC server address.
   private static final String DEFAULT_GCS_GRPC_SERVER_ADDRESS =
-      StorageOuterClass.getDescriptor()
+      StorageProto.getDescriptor()
           .findServiceByName("Storage")
           .getOptions()
           .getExtension(ClientProto.defaultHost);
