@@ -276,6 +276,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   /** The fixed reported permission of all files. */
   private FsPermission reportedPermissions;
 
+
+  public static GHFSInstrumentation instrumentation;
   /**
    * GCS {@link FileChecksum} which takes constructor parameters to define the return values of the
    * various abstract methods of {@link FileChecksum}.
@@ -654,6 +656,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 "Unsupported output stream type given for key '%s': '%s'",
                 GCS_OUTPUT_STREAM_TYPE.getKey(), type));
     }
+
+    instrumentation.fileCreated();
 
     return new FSDataOutputStream(out, /* stats= */ null);
   }
