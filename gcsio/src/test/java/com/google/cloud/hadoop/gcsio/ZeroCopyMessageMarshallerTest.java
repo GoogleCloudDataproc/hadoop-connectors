@@ -17,7 +17,7 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
-import com.google.google.storage.v1.GetObjectRequest;
+import com.google.storage.v2.ReadObjectRequest;
 import io.grpc.StatusRuntimeException;
 import io.grpc.internal.ReadableBuffer;
 import io.grpc.internal.ReadableBuffers;
@@ -31,11 +31,11 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class ZeroCopyMessageMarshallerTest {
-  private GetObjectRequest REQUEST =
-      GetObjectRequest.newBuilder().setBucket("b").setObject("o").build();
+  private ReadObjectRequest REQUEST =
+      ReadObjectRequest.newBuilder().setBucket("b").setObject("o").build();
 
-  private ZeroCopyMessageMarshaller<GetObjectRequest> createMarshaller() {
-    return new ZeroCopyMessageMarshaller<>(GetObjectRequest.getDefaultInstance());
+  private ZeroCopyMessageMarshaller<ReadObjectRequest> createMarshaller() {
+    return new ZeroCopyMessageMarshaller<>(ReadObjectRequest.getDefaultInstance());
   }
 
   private byte[] dropLastOneByte(byte[] bytes) {
@@ -51,8 +51,8 @@ public class ZeroCopyMessageMarshallerTest {
   @Test
   public void testParseOnFastPath() throws IOException {
     InputStream stream = createInputStream(REQUEST.toByteArray(), true);
-    ZeroCopyMessageMarshaller<GetObjectRequest> marshaller = createMarshaller();
-    GetObjectRequest request = marshaller.parse(stream);
+    ZeroCopyMessageMarshaller<ReadObjectRequest> marshaller = createMarshaller();
+    ReadObjectRequest request = marshaller.parse(stream);
     assertThat(request).isEqualTo(REQUEST);
     InputStream stream2 = marshaller.popStream(request);
     assertThat(stream2).isNotNull();
@@ -64,8 +64,8 @@ public class ZeroCopyMessageMarshallerTest {
   @Test
   public void testParseOnSlowPath() {
     InputStream stream = createInputStream(REQUEST.toByteArray(), false);
-    ZeroCopyMessageMarshaller<GetObjectRequest> marshaller = createMarshaller();
-    GetObjectRequest request = marshaller.parse(stream);
+    ZeroCopyMessageMarshaller<ReadObjectRequest> marshaller = createMarshaller();
+    ReadObjectRequest request = marshaller.parse(stream);
     assertThat(request).isEqualTo(REQUEST);
     InputStream stream2 = marshaller.popStream(request);
     assertThat(stream2).isNull();
@@ -74,7 +74,7 @@ public class ZeroCopyMessageMarshallerTest {
   @Test
   public void testParseBrokenMessageOnFastPath() {
     InputStream stream = createInputStream(dropLastOneByte(REQUEST.toByteArray()), true);
-    ZeroCopyMessageMarshaller<GetObjectRequest> marshaller = createMarshaller();
+    ZeroCopyMessageMarshaller<ReadObjectRequest> marshaller = createMarshaller();
     assertThrows(
         StatusRuntimeException.class,
         () -> {
@@ -85,7 +85,7 @@ public class ZeroCopyMessageMarshallerTest {
   @Test
   public void testParseBrokenMessageOnSlowPath() {
     InputStream stream = createInputStream(dropLastOneByte(REQUEST.toByteArray()), false);
-    ZeroCopyMessageMarshaller<GetObjectRequest> marshaller = createMarshaller();
+    ZeroCopyMessageMarshaller<ReadObjectRequest> marshaller = createMarshaller();
     assertThrows(
         StatusRuntimeException.class,
         () -> {
