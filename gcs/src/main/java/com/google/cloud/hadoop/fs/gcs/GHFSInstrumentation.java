@@ -18,8 +18,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.net.URI;
+import java.time.Duration;
 import java.util.EnumSet;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
 
@@ -100,13 +102,6 @@ public class GHFSInstrumentation implements Closeable, MetricsSource, IOStatisti
     }
 
 
-    public void incrementCounter(GHFSStatistic op, long count) {
-        String name = op.getSymbol();
-        if (count != 0) {
-            incrementMutableCounter(name, count);
-            instanceIOStatistics.incrementCounter(name, count);
-        }
-    }
 
     /**
      * Indicate that GCS created a file.
@@ -198,21 +193,7 @@ public class GHFSInstrumentation implements Closeable, MetricsSource, IOStatisti
         return gauge(op.getSymbol(), op.getDescription());
     }
 
-    /**
-     * Create a quantiles in the registry.
-     * @param op  statistic to collect
-     * @param sampleName sample name of the quantiles
-     * @param valueName value name of the quantiles
-     * @param interval interval of the quantiles in seconds
-     * @return the created quantiles metric
-     */
-    protected final MutableQuantiles quantiles(GHFSStatistic op,
-                                               String sampleName,
-                                               String valueName,
-                                               int interval) {
-        return registry.newQuantiles(op.getSymbol(), op.getDescription(),
-                sampleName, valueName, interval);
-    }
+
 
     public MetricsRegistry getRegistry() {
         return registry;
@@ -272,19 +253,7 @@ public class GHFSInstrumentation implements Closeable, MetricsSource, IOStatisti
         }
         return (MutableGaugeLong) metric;
     }
-    /**
-     * Look up a quantiles.
-     * @param name quantiles name
-     * @return the quantiles or null
-     * @throws ClassCastException if the metric is not a Quantiles.
-     */
-    public MutableQuantiles lookupQuantiles(String name) {
-        MutableMetric metric = lookupMetric(name);
-        if (metric == null) {
-            LOG.debug("No quantiles {}", name);
-        }
-        return (MutableQuantiles) metric;
-    }
+
     /**
      * The duration tracker updates the metrics with the count
      * and IOStatistics will full duration information.
@@ -312,6 +281,111 @@ public class GHFSInstrumentation implements Closeable, MetricsSource, IOStatisti
         sb.append('}');
         return sb.toString();
     }
+
+    /**
+     * Indicate that fake directory request was made.
+     * @param count number of directory entries included in the delete request.
+     */
+    public void fakeDirsDeleted(int count) {
+        incrementCounter(GHFSStatistic.FAKE_DIRECTORIES_DELETED, count);
+    }
+
+    /**
+     * Indicate that gcs created a directory.
+     */
+    public void directoryCreated() {
+        incrementCounter(GHFSStatistic.DIRECTORIES_CREATED, 1);
+    }
+
+    /**
+     * Indicate that gcs just deleted a directory.
+     */
+    public void directoryDeleted() {
+        incrementCounter(GHFSStatistic.DIRECTORIES_DELETED, 1);
+    }
+
+    /**
+     * Indicate that gcs copied some files within the store.
+     *
+     * @param files number of files
+     * @param size total size in bytes
+     */
+    public void filesCopied(int files, long size) {
+        incrementCounter(GHFSStatistic.FILES_COPIED, files);
+        incrementCounter(GHFSStatistic.FILES_COPIED_BYTES, size);
+    }
+
+    /**
+     * Note that an error was ignored.
+     */
+    public void errorIgnored() {
+        incrementCounter(GHFSStatistic.IGNORED_ERRORS, 1);
+    }
+    /**
+     * Increments a mutable counter and the matching
+     * instance IOStatistics counter.
+     * No-op if the counter is not defined, or the count == 0.
+     * @param op operation
+     * @param count increment value
+     */
+
+    public void incrementCounter(GHFSStatistic op, long count) {
+        String name = op.getSymbol();
+        if (count != 0) {
+            incrementMutableCounter(name, count);
+            instanceIOStatistics.incrementCounter(name, count);
+        }
+    }
+    /**
+     * Increments a mutable counter and the matching
+     * instance IOStatistics counter with the value of
+     * the atomic long.
+     * No-op if the counter is not defined, or the count == 0.
+     * @param op operation
+     * @param count atomic long containing value
+     */
+    public void incrementCounter(GHFSStatistic op, AtomicLong count) {
+        incrementCounter(op, count.get());
+    }
+
+    /**
+     * Increment a specific gauge.
+     * No-op if not defined.
+     * @param op operation
+     * @param count increment value
+     * @throws ClassCastException if the metric is of the wrong type
+     */
+    public void incrementGauge(GHFSStatistic op, long count) {
+        MutableGaugeLong gauge = lookupGauge(op.getSymbol());
+        if (gauge != null) {
+            gauge.incr(count);
+        } else {
+            LOG.debug("No Gauge: "+ op);
+        }
+    }
+
+    /**
+     * Decrement a specific gauge.
+     * No-op if not defined.
+     * @param op operation
+     * @param count increment value
+     * @throws ClassCastException if the metric is of the wrong type
+     */
+    public void decrementGauge(GHFSStatistic op, long count) {
+        MutableGaugeLong gauge = lookupGauge(op.getSymbol());
+        if (gauge != null) {
+            gauge.decr(count);
+        } else {
+            LOG.debug("No Gauge: {}", op);
+        }
+    }
+
+    /**
+     * Increments a Mutable counter.
+     * No-op if not a positive integer.
+     * @param name counter name.
+     * @param count increment value
+     */
     private void incrementMutableCounter(final String name, final long count) {
         if (count > 0) {
             MutableCounterLong counter = lookupCounter(name);
@@ -319,6 +393,23 @@ public class GHFSInstrumentation implements Closeable, MetricsSource, IOStatisti
                 counter.incr(count);
             }
         }
+    }
+
+
+    /**
+     * Add the duration as a timed statistic, deriving
+     * statistic name from the operation symbol and the outcome.
+     * @param op operation
+     * @param success was the operation a success?
+     * @param duration how long did it take
+     */
+
+    public void recordDuration(final GHFSStatistic op,
+                               final boolean success,
+                               final Duration duration) {
+        String name = op.getSymbol()
+                + (success ? "" : SUFFIX_FAILURES);
+        instanceIOStatistics.addTimedOperation(name, duration);
     }
 
     @Override
