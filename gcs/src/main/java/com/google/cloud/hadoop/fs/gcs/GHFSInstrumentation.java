@@ -7,9 +7,7 @@ import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 import org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding;
 import org.apache.hadoop.fs.statistics.impl.IOStatisticsStore;
 import org.apache.hadoop.fs.statistics.impl.IOStatisticsStoreBuilder;
-import org.apache.hadoop.metrics2.MetricsCollector;
-import org.apache.hadoop.metrics2.MetricsSource;
-import org.apache.hadoop.metrics2.MetricsSystem;
+import org.apache.hadoop.metrics2.*;
 import org.apache.hadoop.metrics2.impl.MetricsSystemImpl;
 import org.apache.hadoop.metrics2.lib.*;
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
@@ -20,6 +18,8 @@ import java.io.Closeable;
 import java.net.URI;
 import java.time.Duration;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -43,9 +43,9 @@ public class GHFSInstrumentation implements Closeable, MetricsSource, IOStatisti
             GHFSInstrumentation.class);
 
     public GHFSInstrumentation(URI name){
-    UUID tempFileSystemID=UUID.randomUUID();
+    UUID fileSystemInstanceID=UUID.randomUUID();
     registry.tag(METRIC_TAG_FILESYSTEM_ID,"A unique identifier for the instance",
-            tempFileSystemID.toString());
+            fileSystemInstanceID.toString());
     registry.tag(METRIC_TAG_BUCKET,"Hostname from the FS URL",name.getHost());
     IOStatisticsStoreBuilder storeBuilder= IOStatisticsBinding.iostatisticsStore();
     // declare all counter statistics
@@ -139,6 +139,9 @@ public class GHFSInstrumentation implements Closeable, MetricsSource, IOStatisti
         }
         return metricsSystem;
     }
+
+
+
     /**
      * Indicate that GCS deleted one or more files.
      * @param count number of files.
@@ -411,7 +414,15 @@ public class GHFSInstrumentation implements Closeable, MetricsSource, IOStatisti
                 + (success ? "" : SUFFIX_FAILURES);
         instanceIOStatistics.addTimedOperation(name, duration);
     }
-
+    /**
+     * Copy all the metrics to a map of (name, long-value).
+     * @return a map of the metrics
+     */
+    public Map<String, Long> toMap() {
+        MetricsToMap metricBuilder = new MetricsToMap(null);
+        registry.snapshot(metricBuilder, true);
+        return metricBuilder.getMap();
+    }
     @Override
     public void getMetrics(MetricsCollector metricsCollector, boolean b) {
 //        System.out.println("getMetrics");
@@ -456,6 +467,90 @@ public class GHFSInstrumentation implements Closeable, MetricsSource, IOStatisti
             return new MetricUpdatingDurationTracker(key, count);
         }
 
+    }
+    /**
+     * Convert all metrics to a map.
+     */
+    private static class MetricsToMap extends MetricsRecordBuilder {
+        private final MetricsCollector parent;
+        private final Map<String, Long> map =
+                new HashMap<>();
+
+        MetricsToMap(MetricsCollector parent) {
+            this.parent = parent;
+        }
+
+        @Override
+        public MetricsRecordBuilder tag(MetricsInfo info, String value) {
+            return this;
+        }
+
+        @Override
+        public MetricsRecordBuilder add(MetricsTag tag) {
+            return this;
+        }
+
+        @Override
+        public MetricsRecordBuilder add(AbstractMetric metric) {
+            return this;
+        }
+
+        @Override
+        public MetricsRecordBuilder setContext(String value) {
+            return this;
+        }
+
+        @Override
+        public MetricsRecordBuilder addCounter(MetricsInfo info, int value) {
+            return tuple(info, value);
+        }
+
+        @Override
+        public MetricsRecordBuilder addCounter(MetricsInfo info, long value) {
+            return tuple(info, value);
+        }
+
+        @Override
+        public MetricsRecordBuilder addGauge(MetricsInfo info, int value) {
+            return tuple(info, value);
+        }
+
+        @Override
+        public MetricsRecordBuilder addGauge(MetricsInfo info, long value) {
+            return tuple(info, value);
+        }
+
+        public MetricsToMap tuple(MetricsInfo info, long value) {
+            return tuple(info.name(), value);
+        }
+
+        public MetricsToMap tuple(String name, long value) {
+            map.put(name, value);
+            return this;
+        }
+
+        @Override
+        public MetricsRecordBuilder addGauge(MetricsInfo info, float value) {
+            return tuple(info, (long) value);
+        }
+
+        @Override
+        public MetricsRecordBuilder addGauge(MetricsInfo info, double value) {
+            return tuple(info, (long) value);
+        }
+
+        @Override
+        public MetricsCollector parent() {
+            return parent;
+        }
+
+        /**
+         * Get the map.
+         * @return the map of metrics
+         */
+        public Map<String, Long> getMap() {
+            return map;
+        }
     }
 
 }
