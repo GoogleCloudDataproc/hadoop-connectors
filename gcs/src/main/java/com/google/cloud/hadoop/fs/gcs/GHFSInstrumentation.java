@@ -115,6 +115,13 @@ public GHFSInstrumentation(URI name){
         return metricsSystem;
     }
     /**
+     * Indicate that GCS deleted one or more files.
+     * @param count number of files.
+     */
+    public void fileDeleted(int count) {
+        incrementCounter(GHFSStatistic.FILES_DELETED, count);
+    }
+    /**
      * Create a counter in the registry.
      * @param name counter name
      * @param desc counter description
