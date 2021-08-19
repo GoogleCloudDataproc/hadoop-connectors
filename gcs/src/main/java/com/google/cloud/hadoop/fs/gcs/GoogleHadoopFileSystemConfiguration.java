@@ -359,9 +359,15 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_TIMEOUT_MS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.read.timeout.ms", 20 * 60 * 1000L);
 
-  /** Configuration key for the connect timeout (in millisecond) for gRPC metadata requests to GCS. */
+  /**
+   * Configuration key for the connect timeout (in millisecond) for gRPC metadata requests to GCS.
+   */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_METADATA_TIMEOUT_MS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.read.metadata.timeout.ms", 60 * 1000L);
+
+  /** Configuration key for enabling the zero-copy deserializer for the gRPC API. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_READ_ZEROCOPY_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.grpc.read.zerocopy.enable", true);
 
   /** Configuration key for the number of requests to be buffered for uploads to GCS. */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_UPLOAD_BUFFERED_REQUESTS =
@@ -509,7 +515,9 @@ public class GoogleHadoopFileSystemConfiguration {
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
         .setGrpcServerAddress(GCS_GRPC_SERVER_ADDRESS.get(config, config::get))
         .setGrpcReadTimeoutMillis(GCS_GRPC_READ_TIMEOUT_MS.get(config, config::getLong))
-        .setGrpcReadMetadataTimeoutMillis(GCS_GRPC_READ_METADATA_TIMEOUT_MS.get(config, config::getLong))
+        .setGrpcReadMetadataTimeoutMillis(
+            GCS_GRPC_READ_METADATA_TIMEOUT_MS.get(config, config::getLong))
+        .setGrpcReadZeroCopyEnabled(GCS_GRPC_READ_ZEROCOPY_ENABLE.get(config, config::getBoolean))
         .build();
   }
 

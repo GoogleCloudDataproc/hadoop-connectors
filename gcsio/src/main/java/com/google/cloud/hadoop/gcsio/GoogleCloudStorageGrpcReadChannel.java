@@ -67,7 +67,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
               .toBuilder()
               .setResponseMarshaller(getObjectMediaResponseMarshaller)
               .build();
-  private static final boolean useZeroCopyMarshaller = ZeroCopyReadinessChecker.isReady();
+  private final boolean useZeroCopyMarshaller;
 
   private volatile StorageBlockingStub stub;
 
@@ -299,6 +299,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       ByteString footerContent,
       GoogleCloudStorageReadOptions readOptions,
       BackOffFactory backOffFactory) {
+    this.useZeroCopyMarshaller =
+        ZeroCopyReadinessChecker.isReady() && readOptions.isGrpcReadZeroCopyEnabled();
     this.stub = gcsGrpcBlockingStub;
     this.stubProvider = stubProvider;
     this.resourceId = resourceId;
