@@ -63,14 +63,16 @@ public class GoogleHadoopFileSystem extends GoogleHadoopFileSystemBase {
    * GoogleCloudStorageFileSystem; initialize() will not re-initialize it.
    */
   @VisibleForTesting
-  GoogleHadoopFileSystem(GoogleCloudStorageFileSystem gcsfs) {
+  //Bhagyaa-s
+  public GoogleHadoopFileSystem(GoogleCloudStorageFileSystem gcsfs) {
     super(gcsfs);
   }
-
+//Bhagyaa-e
   /** Sets and validates the root bucket. */
   @Override
   @VisibleForTesting
-  protected void configureBuckets(GoogleCloudStorageFileSystem gcsFs) throws IOException {
+  //Bhagyaa-s Bhagyaa-e
+  public void configureBuckets(GoogleCloudStorageFileSystem gcsFs) throws IOException {
     rootBucket = initUri.getAuthority();
     checkArgument(rootBucket != null, "No bucket specified in GCS URI: %s", initUri);
     // Validate root bucket name

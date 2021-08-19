@@ -62,6 +62,7 @@ import com.google.cloud.hadoop.gcsio.ListFileOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
 import com.google.cloud.hadoop.gcsio.UriPaths;
+import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializerFromGcsio;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.AccessTokenProvider.AccessTokenType;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
@@ -613,7 +614,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       checkArgument(path.equals(providedStatus.getPath()),"FileStatus parameter is not for the path %s: %s",path,providedStatus);
     }
     else{
-      LOG.debug("Ignoring file status");
+      providedStatus = getFileStatus(path);
     }
     Optional<FileStatus> ost=Optional.ofNullable(providedStatus);
     CompletableFuture<FSDataInputStream> result=new CompletableFuture<>();

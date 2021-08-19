@@ -68,6 +68,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
+import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializerFromGcsio;
 
 /**
  * Provides a POSIX like file system layered on top of Google Cloud Storage (GCS).
@@ -83,7 +84,7 @@ import javax.annotation.Nullable;
 public class GoogleCloudStorageFileSystem {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-
+  public static TrackingHttpRequestInitializerFromGcsio httpReq=null;
   // URI scheme for GCS.
   public static final String SCHEME = "gs";
 
@@ -187,7 +188,9 @@ public class GoogleCloudStorageFileSystem {
     this(gcsFn.apply(options.getCloudStorageOptions()), options);
   }
 
-  private GoogleCloudStorageFileSystem(
+  //Bhagyaa-s Bhagyaa-e
+  @VisibleForTesting
+  public GoogleCloudStorageFileSystem(
       GoogleCloudStorage gcs, GoogleCloudStorageFileSystemOptions options) {
     checkArgument(
         gcs.getOptions() == options.getCloudStorageOptions(),
@@ -198,6 +201,10 @@ public class GoogleCloudStorageFileSystem {
             ? new PerformanceCachingGoogleCloudStorage(gcs, options.getPerformanceCacheOptions())
             : gcs;
     this.options = options;
+  }
+
+  private void setHttpReq(TrackingHttpRequestInitializerFromGcsio httpReqParam){
+    this.httpReq=httpReqParam;
   }
 
   private static ExecutorService createCachedExecutor() {
