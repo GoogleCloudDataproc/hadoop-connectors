@@ -445,38 +445,38 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       // should be closed when the mssage is no longed needed so that all buffers in the
       // stream can be reclaimed. If zero-copy is not used, stream will be null.
       InputStream stream = getObjectMediaResponseMarshaller.popStream(res);
-      ByteString content = res.getChecksummedData().getContent();
-      if (bytesToSkipBeforeReading >= 0 && bytesToSkipBeforeReading < content.size()) {
-        content = res.getChecksummedData().getContent().substring((int) bytesToSkipBeforeReading);
-        positionInGrpcStream += bytesToSkipBeforeReading;
-        bytesToSkipBeforeReading = 0;
-      } else if (bytesToSkipBeforeReading >= content.size()) {
-        positionInGrpcStream += content.size();
-        bytesToSkipBeforeReading -= content.size();
-        if (stream != null) {
-          stream.close();
+      try {
+        ByteString content = res.getChecksummedData().getContent();
+        if (bytesToSkipBeforeReading >= 0 && bytesToSkipBeforeReading < content.size()) {
+          content = res.getChecksummedData().getContent().substring((int) bytesToSkipBeforeReading);
+          positionInGrpcStream += bytesToSkipBeforeReading;
+          bytesToSkipBeforeReading = 0;
+        } else if (bytesToSkipBeforeReading >= content.size()) {
+          positionInGrpcStream += content.size();
+          bytesToSkipBeforeReading -= content.size();
+          continue;
         }
-        continue;
-      }
 
-      if (readOptions.isGrpcChecksumsEnabled() && res.getChecksummedData().hasCrc32C()) {
-        validateChecksum(res);
-      }
+        if (readOptions.isGrpcChecksumsEnabled() && res.getChecksummedData().hasCrc32C()) {
+          validateChecksum(res);
+        }
 
-      boolean responseSizeLargerThanRemainingBuffer = content.size() > byteBuffer.remaining();
-      int bytesToWrite =
-          responseSizeLargerThanRemainingBuffer ? byteBuffer.remaining() : content.size();
-      put(content, 0, bytesToWrite, byteBuffer);
-      bytesRead += bytesToWrite;
-      positionInGrpcStream += bytesToWrite;
+        boolean responseSizeLargerThanRemainingBuffer = content.size() > byteBuffer.remaining();
+        int bytesToWrite =
+            responseSizeLargerThanRemainingBuffer ? byteBuffer.remaining() : content.size();
+        put(content, 0, bytesToWrite, byteBuffer);
+        bytesRead += bytesToWrite;
+        positionInGrpcStream += bytesToWrite;
 
-      if (responseSizeLargerThanRemainingBuffer) {
-        invalidateBufferedContent();
-        bufferedContent = content;
-        bufferedContentReadOffset = bytesToWrite;
-        // This is to keep the stream alive for the message backed by this.
-        streamForBufferedContent = stream;
-      } else {
+        if (responseSizeLargerThanRemainingBuffer) {
+          invalidateBufferedContent();
+          bufferedContent = content;
+          bufferedContentReadOffset = bytesToWrite;
+          // This is to keep the stream alive for the message backed by this.
+          streamForBufferedContent = stream;
+          stream = null;
+        }
+      } finally {
         if (stream != null) {
           stream.close();
         }
