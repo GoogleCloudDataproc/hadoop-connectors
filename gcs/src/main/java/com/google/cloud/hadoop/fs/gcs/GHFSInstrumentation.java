@@ -2,9 +2,7 @@ package com.google.cloud.hadoop.fs.gcs;
 
 
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.statistics.DurationTracker;
-import org.apache.hadoop.fs.statistics.DurationTrackerFactory;
-import org.apache.hadoop.fs.statistics.IOStatisticsSource;
+import org.apache.hadoop.fs.statistics.*;
 import org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding;
 import org.apache.hadoop.fs.statistics.impl.IOStatisticsStore;
 import org.apache.hadoop.fs.statistics.impl.IOStatisticsStoreBuilder;
@@ -25,7 +23,13 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
+
+
+import static com.google.cloud.hadoop.fs.gcs.Constants.STREAM_READ_GAUGE_INPUT_POLICY;
+import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStatistics;
+import static org.apache.hadoop.fs.statistics.StoreStatisticNames.ACTION_HTTP_GET_REQUEST;
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
+import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.iostatisticsStore;
 
 public class GHFSInstrumentation implements Closeable, MetricsSource, IOStatisticsSource, DurationTrackerFactory{
     public static final String CONTEXT="DFSClient";
@@ -457,8 +461,119 @@ public class GHFSInstrumentation implements Closeable, MetricsSource, IOStatisti
      *
      */
     private final class InputStreamStatistics  extends AbstractGHFSStatisticsSource {
+
+        /**
+         * Distance used when incrementing FS stats.
+         */
+        private static final int DISTANCE = 5;
+
+        /**
+         * FS statistics for the thread creating the stream.
+         */
+        private final FileSystem.Statistics filesystemStatistics;
+
+        /**
+         * The statistics from the last merge.
+         */
+        private IOStatisticsSnapshot mergedStats;
+        /*
+   The core counters are extracted to atomic longs for slightly
+   faster resolution on the critical paths, especially single byte
+   reads and the like.
+    */
+        private final AtomicLong aborted;
+        private final AtomicLong backwardSeekOperations;
+        private final AtomicLong bytesBackwardsOnSeek;
+        private final AtomicLong bytesDiscardedInAbort;
+        /** Bytes read by the application. */
+        private final AtomicLong bytesRead;
+        private final AtomicLong bytesDiscardedInClose;
+        private final AtomicLong bytesDiscardedOnSeek;
+        private final AtomicLong bytesSkippedOnSeek;
+        private final AtomicLong closed;
+        private final AtomicLong forwardSeekOperations;
+        private final AtomicLong openOperations;
+        private final AtomicLong readExceptions;
+        private final AtomicLong readsIncomplete;
+        private final AtomicLong readOperations;
+        private final AtomicLong readFullyOperations;
+        private final AtomicLong seekOperations;
+
+        /** Bytes read by the application and any when draining streams . */
+        private final AtomicLong totalBytesRead;
+
+        /**
+         * Instantiate.
+         * @param filesystemStatistics FS Statistics to update in close().
+         */
+
         private InputStreamStatistics(
                 @Nullable FileSystem.Statistics filesystemStatistics) {
+            this.filesystemStatistics = filesystemStatistics;
+            IOStatisticsStore st = iostatisticsStore()
+                    .withCounters(
+                            StreamStatisticNames.STREAM_READ_ABORTED,
+                            StreamStatisticNames.STREAM_READ_BYTES_DISCARDED_ABORT,
+                            StreamStatisticNames.STREAM_READ_CLOSED,
+                            StreamStatisticNames.STREAM_READ_BYTES_DISCARDED_CLOSE,
+                            StreamStatisticNames.STREAM_READ_CLOSE_OPERATIONS,
+                            StreamStatisticNames.STREAM_READ_OPENED,
+                            StreamStatisticNames.STREAM_READ_BYTES,
+                            StreamStatisticNames.STREAM_READ_EXCEPTIONS,
+                            StreamStatisticNames.STREAM_READ_FULLY_OPERATIONS,
+                            StreamStatisticNames.STREAM_READ_OPERATIONS,
+                            StreamStatisticNames.STREAM_READ_OPERATIONS_INCOMPLETE,
+                            StreamStatisticNames.STREAM_READ_SEEK_OPERATIONS,
+                            StreamStatisticNames.STREAM_READ_SEEK_POLICY_CHANGED,
+                            StreamStatisticNames.STREAM_READ_SEEK_BACKWARD_OPERATIONS,
+                            StreamStatisticNames.STREAM_READ_SEEK_FORWARD_OPERATIONS,
+                            StreamStatisticNames.STREAM_READ_SEEK_BYTES_BACKWARDS,
+                            StreamStatisticNames.STREAM_READ_SEEK_BYTES_DISCARDED,
+                            StreamStatisticNames.STREAM_READ_SEEK_BYTES_SKIPPED,
+                            StreamStatisticNames.STREAM_READ_TOTAL_BYTES,
+                            StreamStatisticNames.STREAM_READ_UNBUFFERED,
+                            StreamStatisticNames.STREAM_READ_VERSION_MISMATCHES)
+                    .withGauges(STREAM_READ_GAUGE_INPUT_POLICY)
+                    .withDurationTracking(ACTION_HTTP_GET_REQUEST)
+                    .build();
+            setIOStatistics(st);
+            aborted = st.getCounterReference(
+                    StreamStatisticNames.STREAM_READ_ABORTED);
+            backwardSeekOperations = st.getCounterReference(
+                    StreamStatisticNames.STREAM_READ_SEEK_BACKWARD_OPERATIONS);
+            bytesBackwardsOnSeek = st.getCounterReference(
+                    StreamStatisticNames.STREAM_READ_SEEK_BYTES_BACKWARDS);
+            bytesDiscardedInAbort = st.getCounterReference(
+                    StreamStatisticNames.STREAM_READ_BYTES_DISCARDED_ABORT);
+            bytesRead = st.getCounterReference(
+                    StreamStatisticNames.STREAM_READ_BYTES);
+            bytesDiscardedInClose = st.getCounterReference(
+                    StreamStatisticNames.STREAM_READ_BYTES_DISCARDED_CLOSE);
+            bytesDiscardedOnSeek = st.getCounterReference(
+                    StreamStatisticNames.STREAM_READ_SEEK_BYTES_DISCARDED);
+            bytesSkippedOnSeek = st.getCounterReference(
+                    StreamStatisticNames.STREAM_READ_SEEK_BYTES_SKIPPED);
+            closed = st.getCounterReference(
+                    StreamStatisticNames.STREAM_READ_CLOSED);
+            forwardSeekOperations = st.getCounterReference(
+                    StreamStatisticNames.STREAM_READ_SEEK_FORWARD_OPERATIONS);
+            openOperations = st.getCounterReference(
+                    StreamStatisticNames.STREAM_READ_OPENED);
+            readExceptions = st.getCounterReference(
+                    StreamStatisticNames.STREAM_READ_EXCEPTIONS);
+            readsIncomplete = st.getCounterReference(
+                    StreamStatisticNames.STREAM_READ_OPERATIONS_INCOMPLETE);
+            readOperations = st.getCounterReference(
+                    StreamStatisticNames.STREAM_READ_OPERATIONS);
+            readFullyOperations = st.getCounterReference(
+                    StreamStatisticNames.STREAM_READ_FULLY_OPERATIONS);
+            seekOperations = st.getCounterReference(
+                    StreamStatisticNames.STREAM_READ_SEEK_OPERATIONS);
+            totalBytesRead = st.getCounterReference(
+                    StreamStatisticNames.STREAM_READ_TOTAL_BYTES);
+            setIOStatistics(st);
+            // create initial snapshot of merged statistics
+            mergedStats = snapshotIOStatistics(st);
 
 
         }
