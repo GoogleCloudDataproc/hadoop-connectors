@@ -1,6 +1,7 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.statistics.DurationTracker;
 import org.apache.hadoop.fs.statistics.DurationTrackerFactory;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
@@ -14,6 +15,7 @@ import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTest
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.net.URI;
 import java.time.Duration;
@@ -427,6 +429,45 @@ public class GHFSInstrumentation implements Closeable, MetricsSource, IOStatisti
     public void getMetrics(MetricsCollector metricsCollector, boolean b) {
 //        System.out.println("getMetrics");
     }
+
+
+    /**
+     * Create a stream input statistics instance.
+     * @return the new instance
+     * @param filesystemStatistics FS Statistics to update in close().
+     */
+//    public GHFSInputStreamStatistics newInputStreamStatistics(
+//            @Nullable final FileSystem.Statistics filesystemStatistics) {
+//        return new InputStreamStatistics(filesystemStatistics);
+//    }
+    /**
+     * Statistics updated by an GoogleHadoopFSInputStream during its actual operation.
+     * <p>
+     * When {@code unbuffer()} is called, the changed numbers are propagated
+     * to the S3AFileSystem metrics.
+     * </p>
+     * <p>
+     * When {@code close()} is called, the final set of numbers are propagated
+     * to the S3AFileSystem metrics.
+     * </p>
+     * The {@link FileSystem.Statistics} statistics passed in are also
+     * updated. This ensures that whichever thread calls close() gets the
+     * total count of bytes read, even if any work is done in other
+     * threads.
+     *
+     */
+    private final class InputStreamStatistics  extends AbstractGHFSStatisticsSource {
+        private InputStreamStatistics(
+                @Nullable FileSystem.Statistics filesystemStatistics) {
+
+
+        }
+
+
+
+
+    }
+
 
     private final class MetricUpdatingDurationTracker
             implements DurationTracker {
