@@ -87,7 +87,7 @@ class ZeroCopyMessageMarshaller<T extends MessageLite> implements PrototypeMarsh
           while (detachedStream.available() != 0) {
             ByteBuffer buffer = ((HasByteBuffer) detachedStream).getByteBuffer();
             byteStrings.add(UnsafeByteOperations.unsafeWrap(buffer));
-            stream.skip(buffer.remaining());
+            detachedStream.skip(buffer.remaining());
           }
           detachedStream.reset();
           CodedInputStream codedInputStream = ByteString.copyFrom(byteStrings).newCodedInput();
