@@ -50,6 +50,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.util.Iterator;
+import java.util.List;
 import java.util.OptionalLong;
 import javax.annotation.Nullable;
 
@@ -59,14 +60,13 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   protected static final String METADATA_FIELDS = "contentEncoding,generation,size";
 
   // ZeroCopy version of GetObjectMedia Method
-  private static final ZeroCopyMessageMarshaller getObjectMediaResponseMarshaller =
+  private final ZeroCopyMessageMarshaller getObjectMediaResponseMarshaller =
       new ZeroCopyMessageMarshaller(ReadObjectResponse.getDefaultInstance());
-  private static final MethodDescriptor<ReadObjectRequest, ReadObjectResponse>
-      getObjectMediaMethod =
-          StorageGrpc.getReadObjectMethod()
-              .toBuilder()
-              .setResponseMarshaller(getObjectMediaResponseMarshaller)
-              .build();
+  private final MethodDescriptor<ReadObjectRequest, ReadObjectResponse> getObjectMediaMethod =
+      StorageGrpc.getReadObjectMethod()
+          .toBuilder()
+          .setResponseMarshaller(getObjectMediaResponseMarshaller)
+          .build();
   private final boolean useZeroCopyMarshaller;
 
   private volatile StorageBlockingStub stub;
@@ -588,6 +588,14 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     }
     if (resIterator != null) {
       resIterator = null;
+    }
+    List<InputStream> unclosedStreams = getObjectMediaResponseMarshaller.popAllStreams();
+    for (InputStream stream : unclosedStreams) {
+      try {
+        stream.close();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
     }
     contentChannelEndOffset = -1;
   }
