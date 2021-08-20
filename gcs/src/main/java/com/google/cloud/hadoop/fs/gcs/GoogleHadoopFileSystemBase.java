@@ -814,7 +814,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     URI srcPath = getGcsPath(src);
     URI dstPath = getGcsPath(dst);
-
+    entryPoint(INVOCATION_RENAME);
     getGcsFs().rename(srcPath, dstPath);
 
     logger.atFiner().log("rename(src: %s, dst: %s): true", src, dst);
@@ -838,6 +838,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     URI gcsPath = getGcsPath(hadoopPath);
     try {
+      entryPoint(INVOCATION_DELETE);
       getGcsFs().delete(gcsPath, recursive);
     } catch (DirectoryNotEmptyException e) {
       throw e;
@@ -1717,7 +1718,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
-
+    entryPoint(INVOCATION_GET_FILE_CHECKSUM);
     URI gcsPath = getGcsPath(hadoopPath);
     final FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
     if (!fileInfo.exists()) {
