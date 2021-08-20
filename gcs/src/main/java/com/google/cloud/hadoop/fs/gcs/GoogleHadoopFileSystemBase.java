@@ -571,7 +571,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         getGcsFs().getOptions().getCloudStorageOptions().getReadChannelOptions();
     GoogleHadoopFSInputStream in =
         new GoogleHadoopFSInputStream(this, gcsPath, readChannelOptions, statistics);
-    entryPoint(INVOCATION_OPEN);
+  //  entryPoint(INVOCATION_OPEN);
     return new FSDataInputStream(in);
   }
 
@@ -603,6 +603,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       long blockSize,
       Progressable progress)
       throws IOException {
+    entryPoint(GHFSStatistic.INVOCATION_CREATE);
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
     checkArgument(replication > 0, "replication must be a positive integer: %s", replication);
     checkArgument(blockSize > 0, "blockSize must be a positive integer: %s", blockSize);
@@ -1892,7 +1893,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   protected void entryPoint(GHFSStatistic operation) throws IOException {
     checkOpen();
-   // incrementStatistic(operation);
+    incrementStatistic(operation);
   }
   /**
    * Increment a statistic by 1.
@@ -1909,7 +1910,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * @param count the count to increment
    */
   protected void incrementStatistic(GHFSStatistic statistic, long count) {
- //   statisticsContext.incrementCounter(statistic, count);
+    instrumentation.incrementCounter(statistic, count);
   }
 
 
