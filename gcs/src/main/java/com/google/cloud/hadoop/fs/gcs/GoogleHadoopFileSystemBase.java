@@ -888,6 +888,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                       "listStatus(hadoopPath: %s): '%s' does not exist.", hadoopPath, gcsPath))
               .initCause(fnfe);
     }
+    entryPoint(GHFSStatistic.INVOCATION_LIST_STATUS);
     return status.toArray(new FileStatus[0]);
   }
 
@@ -941,6 +942,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     URI gcsPath = getGcsPath(hadoopPath);
     try {
+      entryPoint(GHFSStatistic.INVOCATION_MKDIRS);
       getGcsFs().mkdirs(gcsPath);
     } catch (java.nio.file.FileAlreadyExistsException faee) {
       // Need to convert to the Hadoop flavor of FileAlreadyExistsException.
@@ -985,7 +987,18 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
               "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
     }
     String userName = getUgiUserName();
+    entryPoint(GHFSStatistic.INVOCATION_GET_FILE_STATUS);
     return getFileStatus(fileInfo, userName);
+  }
+
+  /**
+   * Override superclass so as to add statistic collection.
+   * {@inheritDoc}
+   */
+  @Override
+  public boolean exists(Path f) throws IOException {
+    entryPoint(GHFSStatistic.INVOCATION_EXISTS);
+    return super.exists(f);
   }
 
   /** Gets FileStatus corresponding to the given FileInfo value. */
@@ -1120,7 +1133,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     if (globAlgorithm == GlobAlgorithm.FLAT && couldUseFlatGlob(fixedPath)) {
       return flatGlobInternal(fixedPath, filter);
     }
-
+    entryPoint(GHFSStatistic.INVOCATION_GLOB_STATUS);
     return super.globStatus(fixedPath, filter);
   }
 
@@ -1612,6 +1625,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public Token<?> getDelegationToken(String renewer) throws IOException {
     Token<?> result = null;
+    entryPoint(GHFSStatistic.INVOCATION_GET_DELEGATION_TOKEN);
 
     if (delegationTokens != null) {
       result = delegationTokens.getBoundOrNewDT(renewer);
@@ -1624,6 +1638,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path[] srcs, Path dst)
       throws IOException {
+    entryPoint(GHFSStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
     logger.atFiner().log(
         "copyFromLocalFile(delSrc: %b, overwrite: %b, %d srcs, dst: %s)",
         delSrc, overwrite, srcs.length, dst);
@@ -1633,6 +1648,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path src, Path dst)
       throws IOException {
+    entryPoint(GHFSStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
     logger.atFiner().log(
         "copyFromLocalFile(delSrc: %b, overwrite: %b, src: %s, dst: %s)",
         delSrc, overwrite, src, dst);
