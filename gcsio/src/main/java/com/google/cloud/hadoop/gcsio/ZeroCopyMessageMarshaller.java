@@ -130,13 +130,15 @@ class ZeroCopyMessageMarshaller<T extends MessageLite> implements PrototypeMarsh
     }
   }
 
-  // Application needs to call this function to get the stream for the message and
-  // call stream.close() function to return it to the pool.
+  /**
+   * Application needs to call this function to get the stream for the message and call
+   * stream.close() function to return it to the pool.
+   */
   public InputStream popStream(T message) {
     return unclosedStreams.remove(message);
   }
 
-  // Application needs to call stream.close() function to all streams returned.
+  /** Application needs to call stream.close() function to all streams returned. */
   public List<InputStream> popAllStreams() {
     ArrayList<InputStream> streams = new ArrayList<>(unclosedStreams.values());
     unclosedStreams.clear();
