@@ -25,4 +25,48 @@ public class TestInMemoryGoogleContractOpen extends AbstractContractOpenTest {
   protected AbstractFSContract createContract(Configuration conf) {
     return new InMemoryGoogleContract(conf);
   }
+
+  @Override
+  public void testChainedFailureAwaitFuture() throws Throwable {
+    // describe("await Future handles chained failures");
+    // CompletableFuture<FSDataInputStream> f = getFileSystem()
+    //     .openFile(path("testOpenFileUnknownOption"))
+    //     .build();
+    // intercept(RuntimeException.class,
+    //     "exceptionally",
+    //     () -> FutureIOSupport.awaitFuture(
+    //         f.exceptionally(ex -> {
+    //           throw new RuntimeException("exceptionally", ex);
+    //         })));
+  }
+  @Override
+  public void testOpenFileExceptionallyTranslating() throws Throwable {
+    // describe("openFile missing file chains into exceptionally()");
+    // CompletableFuture<FSDataInputStream> f = getFileSystem()
+    //     .openFile(path("testOpenFileUnknownOption")).build();
+    // interceptFuture(RuntimeException.class,
+    //     "exceptionally",
+    //     f.exceptionally(ex -> {
+    //       throw new RuntimeException("exceptionally", ex);
+    //     }));
+  }
+
+  @Override
+  public void testOpenFileLazyFail() throws Throwable {
+    // describe("openFile fails on a missing file in the get() and not before");
+    // FutureDataInputStreamBuilder builder =
+    //     getFileSystem().openFile(path("testOpenFileLazyFail"))
+    //         .opt("fs.test.something", true);
+    // interceptFuture(FileNotFoundException.class, "", builder.build());
+  }
+
+  @Override
+  public void testOpenFileFailExceptionally() throws Throwable {
+    // describe("openFile missing file chains into exceptionally()");
+    // FutureDataInputStreamBuilder builder =
+    //     getFileSystem().openFile(path("testOpenFileFailExceptionally"))
+    //         .opt("fs.test.something", true);
+    // assertNull("exceptional uprating",
+    //     builder.build().exceptionally(ex -> null).get());
+  }
 }

@@ -615,6 +615,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     }
     else{
       providedStatus = getFileStatus(path);
+//      LOG.debug("Ignoring file status");
     }
     Optional<FileStatus> ost=Optional.ofNullable(providedStatus);
     CompletableFuture<FSDataInputStream> result=new CompletableFuture<>();
