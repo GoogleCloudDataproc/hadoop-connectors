@@ -63,7 +63,7 @@ public class GoogleHadoopFileSystem extends GoogleHadoopFileSystemBase {
    * GoogleCloudStorageFileSystem; initialize() will not re-initialize it.
    */
   @VisibleForTesting
-  GoogleHadoopFileSystem(GoogleCloudStorageFileSystem gcsfs) {
+  public GoogleHadoopFileSystem(GoogleCloudStorageFileSystem gcsfs) {
     super(gcsfs);
   }
 

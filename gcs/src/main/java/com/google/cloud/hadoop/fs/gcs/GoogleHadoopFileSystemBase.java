@@ -876,7 +876,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     List<FileStatus> status;
 
     try {
-      List<FileInfo> fileInfos = getGcsFs().listFileInfo(gcsPath, LIST_OPTIONS);
+      List<FileInfo> fileInfos = getGcsFs().listFileInfo(this, gcsPath, LIST_OPTIONS);
       status = new ArrayList<>(fileInfos.size());
       String userName = getUgiUserName();
       for (FileInfo fileInfo : fileInfos) {
@@ -1910,7 +1910,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * @param operation The operation to increment
    * @throws IOException if the
    */
-  protected void entryPoint(GHFSStatistic operation) throws IOException {
+  public void entryPoint(GHFSStatistic operation) throws IOException {
     checkOpen();
     incrementStatistic(operation);
   }
