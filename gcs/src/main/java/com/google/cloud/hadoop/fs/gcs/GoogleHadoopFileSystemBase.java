@@ -282,7 +282,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   private FsPermission reportedPermissions;
 
 
-  public static GHFSInstrumentation instrumentation;
+  private static GHFSInstrumentation instrumentation;
   /**
    * GCS {@link FileChecksum} which takes constructor parameters to define the return values of the
    * various abstract methods of {@link FileChecksum}.
@@ -475,6 +475,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     instrumentation = new GHFSInstrumentation(path);
 
     configure(config);
+  }
+
+  public GHFSInstrumentation getInstrumentation(){
+    return this.instrumentation;
+  }
+
+  private void setInstrumentation(GHFSInstrumentation instrumentation){
+    this.instrumentation = instrumentation;
   }
 
   /**
