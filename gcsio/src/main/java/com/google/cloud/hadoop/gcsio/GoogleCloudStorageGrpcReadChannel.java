@@ -440,7 +440,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private int readObjectContentFromGCS(ByteBuffer byteBuffer) throws IOException {
     int bytesRead = 0;
-    while (moreServerContent() && byteBuffer.hasRemaining()) {
+    while (byteBuffer.hasRemaining() && moreServerContent()) {
       ReadObjectResponse res = resIterator.next();
 
       // When zero-copy mashaller is used, the stream that backs GetObjectMediaResponse
