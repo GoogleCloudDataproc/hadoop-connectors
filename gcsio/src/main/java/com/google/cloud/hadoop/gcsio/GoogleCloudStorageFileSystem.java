@@ -28,9 +28,6 @@ import static java.lang.Math.min;
 import static java.util.Comparator.comparing;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
-import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
-import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase;
-import com.google.cloud.hadoop.fs.gcs.GHFSStatistic;
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationDelete;
@@ -1004,53 +1001,7 @@ public class GoogleCloudStorageFileSystem {
    * @return Information about a file or children of a directory.
    * @throws FileNotFoundException if the given path does not exist.
    */
-  public List<FileInfo> listFileInfo(GoogleHadoopFileSystemBase ghfs, URI path, ListFileOptions listOptions) throws IOException {
-    Preconditions.checkNotNull(path, "path can not be null");
-    logger.atFiner().log("listFileInfo(path: %s)", path);
 
-    StorageResourceId pathId =
-            StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true);
-    StorageResourceId dirId = pathId.toDirectoryId();
-    ghfs.entryPoint(GHFSStatistic.INVOCATION_LIST_FILES);
-    Future<List<GoogleCloudStorageItemInfo>> dirItemInfosFuture =
-            (options.isStatusParallelEnabled() ? cachedExecutor : lazyExecutor)
-                    .submit(
-                            () ->
-                                    dirId.isRoot()
-                                            ? gcs.listBucketInfo()
-                                            : gcs.listObjectInfo(
-                                            dirId.getBucketName(),
-                                            dirId.getObjectName(),
-                                            updateListObjectOptions(LIST_FILE_INFO_LIST_OPTIONS, listOptions)));
-
-    if (!pathId.isDirectory()) {
-      try {
-        GoogleCloudStorageItemInfo pathInfo = gcs.getItemInfo(pathId);
-        if (pathInfo.exists()) {
-          List<FileInfo> listedInfo = new ArrayList<>();
-          listedInfo.add(FileInfo.fromItemInfo(pathInfo));
-          dirItemInfosFuture.cancel(/* mayInterruptIfRunning= */ true);
-          return listedInfo;
-        }
-      } catch (Exception e) {
-        dirItemInfosFuture.cancel(/* mayInterruptIfRunning= */ true);
-        throw e;
-      }
-    }
-
-    List<GoogleCloudStorageItemInfo> dirItemInfos = getFromFuture(dirItemInfosFuture);
-    if (pathId.isStorageObject() && dirItemInfos.isEmpty()) {
-      throw new FileNotFoundException("Item not found: " + path);
-    }
-
-    if (!dirItemInfos.isEmpty() && Objects.equals(dirItemInfos.get(0).getResourceId(), dirId)) {
-      dirItemInfos.remove(0);
-    }
-
-    List<FileInfo> fileInfos = FileInfo.fromItemInfos(dirItemInfos);
-    fileInfos.sort(FILE_INFO_PATH_COMPARATOR);
-    return fileInfos;
-  }
 
   public List<FileInfo> listFileInfo(URI path, ListFileOptions listOptions) throws IOException {
     Preconditions.checkNotNull(path, "path can not be null");
