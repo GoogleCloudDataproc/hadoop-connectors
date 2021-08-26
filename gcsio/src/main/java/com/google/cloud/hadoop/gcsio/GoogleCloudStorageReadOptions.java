@@ -48,6 +48,7 @@ public abstract class GoogleCloudStorageReadOptions {
   public static final boolean GRPC_CHECKSUMS_ENABLED_DEFAULT = false;
   public static final long DEFAULT_GRPC_READ_TIMEOUT_MILLIS = 20 * 60 * 1000;
   public static final long DEFAULT_GRPC_READ_METADATA_TIMEOUT_MILLIS = 60 * 1000;
+  public static final boolean DEFAULT_GRPC_READ_ZEROCOPY_ENABLED = true;
 
   // Default builder should be initialized after default values,
   // otherwise it will access not initialized default values.
@@ -67,7 +68,8 @@ public abstract class GoogleCloudStorageReadOptions {
         .setMinRangeRequestSize(DEFAULT_MIN_RANGE_REQUEST_SIZE)
         .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT)
         .setGrpcReadTimeoutMillis(DEFAULT_GRPC_READ_TIMEOUT_MILLIS)
-        .setGrpcReadMetadataTimeoutMillis(DEFAULT_GRPC_READ_METADATA_TIMEOUT_MILLIS);
+        .setGrpcReadMetadataTimeoutMillis(DEFAULT_GRPC_READ_METADATA_TIMEOUT_MILLIS)
+        .setGrpcReadZeroCopyEnabled(DEFAULT_GRPC_READ_ZEROCOPY_ENABLED);
   }
 
   public abstract Builder toBuilder();
@@ -114,6 +116,9 @@ public abstract class GoogleCloudStorageReadOptions {
 
   /** See {@link Builder#setGrpcReadMetadataTimeoutMillis}. */
   public abstract long getGrpcReadMetadataTimeoutMillis();
+
+  /** See {@link Builder#setGrpcReadZeroCopyEnabled}. */
+  public abstract boolean isGrpcReadZeroCopyEnabled();
 
   /** Mutable builder for GoogleCloudStorageReadOptions. */
   @AutoValue.Builder
@@ -212,6 +217,9 @@ public abstract class GoogleCloudStorageReadOptions {
 
     /** Sets the property to override the default timeout for GCS metadata reads from gRPC. */
     public abstract Builder setGrpcReadMetadataTimeoutMillis(long grpcReadMetadataTimeoutMillis);
+
+    /** Sets the property to use the zero-copy deserializer for gRPC read. */
+    public abstract Builder setGrpcReadZeroCopyEnabled(boolean grpcReadZeroCopyEnabled);
 
     abstract GoogleCloudStorageReadOptions autoBuild();
 

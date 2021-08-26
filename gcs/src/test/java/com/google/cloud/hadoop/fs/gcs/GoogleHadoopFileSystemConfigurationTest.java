@@ -75,13 +75,14 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.create.items.conflict.check.enable", true);
           put("fs.gs.delegation.token.binding", null);
           put("fs.gs.encryption.algorithm", null);
-          put("fs.gs.encryption.key", null);
           put("fs.gs.encryption.key.hash", null);
+          put("fs.gs.encryption.key", null);
           put("fs.gs.glob.algorithm", GlobAlgorithm.CONCURRENT);
           put("fs.gs.grpc.checksums.enable", false);
           put("fs.gs.grpc.enable", false);
-          put("fs.gs.grpc.read.timeout.ms", 20 * 60 * 1000L);
           put("fs.gs.grpc.read.metadata.timeout.ms", 60 * 1000L);
+          put("fs.gs.grpc.read.timeout.ms", 20 * 60 * 1000L);
+          put("fs.gs.grpc.read.zerocopy.enable", true);
           put("fs.gs.grpc.server.address", null);
           put("fs.gs.grpc.write.buffered.requests", 20L);
           put("fs.gs.grpc.write.timeout.ms", 10 * 60 * 1000L);
@@ -338,18 +339,18 @@ public class GoogleHadoopFileSystemConfigurationTest {
     config.set(GCS_GRPC_READ_TIMEOUT_MS.getKey(), String.valueOf(grpcReadTimeout));
     config.set(GCS_GRPC_READ_METADATA_TIMEOUT_MS.getKey(), String.valueOf(grpcReadMetadataTimeout));
     config.set(GCS_GRPC_WRITE_TIMEOUT_MS.getKey(), String.valueOf(grpcWriteTimeout));
-    config.set(GCS_GRPC_UPLOAD_BUFFERED_REQUESTS.getKey(),
-        String.valueOf(grpcUploadBufferedRequests));
+    config.set(
+        GCS_GRPC_UPLOAD_BUFFERED_REQUESTS.getKey(), String.valueOf(grpcUploadBufferedRequests));
 
     GoogleCloudStorageOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
 
     assertThat(options.getReadChannelOptions().getGrpcReadTimeoutMillis())
         .isEqualTo(grpcReadTimeout);
-    assertThat(options.getReadChannelOptions().getGrpcReadMetadataTimeoutMillis()).isEqualTo(
-        grpcReadMetadataTimeout);
+    assertThat(options.getReadChannelOptions().getGrpcReadMetadataTimeoutMillis())
+        .isEqualTo(grpcReadMetadataTimeout);
     assertThat(options.getWriteChannelOptions().getGrpcWriteTimeout()).isEqualTo(grpcWriteTimeout);
-    assertThat(options.getWriteChannelOptions().getNumberOfBufferedRequests()).isEqualTo(
-        grpcUploadBufferedRequests);
+    assertThat(options.getWriteChannelOptions().getNumberOfBufferedRequests())
+        .isEqualTo(grpcUploadBufferedRequests);
   }
 }
