@@ -33,11 +33,11 @@ import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.hash.Hashing;
-import com.google.google.storage.v1.GetObjectMediaRequest;
-import com.google.google.storage.v1.GetObjectMediaResponse;
-import com.google.google.storage.v1.StorageGrpc;
-import com.google.google.storage.v1.StorageGrpc.StorageBlockingStub;
 import com.google.protobuf.ByteString;
+import com.google.storage.v2.ReadObjectRequest;
+import com.google.storage.v2.ReadObjectResponse;
+import com.google.storage.v2.StorageGrpc;
+import com.google.storage.v2.StorageGrpc.StorageBlockingStub;
 import io.grpc.Context;
 import io.grpc.Context.CancellableContext;
 import io.grpc.MethodDescriptor;
@@ -60,10 +60,10 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   // ZeroCopy version of GetObjectMedia Method
   private static final ZeroCopyMessageMarshaller getObjectMediaResponseMarshaller =
-      new ZeroCopyMessageMarshaller(GetObjectMediaResponse.getDefaultInstance());
-  private static final MethodDescriptor<GetObjectMediaRequest, GetObjectMediaResponse>
+      new ZeroCopyMessageMarshaller(ReadObjectResponse.getDefaultInstance());
+  private static final MethodDescriptor<ReadObjectRequest, ReadObjectResponse>
       getObjectMediaMethod =
-          StorageGrpc.getGetObjectMediaMethod()
+          StorageGrpc.getReadObjectMethod()
               .toBuilder()
               .setResponseMarshaller(getObjectMediaResponseMarshaller)
               .build();
@@ -104,7 +104,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   @Nullable private InputStream streamForBufferedContent = null;
 
   // The streaming read operation. If null, there is not an in-flight read in progress.
-  @Nullable private Iterator<GetObjectMediaResponse> resIterator = null;
+  @Nullable private Iterator<ReadObjectResponse> resIterator = null;
 
   // Fine-grained options.
   private final GoogleCloudStorageReadOptions readOptions;
@@ -256,20 +256,20 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       long footerOffset)
       throws IOException {
     try {
-      Iterator<GetObjectMediaResponse> footerContentResponse =
+      Iterator<ReadObjectResponse> footerContentResponse =
           stub.withDeadlineAfter(readOptions.getGrpcReadTimeoutMillis(), MILLISECONDS)
-              .getObjectMedia(
-                  GetObjectMediaRequest.newBuilder()
+              .readObject(
+                  ReadObjectRequest.newBuilder()
                       .setReadOffset(footerOffset)
-                      .setBucket(resourceId.getBucketName())
+                      .setBucket(GrpcChannelUtils.toV2BucketName(resourceId.getBucketName()))
                       .setObject(resourceId.getObjectName())
                       .build());
 
       ByteString footerContent = null;
       while (footerContentResponse.hasNext()) {
-        GetObjectMediaResponse objectMediaResponse = footerContentResponse.next();
-        if (objectMediaResponse.hasChecksummedData()) {
-          ByteString content = objectMediaResponse.getChecksummedData().getContent();
+        ReadObjectResponse readObjectResponse = footerContentResponse.next();
+        if (readObjectResponse.hasChecksummedData()) {
+          ByteString content = readObjectResponse.getChecksummedData().getContent();
           if (footerContent == null) {
             footerContent = content;
           } else {
@@ -438,8 +438,9 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private int readObjectContentFromGCS(ByteBuffer byteBuffer) throws IOException {
     int bytesRead = 0;
-    while (moreServerContent() && byteBuffer.hasRemaining()) {
-      GetObjectMediaResponse res = resIterator.next();
+    while (byteBuffer.hasRemaining() && moreServerContent()) {
+      ReadObjectResponse res = resIterator.next();
+
       // When zero-copy mashaller is used, the stream that backs GetObjectMediaResponse
       // should be closed when the mssage is no longed needed so that all buffers in the
       // stream can be reclaimed. If zero-copy is not used, stream will be null.
@@ -484,11 +485,11 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     return bytesRead;
   }
 
-  private void validateChecksum(GetObjectMediaResponse res) throws IOException {
+  private void validateChecksum(ReadObjectResponse res) throws IOException {
     // TODO: Concatenate all these hashes together and compare the result at the end.
     int calculatedChecksum =
         Hashing.crc32c().hashBytes(res.getChecksummedData().getContent().toByteArray()).asInt();
-    int expectedChecksum = res.getChecksummedData().getCrc32C().getValue();
+    int expectedChecksum = res.getChecksummedData().getCrc32C();
     if (calculatedChecksum != expectedChecksum) {
       throw new IOException(
           String.format(
@@ -534,14 +535,14 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   }
 
   private void requestObjectMedia(OptionalLong bytesToRead) throws IOException {
-    GetObjectMediaRequest.Builder requestBuilder =
-        GetObjectMediaRequest.newBuilder()
-            .setBucket(resourceId.getBucketName())
+    ReadObjectRequest.Builder requestBuilder =
+        ReadObjectRequest.newBuilder()
+            .setBucket(GrpcChannelUtils.toV2BucketName(resourceId.getBucketName()))
             .setObject(resourceId.getObjectName())
             .setGeneration(objectGeneration)
             .setReadOffset(positionInGrpcStream);
     bytesToRead.ifPresent(requestBuilder::setReadLimit);
-    GetObjectMediaRequest request = requestBuilder.build();
+    ReadObjectRequest request = requestBuilder.build();
     try {
       ResilientOperation.retry(
           () -> {
@@ -559,7 +560,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
                           blockingStub.getCallOptions(),
                           request);
                 } else {
-                  resIterator = blockingStub.getObjectMedia(request);
+                  resIterator = blockingStub.readObject(request);
                 }
               } finally {
                 requestContext.detach(toReattach);
@@ -641,9 +642,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       throw new ClosedChannelException();
     }
     // Our real position is tracked in "positionInGrpcStream," but if the user is skipping
-    // forwards
-    // a bit, we
-    // pretend we're at the new position already.
+    // forwards a bit, we pretend we're at the new position already.
     return positionInGrpcStream + bytesToSkipBeforeReading;
   }
 

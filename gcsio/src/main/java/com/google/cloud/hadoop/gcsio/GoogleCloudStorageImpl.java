@@ -22,6 +22,7 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInf
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Strings.emptyToNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static java.lang.Math.toIntExact;
@@ -1490,7 +1491,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
 
     Storage.Objects.List listObject =
-        initializeRequest(storage.objects().list(bucketName), bucketName);
+        initializeRequest(
+            storage.objects().list(bucketName).setPrefix(emptyToNull(objectNamePrefix)),
+            bucketName);
 
     // Set delimiter if supplied.
     if (delimiter != null) {
@@ -1503,11 +1506,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         maxResults <= 0 || maxResults >= storageOptions.getMaxListItemsPerCall()
             ? storageOptions.getMaxListItemsPerCall()
             : maxResults);
-
-    // Set prefix if supplied.
-    if (!isNullOrEmpty(objectNamePrefix)) {
-      listObject.setPrefix(objectNamePrefix);
-    }
 
     // Request only fields used in GoogleCloudStorageItemInfo:
     // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
@@ -2211,13 +2209,27 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     return compositeInfo;
   }
 
+  /**
+   * Initialize HTTP request.
+   *
+   * <p>Initialize the storage access requests. Since access request authorization are done here and
+   * right before sending out the HTTP requests, the passed in storage requests should contain as
+   * much information as possible. Callers shouldn't modify storage request content like bucket and
+   * object path after calling this function.
+   *
+   * @param request the storage request to be initialized before send out
+   * @param bucketName the bucket name the storage request accesses
+   * @return the initialized storage request.
+   * @throws IOException
+   */
   @VisibleForTesting
   <RequestT extends StorageRequest<?>> RequestT initializeRequest(
       RequestT request, String bucketName) throws IOException {
     if (downscopedAccessTokenFn != null) {
       List<AccessBoundary> accessBoundaries =
           StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
-      request.setOauthToken(downscopedAccessTokenFn.apply(accessBoundaries));
+      String token = downscopedAccessTokenFn.apply(accessBoundaries);
+      request.getRequestHeaders().setAuthorization("Bearer " + token);
     }
     if (storageRequestAuthorizer != null) {
       storageRequestAuthorizer.authorize(request);
