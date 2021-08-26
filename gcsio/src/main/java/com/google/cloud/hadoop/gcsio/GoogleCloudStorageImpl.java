@@ -783,6 +783,49 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     };
   }
 
+  public SeekableByteChannel open(
+          final GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
+          throws IOException {
+    logger.atFiner().log("open(%s, %s)", itemInfo.getResourceId(), readOptions);
+    Preconditions.checkArgument(
+            itemInfo.getResourceId().isStorageObject(), "Expected full StorageObject id, got %s", itemInfo.getResourceId());
+
+    if (storageOptions.isGrpcEnabled()) {
+      return GoogleCloudStorageGrpcReadChannel
+              .open(storageStubProvider, storage, errorExtractor, itemInfo, readOptions);
+    }
+
+    // The underlying channel doesn't initially read data, which means that we won't see a
+    // FileNotFoundException until read is called. As a result, in order to find out if the object
+    // exists, we'll need to do an RPC (metadata or data). A metadata check should be a less
+    // expensive operation than a read data operation.
+//    GoogleCloudStorageItemInfo info;
+    if (readOptions.getFastFailOnNotFound()) {
+      if (!itemInfo.exists()) {
+        throw createFileNotFoundException(
+                itemInfo.getResourceId().getBucketName(), itemInfo.getResourceId().getObjectName(), /* cause= */ null);
+      }
+    }
+//     else {
+//      itemInfo = null;
+//    }
+
+    return new GoogleCloudStorageReadChannel(
+            storage, itemInfo, errorExtractor, clientRequestHelper, readOptions) {
+
+      @Override
+      @Nullable
+      protected GoogleCloudStorageItemInfo getInitialMetadata() {
+        return itemInfo;
+      }
+
+      @Override
+      protected Storage.Objects.Get createRequest() throws IOException {
+        return initializeRequest(super.createRequest(), itemInfo.getBucketName());
+      }
+    };
+  }
+
   /** See {@link GoogleCloudStorage#deleteBuckets(List)} for details about expected behavior. */
   @Override
   public void deleteBuckets(List<String> bucketNames) throws IOException {

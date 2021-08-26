@@ -97,6 +97,13 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
+  public SeekableByteChannel open(
+          GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions) throws IOException {
+    logger.atFiner().log("%s.open(%s, %s)", delegateClassName, itemInfo.getResourceId(), readOptions);
+    return delegate.open(itemInfo, readOptions);
+  }
+
+  @Override
   public void deleteBuckets(List<String> bucketNames) throws IOException {
     logger.atFiner().log("%s.deleteBuckets(%s)", delegateClassName, bucketNames);
     delegate.deleteBuckets(bucketNames);

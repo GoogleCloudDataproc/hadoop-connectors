@@ -299,6 +299,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   private FsPermission reportedPermissions;
   //Bhagyaa-s
   private ThreadPoolExecutor unboundedThreadPool;
+  private GoogleCloudStorageItemInfo itemInfo;
   //Bhagyaa-e
   /**
    * GCS {@link FileChecksum} which takes constructor parameters to define the return values of the
@@ -609,18 +610,27 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     Configuration options=parameters.getOptions();
     Set<String> mandatoryKeys=parameters.getMandatoryKeys();
     AbstractFSBuilderImpl.rejectUnknownMandatoryKeys(mandatoryKeys,Collections.emptySet(),"for "+path);
-    FileStatus providedStatus=parameters.getStatus();
-    if(providedStatus!=null){
-      checkArgument(path.equals(providedStatus.getPath()),"FileStatus parameter is not for the path %s: %s",path,providedStatus);
-    }
-    else{
-      providedStatus = getFileStatus(path);
-//      LOG.debug("Ignoring file status");
-    }
-    Optional<FileStatus> ost=Optional.ofNullable(providedStatus);
+    StorageResourceId storageResourceId = StorageResourceId.fromUriPath(rawPath.toUri(),false);
+    itemInfo = this.getGcsFs().getGcs().getItemInfo(storageResourceId);
+    LOG.debug("Ignoring file status");
     CompletableFuture<FSDataInputStream> result=new CompletableFuture<>();
-    unboundedThreadPool.submit(()->LambdaUtils.eval(result,()->open(path,parameters.getBufferSize())));
+    unboundedThreadPool.submit(()->LambdaUtils.eval(result,()->open(itemInfo,path,parameters.getBufferSize())));
     return result;
+  }
+
+  public FSDataInputStream open(GoogleCloudStorageItemInfo itemInfo, Path hadoopPath, int bufferSize) throws IOException {
+    checkArgument(hadoopPath != null, "hadoopPath must not be null");
+
+    checkOpen();
+
+    logger.atFiner().log("open(hadoopPath: %s, bufferSize: %d [ignored])", hadoopPath, bufferSize);
+    URI gcsPath = getGcsPath(hadoopPath);
+    GoogleCloudStorageReadOptions readChannelOptions =
+            getGcsFs().getOptions().getCloudStorageOptions().getReadChannelOptions();
+    GoogleHadoopFSInputStream in =
+            new GoogleHadoopFSInputStream(this, gcsPath, itemInfo, readChannelOptions, statistics);
+
+    return new FSDataInputStream(in);
   }
   /**Bhagyaa-e**/
   /**

@@ -134,6 +134,17 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         stubProvider, storage, errorExtractor, resourceId, readOptions, BackOffFactory.DEFAULT);
   }
 
+  public static GoogleCloudStorageGrpcReadChannel open(
+          StorageStubProvider stubProvider,
+          Storage storage,
+          ApiErrorExtractor errorExtractor,
+          GoogleCloudStorageItemInfo itemInfo,
+          GoogleCloudStorageReadOptions readOptions)
+          throws IOException {
+    return open(stubProvider, storage, errorExtractor, itemInfo, readOptions,
+            BackOffFactory.DEFAULT);
+  }
+
   @VisibleForTesting
   static GoogleCloudStorageGrpcReadChannel open(
       StorageStubProvider stubProvider,
@@ -157,6 +168,29 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
           IOException.class);
     } catch (Exception e) {
       throw new IOException(String.format("Error reading '%s'", resourceId), e);
+    }
+  }
+
+  static GoogleCloudStorageGrpcReadChannel open(
+          StorageStubProvider stubProvider,
+          Storage storage,
+          ApiErrorExtractor errorExtractor,
+          GoogleCloudStorageItemInfo itemInfo,
+          GoogleCloudStorageReadOptions readOptions,
+          BackOffFactory backOffFactory)
+          throws IOException {
+    // The gRPC API's GetObjectMedia call does not provide a generation number, so to ensure
+    // consistent reads, we need to begin by checking the current generation number with a separate
+    // call.
+    try {
+      return ResilientOperation.retry(
+              () -> openChannel(stubProvider, storage, errorExtractor, itemInfo, readOptions,
+                      backOffFactory),
+              backOffFactory.newBackOff(),
+              RetryDeterminer.ALL_ERRORS,
+              IOException.class);
+    } catch (Exception e) {
+      throw new IOException(String.format("Error reading '%s'", itemInfo.getResourceId()), e);
     }
   }
 
@@ -199,6 +233,46 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         footerContent,
         readOptions,
         backOffFactory);
+  }
+
+  private static GoogleCloudStorageGrpcReadChannel openChannel(
+          StorageStubProvider stubProvider,
+          Storage storage,
+          ApiErrorExtractor errorExtractor,
+          GoogleCloudStorageItemInfo itemInfo,
+          GoogleCloudStorageReadOptions readOptions,
+          BackOffFactory backOffFactory) throws IOException {
+    StorageBlockingStub stub = stubProvider.newBlockingStub();
+    // TODO(b/135138893): We can avoid this call by adding metadata to a read request.
+    //      That will save about 40ms per read.
+    Preconditions.checkArgument(storage != null, "GCS json client cannot be null");
+//    GoogleCloudStorageItemInfo itemInfo = getObjectMetadata(resourceId,
+//            errorExtractor, backOffFactory, storage);
+    Preconditions.checkArgument(itemInfo != null, "object metadata cannot be null");
+    // The non-gRPC read channel has special support for gzip. This channel doesn't
+    // decompress gzip-encoded objects on the fly, so best to fail fast rather than return
+    // gibberish unexpectedly.
+    String contentEncoding = itemInfo.getContentEncoding();
+    if (contentEncoding != null && contentEncoding.contains("gzip")) {
+      throw new IOException(
+              "Cannot read GZIP encoded files - content encoding support is disabled.");
+    }
+
+    int prefetchSizeInBytes = readOptions.getMinRangeRequestSize() / 2;
+    long footerOffsetInBytes = Math.max(0, (itemInfo.getSize() - prefetchSizeInBytes));
+
+    ByteString footerContent = getFooterContent(itemInfo.getResourceId(), readOptions, stub, footerOffsetInBytes);
+
+    return new GoogleCloudStorageGrpcReadChannel(
+            stub,
+            stubProvider,
+            itemInfo.getResourceId(),
+            itemInfo.getContentGeneration(),
+            itemInfo.getSize(),
+            footerOffsetInBytes,
+            footerContent,
+            readOptions,
+            backOffFactory);
   }
 
   private static GoogleCloudStorageItemInfo getObjectMetadata(

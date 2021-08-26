@@ -140,6 +140,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   // Whether object content is gzip-encoded.
   private boolean gzipEncoded = false;
 
+  private GoogleCloudStorageItemInfo itemInfo;
   // Prefetched footer content.
   // TODO(b/110832992):
   // 1. Test showing footer prefetch avoids another request to GCS.
@@ -176,6 +177,26 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     GoogleCloudStorageItemInfo info = getInitialMetadata();
     if (info != null) {
       initMetadata(info);
+    }
+  }
+
+  public GoogleCloudStorageReadChannel(
+          Storage gcs,
+          GoogleCloudStorageItemInfo itemInfo,
+          ApiErrorExtractor errorExtractor,
+          ClientRequestHelper<StorageObject> requestHelper,
+          @Nonnull GoogleCloudStorageReadOptions readOptions)
+          throws IOException {
+    this.gcs = gcs;
+    this.clientRequestHelper = requestHelper;
+    this.errorExtractor = errorExtractor;
+    this.readOptions = readOptions;
+    this.resourceId = itemInfo.getResourceId();
+    this.itemInfo = itemInfo;
+    // Initialize metadata if available.
+//    GoogleCloudStorageItemInfo info = getInitialMetadata();
+    if (itemInfo != null) {
+      initMetadata(itemInfo);
     }
   }
 

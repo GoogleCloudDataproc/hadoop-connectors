@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
@@ -48,6 +49,8 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   // Used for single-byte reads.
   private final byte[] singleReadBuf = new byte[1];
 
+  private GoogleCloudStorageItemInfo itemInfo;
+
   /**
    * Constructs an instance of GoogleHadoopFSInputStream object.
    *
@@ -68,6 +71,22 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     this.statistics = statistics;
     this.totalBytesRead = 0;
     this.channel = ghfs.getGcsFs().open(gcsPath, readOptions);
+  }
+
+  GoogleHadoopFSInputStream(
+          GoogleHadoopFileSystemBase ghfs,
+          URI gcsPath,
+          GoogleCloudStorageItemInfo itemInfo,
+          GoogleCloudStorageReadOptions readOptions,
+          FileSystem.Statistics statistics)
+          throws IOException {
+    logger.atFiner().log(
+            "GoogleHadoopFSInputStream(gcsPath: %s, readOptions: %s)", gcsPath, readOptions);
+    this.gcsPath = gcsPath;
+    this.statistics = statistics;
+    this.totalBytesRead = 0;
+    this.itemInfo = itemInfo;
+    this.channel = ghfs.getGcsFs().open(itemInfo, readOptions);
   }
 
   /**

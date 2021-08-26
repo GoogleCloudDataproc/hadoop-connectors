@@ -262,6 +262,74 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
+  public SeekableByteChannel open(
+      GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions) throws IOException {
+    if (!itemInfo.exists()) {
+      IOException notFoundException =
+          createFileNotFoundException(
+              itemInfo.getBucketName(), itemInfo.getObjectName(), /* cause= */ null);
+
+      if (readOptions.getFastFailOnNotFound()) {
+        throw notFoundException;
+      }
+
+      // We'll need to simulate a lazy-evaluating byte channel which only detects nonexistence
+      // on size() and read(ByteBuffer) calls.
+      return new SeekableByteChannel() {
+        private long position = 0;
+        private boolean isOpen = true;
+
+        @Override
+        public long position() {
+          return position;
+        }
+
+        @Override
+        public SeekableByteChannel position(long newPosition) {
+          position = newPosition;
+          return this;
+        }
+
+        @Override
+        public int read(ByteBuffer dst) throws IOException {
+          throw notFoundException;
+        }
+
+        @Override
+        public long size() throws IOException {
+          throw notFoundException;
+        }
+
+        @Override
+        public SeekableByteChannel truncate(long size) {
+          throw new UnsupportedOperationException("Cannot mutate read-only channel");
+        }
+
+        @Override
+        public int write(ByteBuffer src) throws IOException {
+          throw new UnsupportedOperationException("Cannot mutate read-only channel");
+        }
+
+        @Override
+        public void close() {
+          isOpen = false;
+        }
+
+        @Override
+        public boolean isOpen() {
+          return isOpen;
+        }
+      };
+    }
+
+    return bucketLookup
+        .get(itemInfo.getBucketName())
+        .get(itemInfo.getObjectName())
+        .getReadChannel(itemInfo.getBucketName(), itemInfo.getObjectName(), readOptions);
+  }
+
+
+  @Override
   public synchronized void deleteBuckets(List<String> bucketNames) throws IOException {
     boolean hasError = false;
     for (String bucketName : bucketNames) {

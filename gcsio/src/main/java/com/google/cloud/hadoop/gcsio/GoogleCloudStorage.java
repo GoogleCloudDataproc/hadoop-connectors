@@ -168,6 +168,8 @@ public interface GoogleCloudStorage {
   SeekableByteChannel open(StorageResourceId resourceId, GoogleCloudStorageReadOptions readOptions)
       throws IOException;
 
+  SeekableByteChannel open(GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
+          throws IOException;
   /**
    * Deletes a list of buckets. Does not throw any exception for "bucket not found" errors.
    *

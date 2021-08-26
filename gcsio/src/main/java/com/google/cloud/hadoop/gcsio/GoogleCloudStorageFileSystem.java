@@ -332,6 +332,17 @@ public class GoogleCloudStorageFileSystem {
     return gcs.open(resourceId, readOptions);
   }
 
+  public SeekableByteChannel open(GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
+          throws IOException {
+    logger.atFiner().log("open(path: %s, readOptions: %s)", itemInfo, readOptions);
+    Preconditions.checkNotNull(UriPaths.fromResourceId(itemInfo.getResourceId(),false), "path should not be null");
+//    StorageResourceId resourceId =
+//            StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ false);
+    checkArgument(!itemInfo.isDirectory(), "Cannot open a directory for reading: %s", FileInfo.fromItemInfo(itemInfo).getPath());
+
+    return gcs.open(itemInfo, readOptions);
+  }
+
   /**
    * Deletes one or more items indicated by the given path.
    *
