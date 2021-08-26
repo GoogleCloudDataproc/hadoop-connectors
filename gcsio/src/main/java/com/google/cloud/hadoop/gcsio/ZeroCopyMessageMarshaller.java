@@ -79,32 +79,38 @@ class ZeroCopyMessageMarshaller<T extends MessageLite> implements PrototypeMarsh
           && ((HasByteBuffer) stream).byteBufferSupported()) {
         int size = stream.available();
         // Stream is now detached here and should be closed later.
-        stream = ((Detachable) stream).detach();
-        // This mark call is to keep buffer while traversing buffers using skip.
-        stream.mark(size);
-        List<ByteString> byteStrings = new ArrayList<>();
-        while (stream.available() != 0) {
-          ByteBuffer buffer = ((HasByteBuffer) stream).getByteBuffer();
-          byteStrings.add(UnsafeByteOperations.unsafeWrap(buffer));
-          stream.skip(buffer.remaining());
-        }
-        stream.reset();
-        CodedInputStream codedInputStream = ByteString.copyFrom(byteStrings).newCodedInput();
-        codedInputStream.enableAliasing(true);
-        codedInputStream.setSizeLimit(Integer.MAX_VALUE);
-        // fast path (no memory copy)
-        T message;
+        InputStream detachedStream = ((Detachable) stream).detach();
         try {
-          message = parseFrom(codedInputStream);
-        } catch (InvalidProtocolBufferException ipbe) {
-          stream.close();
-          throw Status.INTERNAL
-              .withDescription("Invalid protobuf byte sequence")
-              .withCause(ipbe)
-              .asRuntimeException();
+          // This mark call is to keep buffer while traversing buffers using skip.
+          detachedStream.mark(size);
+          List<ByteString> byteStrings = new ArrayList<>();
+          while (detachedStream.available() != 0) {
+            ByteBuffer buffer = ((HasByteBuffer) detachedStream).getByteBuffer();
+            byteStrings.add(UnsafeByteOperations.unsafeWrap(buffer));
+            detachedStream.skip(buffer.remaining());
+          }
+          detachedStream.reset();
+          CodedInputStream codedInputStream = ByteString.copyFrom(byteStrings).newCodedInput();
+          codedInputStream.enableAliasing(true);
+          codedInputStream.setSizeLimit(Integer.MAX_VALUE);
+          // fast path (no memory copy)
+          T message;
+          try {
+            message = parseFrom(codedInputStream);
+          } catch (InvalidProtocolBufferException ipbe) {
+            throw Status.INTERNAL
+                .withDescription("Invalid protobuf byte sequence")
+                .withCause(ipbe)
+                .asRuntimeException();
+          }
+          unclosedStreams.put(message, detachedStream);
+          detachedStream = null;
+          return message;
+        } finally {
+          if (detachedStream != null) {
+            detachedStream.close();
+          }
         }
-        unclosedStreams.put(message, stream);
-        return message;
       }
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -124,9 +130,18 @@ class ZeroCopyMessageMarshaller<T extends MessageLite> implements PrototypeMarsh
     }
   }
 
-  // Application needs to call this function to get the stream for the message and
-  // call stream.close() function to return it to the pool.
+  /**
+   * Application needs to call this function to get the stream for the message and call
+   * stream.close() function to return it to the pool.
+   */
   public InputStream popStream(T message) {
     return unclosedStreams.remove(message);
+  }
+
+  /** Application needs to call stream.close() function to all streams returned. */
+  public List<InputStream> popAllStreams() {
+    ArrayList<InputStream> streams = new ArrayList<>(unclosedStreams.values());
+    unclosedStreams.clear();
+    return streams;
   }
 }

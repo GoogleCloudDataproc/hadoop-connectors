@@ -50,6 +50,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.util.Iterator;
+import java.util.List;
 import java.util.OptionalLong;
 import javax.annotation.Nullable;
 
@@ -59,15 +60,14 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   protected static final String METADATA_FIELDS = "contentEncoding,generation,size";
 
   // ZeroCopy version of GetObjectMedia Method
-  private static final ZeroCopyMessageMarshaller getObjectMediaResponseMarshaller =
+  private final ZeroCopyMessageMarshaller getObjectMediaResponseMarshaller =
       new ZeroCopyMessageMarshaller(ReadObjectResponse.getDefaultInstance());
-  private static final MethodDescriptor<ReadObjectRequest, ReadObjectResponse>
-      getObjectMediaMethod =
-          StorageGrpc.getReadObjectMethod()
-              .toBuilder()
-              .setResponseMarshaller(getObjectMediaResponseMarshaller)
-              .build();
-  private static final boolean useZeroCopyMarshaller = ZeroCopyReadinessChecker.isReady();
+  private final MethodDescriptor<ReadObjectRequest, ReadObjectResponse> getObjectMediaMethod =
+      StorageGrpc.getReadObjectMethod()
+          .toBuilder()
+          .setResponseMarshaller(getObjectMediaResponseMarshaller)
+          .build();
+  private final boolean useZeroCopyMarshaller;
 
   private volatile StorageBlockingStub stub;
 
@@ -299,6 +299,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       ByteString footerContent,
       GoogleCloudStorageReadOptions readOptions,
       BackOffFactory backOffFactory) {
+    this.useZeroCopyMarshaller =
+        ZeroCopyReadinessChecker.isReady() && readOptions.isGrpcReadZeroCopyEnabled();
     this.stub = gcsGrpcBlockingStub;
     this.stubProvider = stubProvider;
     this.resourceId = resourceId;
@@ -445,38 +447,38 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       // should be closed when the mssage is no longed needed so that all buffers in the
       // stream can be reclaimed. If zero-copy is not used, stream will be null.
       InputStream stream = getObjectMediaResponseMarshaller.popStream(res);
-      ByteString content = res.getChecksummedData().getContent();
-      if (bytesToSkipBeforeReading >= 0 && bytesToSkipBeforeReading < content.size()) {
-        content = res.getChecksummedData().getContent().substring((int) bytesToSkipBeforeReading);
-        positionInGrpcStream += bytesToSkipBeforeReading;
-        bytesToSkipBeforeReading = 0;
-      } else if (bytesToSkipBeforeReading >= content.size()) {
-        positionInGrpcStream += content.size();
-        bytesToSkipBeforeReading -= content.size();
-        if (stream != null) {
-          stream.close();
+      try {
+        ByteString content = res.getChecksummedData().getContent();
+        if (bytesToSkipBeforeReading >= 0 && bytesToSkipBeforeReading < content.size()) {
+          content = res.getChecksummedData().getContent().substring((int) bytesToSkipBeforeReading);
+          positionInGrpcStream += bytesToSkipBeforeReading;
+          bytesToSkipBeforeReading = 0;
+        } else if (bytesToSkipBeforeReading >= content.size()) {
+          positionInGrpcStream += content.size();
+          bytesToSkipBeforeReading -= content.size();
+          continue;
         }
-        continue;
-      }
 
-      if (readOptions.isGrpcChecksumsEnabled() && res.getChecksummedData().hasCrc32C()) {
-        validateChecksum(res);
-      }
+        if (readOptions.isGrpcChecksumsEnabled() && res.getChecksummedData().hasCrc32C()) {
+          validateChecksum(res);
+        }
 
-      boolean responseSizeLargerThanRemainingBuffer = content.size() > byteBuffer.remaining();
-      int bytesToWrite =
-          responseSizeLargerThanRemainingBuffer ? byteBuffer.remaining() : content.size();
-      put(content, 0, bytesToWrite, byteBuffer);
-      bytesRead += bytesToWrite;
-      positionInGrpcStream += bytesToWrite;
+        boolean responseSizeLargerThanRemainingBuffer = content.size() > byteBuffer.remaining();
+        int bytesToWrite =
+            responseSizeLargerThanRemainingBuffer ? byteBuffer.remaining() : content.size();
+        put(content, 0, bytesToWrite, byteBuffer);
+        bytesRead += bytesToWrite;
+        positionInGrpcStream += bytesToWrite;
 
-      if (responseSizeLargerThanRemainingBuffer) {
-        invalidateBufferedContent();
-        bufferedContent = content;
-        bufferedContentReadOffset = bytesToWrite;
-        // This is to keep the stream alive for the message backed by this.
-        streamForBufferedContent = stream;
-      } else {
+        if (responseSizeLargerThanRemainingBuffer) {
+          invalidateBufferedContent();
+          bufferedContent = content;
+          bufferedContentReadOffset = bytesToWrite;
+          // This is to keep the stream alive for the message backed by this.
+          streamForBufferedContent = stream;
+          stream = null;
+        }
+      } finally {
         if (stream != null) {
           stream.close();
         }
@@ -586,6 +588,14 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     }
     if (resIterator != null) {
       resIterator = null;
+    }
+    List<InputStream> unclosedStreams = getObjectMediaResponseMarshaller.popAllStreams();
+    for (InputStream stream : unclosedStreams) {
+      try {
+        stream.close();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
     }
     contentChannelEndOffset = -1;
   }
