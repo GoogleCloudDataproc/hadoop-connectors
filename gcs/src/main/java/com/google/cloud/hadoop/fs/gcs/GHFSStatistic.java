@@ -213,7 +213,7 @@ public enum GHFSStatistic {
             TYPE_GAUGE),
     OBJECT_SELECT_REQUESTS(
             StoreStatisticNames.OBJECT_SELECT_REQUESTS,
-            "Count of S3 Select requests issued",
+            "Count of gcs Select requests issued",
             TYPE_COUNTER),
     STREAM_READ_ABORTED(
             StreamStatisticNames.STREAM_READ_ABORTED,
@@ -354,107 +354,7 @@ public enum GHFSStatistic {
             "Total queue duration of all block uploads",
             TYPE_DURATION),
 
-    /* committer stats */
-    COMMITTER_COMMITS_CREATED(
-            "committer_commits_created",
-            "Count of files to commit created",
-            TYPE_COUNTER),
-    COMMITTER_COMMITS_COMPLETED(
-            "committer_commits_completed",
-            "Count of files committed",
-            TYPE_COUNTER),
-    COMMITTER_COMMIT_JOB(
-            "committer_commit_job",
-            "Duration Tracking of time to commit an entire job",
-            TYPE_DURATION),
-    COMMITTER_JOBS_SUCCEEDED(
-            "committer_jobs_completed",
-            "Count of successful jobs",
-            TYPE_COUNTER),
-    COMMITTER_JOBS_FAILED(
-            "committer_jobs_failed",
-            "Count of failed jobs",
-            TYPE_COUNTER),
-    COMMITTER_TASKS_SUCCEEDED(
-            "committer_tasks_completed",
-            "Count of successful tasks",
-            TYPE_COUNTER),
-    COMMITTER_TASKS_FAILED(
-            "committer_tasks_failed",
-            "Count of failed tasks",
-            TYPE_COUNTER),
-    COMMITTER_BYTES_COMMITTED(
-            "committer_bytes_committed",
-            "Amount of data committed",
-            TYPE_COUNTER),
-    COMMITTER_BYTES_UPLOADED(
-            "committer_bytes_uploaded",
-            "Count of bytes uploaded duing commit operations",
-            TYPE_COUNTER),
-    COMMITTER_COMMITS_FAILED(
-            "committer_commits"+ StoreStatisticNames.SUFFIX_FAILURES,
-            "Count of commits failed",
-            TYPE_COUNTER),
-    COMMITTER_COMMITS_ABORTED(
-            "committer_commits_aborted",
-            "Count of commits aborted",
-            TYPE_COUNTER),
-    COMMITTER_COMMITS_REVERTED(
-            "committer_commits_reverted",
-            "Count of commits reverted",
-            TYPE_COUNTER),
-    COMMITTER_MAGIC_FILES_CREATED(
-            "committer_magic_files_created",
-            "Count of files created under 'magic' paths",
-            TYPE_COUNTER),
-    COMMITTER_MATERIALIZE_FILE(
-            "committer_materialize_file",
-            "Duration Tracking of time to materialize a file in job commit",
-            TYPE_DURATION),
-    COMMITTER_STAGE_FILE_UPLOAD(
-            "committer_stage_file_upload",
-            "Duration Tracking of files uploaded from a local staging path",
-            TYPE_DURATION),
-
-    /* S3guard stats */
-    S3GUARD_METADATASTORE_PUT_PATH_REQUEST(
-            "s3guard_metadatastore_put_path_request",
-            "S3Guard metadata store put one metadata path request",
-            TYPE_COUNTER),
-    S3GUARD_METADATASTORE_PUT_PATH_LATENCY(
-            "s3guard_metadatastore_put_path_latency",
-            "S3Guard metadata store put one metadata path latency",
-            TYPE_QUANTILE),
-    S3GUARD_METADATASTORE_INITIALIZATION(
-            "s3guard_metadatastore_initialization",
-            "S3Guard metadata store initialization times",
-            TYPE_COUNTER),
-    S3GUARD_METADATASTORE_RECORD_DELETES(
-            "s3guard_metadatastore_record_deletes",
-            "S3Guard metadata store records deleted",
-            TYPE_COUNTER),
-    S3GUARD_METADATASTORE_RECORD_READS(
-            "s3guard_metadatastore_record_reads",
-            "S3Guard metadata store records read",
-            TYPE_COUNTER),
-    S3GUARD_METADATASTORE_RECORD_WRITES(
-            "s3guard_metadatastore_record_writes",
-            "S3Guard metadata store records written",
-            TYPE_COUNTER),
-    S3GUARD_METADATASTORE_RETRY("s3guard_metadatastore_retry",
-            "S3Guard metadata store retry events",
-            TYPE_COUNTER),
-    S3GUARD_METADATASTORE_THROTTLED("s3guard_metadatastore_throttled",
-            "S3Guard metadata store throttled events",
-            TYPE_COUNTER),
-    S3GUARD_METADATASTORE_THROTTLE_RATE(
-            "s3guard_metadatastore_throttle_rate",
-            "S3Guard metadata store throttle rate",
-            TYPE_QUANTILE),
-    S3GUARD_METADATASTORE_AUTHORITATIVE_DIRECTORIES_UPDATED(
-            "s3guard_metadatastore_authoritative_directories_updated",
-            "S3Guard metadata store authoritative directories updated from S3",
-            TYPE_COUNTER),
+    
 
 
     /* General Store operations */
@@ -472,7 +372,7 @@ public enum GHFSStatistic {
             TYPE_COUNTER),
     STORE_IO_THROTTLE_RATE(
             StoreStatisticNames.STORE_IO_THROTTLE_RATE,
-            "Rate of S3 request throttling",
+            "Rate of gcs request throttling",
             TYPE_QUANTILE),
 
     /*

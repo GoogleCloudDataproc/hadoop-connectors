@@ -121,7 +121,7 @@ public class GHFSInstrumentation implements Closeable, MetricsSource, IOStatisti
 
     /**
      * Register this instance as a metrics source.
-     * @param name s3a:// URI for the associated FileSystem instance
+     * @param name gs:// URI for the associated FileSystem instance
      */
     private void registerAsMetricsSource(URI name) {
         int number;
@@ -285,7 +285,7 @@ public class GHFSInstrumentation implements Closeable, MetricsSource, IOStatisti
     @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder(
-                "S3AInstrumentation{");
+                "GHFSInstrumentation{");
         if (LOG.isDebugEnabled()) {
             sb.append("instanceIOStatistics=").append(instanceIOStatistics);
         }
@@ -460,11 +460,11 @@ public class GHFSInstrumentation implements Closeable, MetricsSource, IOStatisti
      * Statistics updated by an GoogleHadoopFSInputStream during its actual operation.
      * <p>
      * When {@code unbuffer()} is called, the changed numbers are propagated
-     * to the S3AFileSystem metrics.
+     * to the GHFSFileSystem metrics.
      * </p>
      * <p>
      * When {@code close()} is called, the final set of numbers are propagated
-     * to the S3AFileSystem metrics.
+     * to the GHFSFileSystem metrics.
      * </p>
      * The {@link FileSystem.Statistics} statistics passed in are also
      * updated. This ensures that whichever thread calls close() gets the

@@ -53,7 +53,7 @@ public abstract class AbstractGHFSStatisticsSource implements
         return incCounter(name, 1);
     }
 
-    /**DefaultS3ClientFactoryDefaultS3ClientFactory
+    /**DefaultGHFSClientFactoryDefaultGHFSClientFactory
      * Increment a named counter by 1.
      * @param name counter name
      * @param value value to increment by

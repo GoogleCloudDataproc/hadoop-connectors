@@ -117,7 +117,7 @@ public interface GHFSInputStreamStatistics extends AutoCloseable, GHFSStatisticI
      * all read and discarded when closing streams
      * or skipped during seek calls.
      * @return the total number of bytes read from
-     * S3.
+     * GHFS.
      */
     long getTotalBytesRead();
 
