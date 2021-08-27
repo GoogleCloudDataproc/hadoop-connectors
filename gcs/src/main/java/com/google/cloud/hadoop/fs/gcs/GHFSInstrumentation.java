@@ -26,9 +26,11 @@ import java.util.concurrent.atomic.AtomicLong;
 
 
 import static com.google.cloud.hadoop.fs.gcs.Constants.STREAM_READ_GAUGE_INPUT_POLICY;
+import static org.apache.hadoop.fs.statistics.IOStatisticsLogging.demandStringifyIOStatistics;
 import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStatistics;
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.ACTION_HTTP_GET_REQUEST;
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
+import static org.apache.hadoop.fs.statistics.StreamStatisticNames.STREAM_READ_UNBUFFERED;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.iostatisticsStore;
 
 public class GHFSInstrumentation implements Closeable, MetricsSource, IOStatisticsSource, DurationTrackerFactory{
@@ -49,44 +51,44 @@ public class GHFSInstrumentation implements Closeable, MetricsSource, IOStatisti
             GHFSInstrumentation.class);
 
     public GHFSInstrumentation(URI name){
-    UUID fileSystemInstanceID=UUID.randomUUID();
-    registry.tag(METRIC_TAG_FILESYSTEM_ID,"A unique identifier for the instance",
-            fileSystemInstanceID.toString());
-    registry.tag(METRIC_TAG_BUCKET,"Hostname from the FS URL",name.getHost());
-    IOStatisticsStoreBuilder storeBuilder= IOStatisticsBinding.iostatisticsStore();
-    // declare all counter statistics
-    EnumSet.allOf(GHFSStatistic.class).stream()
-            .filter(GHFSStatistic -> GHFSStatistic.getType() == GHFSStatisticTypeEnum.TYPE_COUNTER)
-            .forEach(stat -> {
-                counter(stat);
-                storeBuilder.withCounters(stat.getSymbol());
-            });
-    // declare all gauge statistics
-    EnumSet.allOf(GHFSStatistic.class).stream()
-            .filter(statistic ->
-                    statistic.getType() == GHFSStatisticTypeEnum.TYPE_GAUGE)
-            .forEach(stat -> {
-                gauge(stat);
-                storeBuilder.withGauges(stat.getSymbol());
-            });
+        UUID fileSystemInstanceID=UUID.randomUUID();
+        registry.tag(METRIC_TAG_FILESYSTEM_ID,"A unique identifier for the instance",
+                fileSystemInstanceID.toString());
+        registry.tag(METRIC_TAG_BUCKET,"Hostname from the FS URL",name.getHost());
+        IOStatisticsStoreBuilder storeBuilder= IOStatisticsBinding.iostatisticsStore();
+        // declare all counter statistics
+        EnumSet.allOf(GHFSStatistic.class).stream()
+                .filter(GHFSStatistic -> GHFSStatistic.getType() == GHFSStatisticTypeEnum.TYPE_COUNTER)
+                .forEach(stat -> {
+                    counter(stat);
+                    storeBuilder.withCounters(stat.getSymbol());
+                });
+        // declare all gauge statistics
+        EnumSet.allOf(GHFSStatistic.class).stream()
+                .filter(statistic ->
+                        statistic.getType() == GHFSStatisticTypeEnum.TYPE_GAUGE)
+                .forEach(stat -> {
+                    gauge(stat);
+                    storeBuilder.withGauges(stat.getSymbol());
+                });
 
-    // and durations
-    EnumSet.allOf(GHFSStatistic.class).stream()
-            .filter(statistic ->
-                    statistic.getType() == GHFSStatisticTypeEnum.TYPE_DURATION)
-            .forEach(stat -> {
-                duration(stat);
-                storeBuilder.withDurationTracking(stat.getSymbol());
-            });
-    // register with Hadoop metrics
-    registerAsMetricsSource(name);
-    // and build the IO Statistics
-    instanceIOStatistics=storeBuilder.build();
-    // duration track metrics (Success/failure) and IOStatistics.
-    durationTrackerFactory=IOStatisticsBinding.pairedTrackerFactory(instanceIOStatistics,new MetricDurationTrackerFactory());
+        // and durations
+        EnumSet.allOf(GHFSStatistic.class).stream()
+                .filter(statistic ->
+                        statistic.getType() == GHFSStatisticTypeEnum.TYPE_DURATION)
+                .forEach(stat -> {
+                    duration(stat);
+                    storeBuilder.withDurationTracking(stat.getSymbol());
+                });
+        // register with Hadoop metrics
+        registerAsMetricsSource(name);
+        // and build the IO Statistics
+        instanceIOStatistics=storeBuilder.build();
+        // duration track metrics (Success/failure) and IOStatistics.
+        durationTrackerFactory=IOStatisticsBinding.pairedTrackerFactory(instanceIOStatistics,new MetricDurationTrackerFactory());
 
 
-}
+    }
     public void close(){
         System.out.println("Close");
     }
@@ -440,9 +442,19 @@ public class GHFSInstrumentation implements Closeable, MetricsSource, IOStatisti
      * @return the new instance
      * @param filesystemStatistics FS Statistics to update in close().
      */
-//    public GHFSInputStreamStatistics newInputStreamStatistics(
-//            @Nullable final FileSystem.Statistics filesystemStatistics) {
-//        return new InputStreamStatistics(filesystemStatistics);
+    public GHFSInputStreamStatistics newInputStreamStatistics(
+            @Nullable final FileSystem.Statistics filesystemStatistics) {
+        return new InputStreamStatistics(filesystemStatistics);
+    }
+
+    /**
+     * Create a stream output statistics instance.
+     * @param filesystemStatistics thread-local FS statistics.
+     * @return the new instance
+     */
+//    public GHFSOutputStreamStatistics newOutputStreamStatistics(
+//            FileSystem.Statistics filesystemStatistics) {
+//        return new OutputStreamStatistics(filesystemStatistics);
 //    }
     /**
      * Statistics updated by an GoogleHadoopFSInputStream during its actual operation.
@@ -460,7 +472,21 @@ public class GHFSInstrumentation implements Closeable, MetricsSource, IOStatisti
      * threads.
      *
      */
-    private final class InputStreamStatistics  extends AbstractGHFSStatisticsSource {
+    /**
+     * Merge in the statistics of a single output stream into
+     * the filesystem-wide statistics.
+     * @param source stream statistics
+     */
+    private void mergeOutputStreamStatistics(
+            OutputStreamStatistics source) {
+
+        incrementCounter(GHFSStatistic.STREAM_WRITE_EXCEPTIONS,
+                source.lookupCounterValue(
+                        StreamStatisticNames.STREAM_WRITE_EXCEPTIONS));
+        // merge in all the IOStatistics
+        this.getIOStatistics().aggregate(source.getIOStatistics());
+    }
+    private final class InputStreamStatistics  extends AbstractGHFSStatisticsSource implements GHFSInputStreamStatistics{
 
         /**
          * Distance used when incrementing FS stats.
@@ -577,10 +603,479 @@ public class GHFSInstrumentation implements Closeable, MetricsSource, IOStatisti
 
 
         }
+        /**
+         * Increment a named counter by one.
+         * @param name counter name
+         * @return the new value
+         */
+        private long increment(String name) {
+            return increment(name, 1);
+        }
+
+        /**
+         * Increment a named counter by a given value.
+         * @param name counter name
+         * @param value value to increment by.
+         * @return the new value
+         */
+        private long increment(String name, long value) {
+            return incCounter(name, value);
+        }
+        /**
+         * Get the inner class's IO Statistics. This is
+         * needed to avoid findbugs warnings about ambiguity.
+         * @return the Input Stream's statistics.
+         */
+        private IOStatisticsStore localIOStatistics() {
+            return InputStreamStatistics.super.getIOStatistics();
+        }
+        /**
+         * {@inheritDoc}.
+         * Increments the number of seek operations,
+         * and backward seek operations.
+         * The offset is inverted and used as the increment
+         * of {@link #bytesBackwardsOnSeek}.
+         */
+        @Override
+        public void seekBackwards(long negativeOffset) {
+            seekOperations.incrementAndGet();
+            backwardSeekOperations.incrementAndGet();
+            bytesBackwardsOnSeek.addAndGet(-negativeOffset);
+        }
+
+        /**
+         * {@inheritDoc}.
+         * Increment the number of seek and forward seek
+         * operations, as well as counters of bytes skipped
+         * and bytes read in seek, where appropriate.
+         * Bytes read in seek are also added to the totalBytesRead
+         * counter.
+         */
+        @Override
+        public void seekForwards(final long skipped,
+                                 long bytesReadInSeek) {
+            seekOperations.incrementAndGet();
+            forwardSeekOperations.incrementAndGet();
+            if (skipped > 0) {
+                bytesSkippedOnSeek.addAndGet(skipped);
+            }
+            if (bytesReadInSeek > 0) {
+                bytesDiscardedOnSeek.addAndGet(bytesReadInSeek);
+                totalBytesRead.addAndGet(bytesReadInSeek);
+            }
+        }
+
+        /**
+         * {@inheritDoc}.
+         * Use {@code getAnIncrement()} on {@link #openOperations}
+         * so that on invocation 1 it returns 0.
+         * The caller will know that this is the first invocation.
+         */
+        @Override
+        public long streamOpened() {
+            return openOperations.getAndIncrement();
+        }
+
+        /**
+         * {@inheritDoc}.
+         * If the connection was aborted, increment {@link #aborted}
+         * and add the byte's remaining count to {@link #bytesDiscardedInAbort}.
+         * If not aborted, increment {@link #closed} and
+         * then {@link #bytesDiscardedInClose} and {@link #totalBytesRead}
+         * with the bytes remaining value.
+         */
+        @Override
+        public void streamClose(boolean abortedConnection,
+                                long remainingInCurrentRequest) {
+            if (abortedConnection) {
+                // the connection was aborted.
+                // update the counter of abort() calls and bytes discarded
+                aborted.incrementAndGet();
+                bytesDiscardedInAbort.addAndGet(remainingInCurrentRequest);
+            } else {
+                // connection closed, possibly draining the stream of surplus
+                // bytes.
+                closed.incrementAndGet();
+                bytesDiscardedInClose.addAndGet(remainingInCurrentRequest);
+                totalBytesRead.addAndGet(remainingInCurrentRequest);
+            }
+        }
+
+        /**
+         * {@inheritDoc}.
+         */
+        @Override
+        public void readException() {
+            readExceptions.incrementAndGet();
+        }
+
+        /**
+         * {@inheritDoc}.
+         * If the byte counter is positive, increment bytesRead and totalBytesRead.
+         */
+        @Override
+        public void bytesRead(long bytes) {
+            if (bytes > 0) {
+                bytesRead.addAndGet(bytes);
+                totalBytesRead.addAndGet(bytes);
+            }
+        }
+
+        @Override
+        public void readOperationStarted(long pos, long len) {
+            readOperations.incrementAndGet();
+        }
+
+        @Override
+        public void readFullyOperationStarted(long pos, long len) {
+            readFullyOperations.incrementAndGet();
+        }
+
+        /**
+         * {@inheritDoc}.
+         * If more data was requested than was actually returned, this
+         * was an incomplete read. Increment {@link #readsIncomplete}.
+         */
+        @Override
+        public void readOperationCompleted(int requested, int actual) {
+            if (requested > actual) {
+                readsIncomplete.incrementAndGet();
+            }
+        }
+
+        /**
+         * {@code close()} merges the stream statistics into the filesystem's
+         * instrumentation instance.
+         */
+        @Override
+        public void close() {
+            System.out.println("Close in GHFSInstrumentation is called");
+            increment(StreamStatisticNames.STREAM_READ_CLOSE_OPERATIONS);
+            merge(true);
+        }
+
+        /**
+         * {@inheritDoc}.
+         * As well as incrementing the {@code STREAM_READ_SEEK_POLICY_CHANGED}
+         * counter, the
+         * {@code STREAM_READ_GAUGE_INPUT_POLICY} gauge is set to the new value.
+         *
+         */
+        @Override
+        public void inputPolicySet(int updatedPolicy) {
+            increment(StreamStatisticNames.STREAM_READ_SEEK_POLICY_CHANGED);
+            localIOStatistics().setGauge(STREAM_READ_GAUGE_INPUT_POLICY,
+                    updatedPolicy);
+        }
+        /**
+         * {@inheritDoc}
+         * Increment the counter {@code STREAM_READ_UNBUFFERED}
+         * and then merge the current set of statistics into the
+         * FileSystem's statistics through {@link #merge(boolean)}.
+         */
+        @Override
+        public void unbuffered() {
+            increment(STREAM_READ_UNBUFFERED);
+            merge(false);
+        }
+
+
+        @Override
+        public long getCloseOperations() {
+            return lookupCounterValue(
+                    StreamStatisticNames.STREAM_READ_CLOSE_OPERATIONS);
+        }
+
+        @Override
+        public long getClosed() {
+            return lookupCounterValue(StreamStatisticNames.STREAM_READ_CLOSED);
+        }
+
+        @Override
+        public long getAborted() {
+            return lookupCounterValue(StreamStatisticNames.STREAM_READ_ABORTED);
+        }
+
+        @Override
+        public long getForwardSeekOperations() {
+            return lookupCounterValue(
+                    StreamStatisticNames.STREAM_READ_SEEK_FORWARD_OPERATIONS);
+        }
+
+        @Override
+        public long getBackwardSeekOperations() {
+            return lookupCounterValue(
+                    StreamStatisticNames.STREAM_READ_SEEK_BACKWARD_OPERATIONS);
+        }
+
+        @Override
+        public long getBytesRead() {
+            return lookupCounterValue(StreamStatisticNames.STREAM_READ_BYTES);
+        }
+
+        @Override
+        public long getTotalBytesRead() {
+            return lookupCounterValue(StreamStatisticNames.STREAM_READ_TOTAL_BYTES);
+        }
+
+        @Override
+        public long getBytesSkippedOnSeek() {
+            return lookupCounterValue(
+                    StreamStatisticNames.STREAM_READ_SEEK_BYTES_SKIPPED);
+        }
+
+        @Override
+        public long getBytesBackwardsOnSeek() {
+            return lookupCounterValue(
+                    StreamStatisticNames.STREAM_READ_SEEK_BYTES_BACKWARDS);
+        }
+
+        @Override
+        public long getBytesReadInClose() {
+            return lookupCounterValue(
+                    StreamStatisticNames.STREAM_READ_BYTES_DISCARDED_CLOSE);
+        }
+
+        @Override
+        public long getBytesDiscardedInAbort() {
+            return lookupCounterValue(
+                    StreamStatisticNames.STREAM_READ_BYTES_DISCARDED_ABORT);
+        }
+
+        @Override
+        public long getOpenOperations() {
+            return lookupCounterValue(StreamStatisticNames.STREAM_READ_OPENED);
+        }
+
+        @Override
+        public long getSeekOperations() {
+            return lookupCounterValue(
+                    StreamStatisticNames.STREAM_READ_SEEK_OPERATIONS);
+        }
+
+        @Override
+        public long getReadExceptions() {
+            return lookupCounterValue(
+                    StreamStatisticNames.STREAM_READ_EXCEPTIONS);
+        }
+
+        @Override
+        public long getReadOperations() {
+            return lookupCounterValue(StreamStatisticNames.STREAM_READ_OPERATIONS);
+        }
+
+        @Override
+        public long getReadFullyOperations() {
+            return lookupCounterValue(
+                    StreamStatisticNames.STREAM_READ_FULLY_OPERATIONS);
+        }
+
+        @Override
+        public long getReadsIncomplete() {
+            return lookupCounterValue(
+                    StreamStatisticNames.STREAM_READ_OPERATIONS_INCOMPLETE);
+        }
+
+        @Override
+        public long getPolicySetCount() {
+            return lookupCounterValue(
+                    StreamStatisticNames.STREAM_READ_SEEK_POLICY_CHANGED);
+        }
+
+
+        @Override
+        public long getInputPolicy() {
+            return localIOStatistics().gauges()
+                    .get(STREAM_READ_GAUGE_INPUT_POLICY);
+        }
+
+        @Override
+        public DurationTracker initiateGetRequest() {
+            return trackDuration(ACTION_HTTP_GET_REQUEST);
+        }
+
+
+        /**
+         * Merge the statistics into the filesystem's instrumentation instance.
+         * <p>
+         *   If the merge is invoked because the stream has been closed,
+         *   then all statistics are merged, and the filesystem
+         *   statistics of {@link #filesystemStatistics} updated
+         *   with the bytes read values.
+         * </p>
+         * <p>
+         *   Whichever thread close()d the stream will have its counters
+         *   updated.
+         * </p>
+         * <p>
+         *   If the merge is due to an unbuffer() call, the change in all
+         *   counters since the last merge will be pushed to the Instrumentation's
+         *   counters.
+         * </p>
+         *
+         * @param isClosed is this merge invoked because the stream is closed?
+         */
+        private void merge(boolean isClosed) {
+
+            IOStatisticsStore ioStatistics = localIOStatistics();
+            LOG.debug("Merging statistics into FS statistics in {}: {}",
+                    (isClosed ? "close()" : "unbuffer()"),
+                    demandStringifyIOStatistics(ioStatistics));
+            promoteInputStreamCountersToMetrics();
+            mergedStats = snapshotIOStatistics(localIOStatistics());
+
+            if (isClosed) {
+                // stream is being closed.
+                // merge in all the IOStatistics
+                GHFSInstrumentation.this.getIOStatistics().aggregate(ioStatistics);
+
+                // increment the filesystem statistics for this thread.
+                if (filesystemStatistics != null) {
+                    long t = getTotalBytesRead();
+                    filesystemStatistics.incrementBytesRead(t);
+                    filesystemStatistics.incrementBytesReadByDistance(DISTANCE, t);
+                }
+            }
+        }
+
+        /**
+         * Merge in the statistics of a single input stream into
+         * the filesystem-wide metrics counters.
+         * This does not update the FS IOStatistics values.
+         */
+        private void promoteInputStreamCountersToMetrics() {
+            // iterate through all the counters
+            localIOStatistics().counters()
+                    .keySet().stream()
+                    .forEach(e -> promoteIOCounter(e));
+        }
+        /**
+         * Propagate a counter from the instance-level statistics
+         * to the S3A instrumentation, subtracting the previous merged value.
+         * @param name statistic to promote
+         */
+        void promoteIOCounter(String name) {
+            incrementMutableCounter(name,
+                    lookupCounterValue(name)
+                            - mergedStats.counters().get(name));
+        }
+
+    }
+
+
+    private final class OutputStreamStatistics
+            extends AbstractGHFSStatisticsSource
+            implements GHFSOutputStreamStatistics {
+        private final AtomicLong bytesWritten;
+        private final AtomicLong transferDuration = new AtomicLong(0);
+        private final AtomicLong queueDuration = new AtomicLong(0);
+        private final FileSystem.Statistics filesystemStatistics;
+
+        /**
+         * Instantiate.
+         * @param filesystemStatistics FS Statistics to update in close().
+         */
+        private OutputStreamStatistics(
+                @Nullable FileSystem.Statistics filesystemStatistics) {
+            this.filesystemStatistics = filesystemStatistics;
+            IOStatisticsStore st = iostatisticsStore()
+                    .withCounters(
+                            GHFSStatistic.STREAM_WRITE_BYTES.getSymbol(),
+                            GHFSStatistic.STREAM_WRITE_EXCEPTIONS.getSymbol(),
+                            GHFSStatistic.INVOCATION_HFLUSH.getSymbol(),
+                            GHFSStatistic.INVOCATION_HSYNC.getSymbol())
+                    .build();
+            setIOStatistics(st);
+            // these are extracted to avoid lookups on heavily used counters.
+
+            bytesWritten = st.getCounterReference(
+                    StreamStatisticNames.STREAM_WRITE_BYTES);
+        }
+
+        /**
+         * Increment the Statistic gauge and the local IOStatistics
+         * equivalent.
+         * @param statistic statistic
+         * @param v value.
+         * @return local IOStatistic value
+         */
+        private long incAllGauges(GHFSStatistic statistic, long v) {
+            incrementGauge(statistic, v);
+            return incGauge(statistic.getSymbol(), v);
+        }
 
 
 
 
+        /**
+         * Get the inner class's IO Statistics. This is
+         * needed to avoid findbugs warnings about ambiguity.
+         * @return the Input Stream's statistics.
+         */
+        private IOStatisticsStore localIOStatistics() {
+            return OutputStreamStatistics.super.getIOStatistics();
+        }
+
+        @Override
+        public void hflushInvoked() {
+            incCounter(GHFSStatistic.INVOCATION_HFLUSH.getSymbol(), 1);
+        }
+
+        @Override
+        public void hsyncInvoked() {
+            incCounter(GHFSStatistic.INVOCATION_HSYNC.getSymbol(), 1);
+        }
+
+        @Override
+        public void close() {
+
+            mergeOutputStreamStatistics(this);
+            // and patch the FS statistics.
+            // provided the stream is closed in the worker thread, this will
+            // ensure that the thread-specific worker stats are updated.
+            if (filesystemStatistics != null) {
+                // filesystemStatistics.incrementBytesWritten(bytesUploaded.get());
+            }
+        }
+
+
+        /**
+         * Record bytes written.
+         * @param count number of bytes
+         */
+        @Override
+        public void writeBytes(long count) {
+            bytesWritten.addAndGet(count);
+        }
+
+        /**
+         * Get the current count of bytes written.
+         * @return the counter value.
+         */
+        @Override
+        public long getBytesWritten() {
+            return bytesWritten.get();
+        }
+
+        @Override
+        public String toString() {
+            final StringBuilder sb = new StringBuilder(
+                    "OutputStreamStatistics{");
+//            sb.append(localIOStatistics().toString());
+//            sb.append(", blocksActive=").append(blocksActive);
+//            sb.append(", blockUploadsCompleted=").append(blockUploadsCompleted);
+//            sb.append(", blocksAllocated=").append(blocksAllocated);
+//            sb.append(", blocksReleased=").append(blocksReleased);
+//            sb.append(", blocksActivelyAllocated=")
+//                    .append(getBlocksActivelyAllocated());
+            sb.append(", transferDuration=").append(transferDuration).append(" ms");
+//            sb.append(", totalUploadDuration=").append(totalUploadDuration())
+//                    .append(" ms");
+//            sb.append(", effectiveBandwidth=").append(effectiveBandwidth())
+//                    .append(" bytes/s");
+//            sb.append('}');
+            return sb.toString();
+        }
     }
 
 
