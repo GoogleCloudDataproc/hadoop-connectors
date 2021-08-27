@@ -20,7 +20,7 @@ import org.apache.hadoop.fs.statistics.DurationTrackerFactory;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 
 /**
- * Base Interface for S3A Statistics, as a way of managing
+ * Base Interface for GHFS Statistics, as a way of managing
  * them.
  */
 public interface GHFSStatisticInterface extends IOStatisticsSource,
