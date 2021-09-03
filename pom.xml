@@ -102,7 +102,7 @@
     <google.protobuf.version>3.17.3</google.protobuf.version>
     <grpc.version>1.39.0</grpc.version>
     <hadoop.two.version>2.10.1</hadoop.two.version>
-    <hadoop.three.version>3.2.2</hadoop.three.version>
+    <hadoop.three.version>3.3.1</hadoop.three.version>
 
     <!-- Test dependencies -->
     <google.truth.version>1.1.3</google.truth.version>
@@ -123,7 +123,7 @@
   </modules>
 
   <profiles>
-    <profile>
+    <!-- <profile>
       <id>hadoop2</id>
       <properties>
         <hadoop.identifier>hadoop2</hadoop.identifier>
@@ -154,7 +154,7 @@
           </dependency>
         </dependencies>
       </dependencyManagement>
-    </profile>
+    </profile> -->
 
     <profile>
       <id>hadoop3</id>
@@ -687,7 +687,7 @@
           </annotationProcessorPaths>
         </configuration>
       </plugin>
-      <plugin>
+      <!-- <plugin>
         <groupId>com.diffplug.spotless</groupId>
         <artifactId>spotless-maven-plugin</artifactId>
         <version>2.12.2</version>
@@ -717,7 +717,7 @@
             <phase>compile</phase>
           </execution>
         </executions>
-      </plugin>
+      </plugin> -->
     </plugins>
   </build>
 </project>
