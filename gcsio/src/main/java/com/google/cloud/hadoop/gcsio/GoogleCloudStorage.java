@@ -357,6 +357,12 @@ public interface GoogleCloudStorage {
   /** Releases resources used by this instance. */
   void close();
 
+
+  /**
+   * Get the http related statistics count from GCSio
+   */
+  public long getStatistics(GoogleCloudStorageStatistics Key);
+
   /** Paged list request response */
   class ListPage<T> {
     private final List<T> items;
