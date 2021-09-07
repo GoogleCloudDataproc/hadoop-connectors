@@ -427,9 +427,7 @@ public class GoogleHadoopFileSystemConfiguration {
 
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
-  //Bhagyaa-s
   @VisibleForTesting
-  //Bhagyaa-e
   public static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setCloudStorageOptions(getGcsOptionsBuilder(config).build())
