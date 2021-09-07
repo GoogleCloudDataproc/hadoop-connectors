@@ -69,6 +69,12 @@
     behavior of the connector or the underlying GCS objects. However it will
     affect the number of splits Hadoop MapReduce uses for a given input.
 
+*   `fs.gs.default.max.threads` (default: `16`)
+    The number of threads by default is set to a value of 16 and can go up to 64.
+
+*   `fs.gs.keep.alive.time` (default: `60`)
+    Default keep-alive-time for a thread is 60s.
+
 *   `fs.gs.create.items.conflict.check.enable` (default: `true`)
 
     Enables a check that ensures that conflicting directories do not exist when

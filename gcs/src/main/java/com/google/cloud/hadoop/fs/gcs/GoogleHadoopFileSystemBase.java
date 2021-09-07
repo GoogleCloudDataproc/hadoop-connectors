@@ -18,6 +18,8 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType.FLUSHABLE_COMPOSITE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DEFAULT_MAX_THREADS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.KEEP_ALIVE_TIME;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.CONFIG_KEY_PREFIXES;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
@@ -168,9 +170,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   private static final ListFileOptions LIST_OPTIONS =
       ListFileOptions.DEFAULT.toBuilder().setFields(OBJECT_FIELDS).build();
-  private static final int DEFAULT_MAX_THREADS = 64; //16
-//  public static final String MAX_THREADS = "fs.gcs.threads.max";
-  private int executorCapacity;
 
   /**
    * Available types for use with {@link
@@ -572,19 +571,16 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   }
   //Conf not used in the method for sometime, as some changes need to be made for laters
   private void initThreadPools(Configuration conf){
-    int maxThreads=DEFAULT_MAX_THREADS;
-    //commenting below block as we already hard-coded the value
-//    if (maxThreads < 2) {
-//      LOG.warn("MAX_THREADS or DEFAULT_MAX_THREAD must be at least 2: forcing to 2.");
-//      maxThreads = 2;
-//    }
-    //int totalTasks=32; //commenting as it is used only in select feature of s3
-    int keepAliveTime=60;
+    int maxThreads=DEFAULT_MAX_THREADS.getDefault();
+    if (maxThreads < 2) {
+      logger.atWarning().log("Maximum number of threads should at least be 2.");
+      maxThreads = 2;
+    }
+    int keepAliveTime=KEEP_ALIVE_TIME.getDefault();
     unboundedThreadPool=new ThreadPoolExecutor(maxThreads,Integer.MAX_VALUE,
             keepAliveTime,TimeUnit.SECONDS, new LinkedBlockingQueue<>(),
             BlockingThreadPoolExecutorService.newDaemonThreadFactory("gcs-transfer-unbounded"));
     unboundedThreadPool.allowCoreThreadTimeOut(true);
-    executorCapacity=16;
   }
   @Override
   public CompletableFuture<FSDataInputStream> openFileWithOptions(final Path rawPath, final OpenFileParameters parameters) throws IOException{
@@ -594,7 +590,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     AbstractFSBuilderImpl.rejectUnknownMandatoryKeys(mandatoryKeys,Collections.emptySet(),"for "+path);
     StorageResourceId storageResourceId = StorageResourceId.fromUriPath(rawPath.toUri(),false);
     GoogleCloudStorageItemInfo itemInfo = this.getGcsFs().getGcs().getItemInfo(storageResourceId);
-    LOG.debug("Ignoring file status");
+    logger.atFine().log("Ignoring file status");
     CompletableFuture<FSDataInputStream> result=new CompletableFuture<>();
     unboundedThreadPool.submit(()->LambdaUtils.eval(result,()->open(itemInfo,path,parameters.getBufferSize())));
     return result;

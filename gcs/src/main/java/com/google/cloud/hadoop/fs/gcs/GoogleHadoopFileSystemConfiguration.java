@@ -94,6 +94,12 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Long> BLOCK_SIZE =
       new HadoopConfigurationProperty<>("fs.gs.block.size", 64 * 1024 * 1024L);
 
+  public static final HadoopConfigurationProperty<Integer> DEFAULT_MAX_THREADS =
+          new HadoopConfigurationProperty<Integer>("fs.gs.default.max.threads",16);
+
+  public static final HadoopConfigurationProperty<Integer> KEEP_ALIVE_TIME =
+          new HadoopConfigurationProperty<Integer>("fs.gs.keep.alive.time",60);
+
   /** Configuration key for Delegation Token binding class. Default value: none */
   public static final HadoopConfigurationProperty<String> DELEGATION_TOKEN_BINDING_CLASS =
       new HadoopConfigurationProperty<>("fs.gs.delegation.token.binding");
