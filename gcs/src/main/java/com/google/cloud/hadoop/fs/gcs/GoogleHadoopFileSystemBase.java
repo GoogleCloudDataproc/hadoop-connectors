@@ -74,6 +74,7 @@ import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.PropertyUtil;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ascii;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -585,12 +586,13 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public CompletableFuture<FSDataInputStream> openFileWithOptions(final Path rawPath, final OpenFileParameters parameters) throws IOException{
     final Path path=makeQualified(rawPath);
-    Configuration options=parameters.getOptions();
     Set<String> mandatoryKeys=parameters.getMandatoryKeys();
     AbstractFSBuilderImpl.rejectUnknownMandatoryKeys(mandatoryKeys,Collections.emptySet(),"for "+path);
     StorageResourceId storageResourceId = StorageResourceId.fromUriPath(rawPath.toUri(),false);
     GoogleCloudStorageItemInfo itemInfo = this.getGcsFs().getGcs().getItemInfo(storageResourceId);
-    logger.atFine().log("Ignoring file status");
+    checkArgument(itemInfo.exists()!=false,"Item info %s does not exist",itemInfo);
+    logger.atFine().log("ItemInfo :%s",itemInfo);
+    logger.atFine().log("File exists: %s",itemInfo.getResourceId());
     CompletableFuture<FSDataInputStream> result=new CompletableFuture<>();
     unboundedThreadPool.submit(()->LambdaUtils.eval(result,()->open(itemInfo,path,parameters.getBufferSize())));
     return result;
