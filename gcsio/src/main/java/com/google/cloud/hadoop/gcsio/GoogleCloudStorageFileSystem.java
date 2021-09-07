@@ -188,8 +188,7 @@ public class GoogleCloudStorageFileSystem {
       throws IOException {
     this(gcsFn.apply(options.getCloudStorageOptions()), options);
   }
-
-  //Bhagyaa-s Bhagyaa-e
+  
   @VisibleForTesting
   public GoogleCloudStorageFileSystem(
       GoogleCloudStorage gcs, GoogleCloudStorageFileSystemOptions options) {

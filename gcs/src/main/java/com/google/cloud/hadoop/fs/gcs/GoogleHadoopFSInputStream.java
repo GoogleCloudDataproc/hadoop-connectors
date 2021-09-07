@@ -49,8 +49,6 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   // Used for single-byte reads.
   private final byte[] singleReadBuf = new byte[1];
 
-  private GoogleCloudStorageItemInfo itemInfo;
-
   /**
    * Constructs an instance of GoogleHadoopFSInputStream object.
    *
@@ -85,7 +83,6 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     this.gcsPath = gcsPath;
     this.statistics = statistics;
     this.totalBytesRead = 0;
-    this.itemInfo = itemInfo;
     this.channel = ghfs.getGcsFs().open(itemInfo, readOptions);
   }
 
