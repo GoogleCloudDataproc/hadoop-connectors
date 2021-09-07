@@ -599,16 +599,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   }
 
   private FSDataInputStream open(GoogleCloudStorageItemInfo itemInfo, Path hadoopPath, int bufferSize) throws IOException {
-    checkArgument(hadoopPath != null, "hadoopPath must not be null");
-
     checkOpen();
-
-    logger.atFiner().log("open(hadoopPath: %s, bufferSize: %d [ignored])", hadoopPath, bufferSize);
-    URI gcsPath = getGcsPath(hadoopPath);
+    logger.atFiner().log("open(itemInfo: %s, bufferSize: %d [ignored])", itemInfo, bufferSize);
+    checkArgument(itemInfo.exists()!=false,"Item info %s does not exist",itemInfo);
+    logger.atFine().log("File exists: %s",itemInfo.getResourceId());
     GoogleCloudStorageReadOptions readChannelOptions =
             getGcsFs().getOptions().getCloudStorageOptions().getReadChannelOptions();
+    logger.atFiner().log("Read channel options: %s", readChannelOptions);
     GoogleHadoopFSInputStream in =
-            new GoogleHadoopFSInputStream(this, itemInfo, readChannelOptions, statistics);
             new GoogleHadoopFSInputStream(this, itemInfo, readChannelOptions, statistics);
 
     return new FSDataInputStream(in);
