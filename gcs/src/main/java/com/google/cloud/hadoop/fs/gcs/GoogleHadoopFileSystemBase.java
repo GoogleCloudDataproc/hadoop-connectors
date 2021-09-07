@@ -601,7 +601,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     return result;
   }
 
-  public FSDataInputStream open(GoogleCloudStorageItemInfo itemInfo, Path hadoopPath, int bufferSize) throws IOException {
+  private FSDataInputStream open(GoogleCloudStorageItemInfo itemInfo, Path hadoopPath, int bufferSize) throws IOException {
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
