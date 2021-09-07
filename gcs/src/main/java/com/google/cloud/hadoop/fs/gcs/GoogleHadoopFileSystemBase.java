@@ -615,7 +615,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     return new FSDataInputStream(in);
   }
-  /**Bhagyaa-e**/
   /**
    * Opens the given file for writing.
    *
