@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.gcsio.UriPaths;
 import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
@@ -73,14 +74,13 @@ class GoogleHadoopFSInputStream extends FSInputStream {
 
   GoogleHadoopFSInputStream(
           GoogleHadoopFileSystemBase ghfs,
-          URI gcsPath,
           GoogleCloudStorageItemInfo itemInfo,
           GoogleCloudStorageReadOptions readOptions,
           FileSystem.Statistics statistics)
           throws IOException {
     logger.atFiner().log(
-            "GoogleHadoopFSInputStream(gcsPath: %s, readOptions: %s)", gcsPath, readOptions);
-    this.gcsPath = gcsPath;
+            "GoogleHadoopFSInputStream(itemInfo: %s, readOptions: %s)", itemInfo, readOptions);
+    this.gcsPath = UriPaths.fromResourceId(itemInfo.getResourceId(),false);
     this.statistics = statistics;
     this.totalBytesRead = 0;
     this.channel = ghfs.getGcsFs().open(itemInfo, readOptions);
