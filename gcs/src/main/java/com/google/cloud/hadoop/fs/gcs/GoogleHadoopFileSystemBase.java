@@ -287,7 +287,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   /** The fixed reported permission of all files. */
   private FsPermission reportedPermissions;
   private ThreadPoolExecutor unboundedThreadPool;
-  private GoogleCloudStorageItemInfo itemInfo;
   /**
    * GCS {@link FileChecksum} which takes constructor parameters to define the return values of the
    * various abstract methods of {@link FileChecksum}.
@@ -595,7 +594,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     Set<String> mandatoryKeys=parameters.getMandatoryKeys();
     AbstractFSBuilderImpl.rejectUnknownMandatoryKeys(mandatoryKeys,Collections.emptySet(),"for "+path);
     StorageResourceId storageResourceId = StorageResourceId.fromUriPath(rawPath.toUri(),false);
-    itemInfo = this.getGcsFs().getGcs().getItemInfo(storageResourceId);
+    GoogleCloudStorageItemInfo itemInfo = this.getGcsFs().getGcs().getItemInfo(storageResourceId);
     LOG.debug("Ignoring file status");
     CompletableFuture<FSDataInputStream> result=new CompletableFuture<>();
     unboundedThreadPool.submit(()->LambdaUtils.eval(result,()->open(itemInfo,path,parameters.getBufferSize())));
