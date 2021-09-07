@@ -60,7 +60,6 @@ import com.google.cloud.hadoop.gcsio.ListFileOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
 import com.google.cloud.hadoop.gcsio.UriPaths;
-import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializerFromGcsio;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.AccessTokenProvider.AccessTokenType;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;

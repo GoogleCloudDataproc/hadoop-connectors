@@ -68,7 +68,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
-import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializerFromGcsio;
 
 /**
  * Provides a POSIX like file system layered on top of Google Cloud Storage (GCS).
@@ -84,7 +83,6 @@ import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializerFromGcsio;
 public class GoogleCloudStorageFileSystem {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-  public static TrackingHttpRequestInitializerFromGcsio httpReq=null;
   // URI scheme for GCS.
   public static final String SCHEME = "gs";
 
@@ -209,10 +207,6 @@ public class GoogleCloudStorageFileSystem {
 
   public void setItemInfo(GoogleCloudStorageItemInfo itemInfo) {
     this.itemInfo = itemInfo;
-  }
-
-  private void setHttpReq(TrackingHttpRequestInitializerFromGcsio httpReqParam){
-    this.httpReq=httpReqParam;
   }
 
   private static ExecutorService createCachedExecutor() {
