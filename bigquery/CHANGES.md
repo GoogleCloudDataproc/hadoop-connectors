@@ -1,5 +1,7 @@
 ### 2.0.0 - 2022-XX-XX
 
+1.  Remove Hadoop 2.x support.
+
 1.  Update all dependencies to the latest versions.
 
 ### 1.2.0 - 2021-01-06

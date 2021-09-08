@@ -16,17 +16,16 @@
 
 set -euxo pipefail
 
-readonly HADOOP_PROFILE="$1"
-readonly TEST_TYPE="${2:-unittest}"
+readonly TEST_TYPE="${1:-unittest}"
 
 cd /hadoop-connectors
 
 # Run unit or integration tests and generate test coverage report
 if [[ $TEST_TYPE == unittest ]]; then
-  ./mvnw -B -e "-P${HADOOP_PROFILE}" -Pcoverage clean verify
+  ./mvnw -B -e -Pcoverage clean verify
 else
-  ./mvnw -B -e "-P${HADOOP_PROFILE}" -Pintegration-test -Pcoverage clean verify
+  ./mvnw -B -e -Pintegration-test -Pcoverage clean verify
 fi
 
 # Upload test coverage report to Codecov
-bash <(curl -s https://codecov.io/bash) -K -F "${HADOOP_PROFILE}${TEST_TYPE}"
+bash <(curl -s https://codecov.io/bash) -K -F "${TEST_TYPE}"

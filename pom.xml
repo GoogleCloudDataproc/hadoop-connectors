@@ -101,8 +101,7 @@
     <google.oauth-client.version>1.31.5</google.oauth-client.version>
     <google.protobuf.version>3.17.3</google.protobuf.version>
     <grpc.version>1.39.0</grpc.version>
-    <hadoop.two.version>2.10.1</hadoop.two.version>
-    <hadoop.three.version>3.2.2</hadoop.three.version>
+    <hadoop.version>3.3.1</hadoop.version>
 
     <!-- Test dependencies -->
     <google.truth.version>1.1.3</google.truth.version>
@@ -123,76 +122,6 @@
   </modules>
 
   <profiles>
-    <profile>
-      <id>hadoop2</id>
-      <properties>
-        <hadoop.identifier>hadoop2</hadoop.identifier>
-        <hadoop.version>${hadoop.two.version}</hadoop.version>
-      </properties>
-      <activation>
-        <activeByDefault>true</activeByDefault>
-      </activation>
-      <dependencyManagement>
-        <dependencies>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-common</artifactId>
-            <version>${hadoop.version}</version>
-            <scope>provided</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-annotations</artifactId>
-            <version>${hadoop.version}</version>
-            <scope>provided</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-mapreduce-client-core</artifactId>
-            <version>${hadoop.version}</version>
-            <scope>provided</scope>
-          </dependency>
-        </dependencies>
-      </dependencyManagement>
-    </profile>
-
-    <profile>
-      <id>hadoop3</id>
-      <properties>
-        <hadoop.identifier>hadoop3</hadoop.identifier>
-        <hadoop.version>${hadoop.three.version}</hadoop.version>
-      </properties>
-      <dependencyManagement>
-        <dependencies>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-client-api</artifactId>
-            <version>${hadoop.version}</version>
-            <scope>provided</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-common</artifactId>
-            <version>${hadoop.version}</version>
-            <scope>provided</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-mapreduce-client</artifactId>
-            <version>${hadoop.version}</version>
-            <scope>provided</scope>
-            <type>pom</type>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-client-runtime</artifactId>
-            <version>${hadoop.version}</version>
-            <scope>test</scope>
-          </dependency>
-        </dependencies>
-      </dependencyManagement>
-    </profile>
-
     <profile>
       <id>integration-test</id>
       <build>
@@ -487,6 +416,25 @@
         <artifactId>grpc-google-cloud-storage-v2</artifactId>
         <version>${google.cloud-storage.grpc.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-client-api</artifactId>
+        <version>${hadoop.version}</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-common</artifactId>
+        <version>${hadoop.version}</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-mapreduce-client</artifactId>
+        <version>${hadoop.version}</version>
+        <scope>provided</scope>
+        <type>pom</type>
+      </dependency>
 
       <!-- Test dependencies -->
       <dependency>
@@ -545,6 +493,12 @@
         <scope>test</scope>
       </dependency>
       <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-client-runtime</artifactId>
+        <version>${hadoop.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
         <groupId>org.assertj</groupId>
         <artifactId>assertj-core</artifactId>
         <version>${assertj.version}</version>
@@ -552,6 +506,7 @@
       </dependency>
     </dependencies>
   </dependencyManagement>
+
   <build>
     <resources>
       <resource>
@@ -607,11 +562,6 @@
         <plugin>
           <artifactId>maven-shade-plugin</artifactId>
           <version>3.2.4</version>
-        </plugin>
-        <plugin>
-          <groupId>org.codehaus.mojo</groupId>
-          <artifactId>build-helper-maven-plugin</artifactId>
-          <version>3.2.0</version>
         </plugin>
         <plugin>
           <groupId>org.jacoco</groupId>

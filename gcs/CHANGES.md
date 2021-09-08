@@ -1,5 +1,7 @@
 ### 3.0.0 - 2022-XX-XX
 
+1.  Remove Hadoop 2.x support.
+
 1.  Update all dependencies to the latest versions.
 
 1.  Add support for downscoped tokens in `AccessTokenProvider`.

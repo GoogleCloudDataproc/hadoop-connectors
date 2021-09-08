@@ -43,12 +43,12 @@
     <dependency>
       <groupId>com.google.cloud.bigdataoss</groupId>
       <artifactId>bigquery-connector</artifactId>
-      <version>${hadoop.identifier}-${bigquery-connector.version}</version>
+      <version>${bigquery-connector.version}</version>
     </dependency>
     <dependency>
       <groupId>com.google.cloud.bigdataoss</groupId>
       <artifactId>gcs-connector</artifactId>
-      <version>${hadoop.identifier}-${bigdataoss.version}</version>
+      <version>${bigdataoss.version}</version>
     </dependency>
     <dependency>
       <groupId>com.google.cloud.bigdataoss</groupId>
@@ -63,7 +63,7 @@
     <dependency>
       <groupId>com.google.cloud.bigdataoss</groupId>
       <artifactId>util-hadoop</artifactId>
-      <version>${hadoop.identifier}-${bigdataoss.version}</version>
+      <version>${bigdataoss.version}</version>
     </dependency>
   </dependencies>
 </project>

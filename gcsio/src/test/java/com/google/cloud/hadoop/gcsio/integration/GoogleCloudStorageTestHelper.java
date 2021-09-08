@@ -102,14 +102,17 @@ public class GoogleCloudStorageTestHelper {
     }
 
     if (expected.length != actual.length) {
-      fail(String.format(
-          "Length mismatch: expected: %d, actual: %d", expected.length, actual.length));
+      fail(
+          String.format(
+              "Length mismatch: expected: %d, actual: %d", expected.length, actual.length));
     }
 
     for (int i = 0; i < expected.length; ++i) {
       if (expected[i] != actual[i]) {
-        fail(String.format(
-            "Mismatch at index %d. expected: 0x%02x, actual: 0x%02x", i, expected[i], actual[i]));
+        fail(
+            String.format(
+                "Mismatch at index %d. expected: 0x%02x, actual: 0x%02x",
+                i, expected[i], actual[i]));
       }
     }
   }
@@ -121,15 +124,21 @@ public class GoogleCloudStorageTestHelper {
   }
 
   public static void assertObjectContent(
-      GoogleCloudStorage gcs, StorageResourceId resourceId,
-      GoogleCloudStorageReadOptions readOptions, byte[] expectedBytes)
+      GoogleCloudStorage gcs,
+      StorageResourceId resourceId,
+      GoogleCloudStorageReadOptions readOptions,
+      byte[] expectedBytes)
       throws IOException {
     assertObjectContent(gcs, resourceId, readOptions, expectedBytes, /* expectedBytesCount= */ 1);
   }
 
   public static void assertObjectContent(
-      GoogleCloudStorage gcs, StorageResourceId id, GoogleCloudStorageReadOptions readOptions,
-      byte[] expectedBytes, int expectedBytesCount, int offset)
+      GoogleCloudStorage gcs,
+      StorageResourceId id,
+      GoogleCloudStorageReadOptions readOptions,
+      byte[] expectedBytes,
+      int expectedBytesCount,
+      int offset)
       throws IOException {
     checkArgument(expectedBytesCount > 0, "expectedBytesCount should be greater than 0");
 
@@ -160,8 +169,11 @@ public class GoogleCloudStorageTestHelper {
   }
 
   public static void assertObjectContent(
-      GoogleCloudStorage gcs, StorageResourceId id, GoogleCloudStorageReadOptions readOptions,
-      byte[] expectedBytes, int expectedBytesCount)
+      GoogleCloudStorage gcs,
+      StorageResourceId id,
+      GoogleCloudStorageReadOptions readOptions,
+      byte[] expectedBytes,
+      int expectedBytesCount)
       throws IOException {
     assertObjectContent(gcs, id, readOptions, expectedBytes, expectedBytesCount, /* offset= */ 0);
   }
@@ -169,8 +181,8 @@ public class GoogleCloudStorageTestHelper {
   public static void assertObjectContent(
       GoogleCloudStorage gcs, StorageResourceId id, byte[] expectedBytes, int expectedBytesCount)
       throws IOException {
-    assertObjectContent(gcs, id, GoogleCloudStorageReadOptions.DEFAULT, expectedBytes,
-        expectedBytesCount);
+    assertObjectContent(
+        gcs, id, GoogleCloudStorageReadOptions.DEFAULT, expectedBytes, expectedBytesCount);
   }
 
   private static byte[] getExpectedBytesRead(byte[] expectedBytes, long totalRead, int read) {
@@ -286,7 +298,8 @@ public class GoogleCloudStorageTestHelper {
       }
 
       List<GoogleCloudStorageItemInfo> objectsToDelete =
-          bucketsToDelete.parallelStream()
+          bucketsToDelete
+              .parallelStream()
               .flatMap(
                   bucket -> {
                     try {
