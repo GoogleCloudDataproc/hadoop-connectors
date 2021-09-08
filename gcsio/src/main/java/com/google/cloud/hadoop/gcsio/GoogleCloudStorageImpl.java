@@ -788,29 +788,19 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           final GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
           throws IOException {
     logger.atFiner().log("open(%s, %s)", itemInfo.getResourceId(), readOptions);
+    checkNotNull(itemInfo,"Item info: %s cannot be null",itemInfo);
     Preconditions.checkArgument(
             itemInfo.getResourceId().isStorageObject(), "Expected full StorageObject id, got %s", itemInfo.getResourceId());
-
-    if (storageOptions.isGrpcEnabled()) {
-      return GoogleCloudStorageGrpcReadChannel
-              .open(storageStubProvider, storage, errorExtractor, itemInfo, readOptions);
-    }
-
-    // The underlying channel doesn't initially read data, which means that we won't see a
-    // FileNotFoundException until read is called. As a result, in order to find out if the object
-    // exists, we'll need to do an RPC (metadata or data). A metadata check should be a less
-    // expensive operation than a read data operation.
-//    GoogleCloudStorageItemInfo info;
     if (readOptions.getFastFailOnNotFound()) {
       if (!itemInfo.exists()) {
         throw createFileNotFoundException(
                 itemInfo.getResourceId().getBucketName(), itemInfo.getResourceId().getObjectName(), /* cause= */ null);
       }
     }
-//     else {
-//      itemInfo = null;
-//    }
-
+    if (storageOptions.isGrpcEnabled()) {
+      return GoogleCloudStorageGrpcReadChannel
+              .open(storageStubProvider, storage, errorExtractor, itemInfo, readOptions);
+    }
     return new GoogleCloudStorageReadChannel(
             storage, itemInfo, errorExtractor, clientRequestHelper, readOptions) {
 
