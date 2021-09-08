@@ -74,7 +74,6 @@ import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.PropertyUtil;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ascii;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -134,6 +133,7 @@ import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.BlockingThreadPoolExecutorService;
 import org.apache.hadoop.util.LambdaUtils;
 import com.google.common.util.concurrent.ForwardingExecutorService;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * This class provides a Hadoop compatible File System on top of Google Cloud Storage (GCS).
@@ -590,7 +590,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     AbstractFSBuilderImpl.rejectUnknownMandatoryKeys(mandatoryKeys,Collections.emptySet(),"for "+path);
     StorageResourceId storageResourceId = StorageResourceId.fromUriPath(rawPath.toUri(),false);
     GoogleCloudStorageItemInfo itemInfo = this.getGcsFs().getGcs().getItemInfo(storageResourceId);
-    checkArgument(itemInfo.exists()!=false,"Item info %s does not exist",itemInfo);
+    checkNotNull(itemInfo,"Item info cannot be null");
     logger.atFine().log("ItemInfo :%s",itemInfo);
     logger.atFine().log("File exists: %s",itemInfo.getResourceId());
     CompletableFuture<FSDataInputStream> result=new CompletableFuture<>();
@@ -601,7 +601,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   private FSDataInputStream open(GoogleCloudStorageItemInfo itemInfo, Path hadoopPath, int bufferSize) throws IOException {
     checkOpen();
     logger.atFiner().log("open(itemInfo: %s, bufferSize: %d [ignored])", itemInfo, bufferSize);
-    checkArgument(itemInfo.exists()!=false,"Item info %s does not exist",itemInfo);
+    checkNotNull(itemInfo,"Item info cannot be null");
     logger.atFine().log("File exists: %s",itemInfo.getResourceId());
     GoogleCloudStorageReadOptions readChannelOptions =
             getGcsFs().getOptions().getCloudStorageOptions().getReadChannelOptions();
@@ -611,6 +611,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     return new FSDataInputStream(in);
   }
+
   /**
    * Opens the given file for writing.
    *

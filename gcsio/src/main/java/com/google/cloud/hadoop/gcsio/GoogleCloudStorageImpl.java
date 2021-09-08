@@ -783,6 +783,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     };
   }
 
+  @Override
   public SeekableByteChannel open(
           final GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
           throws IOException {

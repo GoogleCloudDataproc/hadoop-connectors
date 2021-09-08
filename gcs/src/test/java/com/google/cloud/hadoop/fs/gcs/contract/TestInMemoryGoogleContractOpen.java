@@ -80,4 +80,15 @@ public class TestInMemoryGoogleContractOpen extends AbstractContractOpenTest {
      assertNull("exceptional uprating",
          builder.build().exceptionally(ex -> null).get());
   }
+
+  @Override
+  public void testAwaitFutureFailToFNFE() throws Throwable {
+    describe("Verify that FutureIOSupport.awaitFuture extracts IOExceptions");
+    FutureDataInputStreamBuilder builder =
+        getFileSystem().openFile(path("testAwaitFutureFailToFNFE"))
+            .opt("fs.test.something", true);
+      System.out.println("Inside test");
+    intercept(FileNotFoundException.class,
+        () -> FutureIOSupport.awaitFuture(builder.build()));
+  }
 }

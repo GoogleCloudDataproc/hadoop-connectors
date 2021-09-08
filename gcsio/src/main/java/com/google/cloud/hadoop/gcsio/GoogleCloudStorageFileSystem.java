@@ -338,7 +338,6 @@ public class GoogleCloudStorageFileSystem {
           throws IOException {
     logger.atFiner().log("open(path: %s, readOptions: %s)", itemInfo, readOptions);
     checkNotNull(itemInfo,"Item info cannot be null");
-    checkArgument(itemInfo.exists()!=false,"Item info %s does not exist",itemInfo);
     checkNotNull(UriPaths.fromResourceId(itemInfo.getResourceId(),false), "path should not be null");
     checkArgument(!itemInfo.isDirectory(), "Cannot open a directory for reading: %s", FileInfo.fromItemInfo(itemInfo).getPath());
     return gcs.open(itemInfo, readOptions);
