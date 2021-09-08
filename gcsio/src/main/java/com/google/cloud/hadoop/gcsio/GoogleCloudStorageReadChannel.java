@@ -172,7 +172,6 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     this.errorExtractor = errorExtractor;
     this.readOptions = readOptions;
     this.resourceId = resourceId;
-
     // Initialize metadata if available.
     GoogleCloudStorageItemInfo info = getInitialMetadata();
     if (info != null) {
@@ -180,7 +179,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     }
   }
 
-  public GoogleCloudStorageReadChannel(
+  GoogleCloudStorageReadChannel(
           Storage gcs,
           GoogleCloudStorageItemInfo itemInfo,
           ApiErrorExtractor errorExtractor,
@@ -193,11 +192,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     this.readOptions = readOptions;
     this.resourceId = itemInfo.getResourceId();
     this.itemInfo = itemInfo;
-    // Initialize metadata if available.
-//    GoogleCloudStorageItemInfo info = getInitialMetadata();
-    if (itemInfo != null) {
-      initMetadata(itemInfo);
-    }
+    checkNotNull(itemInfo,"Item info: %s cannot be null",itemInfo);
+    initMetadata(itemInfo);
   }
 
   /** Sets the Sleeper used for sleeping between retries. */
