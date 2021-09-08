@@ -179,7 +179,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     }
   }
 
-  GoogleCloudStorageReadChannel(
+  public GoogleCloudStorageReadChannel(
           Storage gcs,
           GoogleCloudStorageItemInfo itemInfo,
           ApiErrorExtractor errorExtractor,
