@@ -113,7 +113,6 @@ public class GoogleCloudStorageFileSystem {
   /** Cached executor for synchronous tasks. */
   private ExecutorService lazyExecutor = new LazyExecutorService();
 
-  private GoogleCloudStorageItemInfo itemInfo;
   // Comparator used for sorting paths.
   //
   // For some bulk operations, we need to operate on parent directories before
@@ -199,14 +198,6 @@ public class GoogleCloudStorageFileSystem {
             ? new PerformanceCachingGoogleCloudStorage(gcs, options.getPerformanceCacheOptions())
             : gcs;
     this.options = options;
-  }
-
-  public GoogleCloudStorageItemInfo getItemInfo() {
-    return itemInfo;
-  }
-
-  public void setItemInfo(GoogleCloudStorageItemInfo itemInfo) {
-    this.itemInfo = itemInfo;
   }
 
   private static ExecutorService createCachedExecutor() {
