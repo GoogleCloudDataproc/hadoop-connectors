@@ -473,7 +473,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     // Initialize the delegation token support, if it is configured
     initializeDelegationTokenSupport(config, path);
-    initThreadPools(config);
+    initThreadPools();
     configure(config);
   }
 
@@ -571,7 +571,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     return new FSDataInputStream(in);
   }
   //Conf not used in the method for sometime, as some changes need to be made for laters
-  private void initThreadPools(Configuration conf){
+  private void initThreadPools(){
     int maxThreads=DEFAULT_MAX_THREADS.getDefault();
     if (maxThreads < 2) {
       logger.atWarning().log("Maximum number of threads should at least be 2.");
@@ -594,11 +594,17 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     logger.atFine().log("ItemInfo :%s",itemInfo);
     logger.atFine().log("File exists: %s",itemInfo.getResourceId());
     CompletableFuture<FSDataInputStream> result=new CompletableFuture<>();
-    unboundedThreadPool.submit(()->LambdaUtils.eval(result,()->open(itemInfo,path,parameters.getBufferSize())));
+    try {
+      return  unboundedThreadPool.submit(()->LambdaUtils.eval(result,()->open(itemInfo,parameters.getBufferSize()))).get();
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    } catch (ExecutionException e) {
+      e.printStackTrace();
+    }
     return result;
   }
 
-  private FSDataInputStream open(GoogleCloudStorageItemInfo itemInfo, Path hadoopPath, int bufferSize) throws IOException {
+  protected FSDataInputStream open(GoogleCloudStorageItemInfo itemInfo, int bufferSize) throws IOException {
     checkOpen();
     logger.atFiner().log("open(itemInfo: %s, bufferSize: %d [ignored])", itemInfo, bufferSize);
     checkNotNull(itemInfo,"Item info cannot be null");
