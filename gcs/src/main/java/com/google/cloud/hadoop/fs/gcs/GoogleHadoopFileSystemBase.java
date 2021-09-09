@@ -18,9 +18,8 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType.FLUSHABLE_COMPOSITE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DEFAULT_MAX_THREADS;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.KEEP_ALIVE_TIME;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.CONFIG_KEY_PREFIXES;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DEFAULT_MAX_THREADS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE;
@@ -29,6 +28,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_TYPE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.KEEP_ALIVE_TIME;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT;
 import static com.google.cloud.hadoop.gcsio.CreateFileOptions.DEFAULT_OVERWRITE;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
@@ -42,8 +42,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.flogger.LazyArgs.lazy;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.Executors.newFixedThreadPool;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.CompletableFuture;
+
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.http.HttpTransport;
@@ -103,16 +102,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.impl.AbstractFSBuilderImpl;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -124,16 +124,15 @@ import org.apache.hadoop.fs.GlobPattern;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.XAttrSetFlag;
+import org.apache.hadoop.fs.impl.AbstractFSBuilderImpl;
 import org.apache.hadoop.fs.impl.OpenFileParameters;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.BlockingThreadPoolExecutorService;
 import org.apache.hadoop.util.LambdaUtils;
-import com.google.common.util.concurrent.ForwardingExecutorService;
-import org.checkerframework.checker.nullness.qual.Nullable;
+import org.apache.hadoop.util.Progressable;
 
 /**
  * This class provides a Hadoop compatible File System on top of Google Cloud Storage (GCS).
@@ -285,6 +284,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   protected long defaultBlockSize = BLOCK_SIZE.getDefault();
   /** The fixed reported permission of all files. */
   private FsPermission reportedPermissions;
+
   private ThreadPoolExecutor unboundedThreadPool;
   /**
    * GCS {@link FileChecksum} which takes constructor parameters to define the return values of the
@@ -570,32 +570,42 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     return new FSDataInputStream(in);
   }
-  //Conf not used in the method for sometime, as some changes need to be made for laters
-  private void initThreadPools(){
-    int maxThreads=DEFAULT_MAX_THREADS.getDefault();
+  // Conf not used in the method for sometime, as some changes need to be made for laters
+  private void initThreadPools() {
+    int maxThreads = DEFAULT_MAX_THREADS.getDefault();
     if (maxThreads < 2) {
       logger.atWarning().log("Maximum number of threads should at least be 2.");
       maxThreads = 2;
     }
-    int keepAliveTime=KEEP_ALIVE_TIME.getDefault();
-    unboundedThreadPool=new ThreadPoolExecutor(maxThreads,Integer.MAX_VALUE,
-            keepAliveTime,TimeUnit.SECONDS, new LinkedBlockingQueue<>(),
+    int keepAliveTime = KEEP_ALIVE_TIME.getDefault();
+    unboundedThreadPool =
+        new ThreadPoolExecutor(
+            maxThreads,
+            Integer.MAX_VALUE,
+            keepAliveTime,
+            TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(),
             BlockingThreadPoolExecutorService.newDaemonThreadFactory("gcs-transfer-unbounded"));
     unboundedThreadPool.allowCoreThreadTimeOut(true);
   }
+
   @Override
-  public CompletableFuture<FSDataInputStream> openFileWithOptions(final Path rawPath, final OpenFileParameters parameters) throws IOException{
-    final Path path=makeQualified(rawPath);
-    Set<String> mandatoryKeys=parameters.getMandatoryKeys();
-    AbstractFSBuilderImpl.rejectUnknownMandatoryKeys(mandatoryKeys,Collections.emptySet(),"for "+path);
-    StorageResourceId storageResourceId = StorageResourceId.fromUriPath(rawPath.toUri(),false);
+  public CompletableFuture<FSDataInputStream> openFileWithOptions(
+      final Path rawPath, final OpenFileParameters parameters) throws IOException {
+    final Path path = makeQualified(rawPath);
+    Set<String> mandatoryKeys = parameters.getMandatoryKeys();
+    AbstractFSBuilderImpl.rejectUnknownMandatoryKeys(
+        mandatoryKeys, Collections.emptySet(), "for " + path);
+    StorageResourceId storageResourceId = StorageResourceId.fromUriPath(rawPath.toUri(), false);
     GoogleCloudStorageItemInfo itemInfo = this.getGcsFs().getGcs().getItemInfo(storageResourceId);
-    checkNotNull(itemInfo,"Item info cannot be null");
-    logger.atFine().log("ItemInfo :%s",itemInfo);
-    logger.atFine().log("File exists: %s",itemInfo.getResourceId());
-    CompletableFuture<FSDataInputStream> result=new CompletableFuture<>();
+    checkNotNull(itemInfo, "Item info cannot be null");
+    logger.atFine().log("ItemInfo :%s", itemInfo);
+    logger.atFine().log("File exists: %s", itemInfo.getResourceId());
+    CompletableFuture<FSDataInputStream> result = new CompletableFuture<>();
     try {
-      return  unboundedThreadPool.submit(()->LambdaUtils.eval(result,()->open(itemInfo,parameters.getBufferSize()))).get();
+      return unboundedThreadPool
+          .submit(() -> LambdaUtils.eval(result, () -> open(itemInfo, parameters.getBufferSize())))
+          .get();
     } catch (InterruptedException e) {
       e.printStackTrace();
     } catch (ExecutionException e) {
@@ -604,16 +614,17 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     return result;
   }
 
-  protected FSDataInputStream open(GoogleCloudStorageItemInfo itemInfo, int bufferSize) throws IOException {
+  protected FSDataInputStream open(GoogleCloudStorageItemInfo itemInfo, int bufferSize)
+      throws IOException {
     checkOpen();
     logger.atFiner().log("open(itemInfo: %s, bufferSize: %d [ignored])", itemInfo, bufferSize);
-    checkNotNull(itemInfo,"Item info cannot be null");
-    logger.atFine().log("File exists: %s",itemInfo.getResourceId());
+    checkNotNull(itemInfo, "Item info cannot be null");
+    logger.atFine().log("File exists: %s", itemInfo.getResourceId());
     GoogleCloudStorageReadOptions readChannelOptions =
-            getGcsFs().getOptions().getCloudStorageOptions().getReadChannelOptions();
+        getGcsFs().getOptions().getCloudStorageOptions().getReadChannelOptions();
     logger.atFiner().log("Read channel options: %s", readChannelOptions);
     GoogleHadoopFSInputStream in =
-            new GoogleHadoopFSInputStream(this, itemInfo, readChannelOptions, statistics);
+        new GoogleHadoopFSInputStream(this, itemInfo, readChannelOptions, statistics);
 
     return new FSDataInputStream(in);
   }

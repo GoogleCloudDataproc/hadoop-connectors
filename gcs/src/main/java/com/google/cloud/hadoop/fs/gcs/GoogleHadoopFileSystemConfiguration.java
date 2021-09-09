@@ -95,10 +95,10 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>("fs.gs.block.size", 64 * 1024 * 1024L);
 
   public static final HadoopConfigurationProperty<Integer> DEFAULT_MAX_THREADS =
-          new HadoopConfigurationProperty<Integer>("fs.gs.default.max.threads",16);
+      new HadoopConfigurationProperty<Integer>("fs.gs.default.max.threads", 16);
 
   public static final HadoopConfigurationProperty<Integer> KEEP_ALIVE_TIME =
-          new HadoopConfigurationProperty<Integer>("fs.gs.keep.alive.time",60);
+      new HadoopConfigurationProperty<Integer>("fs.gs.keep.alive.time", 60);
 
   /** Configuration key for Delegation Token binding class. Default value: none */
   public static final HadoopConfigurationProperty<String> DELEGATION_TOKEN_BINDING_CLASS =
@@ -434,7 +434,8 @@ public class GoogleHadoopFileSystemConfiguration {
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
   @VisibleForTesting
-  public static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
+  public static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(
+      Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setCloudStorageOptions(getGcsOptionsBuilder(config).build())
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))

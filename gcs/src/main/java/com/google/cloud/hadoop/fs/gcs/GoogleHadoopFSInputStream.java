@@ -73,14 +73,14 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   }
 
   GoogleHadoopFSInputStream(
-          GoogleHadoopFileSystemBase ghfs,
-          GoogleCloudStorageItemInfo itemInfo,
-          GoogleCloudStorageReadOptions readOptions,
-          FileSystem.Statistics statistics)
-          throws IOException {
+      GoogleHadoopFileSystemBase ghfs,
+      GoogleCloudStorageItemInfo itemInfo,
+      GoogleCloudStorageReadOptions readOptions,
+      FileSystem.Statistics statistics)
+      throws IOException {
     logger.atFiner().log(
-            "GoogleHadoopFSInputStream(itemInfo: %s, readOptions: %s)", itemInfo, readOptions);
-    this.gcsPath = UriPaths.fromResourceId(itemInfo.getResourceId(),false);
+        "GoogleHadoopFSInputStream(itemInfo: %s, readOptions: %s)", itemInfo, readOptions);
+    this.gcsPath = UriPaths.fromResourceId(itemInfo.getResourceId(), false);
     this.statistics = statistics;
     this.totalBytesRead = 0;
     this.channel = ghfs.getGcsFs().open(itemInfo, readOptions);

@@ -98,8 +98,10 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
 
   @Override
   public SeekableByteChannel open(
-          GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions) throws IOException {
-    logger.atFiner().log("%s.open(%s, %s)", delegateClassName, itemInfo.getResourceId(), readOptions);
+      GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
+      throws IOException {
+    logger.atFiner().log(
+        "%s.open(%s, %s)", delegateClassName, itemInfo.getResourceId(), readOptions);
     return delegate.open(itemInfo, readOptions);
   }
 

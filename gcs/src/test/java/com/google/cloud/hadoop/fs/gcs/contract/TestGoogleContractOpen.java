@@ -45,5 +45,4 @@ public class TestGoogleContractOpen extends AbstractContractOpenTest {
   protected AbstractFSContract createContract(Configuration conf) {
     return new GoogleContract(conf, TEST_BUCKET_HELPER);
   }
-
 }

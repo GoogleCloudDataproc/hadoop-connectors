@@ -263,7 +263,8 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
   @Override
   public SeekableByteChannel open(
-      GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions) throws IOException {
+      GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
+      throws IOException {
     if (!itemInfo.exists()) {
       IOException notFoundException =
           createFileNotFoundException(
@@ -327,7 +328,6 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
         .get(itemInfo.getObjectName())
         .getReadChannel(itemInfo.getBucketName(), itemInfo.getObjectName(), readOptions);
   }
-
 
   @Override
   public synchronized void deleteBuckets(List<String> bucketNames) throws IOException {

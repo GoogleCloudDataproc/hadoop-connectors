@@ -785,24 +785,28 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   @Override
   public SeekableByteChannel open(
-          final GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
-          throws IOException {
-    logger.atFiner().log("open(%s, %s)", itemInfo.getResourceId(), readOptions);
-    checkNotNull(itemInfo,"Item info: %s cannot be null",itemInfo);
+      final GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
+      throws IOException {
+    checkNotNull(itemInfo, "Item info: %s cannot be null", itemInfo);
     Preconditions.checkArgument(
-            itemInfo.getResourceId().isStorageObject(), "Expected full StorageObject id, got %s", itemInfo.getResourceId());
+        itemInfo.getResourceId().isStorageObject(),
+        "Expected full StorageObject id, got %s",
+        itemInfo.getResourceId());
+    logger.atFiner().log("open(%s, %s)", itemInfo.getResourceId(), readOptions);
     if (readOptions.getFastFailOnNotFound()) {
       if (!itemInfo.exists()) {
         throw createFileNotFoundException(
-                itemInfo.getResourceId().getBucketName(), itemInfo.getResourceId().getObjectName(), /* cause= */ null);
+            itemInfo.getResourceId().getBucketName(),
+            itemInfo.getResourceId().getObjectName(),
+            /* cause= */ null);
       }
     }
     if (storageOptions.isGrpcEnabled()) {
-      return GoogleCloudStorageGrpcReadChannel
-              .open(storageStubProvider, storage, errorExtractor, itemInfo, readOptions);
+      return GoogleCloudStorageGrpcReadChannel.open(
+          storageStubProvider, storage, errorExtractor, itemInfo, readOptions);
     }
     return new GoogleCloudStorageReadChannel(
-            storage, itemInfo, errorExtractor, clientRequestHelper, readOptions) {
+        storage, itemInfo, errorExtractor, clientRequestHelper, readOptions) {
 
       @Override
       @Nullable

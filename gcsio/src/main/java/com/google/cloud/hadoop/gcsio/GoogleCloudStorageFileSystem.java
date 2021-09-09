@@ -185,7 +185,7 @@ public class GoogleCloudStorageFileSystem {
       throws IOException {
     this(gcsFn.apply(options.getCloudStorageOptions()), options);
   }
-  
+
   @VisibleForTesting
   public GoogleCloudStorageFileSystem(
       GoogleCloudStorage gcs, GoogleCloudStorageFileSystemOptions options) {
@@ -325,12 +325,17 @@ public class GoogleCloudStorageFileSystem {
     return gcs.open(resourceId, readOptions);
   }
 
-  public SeekableByteChannel open(GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
-          throws IOException {
+  public SeekableByteChannel open(
+      GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
+      throws IOException {
     logger.atFiner().log("open(Item info : %s, readOptions: %s)", itemInfo, readOptions);
-    checkNotNull(itemInfo,"Item info cannot be null");
-    checkNotNull(UriPaths.fromResourceId(itemInfo.getResourceId(),false), "path should not be null");
-    checkArgument(!itemInfo.isDirectory(), "Cannot open a directory for reading: %s", FileInfo.fromItemInfo(itemInfo).getPath());
+    checkNotNull(itemInfo, "Item info cannot be null");
+    checkNotNull(
+        UriPaths.fromResourceId(itemInfo.getResourceId(), false), "path should not be null");
+    checkArgument(
+        !itemInfo.isDirectory(),
+        "Cannot open a directory for reading: %s",
+        FileInfo.fromItemInfo(itemInfo).getPath());
     return gcs.open(itemInfo, readOptions);
   }
 

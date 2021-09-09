@@ -180,19 +180,19 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   }
 
   public GoogleCloudStorageReadChannel(
-          Storage gcs,
-          GoogleCloudStorageItemInfo itemInfo,
-          ApiErrorExtractor errorExtractor,
-          ClientRequestHelper<StorageObject> requestHelper,
-          @Nonnull GoogleCloudStorageReadOptions readOptions)
-          throws IOException {
+      Storage gcs,
+      GoogleCloudStorageItemInfo itemInfo,
+      ApiErrorExtractor errorExtractor,
+      ClientRequestHelper<StorageObject> requestHelper,
+      @Nonnull GoogleCloudStorageReadOptions readOptions)
+      throws IOException {
     this.gcs = gcs;
     this.clientRequestHelper = requestHelper;
     this.errorExtractor = errorExtractor;
     this.readOptions = readOptions;
     this.resourceId = itemInfo.getResourceId();
     this.itemInfo = itemInfo;
-    checkNotNull(itemInfo,"Item info: %s cannot be null",itemInfo);
+    checkNotNull(itemInfo, "Item info: %s cannot be null", itemInfo);
     initMetadata(itemInfo);
   }
 

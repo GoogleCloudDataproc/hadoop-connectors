@@ -51,7 +51,8 @@ public class ForwardingGoogleCloudStorageTest {
   private static final UpdatableItemInfo TEST_ITEM_INFO =
       new UpdatableItemInfo(TEST_STORAGE_RESOURCE_ID, null);
 
-  private static final GoogleCloudStorageItemInfo TEST_GCS_ITEM_INFO = GoogleCloudStorageItemInfo.createInferredDirectory(TEST_STORAGE_RESOURCE_ID);
+  private static final GoogleCloudStorageItemInfo TEST_GCS_ITEM_INFO =
+      GoogleCloudStorageItemInfo.createInferredDirectory(TEST_STORAGE_RESOURCE_ID);
 
   /** Sample list of updatable item infos. */
   private static final List<UpdatableItemInfo> TEST_ITEM_INFOS = Lists.newArrayList(TEST_ITEM_INFO);
@@ -157,13 +158,13 @@ public class ForwardingGoogleCloudStorageTest {
   @Test
   public void testOpenWithItemInfo() throws IllegalArgumentException, IOException {
     gcs.open(TEST_GCS_ITEM_INFO);
-    verify(mockGcsDelegate).open(eq(TEST_GCS_ITEM_INFO),eq(GoogleCloudStorageReadOptions.DEFAULT));
+    verify(mockGcsDelegate).open(eq(TEST_GCS_ITEM_INFO), eq(GoogleCloudStorageReadOptions.DEFAULT));
   }
 
   @Test
   public void testOpenWithItemInfoWithOptions() throws IllegalArgumentException, IOException {
-    gcs.open(TEST_GCS_ITEM_INFO,TEST_READ_OPTIONS);
-    verify(mockGcsDelegate).open(eq(TEST_GCS_ITEM_INFO),eq(TEST_READ_OPTIONS));
+    gcs.open(TEST_GCS_ITEM_INFO, TEST_READ_OPTIONS);
+    verify(mockGcsDelegate).open(eq(TEST_GCS_ITEM_INFO), eq(TEST_READ_OPTIONS));
   }
 
   @Test
