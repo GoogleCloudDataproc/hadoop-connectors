@@ -155,6 +155,17 @@ public interface GoogleCloudStorage {
   default SeekableByteChannel open(StorageResourceId resourceId) throws IOException {
     return open(resourceId, GoogleCloudStorageReadOptions.DEFAULT);
   }
+  /**
+   * Opens an object for reading.
+   *
+   * @param itemInfo provides information about the given object
+   * @return a channel for reading from the given object
+   * @throws java.io.FileNotFoundException if the given object does not exist
+   * @throws IOException if object exists but cannot be opened
+   */
+  default SeekableByteChannel open(GoogleCloudStorageItemInfo itemInfo) throws IOException {
+    return open(itemInfo, GoogleCloudStorageReadOptions.DEFAULT);
+  }
 
   /**
    * Opens an object for reading.
