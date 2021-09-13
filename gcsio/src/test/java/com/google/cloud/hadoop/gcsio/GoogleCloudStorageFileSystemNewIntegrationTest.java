@@ -296,8 +296,10 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
+            getRequestString(bucketName, dirObject),
             listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null));
+                bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null))
+        .inOrder();
 
     assertThat(dirInfo.exists()).isTrue();
     assertThat(dirInfo.getPath().toString()).isEqualTo(dirObjectUri + "/");
@@ -348,6 +350,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
+            getRequestString(bucketName, dirObject),
             listRequestWithTrailingDelimiter(
                 bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null));
 
