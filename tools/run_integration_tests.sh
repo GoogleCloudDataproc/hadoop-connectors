@@ -14,17 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# tools/run_integration_tests.sh (hadoop2 | hadoop3) <project_id> <service_account_email> <path_to_p12> [optional_maven_parameters, [...]]
+# tools/run_integration_tests.sh <project_id> <service_account_email> <path_to_p12> [optional_maven_parameters, [...]]
 
 set -Eeuo pipefail
 
-HADOOP_VERSION=$1
-export GCS_TEST_PROJECT_ID=$2
-export GCS_TEST_SERVICE_ACCOUNT=$3
-GCS_TEST_PRIVATE_KEYFILE=$4
+export GCS_TEST_PROJECT_ID=$1
+export GCS_TEST_SERVICE_ACCOUNT=$2
+GCS_TEST_PRIVATE_KEYFILE=$3
 
 print_usage() {
-  echo -n "$0 (hadoop2 | hadoop3) <project ID> <service_account_email> <path_to_p12> [optional_maven_parameters, [...]]"
+  echo -n "$0 <project ID> <service_account_email> <path_to_p12> [optional_maven_parameters, [...]]"
 }
 
 check_required_param() {
@@ -38,7 +37,6 @@ check_required_param() {
 }
 
 check_required_params() {
-  check_required_param "${HADOOP_VERSION}" "Hadoop version required."
   check_required_param "${GCS_TEST_PROJECT_ID}" "Project ID required."
   check_required_param "${GCS_TEST_SERVICE_ACCOUNT}" "Service account email is required."
   check_required_param "${GCS_TEST_PRIVATE_KEYFILE}" "Private key file is required."
@@ -76,4 +74,4 @@ export GCS_TEST_PRIVATE_KEYFILE
 export HDFS_ROOT=file:///tmp
 export RUN_INTEGRATION_TESTS=true
 
-./mvnw -B -e -T1C "-P${HADOOP_VERSION}" -Pintegration-test clean verify "${@:5}"
+./mvnw -B -e -T1C -Pintegration-test clean verify "${@:5}"

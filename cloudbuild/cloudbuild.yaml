@@ -4,12 +4,12 @@ steps:
     id: 'docker-build'
     args: ['build', '--tag=gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit', '-f', 'cloudbuild/Dockerfile', '.']
 
-  # 2. Run Hadoop 3 unit tests concurrently
+  # 2. Run unit tests
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
-    id: 'unit-tests-hadoop3'
+    id: 'unit-tests'
     waitFor: ['docker-build']
     entrypoint: 'bash'
-    args: ['/hadoop-connectors/cloudbuild/presubmit.sh', 'hadoop3', 'unittest']
+    args: ['/hadoop-connectors/cloudbuild/presubmit.sh', 'unittest']
     env:
       - 'CODECOV_TOKEN=$_CODECOV_TOKEN'
       - 'VCS_BRANCH_NAME=$BRANCH_NAME'
@@ -17,12 +17,12 @@ steps:
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
 
-  # 3. Run Hadoop 3 integration tests concurrently with Hadoop 2 integration tests
+  # 3. Run integration tests concurrently with unit tests
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
-    id: 'integration-tests-hadoop3'
-    waitFor: ['unit-tests-hadoop3']
+    id: 'integration-tests'
+    waitFor: ['docker-build']
     entrypoint: 'bash'
-    args: ['/hadoop-connectors/cloudbuild/presubmit.sh', 'hadoop3', 'integrationtest']
+    args: ['/hadoop-connectors/cloudbuild/presubmit.sh', 'integrationtest']
     env:
       - 'GCS_TEST_PROJECT_ID=$PROJECT_ID'
       - 'CODECOV_TOKEN=$_CODECOV_TOKEN'
@@ -36,3 +36,4 @@ timeout: 2400s
 
 options:
   machineType: 'N1_HIGHCPU_32'
+
