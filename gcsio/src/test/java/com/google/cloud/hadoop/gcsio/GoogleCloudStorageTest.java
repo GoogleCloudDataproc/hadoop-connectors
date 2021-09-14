@@ -1237,6 +1237,51 @@ public class GoogleCloudStorageTest {
         .inOrder();
   }
 
+  @Test
+  public void testOpenNoSupportGzipEncodingAndNoFailFastOnNotFoundItemInfo() throws Exception {
+    byte[] testData = {0x01, 0x02, 0x03, 0x05, 0x08};
+
+    MockHttpTransport transport = mockTransport(dataResponse(testData));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder()
+            .setSupportGzipEncoding(false)
+            .setFastFailOnNotFound(false)
+            .build();
+    StorageObject storageObject = newStorageObject(BUCKET_NAME, OBJECT_NAME);
+    GoogleCloudStorageItemInfo itemInfo =
+        GoogleCloudStorageImpl.createItemInfoForStorageObject(RESOURCE_ID, storageObject);
+    GoogleCloudStorageReadChannel readChannel =
+        (GoogleCloudStorageReadChannel) gcs.open(itemInfo, readOptions);
+
+    byte[] actualData = new byte[testData.length];
+    int bytesRead = readChannel.read(ByteBuffer.wrap(actualData));
+
+    assertThat(bytesRead).isEqualTo(testData.length);
+    assertThat(actualData).isEqualTo(testData);
+    assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
+        .contains(getMediaRequestString(BUCKET_NAME, OBJECT_NAME, itemInfo.getContentGeneration()));
+  }
+
+  @Test
+  public void testOpenNoSupportGzipEncodingAndFailFastOnNotFoundItemInfo() throws Exception {
+    byte[] testData = {0x01, 0x02, 0x03, 0x05, 0x08};
+
+    MockHttpTransport transport = mockTransport(dataResponse(testData));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder()
+            .setSupportGzipEncoding(false)
+            .setFastFailOnNotFound(true)
+            .build();
+    GoogleCloudStorageItemInfo itemInfo = GoogleCloudStorageItemInfo.createNotFound(RESOURCE_ID);
+    assertThrows(FileNotFoundException.class, () -> gcs.open(itemInfo, readOptions));
+  }
+
   /** Test in-place forward seeks smaller than seek buffer, smaller than limit. */
   @Test
   public void testInplaceSeekSmallerThanSeekLimit() throws Exception {

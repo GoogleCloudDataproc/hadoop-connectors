@@ -337,6 +337,20 @@ public class GoogleCloudStorageTest {
   }
 
   @Test
+  public void testOpenFileItemInfoWithMatchingSize() throws IOException {
+    String bucketName = getSharedBucketName();
+
+    StorageResourceId objectToCreate =
+        new StorageResourceId(bucketName, "testOpenFileWithMatchingSize_Object");
+    GoogleCloudStorageItemInfo itemInfo = rawStorage.getItemInfo(objectToCreate);
+    byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
+
+    try (SeekableByteChannel channel = rawStorage.open(itemInfo)) {
+      assertThat(channel.size()).isEqualTo(objectBytes.length);
+    }
+  }
+
+  @Test
   public void testOpenFileWithMatchingSizeAndSpecifiedReadOptions() throws IOException {
     String bucketName = getSharedBucketName();
 
@@ -347,6 +361,23 @@ public class GoogleCloudStorageTest {
 
     try (SeekableByteChannel channel =
         rawStorage.open(objectToCreate, GoogleCloudStorageReadOptions.DEFAULT)) {
+      assertThat(channel.size()).isEqualTo(objectBytes.length);
+    }
+  }
+
+  @Test
+  public void testOpenFileItemInfoWithMatchingSizeAndSpecifiedReadOptions() throws IOException {
+    String bucketName = getSharedBucketName();
+
+    StorageResourceId objectToCreate =
+        new StorageResourceId(
+            bucketName, "testOpenFileWithMatchingSizeAndSpecifiedReadOptions_Object");
+    GoogleCloudStorageItemInfo itemInfo =
+        GoogleCloudStorageItemInfo.createInferredDirectory(objectToCreate);
+    byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
+
+    try (SeekableByteChannel channel =
+        rawStorage.open(itemInfo, GoogleCloudStorageReadOptions.DEFAULT)) {
       assertThat(channel.size()).isEqualTo(objectBytes.length);
     }
   }
@@ -1146,6 +1177,15 @@ public class GoogleCloudStorageTest {
     assertThrows(
         FileNotFoundException.class,
         () -> rawStorage.open(new StorageResourceId(bucketName, "testOpenNonExistentItem_Object")));
+  }
+
+  @Test
+  public void testOpenItemInfoNonExistentItem() throws IOException {
+    String bucketName = getSharedBucketName();
+    StorageResourceId nonExistent =
+        new StorageResourceId(bucketName, "testOpenNonExistentItem_Object");
+    GoogleCloudStorageItemInfo itemInfo = GoogleCloudStorageItemInfo.createNotFound(nonExistent);
+    assertThrows(FileNotFoundException.class, () -> rawStorage.open(itemInfo));
   }
 
   @Test

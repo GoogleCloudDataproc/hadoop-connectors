@@ -1305,6 +1305,66 @@ public class GoogleCloudStorageNewIntegrationTest {
         .containsExactly(getRequestString(testBucket, testFile.getObjectName()));
   }
 
+  @Test
+  public void open_gzipEncoded_succeeds_ifContentEncodingSupportEnabled_itemInfo()
+      throws Exception {
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    StorageResourceId testFile = new StorageResourceId(testBucket, getTestResource());
+    GoogleCloudStorageItemInfo itemInfo = GoogleCloudStorageItemInfo.createNotFound(testFile);
+    try (OutputStream os =
+        new GZIPOutputStream(
+            Channels.newOutputStream(gcsfsIHelper.gcs.create(testFile, GZIP_CREATE_OPTIONS)))) {
+      os.write("content".getBytes(UTF_8));
+    }
+
+    long generationId = gcsfsIHelper.gcs.getItemInfo(testFile).getContentGeneration();
+
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    byte[] readContent = new byte[7];
+    final GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setSupportGzipEncoding(true).build();
+    try (SeekableByteChannel channel = gcs.open(itemInfo, readOptions)) {
+      channel.read(ByteBuffer.wrap(readContent));
+    }
+
+    assertThat(new String(readContent, UTF_8)).isEqualTo("content");
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(testBucket, testFile.getObjectName()),
+            getMediaRequestString(testBucket, testFile.getObjectName(), generationId));
+  }
+
+  @Test
+  public void open_gzipEncoded_succeeds_ifContentEncodingSupportDisabled_itemInfo()
+      throws Exception {
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    StorageResourceId testFile = new StorageResourceId(testBucket, getTestResource());
+
+    try (OutputStream os =
+        new GZIPOutputStream(
+            Channels.newOutputStream(gcsfsIHelper.gcs.create(testFile, GZIP_CREATE_OPTIONS)))) {
+      os.write("content".getBytes(UTF_8));
+    }
+
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setSupportGzipEncoding(false).build();
+    IOException e = assertThrows(IOException.class, () -> gcs.open(testFile, readOptions));
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo("Cannot read GZIP encoded files - content encoding support is disabled.");
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(getRequestString(testBucket, testFile.getObjectName()));
+  }
+
   private static List<String> getObjectNames(List<GoogleCloudStorageItemInfo> listedObjects) {
     return listedObjects.stream().map(GoogleCloudStorageItemInfo::getObjectName).collect(toList());
   }

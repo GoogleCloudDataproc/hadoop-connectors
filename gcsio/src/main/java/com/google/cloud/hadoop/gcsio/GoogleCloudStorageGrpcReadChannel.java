@@ -247,6 +247,9 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     // The non-gRPC read channel has special support for gzip. This channel doesn't
     // decompress gzip-encoded objects on the fly, so best to fail fast rather than return
     // gibberish unexpectedly.
+    if (!itemInfo.exists()) {
+      throw new IOException("Item not found");
+    }
     String contentEncoding = itemInfo.getContentEncoding();
     if (contentEncoding != null && contentEncoding.contains("gzip")) {
       throw new IOException(

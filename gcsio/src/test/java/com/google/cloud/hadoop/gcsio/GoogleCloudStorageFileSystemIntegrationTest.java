@@ -587,6 +587,24 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
                 + " but the requested generation is deleted.");
   }
 
+  @Test
+  public void read_failure_ifItemInfoNull_itemInfo() throws IOException {
+    URI testObject = gcsiHelper.getUniqueObjectUri("generation-strict");
+    String message1 = "Hello world!\n";
+    gcsiHelper.writeTextFile(testObject, message1);
+    // These read options force the readChannel to open stream again on second read.
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder()
+            .setFadvise(Fadvise.RANDOM)
+            .setMinRangeRequestSize(0)
+            .build();
+    NullPointerException expected =
+        assertThrows(
+            NullPointerException.class,
+            () -> gcsiHelper.open(((GoogleCloudStorageItemInfo) null), readOptions));
+    assertThat(expected).hasMessageThat().contains("null");
+  }
+
   /** Validates that we cannot open a non-existent object. */
   @Test
   public void testOpenNonExistentObject() throws IOException {
