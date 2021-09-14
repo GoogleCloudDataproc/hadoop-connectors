@@ -106,11 +106,11 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
     logger.atFiner().log("%s.deleteObjects(%s)", delegateClassName, fullObjectNames);
     delegate.deleteObjects(fullObjectNames);
   }
+
   @Override
-  public long getStatistics(GoogleCloudStorageStatistics key){
+  public long getStatistics(GoogleCloudStorageStatistics key) {
     return 0;
   }
-
 
   @Override
   public void copy(

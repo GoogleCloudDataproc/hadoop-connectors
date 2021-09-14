@@ -74,9 +74,8 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     return storageOptions;
   }
 
-
   @Override
-  public long getStatistics(GoogleCloudStorageStatistics key){
+  public long getStatistics(GoogleCloudStorageStatistics key) {
     return 0;
   }
 
