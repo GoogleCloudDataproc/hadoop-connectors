@@ -22,19 +22,10 @@ import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 
-import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
+import com.google.api.client.util.DateTime;
+import com.google.api.services.storage.model.StorageObject;
+import com.google.cloud.hadoop.gcsio.*;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
-import com.google.cloud.hadoop.gcsio.ListObjectOptions;
-import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorage;
-import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
-import com.google.cloud.hadoop.gcsio.StorageResourceId;
-import com.google.cloud.hadoop.gcsio.StringPaths;
-import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
-import com.google.cloud.hadoop.gcsio.VerificationAttributes;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
@@ -57,17 +48,13 @@ import com.google.common.primitives.Ints;
 import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -365,6 +352,19 @@ public class GoogleCloudStorageTest {
     }
   }
 
+  static StorageObject newStorageObject(String bucketName, String objectName) {
+    Random r = new Random();
+    return new StorageObject()
+        .setBucket(bucketName)
+        .setName(objectName)
+        .setSize(BigInteger.valueOf(r.nextInt(Integer.MAX_VALUE)))
+        .setStorageClass("standard")
+        .setGeneration((long) r.nextInt(Integer.MAX_VALUE))
+        .setMetageneration((long) r.nextInt(Integer.MAX_VALUE))
+        .setTimeCreated(new DateTime(new Date()))
+        .setUpdated(new DateTime(new Date()));
+  }
+
   @Test
   public void testOpenFileItemInfoWithMatchingSizeAndSpecifiedReadOptions() throws IOException {
     String bucketName = getSharedBucketName();
@@ -372,10 +372,12 @@ public class GoogleCloudStorageTest {
     StorageResourceId objectToCreate =
         new StorageResourceId(
             bucketName, "testOpenFileWithMatchingSizeAndSpecifiedReadOptions_Object");
-    GoogleCloudStorageItemInfo itemInfo =
-        GoogleCloudStorageItemInfo.createInferredDirectory(objectToCreate);
+    StorageObject storageObject =
+        newStorageObject(bucketName, "testOpenFileWithMatchingSizeAndSpecifiedReadOptions_Object");
+    //    GoogleCloudStorageItemInfo itemInfo =
+    //        GoogleCloudStorageImpl.createItemInfoForStorageObject(objectToCreate, storageObject);
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
-
+    GoogleCloudStorageItemInfo itemInfo = rawStorage.getItemInfo(objectToCreate);
     try (SeekableByteChannel channel =
         rawStorage.open(itemInfo, GoogleCloudStorageReadOptions.DEFAULT)) {
       assertThat(channel.size()).isEqualTo(objectBytes.length);
