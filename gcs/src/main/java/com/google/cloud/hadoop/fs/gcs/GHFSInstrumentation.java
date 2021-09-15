@@ -349,4 +349,18 @@ class GHFSInstrumentation
 
   @Override
   public void getMetrics(MetricsCollector metricsCollector, boolean b) {}
+
+  /** Indicate that GCS created a file. */
+  public void fileCreated() {
+    incrementCounter(GHFSStatistic.FILES_CREATED, 1);
+  }
+
+  /**
+   * Indicate that GCS deleted one or more files.
+   *
+   * @param count number of files.
+   */
+  public void fileDeleted(int count) {
+    incrementCounter(GHFSStatistic.FILES_DELETED, count);
+  }
 }

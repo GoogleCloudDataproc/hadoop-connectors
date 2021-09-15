@@ -16,7 +16,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GHFSStatisticTypeEnum.TYPE_DURATION;
+import static com.google.cloud.hadoop.fs.gcs.GHFSStatisticTypeEnum.*;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -34,11 +34,31 @@ import org.apache.hadoop.fs.statistics.StreamStatisticNames;
  */
 @InterfaceStability.Unstable
 enum GHFSStatistic {
-  /** Low-level duration counters */
-  ACTION_HTTP_HEAD_REQUEST(
-      StoreStatisticNames.ACTION_HTTP_HEAD_REQUEST, "HEAD request.", TYPE_DURATION),
-  ACTION_HTTP_GET_REQUEST(
-      StoreStatisticNames.ACTION_HTTP_GET_REQUEST, "GET request.", TYPE_DURATION);
+
+  /** FileSystem Level statistics */
+  FILES_CREATED(
+      "files_created", "Total number of files created through the object store.", TYPE_COUNTER),
+  FILES_DELETED(
+      "files_deleted", "Total number of files deleted from the object store.", TYPE_COUNTER),
+  INVOCATION_COPY_FROM_LOCAL_FILE(
+      StoreStatisticNames.OP_COPY_FROM_LOCAL_FILE, "Calls of copyFromLocalFile()", TYPE_COUNTER),
+  INVOCATION_CREATE(StoreStatisticNames.OP_CREATE, "Calls of create()", TYPE_COUNTER),
+  INVOCATION_CREATE_NON_RECURSIVE(
+      StoreStatisticNames.OP_CREATE_NON_RECURSIVE, "Calls of createNonRecursive()", TYPE_COUNTER),
+  INVOCATION_DELETE(StoreStatisticNames.OP_DELETE, "Calls of delete()", TYPE_COUNTER),
+  INVOCATION_EXISTS(StoreStatisticNames.OP_EXISTS, "Calls of exists()", TYPE_COUNTER),
+  INVOCATION_GET_DELEGATION_TOKEN(
+      StoreStatisticNames.OP_GET_DELEGATION_TOKEN, "Calls of getDelegationToken()", TYPE_COUNTER),
+  INVOCATION_GET_FILE_CHECKSUM(
+      StoreStatisticNames.OP_GET_FILE_CHECKSUM, "Calls of getFileChecksum()", TYPE_COUNTER),
+  INVOCATION_GET_FILE_STATUS(
+      StoreStatisticNames.OP_GET_FILE_STATUS, "Calls of getFileStatus()", TYPE_COUNTER),
+  INVOCATION_GLOB_STATUS(StoreStatisticNames.OP_GLOB_STATUS, "Calls of globStatus()", TYPE_COUNTER),
+  INVOCATION_LIST_FILES(StoreStatisticNames.OP_LIST_FILES, "Calls of listFiles()", TYPE_COUNTER),
+  INVOCATION_LIST_STATUS(StoreStatisticNames.OP_LIST_STATUS, "Calls of listStatus()", TYPE_COUNTER),
+  INVOCATION_MKDIRS(StoreStatisticNames.OP_MKDIRS, "Calls of mkdirs()", TYPE_COUNTER),
+  INVOCATION_OPEN(StoreStatisticNames.OP_OPEN, "Calls of open()", TYPE_COUNTER),
+  INVOCATION_RENAME(StoreStatisticNames.OP_RENAME, "Calls of rename()", TYPE_COUNTER);
 
   /** A map used to support the {@link #fromSymbol(String)} call. */
   private static final Map<String, GHFSStatistic> SYMBOL_MAP =
