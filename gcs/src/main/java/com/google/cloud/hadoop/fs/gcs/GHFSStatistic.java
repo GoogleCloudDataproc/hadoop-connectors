@@ -58,7 +58,63 @@ enum GHFSStatistic {
   INVOCATION_LIST_STATUS(StoreStatisticNames.OP_LIST_STATUS, "Calls of listStatus()", TYPE_COUNTER),
   INVOCATION_MKDIRS(StoreStatisticNames.OP_MKDIRS, "Calls of mkdirs()", TYPE_COUNTER),
   INVOCATION_OPEN(StoreStatisticNames.OP_OPEN, "Calls of open()", TYPE_COUNTER),
-  INVOCATION_RENAME(StoreStatisticNames.OP_RENAME, "Calls of rename()", TYPE_COUNTER);
+  INVOCATION_RENAME(StoreStatisticNames.OP_RENAME, "Calls of rename()", TYPE_COUNTER),
+
+  /** Stream Reads */
+  STREAM_READ_BYTES(
+      StreamStatisticNames.STREAM_READ_BYTES,
+      "Bytes read from an input stream in read() calls",
+      TYPE_COUNTER),
+  STREAM_READ_CLOSE_OPERATIONS(
+      StreamStatisticNames.STREAM_READ_CLOSE_OPERATIONS,
+      "Total count of times an attempt to close an input stream was made",
+      TYPE_COUNTER),
+  STREAM_READ_EXCEPTIONS(
+      StreamStatisticNames.STREAM_READ_EXCEPTIONS,
+      "Count of exceptions raised during input stream reads",
+      TYPE_COUNTER),
+  STREAM_READ_OPERATIONS(
+      StreamStatisticNames.STREAM_READ_OPERATIONS,
+      "Count of read() operations in an input stream",
+      TYPE_COUNTER),
+  STREAM_READ_OPERATIONS_INCOMPLETE(
+      StreamStatisticNames.STREAM_READ_OPERATIONS_INCOMPLETE,
+      "Count of incomplete read() operations in an input stream",
+      TYPE_COUNTER),
+  STREAM_READ_SEEK_BACKWARD_OPERATIONS(
+      StreamStatisticNames.STREAM_READ_SEEK_BACKWARD_OPERATIONS,
+      "Count of executed seek operations which went backwards in a stream",
+      TYPE_COUNTER),
+  STREAM_READ_SEEK_BYTES_BACKWARDS(
+      StreamStatisticNames.STREAM_READ_SEEK_BYTES_BACKWARDS,
+      "Count of bytes moved backwards during seek operations" + " in an input stream",
+      TYPE_COUNTER),
+  STREAM_READ_SEEK_BYTES_SKIPPED(
+      StreamStatisticNames.STREAM_READ_SEEK_BYTES_SKIPPED,
+      "Count of bytes skipped during forward seek operations" + " an input stream",
+      TYPE_COUNTER),
+  STREAM_READ_SEEK_FORWARD_OPERATIONS(
+      StreamStatisticNames.STREAM_READ_SEEK_FORWARD_OPERATIONS,
+      "Count of executed seek operations which went forward in" + " an input stream",
+      TYPE_COUNTER),
+  STREAM_READ_SEEK_OPERATIONS(
+      StreamStatisticNames.STREAM_READ_SEEK_OPERATIONS,
+      "Count of seek operations in an input stream",
+      TYPE_COUNTER),
+  STREAM_READ_TOTAL_BYTES(
+      StreamStatisticNames.STREAM_READ_TOTAL_BYTES,
+      "Total count of bytes read from an input stream",
+      TYPE_COUNTER),
+
+  /** Stream Write statistics */
+  STREAM_WRITE_EXCEPTIONS(
+      StreamStatisticNames.STREAM_WRITE_EXCEPTIONS,
+      "Count of stream write failures reported",
+      TYPE_COUNTER),
+  STREAM_WRITE_BYTES(
+      StreamStatisticNames.STREAM_WRITE_BYTES,
+      "Count of bytes written to output stream" + " (including all not yet uploaded)",
+      TYPE_COUNTER);
 
   /** A map used to support the {@link #fromSymbol(String)} call. */
   private static final Map<String, GHFSStatistic> SYMBOL_MAP =

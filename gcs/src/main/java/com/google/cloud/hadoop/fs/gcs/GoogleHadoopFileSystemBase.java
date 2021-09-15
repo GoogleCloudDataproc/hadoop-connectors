@@ -119,6 +119,8 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.statistics.IOStatistics;
+import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -148,7 +150,7 @@ import org.apache.hadoop.util.Progressable;
  * throw or to return false.
  */
 public abstract class GoogleHadoopFileSystemBase extends FileSystem
-    implements FileSystemDescriptor {
+    implements FileSystemDescriptor, IOStatisticsSource {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
@@ -1880,6 +1882,21 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     entryPoint(GHFSStatistic.INVOCATION_EXISTS);
     return super.exists(f);
   }
+
+  public GHFSInstrumentation getInstrumentation() {
+    return this.instrumentation;
+  }
+
+  /**
+   * Get the instrumentation's IOStatistics.
+   *
+   * @return statistics
+   */
+  @Override
+  public IOStatistics getIOStatistics() {
+    return instrumentation != null ? instrumentation.getIOStatistics() : null;
+  }
+
   /**
    * Entry point to an operation. Increments the statistic; verifies the FS is active.
    *

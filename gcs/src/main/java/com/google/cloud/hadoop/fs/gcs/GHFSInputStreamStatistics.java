@@ -63,8 +63,6 @@ public interface GHFSInputStreamStatistics extends AutoCloseable, GHFSStatisticI
   @Override
   void close();
 
-  long getClosed();
-
   /**
    * The bytes read in read() operations.
    *
@@ -79,4 +77,38 @@ public interface GHFSInputStreamStatistics extends AutoCloseable, GHFSStatisticI
    * @return the total number of bytes read from GHFS.
    */
   long getTotalBytesRead();
+
+  long getBytesSkippedOnSeek();
+
+  long getBytesBackwardsOnSeek();
+
+  long getSeekOperations();
+
+  long getReadExceptions();
+
+  long getReadOperations();
+
+  long getReadsIncomplete();
+
+  long getCloseOperations();
+
+  long getForwardSeekOperations();
+
+  long getBackwardSeekOperations();
+
+  /**
+   * Get the value of a counter.
+   *
+   * @param name counter name
+   * @return the value or null if no matching counter was found.
+   */
+  Long lookupCounterValue(String name);
+
+  /**
+   * Get the value of a gauge.
+   *
+   * @param name gauge name
+   * @return the value or null if no matching gauge was found.
+   */
+  Long lookupGaugeValue(String name);
 }
