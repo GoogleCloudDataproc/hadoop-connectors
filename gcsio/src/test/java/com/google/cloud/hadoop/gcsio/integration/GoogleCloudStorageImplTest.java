@@ -138,8 +138,7 @@ public class GoogleCloudStorageImplTest {
         newStorageObject(resourceId.getBucketName(), resourceId.getObjectName());
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
-    GoogleCloudStorageItemInfo itemInfo =
-        GoogleCloudStorageImpl.createItemInfoForStorageObject(resourceId, storageObject);
+    GoogleCloudStorageItemInfo itemInfo = trackingGcs.delegate.getItemInfo(resourceId);
     try (SeekableByteChannel readChannel = trackingGcs.delegate.open(itemInfo, readOptions)) {
       assertThat(readChannel.size()).isEqualTo(expectedSize);
     }

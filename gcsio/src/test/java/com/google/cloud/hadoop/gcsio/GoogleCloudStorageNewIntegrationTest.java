@@ -1323,8 +1323,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     String testBucket = gcsfsIHelper.sharedBucketName1;
     StorageResourceId testFile = new StorageResourceId(testBucket, getTestResource());
     StorageObject storageObject = newStorageObject(testBucket, getTestResource());
-    GoogleCloudStorageItemInfo itemInfo =
-        GoogleCloudStorageImpl.createItemInfoForStorageObject(testFile, storageObject);
+    GoogleCloudStorageItemInfo itemInfo = gcsfsIHelper.gcs.getItemInfo(testFile);
     try (OutputStream os =
         new GZIPOutputStream(
             Channels.newOutputStream(gcsfsIHelper.gcs.create(testFile, GZIP_CREATE_OPTIONS)))) {
