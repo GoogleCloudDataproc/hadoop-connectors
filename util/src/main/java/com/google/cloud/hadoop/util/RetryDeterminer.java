@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-
 package com.google.cloud.hadoop.util;
 
 import com.google.api.client.http.HttpResponseException;

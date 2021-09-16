@@ -41,7 +41,8 @@ public class RetryDeterminerTest {
     builder.setLowLevelHttpResponse(resp);
     try {
       HttpResponse res =
-          builder.build()
+          builder
+              .build()
               .createRequestFactory()
               .buildGetRequest(HttpTesting.SIMPLE_GENERIC_URL)
               .execute();

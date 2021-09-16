@@ -37,22 +37,23 @@ public class BigQueryStrings {
    * @return A string of the form [projectId]:[datasetId].[tableId].
    */
   public static String toString(TableReference tableRef) {
-    Preconditions.checkArgument(!Strings.isNullOrEmpty(tableRef.getDatasetId()),
+    Preconditions.checkArgument(
+        !Strings.isNullOrEmpty(tableRef.getDatasetId()),
         "tableRef must contain non-empty DatasetId.");
-    Preconditions.checkArgument(!Strings.isNullOrEmpty(tableRef.getTableId()),
-        "tableRef must contain non-empty TableId.");
+    Preconditions.checkArgument(
+        !Strings.isNullOrEmpty(tableRef.getTableId()), "tableRef must contain non-empty TableId.");
     if (Strings.isNullOrEmpty(tableRef.getProjectId())) {
       return String.format("%s.%s", tableRef.getDatasetId(), tableRef.getTableId());
     } else {
-      return String.format("%s:%s.%s",
-          tableRef.getProjectId(), tableRef.getDatasetId(), tableRef.getTableId());
+      return String.format(
+          "%s:%s.%s", tableRef.getProjectId(), tableRef.getDatasetId(), tableRef.getTableId());
     }
   }
 
   /**
    * Parses a string into a TableReference; projectId may be omitted if the caller defines a
-   * "default" project; in such a case, getProjectId() of the returned TableReference will
-   * return null.
+   * "default" project; in such a case, getProjectId() of the returned TableReference will return
+   * null.
    *
    * @param tableRefString A string of the form [projectId]:[datasetId].[tableId].
    * @return a TableReference with the parsed components.
@@ -69,9 +70,11 @@ public class BigQueryStrings {
       datasetAndTableString = tableRefString.substring(projectIdEnd + 1);
     }
 
-    Preconditions.checkArgument(datasetAndTableString.matches(DATASET_AND_TABLE_REGEX),
+    Preconditions.checkArgument(
+        datasetAndTableString.matches(DATASET_AND_TABLE_REGEX),
         "Invalid datasetAndTableString '%s'; must match regex '%s'.",
-        datasetAndTableString, DATASET_AND_TABLE_REGEX);
+        datasetAndTableString,
+        DATASET_AND_TABLE_REGEX);
 
     List<String> idParts = DOT_SPLITTER.splitToList(datasetAndTableString);
     tableRef.setDatasetId(idParts.get(0));

@@ -16,17 +16,13 @@ package com.google.cloud.hadoop.gcsio;
 
 /**
  * DeletionBehavior distills out the fine-grained expected behavior of a FileSystem in various
- * edge/error cases; implementations associated with each possible FileSystem thus encapsulate
- * the minor differences in behavior in delete() calls.
+ * edge/error cases; implementations associated with each possible FileSystem thus encapsulate the
+ * minor differences in behavior in delete() calls.
  */
 public interface DeletionBehavior {
-  /**
-   * Returns the MethodOutcome of trying non-recursive deletes for non-empty directories.
-   */
+  /** Returns the MethodOutcome of trying non-recursive deletes for non-empty directories. */
   MethodOutcome nonEmptyDeleteOutcome();
 
-  /**
-   * Returns the MethodOutcome of trying to delete a non-existent filename.
-   */
+  /** Returns the MethodOutcome of trying to delete a non-existent filename. */
   MethodOutcome nonExistentDeleteOutcome();
 }

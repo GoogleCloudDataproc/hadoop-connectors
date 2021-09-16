@@ -37,9 +37,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/**
- * Unit tests for BigQueryUtils.
- */
+/** Unit tests for BigQueryUtils. */
 @RunWith(JUnit4.class)
 public class BigQueryUtilsTest {
   // Mock BigQuery.
@@ -148,12 +146,9 @@ public class BigQueryUtilsTest {
     verify(mockProgressable, atLeastOnce()).progress();
   }
 
-  /**
-   * Tests waitForJobCompletion method of BigQueryUtils when the job returns an error.
-   */
+  /** Tests waitForJobCompletion method of BigQueryUtils when the job returns an error. */
   @Test
-  public void testWaitForJobCompletionError()
-      throws InterruptedException, IOException {
+  public void testWaitForJobCompletionError() throws InterruptedException, IOException {
     // Return completed job.
     when(mockJobsGet.execute()).thenReturn(job);
 
@@ -170,15 +165,13 @@ public class BigQueryUtilsTest {
     assertThat(e).hasMessageThat().contains(jobReference.getJobId());
   }
 
-  /**
-   * Tests getSchemaFromString method of BigQueryUtils for simple schema.
-   */
+  /** Tests getSchemaFromString method of BigQueryUtils for simple schema. */
   @Test
   public void testGetSchemaFromString() {
     // Set fields schema for testing.
     String fields =
         "[{'name': 'MyName', 'type': 'STRING'},"
-        + "{'name': 'Number', 'type': 'INTEGER', 'mode': 'sample'}]";
+            + "{'name': 'Number', 'type': 'INTEGER', 'mode': 'sample'}]";
     List<TableFieldSchema> list = BigQueryUtils.getSchemaFromString(fields);
     assertThat(list).hasSize(2);
     assertThat(list.get(0).getName()).isEqualTo("MyName");
@@ -189,17 +182,15 @@ public class BigQueryUtilsTest {
     assertThat(list.get(1).getMode()).isEqualTo("sample");
   }
 
-  /**
-   * Tests getSchemaFromString method of BigQueryUtils for nested schema.
-   */
+  /** Tests getSchemaFromString method of BigQueryUtils for nested schema. */
   @Test
   public void testGetSchemaFromStringNested() {
     // Set fields schema for testing.
     String fields =
         "[{'name': 'MyName', 'type': 'STRING'},"
-        + "{'name': 'MyNestedField', 'type': 'RECORD', 'mode': 'repeated', 'fields': ["
+            + "{'name': 'MyNestedField', 'type': 'RECORD', 'mode': 'repeated', 'fields': ["
             + "{'name': 'field1', 'type': 'INTEGER'}, {'name': 'field2', 'type': 'STRING'}"
-        + "]}]";
+            + "]}]";
     List<TableFieldSchema> list = BigQueryUtils.getSchemaFromString(fields);
     assertThat(list).hasSize(2);
     assertThat(list.get(0).getName()).isEqualTo("MyName");
@@ -219,52 +210,42 @@ public class BigQueryUtilsTest {
     assertThat(nestedList.get(1).getType()).isEqualTo("STRING");
   }
 
-  /**
-   * Tests getSchemaFromString method of BigQueryUtils for schema with a missing 'name' field.
-   */
+  /** Tests getSchemaFromString method of BigQueryUtils for schema with a missing 'name' field. */
   @Test
   public void testGetSchemaFromStringWithMissingName() {
     // Set bad schema for testing; missing 'name' for the first schema entry.
     String fields =
-        "[{'type': 'STRING'},"
-        + "{'name': 'Number', 'type': 'INTEGER', 'mode': 'sample'}]";
+        "[{'type': 'STRING'}," + "{'name': 'Number', 'type': 'INTEGER', 'mode': 'sample'}]";
     assertThrows(IllegalArgumentException.class, () -> BigQueryUtils.getSchemaFromString(fields));
   }
 
-  /**
-   * Tests getSchemaFromString method of BigQueryUtils for schema with a missing 'type' field.
-   */
+  /** Tests getSchemaFromString method of BigQueryUtils for schema with a missing 'type' field. */
   @Test
   public void testGetSchemaFromStringWithMissingType() {
     // Bad schema, missing 'type' in the second entry.
     String fields =
-        "[{'name': 'MyName', 'type': 'STRING'},"
-        + "{'name': 'Number', 'mode': 'sample'}]";
+        "[{'name': 'MyName', 'type': 'STRING'}," + "{'name': 'Number', 'mode': 'sample'}]";
     assertThrows(IllegalArgumentException.class, () -> BigQueryUtils.getSchemaFromString(fields));
   }
 
-  /**
-   * Tests getSchemaFromString for a schema where a top-level entry is not a JsonObject.
-   */
+  /** Tests getSchemaFromString for a schema where a top-level entry is not a JsonObject. */
   @Test
   public void testGetSchemaFromStringWithTopLevelNonJsonObject() {
     // Bad schema, missing 'type' in the second entry.
     String fields =
         "[{'name': 'MyName', 'type': 'STRING'},"
-        + "foo,"
-        + "{'name': 'Number', 'type': 'INTEGER', 'mode': 'sample'}]";
+            + "foo,"
+            + "{'name': 'Number', 'type': 'INTEGER', 'mode': 'sample'}]";
     assertThrows(IllegalArgumentException.class, () -> BigQueryUtils.getSchemaFromString(fields));
   }
 
-  /**
-   * Tests getSchemaFromString for a schema where a "RECORD" entry lacks 'fields'.
-   */
+  /** Tests getSchemaFromString for a schema where a "RECORD" entry lacks 'fields'. */
   @Test
   public void testGetSchemaFromStringRecordTypeLacksFields() {
     // Missing 'fields' entry for an entry of type "RECORD".
     String fields =
         "[{'name': 'MyName', 'type': 'STRING'},"
-        + "{'name': 'MyNestedField', 'type': 'RECORD', 'mode': 'repeated'}]";
+            + "{'name': 'MyNestedField', 'type': 'RECORD', 'mode': 'repeated'}]";
     assertThrows(IllegalArgumentException.class, () -> BigQueryUtils.getSchemaFromString(fields));
   }
 }

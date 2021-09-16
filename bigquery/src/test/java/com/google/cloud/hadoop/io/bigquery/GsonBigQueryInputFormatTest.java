@@ -63,9 +63,7 @@ import org.junit.runners.JUnit4;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
-/**
- * Unit tests for GsonBigQueryInputFormat.
- */
+/** Unit tests for GsonBigQueryInputFormat. */
 @RunWith(JUnit4.class)
 public class GsonBigQueryInputFormatTest {
 
@@ -116,8 +114,7 @@ public class GsonBigQueryInputFormatTest {
    * @throws IOException on IOError.
    */
   @Before
-  public void setUp()
-      throws IOException {
+  public void setUp() throws IOException {
     MockitoAnnotations.initMocks(this);
 
     configuredLoggers.add(Logger.getLogger(GsonBigQueryInputFormat.class.getName()));
@@ -165,38 +162,31 @@ public class GsonBigQueryInputFormatTest {
 
     table = new Table().setTableReference(tableRef).setLocation("test_location");
 
-    when(mockBigQueryHelper.getRawBigquery())
-        .thenReturn(mockBigquery);
+    when(mockBigQueryHelper.getRawBigquery()).thenReturn(mockBigquery);
 
     // Mocks for Bigquery jobs.
-    when(mockBigquery.jobs())
-        .thenReturn(mockBigqueryJobs);
+    when(mockBigquery.jobs()).thenReturn(mockBigqueryJobs);
 
     // Mock getting Bigquery job.
     when(mockBigqueryJobs.get(any(String.class), any(String.class)))
         .thenReturn(mockBigqueryJobsGet);
     when(mockBigqueryJobsGet.setLocation(any(String.class))).thenReturn(mockBigqueryJobsGet);
-    when(mockBigqueryJobsGet.execute())
-        .thenReturn(jobHandle);
+    when(mockBigqueryJobsGet.execute()).thenReturn(jobHandle);
 
     // Mock inserting Bigquery job.
     when(mockBigqueryJobs.insert(any(String.class), any(Job.class)))
         .thenReturn(mockBigqueryJobsInsert);
-    when(mockBigqueryJobsInsert.execute())
-        .thenReturn(jobHandle);
+    when(mockBigqueryJobsInsert.execute()).thenReturn(jobHandle);
 
     // Mocks for Bigquery tables.
-    when(mockBigquery.tables())
-        .thenReturn(mockBigqueryTables);
+    when(mockBigquery.tables()).thenReturn(mockBigqueryTables);
 
     // Mocks for getting Bigquery table.
     when(mockBigqueryTables.get(any(String.class), any(String.class), any(String.class)))
         .thenReturn(mockBigqueryTablesGet);
-    when(mockBigqueryTablesGet.execute())
-        .thenReturn(table);
+    when(mockBigqueryTablesGet.execute()).thenReturn(table);
 
-    when(mockBigQueryHelper.getTable(any(TableReference.class)))
-        .thenReturn(table);
+    when(mockBigQueryHelper.getTable(any(TableReference.class))).thenReturn(table);
 
     when(mockBigQueryHelper.createJobReference(
             any(String.class), any(String.class), any(String.class)))
@@ -206,8 +196,7 @@ public class GsonBigQueryInputFormatTest {
   }
 
   @After
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     Path tmpPath = new Path(BigQueryConfiguration.TEMP_GCS_PATH.get(config, config::get));
     tmpPath.getFileSystem(config).delete(tmpPath, true);
     verifyNoMoreInteractions(mockBigQueryHelper);
@@ -275,7 +264,8 @@ public class GsonBigQueryInputFormatTest {
   public void testGetSplitsFederated() throws Exception {
     JobContext jobContext = new JobContextImpl(config, new JobID());
 
-    table.setType("EXTERNAL")
+    table
+        .setType("EXTERNAL")
         .setExternalDataConfiguration(
             new ExternalDataConfiguration()
                 .setSourceFormat("NEWLINE_DELIMITED_JSON")
@@ -318,12 +308,9 @@ public class GsonBigQueryInputFormatTest {
     assertThrows(IOException.class, () -> gsonBigQueryInputFormat.getSplits(jobContext));
   }
 
-  /**
-   * Tests the cleanupJob method of GsonBigQueryInputFormat with intermediate delete.
-   */
+  /** Tests the cleanupJob method of GsonBigQueryInputFormat with intermediate delete. */
   @Test
-  public void testCleanupJobWithIntermediateDeleteAndGcsDelete()
-      throws IOException {
+  public void testCleanupJobWithIntermediateDeleteAndGcsDelete() throws IOException {
     config.setBoolean(BigQueryConfiguration.DELETE_EXPORT_FILES_FROM_GCS.getKey(), true);
 
     Path tempPath = new Path(BigQueryConfiguration.TEMP_GCS_PATH.get(config, config::get));
@@ -345,12 +332,9 @@ public class GsonBigQueryInputFormatTest {
     verify(mockBigQueryHelper, times(1)).getTable(eq(tableRef));
   }
 
-  /**
-   * Tests the cleanupJob method of GsonBigQueryInputFormat with intermediate delete.
-   */
+  /** Tests the cleanupJob method of GsonBigQueryInputFormat with intermediate delete. */
   @Test
-  public void testCleanupJobWithIntermediateDeleteNoGcsDelete()
-      throws IOException {
+  public void testCleanupJobWithIntermediateDeleteNoGcsDelete() throws IOException {
     config.setBoolean(BigQueryConfiguration.DELETE_EXPORT_FILES_FROM_GCS.getKey(), false);
 
     Path tempPath = new Path(BigQueryConfiguration.TEMP_GCS_PATH.get(config, config::get));
@@ -372,16 +356,12 @@ public class GsonBigQueryInputFormatTest {
     verify(mockBigQueryHelper, times(1)).getTable(eq(tableRef));
   }
 
-  /**
-   * Tests the cleanupJob method of GsonBigQueryInputFormat with no intermediate delete.
-   */
+  /** Tests the cleanupJob method of GsonBigQueryInputFormat with no intermediate delete. */
   @Test
-  public void testCleanupJobWithNoIntermediateDelete()
-      throws IOException {
+  public void testCleanupJobWithNoIntermediateDelete() throws IOException {
     config.setBoolean(BigQueryConfiguration.DELETE_EXPORT_FILES_FROM_GCS.getKey(), true);
 
-    when(mockBigQueryHelper.getTable(any(TableReference.class)))
-        .thenReturn(new Table());
+    when(mockBigQueryHelper.getTable(any(TableReference.class))).thenReturn(new Table());
 
     Path tempPath = new Path(BigQueryConfiguration.TEMP_GCS_PATH.get(config, config::get));
     FileSystem fs = tempPath.getFileSystem(config);
@@ -407,8 +387,7 @@ public class GsonBigQueryInputFormatTest {
    * export.
    */
   @Test
-  public void testCleanupJobWithIntermediateDeleteNoShardedExport()
-      throws IOException {
+  public void testCleanupJobWithIntermediateDeleteNoShardedExport() throws IOException {
     config.setBoolean(BigQueryConfiguration.DELETE_EXPORT_FILES_FROM_GCS.getKey(), true);
 
     // GCS cleanup should still happen.
@@ -430,15 +409,11 @@ public class GsonBigQueryInputFormatTest {
     verifyNoMoreInteractions(mockBigquery);
   }
 
-  /**
-   * Helper class to provide a mock Bigquery for testing.
-   */
-  class GsonBigQueryInputFormatForTest
-    extends GsonBigQueryInputFormat {
+  /** Helper class to provide a mock Bigquery for testing. */
+  class GsonBigQueryInputFormatForTest extends GsonBigQueryInputFormat {
 
     @Override
-    public Bigquery getBigQuery(Configuration config)
-        throws GeneralSecurityException, IOException {
+    public Bigquery getBigQuery(Configuration config) throws GeneralSecurityException, IOException {
       return mockBigquery;
     }
 
@@ -455,8 +430,7 @@ public class GsonBigQueryInputFormatTest {
   static class GsonBigQueryInputFormatForTestGeneralSecurityException
       extends GsonBigQueryInputFormat {
     @Override
-    public Bigquery getBigQuery(Configuration config)
-        throws GeneralSecurityException, IOException {
+    public Bigquery getBigQuery(Configuration config) throws GeneralSecurityException, IOException {
       throw new GeneralSecurityException();
     }
 

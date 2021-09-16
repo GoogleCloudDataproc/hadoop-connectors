@@ -32,9 +32,7 @@ import org.junit.runners.JUnit4;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
-/**
- * Unit tests for BigQueryConfigurationTest.
- */
+/** Unit tests for BigQueryConfigurationTest. */
 @RunWith(JUnit4.class)
 public class BigQueryConfigurationTest {
 
@@ -151,16 +149,11 @@ public class BigQueryConfigurationTest {
     checkNotNull(BigQueryConfiguration.getTemporaryPathRoot(conf, mockJobID));
   }
 
-  /**
-   * Tests the BigQueryConfiguration configureBigQueryInput method.
-   */
+  /** Tests the BigQueryConfiguration configureBigQueryInput method. */
   @Test
   public void testConfigureBigQueryInput() throws IOException {
     BigQueryConfiguration.configureBigQueryInput(
-        conf,
-        INPUT_PROJECT_ID,
-        INPUT_DATASET_ID,
-        INPUT_TABLE_ID);
+        conf, INPUT_PROJECT_ID, INPUT_DATASET_ID, INPUT_TABLE_ID);
     assertThat(BigQueryConfiguration.INPUT_PROJECT_ID.get(conf, conf::get))
         .isEqualTo(INPUT_PROJECT_ID);
     assertThat(BigQueryConfiguration.INPUT_DATASET_ID.get(conf, conf::get))
@@ -171,17 +164,11 @@ public class BigQueryConfigurationTest {
     assertThat(BigQueryConfiguration.PROJECT_ID.get(conf, conf::get)).isEqualTo(INPUT_PROJECT_ID);
   }
 
-  /**
-   * Tests the BigQueryConfiguration configureBigQueryOutput method.
-   */
+  /** Tests the BigQueryConfiguration configureBigQueryOutput method. */
   @Test
   public void testConfigureBigQueryOutput() throws IOException {
     BigQueryConfiguration.configureBigQueryOutput(
-        conf,
-        OUTPUT_PROJECT_ID,
-        OUTPUT_DATASET_ID,
-        OUTPUT_TABLE_ID,
-        OUTPUT_TABLE_SCHEMA);
+        conf, OUTPUT_PROJECT_ID, OUTPUT_DATASET_ID, OUTPUT_TABLE_ID, OUTPUT_TABLE_SCHEMA);
     assertThat(BigQueryConfiguration.OUTPUT_PROJECT_ID.get(conf, conf::get))
         .isEqualTo(OUTPUT_PROJECT_ID);
     assertThat(BigQueryConfiguration.OUTPUT_DATASET_ID.get(conf, conf::get))
@@ -198,16 +185,9 @@ public class BigQueryConfigurationTest {
   @Test
   public void testConfigureBigQueryInputThenOutput() throws IOException {
     BigQueryConfiguration.configureBigQueryInput(
-        conf,
-        INPUT_PROJECT_ID,
-        INPUT_DATASET_ID,
-        INPUT_TABLE_ID);
+        conf, INPUT_PROJECT_ID, INPUT_DATASET_ID, INPUT_TABLE_ID);
     BigQueryConfiguration.configureBigQueryOutput(
-        conf,
-        OUTPUT_PROJECT_ID,
-        OUTPUT_DATASET_ID,
-        OUTPUT_TABLE_ID,
-        OUTPUT_TABLE_SCHEMA);
+        conf, OUTPUT_PROJECT_ID, OUTPUT_DATASET_ID, OUTPUT_TABLE_ID, OUTPUT_TABLE_SCHEMA);
 
     assertThat(BigQueryConfiguration.INPUT_PROJECT_ID.get(conf, conf::get))
         .isEqualTo(INPUT_PROJECT_ID);
@@ -231,16 +211,9 @@ public class BigQueryConfigurationTest {
   public void testConfigureBigQueryInputThenOutputWithPresetJobProject() throws IOException {
     conf.set(BigQueryConfiguration.PROJECT_ID.getKey(), JOB_PROJECT_ID);
     BigQueryConfiguration.configureBigQueryInput(
-        conf,
-        INPUT_PROJECT_ID,
-        INPUT_DATASET_ID,
-        INPUT_TABLE_ID);
+        conf, INPUT_PROJECT_ID, INPUT_DATASET_ID, INPUT_TABLE_ID);
     BigQueryConfiguration.configureBigQueryOutput(
-        conf,
-        OUTPUT_PROJECT_ID,
-        OUTPUT_DATASET_ID,
-        OUTPUT_TABLE_ID,
-        OUTPUT_TABLE_SCHEMA);
+        conf, OUTPUT_PROJECT_ID, OUTPUT_DATASET_ID, OUTPUT_TABLE_ID, OUTPUT_TABLE_SCHEMA);
 
     assertThat(BigQueryConfiguration.INPUT_PROJECT_ID.get(conf, conf::get))
         .isEqualTo(INPUT_PROJECT_ID);
@@ -264,11 +237,7 @@ public class BigQueryConfigurationTest {
   public void testConfigureBigQueryDefaultToJobProject() throws IOException {
     conf.set(BigQueryConfiguration.PROJECT_ID.getKey(), JOB_PROJECT_ID);
 
-    BigQueryConfiguration.configureBigQueryInput(
-        conf,
-        "",
-        INPUT_DATASET_ID,
-        INPUT_TABLE_ID);
+    BigQueryConfiguration.configureBigQueryInput(conf, "", INPUT_DATASET_ID, INPUT_TABLE_ID);
 
     assertThat(BigQueryConfiguration.INPUT_PROJECT_ID.get(conf, conf::get))
         .isEqualTo(JOB_PROJECT_ID);
@@ -277,11 +246,7 @@ public class BigQueryConfigurationTest {
     assertThat(BigQueryConfiguration.INPUT_TABLE_ID.get(conf, conf::get)).isEqualTo(INPUT_TABLE_ID);
 
     BigQueryConfiguration.configureBigQueryOutput(
-        conf,
-        null,
-        OUTPUT_DATASET_ID,
-        OUTPUT_TABLE_ID,
-        OUTPUT_TABLE_SCHEMA);
+        conf, null, OUTPUT_DATASET_ID, OUTPUT_TABLE_ID, OUTPUT_TABLE_SCHEMA);
 
     assertThat(BigQueryConfiguration.OUTPUT_PROJECT_ID.get(conf, conf::get))
         .isEqualTo(JOB_PROJECT_ID);

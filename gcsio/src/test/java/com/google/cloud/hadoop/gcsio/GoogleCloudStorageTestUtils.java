@@ -66,7 +66,6 @@ public final class GoogleCloudStorageTestUtils {
         options);
   }
 
-
   public static MockLowLevelHttpResponse resumableUploadResponse(String bucket, String object) {
     String uploadId = UUID.randomUUID().toString();
     return new MockLowLevelHttpResponse()
