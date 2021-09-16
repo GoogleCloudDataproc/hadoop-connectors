@@ -32,7 +32,7 @@ jar is loaded, you can add
 `HADOOP_CLASSPATH=$HADOOP_CLASSPATH:</path/to/gcs-connector.jar>` to
 `hadoop-env.sh` in the Hadoop configuration directory.
 
-## Configure
+## Configuring the connector
 
 To begin, you will need a JSON keyfile so the connector can authenticate to
 Google Cloud Storage. You can follow
@@ -49,7 +49,7 @@ Additional properties can be specified for the Cloud Storage connector,
 including alternative authentication options. For more information, see the
 documentation in the [CONFIGURATION.md](/gcs/CONFIGURATION.md).
 
-### Configure Hadoop
+### Configuring Hadoop
 
 To configure Hadoop to use GCS connector you need to configure following
 properties in `core-site.xml` on your Hadoop cluster:
@@ -87,7 +87,7 @@ properties in `core-site.xml` on your Hadoop cluster:
 </property>
 ```
 
-## Configure Spark
+### Configuring Spark
 
 Note that you do not need to configure Hadoop `core-site.xml` in order to use
 the GCS connector with Spark.
