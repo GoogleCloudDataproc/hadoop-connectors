@@ -22,9 +22,7 @@ import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 
-/**
- * InputFormat to generate and ingest Avro-based BigQuery exports.
- */
+/** InputFormat to generate and ingest Avro-based BigQuery exports. */
 public class AvroBigQueryInputFormat
     extends AbstractBigQueryInputFormat<LongWritable, GenericData.Record> {
   @Override

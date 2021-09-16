@@ -60,11 +60,12 @@ public class GsonRecordReader extends RecordReader<LongWritable, JsonObject> {
   public void initialize(InputSplit genericSplit, TaskAttemptContext context)
       throws IOException, InterruptedException {
     if (logger.atFine().isEnabled()) {
-        logger.atFine().log(
-            "initialize('%s', '%s')",
-            HadoopToStringUtil.toString(genericSplit), HadoopToStringUtil.toString(context));
+      logger.atFine().log(
+          "initialize('%s', '%s')",
+          HadoopToStringUtil.toString(genericSplit), HadoopToStringUtil.toString(context));
     }
-    Preconditions.checkArgument(genericSplit instanceof FileSplit,
+    Preconditions.checkArgument(
+        genericSplit instanceof FileSplit,
         "InputSplit genericSplit should be an instance of FileSplit.");
     // Get FileSplit.
     FileSplit fileSplit = (FileSplit) genericSplit;
@@ -80,8 +81,7 @@ public class GsonRecordReader extends RecordReader<LongWritable, JsonObject> {
    * @throws IOException on IO Error.
    */
   @Override
-  public boolean nextKeyValue()
-      throws IOException {
+  public boolean nextKeyValue() throws IOException {
     // If there is no next value, return false. Set current key and value to null.
     // Different Hadoop recordreaders have different behavior for calling current key and value
     // after nextKeyValue returns false.
@@ -125,8 +125,7 @@ public class GsonRecordReader extends RecordReader<LongWritable, JsonObject> {
    * @throws IOException on IO Error.
    */
   @Override
-  public float getProgress()
-      throws IOException {
+  public float getProgress() throws IOException {
     return lineReader.getProgress();
   }
 
@@ -136,8 +135,7 @@ public class GsonRecordReader extends RecordReader<LongWritable, JsonObject> {
    * @throws IOException on IO Error.
    */
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     lineReader.close();
   }
 }

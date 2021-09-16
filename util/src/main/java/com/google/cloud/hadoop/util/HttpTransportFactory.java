@@ -40,15 +40,11 @@ import org.apache.http.client.CredentialsProvider;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.HttpClientBuilder;
 
-/**
- * Factory for creating HttpTransport types.
- */
+/** Factory for creating HttpTransport types. */
 public class HttpTransportFactory {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  /**
-   * Types of HttpTransports the factory can create.
-   */
+  /** Types of HttpTransports the factory can create. */
   public enum HttpTransportType {
     APACHE,
     JAVA_NET,
@@ -204,6 +200,7 @@ public class HttpTransportFactory {
 
   /**
    * Parse an HTTP proxy from a String address.
+   *
    * @param proxyAddress The address of the proxy of the form (https?://)HOST:PORT.
    * @return The URI of the proxy.
    * @throws IllegalArgumentException If the address is invalid.
@@ -221,12 +218,15 @@ public class HttpTransportFactory {
       int port = uri.getPort();
       checkArgument(
           Strings.isNullOrEmpty(scheme) || scheme.matches("https?"),
-          "HTTP proxy address '%s' has invalid scheme '%s'.", proxyAddress, scheme);
+          "HTTP proxy address '%s' has invalid scheme '%s'.",
+          proxyAddress,
+          scheme);
       checkArgument(!Strings.isNullOrEmpty(host), "Proxy address '%s' has no host.", proxyAddress);
       checkArgument(port != -1, "Proxy address '%s' has no port.", proxyAddress);
       checkArgument(
           uri.equals(new URI(scheme, null, host, port, null, null, null)),
-          "Invalid proxy address '%s'.", proxyAddress);
+          "Invalid proxy address '%s'.",
+          proxyAddress);
       return uri;
     } catch (URISyntaxException e) {
       throw new IllegalArgumentException(

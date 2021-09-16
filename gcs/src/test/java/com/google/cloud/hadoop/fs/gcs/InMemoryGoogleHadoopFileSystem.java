@@ -24,11 +24,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import org.apache.hadoop.conf.Configuration;
 
-/**
- * Helper class to create an in-memory GHFS from an in-memory GcsFs instance for testing only.
- */
-public class InMemoryGoogleHadoopFileSystem
-    extends GoogleHadoopFileSystem {
+/** Helper class to create an in-memory GHFS from an in-memory GcsFs instance for testing only. */
+public class InMemoryGoogleHadoopFileSystem extends GoogleHadoopFileSystem {
   // The in-memory GcsFs instance to be used.
   private static GoogleCloudStorageFileSystem inMemoryGcsFs = createUnderlyingStorage();
 
@@ -37,8 +34,7 @@ public class InMemoryGoogleHadoopFileSystem
    *
    * @throws IOException on IO Error.
    */
-  public InMemoryGoogleHadoopFileSystem()
-      throws IOException {
+  public InMemoryGoogleHadoopFileSystem() throws IOException {
     super(inMemoryGcsFs);
     initialize();
   }
@@ -68,8 +64,7 @@ public class InMemoryGoogleHadoopFileSystem
    * @return a sample Hadoop Configuration for in-memory GHFS.
    * @throws IOException on IO Error.
    */
-  public static Configuration getSampleConfiguration()
-      throws IOException {
+  public static Configuration getSampleConfiguration() throws IOException {
     // Set the Hadoop job configuration.
     Configuration config = new Configuration();
     config.set("fs.gs.impl", InMemoryGoogleHadoopFileSystem.class.getName());
@@ -81,8 +76,7 @@ public class InMemoryGoogleHadoopFileSystem
    *
    * @throws IOException on IO Error.
    */
-  private void initialize()
-      throws IOException {
+  private void initialize() throws IOException {
     // Initialize the GoogleHadoopFileSystemBase.
     URI initUri;
     try {

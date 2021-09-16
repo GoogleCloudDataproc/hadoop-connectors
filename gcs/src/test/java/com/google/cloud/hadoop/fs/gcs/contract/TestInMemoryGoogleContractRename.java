@@ -18,9 +18,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractContractRenameTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 
-/**
- * GCS contract tests covering file rename using in-memory fakes.
- */
+/** GCS contract tests covering file rename using in-memory fakes. */
 public class TestInMemoryGoogleContractRename extends AbstractContractRenameTest {
 
   @Override

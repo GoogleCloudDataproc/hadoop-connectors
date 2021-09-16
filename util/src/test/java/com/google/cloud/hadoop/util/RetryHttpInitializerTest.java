@@ -45,8 +45,8 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 /**
- * Basic unittests for RetryHttpInitializer to check the proper wiring of various interceptors
- * and handlers for HttpRequests.
+ * Basic unittests for RetryHttpInitializer to check the proper wiring of various interceptors and
+ * handlers for HttpRequests.
  */
 @RunWith(JUnit4.class)
 public class RetryHttpInitializerTest {
@@ -122,10 +122,8 @@ public class RetryHttpInitializerTest {
         .when(mockCredential)
         .intercept(eq(req));
 
-    when(mockLowLevelRequest.execute())
-        .thenReturn(mockLowLevelResponse);
-    when(mockLowLevelResponse.getStatusCode())
-        .thenReturn(200);
+    when(mockLowLevelRequest.execute()).thenReturn(mockLowLevelResponse);
+    when(mockLowLevelResponse.getStatusCode()).thenReturn(200);
 
     HttpResponse res = req.execute();
     assertThat(res).isNotNull();
@@ -160,10 +158,7 @@ public class RetryHttpInitializerTest {
     when(mockLowLevelRequest.execute())
         .thenReturn(mockLowLevelResponse)
         .thenReturn(mockLowLevelResponse);
-    when(mockLowLevelResponse.getStatusCode())
-        .thenReturn(403)
-        .thenReturn(403)
-        .thenReturn(200);
+    when(mockLowLevelResponse.getStatusCode()).thenReturn(403).thenReturn(403).thenReturn(200);
     when(mockCredential.handleResponse(eq(req), any(HttpResponse.class), eq(true)))
         .thenReturn(true);
 
@@ -211,10 +206,7 @@ public class RetryHttpInitializerTest {
     when(mockLowLevelRequest.execute())
         .thenReturn(mockLowLevelResponse)
         .thenReturn(mockLowLevelResponse);
-    when(mockLowLevelResponse.getStatusCode())
-        .thenReturn(code)
-        .thenReturn(code)
-        .thenReturn(200);
+    when(mockLowLevelResponse.getStatusCode()).thenReturn(code).thenReturn(code).thenReturn(200);
     when(mockCredential.handleResponse(eq(req), any(HttpResponse.class), eq(true)))
         .thenReturn(false);
 
@@ -253,8 +245,7 @@ public class RetryHttpInitializerTest {
     when(mockLowLevelRequest.execute())
         .thenThrow(new IOException("fake IOException"))
         .thenReturn(mockLowLevelResponse);
-    when(mockLowLevelResponse.getStatusCode())
-        .thenReturn(200);
+    when(mockLowLevelResponse.getStatusCode()).thenReturn(200);
     when(mockCredential.handleResponse(eq(req), any(HttpResponse.class), eq(true)))
         .thenReturn(false);
 

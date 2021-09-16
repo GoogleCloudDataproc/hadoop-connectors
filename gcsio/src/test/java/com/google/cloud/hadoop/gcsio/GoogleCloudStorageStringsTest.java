@@ -22,9 +22,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/**
- * UnitTests for GoogleCloudStorageStrings class.
- */
+/** UnitTests for GoogleCloudStorageStrings class. */
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageStringsTest {
   @Test
@@ -62,36 +60,29 @@ public class GoogleCloudStorageStringsTest {
     public final String objectName;
     public String returnValue;
 
-    /**
-     * The args which will be passed to GoogleCloudStorageStrings.matchListPrefix.
-     */
+    /** The args which will be passed to GoogleCloudStorageStrings.matchListPrefix. */
     public MatchResultExpectation(String objectNamePrefix, String delimiter, String objectName) {
       this.objectNamePrefix = objectNamePrefix;
       this.delimiter = delimiter;
       this.objectName = objectName;
     }
 
-    /**
-     * Sets the expected return value.
-     */
+    /** Sets the expected return value. */
     public MatchResultExpectation willReturn(String returnValue) {
       this.returnValue = returnValue;
       return this;
     }
 
-    /**
-     * Useful formatted String summarizing this expectation.
-     */
+    /** Useful formatted String summarizing this expectation. */
     @Override
     public String toString() {
-      return String.format("Expect '%s' for args (%s, %s, %s)",
+      return String.format(
+          "Expect '%s' for args (%s, %s, %s)",
           returnValue, objectNamePrefix, delimiter, objectName);
     }
   }
 
-  /**
-   * Helper for verifying an array of test-case expectations.
-   */
+  /** Helper for verifying an array of test-case expectations. */
   private void verifyExpectations(MatchResultExpectation[] expectations) {
     for (MatchResultExpectation expectation : expectations) {
       String actualReturn =
@@ -110,17 +101,10 @@ public class GoogleCloudStorageStringsTest {
   public void testMatchListPrefixNoPrefixNoDelimiter() {
     MatchResultExpectation[] expectations = {
       // Return value should always be equal to input.
-      new MatchResultExpectation(null, null, "/")
-          .willReturn("/"),
-
-      new MatchResultExpectation(null, null, "foo/bar")
-          .willReturn("foo/bar"),
-
-      new MatchResultExpectation(null, "", "foo/bar")
-          .willReturn("foo/bar"),
-
-      new MatchResultExpectation("", "", "foo/bar")
-          .willReturn("foo/bar"),
+      new MatchResultExpectation(null, null, "/").willReturn("/"),
+      new MatchResultExpectation(null, null, "foo/bar").willReturn("foo/bar"),
+      new MatchResultExpectation(null, "", "foo/bar").willReturn("foo/bar"),
+      new MatchResultExpectation("", "", "foo/bar").willReturn("foo/bar"),
     };
 
     verifyExpectations(expectations);
@@ -132,25 +116,20 @@ public class GoogleCloudStorageStringsTest {
       // Match should succeed and return entire input.
       new MatchResultExpectation("foo/bar/baz", null, "foo/bar/baz123")
           .willReturn("foo/bar/baz123"),
-
-      new MatchResultExpectation("foo/bar/baz", null, "foo/bar/baz")
-          .willReturn("foo/bar/baz"),
+      new MatchResultExpectation("foo/bar/baz", null, "foo/bar/baz").willReturn("foo/bar/baz"),
 
       // String shorter than the prefix will not succeed.
-      new MatchResultExpectation("foo/bar/baz", null, "foo/bar/ba")
-          .willReturn(null),
+      new MatchResultExpectation("foo/bar/baz", null, "foo/bar/ba").willReturn(null),
 
       // Since no delimiter was passed, '/' should not cause truncation.
       new MatchResultExpectation("foo/bar/baz", null, "foo/bar/baz/sub")
           .willReturn("foo/bar/baz/sub"),
 
       // Prefix match where objectName ends with '/'.
-      new MatchResultExpectation("foo/bar/baz", null, "foo/bar/baz/")
-          .willReturn("foo/bar/baz/"),
+      new MatchResultExpectation("foo/bar/baz", null, "foo/bar/baz/").willReturn("foo/bar/baz/"),
 
       // Exact match where both prefix and objectName end with '/'.
-      new MatchResultExpectation("foo/bar/baz/", null, "foo/bar/baz/")
-          .willReturn(null),
+      new MatchResultExpectation("foo/bar/baz/", null, "foo/bar/baz/").willReturn(null),
     };
 
     verifyExpectations(expectations);
@@ -159,26 +138,18 @@ public class GoogleCloudStorageStringsTest {
   @Test
   public void testMatchListPrefixNoPrefix() {
     MatchResultExpectation[] expectations = {
-      new MatchResultExpectation(null, "/", "/")
-          .willReturn("/"),
+      new MatchResultExpectation(null, "/", "/").willReturn("/"),
 
       // Truncates to the first occurrence of the delimiter.
-      new MatchResultExpectation(null, "/", "foo/bar")
-          .willReturn("foo/"),
-
-      new MatchResultExpectation(null, "/", "foo/bar/")
-          .willReturn("foo/"),
-
-      new MatchResultExpectation(null, "/", "foo/")
-          .willReturn("foo/"),
+      new MatchResultExpectation(null, "/", "foo/bar").willReturn("foo/"),
+      new MatchResultExpectation(null, "/", "foo/bar/").willReturn("foo/"),
+      new MatchResultExpectation(null, "/", "foo/").willReturn("foo/"),
 
       // If the delimiter isn't in the String, it will return unchanged.
-      new MatchResultExpectation(null, "/", "foo")
-          .willReturn("foo"),
+      new MatchResultExpectation(null, "/", "foo").willReturn("foo"),
 
       // "First occurrence" includes index 0.
-      new MatchResultExpectation(null, "/", "/foo/bar")
-          .willReturn("/"),
+      new MatchResultExpectation(null, "/", "/foo/bar").willReturn("/"),
     };
 
     verifyExpectations(expectations);
@@ -187,38 +158,26 @@ public class GoogleCloudStorageStringsTest {
   @Test
   public void testMatchListPrefixWithPrefixAndDelimiter() {
     MatchResultExpectation[] expectations = {
-      new MatchResultExpectation("foo/bar", "/", "foo/bar/baz")
-          .willReturn("foo/bar/"),
+      new MatchResultExpectation("foo/bar", "/", "foo/bar/baz").willReturn("foo/bar/"),
 
       // Include some extra characters between the prefix-matched portion and the following
       // delimiter.
-      new MatchResultExpectation("foo/bar", "/", "foo/bar123/baz")
-          .willReturn("foo/bar123/"),
+      new MatchResultExpectation("foo/bar", "/", "foo/bar123/baz").willReturn("foo/bar123/"),
 
       // Exact match that not ends with delimiter means we return matched item.
-      new MatchResultExpectation("foo/bar", "/", "foo/bar")
-          .willReturn("foo/bar"),
+      new MatchResultExpectation("foo/bar", "/", "foo/bar").willReturn("foo/bar"),
 
       // Exact match and ends with delimiter means we return null.
-      new MatchResultExpectation("foo/bar/", "/", "foo/bar/")
-          .willReturn(null),
+      new MatchResultExpectation("foo/bar/", "/", "foo/bar/").willReturn(null),
 
       // The delimiter-truncation search begins *strictly after* the prefix; if the prefix
       // ends with the delimiter, then truncation occurs at the *next* delimiter after it.
-      new MatchResultExpectation("foo/bar/", "/", "foo/bar/baz")
-          .willReturn("foo/bar/baz"),
-
-      new MatchResultExpectation("foo/bar/", "/", "foo/bar/baz/bat")
-          .willReturn("foo/bar/baz/"),
-
+      new MatchResultExpectation("foo/bar/", "/", "foo/bar/baz").willReturn("foo/bar/baz"),
+      new MatchResultExpectation("foo/bar/", "/", "foo/bar/baz/bat").willReturn("foo/bar/baz/"),
 
       // Multi-char delimiters work too.
-      new MatchResultExpectation("foo$$bar", "$$", "foo$$bar$$baz")
-          .willReturn("foo$$bar$$"),
-
-      new MatchResultExpectation("foo$$bar$$", "$$", "foo$$bar$$baz")
-          .willReturn("foo$$bar$$baz"),
-
+      new MatchResultExpectation("foo$$bar", "$$", "foo$$bar$$baz").willReturn("foo$$bar$$"),
+      new MatchResultExpectation("foo$$bar$$", "$$", "foo$$bar$$baz").willReturn("foo$$bar$$baz"),
       new MatchResultExpectation("foo$$bar$$", "$$", "foo$$bar$$baz$$bat")
           .willReturn("foo$$bar$$baz$$"),
     };
