@@ -38,17 +38,16 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 
 /**
- * DynamicFileListRecordReader implements hadoop RecordReader by exposing a single logical
- * record stream despite being made up of multiple files which are still newly appearing
- * while this RecordReader is being used. Requires a single zero-record file to mark the end of the
- * series of files, and all files must appear under a single directory. Note that with some
- * file encodings a 0-record file may not be the same as a 0-length file. Filenames must follow
- * the naming convention specified in the static final members of this class; files will be
- * read in whatever order they appear, so multiple uses of this RecordReader may result in
- * very different orderings of data being read.
+ * DynamicFileListRecordReader implements hadoop RecordReader by exposing a single logical record
+ * stream despite being made up of multiple files which are still newly appearing while this
+ * RecordReader is being used. Requires a single zero-record file to mark the end of the series of
+ * files, and all files must appear under a single directory. Note that with some file encodings a
+ * 0-record file may not be the same as a 0-length file. Filenames must follow the naming convention
+ * specified in the static final members of this class; files will be read in whatever order they
+ * appear, so multiple uses of this RecordReader may result in very different orderings of data
+ * being read.
  */
-public class DynamicFileListRecordReader<K, V>
-    extends RecordReader<K, V> {
+public class DynamicFileListRecordReader<K, V> extends RecordReader<K, V> {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Directory/file-pattern which will contain all the files we read with this reader.
@@ -107,10 +106,11 @@ public class DynamicFileListRecordReader<K, V>
   @Override
   public void initialize(InputSplit genericSplit, TaskAttemptContext context)
       throws IOException, InterruptedException {
-      logger.atInfo().log(
-          "Initializing DynamicFileListRecordReader with split '%s', task context '%s'",
-          HadoopToStringUtil.toString(genericSplit), HadoopToStringUtil.toString(context));
-    Preconditions.checkArgument(genericSplit instanceof ShardedInputSplit,
+    logger.atInfo().log(
+        "Initializing DynamicFileListRecordReader with split '%s', task context '%s'",
+        HadoopToStringUtil.toString(genericSplit), HadoopToStringUtil.toString(context));
+    Preconditions.checkArgument(
+        genericSplit instanceof ShardedInputSplit,
         "InputSplit genericSplit should be an instance of ShardedInputSplit.");
 
     this.context = context;
@@ -197,8 +197,8 @@ public class DynamicFileListRecordReader<K, V>
           newFile.getPath(), newFile.getLen(), recordsRead);
 
       InputSplit split = new FileSplit(newFile.getPath(), 0, newFile.getLen(), new String[0]);
-      delegateReader = delegateRecordReaderFactory.createDelegateRecordReader(
-          split, context.getConfiguration());
+      delegateReader =
+          delegateRecordReaderFactory.createDelegateRecordReader(split, context.getConfiguration());
       delegateReader.initialize(split, context);
       if (!delegateReader.nextKeyValue()) {
         // we found the end of dataset marker.
@@ -220,8 +220,8 @@ public class DynamicFileListRecordReader<K, V>
   }
 
   /**
-   * Gets the current key as reported by the delegate record reader. This will generally be the
-   * byte position within the current file.
+   * Gets the current key as reported by the delegate record reader. This will generally be the byte
+   * position within the current file.
    *
    * @return the current key or null if there is no current key.
    */
@@ -242,8 +242,8 @@ public class DynamicFileListRecordReader<K, V>
 
   /**
    * Returns the current progress based on the number of records read compared to the *estimated*
-   * total number of records planned to be read; this number may be inexact, but will not
-   * report a number greater than 1.
+   * total number of records planned to be read; this number may be inexact, but will not report a
+   * number greater than 1.
    *
    * @return a number between 0.0 and 1.0 that is the fraction of the data read.
    */
@@ -258,8 +258,7 @@ public class DynamicFileListRecordReader<K, V>
    * @throws IOException on IO Error.
    */
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     if (delegateReader != null) {
       logger.atWarning().log(
           "Got non-null delegateReader during close(); possible premature close() call.");
@@ -268,9 +267,7 @@ public class DynamicFileListRecordReader<K, V>
     }
   }
 
-  /**
-   * Allows setting a mock Sleeper for tests to not have to wait in realtime for polling.
-   */
+  /** Allows setting a mock Sleeper for tests to not have to wait in realtime for polling. */
   @VisibleForTesting
   void setSleeper(Sleeper sleeper) {
     this.sleeper = sleeper;
@@ -287,26 +284,24 @@ public class DynamicFileListRecordReader<K, V>
     ++recordsRead;
   }
 
-  /**
-   * @return true if the next file is available for immediate usage.
-   */
+  /** @return true if the next file is available for immediate usage. */
   private boolean isNextFileReady() {
     return !fileQueue.isEmpty();
   }
 
   /**
-   * Moves to the next file; must have checked to make sure isNextFileReady() returns true prior
-   * to calling this.
+   * Moves to the next file; must have checked to make sure isNextFileReady() returns true prior to
+   * calling this.
    */
   private FileStatus moveToNextFile() {
     return fileQueue.remove();
   }
 
   /**
-   * @return true if we haven't found the end-indicator file yet, or if the number of known files
-   *     is less than the total number of files as indicated by the endFileNumber. Note that
-   *     returning false does *not* mean this RecordReader is done, just that we know of all the
-   *     files we plan to read.
+   * @return true if we haven't found the end-indicator file yet, or if the number of known files is
+   *     less than the total number of files as indicated by the endFileNumber. Note that returning
+   *     false does *not* mean this RecordReader is done, just that we know of all the files we plan
+   *     to read.
    */
   private boolean shouldExpectMoreFiles() {
     if (endFileNumber == -1 || knownFileSet.size() <= endFileNumber) {
@@ -333,16 +328,15 @@ public class DynamicFileListRecordReader<K, V>
     }
     long longValue = Long.parseLong(indexString);
     if (longValue > Integer.MAX_VALUE) {
-      throw new IndexOutOfBoundsException(String.format(
-          "Invalid fileName '%s'; max allowable index is %d, got %d instead",
-          fileName, Integer.MAX_VALUE, longValue));
+      throw new IndexOutOfBoundsException(
+          String.format(
+              "Invalid fileName '%s'; max allowable index is %d, got %d instead",
+              fileName, Integer.MAX_VALUE, longValue));
     }
     return (int) longValue;
   }
 
-  /**
-   * Record a specific file as being the 0-record end of stream marker.
-   */
+  /** Record a specific file as being the 0-record end of stream marker. */
   private void setEndFileMarkerFile(String fileName) {
     int fileIndex = parseFileIndex(fileName);
     if (endFileNumber == -1) {
@@ -357,22 +351,26 @@ public class DynamicFileListRecordReader<K, V>
             knownFileIndex <= endFileNumber,
             "Found known file '%s' with index %s, which isn't less than or "
                 + "equal to than endFileNumber %s!",
-            knownFile, knownFileIndex, endFileNumber);
+            knownFile,
+            knownFileIndex,
+            endFileNumber);
       }
     } else {
       // If we found it before, make sure the file we're looking at has the same index.
-      Preconditions.checkState(fileIndex == endFileNumber,
+      Preconditions.checkState(
+          fileIndex == endFileNumber,
           "Found new end-marker file '%s' with index %s but already have endFileNumber %s!",
-          fileName, fileIndex, endFileNumber);
+          fileName,
+          fileIndex,
+          endFileNumber);
     }
   }
 
   /**
-   * Lists files, and sifts through the results for any new files we haven't found before.
-   * If a file of size 0 is found, we mark the 'endFileNumber' from it.
+   * Lists files, and sifts through the results for any new files we haven't found before. If a file
+   * of size 0 is found, we mark the 'endFileNumber' from it.
    */
-  private void refreshFileList()
-      throws IOException {
+  private void refreshFileList() throws IOException {
     FileStatus[] files = fileSystem.globStatus(inputDirectoryAndPattern);
     for (FileStatus file : files) {
       String fileName = file.getPath().getName();
@@ -380,9 +378,12 @@ public class DynamicFileListRecordReader<K, V>
         if (endFileNumber != -1) {
           // Sanity check against endFileNumber.
           int newFileIndex = parseFileIndex(fileName);
-          Preconditions.checkState(newFileIndex < endFileNumber,
+          Preconditions.checkState(
+              newFileIndex < endFileNumber,
               "Found new file '%s' with index %s, which isn't less than endFileNumber %s!",
-              fileName, newFileIndex, endFileNumber);
+              fileName,
+              newFileIndex,
+              endFileNumber);
         }
 
         logger.atInfo().log(

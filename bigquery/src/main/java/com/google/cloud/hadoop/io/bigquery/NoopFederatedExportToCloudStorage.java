@@ -44,8 +44,13 @@ public class NoopFederatedExportToCloudStorage extends UnshardedExportToCloudSto
       Table table,
       @Nullable InputFormat<LongWritable, Text> delegateInputFormat) {
     super(
-        configuration, getCommaSeparatedGcsPathList(table), fileFormat, bigQueryHelper,
-        projectId, table, delegateInputFormat);
+        configuration,
+        getCommaSeparatedGcsPathList(table),
+        fileFormat,
+        bigQueryHelper,
+        projectId,
+        table,
+        delegateInputFormat);
     Preconditions.checkNotNull(table.getExternalDataConfiguration());
     String inputType = fileFormat.getFormatIdentifier();
     String tableType = table.getExternalDataConfiguration().getSourceFormat();
@@ -53,7 +58,8 @@ public class NoopFederatedExportToCloudStorage extends UnshardedExportToCloudSto
         inputType.equals(tableType),
         "MapReduce fileFormat '%s' does not match BigQuery sourceFormat '%s'. Use the "
             + "appropriate InputFormat.",
-        inputType, tableType);
+        inputType,
+        tableType);
     gcsPaths = table.getExternalDataConfiguration().getSourceUris();
   }
 

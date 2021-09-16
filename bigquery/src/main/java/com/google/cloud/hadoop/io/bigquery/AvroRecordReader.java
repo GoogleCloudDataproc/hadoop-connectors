@@ -32,9 +32,7 @@ import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 
-/**
- * RecordReader for avro BigQuery exports.
- */
+/** RecordReader for avro BigQuery exports. */
 public class AvroRecordReader extends RecordReader<LongWritable, GenericData.Record> {
 
   final LongWritable currentKey = new LongWritable();

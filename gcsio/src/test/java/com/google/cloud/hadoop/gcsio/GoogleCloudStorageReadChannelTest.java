@@ -288,9 +288,7 @@ public class GoogleCloudStorageReadChannelTest {
       throws IOException {
     Storage storage = new Storage(HTTP_TRANSPORT, JSON_FACTORY, r -> {});
 
-    GoogleCloudStorageReadOptions options =
-        newLazyReadOptionsBuilder()
-            .build();
+    GoogleCloudStorageReadOptions options = newLazyReadOptionsBuilder().build();
 
     GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
 

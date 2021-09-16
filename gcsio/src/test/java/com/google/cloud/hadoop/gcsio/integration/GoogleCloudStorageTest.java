@@ -574,7 +574,8 @@ public class GoogleCloudStorageTest {
   }
 
   // TODO(user): Re-enable once a new method of inducing errors is devised.
-  @Test @Ignore
+  @Test
+  @Ignore
   public void testGetMultipleItemInfoWithSomeInvalid() throws IOException {
     String bucketName = getSharedBucketName();
 
@@ -593,7 +594,8 @@ public class GoogleCloudStorageTest {
   }
 
   // TODO(user): Re-enable once a new method of inducing errors is devised.
-  @Test @Ignore
+  @Test
+  @Ignore
   public void testOneInvalidGetItemInfo() throws IOException {
     String bucketName = getSharedBucketName();
 
@@ -645,7 +647,8 @@ public class GoogleCloudStorageTest {
   }
 
   // TODO(user): Re-enable once a new method of inducing errors is devised.
-  @Test @Ignore
+  @Test
+  @Ignore
   public void testSomeInvalidObjectsDelete() throws IOException {
     String bucketName = getSharedBucketName();
 
@@ -1301,7 +1304,8 @@ public class GoogleCloudStorageTest {
     assertThrows(ClosedChannelException.class, () -> readableByteChannel.read(readBuffer));
   }
 
-  @Test @Ignore("Not implemented")
+  @Test
+  @Ignore("Not implemented")
   public void testOperationsAfterCloseFail() {}
 
   @Test

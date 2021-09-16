@@ -51,8 +51,8 @@ public class GoogleHadoopFileSystemTestHelper {
   }
 
   /**
-   * Helper for plumbing through an initUri and creating the proper Configuration object.
-   * Calls FileSystem.initialize on {@code ghfs}.
+   * Helper for plumbing through an initUri and creating the proper Configuration object. Calls
+   * FileSystem.initialize on {@code ghfs}.
    */
   private static void initializeInMemoryFileSystem(FileSystem ghfs, String initUriString)
       throws IOException {

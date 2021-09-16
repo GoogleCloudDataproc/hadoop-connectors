@@ -37,11 +37,11 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.util.Progressable;
 
 /**
- * GoogleHadoopFS provides a YARN compatible Abstract File System on top of
- * Google Cloud Storage (GCS).
+ * GoogleHadoopFS provides a YARN compatible Abstract File System on top of Google Cloud Storage
+ * (GCS).
  *
- * It is implemented as a thin abstraction layer on top of GoogleHadoopFileSystem, but will soon be
- * refactored to share a common base.
+ * <p>It is implemented as a thin abstraction layer on top of GoogleHadoopFileSystem, but will soon
+ * be refactored to share a common base.
  */
 public class GoogleHadoopFS extends AbstractFileSystem {
 
@@ -75,7 +75,8 @@ public class GoogleHadoopFS extends AbstractFileSystem {
       long blockSize,
       Progressable progress,
       ChecksumOpt checksumOpt,
-      boolean createParent) throws IOException {
+      boolean createParent)
+      throws IOException {
     logger.atFiner().log(
         "createInternal(file: %s, flag: %s, absolutePermission: %s, bufferSize: %d, "
             + "replication: %b, blockSize: %d, progress: %s, checksumOpt: %s, createParent: %b)",
@@ -114,9 +115,7 @@ public class GoogleHadoopFS extends AbstractFileSystem {
     return ghfs.getUri();
   }
 
-  /**
-   * Follow HDFS conventions except allow for ':' in paths.
-   */
+  /** Follow HDFS conventions except allow for ':' in paths. */
   @Override
   public boolean isValidName(String src) {
     StringTokenizer tokens = new StringTokenizer(src, Path.SEPARATOR);
@@ -129,9 +128,7 @@ public class GoogleHadoopFS extends AbstractFileSystem {
     return true;
   }
 
-  /**
-   * Only accept valid AbstractFileSystem and GoogleHadoopFileSystem Paths.
-   */
+  /** Only accept valid AbstractFileSystem and GoogleHadoopFileSystem Paths. */
   @Override
   public void checkPath(Path path) {
     super.checkPath(path);
@@ -145,7 +142,6 @@ public class GoogleHadoopFS extends AbstractFileSystem {
     logger.atFiner().log("getServerDefaults()");
     return ghfs.getServerDefaults();
   }
-
 
   @Override
   public void mkdir(final Path dir, final FsPermission permission, final boolean createParent)

@@ -23,8 +23,8 @@ import javax.annotation.concurrent.NotThreadSafe;
 
 /**
  * An implementation of {@link BackOff} that limits the number of calls on another {@link BackOff}.
- * This class will call the same methods of another BackOff until the maximum number of
- * retries are reached, and then it will return {@code BackOff.STOP}.
+ * This class will call the same methods of another BackOff until the maximum number of retries are
+ * reached, and then it will return {@code BackOff.STOP}.
  */
 @NotThreadSafe
 public class RetryBoundedBackOff implements BackOff {
@@ -39,8 +39,8 @@ public class RetryBoundedBackOff implements BackOff {
    * @param backoff The underlying {@link BackOff} to use.
    */
   public RetryBoundedBackOff(BackOff backoff, int maxRetries) {
-    Preconditions.checkArgument(maxRetries >= 0,
-        "Maximum number of retries must not be less than 0.");
+    Preconditions.checkArgument(
+        maxRetries >= 0, "Maximum number of retries must not be less than 0.");
     this.backoff = backoff;
     this.maxRetries = maxRetries;
   }

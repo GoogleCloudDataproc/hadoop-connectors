@@ -50,7 +50,8 @@ public class GoogleHadoopFSMainOperationsTest extends FSMainOperationsBaseTest {
    * instead of returning false when trying to create directories on top of existing files. This
    * behavior is in-line with HDFS, but differs from LocalFileSystem.
    */
-  @Test @Override
+  @Test
+  @Override
   public void testMkdirsFailsForSubdirectoryOfExistingFile() throws Exception {
     Path testDir = helper.getTestRootPath(fSys, "test/hadoop");
     assertThat(exists(fSys, testDir)).isFalse();

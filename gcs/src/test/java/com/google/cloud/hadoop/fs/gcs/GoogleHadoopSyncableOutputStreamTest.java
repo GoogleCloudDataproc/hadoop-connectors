@@ -48,9 +48,7 @@ import org.junit.runners.JUnit4;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
-/**
- * Unittests for fine-grained edge cases in GoogleHadoopSyncableOutputStream.
- */
+/** Unittests for fine-grained edge cases in GoogleHadoopSyncableOutputStream. */
 @RunWith(JUnit4.class)
 public class GoogleHadoopSyncableOutputStreamTest {
   @Mock private ExecutorService mockExecutorService;
@@ -77,9 +75,9 @@ public class GoogleHadoopSyncableOutputStreamTest {
     Path objectPath = new Path(ghfs.getFileSystemRoot(), "dir/object.txt");
     FSDataOutputStream fout = ghfs.create(objectPath);
 
-    byte[] data1 = new byte[] { 0x0f, 0x0e, 0x0e, 0x0d };
-    byte[] data2 = new byte[] { 0x0b, 0x0e, 0x0e, 0x0f };
-    byte[] data3 = new byte[] { 0x04, 0x02 };
+    byte[] data1 = new byte[] {0x0f, 0x0e, 0x0e, 0x0d};
+    byte[] data2 = new byte[] {0x0b, 0x0e, 0x0e, 0x0f};
+    byte[] data3 = new byte[] {0x04, 0x02};
     byte[] data1Read = new byte[4];
     byte[] data2Read = new byte[4];
     byte[] data3Read = new byte[2];
@@ -134,13 +132,13 @@ public class GoogleHadoopSyncableOutputStreamTest {
     when(mockExecutorService.submit(any(Callable.class)))
         .thenReturn(Futures.immediateFailedFuture(new ExecutionException(fakeIoException)));
 
-    byte[] data1 = new byte[] { 0x0f, 0x0e, 0x0e, 0x0d };
-    byte[] data2 = new byte[] { 0x0b, 0x0e, 0x0e, 0x0f };
+    byte[] data1 = new byte[] {0x0f, 0x0e, 0x0e, 0x0d};
+    byte[] data2 = new byte[] {0x0b, 0x0e, 0x0e, 0x0f};
 
     fout.write(data1, 0, data1.length);
-    fout.sync();  // This one commits straight into destination.
+    fout.sync(); // This one commits straight into destination.
     fout.write(data2, 0, data2.length);
-    fout.sync();  // This one enqueues the delete, but doesn't propagate exception yet.
+    fout.sync(); // This one enqueues the delete, but doesn't propagate exception yet.
 
     verify(mockExecutorService).submit(any(Callable.class));
 
@@ -155,7 +153,7 @@ public class GoogleHadoopSyncableOutputStreamTest {
     Path objectPath = new Path(ghfs.getFileSystemRoot(), "dir/object.txt");
     FSDataOutputStream fout = ghfs.create(objectPath);
     fout.close();
-    fout.close();  // Fine to close twice.
+    fout.close(); // Fine to close twice.
   }
 
   @Test

@@ -21,28 +21,24 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
-/**
- * Helpers for interacting with properties files
- */
+/** Helpers for interacting with properties files */
 public class PropertyUtil {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   /**
    * Get the value of a property or a default value if there's an error retrieving the property key.
+   *
    * @param referenceClass The class which should be used to find the property file. The property
-   * file is expected to be packaged in the same directory as this class.
+   *     file is expected to be packaged in the same directory as this class.
    * @param propertyFile The name of the property file to be read.
    * @param key The property key to find in the property file.
    * @param defaultValue The value to return if no property with the given key is found or if the
-   * property file cannot be found.
+   *     property file cannot be found.
    * @return The value specified in the property file or defaultValue if an error occurs or if the
-   * key could not be found
+   *     key could not be found
    */
   public static String getPropertyOrDefault(
-      Class<?> referenceClass,
-      String propertyFile,
-      String key,
-      String defaultValue) {
+      Class<?> referenceClass, String propertyFile, String key, String defaultValue) {
     try (InputStream stream = referenceClass.getResourceAsStream(propertyFile)) {
       if (stream == null) {
         logger.atSevere().log("Could not load properties file '%s'", propertyFile);
