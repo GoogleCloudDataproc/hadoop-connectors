@@ -47,13 +47,15 @@ public class NoopFederatedExportToCloudStorageTest {
   @Before
   public void setup() {
     conf = new Configuration();
-    table = new Table().setExternalDataConfiguration(
-        new ExternalDataConfiguration()
-            .setSourceFormat("AVRO")
-            .setSourceUris(
-                ImmutableList.of(
-                    "gs://foo-bucket/bar-dir/glob-*.avro",
-                    "gs://foo-bucket/bar-dir/file.avro")));
+    table =
+        new Table()
+            .setExternalDataConfiguration(
+                new ExternalDataConfiguration()
+                    .setSourceFormat("AVRO")
+                    .setSourceUris(
+                        ImmutableList.of(
+                            "gs://foo-bucket/bar-dir/glob-*.avro",
+                            "gs://foo-bucket/bar-dir/file.avro")));
   }
 
   @Test
@@ -65,8 +67,9 @@ public class NoopFederatedExportToCloudStorageTest {
 
   @Test
   public void testValidateGcsPaths() throws Exception {
-    table.getExternalDataConfiguration().setSourceUris(ImmutableList.of(
-        "https://drive.google.com/open?id=1234"));
+    table
+        .getExternalDataConfiguration()
+        .setSourceUris(ImmutableList.of("https://drive.google.com/open?id=1234"));
     IllegalArgumentException thrown =
         assertThrows(
             IllegalArgumentException.class,
@@ -98,28 +101,35 @@ public class NoopFederatedExportToCloudStorageTest {
 
     NoopFederatedExportToCloudStorage export =
         new NoopFederatedExportToCloudStorage(
-            conf, AVRO, helper, projectId, table,
+            conf,
+            AVRO,
+            helper,
+            projectId,
+            table,
             new InputFormat<LongWritable, Text>() {
               @Override
               public List<InputSplit> getSplits(JobContext jobContext)
                   throws IOException, InterruptedException {
                 return ImmutableList.<InputSplit>builder()
-                    .add(new FileSplit(
-                        new Path("gs://foo-bucket/bar-dir/glob-1.avro"), 0L, 1L, new String[0]))
-                    .add(new FileSplit(
-                        new Path("gs://foo-bucket/bar-dir/glob-2.avro"), 0L, 1L, new String[0]))
-                    .add(new FileSplit(
-                        new Path("gs://foo-bucket/bar-dir/file.avro"), 0L, 1L, new String[0]))
+                    .add(
+                        new FileSplit(
+                            new Path("gs://foo-bucket/bar-dir/glob-1.avro"), 0L, 1L, new String[0]))
+                    .add(
+                        new FileSplit(
+                            new Path("gs://foo-bucket/bar-dir/glob-2.avro"), 0L, 1L, new String[0]))
+                    .add(
+                        new FileSplit(
+                            new Path("gs://foo-bucket/bar-dir/file.avro"), 0L, 1L, new String[0]))
                     .build();
-          }
+              }
 
-          @Override
-          public RecordReader<LongWritable, Text> createRecordReader(
-              InputSplit inputSplit,
-              TaskAttemptContext taskAttemptContext) throws IOException, InterruptedException {
-            throw new UnsupportedOperationException("Not implemented.");
-          }
-        });
+              @Override
+              public RecordReader<LongWritable, Text> createRecordReader(
+                  InputSplit inputSplit, TaskAttemptContext taskAttemptContext)
+                  throws IOException, InterruptedException {
+                throw new UnsupportedOperationException("Not implemented.");
+              }
+            });
 
     List<InputSplit> splits = export.getSplits(null);
     // Verify configuration

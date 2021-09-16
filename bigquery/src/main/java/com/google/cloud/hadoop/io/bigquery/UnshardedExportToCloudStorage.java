@@ -33,8 +33,8 @@ import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.util.Progressable;
 
 /**
- * An Export to GCS that provides a single directory for BigQuery to export to and requires
- * all content to be written (the export complete) before we begin execution of the MapReduce.
+ * An Export to GCS that provides a single directory for BigQuery to export to and requires all
+ * content to be written (the export complete) before we begin execution of the MapReduce.
  */
 public class UnshardedExportToCloudStorage extends AbstractExportToCloudStorage {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
@@ -85,18 +85,17 @@ public class UnshardedExportToCloudStorage extends AbstractExportToCloudStorage 
 
   @Override
   public void waitForUsableMapReduceInput() throws IOException, InterruptedException {
-      Preconditions.checkState(
-          exportJobReference != null,
-          "beginExport() must be called before waitForUsableMapReduceInput()");
+    Preconditions.checkState(
+        exportJobReference != null,
+        "beginExport() must be called before waitForUsableMapReduceInput()");
 
-      BigQueryUtils.waitForJobCompletion(
-          bigQueryHelper.getRawBigquery(),
-          projectId,
-          exportJobReference,
-          new Progressable() {
-            @Override
-            public void progress() {
-            }
-          });
-    }
+    BigQueryUtils.waitForJobCompletion(
+        bigQueryHelper.getRawBigquery(),
+        projectId,
+        exportJobReference,
+        new Progressable() {
+          @Override
+          public void progress() {}
+        });
+  }
 }

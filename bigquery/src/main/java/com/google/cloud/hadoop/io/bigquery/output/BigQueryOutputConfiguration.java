@@ -474,7 +474,6 @@ public class BigQueryOutputConfiguration {
     return OUTPUT_TABLE_CREATE_DISPOSITION.get(conf, conf::get);
   }
 
-
   /**
    * Gets the write disposition of the output table. This specifies the action that occurs if the
    * destination table already exists. By default, if the table already exists, BigQuery appends
