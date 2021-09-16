@@ -27,8 +27,7 @@ import org.apache.hadoop.fs.statistics.impl.IOStatisticsStore;
  * <p>A lot of the methods are very terse, because GHFSInstrumentation has verbose methods of
  * similar names; the short ones always refer to the inner class and not any superclass method.
  */
-abstract class AbstractGhfsStatisticsSource
-    implements IOStatisticsSource, DurationTrackerFactory {
+abstract class AbstractGhfsStatisticsSource implements IOStatisticsSource, DurationTrackerFactory {
   private IOStatisticsStore ioStatistics;
 
   protected AbstractGhfsStatisticsSource() {}

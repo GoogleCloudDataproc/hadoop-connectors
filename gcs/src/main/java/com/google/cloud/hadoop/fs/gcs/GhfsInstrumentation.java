@@ -345,7 +345,7 @@ class GhfsInstrumentation
    * @param duration how long did it take
    */
   public void recordDuration(
-          final GhfsStatistic op, final boolean success, final Duration duration) {
+      final GhfsStatistic op, final boolean success, final Duration duration) {
     String name = op.getSymbol() + (success ? "" : SUFFIX_FAILURES);
     instanceIOStatistics.addTimedOperation(name, duration);
   }
@@ -417,6 +417,7 @@ class GhfsInstrumentation
     private final AtomicLong bytesBackwardsOnSeek;
     /** Bytes read by the application. */
     private final AtomicLong bytesRead;
+
     private final AtomicLong bytesSkippedOnSeek;
     private final AtomicLong forwardSeekOperations;
     private final AtomicLong readExceptions;
@@ -717,14 +718,9 @@ class GhfsInstrumentation
 
     @Override
     public void close() {
-      mergeOutputStreamStatistics(this);
-      // and patch the FS statistics.
       // provided the stream is closed in the worker thread, this will
       // ensure that the thread-specific worker stats are updated.
-      if (filesystemStatistics != null) {
-        long t = getBytesWritten();
-        filesystemStatistics.incrementBytesWritten(t);
-      }
+      mergeOutputStreamStatistics(this);
     }
 
     /**
@@ -757,7 +753,6 @@ class GhfsInstrumentation
     public long getWriteExceptions() {
       return lookupCounterValue(StreamStatisticNames.STREAM_WRITE_EXCEPTIONS);
     }
-
   }
   /**
    * Merge in the statistics of a single output stream into the filesystem-wide statistics.
