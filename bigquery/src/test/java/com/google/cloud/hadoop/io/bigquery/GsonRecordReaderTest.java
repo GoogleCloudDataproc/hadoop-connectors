@@ -36,9 +36,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Mockito;
 
-/**
- * Unit tests for GsonRecordReader.
- */
+/** Unit tests for GsonRecordReader. */
 @RunWith(JUnit4.class)
 public class GsonRecordReaderTest {
   // Sample key values for tests.
@@ -55,15 +53,12 @@ public class GsonRecordReaderTest {
   // Hadoop job configuration.
   private Configuration config;
 
-  private TaskAttemptID testTaskAttemptId = new TaskAttemptID(
-      new TaskID(new JobID("", 1), true /* isMap */, 1), 1);
+  private TaskAttemptID testTaskAttemptId =
+      new TaskAttemptID(new TaskID(new JobID("", 1), true /* isMap */, 1), 1);
 
-  /**
-   * Create an in-memory GHFS.
-   */
+  /** Create an in-memory GHFS. */
   @Before
-  public void setUp()
-      throws IOException {
+  public void setUp() throws IOException {
     // Set the Hadoop job configuration.
     config = InMemoryGoogleHadoopFileSystem.getSampleConfiguration();
 
@@ -79,8 +74,8 @@ public class GsonRecordReaderTest {
     GsonRecordReader recordReader = getRecordReader(0);
 
     // Assert there are no records to read.
-    //TODO(user) Investigate why this flipped in Hadoop 1.2.1
-    //assertEquals(recordReader.nextKeyValue(), false);
+    // TODO(user) Investigate why this flipped in Hadoop 1.2.1
+    // assertEquals(recordReader.nextKeyValue(), false);
 
     // Close RecordReader.
     recordReader.close();

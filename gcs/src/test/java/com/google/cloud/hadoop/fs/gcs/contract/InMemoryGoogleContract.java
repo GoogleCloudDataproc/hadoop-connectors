@@ -22,8 +22,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 
 /**
- * Contract of GoogleHadoopFileSystem via scheme "gs" based on an in-memory fake of the GCS
- * service.
+ * Contract of GoogleHadoopFileSystem via scheme "gs" based on an in-memory fake of the GCS service.
  */
 public class InMemoryGoogleContract extends AbstractFSContract {
   public static final String CONTRACT_XML = "contract/gs.xml";

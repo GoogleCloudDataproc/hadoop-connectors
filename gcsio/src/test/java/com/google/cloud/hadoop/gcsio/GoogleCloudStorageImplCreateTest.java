@@ -50,7 +50,8 @@ public class GoogleCloudStorageImplCreateTest {
   }
 
   @Test
-  public void create_grpcAndDisableDirectPathAndVmComputeEngineCredentials_useCloudpath() throws IOException {
+  public void create_grpcAndDisableDirectPathAndVmComputeEngineCredentials_useCloudpath()
+      throws IOException {
     GoogleCloudStorageImpl gcs =
         new GoogleCloudStorageImpl(
             GoogleCloudStorageOptions.builder()

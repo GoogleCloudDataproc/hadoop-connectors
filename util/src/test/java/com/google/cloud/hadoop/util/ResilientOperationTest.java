@@ -37,8 +37,8 @@ public class ResilientOperationTest {
     MockSleeper sleeper = new MockSleeper();
     CallableTester callTester = new CallableTester(new ArrayList<>());
     BackOff backoff = new RetryBoundedBackOff(new BackOffTester(), 3);
-    ResilientOperation.retry(callTester, backoff, RetryDeterminer.DEFAULT, Exception.class,
-        sleeper);
+    ResilientOperation.retry(
+        callTester, backoff, RetryDeterminer.DEFAULT, Exception.class, sleeper);
     assertThat(callTester.timesCalled()).isEqualTo(1);
     assertThat(sleeper.getCount()).isEqualTo(0);
   }

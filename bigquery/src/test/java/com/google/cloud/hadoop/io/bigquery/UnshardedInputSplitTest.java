@@ -27,9 +27,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/**
- * Unit Tests for UnshardedInputSplit.
- */
+/** Unit Tests for UnshardedInputSplit. */
 @RunWith(JUnit4.class)
 public class UnshardedInputSplitTest {
   // Sample start value for testing.
@@ -63,9 +61,7 @@ public class UnshardedInputSplitTest {
     assertThat(bqInputSplit.getLocations()).hasLength(START);
   }
 
-  /**
-   * Tests the getLocations method.
-   */
+  /** Tests the getLocations method. */
   @Test
   public void testGetPath() {
     // Create a new InputSplit containing the values.
@@ -76,15 +72,13 @@ public class UnshardedInputSplitTest {
     assertThat(bqInputSplit.getPath()).isEqualTo(PATH);
   }
 
-  /**
-   * Tests the toString method.
-   */
+  /** Tests the toString method. */
   @Test
   public void testToString() {
     // Create a new InputSplit containing the values.
     FileSplit inputSplit = new FileSplit(PATH, START, START + LENGTH, new String[0]);
-    UnshardedInputSplit bqInputSplit = new UnshardedInputSplit(
-        PATH, START, START + LENGTH, new String[0]);
+    UnshardedInputSplit bqInputSplit =
+        new UnshardedInputSplit(PATH, START, START + LENGTH, new String[0]);
 
     // Test for correct construction
     assertThat(bqInputSplit.toString()).isEqualTo(inputSplit.toString());

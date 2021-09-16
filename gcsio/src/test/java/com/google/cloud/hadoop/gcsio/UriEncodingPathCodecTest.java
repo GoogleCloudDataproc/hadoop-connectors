@@ -36,8 +36,7 @@ public class UriEncodingPathCodecTest {
     Truth.assertThat(id.getScheme()).isEqualTo("gs");
     Truth.assertThat(id.getRawSchemeSpecificPart())
         .isEqualTo("//b1/path/to/!@%23$%25&*()_/my/resource");
-    Truth.assertThat(id.getPath())
-        .isEqualTo("/path/to/!@#$%&*()_/my/resource");
+    Truth.assertThat(id.getPath()).isEqualTo("/path/to/!@#$%&*()_/my/resource");
   }
 
   @Test
@@ -48,8 +47,7 @@ public class UriEncodingPathCodecTest {
     Truth.assertThat(id.getScheme()).isEqualTo("gs");
     Truth.assertThat(id.getRawSchemeSpecificPart())
         .isEqualTo("//b1/path/to/segment1_%23Foo%23bar%23123");
-    Truth.assertThat(id.getPath())
-        .isEqualTo("/path/to/segment1_#Foo#bar#123");
+    Truth.assertThat(id.getPath()).isEqualTo("/path/to/segment1_#Foo#bar#123");
   }
 
   @Test

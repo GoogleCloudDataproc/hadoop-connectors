@@ -32,10 +32,10 @@ import org.apache.hadoop.mapreduce.JobID;
 /**
  * A container for configuration property names for jobs with BigQuery input/output.
  *
- *  The job can be configured programmatically using the static methods in this class,
+ * <p>The job can be configured programmatically using the static methods in this class,
  * GsonBigQueryInputFormat, and BigqueryOutputFormat}.
  *
- * Alternatively, the properties can be set in the configuration xml files with proper values.
+ * <p>Alternatively, the properties can be set in the configuration xml files with proper values.
  */
 public class BigQueryConfiguration {
 
@@ -206,11 +206,7 @@ public class BigQueryConfiguration {
    * @param tableId the table to write the intermediate results to.
    */
   public static void configureBigQueryInput(
-      Configuration config,
-      String projectId,
-      String datasetId,
-      String tableId)
-      throws IOException {
+      Configuration config, String projectId, String datasetId, String tableId) throws IOException {
     // Check preconditions.
     Preconditions.checkArgument(
         !Strings.isNullOrEmpty(datasetId), "datasetId must not be null or empty.");
@@ -245,11 +241,10 @@ public class BigQueryConfiguration {
    * Sets the Bigquery access related fields in the JobConf for input connector.
    *
    * @param config the job configuration.
-   * @param fullyQualifiedInputTableId input-table id of the form
-   *     [optional projectId]:[datasetId].[tableId]
+   * @param fullyQualifiedInputTableId input-table id of the form [optional
+   *     projectId]:[datasetId].[tableId]
    */
-  public static void configureBigQueryInput(
-      Configuration config, String fullyQualifiedInputTableId)
+  public static void configureBigQueryInput(Configuration config, String fullyQualifiedInputTableId)
       throws IOException {
     TableReference parsedTable = BigQueryStrings.parseTableReference(fullyQualifiedInputTableId);
     configureBigQueryInput(
@@ -266,11 +261,7 @@ public class BigQueryConfiguration {
    * @param tableSchema the output table schema used by this output connector.
    */
   public static void configureBigQueryOutput(
-      Configuration config,
-      String projectId,
-      String datasetId,
-      String tableId,
-      String tableSchema)
+      Configuration config, String projectId, String datasetId, String tableId, String tableSchema)
       throws IOException {
     // Check preconditions.
     Preconditions.checkArgument(
@@ -309,8 +300,8 @@ public class BigQueryConfiguration {
    * Sets the Bigquery access related fields in the JobConf for output connector.
    *
    * @param config the job configuration.
-   * @param fullyQualifiedOutputTableId output-table id of the form
-   *     [optional projectId]:[datasetId].[tableId]
+   * @param fullyQualifiedOutputTableId output-table id of the form [optional
+   *     projectId]:[datasetId].[tableId]
    * @param tableSchema the output table schema used by this output connector.
    */
   public static void configureBigQueryOutput(
@@ -318,7 +309,10 @@ public class BigQueryConfiguration {
       throws IOException {
     TableReference parsedTable = BigQueryStrings.parseTableReference(fullyQualifiedOutputTableId);
     configureBigQueryOutput(
-        config, parsedTable.getProjectId(), parsedTable.getDatasetId(), parsedTable.getTableId(),
+        config,
+        parsedTable.getProjectId(),
+        parsedTable.getDatasetId(),
+        parsedTable.getTableId(),
         tableSchema);
   }
 

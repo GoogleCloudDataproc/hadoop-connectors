@@ -18,9 +18,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractContractMkdirTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 
-/**
- * GCS contract tests covering file mkdir using in-memory fakes.
- */
+/** GCS contract tests covering file mkdir using in-memory fakes. */
 public class TestInMemoryGoogleContractMkdir extends AbstractContractMkdirTest {
 
   @Override
