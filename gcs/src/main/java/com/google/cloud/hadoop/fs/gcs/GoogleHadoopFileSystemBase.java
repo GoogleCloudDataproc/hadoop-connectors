@@ -231,7 +231,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   public static final String GHFS_ID;
 
   /** Instrumentation to track Statistics */
-  private GHFSInstrumentation instrumentation;
+  private GhfsInstrumentation instrumentation;
 
   static {
     VERSION =
@@ -470,7 +470,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     initializeDelegationTokenSupport(config, path);
 
     // Initialize the instrumentation
-    this.instrumentation = new GHFSInstrumentation(path);
+    this.instrumentation = new GhfsInstrumentation(path);
 
     configure(config);
   }
@@ -565,7 +565,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         getGcsFs().getOptions().getCloudStorageOptions().getReadChannelOptions();
     GoogleHadoopFSInputStream in =
         new GoogleHadoopFSInputStream(this, gcsPath, readChannelOptions, statistics);
-    entryPoint(GHFSStatistic.INVOCATION_OPEN);
+    entryPoint(GhfsStatistic.INVOCATION_OPEN);
     return new FSDataInputStream(in);
   }
 
@@ -597,7 +597,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       long blockSize,
       Progressable progress)
       throws IOException {
-    entryPoint(GHFSStatistic.INVOCATION_CREATE);
+    entryPoint(GhfsStatistic.INVOCATION_CREATE);
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
     checkArgument(replication > 0, "replication must be a positive integer: %s", replication);
     checkArgument(blockSize > 0, "blockSize must be a positive integer: %s", blockSize);
@@ -673,7 +673,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       long blockSize,
       Progressable progress)
       throws IOException {
-    entryPoint(GHFSStatistic.INVOCATION_CREATE_NON_RECURSIVE);
+    entryPoint(GhfsStatistic.INVOCATION_CREATE_NON_RECURSIVE);
     URI gcsPath = getGcsPath(checkNotNull(hadoopPath, "hadoopPath must not be null"));
     URI parentGcsPath = UriPaths.getParentPath(gcsPath);
     if (!getGcsFs().getFileInfo(parentGcsPath).exists()) {
@@ -803,7 +803,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     checkOpen();
 
-    entryPoint(GHFSStatistic.INVOCATION_RENAME);
+    entryPoint(GhfsStatistic.INVOCATION_RENAME);
 
     URI srcPath = getGcsPath(src);
     URI dstPath = getGcsPath(dst);
@@ -829,7 +829,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     URI gcsPath = getGcsPath(hadoopPath);
     try {
-      entryPoint(GHFSStatistic.INVOCATION_DELETE);
+      entryPoint(GhfsStatistic.INVOCATION_DELETE);
       getGcsFs().delete(gcsPath, recursive);
     } catch (DirectoryNotEmptyException e) {
       throw e;
@@ -867,7 +867,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     try {
       List<FileInfo> fileInfos = getGcsFs().listFileInfo(gcsPath, LIST_OPTIONS);
-      entryPoint(GHFSStatistic.INVOCATION_LIST_FILES);
+      entryPoint(GhfsStatistic.INVOCATION_LIST_FILES);
       status = new ArrayList<>(fileInfos.size());
       String userName = getUgiUserName();
       for (FileInfo fileInfo : fileInfos) {
@@ -880,7 +880,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                       "listStatus(hadoopPath: %s): '%s' does not exist.", hadoopPath, gcsPath))
               .initCause(fnfe);
     }
-    entryPoint(GHFSStatistic.INVOCATION_LIST_STATUS);
+    entryPoint(GhfsStatistic.INVOCATION_LIST_STATUS);
     return status.toArray(new FileStatus[0]);
   }
 
@@ -933,7 +933,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     URI gcsPath = getGcsPath(hadoopPath);
     try {
-      entryPoint(GHFSStatistic.INVOCATION_MKDIRS);
+      entryPoint(GhfsStatistic.INVOCATION_MKDIRS);
       getGcsFs().mkdirs(gcsPath);
     } catch (java.nio.file.FileAlreadyExistsException faee) {
       // Need to convert to the Hadoop flavor of FileAlreadyExistsException.
@@ -975,7 +975,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
               "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
     }
     String userName = getUgiUserName();
-    entryPoint(GHFSStatistic.INVOCATION_GET_FILE_STATUS);
+    entryPoint(GhfsStatistic.INVOCATION_GET_FILE_STATUS);
     return getFileStatus(fileInfo, userName);
   }
 
@@ -1111,7 +1111,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     if (globAlgorithm == GlobAlgorithm.FLAT && couldUseFlatGlob(fixedPath)) {
       return flatGlobInternal(fixedPath, filter);
     }
-    entryPoint(GHFSStatistic.INVOCATION_GLOB_STATUS);
+    entryPoint(GhfsStatistic.INVOCATION_GLOB_STATUS);
     return super.globStatus(fixedPath, filter);
   }
 
@@ -1598,7 +1598,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public Token<?> getDelegationToken(String renewer) throws IOException {
     Token<?> result = null;
-    entryPoint(GHFSStatistic.INVOCATION_GET_DELEGATION_TOKEN);
+    entryPoint(GhfsStatistic.INVOCATION_GET_DELEGATION_TOKEN);
     if (delegationTokens != null) {
       result = delegationTokens.getBoundOrNewDT(renewer);
     }
@@ -1610,7 +1610,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path[] srcs, Path dst)
       throws IOException {
-    entryPoint(GHFSStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
+    entryPoint(GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
     logger.atFiner().log(
         "copyFromLocalFile(delSrc: %b, overwrite: %b, %d srcs, dst: %s)",
         delSrc, overwrite, srcs.length, dst);
@@ -1620,7 +1620,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path src, Path dst)
       throws IOException {
-    entryPoint(GHFSStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
+    entryPoint(GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
     logger.atFiner().log(
         "copyFromLocalFile(delSrc: %b, overwrite: %b, src: %s, dst: %s)",
         delSrc, overwrite, src, dst);
@@ -1686,7 +1686,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
-    entryPoint(GHFSStatistic.INVOCATION_GET_FILE_CHECKSUM);
+    entryPoint(GhfsStatistic.INVOCATION_GET_FILE_CHECKSUM);
     URI gcsPath = getGcsPath(hadoopPath);
     final FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
     if (!fileInfo.exists()) {
@@ -1879,18 +1879,18 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   /** Override superclass so as to add statistic collection. {@inheritDoc} */
   @Override
   public boolean exists(Path f) throws IOException {
-    entryPoint(GHFSStatistic.INVOCATION_EXISTS);
+    entryPoint(GhfsStatistic.INVOCATION_EXISTS);
     return super.exists(f);
   }
 
-  public GHFSInstrumentation getInstrumentation() {
+  public GhfsInstrumentation getInstrumentation() {
     return this.instrumentation;
   }
 
   /**
    * Get the instrumentation's IOStatistics.
    *
-   * @return statistics
+   * @return
    */
   @Override
   public IOStatistics getIOStatistics() {
@@ -1903,7 +1903,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * @param operation The operation to increment
    * @throws IOException if the
    */
-  public void entryPoint(GHFSStatistic operation) throws IOException {
+  public void entryPoint(GhfsStatistic operation) throws IOException {
     checkOpen();
     incrementStatistic(operation);
   }
@@ -1912,7 +1912,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    *
    * @param statistic The operation to increment
    */
-  protected void incrementStatistic(GHFSStatistic statistic) {
+  protected void incrementStatistic(GhfsStatistic statistic) {
     incrementStatistic(statistic, 1);
   }
   /**
@@ -1922,7 +1922,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * @param statistic The operation to increment
    * @param count the count to increment
    */
-  protected void incrementStatistic(GHFSStatistic statistic, long count) {
+  protected void incrementStatistic(GhfsStatistic statistic, long count) {
     instrumentation.incrementCounter(statistic, count);
   }
 }

@@ -49,7 +49,7 @@ class GoogleHadoopOutputStream extends OutputStream {
   private final FileSystem.Statistics statistics;
 
   // Statistics tracker for outputstream related statistics
-  private GHFSOutputStreamStatistics streamStatistics;
+  private GhfsOutputStreamStatistics streamStatistics;
 
   /**
    * Constructs an instance of GoogleHadoopOutputStream object.

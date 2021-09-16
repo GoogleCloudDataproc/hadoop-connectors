@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Google Inc. All Rights Reserved.
+ * Copyright 2021 Google Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,17 +16,8 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-/** Enum of statistic types. */
-public enum GHFSStatisticTypeEnum {
-  /** Counter. */
-  TYPE_COUNTER,
+import org.apache.hadoop.fs.statistics.DurationTrackerFactory;
+import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 
-  /** Duration. */
-  TYPE_DURATION,
-
-  /** Gauge. */
-  TYPE_GAUGE,
-
-  /** Quantile. */
-  TYPE_QUANTILE,
-}
+/** Base Interface for GHFS Statistics, as a way of managing them. */
+public interface GhfsStatisticInterface extends IOStatisticsSource, DurationTrackerFactory {}

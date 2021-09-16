@@ -49,7 +49,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   private final byte[] singleReadBuf = new byte[1];
 
   // Statistics tracker of Input Stream
-  private final GHFSInputStreamStatistics streamStatistics;
+  private final GhfsInputStreamStatistics streamStatistics;
 
   /**
    * Constructs an instance of GoogleHadoopFSInputStream object.
@@ -84,6 +84,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   public synchronized int read() throws IOException {
     // TODO(user): Wrap this in a while-loop if we ever introduce a non-blocking mode for the
     // underlying channel.
+    streamStatistics.readOperationStarted(getPos(), 1);
     int numRead = channel.read(ByteBuffer.wrap(singleReadBuf));
     if (numRead == -1) {
       return -1;
@@ -102,7 +103,6 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     statistics.incrementBytesRead(1);
     statistics.incrementReadOps(1);
     streamStatistics.bytesRead(1);
-    streamStatistics.readOperationStarted(getPos(), 1);
     streamStatistics.readOperationCompleted(1, numRead);
     return (b & 0xff);
   }

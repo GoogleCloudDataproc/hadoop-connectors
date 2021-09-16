@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Google Inc. All Rights Reserved.
+ * Copyright 2021 Google Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,13 +20,15 @@ package com.google.cloud.hadoop.fs.gcs;
  * Statistics updated by a {@link GoogleHadoopFSInputStream} during its use. It also contains
  * getters for tests.
  */
-public interface GHFSInputStreamStatistics extends AutoCloseable, GHFSStatisticInterface {
+interface GhfsInputStreamStatistics extends AutoCloseable, GhfsStatisticInterface {
+
   /**
    * Seek backwards, incrementing the seek and backward seek counters.
    *
    * @param negativeOffset how far was the seek? This is expected to be negative.
    */
   void seekBackwards(long negativeOffset);
+
   /**
    * Record a forward seek, adding a seek operation, a forward seek operation.
    *
@@ -37,6 +39,7 @@ public interface GHFSInputStreamStatistics extends AutoCloseable, GHFSStatisticI
 
   /** An ignored stream read exception was received. */
   void readException();
+
   /**
    * Increment the bytes read counter by the number of bytes; no-op if the argument is negative.
    *
