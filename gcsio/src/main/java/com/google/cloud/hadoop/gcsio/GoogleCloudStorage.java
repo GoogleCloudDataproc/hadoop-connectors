@@ -25,29 +25,27 @@ import java.util.List;
  * Interface for exposing the Google Cloud Storage API behavior in a way more amenable to writing
  * filesystem semantics on top of it, without having to deal with API-specific considerations such
  * as HttpTransports, credentials, network errors, batching, etc.
- * <p>
- * Please read the following document to get familiarity with basic GCS concepts:
+ *
+ * <p>Please read the following document to get familiarity with basic GCS concepts:
  * https://developers.google.com/storage/docs/concepts-techniques
  */
 public interface GoogleCloudStorage {
-  // Pseudo path delimiter.
-  //
-  // GCS does not implement full concept of file system paths but it does expose
-  // some notion of a delimiter that can be used with Storage.Objects.List to
-  // control which items are listed.
-  public static final String PATH_DELIMITER = "/";
 
   /**
-   * Value indicating all objects should be returned from GCS, no limit.
+   * Pseudo path delimiter.
+   *
+   * <p>GCS does not implement full concept of file system paths but it does expose some notion of a
+   * delimiter that can be used with ${code Storage.Objects.List} to control which items are listed.
    */
-  public static final long MAX_RESULTS_UNLIMITED = -1;
+  String PATH_DELIMITER = "/";
+
+  /** Value indicating all objects should be returned from GCS, no limit. */
+  long MAX_RESULTS_UNLIMITED = -1;
 
   /** The maximum number of objects that can be composed in one operation. */
-  public static final int MAX_COMPOSE_OBJECTS = 32;
+  int MAX_COMPOSE_OBJECTS = 32;
 
-  /**
-   * Retrieve the options that were used to create this GoogleCloudStorage.
-   */
+  /** Retrieve the options that were used to create this GoogleCloudStorage. */
   GoogleCloudStorageOptions getOptions();
 
   /**
@@ -61,7 +59,9 @@ public interface GoogleCloudStorage {
    * @return a channel for writing to the given object
    * @throws IOException on IO error
    */
-  WritableByteChannel create(StorageResourceId resourceId) throws IOException;
+  default WritableByteChannel create(StorageResourceId resourceId) throws IOException {
+    return create(resourceId, CreateObjectOptions.DEFAULT_OVERWRITE);
+  }
 
   /**
    * Creates and opens an object for writing. The bucket must already exist. If {@code resourceId}
@@ -84,7 +84,9 @@ public interface GoogleCloudStorage {
    * @param bucketName name of the bucket to create
    * @throws IOException on IO error
    */
-  void create(String bucketName) throws IOException;
+  default void createBucket(String bucketName) throws IOException {
+    createBucket(bucketName, CreateBucketOptions.DEFAULT);
+  }
 
   /**
    * Creates a bucket.
@@ -93,7 +95,7 @@ public interface GoogleCloudStorage {
    * @param options options to use when creating bucket
    * @throws IOException on IO error
    */
-  void create(String bucketName, CreateBucketOptions options) throws IOException;
+  void createBucket(String bucketName, CreateBucketOptions options) throws IOException;
 
   /**
    * Creates an empty object, useful for placeholders representing, for example, directories. The
@@ -107,10 +109,10 @@ public interface GoogleCloudStorage {
   void createEmptyObject(StorageResourceId resourceId) throws IOException;
 
   /**
-   * Creates an empty object, useful for placeholders representing, for example, directories.
-   * The bucket must already exist. If the object already exists, it is overwritten.
-   * See {@link #create(StorageResourceId)} for the behavior if StorageResourceId.getGenerationId()
-   * is explicitly set.
+   * Creates an empty object, useful for placeholders representing, for example, directories. The
+   * bucket must already exist. If the object already exists, it is overwritten. See {@link
+   * #create(StorageResourceId)} for the behavior if StorageResourceId.getGenerationId() is
+   * explicitly set.
    *
    * @param resourceId identifies a StorageObject
    * @param options options to use when creating the object
@@ -120,21 +122,18 @@ public interface GoogleCloudStorage {
       throws IOException;
 
   /**
-   * Creates a list of empty objects; see {@link #createEmptyObject(StorageResourceId)} for
-   * the single-item version of this method. Implementations may use different flow than the
-   * single-item version for greater efficiency.
-   * See {@link #create(StorageResourceId)} for the behavior if StorageResourceId.getGenerationId()
-   * is explicitly set.
+   * Creates a list of empty objects; see {@link #createEmptyObject(StorageResourceId)} for the
+   * single-item version of this method. Implementations may use different flow than the single-item
+   * version for greater efficiency. See {@link #create(StorageResourceId)} for the behavior if
+   * StorageResourceId.getGenerationId() is explicitly set.
    */
-  void createEmptyObjects(List<StorageResourceId> resourceIds)
-      throws IOException;
+  void createEmptyObjects(List<StorageResourceId> resourceIds) throws IOException;
 
   /**
-   * Creates a list of empty objects; see {@link #createEmptyObject(StorageResourceId)} for
-   * the single-item version of this method. Implementations may use different flow than the
-   * single-item version for greater efficiency.
-   * See {@link #create(StorageResourceId)} for the behavior if StorageResourceId.getGenerationId()
-   * is explicitly set.
+   * Creates a list of empty objects; see {@link #createEmptyObject(StorageResourceId)} for the
+   * single-item version of this method. Implementations may use different flow than the single-item
+   * version for greater efficiency. See {@link #create(StorageResourceId)} for the behavior if
+   * StorageResourceId.getGenerationId() is explicitly set.
    */
   void createEmptyObjects(List<StorageResourceId> resourceIds, CreateObjectOptions options)
       throws IOException;
@@ -147,7 +146,9 @@ public interface GoogleCloudStorage {
    * @throws java.io.FileNotFoundException if the given object does not exist
    * @throws IOException if object exists but cannot be opened
    */
-  SeekableByteChannel open(StorageResourceId resourceId) throws IOException;
+  default SeekableByteChannel open(StorageResourceId resourceId) throws IOException {
+    return open(resourceId, GoogleCloudStorageReadOptions.DEFAULT);
+  }
 
   /**
    * Opens an object for reading.
@@ -199,119 +200,72 @@ public interface GoogleCloudStorage {
       List<String> dstObjectNames)
       throws IOException;
 
-  /**
-   * Gets a list of names of buckets in this project.
-   */
-  List<String> listBucketNames()
-      throws IOException;
+  /** Gets a list of names of buckets in this project. */
+  List<String> listBucketNames() throws IOException;
 
   /**
    * Gets a list of GoogleCloudStorageItemInfo for all buckets of this project. This is no more
-   * expensive than calling listBucketNames(), since the list API for buckets already retrieves
-   * all the relevant bucket metadata.
+   * expensive than calling listBucketNames(), since the list API for buckets already retrieves all
+   * the relevant bucket metadata.
    */
-  List<GoogleCloudStorageItemInfo> listBucketInfo()
-      throws IOException;
+  List<GoogleCloudStorageItemInfo> listBucketInfo() throws IOException;
 
   /**
-   * Gets names of objects contained in the given bucket and whose names begin with
-   * the given prefix.
-   * <p>
-   * Note:
-   * Although GCS does not implement a file system, it treats objects that contain
-   * a delimiter as different from other objects when listing objects.
-   * This will be clearer with an example.
-   * <p>
-   * Consider a bucket with objects: o1, d1/, d1/o1, d1/o2
-   * With prefix == null and delimiter == /,    we get: d1/, o1
-   * With prefix == null and delimiter == null, we get: o1, d1/, d1/o1, d1/o2
-   * <p>
-   * Thus when delimiter is null, the entire key name is considered an opaque string,
-   * otherwise only the part up to the first delimiter is considered.
-   * <p>
-   * The default implementation of this method should turn around and call
-   * the version that takes {@code maxResults} so that inheriting classes
-   * need only implement that version.
+   * Lists {@link GoogleCloudStorageItemInfo} of objects contained in the given bucket and whose
+   * names begin with the given prefix.
    *
-   * @param bucketName bucket name
-   * @param objectNamePrefix object name prefix or null if all objects in the bucket are desired
-   * @param delimiter delimiter to use (typically "/"), otherwise null
-   * @return list of object names
-   * @throws IOException on IO error
-   */
-  List<String> listObjectNames(
-      String bucketName, String objectNamePrefix, String delimiter)
-      throws IOException;
-
-  /**
-   * Gets names of objects contained in the given bucket and whose names begin with
-   * the given prefix.
-   * <p>
-   * Note:
-   * Although GCS does not implement a file system, it treats objects that contain
-   * a delimiter as different from other objects when listing objects.
-   * This will be clearer with an example.
-   * <p>
-   * Consider a bucket with objects: o1, d1/, d1/o1, d1/o2
-   * With prefix == null and delimiter == /,    we get: d1/, o1
-   * With prefix == null and delimiter == null, we get: o1, d1/, d1/o1, d1/o2
-   * <p>
-   * Thus when delimiter is null, the entire key name is considered an opaque string,
+   * <p>Note: Although GCS does not implement a file system, it treats objects that contain a
+   * delimiter ({@link ListObjectOptions#getDelimiter()}) as different from other objects when
+   * listing objects. This will be clearer with an example.
+   *
+   * <p>Consider a bucket with objects: {@code o1}, {@code d1/}, {@code d1/o1}, {@code d1/o2}
+   *
+   * <ul>
+   *   <li/>With {@code prefix == null} and {@code delimiter == /}, we get: {@code d1/}, {@code o1}
+   *   <li/>With {@code prefix == null} and {@code delimiter == null}, we get: {@code o1}, {@code
+   *       d1/}, {@code d1/o1}, {@code d1/o2}
+   * </ul>
+   *
+   * <p>Thus when delimiter is {@code null}, the entire key name is considered an opaque string,
    * otherwise only the part up to the first delimiter is considered.
    *
    * @param bucketName bucket name
    * @param objectNamePrefix object name prefix or null if all objects in the bucket are desired
-   * @param delimiter delimiter to use (typically "/"), otherwise null
-   * @param maxResults maximum number of results to return,
-   *        unlimited if negative or zero
-   * @return list of object names
+   * @return list of objects
    * @throws IOException on IO error
    */
-  List<String> listObjectNames(
-      String bucketName, String objectNamePrefix, String delimiter,
-      long maxResults)
-      throws IOException;
+  default List<GoogleCloudStorageItemInfo> listObjectInfo(
+      String bucketName, String objectNamePrefix) throws IOException {
+    return listObjectInfo(bucketName, objectNamePrefix, ListObjectOptions.DEFAULT);
+  }
 
   /**
-   * Same name-matching semantics as {@link #listObjectNames} except this method retrieves the full
-   * GoogleCloudStorageFileInfo for each item as well.
+   * Lists {@link GoogleCloudStorageItemInfo} of objects contained in the given bucket and whose
+   * names begin with the given prefix.
    *
-   * <p>Generally the info is already available from the same "list()" calls, so the only additional
-   * cost is dispatching an extra batch request to retrieve object metadata for all listed
-   * <b>directories</b>, since these are originally listed as String prefixes without attached
-   * metadata.
+   * <p>Note: Although GCS does not implement a file system, it treats objects that contain a
+   * delimiter ({@link ListObjectOptions#getDelimiter()}) as different from other objects when
+   * listing objects. This will be clearer with an example.
    *
-   * <p>The default implementation of this method should turn around and call the version that takes
-   * {@code maxResults} so that inheriting classes need only implement that version.
+   * <p>Consider a bucket with objects: {@code o1}, {@code d1/}, {@code d1/o1}, {@code d1/o2}
+   *
+   * <ul>
+   *   <li/>With {@code prefix == null} and {@code delimiter == /}, we get: {@code d1/}, {@code o1}
+   *   <li/>With {@code prefix == null} and {@code delimiter == null}, we get: {@code o1}, {@code
+   *       d1/}, {@code d1/o1}, {@code d1/o2}
+   * </ul>
+   *
+   * <p>Thus when delimiter is {@code null}, the entire key name is considered an opaque string,
+   * otherwise only the part up to the first delimiter is considered.
    *
    * @param bucketName bucket name
    * @param objectNamePrefix object name prefix or null if all objects in the bucket are desired
-   * @param delimiter delimiter to use (typically "/"), otherwise null
-   * @return list of object info
+   * @param listOptions options to use when listing objects
+   * @return list of objects
    * @throws IOException on IO error
    */
   List<GoogleCloudStorageItemInfo> listObjectInfo(
-      String bucketName, String objectNamePrefix, String delimiter) throws IOException;
-
-  /**
-   * Same name-matching semantics as {@link #listObjectNames} except this method retrieves the full
-   * GoogleCloudStorageFileInfo for each item as well.
-   *
-   * <p>Generally the info is already available from the same "list()" calls, so the only additional
-   * cost is dispatching an extra batch request to retrieve object metadata for all listed
-   * <b>directories</b>, since these are originally listed as String prefixes without attached
-   * metadata.
-   *
-   * @param bucketName bucket name
-   * @param objectNamePrefix object name prefix or null if all objects in the bucket are desired
-   * @param delimiter delimiter to use (typically "/"), otherwise null
-   * @param maxResults maximum number of results to return, unlimited if negative or zero
-   * @return list of object info
-   * @throws IOException on IO error
-   */
-  List<GoogleCloudStorageItemInfo> listObjectInfo(
-      String bucketName, String objectNamePrefix, String delimiter, long maxResults)
-      throws IOException;
+      String bucketName, String objectNamePrefix, ListObjectOptions listOptions) throws IOException;
 
   /**
    * The same semantics as {@link #listObjectInfo}, but returns only result of single list request
@@ -319,14 +273,29 @@ public interface GoogleCloudStorage {
    *
    * @param bucketName bucket name
    * @param objectNamePrefix object name prefix or null if all objects in the bucket are desired
-   * @param delimiter delimiter to use (typically "/"), otherwise null
+   * @param pageToken the page token
+   * @return {@link ListPage} object with listed {@link GoogleCloudStorageItemInfo}s and next page
+   *     token if any
+   * @throws IOException on IO error
+   */
+  default ListPage<GoogleCloudStorageItemInfo> listObjectInfoPage(
+      String bucketName, String objectNamePrefix, String pageToken) throws IOException {
+    return listObjectInfoPage(bucketName, objectNamePrefix, ListObjectOptions.DEFAULT, pageToken);
+  }
+  /**
+   * The same semantics as {@link #listObjectInfo}, but returns only result of single list request
+   * (1 page).
+   *
+   * @param bucketName bucket name
+   * @param objectNamePrefix object name prefix or null if all objects in the bucket are desired
+   * @param listOptions options to use when listing objects
    * @param pageToken the page token
    * @return {@link ListPage} object with listed {@link GoogleCloudStorageItemInfo}s and next page
    *     token if any
    * @throws IOException on IO error
    */
   ListPage<GoogleCloudStorageItemInfo> listObjectInfoPage(
-      String bucketName, String objectNamePrefix, String delimiter, String pageToken)
+      String bucketName, String objectNamePrefix, ListObjectOptions listOptions, String pageToken)
       throws IOException;
 
   /**
@@ -336,8 +305,7 @@ public interface GoogleCloudStorage {
    * @return information about the given item
    * @throws IOException on IO error
    */
-  GoogleCloudStorageItemInfo getItemInfo(StorageResourceId resourceId)
-      throws IOException;
+  GoogleCloudStorageItemInfo getItemInfo(StorageResourceId resourceId) throws IOException;
 
   /**
    * Gets information about multiple objects and/or buckets. Items that are "not found" will still
@@ -353,16 +321,12 @@ public interface GoogleCloudStorage {
 
   /**
    * Attempt to update metadata of the objects referenced within the passed itemInfo objects.
+   *
    * @return Updated GoogleCloudStorageItemInfo objects for the referenced objects.
    * @throws IOException on IO error
    */
   List<GoogleCloudStorageItemInfo> updateItems(List<UpdatableItemInfo> itemInfoList)
       throws IOException;
-
-  /**
-   * Releases resources used by this instance.
-   */
-  void close();
 
   /**
    * Composes inputs into a single GCS object. This performs a GCS Compose. Objects will be composed
@@ -382,13 +346,16 @@ public interface GoogleCloudStorage {
    * Composes inputs into a single GCS object. This performs a GCS Compose. Objects will be composed
    * according to the order they appear in the input. The destination object will have metadata set
    * according to {@code options}. Overwrite semantics for the destination object will follow the
-   * same semantics as {@link #create(StorageResourceId, CreateObjectOptions)}.
-   * See {@link #create(StorageResourceId)} for the behavior if StorageResourceId.getGenerationId()
-   * is explicitly set. The bucket must be the same for all sources and the destination.
+   * same semantics as {@link #create(StorageResourceId, CreateObjectOptions)}. See {@link
+   * #create(StorageResourceId)} for the behavior if StorageResourceId.getGenerationId() is
+   * explicitly set. The bucket must be the same for all sources and the destination.
    */
   GoogleCloudStorageItemInfo composeObjects(
       List<StorageResourceId> sources, StorageResourceId destination, CreateObjectOptions options)
       throws IOException;
+
+  /** Releases resources used by this instance. */
+  void close();
 
   /** Paged list request response */
   class ListPage<T> {

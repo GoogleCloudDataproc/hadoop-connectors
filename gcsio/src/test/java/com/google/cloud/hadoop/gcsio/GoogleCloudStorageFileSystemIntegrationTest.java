@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -41,10 +42,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -59,12 +58,10 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.junit.runners.model.Statement;
 
-// TODO(user): add tests for multi-threaded reads/writes
-/**
- * Integration tests for GoogleCloudStorageFileSystem class.
- */
+/** Integration tests for GoogleCloudStorageFileSystem class. */
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageFileSystemIntegrationTest {
+
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // hack to make tests pass until JUnit 4.13 regression will be fixed:
@@ -120,9 +117,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
         public void before() throws Throwable {
           if (gcsfs == null) {
             Credential credential = GoogleCloudStorageTestHelper.getCredential();
-            String appName = GoogleCloudStorageIntegrationHelper.APP_NAME;
-            String projectId = TestConfiguration.getInstance().getProjectId();
-            assertThat(projectId).isNotNull();
+            String projectId = checkNotNull(TestConfiguration.getInstance().getProjectId());
 
             GoogleCloudStorageFileSystemOptions.Builder optionsBuilder =
                 GoogleCloudStorageFileSystemOptions.builder()
@@ -132,7 +127,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
                 .setBucketDeleteEnabled(true)
                 .setCloudStorageOptions(
                     GoogleCloudStorageOptions.builder()
-                        .setAppName(appName)
+                        .setAppName(GoogleCloudStorageTestHelper.APP_NAME)
                         .setProjectId(projectId)
                         .setWriteChannelOptions(
                             AsyncWriteChannelOptions.builder()
@@ -192,11 +187,15 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   private void validateFileInfoInternal(
       String bucketName, String objectName, boolean expectedToExist, FileInfo fileInfo)
       throws IOException {
-    assertThat(fileInfo.exists()).isEqualTo(expectedToExist);
+    assertWithMessage("exists for bucketName '%s' objectName '%s'", bucketName, objectName)
+        .that(fileInfo.exists())
+        .isEqualTo(expectedToExist);
 
     long expectedSize = gcsiHelper.getExpectedObjectSize(objectName, expectedToExist);
     if (expectedSize != Long.MIN_VALUE) {
-      assertThat(fileInfo.getSize()).isEqualTo(expectedSize);
+      assertWithMessage("getSize for bucketName '%s' objectName '%s'", bucketName, objectName)
+          .that(fileInfo.getSize())
+          .isEqualTo(expectedSize);
     }
 
     boolean expectedDirectory = (objectName == null) || StringPaths.isDirectoryPath(objectName);
@@ -206,35 +205,44 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     if (expectedToExist) {
       Instant currentTime = Instant.now();
-      Instant fileCreationTime = Instant.ofEpochMilli(fileInfo.getCreationTime());
+      // Use modification time instead of creation time - by default creation time
+      // not fetched because it's not exposed in HCFS FileSystem interface.
+      Instant fileModificationTime = Instant.ofEpochMilli(fileInfo.getModificationTime());
 
       assertWithMessage(
-              "stale file? testStartTime: %s, fileCreationTime: %s",
-              testStartTime, fileCreationTime)
-          .that(fileCreationTime)
+              "getModificationTime for bucketName '%s' objectName '%s'", bucketName, objectName)
+          .that(fileModificationTime)
           .isAtLeast(testStartTime);
       assertWithMessage(
-              "unexpected creation-time: clock skew? currentTime: %s, fileCreationTime: %s",
-              currentTime, fileCreationTime)
-          .that(fileCreationTime)
+              "getModificationTime for bucketName '%s' objectName '%s'", bucketName, objectName)
+          .that(fileModificationTime)
           .isAtMost(currentTime);
     } else {
-      assertThat(fileInfo.getCreationTime()).isEqualTo(0);
+      assertWithMessage(
+              "getCreationTime for bucketName '%s' objectName '%s'", bucketName, objectName)
+          .that(fileInfo.getCreationTime())
+          .isEqualTo(0);
+      assertWithMessage(
+              "getModificationTime for bucketName '%s' objectName '%s'", bucketName, objectName)
+          .that(fileInfo.getModificationTime())
+          .isEqualTo(0);
     }
 
-    assertThat(fileInfo.toString()).isNotEmpty();
+    assertWithMessage("toString for bucketName '%s' objectName '%s'", bucketName, objectName)
+        .that(fileInfo.toString())
+        .isNotEmpty();
   }
 
   /**
    * Validates FileInfo for the given item.
-   * <p>
-   * See {@link #testListObjectNamesAndGetItemInfo()} for more info.
-   * <p>
-   * Note: The test initialization code creates objects as text files.
-   * Each text file contains name of its associated object.
-   * Therefore, size of an object == objectName.getBytes("UTF-8").length.
+   *
+   * <p>See {@link #testGetAndListFileInfo()} for more info.
+   *
+   * <p>Note: The test initialization code creates objects as text files. Each text file contains
+   * name of its associated object. Therefore, size of an object ==
+   * objectName.getBytes("UTF-8").length.
    */
-  protected void validateGetItemInfo(String bucketName, String objectName, boolean expectedToExist)
+  protected void validateGetFileInfo(String bucketName, String objectName, boolean expectedToExist)
       throws IOException {
     URI path = gcsiHelper.getPath(bucketName, objectName);
     FileInfo fileInfo = gcsfs.getFileInfo(path);
@@ -244,15 +252,17 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
   /**
    * Validates FileInfo returned by listFileInfo().
-   * <p>
-   * See {@link #testListObjectNamesAndGetItemInfo()} for more info.
+   *
+   * <p>See {@link #testGetAndListFileInfo()} for more info.
    */
-  protected void validateListNamesAndInfo(String bucketName, String objectNamePrefix,
-      boolean pathExpectedToExist, String... expectedListedNames)
+  protected void validateListFileInfo(
+      String bucketName,
+      String objectNamePrefix,
+      boolean expectedToExist,
+      String... expectedListedNames)
       throws IOException {
 
-    boolean childPathsExpectedToExist =
-        pathExpectedToExist && (expectedListedNames != null);
+    boolean childPathsExpectedToExist = expectedToExist && (expectedListedNames != null);
     boolean listRoot = bucketName == null;
 
     // Prepare list of expected paths.
@@ -281,7 +291,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     // Get list of actual paths.
     URI path = gcsiHelper.getPath(bucketName, objectNamePrefix);
     List<FileInfo> fileInfos;
-    if (pathExpectedToExist) {
+    if (expectedToExist) {
       fileInfos = gcsfs.listFileInfo(path);
     } else {
       assertThrows(FileNotFoundException.class, () -> gcsfs.listFileInfo(path));
@@ -307,33 +317,6 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
       assertThat(actualPaths).containsAtLeastElementsIn(expectedPaths);
     } else {
       assertThat(actualPaths).containsExactlyElementsIn(expectedPaths);
-    }
-
-    // Now re-verify using listFileNames instead of listFileInfo.
-    FileInfo baseInfo = gcsfs.getFileInfo(path);
-    List<URI> listedUris = gcsfs.listFileNames(baseInfo);
-
-    if (!baseInfo.isDirectory() && !baseInfo.exists()) {
-      // This is one case which differs between listFileInfo and listFileNames; listFileInfo will
-      // throw an exception for non-existent paths, while listFileNames will *always* return the
-      // unaltered path itself as long as it's not a directory. If it's a non-existent directory
-      // path, it returns an empty list, as opposed to this case, where it's a list of size 1.
-      expectedPaths.add(path);
-    }
-
-    if (listRoot) {
-      // By nature of the globally-visible GCS root (gs://), as long as we share a project for
-      // multiple testing purposes there's no way to know the exact expected contents to be listed,
-      // because other people/tests may have their own buckets alongside those created by this test.
-      // So, we just check that the expectedPaths are at least a subset of the listed ones.
-      Set<URI> actualPathsSet = new HashSet<>(listedUris);
-      for (URI expectedPath : expectedPaths) {
-        assertWithMessage("expected: <%s> in: <%s>", expectedPath, actualPathsSet)
-            .that(actualPathsSet)
-            .contains(expectedPath);
-      }
-    } else {
-      assertThat(listedUris).containsExactlyElementsIn(expectedPaths);
     }
   }
 
@@ -408,14 +391,14 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   }
 
   /**
-   * Tests listObjectNames() and getItemInfo().
+   * Tests {@link GoogleCloudStorageFileSystem#getFileInfo(URI)} and {@link
+   * GoogleCloudStorageFileSystem#listFileInfo(URI)}.
    *
    * <p>The data required for the 2 tests is expensive to create therefore we combine the tests into
    * one.
    */
   @Test
-  public void testListObjectNamesAndGetItemInfo() throws Exception {
-
+  public void testGetAndListFileInfo() throws Exception {
     // Objects created for this test.
     String[] objectNames = {
         "o1",
@@ -434,8 +417,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // -------------------------------------------------------
     // Create test objects.
-    String tempTestBucket = gcsiHelper.createUniqueBucket("list");
-    gcsiHelper.createObjectsWithSubdirs(tempTestBucket, objectNames);
+    String testBucket = gcsiHelper.createUniqueBucket("list");
+    gcsiHelper.createObjectsWithSubdirs(testBucket, objectNames);
 
     // -------------------------------------------------------
     // Tests for getItemInfo().
@@ -443,71 +426,80 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // Verify that getItemInfo() returns correct info for each object.
     for (String objectName : objectNames) {
-      validateGetItemInfo(tempTestBucket, objectName, true);
+      validateGetFileInfo(testBucket, objectName, /* expectedToExist= */ true);
     }
 
     // Verify that getItemInfo() returns correct info for bucket.
-    validateGetItemInfo(tempTestBucket, null, true);
+    validateGetFileInfo(testBucket, null, /* expectedToExist= */ true);
 
     // Verify that getItemInfo() returns correct info for a non-existent object.
-    validateGetItemInfo(tempTestBucket, dirDoesNotExist, false);
+    validateGetFileInfo(testBucket, dirDoesNotExist, /* expectedToExist= */ false);
 
     // Verify that getItemInfo() returns correct info for a non-existent bucket.
-    validateGetItemInfo(tempTestBucket, objDoesNotExist, false);
+    validateGetFileInfo(testBucket, objDoesNotExist, /* expectedToExist= */ false);
 
     // -------------------------------------------------------
-    // Tests for listObjectNames().
+    // Tests for listFileInfo().
     // -------------------------------------------------------
 
-    // Verify that listObjectNames() returns correct names for each case below.
+    // Verify that listFileInfo() returns correct result for each case below.
 
     // At root.
-    validateListNamesAndInfo(tempTestBucket, null, true, "o1", "o2", "d0/", "d1/", "d2/");
-    validateListNamesAndInfo(tempTestBucket, "", true, "o1", "o2", "d0/", "d1/", "d2/");
+    validateListFileInfo(
+        testBucket, null, /* expectedToExist= */ true, "o1", "o2", "d0/", "d1/", "d2/");
+    validateListFileInfo(
+        testBucket, "", /* expectedToExist= */ true, "o1", "o2", "d0/", "d1/", "d2/");
 
     // At d0.
-    validateListNamesAndInfo(tempTestBucket, "d0/", true);
+    validateListFileInfo(testBucket, "d0/", /* expectedToExist= */ true);
+    validateListFileInfo(testBucket, "d0", /* expectedToExist= */ true);
 
     // At o1.
-    validateListNamesAndInfo(tempTestBucket, "o1", true, "o1");
-
-    // TODO(user) : bug in GCS? fails only when running gcsfs tests?
-    // validateListNamesAndInfo(bucketName, "d0", true, "d0/");
+    validateListFileInfo(testBucket, "o1", /* expectedToExist= */ true, "o1");
+    if (getClass().equals(GoogleCloudStorageFileSystemIntegrationTest.class)
+        || getClass().equals(GoogleCloudStorageFileSystemTest.class)) {
+      validateListFileInfo(testBucket, "o1/", /* expectedToExist= */ false);
+    } else {
+      validateListFileInfo(testBucket, "o1/", /* expectedToExist= */ true, "o1");
+    }
 
     // At d1.
-    validateListNamesAndInfo(tempTestBucket, "d1/", true, "d1/o11", "d1/o12", "d1/d10/", "d1/d11/");
+    validateListFileInfo(
+        testBucket, "d1/", /* expectedToExist= */ true, "d1/o11", "d1/o12", "d1/d10/", "d1/d11/");
+    validateListFileInfo(
+        testBucket, "d1", /* expectedToExist= */ true, "d1/o11", "d1/o12", "d1/d10/", "d1/d11/");
 
-    // TODO(user) : bug in GCS? fails only when running gcsfs tests?
-    // validateListNamesAndInfo(bucketName, "d1", true, "d1/");
+    // At d1/o12.
+    validateListFileInfo(testBucket, "d1/o12", /* expectedToExist= */ true, "d1/o12");
+    if (getClass().equals(GoogleCloudStorageFileSystemIntegrationTest.class)
+        || getClass().equals(GoogleCloudStorageFileSystemTest.class)) {
+      validateListFileInfo(testBucket, "d1/o12/", /* expectedToExist= */ false);
+    } else {
+      validateListFileInfo(testBucket, "d1/o12/", /* expectedToExist= */ true, "d1/o12");
+    }
 
     // At d1/d11.
-    validateListNamesAndInfo(tempTestBucket, "d1/d11/", true, "d1/d11/o111");
-
-    // TODO(user) : bug in GCS? fails only when running gcsfs tests?
-    // validateListNamesAndInfo(bucketName, "d1/d11", true, "d1/d11/");
+    validateListFileInfo(testBucket, "d1/d11/", /* expectedToExist= */ true, "d1/d11/o111");
+    validateListFileInfo(testBucket, "d1/d11", /* expectedToExist= */ true, "d1/d11/o111");
 
     // At d2.
-    validateListNamesAndInfo(tempTestBucket, "d2/", true, "d2/o21", "d2/o22");
-
-    // TODO(user) : bug in GCS? fails only when running gcsfs tests?
-    // validateListNamesAndInfo(bucketName, "d2", true, "d2/");
+    validateListFileInfo(testBucket, "d2/", /* expectedToExist= */ true, "d2/o21", "d2/o22");
+    validateListFileInfo(testBucket, "d2", /* expectedToExist= */ true, "d2/o21", "d2/o22");
 
     // At non-existent path.
-    validateListNamesAndInfo(tempTestBucket, dirDoesNotExist, false);
-    validateListNamesAndInfo(tempTestBucket, objDoesNotExist, false);
-    validateListNamesAndInfo("gcsio-test-bucket-" + objDoesNotExist, objDoesNotExist, false);
+    validateListFileInfo(testBucket, dirDoesNotExist, /* expectedToExist= */ false);
+    validateListFileInfo(testBucket, objDoesNotExist, /* expectedToExist= */ false);
+    validateListFileInfo(
+        "gcsio-test-bucket-" + objDoesNotExist, objDoesNotExist, /* expectedToExist= */ false);
 
-    // -------------------------------------------------------
-    // Tests for listObjectNames().
-    // -------------------------------------------------------
-    validateListNamesAndInfo(
-        null, null, true, sharedBucketName1, sharedBucketName2, tempTestBucket);
+    validateListFileInfo(
+        null, null, /* expectedToExist= */ true, sharedBucketName1, sharedBucketName2, testBucket);
   }
 
   @Test @SuppressWarnings("EqualsIncompatibleType")
   public void testGoogleCloudStorageItemInfoNegativeEquality() {
     // Assert that .equals with an incorrect type returns false and does not throw.
-    assertThat(!GoogleCloudStorageItemInfo.ROOT_INFO.equals("non-item-info")).isTrue();
+    assertThat(GoogleCloudStorageItemInfo.ROOT_INFO.equals("non-item-info")).isFalse();
   }
 
   /**
@@ -589,12 +581,18 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     }
   }
 
-  /**
-   * Validates that we cannot open a non-existent object.
-   */
+  /** Validates that we cannot open a non-existent object. */
   @Test
-  public void testOpenNonExistent()
-      throws IOException {
+  public void testOpenNonExistentObject() throws IOException {
+    String bucketName = sharedBucketName1;
+    assertThrows(
+        FileNotFoundException.class,
+        () -> gcsiHelper.readTextFile(bucketName, objectName + "_open-non-existent", 0, 100, true));
+  }
+
+  /** Validates that we cannot open an object in non-existent bucket. */
+  @Test
+  public void testOpenInNonExistentBucket() throws IOException {
     String bucketName = gcsiHelper.getUniqueBucketName("open-non-existent");
     assertThrows(
         FileNotFoundException.class,
@@ -834,8 +832,12 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // Make a path where the bucket is a non-existent parent directory.
     String uniqueBucketName2 = gcsiHelper.getUniqueBucketName("mkdir-2");
-    dirData.put(gcsiHelper.getPath(uniqueBucketName2, "foo/bar"),
-                new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE));
+    dirData.put(
+        gcsiHelper.getPath(uniqueBucketName2, "foo/bar"),
+        new MethodOutcome(
+            gcsiHelper.getClass().getSimpleName().equals("HadoopFileSystemIntegrationHelper")
+                ? MethodOutcome.Type.RETURNS_TRUE
+                : MethodOutcome.Type.THROWS_EXCEPTION));
 
     // Call mkdirs() for each path and verify the expected behavior.
     for (URI path : dirData.keySet()) {
@@ -844,7 +846,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
         boolean result = gcsiHelper.mkdirs(path);
         if (result) {
           assertWithMessage(
-                  "Unexpected result for path: %s : expected %s, actually returned true.",
+                  "Unexpected result for path: '%s' : expected %s, actually returned true.",
                   path, expectedOutcome)
               .that(expectedOutcome.getType())
               .isEqualTo(MethodOutcome.Type.RETURNS_TRUE);
@@ -852,20 +854,20 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
           // Assert that all of the sub-dirs have been created.
           List<URI> subDirPaths = getSubDirPaths(path);
           for (URI subDirPath : subDirPaths) {
-            assertWithMessage("Sub-path %s of path %s not found or not a dir", subDirPath, path)
+            assertWithMessage("Sub-path '%s' of path '%s' not found or not a dir", subDirPath, path)
                 .that(gcsiHelper.exists(subDirPath) && gcsiHelper.isDirectory(subDirPath))
                 .isTrue();
           }
         } else {
           assertWithMessage(
-                  "Unexpected result for path: %s : expected %s, actually returned false.",
+                  "Unexpected result for path: '%s' : expected '%s', actually returned false.",
                   path, expectedOutcome)
               .that(expectedOutcome.getType())
               .isEqualTo(MethodOutcome.Type.RETURNS_FALSE);
         }
       } catch (Exception e) {
         assertWithMessage(
-                "Unexpected result for path: %s : expected %s, actually threw exception %s.",
+                "Unexpected result for path: '%s' : expected '%s', actually threw exception %s.",
                 path, expectedOutcome, Throwables.getStackTraceAsString(e))
             .that(expectedOutcome.getType())
             .isEqualTo(MethodOutcome.Type.THROWS_EXCEPTION);
@@ -1334,14 +1336,11 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
                   try {
                     URI src = gcsiHelper.getPath(rd.srcBucketName, rd.srcObjectName);
                     URI dst = gcsiHelper.getPath(rd.dstBucketName, rd.dstObjectName);
-                    boolean result = false;
+                    String desc = src + " -> " + dst;
 
-                    String desc = src.toString() + " -> " + dst.toString();
                     try {
                       // Perform the rename operation.
-                      result = gcsiHelper.rename(src, dst);
-
-                      if (result) {
+                      if (gcsiHelper.rename(src, dst)) {
                         assertWithMessage(
                                 "Unexpected result for '%s': %s :: expected %s,"
                                     + " actually returned true.",
@@ -1521,9 +1520,9 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   @Test
   public void testFileCreationSetsAttributes() throws IOException {
     CreateFileOptions createFileOptions =
-        new CreateFileOptions(
-            false /* overwrite existing */,
-            ImmutableMap.of("key1", "value1".getBytes(StandardCharsets.UTF_8)));
+        CreateFileOptions.builder()
+            .setAttributes(ImmutableMap.of("key1", "value1".getBytes(StandardCharsets.UTF_8)))
+            .build();
 
     URI testFilePath = gcsiHelper.getPath(sharedBucketName1, "test-file-creation-attributes.txt");
     try (WritableByteChannel channel =
@@ -1598,7 +1597,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     assertThat(gcsfs.exists(object1) && gcsfs.exists(object2)).isTrue();
 
     gcsfs.compose(
-        ImmutableList.of(object1, object2), destination, CreateFileOptions.DEFAULT_CONTENT_TYPE);
+        ImmutableList.of(object1, object2), destination, CreateObjectOptions.CONTENT_TYPE_DEFAULT);
 
     byte[] expectedOutput = "content1content2".getBytes(UTF_8);
     ByteBuffer actualOutput = ByteBuffer.allocate(expectedOutput.length);
@@ -1627,7 +1626,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   private List<URI> getSubDirPaths(URI path) {
     StorageResourceId resourceId = StorageResourceId.fromUriPath(path, true);
 
-    List<String> subdirs = GoogleCloudStorageFileSystem.getSubDirs(resourceId.getObjectName());
+    List<String> subdirs = GoogleCloudStorageFileSystem.getDirs(resourceId.getObjectName());
     List<URI> subDirPaths = new ArrayList<>(subdirs.size());
     for (String subdir : subdirs) {
       subDirPaths.add(gcsiHelper.getPath(resourceId.getBucketName(), subdir));

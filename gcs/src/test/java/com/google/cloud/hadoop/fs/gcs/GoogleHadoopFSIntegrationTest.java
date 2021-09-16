@@ -52,9 +52,7 @@ public class GoogleHadoopFSIntegrationTest {
 
   @BeforeClass
   public static void beforeClass() throws Exception {
-    gcsFsIHelper =
-        GoogleCloudStorageFileSystemIntegrationHelper.create(
-            GoogleHadoopFileSystemIntegrationHelper.APP_NAME);
+    gcsFsIHelper = GoogleCloudStorageFileSystemIntegrationHelper.create();
     gcsFsIHelper.beforeAllTests();
     initUri = new URI("gs://" + gcsFsIHelper.sharedBucketName1);
   }
@@ -112,7 +110,7 @@ public class GoogleHadoopFSIntegrationTest {
     }
 
     FileStatus parentStatus = ghfs.getFileStatus(filePath.getParent());
-    assertThat(parentStatus.getModificationTime()).isGreaterThan(0L);
+    assertThat(parentStatus.getModificationTime()).isEqualTo(0L);
   }
 
   @Test
@@ -141,7 +139,7 @@ public class GoogleHadoopFSIntegrationTest {
 
     // GoogleHadoopFS ignores 'createParent' flag and always creates parent
     FileStatus parentStatus = ghfs.getFileStatus(filePath.getParent().getParent());
-    assertThat(parentStatus.getModificationTime()).isGreaterThan(0L);
+    assertThat(parentStatus.getModificationTime()).isEqualTo(0);
   }
 
   @Test

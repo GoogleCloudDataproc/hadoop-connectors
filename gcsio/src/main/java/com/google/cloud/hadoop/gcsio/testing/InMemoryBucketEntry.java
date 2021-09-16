@@ -18,19 +18,20 @@ import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.common.base.MoreObjects;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 /**
- * InMemoryBucketEntry represents a GCS bucket in-memory by containing mappings to objects in
- * the bucket alongside bucket-level metadata including storage location, storage class, etc.
- * It is intended to be used only internally by the InMemoryGoogleCloudStorage class.
+ * InMemoryBucketEntry represents a GCS bucket in-memory by containing mappings to objects in the
+ * bucket alongside bucket-level metadata including storage location, storage class, etc. It is
+ * intended to be used only internally by the InMemoryGoogleCloudStorage class.
  */
 public class InMemoryBucketEntry {
-  // Mapping from objectName to InMemoryObjectEntries which hold byte contents, metadata, and write
+  // Mapping from objectName to InMemoryObjectEntries which hold byte contents, metadata, and
+  // write
   // channels.
-  private Map<String, InMemoryObjectEntry> objectLookup = new HashMap<>();
+  private Map<String, InMemoryObjectEntry> objectLookup = new TreeMap<>();
 
   // The metadata associated with this InMemoryBucketEntry compatible with GoogleCloudStorage; its
   // objectName is always null and size is zero.
@@ -46,11 +47,10 @@ public class InMemoryBucketEntry {
       long modificationTimeMillis,
       CreateBucketOptions options) {
     info =
-        new GoogleCloudStorageItemInfo(
+        GoogleCloudStorageItemInfo.createBucket(
             new StorageResourceId(bucketName),
             creationTimeMillis,
             modificationTimeMillis,
-            /* size= */ 0,
             MoreObjects.firstNonNull(options.getLocation(), "us-central"),
             MoreObjects.firstNonNull(options.getStorageClass(), "inmemory-class"));
   }
@@ -63,9 +63,7 @@ public class InMemoryBucketEntry {
     objectLookup.put(obj.getObjectName(), obj);
   }
 
-  /**
-   * Retrieves a previously inserted {@code InMemoryObjectEntry}, or null if it doesn't exist.
-   */
+  /** Retrieves a previously inserted {@code InMemoryObjectEntry}, or null if it doesn't exist. */
   public synchronized InMemoryObjectEntry get(String objectName) {
     return objectLookup.get(objectName);
   }
@@ -79,23 +77,19 @@ public class InMemoryBucketEntry {
   }
 
   /**
-   * Gets the {@code GoogleCloudStorageItemInfo} associated with this BucketEntry; the 'size'
-   * of a bucket is always 0.
+   * Gets the {@code GoogleCloudStorageItemInfo} associated with this BucketEntry; the 'size' of a
+   * bucket is always 0.
    */
   public synchronized GoogleCloudStorageItemInfo getInfo() {
     return info;
   }
 
-  /**
-   * Returns the Set containing all objectNames previously inserted into this bucket.
-   */
+  /** Returns the Set containing all objectNames previously inserted into this bucket. */
   public synchronized Set<String> getObjectNames() {
     return objectLookup.keySet();
   }
 
-  /**
-   * Returns the number of objects in this bucket.
-   */
+  /** Returns the number of objects in this bucket. */
   public synchronized int size() {
     return objectLookup.size();
   }

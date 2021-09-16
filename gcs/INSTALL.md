@@ -11,7 +11,12 @@ must do one of the following:
     [configured to have access](https://cloud.google.com/compute/docs/authentication#using)
     to the
     [Cloud Storage scope](https://cloud.google.com/storage/docs/authentication#oauth)
-    you intend to use the connector for.
+    you intend to use the connector for. When running inside of Google Compute Engine VMs,
+    including Dataproc clusters, `google.cloud.auth.service.account.enable` is set to false
+    by default, which means you don't need to manually configure a service account for the
+    connector; it will automatically get the service account credential from the metadata
+    server of the VM. But you must need to make sure the VM service account has
+    permission to access the GCS bucket.
 *   **non-Google Cloud Platform** - Obtain an
     [OAuth 2.0 private key](https://cloud.google.com/storage/docs/authentication#generating-a-private-key).
     Installing the connector on a machine other than a GCE VM can lead to higher
@@ -129,6 +134,7 @@ the installation.
 
 *   If the installation test reported `No FileSystem for scheme: gs`, make sure
     that you correctly set the two properties in the correct `core-site.xml`.
+
 *   If the test reported `java.lang.ClassNotFoundException:
     com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem`, check that you added
     the connector to the Hadoop/Spark classpath. If this error caused by
@@ -138,8 +144,23 @@ the installation.
     case, Guava); using a
     [shaded version](https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-hadoop2-latest.jar)
     of the `gcs-connector` jar can resolve this.
+
 *   If the test issued a message related to authorization, make sure that you
     have access to Cloud Storage using
     [gsutil](https://cloud.google.com/storage/docs/gsutil) (`gsutil ls -b
     gs://<some-bucket>`), and that the credentials in your configuration are
     correct.
+
+*   To troubleshot other issues run `hadoop fs` command with debug logs:
+
+    ```
+    $ cat <<EOF >"/tmp/google-logging.properties"
+    handlers = java.util.logging.ConsoleHandler
+    java.util.logging.ConsoleHandler.level = CONFIG
+    com.google.level = CONFIG
+    EOF
+
+    $ export HADOOP_CLIENT_OPTS="-Djava.util.logging.config.file=/tmp/google-logging.properties"
+
+    $ hadoop --loglevel debug fs -ls gs://<some-bucket>
+    ```

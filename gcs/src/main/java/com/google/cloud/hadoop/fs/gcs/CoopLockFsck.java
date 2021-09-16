@@ -18,7 +18,6 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.common.collect.ImmutableSet;
 import java.net.URI;
 import java.util.Arrays;
@@ -93,7 +92,7 @@ public class CoopLockFsck extends Configured implements Tool {
 
     String bucket = args[1];
     checkArgument(
-        bucket.startsWith(GoogleCloudStorageFileSystem.SCHEME + "://"),
+        bucket.startsWith(GoogleHadoopFileSystem.SCHEME + "://"),
         "bucket parameter should have 'gs://' scheme");
 
     String operationId = COMMAND_CHECK.equals(command) ? null : args[2];

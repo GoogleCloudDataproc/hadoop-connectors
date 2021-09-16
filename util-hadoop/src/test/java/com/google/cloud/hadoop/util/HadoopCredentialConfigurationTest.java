@@ -14,12 +14,10 @@
 
 package com.google.cloud.hadoop.util;
 
+import static com.github.stefanbirkner.systemlambda.SystemLambda.withEnvironmentVariable;
 import static com.google.cloud.hadoop.util.CredentialFactory.CREDENTIAL_ENV_VAR;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.CLIENT_ID_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.CLIENT_SECRET_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_NULL_CREDENTIAL_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.OAUTH_CLIENT_FILE_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_KEYFILE_SUFFIX;
@@ -30,7 +28,6 @@ import static com.google.cloud.hadoop.util.HttpTransportFactory.HttpTransportTyp
 import static com.google.cloud.hadoop.util.testing.HadoopConfigurationUtils.getDefaultProperties;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonDataResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
-import static com.google.common.base.StandardSystemProperty.USER_HOME;
 import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertThrows;
@@ -40,6 +37,7 @@ import com.google.api.client.auth.oauth2.TokenResponse;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.cloud.hadoop.util.CredentialFactory.GoogleCredentialWithRetry;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Resources;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -47,9 +45,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.contrib.java.lang.system.EnvironmentVariables;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
@@ -61,11 +57,6 @@ public class HadoopCredentialConfigurationTest {
       new HashMap<String, Object>() {
         {
           put(".auth.access.token.provider.impl", null);
-          put(".auth.client.file", USER_HOME.value() + "/.credentials/storage.json");
-          put(".auth.client.id", null);
-          put(".client.id", null);
-          put(".auth.client.secret", null);
-          put(".client.secret", null);
           put(".auth.null.enable", false);
           put(".auth.service.account.email", null);
           put(".service.account.auth.email", null);
@@ -81,12 +72,13 @@ public class HadoopCredentialConfigurationTest {
           put(".proxy.address", null);
           put(".proxy.password", null);
           put(".proxy.username", null);
+          put(".auth.impersonation.service.account", null);
+          put(".auth.impersonation.service.account.for.user.", ImmutableMap.of());
+          put(".auth.impersonation.service.account.for.group.", ImmutableMap.of());
         }
       };
 
   private static final ImmutableList<String> TEST_SCOPES = ImmutableList.of("scope1", "scope2");
-
-  @Rule public final EnvironmentVariables environmentVariables = new EnvironmentVariables();
 
   private Configuration configuration;
 
@@ -154,12 +146,12 @@ public class HadoopCredentialConfigurationTest {
 
   @Test
   public void applicationDefaultServiceAccountWhenConfigured() throws Exception {
-    environmentVariables.set(CREDENTIAL_ENV_VAR, getStringPath("test-credential.json"));
-
     CredentialFactory credentialFactory = getCredentialFactory();
 
     GoogleCredentialWithRetry credential =
-        (GoogleCredentialWithRetry) credentialFactory.getCredential(TEST_SCOPES);
+        (GoogleCredentialWithRetry)
+            withEnvironmentVariable(CREDENTIAL_ENV_VAR, getStringPath("test-credential.json"))
+                .execute(() -> credentialFactory.getCredential(TEST_SCOPES));
 
     assertThat(credential.getServiceAccountId()).isEqualTo("test-email@gserviceaccount.com");
     assertThat(credential.getServiceAccountPrivateKeyId()).isEqualTo("test-key-id");
@@ -207,22 +199,6 @@ public class HadoopCredentialConfigurationTest {
 
     assertThat(credential.getServiceAccountId()).isEqualTo("foo@example.com");
     assertThat(credential.getServiceAccountPrivateKeyId()).isEqualTo("privatekey");
-  }
-
-  @Test
-  public void installedAppWorkflowUsedWhenConfigured() throws Exception {
-    configuration.setBoolean(getConfigKey(ENABLE_SERVICE_ACCOUNTS_SUFFIX), false);
-    configuration.set(getConfigKey(CLIENT_ID_SUFFIX), "aClientId");
-    configuration.set(getConfigKey(CLIENT_SECRET_SUFFIX), "aClientSecret");
-    configuration.set(
-        getConfigKey(OAUTH_CLIENT_FILE_SUFFIX), getStringPath("test-client-credential.json"));
-
-    CredentialFactory credentialFactory = getCredentialFactory();
-
-    Credential credential = credentialFactory.getCredential(TEST_SCOPES);
-
-    assertThat(credential.getAccessToken()).isEqualTo("test-client-access-token");
-    assertThat(credential.getRefreshToken()).isEqualTo("test-client-refresh-token");
   }
 
   @Test

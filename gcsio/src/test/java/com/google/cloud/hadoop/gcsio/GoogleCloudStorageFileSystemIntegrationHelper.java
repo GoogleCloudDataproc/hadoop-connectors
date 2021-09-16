@@ -31,14 +31,9 @@ public class GoogleCloudStorageFileSystemIntegrationHelper
     extends GoogleCloudStorageIntegrationHelper {
 
   public static GoogleCloudStorageFileSystem createGcsFs(String projectId) throws IOException {
-    return createGcsFs(projectId, GoogleCloudStorageIntegrationHelper.APP_NAME);
-  }
-
-  public static GoogleCloudStorageFileSystem createGcsFs(String projectId, String appName)
-      throws IOException {
     GoogleCloudStorageOptions gcsOptions =
         GoogleCloudStorageOptions.builder()
-            .setAppName(appName)
+            .setAppName(GoogleCloudStorageTestHelper.APP_NAME)
             .setProjectId(projectId)
             .setCopyWithRewriteEnabled(true)
             .build();
@@ -51,15 +46,10 @@ public class GoogleCloudStorageFileSystemIntegrationHelper
             .build());
   }
 
-  static GoogleCloudStorageFileSystemIntegrationHelper create() throws IOException {
-    return create(GoogleCloudStorageIntegrationHelper.APP_NAME);
-  }
-
-  public static GoogleCloudStorageFileSystemIntegrationHelper create(String appName)
-      throws IOException {
+  public static GoogleCloudStorageFileSystemIntegrationHelper create() throws IOException {
     String projectId =
         checkNotNull(TestConfiguration.getInstance().getProjectId(), "projectId can not be null");
-    GoogleCloudStorageFileSystem gcsFs = createGcsFs(projectId, appName);
+    GoogleCloudStorageFileSystem gcsFs = createGcsFs(projectId);
     return new GoogleCloudStorageFileSystemIntegrationHelper(gcsFs);
   }
 
@@ -143,10 +133,8 @@ public class GoogleCloudStorageFileSystemIntegrationHelper
   @Override
   protected void clearBucket(String bucketName) throws IOException {
     URI path = getPath(bucketName, null);
-    FileInfo pathInfo = gcsfs.getFileInfo(path);
-    List<URI> fileNames = gcsfs.listFileNames(pathInfo);
-    for (URI fileName : fileNames) {
-      gcsfs.delete(fileName, true);
+    for (FileInfo fileInfo : gcsfs.listFileInfo(path)) {
+      gcsfs.delete(fileInfo.getPath(), /* recursive= */ true);
     }
   }
 

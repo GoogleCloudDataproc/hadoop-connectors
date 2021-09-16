@@ -13,7 +13,6 @@
  */
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.MAX_RESULTS_UNLIMITED;
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.spy;
@@ -57,7 +56,10 @@ public class PerformanceCachingGoogleCloudStorageTest {
           .build();
 
   private static final CreateObjectOptions CREATE_OBJECT_OPTIONS =
-      new CreateObjectOptions(/* overwriteExisting= */ true, "test_content_type", TEST_METADATA);
+      CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
+          .setContentType("test_content_type")
+          .setMetadata(TEST_METADATA)
+          .build();
 
   // Sample bucket names.
   private static final String BUCKET_A = "alpha";
@@ -113,8 +115,8 @@ public class PerformanceCachingGoogleCloudStorageTest {
     gcs = new PerformanceCachingGoogleCloudStorage(gcsDelegate, cache);
 
     // Prepare the delegate.
-    gcsDelegate.create(BUCKET_A, CREATE_BUCKET_OPTIONS);
-    gcsDelegate.create(BUCKET_B, CREATE_BUCKET_OPTIONS);
+    gcsDelegate.createBucket(BUCKET_A, CREATE_BUCKET_OPTIONS);
+    gcsDelegate.createBucket(BUCKET_B, CREATE_BUCKET_OPTIONS);
     gcsDelegate.createEmptyObject(ITEM_A_A.getResourceId(), CREATE_OBJECT_OPTIONS);
     gcsDelegate.createEmptyObject(ITEM_A_AA.getResourceId(), CREATE_OBJECT_OPTIONS);
     gcsDelegate.createEmptyObject(ITEM_A_ABA.getResourceId(), CREATE_OBJECT_OPTIONS);
@@ -175,11 +177,11 @@ public class PerformanceCachingGoogleCloudStorageTest {
     List<GoogleCloudStorageItemInfo> expected = Lists.newArrayList(ITEM_A_A, ITEM_A_AA, ITEM_A_ABA);
 
     List<GoogleCloudStorageItemInfo> result =
-        gcs.listObjectInfo(BUCKET_A, PREFIX_A, null, MAX_RESULTS_UNLIMITED);
+        gcs.listObjectInfo(BUCKET_A, PREFIX_A, ListObjectOptions.DEFAULT_FLAT_LIST);
 
     // Verify the delegate call.
     verify(gcsDelegate)
-        .listObjectInfo(eq(BUCKET_A), eq(PREFIX_A), eq(null), eq(MAX_RESULTS_UNLIMITED));
+        .listObjectInfo(eq(BUCKET_A), eq(PREFIX_A), eq(ListObjectOptions.DEFAULT_FLAT_LIST));
     assertThat(result).containsExactlyElementsIn(expected);
     // Verify the state of the cache.
     assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expected);
@@ -194,7 +196,8 @@ public class PerformanceCachingGoogleCloudStorageTest {
         Iterables.concat(expectedBuckets, expectedObjectsInBucketA);
 
     List<GoogleCloudStorageItemInfo> objects1 =
-        gcs.listObjectInfo(BUCKET_A, /* objectNamePrefix= */ null, /* delimiter= */ null);
+        gcs.listObjectInfo(
+            BUCKET_A, /* objectNamePrefix= */ null, ListObjectOptions.DEFAULT_FLAT_LIST);
     assertThat(objects1).containsExactlyElementsIn(expectedObjectsInBucketA);
     assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expectedObjectsInBucketA);
 
@@ -203,13 +206,14 @@ public class PerformanceCachingGoogleCloudStorageTest {
     assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expectedAllCachedItems);
 
     List<GoogleCloudStorageItemInfo> objects2 =
-        gcs.listObjectInfo(BUCKET_A, /* objectNamePrefix= */ null, /* delimiter= */ null);
+        gcs.listObjectInfo(
+            BUCKET_A, /* objectNamePrefix= */ null, ListObjectOptions.DEFAULT_FLAT_LIST);
     assertThat(objects2).containsExactlyElementsIn(expectedObjectsInBucketA);
     assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expectedAllCachedItems);
 
     verify(gcsDelegate).listBucketInfo();
     verify(gcsDelegate, times(2))
-        .listObjectInfo(eq(BUCKET_A), eq(null), eq(null), eq(MAX_RESULTS_UNLIMITED));
+        .listObjectInfo(eq(BUCKET_A), eq(null), eq(ListObjectOptions.DEFAULT_FLAT_LIST));
   }
 
   @Test
@@ -220,15 +224,12 @@ public class PerformanceCachingGoogleCloudStorageTest {
     List<GoogleCloudStorageItemInfo> expectedCached = Lists.newArrayList(ITEM_A_A, itemAAPrefix);
 
     List<GoogleCloudStorageItemInfo> result =
-        gcs.listObjectInfo(BUCKET_A, PREFIX_A, "/", MAX_RESULTS_UNLIMITED);
+        gcs.listObjectInfo(BUCKET_A, PREFIX_A, ListObjectOptions.DEFAULT);
 
     // Verify the delegate call.
-    verify(gcsDelegate)
-        .listObjectInfo(eq(BUCKET_A), eq(PREFIX_A), eq("/"), eq(MAX_RESULTS_UNLIMITED));
-
+    verify(gcsDelegate).listObjectInfo(eq(BUCKET_A), eq(PREFIX_A), eq(ListObjectOptions.DEFAULT));
     // Verify the result.
     assertThat(result).containsExactlyElementsIn(expectedResult);
-
     // Verify the state of the cache.
     assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expectedCached);
   }
@@ -244,15 +245,12 @@ public class PerformanceCachingGoogleCloudStorageTest {
     List<GoogleCloudStorageItemInfo> expectedCached = Lists.newArrayList(ITEM_A_AA, itemABAPrefix);
 
     List<GoogleCloudStorageItemInfo> result =
-        gcs.listObjectInfo(BUCKET_A, prefixADir, "/", MAX_RESULTS_UNLIMITED);
+        gcs.listObjectInfo(BUCKET_A, prefixADir, ListObjectOptions.DEFAULT);
 
     // Verify the delegate call.
-    verify(gcsDelegate)
-        .listObjectInfo(eq(BUCKET_A), eq(prefixADir), eq("/"), eq(MAX_RESULTS_UNLIMITED));
-
+    verify(gcsDelegate).listObjectInfo(eq(BUCKET_A), eq(prefixADir), eq(ListObjectOptions.DEFAULT));
     // Verify the result.
     assertThat(result).containsExactlyElementsIn(expectedResult);
-
     // Verify the state of the cache.
     assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expectedCached);
   }
@@ -261,16 +259,17 @@ public class PerformanceCachingGoogleCloudStorageTest {
   public void testListObjectInfoAlt() throws IOException {
     List<GoogleCloudStorageItemInfo> expected = Lists.newArrayList(ITEM_B_A, ITEM_B_B);
 
-    List<GoogleCloudStorageItemInfo> result = gcs.listObjectInfo(BUCKET_B, null, null);
+    List<GoogleCloudStorageItemInfo> result =
+        gcs.listObjectInfo(
+            BUCKET_B, /* objectNamePrefix= */ null, ListObjectOptions.DEFAULT_FLAT_LIST);
 
     // Verify the delegate call.
     verify(gcsDelegate)
         .listObjectInfo(
             eq(BUCKET_B),
             ArgumentMatchers.eq(null),
-            ArgumentMatchers.eq(null),
-            eq(MAX_RESULTS_UNLIMITED));
-
+            ArgumentMatchers.eq(ListObjectOptions.DEFAULT_FLAT_LIST));
+    // Verify the result.
     assertThat(result).containsExactlyElementsIn(expected);
     // Verify the state of the cache.
     assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expected);
@@ -282,17 +281,19 @@ public class PerformanceCachingGoogleCloudStorageTest {
         Lists.newArrayList(ITEM_A_A, ITEM_A_AA, ITEM_A_ABA, ITEM_A_B);
 
     // First call to get the values in cache.
-    gcs.listObjectInfo(BUCKET_A, null, null);
+    gcs.listObjectInfo(BUCKET_A, /* objectNamePrefix= */ null, ListObjectOptions.DEFAULT_FLAT_LIST);
     // Second call to ensure the values are being served from cache.
-    List<GoogleCloudStorageItemInfo> result = gcs.listObjectInfo(BUCKET_A, null, null);
+    List<GoogleCloudStorageItemInfo> result =
+        gcs.listObjectInfo(
+            BUCKET_A, /* objectNamePrefix= */ null, ListObjectOptions.DEFAULT_FLAT_LIST);
 
     // Verify the delegate call once.
     verify(gcsDelegate, times(2))
         .listObjectInfo(
             eq(BUCKET_A),
             ArgumentMatchers.eq(null),
-            ArgumentMatchers.eq(null),
-            eq(MAX_RESULTS_UNLIMITED));
+            ArgumentMatchers.eq(ListObjectOptions.DEFAULT_FLAT_LIST));
+    // Verify the result.
     assertThat(result).containsExactlyElementsIn(expected);
     // Verify the state of the cache.
     assertThat(cache.getAllItemsRaw()).containsExactlyElementsIn(expected);
@@ -435,11 +436,10 @@ public class PerformanceCachingGoogleCloudStorageTest {
    * @return the generated item.
    */
   public static GoogleCloudStorageItemInfo createBucketItemInfo(String bucketName) {
-    return new GoogleCloudStorageItemInfo(
+    return GoogleCloudStorageItemInfo.createBucket(
         new StorageResourceId(bucketName),
         /* creationTime= */ 0,
         /* modificationTime= */ 0,
-        /* size= */ 0,
         CREATE_BUCKET_OPTIONS.getLocation(),
         CREATE_BUCKET_OPTIONS.getStorageClass());
   }
@@ -471,8 +471,6 @@ public class PerformanceCachingGoogleCloudStorageTest {
         .setCreationTime(0)
         .setModificationTime(0)
         .setSize(0)
-        .setLocation(null)
-        .setStorageClass(null)
         .setContentType(createObjectOptions.getContentType())
         .setContentEncoding(createObjectOptions.getContentEncoding())
         .setMetadata(createObjectOptions.getMetadata())
@@ -491,13 +489,11 @@ public class PerformanceCachingGoogleCloudStorageTest {
 
   private static GoogleCloudStorageItemInfo updateObjectItemInfo(
       GoogleCloudStorageItemInfo object, long metaGeneration) {
-    return new GoogleCloudStorageItemInfo(
+    return GoogleCloudStorageItemInfo.createObject(
         object.getResourceId(),
         object.getCreationTime(),
         object.getModificationTime(),
         object.getSize(),
-        object.getLocation(),
-        object.getStorageClass(),
         object.getContentType(),
         object.getContentEncoding(),
         object.getMetadata(),

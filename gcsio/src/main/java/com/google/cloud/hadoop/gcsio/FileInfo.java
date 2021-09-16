@@ -16,19 +16,18 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Contains information about a file or a directory.
  *
- * Note:
- * This class wraps GoogleCloudStorageItemInfo, adds file system specific information and hides
- * bucket/object specific information. The wrapped type should not be visible to callers of
+ * <p>Note: This class wraps GoogleCloudStorageItemInfo, adds file system specific information and
+ * hides bucket/object specific information. The wrapped type should not be visible to callers of
  * GoogleCloudStorageFileSystem because it exposes non-file system information (eg, buckets).
  */
 public class FileInfo {
@@ -43,9 +42,6 @@ public class FileInfo {
   // Information about the underlying GCS item.
   private final GoogleCloudStorageItemInfo itemInfo;
 
-  // Custom file attributes, including those used for storing custom modification times, etc
-  private final Map<String, byte[]> attributes;
-
   /**
    * Constructs an instance of FileInfo.
    *
@@ -56,28 +52,26 @@ public class FileInfo {
 
     // Construct the path once.
     this.path = path;
-    Preconditions.checkArgument(itemInfo.getMetadata() != null);
-
-    this.attributes = itemInfo.getMetadata();
   }
 
-  /**
-   * Gets the path of this file or directory.
-   */
+  /** Gets the path of this file or directory. */
   public URI getPath() {
     return path;
   }
 
-  /**
-   * Indicates whether this item is a directory.
-   */
+  /** Indicates whether this item is a directory. */
   public boolean isDirectory() {
     return itemInfo.isDirectory();
   }
 
+  /** Indicates whether this item is an inferred directory. */
+  public boolean isInferredDirectory() {
+    return itemInfo.isInferredDirectory();
+  }
+
   /**
-   * Indicates whether this instance has information about the unique, shared root of the
-   * underlying storage system.
+   * Indicates whether this instance has information about the unique, shared root of the underlying
+   * storage system.
    */
   public boolean isGlobalRoot() {
     return itemInfo.isGlobalRoot();
@@ -86,7 +80,7 @@ public class FileInfo {
   /**
    * Gets creation time of this item.
    *
-   * Time is expressed as milliseconds since January 1, 1970 UTC.
+   * <p>Time is expressed as milliseconds since January 1, 1970 UTC.
    */
   public long getCreationTime() {
     return itemInfo.getCreationTime();
@@ -95,19 +89,18 @@ public class FileInfo {
   /**
    * Gets the size of this file or directory.
    *
-   * For files, size is in number of bytes.
-   * For directories size is 0.
-   * For items that do not exist, size is -1.
+   * <p>For files, size is in number of bytes. For directories size is 0. For items that do not
+   * exist, size is -1.
    */
   public long getSize() {
     return itemInfo.getSize();
   }
 
   /**
-   * Gets the modification time of this file if one is set, otherwise the value of
-   * {@link #getCreationTime()} is returned.
+   * Gets the modification time of this file if one is set, otherwise the value of {@link
+   * #getCreationTime()} is returned.
    *
-   * Time is expressed as milliseconds since January 1, 1970 UTC.
+   * <p>Time is expressed as milliseconds since January 1, 1970 UTC.
    */
   public long getModificationTime() {
     return itemInfo.getModificationTime();
@@ -115,70 +108,55 @@ public class FileInfo {
 
   /**
    * Retrieve file attributes for this file.
+   *
    * @return A map of file attributes
    */
   public Map<String, byte[]> getAttributes() {
-    return attributes;
+    return itemInfo.getMetadata();
   }
 
-  /**
-   * Indicates whether this file or directory exists.
-   */
+  /** Indicates whether this file or directory exists. */
   public boolean exists() {
     return itemInfo.exists();
   }
 
-  /**
-   * Gets string representation of this instance.
-   */
+  /** Returns CRC32C checksum of the file or {@code null}. */
+  public byte[] getCrc32cChecksum() {
+    VerificationAttributes verificationAttributes = itemInfo.getVerificationAttributes();
+    return verificationAttributes == null ? null : verificationAttributes.getCrc32c();
+  }
+
+  /** Returns MD5 checksum of the file or {@code null}. */
+  public byte[] getMd5Checksum() {
+    VerificationAttributes verificationAttributes = itemInfo.getVerificationAttributes();
+    return verificationAttributes == null ? null : verificationAttributes.getMd5hash();
+  }
+
+  /** Gets information about the underlying item. */
+  GoogleCloudStorageItemInfo getItemInfo() {
+    return itemInfo;
+  }
+
+  /** Gets string representation of this instance. */
   public String toString() {
     return getPath() + (exists() ? ": created on: " + new Date(getCreationTime()) : ": exists: no");
   }
 
-  /**
-   * Gets information about the underlying item.
-   */
-  public GoogleCloudStorageItemInfo getItemInfo() {
-    return itemInfo;
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof FileInfo)) {
+      return false;
+    }
+    FileInfo fileInfo = (FileInfo) o;
+    return Objects.equals(path, fileInfo.path) && Objects.equals(itemInfo, fileInfo.itemInfo);
   }
 
-  /**
-   * Converts the given resourceId to look like a directory path. If the path already looks like a
-   * directory path then this call is a no-op.
-   *
-   * @param resourceId StorageResourceId to convert.
-   * @return A resourceId with a directory path corresponding to the given resourceId.
-   */
-  public static StorageResourceId convertToDirectoryPath(StorageResourceId resourceId) {
-    if (resourceId.isStorageObject()) {
-      if (!StringPaths.isDirectoryPath(resourceId.getObjectName())) {
-        resourceId =
-            new StorageResourceId(
-                resourceId.getBucketName(),
-                StringPaths.toDirectoryPath(resourceId.getObjectName()));
-      }
-    }
-    return resourceId;
-  }
-
-  /**
-   * Converts the given path to look like a directory path. If the path already looks like a
-   * directory path then this call is a no-op.
-   *
-   * @param path Path to convert.
-   * @return Directory path for the given path.
-   */
-  public static URI convertToDirectoryPath(URI path) {
-    StorageResourceId resourceId =
-        StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true);
-
-    if (resourceId.isStorageObject()) {
-      if (!StringPaths.isDirectoryPath(resourceId.getObjectName())) {
-        resourceId = convertToDirectoryPath(resourceId);
-        path = UriPaths.fromResourceId(resourceId, /* allowEmptyObjectName= */ false);
-      }
-    }
-    return path;
+  @Override
+  public int hashCode() {
+    return Objects.hash(path, itemInfo);
   }
 
   /**
@@ -203,15 +181,5 @@ public class FileInfo {
       fileInfos.add(fromItemInfo(itemInfo));
     }
     return fileInfos;
-  }
-
-  /**
-   * Indicates whether the given path looks like a directory path.
-   *
-   * @param path Path to inspect.
-   * @return Whether the path looks like a directory path.
-   */
-  public static boolean isDirectoryPath(URI path) {
-    return (path != null) && path.toString().endsWith(GoogleCloudStorage.PATH_DELIMITER);
   }
 }

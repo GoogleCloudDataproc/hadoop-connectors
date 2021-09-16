@@ -16,6 +16,8 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
+import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -23,9 +25,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.UriPaths;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
-import com.google.common.base.Strings;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
@@ -69,7 +71,12 @@ public class HadoopFileSystemIntegrationHelper
 
   public HadoopFileSystemIntegrationHelper(
       FileSystem hfs, FileSystemDescriptor ghfsFileSystemDescriptor) throws IOException {
-    super(new GoogleCloudStorageFileSystem(new InMemoryGoogleCloudStorage()));
+    super(
+        new GoogleCloudStorageFileSystem(
+            InMemoryGoogleCloudStorage::new,
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
+                .build()));
     this.ghfs = hfs;
     this.ghfsFileSystemDescriptor = ghfsFileSystemDescriptor;
   }
@@ -189,10 +196,7 @@ public class HadoopFileSystemIntegrationHelper
     StringBuilder returnBuffer = new StringBuilder();
 
     try {
-      readStream =
-          ghfs.open(
-              hadoopPath,
-              GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_BUFFER_SIZE.getDefault());
+      readStream = ghfs.open(hadoopPath);
       int numBytesRead = readStream.read(readBuffer);
       while (numBytesRead > 0) {
         returnBuffer.append(new String(readBuffer, 0, numBytesRead, StandardCharsets.UTF_8));
@@ -242,10 +246,7 @@ public class HadoopFileSystemIntegrationHelper
       int bufferSize = len;
       bufferSize += checkOverflow ? 1 : 0;
       byte[] readBuffer = new byte[bufferSize];
-      readStream =
-          ghfs.open(
-              hadoopPath,
-              GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_BUFFER_SIZE.getDefault());
+      readStream = ghfs.open(hadoopPath);
       int numBytesRead;
       if (offset > 0) {
         numBytesRead = readStream.read(offset, readBuffer, 0, bufferSize);
@@ -371,25 +372,19 @@ public class HadoopFileSystemIntegrationHelper
    * <p>when the bucket-rooted FileSystem creates actual data in the underlying GcsFs.
    */
   protected Path castAsHadoopPath(URI gcsPath) {
+    String authority = gcsPath.getAuthority();
     String childPath = gcsPath.getRawPath();
     if (childPath != null && childPath.startsWith("/")) {
       childPath = childPath.substring(1);
     }
-    String authority = gcsPath.getAuthority();
-    if (Strings.isNullOrEmpty(authority)) {
-      if (Strings.isNullOrEmpty(childPath)) {
-        return ghfsFileSystemDescriptor.getFileSystemRoot();
-      } else {
-        return new Path(ghfsFileSystemDescriptor.getFileSystemRoot(), childPath);
-      }
-    } else {
-      if (Strings.isNullOrEmpty(childPath)) {
-        return new Path(ghfsFileSystemDescriptor.getFileSystemRoot(), authority);
-      } else {
-        return new Path(ghfsFileSystemDescriptor.getFileSystemRoot(), new Path(
-            authority, childPath));
-      }
+    if (isNullOrEmpty(childPath)) {
+      return isNullOrEmpty(authority)
+          ? ghfsFileSystemDescriptor.getFileSystemRoot()
+          : new Path(ghfsFileSystemDescriptor.getFileSystemRoot(), authority);
     }
+    return isNullOrEmpty(authority)
+        ? new Path(ghfsFileSystemDescriptor.getFileSystemRoot(), childPath)
+        : new Path(ghfsFileSystemDescriptor.getFileSystemRoot(), new Path(authority, childPath));
   }
 
   /**

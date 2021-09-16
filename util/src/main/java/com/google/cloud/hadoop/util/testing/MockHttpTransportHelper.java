@@ -36,6 +36,7 @@ import com.google.api.client.http.LowLevelHttpRequest;
 import com.google.api.client.http.LowLevelHttpResponse;
 import com.google.api.client.json.GenericJson;
 import com.google.api.client.json.Json;
+import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.client.testing.http.HttpTesting;
 import com.google.api.client.testing.http.MockHttpTransport;
@@ -110,7 +111,7 @@ public final class MockHttpTransportHelper {
 
   private static final int UNKNOWN_CONTENT_LENGTH = -1;
 
-  public static final JacksonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
+  public static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
 
   private MockHttpTransportHelper() {}
 
@@ -140,17 +141,24 @@ public final class MockHttpTransportHelper {
     return request.execute();
   }
 
-  public static MockHttpTransport mockTransport(LowLevelHttpResponse... responsesIn) {
+  public static MockHttpTransport mockTransport(Object... responsesIn) {
     return new MockHttpTransport() {
       int responsesIndex = 0;
-      final LowLevelHttpResponse[] responses = responsesIn;
+      final Object[] responses = responsesIn;
 
       @Override
       public LowLevelHttpRequest buildRequest(String method, String url) {
         return new MockLowLevelHttpRequest() {
           @Override
-          public LowLevelHttpResponse execute() {
-            return responses[responsesIndex++];
+          public LowLevelHttpResponse execute() throws IOException {
+            Object response = responses[responsesIndex++];
+            if (response instanceof IOException) {
+              throw (IOException) response;
+            }
+            if (response instanceof RuntimeException) {
+              throw (RuntimeException) response;
+            }
+            return (LowLevelHttpResponse) response;
           }
         };
       }

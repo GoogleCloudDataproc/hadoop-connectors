@@ -82,7 +82,7 @@ public class BigQueryUtils {
 
     // While job is incomplete continue to poll.
     while (notDone) {
-      BackOff operationBackOff = new ExponentialBackOff.Builder().build();
+      BackOff operationBackOff = new ExponentialBackOff();
       Get get =
           bigquery
               .jobs()
@@ -91,7 +91,7 @@ public class BigQueryUtils {
 
       Job pollJob =
           ResilientOperation.retry(
-              ResilientOperation.getGoogleRequestCallable(get),
+              get::execute,
               operationBackOff,
               RetryDeterminer.RATE_LIMIT_ERRORS,
               IOException.class,
@@ -137,8 +137,7 @@ public class BigQueryUtils {
     logger.atFine().log("getSchemaFromString('%s')", fields);
 
     // Parse the output schema for Json from fields.
-    JsonParser jsonParser = new JsonParser();
-    JsonArray json = jsonParser.parse(fields).getAsJsonArray();
+    JsonArray json = JsonParser.parseString(fields).getAsJsonArray();
     List<TableFieldSchema> fieldsList = new ArrayList<>();
 
     // For each item in the list of fields.

@@ -19,12 +19,15 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.services.storage.Storage;
 import com.google.auto.value.AutoValue;
+import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
 import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
+import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.common.collect.ImmutableMap;
+import java.time.Duration;
 import java.util.Map;
 import javax.annotation.Nullable;
 
@@ -35,6 +38,9 @@ public abstract class GoogleCloudStorageOptions {
   /** Default setting for enabling use of GCS gRPC API. */
   public static final boolean ENABLE_GRPC_DEFAULT = false;
 
+  /** Default setting to prefer DirectPath for gRPC. */
+  public static final boolean DIRECT_PATH_PREFFERED_DEFAULT = true;
+
   /** Default root URL for Cloud Storage API endpoint. */
   public static final String STORAGE_ROOT_URL_DEFAULT = Storage.DEFAULT_ROOT_URL;
 
@@ -43,9 +49,6 @@ public abstract class GoogleCloudStorageOptions {
 
   /** Default setting for enabling auto-repair of implicit directories. */
   public static final boolean AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT = true;
-
-  /** Default setting for enabling inferring of implicit directories. */
-  public static final boolean INFER_IMPLICIT_DIRECTORIES_DEFAULT = true;
 
   /**
    * Default setting for the length of time to wait for empty objects to appear if we believe we are
@@ -77,24 +80,26 @@ public abstract class GoogleCloudStorageOptions {
   /** Default setting for max number of bytes rewritten per rewrite request/call. */
   public static final int MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT = 0;
 
-  /** Default setting for maximum number of requests per GCS batch for copy operations. */
-  public static final long COPY_MAX_REQUESTS_PER_BATCH_DEFAULT = MAX_REQUESTS_PER_BATCH_DEFAULT;
-
-  /** Default setting for number of threads to execute GCS batch requests for copy operations. */
-  public static final int COPY_BATCH_THREADS_DEFAULT = BATCH_THREADS_DEFAULT;
-
   /** Default setting for GCS HTTP request headers. */
   public static final ImmutableMap<String, String> HTTP_REQUEST_HEADERS_DEFAULT = ImmutableMap.of();
+
+  /** Default setting for authorization handler. */
+  public static final Class<? extends AuthorizationHandler>
+      AUTHORIZATION_HANDLER_IMPL_CLASS_DEFAULT = null;
+
+  /** Default properties for authorization handler. */
+  public static final Map<String, String> AUTHORIZATION_HANDLER_PROPERTIES_DEFAULT =
+      ImmutableMap.of();
 
   public static final GoogleCloudStorageOptions DEFAULT = builder().build();
 
   public static Builder builder() {
     return new AutoValue_GoogleCloudStorageOptions.Builder()
         .setGrpcEnabled(ENABLE_GRPC_DEFAULT)
+        .setDirectPathPreffered(DIRECT_PATH_PREFFERED_DEFAULT)
         .setStorageRootUrl(STORAGE_ROOT_URL_DEFAULT)
         .setStorageServicePath(STORAGE_SERVICE_PATH_DEFAULT)
         .setAutoRepairImplicitDirectoriesEnabled(AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT)
-        .setInferImplicitDirectoriesEnabled(INFER_IMPLICIT_DIRECTORIES_DEFAULT)
         .setMaxWaitMillisForEmptyObjectCreation(MAX_WAIT_MILLIS_FOR_EMPTY_OBJECT_CREATION)
         .setMaxListItemsPerCall(MAX_LIST_ITEMS_PER_CALL_DEFAULT)
         .setMaxRequestsPerBatch(MAX_REQUESTS_PER_BATCH_DEFAULT)
@@ -105,18 +110,20 @@ public abstract class GoogleCloudStorageOptions {
         .setTransportType(HttpTransportFactory.DEFAULT_TRANSPORT_TYPE)
         .setCopyWithRewriteEnabled(COPY_WITH_REWRITE_DEFAULT)
         .setMaxBytesRewrittenPerCall(MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT)
-        .setCopyMaxRequestsPerBatch(COPY_MAX_REQUESTS_PER_BATCH_DEFAULT)
-        .setCopyBatchThreads(COPY_BATCH_THREADS_DEFAULT)
         .setReadChannelOptions(GoogleCloudStorageReadOptions.DEFAULT)
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
         .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
         .setCooperativeLockingOptions(CooperativeLockingOptions.DEFAULT)
-        .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT);
+        .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT)
+        .setAuthorizationHandlerImplClass(AUTHORIZATION_HANDLER_IMPL_CLASS_DEFAULT)
+        .setAuthorizationHandlerProperties(AUTHORIZATION_HANDLER_PROPERTIES_DEFAULT);
   }
 
   public abstract Builder toBuilder();
 
   public abstract boolean isGrpcEnabled();
+
+  public abstract boolean isDirectPathPreffered();
 
   public abstract String getStorageRootUrl();
 
@@ -130,8 +137,6 @@ public abstract class GoogleCloudStorageOptions {
 
   public abstract boolean isAutoRepairImplicitDirectoriesEnabled();
 
-  public abstract boolean isInferImplicitDirectoriesEnabled();
-
   public abstract int getMaxWaitMillisForEmptyObjectCreation();
 
   public abstract long getMaxListItemsPerCall();
@@ -139,10 +144,6 @@ public abstract class GoogleCloudStorageOptions {
   public abstract long getMaxRequestsPerBatch();
 
   public abstract int getBatchThreads();
-
-  public abstract long getCopyMaxRequestsPerBatch();
-
-  public abstract int getCopyBatchThreads();
 
   public abstract int getMaxHttpRequestRetries();
 
@@ -184,6 +185,21 @@ public abstract class GoogleCloudStorageOptions {
   @Nullable
   public abstract RedactedString getEncryptionKeyHash();
 
+  public RetryHttpInitializerOptions toRetryHttpInitializerOptions() {
+    return RetryHttpInitializerOptions.builder()
+        .setDefaultUserAgent(getAppName())
+        .setHttpHeaders(getHttpRequestHeaders())
+        .setMaxRequestRetries(getMaxHttpRequestRetries())
+        .setConnectTimeout(Duration.ofMillis(getHttpRequestConnectTimeout()))
+        .setReadTimeout(Duration.ofMillis(getHttpRequestReadTimeout()))
+        .build();
+  }
+
+  @Nullable
+  public abstract Class<? extends AuthorizationHandler> getAuthorizationHandlerImplClass();
+
+  public abstract Map<String, String> getAuthorizationHandlerProperties();
+
   public void throwIfNotValid() {
     checkArgument(!isNullOrEmpty(getAppName()), "appName must not be null or empty");
   }
@@ -194,6 +210,8 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setGrpcEnabled(boolean grpcEnabled);
 
+    public abstract Builder setDirectPathPreffered(boolean directPathPreffered);
+
     public abstract Builder setStorageRootUrl(String rootUrl);
 
     public abstract Builder setStorageServicePath(String servicePath);
@@ -203,8 +221,6 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setAppName(String appName);
 
     public abstract Builder setAutoRepairImplicitDirectoriesEnabled(boolean autoRepair);
-
-    public abstract Builder setInferImplicitDirectoriesEnabled(boolean inferImplicitDirectories);
 
     public abstract Builder setMaxWaitMillisForEmptyObjectCreation(int durationMillis);
 
@@ -234,10 +250,6 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setMaxBytesRewrittenPerCall(long bytes);
 
-    public abstract Builder setCopyMaxRequestsPerBatch(long copyMaxRequestsPerBatch);
-
-    public abstract Builder setCopyBatchThreads(int copyBatchThreads);
-
     public abstract Builder setReadChannelOptions(GoogleCloudStorageReadOptions readChannelOptions);
 
     public abstract Builder setWriteChannelOptions(AsyncWriteChannelOptions writeChannelOptions);
@@ -254,6 +266,11 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setEncryptionKey(RedactedString encryptionKey);
 
     public abstract Builder setEncryptionKeyHash(RedactedString encryptionKeyHash);
+
+    public abstract Builder setAuthorizationHandlerImplClass(
+        Class<? extends AuthorizationHandler> authorizationHandlerImpl);
+
+    public abstract Builder setAuthorizationHandlerProperties(Map<String, String> properties);
 
     abstract GoogleCloudStorageOptions autoBuild();
 

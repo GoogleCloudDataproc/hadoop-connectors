@@ -18,7 +18,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.api.client.googleapis.GoogleUtils;
 import com.google.api.client.http.HttpTransport;
-import com.google.api.client.http.apache.ApacheHttpTransport;
+import com.google.api.client.http.apache.v2.ApacheHttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
@@ -36,7 +36,9 @@ import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.Credentials;
 import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.apache.http.impl.client.HttpClientBuilder;
 
 /**
  * Factory for creating HttpTransport types.
@@ -88,7 +90,7 @@ public class HttpTransportFactory {
       @Nullable RedactedString proxyUsername,
       @Nullable RedactedString proxyPassword)
       throws IOException {
-    logger.atFine().log(
+    logger.atFiner().log(
         "createHttpTransport(%s, %s, %s, %s)", type, proxyAddress, proxyUsername, proxyPassword);
     checkArgument(
         proxyAddress != null || (proxyUsername == null && proxyPassword == null),
@@ -138,20 +140,23 @@ public class HttpTransportFactory {
         proxyUri != null || proxyCredentials == null,
         "if proxyUri is null than proxyCredentials should be null too");
 
-    ApacheHttpTransport transport =
-        new ApacheHttpTransport.Builder()
-            .trustCertificates(GoogleUtils.getCertificateTrustStore())
-            .setProxy(
-                proxyUri == null ? null : new HttpHost(proxyUri.getHost(), proxyUri.getPort()))
-            .build();
+    HttpClientBuilder httpClientBuilder = ApacheHttpTransport.newDefaultHttpClientBuilder();
 
-    if (proxyCredentials != null) {
-      ((DefaultHttpClient) transport.getHttpClient())
-          .getCredentialsProvider()
-          .setCredentials(new AuthScope(proxyUri.getHost(), proxyUri.getPort()), proxyCredentials);
+    if (proxyUri != null) {
+      httpClientBuilder
+          // Set route planner to null because it overrides proxy configuration.
+          .setRoutePlanner(null)
+          .setProxy(new HttpHost(proxyUri.getHost(), proxyUri.getPort()));
     }
 
-    return transport;
+    if (proxyCredentials != null) {
+      CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
+      credentialsProvider.setCredentials(
+          new AuthScope(proxyUri.getHost(), proxyUri.getPort()), proxyCredentials);
+      httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider);
+    }
+
+    return new ApacheHttpTransport(httpClientBuilder.build());
   }
 
   /**

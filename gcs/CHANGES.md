@@ -1,4 +1,30 @@
-### 2.2.0 - 2020-XX-XX
+### 3.0.0 - 2022-XX-XX
+
+1.  Remove Hadoop 2.x support.
+
+1.  Update all dependencies to the latest versions.
+
+1.  Add support for downscoped tokens in `AccessTokenProvider`.
+
+### 2.2.2 - 2021-06-25
+
+1.  Support footer prefetch in gRPC read channel.
+
+1.  Fix in-place seek functionality in gRPC read channel.
+
+1.  Add option to buffer requests for resumable upload over gRPC:
+
+    ```
+    fs.gs.grpc.write.buffered.requests (default : 20)
+    ```
+
+### 2.2.1 - 2021-05-04
+
+1.  Fix proxy configuration for Apache HTTP transport.
+
+1.  Update gRPC dependency to latest version.
+
+### 2.2.0 - 2021-01-06
 
 1.  Delete deprecated methods.
 
@@ -55,6 +81,117 @@
 
     Note that when using `NIO_CHANNEL_PIPE` option maximum upload throughput can
     decrease by 10%.
+
+1.  Add a property to impersonate a service account:
+
+    ```
+    fs.gs.auth.impersonation.service.account (not set by default)
+    ```
+
+    If this property is set, an access token will be generated for this service
+    account to access GCS. The caller who issues a request for the access token
+    must have been granted the Service Account Token Creator role
+    (`roles/iam.serviceAccountTokenCreator`) on the service account to
+    impersonate.
+
+1.  Throw `ClosedChannelException` in `GoogleHadoopOutputStream.write` methods
+    if stream already closed. This fixes Spark Streaming jobs checkpointing to
+    Cloud Storage.
+
+1.  Add properties to impersonate a service account through user or group name:
+
+    ```
+    fs.gs.auth.impersonation.service.account.for.user.<USER_NAME> (not set by default)
+    fs.gs.auth.impersonation.service.account.for.group.<GROUP_NAME> (not set by default)
+    ```
+
+    If any of these properties are set, an access token will be generated for
+    the service account associated with specified user name or group name in
+    order to access GCS. The caller who issues a request for the access token
+    must have been granted the Service Account Token Creator role
+    (`roles/iam.serviceAccountTokenCreator`) on the service account to
+    impersonate.
+
+1.  Fix complex patterns globbing.
+
+1.  Added support for an authorization handler for Cloud Storage requests. This
+    feature is configurable through the properties:
+
+    ```
+    fs.gs.authorization.handler.impl=<FULLY_QUALIFIED_AUTHORIZATION_HANDLER_CLASS>
+    fs.gs.authorization.handler.properties.<AUTHORIZATION_HANDLER_PROPERTY>=<VALUE>
+    ```
+
+    If the `fs.gs.authorization.handler.impl` property is set, the specified
+    authorization handler will be used to authorize Cloud Storage API requests
+    before executing them. The handler will throw `AccessDeniedException` for
+    rejected requests if user does not have enough permissions (not authorized)
+    to execute these requests.
+
+    All properties with the `fs.gs.authorization.handler.properties.` prefix
+    passed to an instance of the configured authorization handler class after
+    instantiation before calling any Cloud Storage requests handling methods.
+
+1.  Set default value for `fs.gs.status.parallel.enable` property to `true`.
+
+1.  Tune exponential backoff configuration for Cloud Storage requests.
+
+1.  Increment Hadoop `FileSystem.Statistics` counters for read and write
+    operations.
+
+1.  Always infer implicit directories and remove
+    `fs.gs.implicit.dir.infer.enable` property.
+
+1.  Replace 2 glob-related properties (`fs.gs.glob.flatlist.enable` and
+    `fs.gs.glob.concurrent.enable`) with a single property to configure glob
+    search algorithm:
+
+    ```
+    fs.gs.glob.algorithm (default: CONCURRENT)
+    ```
+
+1.  Do not create the parent directory objects (this includes buckets) when
+    creating a new file or a directory, instead rely on the implicit directory
+    inference.
+
+1.  Use default logging backend for Google Flogger instead of Slf4j.
+
+1.  Add `FsBenchmark` tool for benchmarking HCFS.
+
+1.  Remove obsolete `fs.gs.inputstream.buffer.size` property and related
+    functionality.
+
+1.  Fix unauthenticated access support (`fs.gs.auth.null.enable=true`).
+
+1.  Improve cache hit ratio when `fs.gs.performance.cache.enable` property is
+    set to `true`.
+
+1.  Remove obsolete configuration properties and related functionality:
+
+    ```
+    fs.gs.auth.client.id
+    fs.gs.auth.client.file
+    fs.gs.auth.client.secret
+    ```
+
+1.  Add a property that allows to disable HCFS semantic enforcement. If set to
+    `false` GSC connector will not check if directory with same name already
+    exists when creating a new file and vise versa.
+
+    ```
+    fs.gs.create.items.conflict.check.enable (default: true)
+    ```
+
+1.  Remove redundant properties:
+
+    ```
+    fs.gs.config.override.file
+    fs.gs.copy.batch.threads
+    fs.gs.copy.max.requests.per.batch
+    ```
+
+1.  Change default value of `fs.gs.inputstream.min.range.request.size` property
+    from `524288` to `2097152`.
 
 ### 2.1.1 - 2020-03-11
 
@@ -301,7 +438,7 @@
     fs.gs.checksum.type (default: NONE)
     ```
 
-    Valid property values: `NONE`, `CRC32C`, `MD5`.
+    Valid values: `NONE`, `CRC32C`, `MD5`.
 
     CRC32c checksum is compatible with
     [HDFS-13056](https://issues.apache.org/jira/browse/HDFS-13056).
@@ -1103,7 +1240,7 @@
 
 1.  Directory timestamp updating can now be controlled via user-settable
     properties `fs.gs.parent.timestamp.update.enable`,
-    `fs.gs.parent.timestamp.update.substrings.excludes`. and
+    `fs.gs.parent.timestamp.update.substrings.excludes`, and
     `fs.gs.parent.timestamp.update.substrings.includes` in `core-site.xml`. By
     default, timestamp updating is enabled for the YARN done and intermediate
     done directories and excluded for everything else. Strings listed in

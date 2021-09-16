@@ -14,25 +14,35 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_AUTHORIZATION_HANDLER_IMPL;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_ALGORITHM;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY_HASH;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_READ_METADATA_TIMEOUT_MS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_READ_TIMEOUT_MS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_UPLOAD_BUFFERED_REQUESTS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_TIMEOUT_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_HTTP_HEADERS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ROOT_URL;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_SERVICE_PATH;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_ADDRESS_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_PASSWORD_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_USERNAME_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.cloud.hadoop.util.testing.HadoopConfigurationUtils.getDefaultProperties;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksumType;
+import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
+import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
+import com.google.cloud.hadoop.gcsio.authorization.FakeAuthorizationHandler;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
 import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.common.collect.ImmutableList;
@@ -51,66 +61,67 @@ public class GoogleHadoopFileSystemConfigurationTest {
   private static final Map<String, Object> expectedDefaultConfiguration =
       new HashMap<String, Object>() {
         {
-          put("fs.gs.project.id", null);
-          put("fs.gs.working.dir", "/");
-          put("fs.gs.implicit.dir.repair.enable", true);
-          put("fs.gs.copy.with.rewrite.enable", true);
-          put("fs.gs.rewrite.max.bytes.per.call", 512 * 1024 * 1024L);
-          put("fs.gs.config.override.file", null);
-          put("fs.gs.storage.root.url", "https://storage.googleapis.com/");
-          put("fs.gs.storage.service.path", "storage/v1/");
-          put("fs.gs.reported.permissions", "700");
-          put("fs.gs.delegation.token.binding", null);
+          put("fs.gs.application.name.suffix", "");
+          put("fs.gs.authorization.handler.impl", null);
+          put("fs.gs.authorization.handler.properties.", ImmutableMap.of());
+          put("fs.gs.batch.threads", 15);
+          put("fs.gs.block.size", 64 * 1024 * 1024L);
           put("fs.gs.bucket.delete.enable", false);
           put("fs.gs.checksum.type", GcsFileChecksumType.NONE);
-          put("fs.gs.status.parallel.enable", false);
-          put("fs.gs.lazy.init.enable", false);
-          put("fs.gs.block.size", 64 * 1024 * 1024L);
-          put("fs.gs.implicit.dir.infer.enable", true);
-          put("fs.gs.glob.flatlist.enable", true);
-          put("fs.gs.glob.concurrent.enable", true);
-          put("fs.gs.max.requests.per.batch", 15L);
-          put("fs.gs.batch.threads", 15);
-          put("fs.gs.copy.max.requests.per.batch", 15L);
-          put("fs.gs.copy.batch.threads", 15);
-          put("fs.gs.list.max.items.per.call", 1024L);
-          put("fs.gs.max.wait.for.empty.object.creation.ms", 3_000);
-          put("fs.gs.marker.file.pattern", null);
-          put("fs.gs.inputstream.buffer.size", 0);
-          put("fs.gs.io.buffersize", 0);
-          put("fs.gs.inputstream.fast.fail.on.not.found.enable", true);
-          put("fs.gs.inputstream.support.gzip.encoding.enable", false);
-          put("fs.gs.outputstream.buffer.size", 8 * 1024 * 1024);
-          put("fs.gs.outputstream.pipe.buffer.size", 1024 * 1024);
-          put("fs.gs.outputstream.pipe.type", PipeType.IO_STREAM_PIPE);
-          put("fs.gs.outputstream.upload.chunk.size", 64 * 1024 * 1024);
-          put("fs.gs.outputstream.upload.cache.size", 0);
-          put("fs.gs.io.buffersize.write", 64 * 1024 * 1024);
-          put("fs.gs.outputstream.direct.upload.enable", false);
-          put("fs.gs.outputstream.type", OutputStreamType.BASIC);
-          put("fs.gs.outputstream.sync.min.interval.ms", 0);
-          put("fs.gs.application.name.suffix", "");
-          put("fs.gs.http.max.retry", 10);
-          put("fs.gs.http.connect-timeout", 20_000);
-          put("fs.gs.http.read-timeout", 20_000);
-          put("fs.gs.inputstream.fadvise", Fadvise.AUTO);
-          put("fs.gs.inputstream.inplace.seek.limit", 8 * 1024 * 1024L);
-          put("fs.gs.inputstream.min.range.request.size", 512 * 1024);
-          put("fs.gs.performance.cache.enable", false);
-          put("fs.gs.performance.cache.max.entry.age.ms", 5_000L);
-          put("fs.gs.requester.pays.mode", RequesterPaysMode.DISABLED);
-          put("fs.gs.requester.pays.project.id", null);
-          put("fs.gs.requester.pays.buckets", ImmutableList.of());
           put("fs.gs.cooperative.locking.enable", false);
           put("fs.gs.cooperative.locking.expiration.timeout.ms", 120_000L);
           put("fs.gs.cooperative.locking.max.concurrent.operations", 20);
-          put("fs.gs.storage.http.headers.", ImmutableMap.of());
+          put("fs.gs.copy.with.rewrite.enable", true);
+          put("fs.gs.create.items.conflict.check.enable", true);
+          put("fs.gs.delegation.token.binding", null);
           put("fs.gs.encryption.algorithm", null);
-          put("fs.gs.encryption.key", null);
           put("fs.gs.encryption.key.hash", null);
-          put("fs.gs.grpc.enable", false);
+          put("fs.gs.encryption.key", null);
+          put("fs.gs.glob.algorithm", GlobAlgorithm.CONCURRENT);
           put("fs.gs.grpc.checksums.enable", false);
+          put("fs.gs.grpc.enable", false);
+          put("fs.gs.grpc.read.metadata.timeout.ms", 60 * 1000L);
+          put("fs.gs.grpc.read.timeout.ms", 20 * 60 * 1000L);
+          put("fs.gs.grpc.read.zerocopy.enable", true);
           put("fs.gs.grpc.server.address", null);
+          put("fs.gs.grpc.write.buffered.requests", 20L);
+          put("fs.gs.grpc.write.timeout.ms", 10 * 60 * 1000L);
+          put("fs.gs.http.connect-timeout", 20_000);
+          put("fs.gs.http.max.retry", 10);
+          put("fs.gs.http.read-timeout", 20_000);
+          put("fs.gs.implicit.dir.repair.enable", true);
+          put("fs.gs.inputstream.fadvise", Fadvise.AUTO);
+          put("fs.gs.inputstream.fast.fail.on.not.found.enable", true);
+          put("fs.gs.inputstream.inplace.seek.limit", 8 * 1024 * 1024L);
+          put("fs.gs.inputstream.min.range.request.size", 2 * 1024 * 1024);
+          put("fs.gs.inputstream.support.gzip.encoding.enable", false);
+          put("fs.gs.io.buffersize.write", 64 * 1024 * 1024);
+          put("fs.gs.lazy.init.enable", false);
+          put("fs.gs.list.max.items.per.call", 1024L);
+          put("fs.gs.marker.file.pattern", null);
+          put("fs.gs.max.requests.per.batch", 15L);
+          put("fs.gs.max.wait.for.empty.object.creation.ms", 3_000);
+          put("fs.gs.outputstream.buffer.size", 8 * 1024 * 1024);
+          put("fs.gs.outputstream.direct.upload.enable", false);
+          put("fs.gs.outputstream.pipe.buffer.size", 1024 * 1024);
+          put("fs.gs.outputstream.pipe.type", PipeType.IO_STREAM_PIPE);
+          put("fs.gs.outputstream.sync.min.interval.ms", 0);
+          put("fs.gs.outputstream.type", OutputStreamType.BASIC);
+          put("fs.gs.outputstream.upload.cache.size", 0);
+          put("fs.gs.outputstream.upload.chunk.size", 64 * 1024 * 1024);
+          put("fs.gs.performance.cache.enable", false);
+          put("fs.gs.performance.cache.max.entry.age.ms", 5_000L);
+          put("fs.gs.project.id", null);
+          put("fs.gs.reported.permissions", "700");
+          put("fs.gs.requester.pays.buckets", ImmutableList.of());
+          put("fs.gs.requester.pays.mode", RequesterPaysMode.DISABLED);
+          put("fs.gs.requester.pays.project.id", null);
+          put("fs.gs.rewrite.max.bytes.per.call", 512 * 1024 * 1024L);
+          put("fs.gs.status.parallel.enable", true);
+          put("fs.gs.storage.http.headers.", ImmutableMap.of());
+          put("fs.gs.storage.root.url", "https://storage.googleapis.com/");
+          put("fs.gs.storage.service.path", "storage/v1/");
+          put("fs.gs.working.dir", "/");
         }
       };
 
@@ -266,5 +277,80 @@ public class GoogleHadoopFileSystemConfigurationTest {
 
     assertThat(options.getStorageRootUrl()).isEqualTo("https://unit-test-storage.googleapis.com/");
     assertThat(options.getStorageServicePath()).isEqualTo("storage/dev_v1/");
+  }
+
+  @Test
+  public void testImpersonationIdentifier() {
+    Configuration config = new Configuration();
+    config.set(
+        GCS_CONFIG_PREFIX + USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey() + "test-user",
+        "test-service-account1");
+    config.set(
+        GCS_CONFIG_PREFIX + GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey() + "test-grp",
+        "test-service-account2");
+
+    assertThat(
+            USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
+                .withPrefixes(ImmutableList.of(GCS_CONFIG_PREFIX))
+                .getPropsWithPrefix(config))
+        .containsExactly("test-user", "test-service-account1");
+    assertThat(
+            GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
+                .withPrefixes(ImmutableList.of(GCS_CONFIG_PREFIX))
+                .getPropsWithPrefix(config))
+        .containsExactly("test-grp", "test-service-account2");
+  }
+
+  @Test
+  public void testGetAuthorizationHandler() {
+    Configuration config = new Configuration();
+    config.setClass(
+        GCS_AUTHORIZATION_HANDLER_IMPL.getKey(),
+        FakeAuthorizationHandler.class,
+        AuthorizationHandler.class);
+
+    GoogleCloudStorageOptions options =
+        GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
+
+    Class<? extends AuthorizationHandler> handler = options.getAuthorizationHandlerImplClass();
+
+    assertThat(handler).isAssignableTo(AuthorizationHandler.class);
+    assertThat(handler).isEqualTo(FakeAuthorizationHandler.class);
+  }
+
+  @Test
+  public void testAuthorizationHandlerClassNotFound() {
+    Configuration config = new Configuration();
+    config.set(GCS_AUTHORIZATION_HANDLER_IMPL.getKey(), "test.class.not.exist");
+
+    assertThrows(
+        RuntimeException.class,
+        () -> GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build());
+  }
+
+  @Test
+  public void testGrpcConfiguration() {
+    Configuration config = new Configuration();
+    long grpcReadTimeout = 10;
+    long grpcReadMetadataTimeout = 15;
+    long grpcWriteTimeout = 20;
+    long grpcUploadBufferedRequests = 25;
+
+    config.set(GCS_GRPC_READ_TIMEOUT_MS.getKey(), String.valueOf(grpcReadTimeout));
+    config.set(GCS_GRPC_READ_METADATA_TIMEOUT_MS.getKey(), String.valueOf(grpcReadMetadataTimeout));
+    config.set(GCS_GRPC_WRITE_TIMEOUT_MS.getKey(), String.valueOf(grpcWriteTimeout));
+    config.set(
+        GCS_GRPC_UPLOAD_BUFFERED_REQUESTS.getKey(), String.valueOf(grpcUploadBufferedRequests));
+
+    GoogleCloudStorageOptions options =
+        GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
+
+    assertThat(options.getReadChannelOptions().getGrpcReadTimeoutMillis())
+        .isEqualTo(grpcReadTimeout);
+    assertThat(options.getReadChannelOptions().getGrpcReadMetadataTimeoutMillis())
+        .isEqualTo(grpcReadMetadataTimeout);
+    assertThat(options.getWriteChannelOptions().getGrpcWriteTimeout()).isEqualTo(grpcWriteTimeout);
+    assertThat(options.getWriteChannelOptions().getNumberOfBufferedRequests())
+        .isEqualTo(grpcUploadBufferedRequests);
   }
 }

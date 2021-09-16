@@ -16,9 +16,9 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_INFER_IMPLICIT_DIRECTORIES_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem;
+import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
 import static com.google.common.base.StandardSystemProperty.USER_NAME;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -28,6 +28,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksumType;
+import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest;
@@ -56,6 +57,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.service.Service;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -191,6 +193,25 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
             IllegalArgumentException.class,
             () -> myGhfs.initialize(incorrectUri, new Configuration()));
     assertThat(exception).hasMessageThat().startsWith("scheme of path must not be null");
+  }
+
+  @Test
+  public void initialize_delegationTokensServiceLifecycle() throws Exception {
+    Configuration config = new Configuration();
+
+    // Token binding config
+    config.set(
+        DELEGATION_TOKEN_BINDING_CLASS.getKey(), TestDelegationTokenBindingImpl.class.getName());
+    config.set(
+        TestDelegationTokenBindingImpl.TestAccessTokenProviderImpl.TOKEN_CONFIG_PROPERTY_NAME,
+        "qWDAWFA3WWFAWFAWFAW3FAWF3AWF3WFAF33GR5G5"); // Bogus auth token
+
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+    fs.initialize(fs.getUri(), config);
+    assertThat(Service.STATE.STARTED).isEqualTo(fs.delegationTokens.getServiceState());
+
+    fs.close();
+    assertThat(Service.STATE.STOPPED).isEqualTo(fs.delegationTokens.getServiceState());
   }
 
   @Test
@@ -419,7 +440,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
   /** Validates that we correctly build our Options object from a Hadoop config. */
   @Test
-  public void testBuildOptionsFromConfig() throws IOException {
+  public void testBuildOptionsFromConfig() {
     Configuration config = loadConfig("projectId", "serviceAccount", "priveKeyFile");
 
     GoogleCloudStorageFileSystemOptions.Builder optionsBuilder =
@@ -428,17 +449,14 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     GoogleCloudStorageOptions gcsOptions = options.getCloudStorageOptions();
 
     assertThat(gcsOptions.isAutoRepairImplicitDirectoriesEnabled()).isTrue();
-    assertThat(gcsOptions.isInferImplicitDirectoriesEnabled()).isFalse();
 
     config.setBoolean(GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.getKey(), false);
-    config.setBoolean(GCS_INFER_IMPLICIT_DIRECTORIES_ENABLE.getKey(), true);
 
     optionsBuilder = GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config);
     options = optionsBuilder.build();
 
     gcsOptions = options.getCloudStorageOptions();
     assertThat(gcsOptions.isAutoRepairImplicitDirectoriesEnabled()).isFalse();
-    assertThat(gcsOptions.isInferImplicitDirectoriesEnabled()).isTrue();
   }
 
   /** Validates success path in initialize(). */
@@ -449,9 +467,6 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     Configuration config = loadConfig();
 
     // Set up remaining settings to known test values.
-    int bufferSize = 512;
-    config.setInt(
-        GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_BUFFER_SIZE.getKey(), bufferSize);
     long blockSize = 1024;
     config.setLong(GoogleHadoopFileSystemConfiguration.BLOCK_SIZE.getKey(), blockSize);
     String rootBucketName = ghfsHelper.getUniqueBucketName("initialize-root");
@@ -463,7 +478,6 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
         fs.getGcsFs().getOptions().getCloudStorageOptions();
 
     // Verify that config settings were set correctly.
-    assertThat(cloudStorageOptions.getReadChannelOptions().getBufferSize()).isEqualTo(bufferSize);
     assertThat(fs.getDefaultBlockSize()).isEqualTo(blockSize);
     assertThat(fs.initUri).isEqualTo(initUri);
     assertThat(fs.getRootBucketName()).isEqualTo(rootBucketName);
@@ -566,7 +580,11 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     // GCSFS and skip the portions of the config specific to GCSFS.
 
     GoogleCloudStorageFileSystem fakeGcsFs =
-        new GoogleCloudStorageFileSystem(new InMemoryGoogleCloudStorage());
+        new GoogleCloudStorageFileSystem(
+            InMemoryGoogleCloudStorage::new,
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
+                .build());
 
     GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem(fakeGcsFs);
     fs.initUri = initUri;
@@ -593,7 +611,11 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     String rootBucketName = ghfsHelper.getUniqueBucketName("configure-root");
     URI initUri = new Path("gs://" + rootBucketName).toUri();
     GoogleCloudStorageFileSystem fakeGcsFs =
-        new GoogleCloudStorageFileSystem(new InMemoryGoogleCloudStorage());
+        new GoogleCloudStorageFileSystem(
+            InMemoryGoogleCloudStorage::new,
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
+                .build());
     GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem(fakeGcsFs);
     fs.initUri = initUri;
     fs.configureBuckets(fakeGcsFs);
@@ -608,7 +630,11 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   public void testConfigureBucketsWithNeitherRootBucketNorSystemBucket() throws IOException {
     URI initUri = new Path("gs://").toUri();
     final GoogleCloudStorageFileSystem fakeGcsFs =
-        new GoogleCloudStorageFileSystem(new InMemoryGoogleCloudStorage());
+        new GoogleCloudStorageFileSystem(
+            InMemoryGoogleCloudStorage::new,
+            GoogleCloudStorageFileSystemOptions.builder()
+                .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
+                .build());
     final GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem(fakeGcsFs);
     fs.initUri = initUri;
 
@@ -663,6 +689,37 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     try (FSDataOutputStream output = ghfs.create(filePath)) {
       output.write(data);
     }
+  }
+
+  @Test
+  public void testGlobStatusPathExpansionAndFilter() throws IOException {
+    Path testRoot = new Path(ghfs.getWorkingDirectory(), "testGlobStatusPathExpansionAndFilter");
+
+    byte[] data = "testGlobStatusPathExpansionAndFilter_data".getBytes(UTF_8);
+
+    createFile(testRoot.suffix("/date/2020/07/17/0/file1.xml"), data);
+    createFile(testRoot.suffix("/date/2020/07/17/0/file1.json"), data);
+    createFile(testRoot.suffix("/date/2020/07/18/0/file2.xml"), data);
+    createFile(testRoot.suffix("/date/2020/07/18/0/file2.json"), data);
+    createFile(testRoot.suffix("/date/2020/07/19/0/file3.xml"), data);
+    createFile(testRoot.suffix("/date/2020/07/19/0/file3.json"), data);
+    createFile(testRoot.suffix("/date/2020/07/20/0/file4.xml"), data);
+    createFile(testRoot.suffix("/date/2020/07/20/0/file4.json"), data);
+
+    FileStatus[] files =
+        ghfs.globStatus(
+            testRoot.suffix("/*/{2020/07/17,2020/07/18,2020/07/19}/*/*"),
+            path -> path.getName().endsWith(".json"));
+
+    Path workingDirRoot = new Path(ghfs.getWorkingDirectory(), testRoot);
+
+    assertThat(Arrays.stream(files).map(FileStatus::getPath).collect(toImmutableList()))
+        .containsExactly(
+            workingDirRoot.suffix("/date/2020/07/17/0/file1.json"),
+            workingDirRoot.suffix("/date/2020/07/18/0/file2.json"),
+            workingDirRoot.suffix("/date/2020/07/19/0/file3.json"));
+
+    assertThat(ghfs.delete(testRoot, /* recursive= */ true)).isTrue();
   }
 
   @Test
@@ -930,18 +987,15 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
   @Test
   public void testGlobStatusOptions_directoriesNamesShouldBeConsistent() throws IOException {
-    testGlobStatusFlatConcurrent(/* flat= */ true, /* concurrent= */ true);
-    testGlobStatusFlatConcurrent(/* flat= */ true, /* concurrent= */ false);
-    testGlobStatusFlatConcurrent(/* flat= */ false, /* concurrent= */ true);
-    testGlobStatusFlatConcurrent(/* flat= */ false, /* concurrent= */ false);
+    testGlobStatusFlatConcurrent(GlobAlgorithm.CONCURRENT);
+    testGlobStatusFlatConcurrent(GlobAlgorithm.DEFAULT);
+    testGlobStatusFlatConcurrent(GlobAlgorithm.FLAT);
   }
 
-  private void testGlobStatusFlatConcurrent(boolean flat, boolean concurrent) throws IOException {
+  private void testGlobStatusFlatConcurrent(GlobAlgorithm globAlgorithm) throws IOException {
     Configuration configuration = ghfs.getConf();
-    configuration.setBoolean(
-        GoogleHadoopFileSystemConfiguration.GCS_FLAT_GLOB_ENABLE.getKey(), flat);
-    configuration.setBoolean(
-        GoogleHadoopFileSystemConfiguration.GCS_CONCURRENT_GLOB_ENABLE.getKey(), concurrent);
+    configuration.setEnum(
+        GoogleHadoopFileSystemConfiguration.GCS_GLOB_ALGORITHM.getKey(), globAlgorithm);
     ghfs.initialize(ghfs.getUri(), configuration);
 
     Path testRoot = new Path("/directory1/");
@@ -1107,5 +1161,35 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     // Validate that authorities can't be crazy:
     assertThrows(
         IllegalArgumentException.class, () -> myghfs.getGcsPath(new Path("gs://buck^et/object")));
+  }
+
+  @Test
+  public void unauthenticatedAccessToPublicBuckets_fsGsProperties() throws Exception {
+    String publicBucket = "gs://gcp-public-data-landsat";
+
+    Configuration config = new Configuration();
+    config.setBoolean("fs.gs.auth.service.account.enable", false);
+    config.setBoolean("fs.gs.auth.null.enable", true);
+
+    FileSystem fs = FileSystem.get(new URI(publicBucket), config);
+
+    FileStatus[] fileStatuses = fs.listStatus(new Path(publicBucket));
+
+    assertThat(fileStatuses).isNotEmpty();
+  }
+
+  @Test
+  public void unauthenticatedAccessToPublicBuckets_googleCloudProperties() throws Exception {
+    String publicBucket = "gs://gcp-public-data-landsat";
+
+    Configuration config = new Configuration();
+    config.setBoolean("google.cloud.auth.service.account.enable", false);
+    config.setBoolean("google.cloud.auth.null.enable", true);
+
+    FileSystem fs = FileSystem.get(new URI(publicBucket), config);
+
+    FileStatus[] fileStatuses = fs.listStatus(new Path(publicBucket));
+
+    assertThat(fileStatuses).isNotEmpty();
   }
 }

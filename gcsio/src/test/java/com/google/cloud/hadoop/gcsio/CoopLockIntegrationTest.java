@@ -23,6 +23,7 @@ import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationType.DELET
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationType.RENAME;
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao.LOCK_DIRECTORY;
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao.LOCK_PATH;
+import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getStandardOptionBuilder;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
@@ -38,7 +39,6 @@ import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.gcsio.cooplock.DeleteOperation;
 import com.google.cloud.hadoop.gcsio.cooplock.RenameOperation;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
-import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.gson.Gson;
 import java.io.IOException;
@@ -73,22 +73,12 @@ public class CoopLockIntegrationTest {
 
   @BeforeClass
   public static void before() throws Throwable {
-    String projectId =
-        checkNotNull(TestConfiguration.getInstance().getProjectId(), "projectId can not be null");
-    String appName = GoogleCloudStorageIntegrationHelper.APP_NAME;
     Credential credential =
         checkNotNull(GoogleCloudStorageTestHelper.getCredential(), "credential must not be null");
 
-    gcsOptions =
-        GoogleCloudStorageOptions.builder().setAppName(appName).setProjectId(projectId).build();
+    gcsOptions = getStandardOptionBuilder().build();
     httpRequestInitializer =
-        new RetryHttpInitializer(
-            credential,
-            gcsOptions.getAppName(),
-            gcsOptions.getMaxHttpRequestRetries(),
-            gcsOptions.getHttpRequestConnectTimeout(),
-            gcsOptions.getHttpRequestReadTimeout(),
-            gcsOptions.getHttpRequestHeaders());
+        new RetryHttpInitializer(credential, gcsOptions.toRetryHttpInitializerOptions());
 
     GoogleCloudStorageFileSystem gcsfs =
         new GoogleCloudStorageFileSystem(
@@ -298,9 +288,8 @@ public class CoopLockIntegrationTest {
   private static GoogleCloudStorageFileSystem newGcsFs(
       GoogleCloudStorageFileSystemOptions gcsfsOptions, HttpRequestInitializer requestInitializer)
       throws IOException {
-    GoogleCloudStorageImpl gcs =
-        new GoogleCloudStorageImpl(gcsfsOptions.getCloudStorageOptions(), requestInitializer);
-    return new GoogleCloudStorageFileSystem(gcs, gcsfsOptions);
+    return new GoogleCloudStorageFileSystem(
+        o -> new GoogleCloudStorageImpl(o, requestInitializer), gcsfsOptions);
   }
 
   private static HttpRequestInitializer interceptingRequestInitializer(

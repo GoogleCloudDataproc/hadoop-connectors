@@ -14,11 +14,12 @@
 
 package com.google.cloud.hadoop.util;
 
-import static com.google.common.base.StandardSystemProperty.USER_HOME;
-
 import com.google.cloud.hadoop.util.HttpTransportFactory.HttpTransportType;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 
 /**
@@ -89,30 +90,6 @@ public class HadoopCredentialConfiguration {
       new HadoopConfigurationProperty<>(".auth.service.account.json.keyfile");
 
   /**
-   * For OAuth-based Installed App authentication, the key suffix specifying the client ID for the
-   * credentials.
-   */
-  public static final HadoopConfigurationProperty<String> CLIENT_ID_SUFFIX =
-      new HadoopConfigurationProperty<>(".auth.client.id", /* defaultValue= */ null, ".client.id");
-
-  /**
-   * For OAuth-based Installed App authentication, the key suffix specifying the client secret for
-   * the credentials.
-   */
-  public static final HadoopConfigurationProperty<String> CLIENT_SECRET_SUFFIX =
-      new HadoopConfigurationProperty<>(
-          ".auth.client.secret", /* defaultValue= */ null, ".client.secret");
-
-  /**
-   * For OAuth-based Installed App authentication, the key suffix specifying the file containing
-   * credentials (JWT). By default we can set this fairly safely (it's only invoked if client ID,
-   * client secret are set and we're not using service accounts).
-   */
-  public static final HadoopConfigurationProperty<String> OAUTH_CLIENT_FILE_SUFFIX =
-      new HadoopConfigurationProperty<>(
-          ".auth.client.file", USER_HOME.value() + "/.credentials/storage.json");
-
-  /**
    * For unit-testing, the key suffix allowing null to be returned from credential creation instead
    * of logging an error and aborting.
    */
@@ -154,9 +131,35 @@ public class HadoopCredentialConfiguration {
       new HadoopConfigurationProperty<>(
           ".http.transport.type", CredentialOptions.HTTP_TRANSPORT_TYPE_DEFAULT);
 
+  /** Configuration key for the name of the AccessTokenProvider to use to generate AccessTokens. */
   public static final HadoopConfigurationProperty<Class<? extends AccessTokenProvider>>
       ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX =
           new HadoopConfigurationProperty<>(".auth.access.token.provider.impl");
+
+  /**
+   * Key suffix specifying the impersonating service account with which to call GCS API to get
+   * access token.
+   */
+  public static final HadoopConfigurationProperty<String> IMPERSONATION_SERVICE_ACCOUNT_SUFFIX =
+      new HadoopConfigurationProperty<>(".auth.impersonation.service.account");
+
+  /**
+   * Key prefix for the user identifier associated with the service account to impersonate when
+   * accessing GCS.
+   */
+  public static final HadoopConfigurationProperty<Map<String, String>>
+      USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX =
+          new HadoopConfigurationProperty<>(
+              ".auth.impersonation.service.account.for.user.", ImmutableMap.of());
+
+  /**
+   * Key prefix for the group identifier associated with the service account to impersonate when
+   * accessing GCS.
+   */
+  public static final HadoopConfigurationProperty<Map<String, String>>
+      GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX =
+          new HadoopConfigurationProperty<>(
+              ".auth.impersonation.service.account.for.group.", ImmutableMap.of());
 
   public static CredentialFactory getCredentialFactory(
       Configuration config, String... keyPrefixesVararg) {
@@ -185,14 +188,6 @@ public class HadoopCredentialConfiguration {
                 SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX
                     .withPrefixes(keyPrefixes)
                     .get(config, config::get))
-            .setClientId(
-                RedactedString.create(
-                    CLIENT_ID_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get)))
-            .setClientSecret(
-                RedactedString.create(
-                    CLIENT_SECRET_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get)))
-            .setOAuthCredentialFile(
-                OAUTH_CLIENT_FILE_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
             .setNullCredentialEnabled(
                 ENABLE_NULL_CREDENTIAL_SUFFIX
                     .withPrefixes(keyPrefixes)
@@ -211,6 +206,21 @@ public class HadoopCredentialConfiguration {
                     PROXY_PASSWORD_SUFFIX.withPrefixes(keyPrefixes).getPassword(config)))
             .build();
     return new CredentialFactory(credentialOptions);
+  }
+
+  /** Creates an {@link AccessTokenProvider} based on the configuration. */
+  public static AccessTokenProvider getAccessTokenProvider(
+      Configuration config, List<String> keyPrefixes) throws IOException {
+    Class<? extends AccessTokenProvider> clazz =
+        getAccessTokenProviderImplClass(config, keyPrefixes.toArray(new String[0]));
+    if (clazz == null) {
+      return null;
+    }
+    try {
+      return clazz.getDeclaredConstructor().newInstance();
+    } catch (ReflectiveOperationException ex) {
+      throw new IOException("Can't instantiate " + clazz.getName(), ex);
+    }
   }
 
   public static Class<? extends AccessTokenProvider> getAccessTokenProviderImplClass(

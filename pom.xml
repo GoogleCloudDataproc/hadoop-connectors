@@ -15,8 +15,8 @@
   limitations under the License.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <name>BigDataOSS Parent</name>
@@ -26,7 +26,7 @@
 
   <groupId>com.google.cloud.bigdataoss</groupId>
   <artifactId>bigdataoss-parent</artifactId>
-  <version>2.2.0-SNAPSHOT</version>
+  <version>3.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <url>https://github.com/GoogleCloudDataproc/hadoop-connectors</url>
@@ -80,41 +80,36 @@
 
     <gpg.skip>true</gpg.skip>
 
-    <bigdataoss.version>2.2.0-SNAPSHOT</bigdataoss.version>
-    <bigquery-connector.version>1.2.0-SNAPSHOT</bigquery-connector.version>
+    <bigdataoss.version>3.0.0-SNAPSHOT</bigdataoss.version>
+    <bigquery-connector.version>2.0.0-SNAPSHOT</bigquery-connector.version>
 
-    <!-- Keep in sync with Hadoop dependencies -->
-    <apache.avro.version>1.7.7</apache.avro.version>
-    <google.gson.version>2.2.4</google.gson.version>
+    <apache.httpclient.version>4.5.13</apache.httpclient.version>
+    <google.api.grpc.proto-google-iam-v1.version>1.0.14</google.api.grpc.proto-google-iam-v1.version>
+    <google.api-client.version>1.32.1</google.api-client.version>
+    <google.api-client-libraries.version>1.31.5</google.api-client-libraries.version>
+    <google.api-bigquery.version>v2-rev20210617-${google.api-client-libraries.version}</google.api-bigquery.version>
+    <google.api-iamcredentials.version>v1-rev20210326-${google.api-client-libraries.version}</google.api-iamcredentials.version>
+    <google.api-storage.version>v1-rev20210127-${google.api-client-libraries.version}</google.api-storage.version>
+    <google.auth.version>0.26.0</google.auth.version>
+    <google.auto-value.version>1.8.1</google.auto-value.version>
+    <google.cloud-bigquerystorage.version>1.22.5</google.cloud-bigquerystorage.version>
+    <google.cloud-storage.grpc.version>2.0.1-alpha</google.cloud-storage.grpc.version>
+    <google.flogger.version>0.6</google.flogger.version>
+    <google.gson.version>2.8.7</google.gson.version>
+    <google.guava.version>30.1.1-jre</google.guava.version>
+    <google.http-client.version>1.39.2-sp.1</google.http-client.version>
+    <google.oauth-client.version>1.31.5</google.oauth-client.version>
+    <google.protobuf.version>3.17.3</google.protobuf.version>
+    <grpc.version>1.39.0</grpc.version>
+    <hadoop.version>3.3.1</hadoop.version>
 
-    <apache.httpclient.version>4.5.12</apache.httpclient.version>
-    <google.api.grpc.proto-google-iam-v1.version>0.13.0</google.api.grpc.proto-google-iam-v1.version>
-    <google.api.grpc.proto-google-common-protos.version>1.18.0</google.api.grpc.proto-google-common-protos.version>
-    <google.api-client.version>1.30.9</google.api-client.version>
-    <google.api-bigquery.version>v2-rev20200324-${google.api-client.version}</google.api-bigquery.version>
-    <google.api-storage.version>v1-rev20200326-${google.api-client.version}</google.api-storage.version>
-    <google.auth.version>0.20.0</google.auth.version>
-    <google.auto-value.version>1.7.1</google.auto-value.version>
-    <google.cloud-bigquery-storage.version>0.131.1-beta</google.cloud-bigquery-storage.version>
-    <!--
-        When updating Flogger version, also update DefaultPlatform class
-        source code in util-hadoop module with code from new Flogger version
-        and override default SimpleBackendFactory with Slf4jBackendFactory.
-        See example in
-        https://github.com/GoogleCloudDataproc/hadoop-connectors/pull/337
-    -->
-    <google.flogger.version>0.5.1</google.flogger.version>
-    <google.guava.version>29.0-jre</google.guava.version>
-    <google.http-client.version>1.35.0</google.http-client.version>
-    <google.oauth-client.version>1.30.6</google.oauth-client.version>
-    <google.protobuf.version>3.11.4</google.protobuf.version>
-    <google.truth.version>1.0.1</google.truth.version>
-    <grpc.version>1.29.0</grpc.version>
-    <hadoop.two.version>2.10.0</hadoop.two.version>
-    <hadoop.three.version>3.2.1</hadoop.three.version>
-    <junit.version>4.13</junit.version>
-    <junit.system-rules.version>1.19.0</junit.system-rules.version>
-    <mockito.version>3.3.3</mockito.version>
+    <!-- Test dependencies -->
+    <google.truth.version>1.1.3</google.truth.version>
+    <junit.version>4.13.2</junit.version>
+    <mockito.version>3.11.2</mockito.version>
+    <system-lambda.version>1.2.0</system-lambda.version>
+    <!-- TODO: remove AssertJ dependency when Hadoop will fix transitive test dependencies -->
+    <assertj.version>3.12.2</assertj.version>
   </properties>
 
   <modules>
@@ -127,81 +122,6 @@
   </modules>
 
   <profiles>
-    <profile>
-      <id>hadoop2</id>
-      <properties>
-        <hadoop.identifier>hadoop2</hadoop.identifier>
-      </properties>
-      <activation>
-        <activeByDefault>true</activeByDefault>
-      </activation>
-      <dependencyManagement>
-        <dependencies>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-common</artifactId>
-            <version>${hadoop.two.version}</version>
-            <scope>provided</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-common</artifactId>
-            <version>${hadoop.two.version}</version>
-            <classifier>tests</classifier>
-            <scope>test</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-mapreduce-client-core</artifactId>
-            <version>${hadoop.two.version}</version>
-            <scope>provided</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-mapreduce-client-common</artifactId>
-            <version>${hadoop.two.version}</version>
-            <scope>test</scope>
-          </dependency>
-        </dependencies>
-      </dependencyManagement>
-    </profile>
-
-    <profile>
-      <id>hadoop3</id>
-      <properties>
-        <hadoop.identifier>hadoop3</hadoop.identifier>
-      </properties>
-      <dependencyManagement>
-        <dependencies>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-client-api</artifactId>
-            <version>${hadoop.three.version}</version>
-            <scope>provided</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-client-runtime</artifactId>
-            <version>${hadoop.three.version}</version>
-            <scope>test</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-common</artifactId>
-            <version>${hadoop.three.version}</version>
-            <classifier>tests</classifier>
-            <scope>test</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-mapreduce-client-common</artifactId>
-            <version>${hadoop.three.version}</version>
-            <scope>test</scope>
-          </dependency>
-        </dependencies>
-      </dependencyManagement>
-    </profile>
-
     <profile>
       <id>integration-test</id>
       <build>
@@ -227,7 +147,8 @@
                 <include>**/*IntegrationTest.java</include>
               </includes>
               <reuseForks>false</reuseForks>
-              <forkCount>2</forkCount>
+              <forkCount>4</forkCount>
+              <argLine>-Xmx2g @{argLine}</argLine>
               <reportNameSuffix>sponge_log</reportNameSuffix>
             </configuration>
           </plugin>
@@ -291,34 +212,77 @@
         </plugins>
       </build>
     </profile>
+
+    <!--
+     This is a profile to enable the use of the ASF snapshot and staging repositories
+     during a build. It is useful when testing against nightly or RC releases of dependencies.
+     -->
+    <profile>
+      <id>snapshots-and-staging</id>
+      <properties>
+        <!-- override point for ASF staging/snapshot repos -->
+        <asf.staging>https://repository.apache.org/content/groups/staging/</asf.staging>
+        <asf.snapshots>https://repository.apache.org/content/repositories/snapshots/</asf.snapshots>
+      </properties>
+
+      <pluginRepositories>
+        <pluginRepository>
+          <id>ASF Staging</id>
+          <url>${asf.staging}</url>
+        </pluginRepository>
+        <pluginRepository>
+          <id>ASF Snapshots</id>
+          <url>${asf.snapshots}</url>
+          <snapshots>
+            <enabled>true</enabled>
+          </snapshots>
+          <releases>
+            <enabled>false</enabled>
+          </releases>
+        </pluginRepository>
+
+      </pluginRepositories>
+      <repositories>
+        <repository>
+          <id>ASF Staging</id>
+          <url>${asf.staging}</url>
+        </repository>
+        <repository>
+          <id>ASF Snapshots</id>
+          <url>${asf.snapshots}</url>
+          <snapshots>
+            <enabled>true</enabled>
+          </snapshots>
+          <releases>
+            <enabled>false</enabled>
+          </releases>
+        </repository>
+      </repositories>
+    </profile>
   </profiles>
 
   <dependencyManagement>
     <dependencies>
       <dependency>
+        <groupId>com.google.http-client</groupId>
+        <artifactId>google-http-client-jackson2</artifactId>
+        <version>${google.http-client.version}</version>
+      </dependency>
+      <dependency>
         <groupId>com.google.api-client</groupId>
         <artifactId>google-api-client-jackson2</artifactId>
         <version>${google.api-client.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>com.google.http-client</groupId>
+            <artifactId>google-http-client-jackson2</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
-        <groupId>com.google.http-client</groupId>
-        <artifactId>google-http-client</artifactId>
-        <version>${google.http-client.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.http-client</groupId>
-        <artifactId>google-http-client-jackson</artifactId>
-        <version>${google.http-client.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.http-client</groupId>
-        <artifactId>google-http-client-protobuf</artifactId>
-        <version>${google.http-client.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.api-client</groupId>
-        <artifactId>google-api-client-java6</artifactId>
-        <version>${google.api-client.version}</version>
+        <groupId>com.google.apis</groupId>
+        <artifactId>google-api-services-iamcredentials</artifactId>
+        <version>${google.api-iamcredentials.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.apis</groupId>
@@ -331,9 +295,9 @@
         <version>${google.oauth-client.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.google.oauth-client</groupId>
-        <artifactId>google-oauth-client-java6</artifactId>
-        <version>${google.oauth-client.version}</version>
+        <groupId>com.google.auth</groupId>
+        <artifactId>google-auth-library-oauth2-http</artifactId>
+        <version>${google.auth.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.apis</groupId>
@@ -343,29 +307,12 @@
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>google-cloud-bigquerystorage</artifactId>
-        <version>${google.cloud-bigquery-storage.version}</version>
+        <version>${google.cloud-bigquerystorage.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.code.gson</groupId>
         <artifactId>gson</artifactId>
         <version>${google.gson.version}</version>
-        <scope>provided</scope>
-      </dependency>
-      <dependency>
-        <groupId>com.google.protobuf</groupId>
-        <artifactId>protobuf-java</artifactId>
-        <version>${google.protobuf.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.guava</groupId>
-        <artifactId>guava</artifactId>
-        <version>${google.guava.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.guava</groupId>
-        <artifactId>guava-testlib</artifactId>
-        <scope>test</scope>
-        <version>${google.guava.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.auto.value</groupId>
@@ -373,19 +320,9 @@
         <version>${google.auto-value.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.google.auth</groupId>
-        <artifactId>google-auth-library-credentials</artifactId>
-        <version>${google.auth.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.auth</groupId>
-        <artifactId>google-auth-library-oauth2-http</artifactId>
-        <version>${google.auth.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.grpc</groupId>
-        <artifactId>grpc-auth</artifactId>
-        <version>${grpc.version}</version>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava</artifactId>
+        <version>${google.guava.version}</version>
       </dependency>
       <dependency>
         <groupId>io.grpc</groupId>
@@ -394,8 +331,34 @@
       </dependency>
       <dependency>
         <groupId>io.grpc</groupId>
+        <artifactId>grpc-api</artifactId>
+        <version>${grpc.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-auth</artifactId>
+        <version>${grpc.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-context</artifactId>
+        <version>${grpc.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-core</artifactId>
+        <version>${grpc.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-grpclb</artifactId>
+        <version>${grpc.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.grpc</groupId>
         <artifactId>grpc-netty-shaded</artifactId>
         <version>${grpc.version}</version>
+        <scope>runtime</scope>
       </dependency>
       <dependency>
         <groupId>io.grpc</groupId>
@@ -404,24 +367,18 @@
       </dependency>
       <dependency>
         <groupId>io.grpc</groupId>
-        <artifactId>grpc-stub</artifactId>
+        <artifactId>grpc-protobuf-lite</artifactId>
         <version>${grpc.version}</version>
       </dependency>
       <dependency>
         <groupId>io.grpc</groupId>
-        <artifactId>grpc-testing</artifactId>
+        <artifactId>grpc-stub</artifactId>
         <version>${grpc.version}</version>
-        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>com.google.api.grpc</groupId>
         <artifactId>proto-google-iam-v1</artifactId>
         <version>${google.api.grpc.proto-google-iam-v1.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.api.grpc</groupId>
-        <artifactId>proto-google-common-protos</artifactId>
-        <version>${google.api.grpc.proto-google-common-protos.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.protobuf</groupId>
@@ -434,16 +391,87 @@
         <version>${google.protobuf.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpclient</artifactId>
+        <version>${apache.httpclient.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.flogger</groupId>
+        <artifactId>flogger</artifactId>
+        <version>${google.flogger.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.flogger</groupId>
+        <artifactId>google-extensions</artifactId>
+        <version>${google.flogger.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.flogger</groupId>
+        <artifactId>flogger-system-backend</artifactId>
+        <version>${google.flogger.version}</version>
+        <scope>runtime</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.google.api.grpc</groupId>
+        <artifactId>grpc-google-cloud-storage-v2</artifactId>
+        <version>${google.cloud-storage.grpc.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-client-api</artifactId>
+        <version>${hadoop.version}</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-common</artifactId>
+        <version>${hadoop.version}</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-mapreduce-client</artifactId>
+        <version>${hadoop.version}</version>
+        <scope>provided</scope>
+        <type>pom</type>
+      </dependency>
+
+      <!-- Test dependencies -->
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-common</artifactId>
+        <version>${hadoop.version}</version>
+        <classifier>tests</classifier>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-mapreduce-client-common</artifactId>
+        <version>${hadoop.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-testing</artifactId>
+        <version>${grpc.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
         <groupId>junit</groupId>
         <artifactId>junit</artifactId>
         <version>${junit.version}</version>
-        <!-- Needed for main compile and test, but not for execution -->
-        <scope>provided</scope>
+        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
         <artifactId>mockito-core</artifactId>
         <version>${mockito.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava-testlib</artifactId>
+        <version>${google.guava.version}</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -460,59 +488,25 @@
       </dependency>
       <dependency>
         <groupId>com.github.stefanbirkner</groupId>
-        <artifactId>system-rules</artifactId>
-        <version>${junit.system-rules.version}</version>
+        <artifactId>system-lambda</artifactId>
+        <version>${system-lambda.version}</version>
         <scope>test</scope>
       </dependency>
       <dependency>
-        <groupId>org.apache.httpcomponents</groupId>
-        <artifactId>httpclient</artifactId>
-        <version>${apache.httpclient.version}</version>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-client-runtime</artifactId>
+        <version>${hadoop.version}</version>
+        <scope>test</scope>
       </dependency>
       <dependency>
-        <groupId>org.apache.avro</groupId>
-        <artifactId>avro</artifactId>
-        <version>${apache.avro.version}</version>
-        <scope>provided</scope>
-      </dependency>
-      <dependency>
-        <groupId>com.google.flogger</groupId>
-        <artifactId>google-extensions</artifactId>
-        <version>${google.flogger.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.flogger</groupId>
-        <artifactId>flogger-system-backend</artifactId>
-        <version>${google.flogger.version}</version>
-        <scope>runtime</scope>
-      </dependency>
-      <dependency>
-        <groupId>com.google.flogger</groupId>
-        <artifactId>flogger-slf4j-backend</artifactId>
-        <version>${google.flogger.version}</version>
-        <scope>runtime</scope>
-      </dependency>
-      <!-- https://stackoverflow.com/q/4908651/3227693 -->
-      <dependency>
-        <groupId>log4j</groupId>
-        <artifactId>log4j</artifactId>
-        <exclusions>
-          <exclusion>
-            <groupId>com.sun.jmx</groupId>
-            <artifactId>jmxri</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.sun.jdmk</groupId>
-            <artifactId>jmxtools</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>javax.jms</groupId>
-            <artifactId>jms</artifactId>
-          </exclusion>
-        </exclusions>
+        <groupId>org.assertj</groupId>
+        <artifactId>assertj-core</artifactId>
+        <version>${assertj.version}</version>
+        <scope>test</scope>
       </dependency>
     </dependencies>
   </dependencyManagement>
+
   <build>
     <resources>
       <resource>
@@ -525,7 +519,7 @@
       <plugins>
         <plugin>
           <artifactId>maven-gpg-plugin</artifactId>
-          <version>1.6</version>
+          <version>3.0.1</version>
         </plugin>
         <plugin>
           <artifactId>maven-source-plugin</artifactId>
@@ -533,7 +527,7 @@
         </plugin>
         <plugin>
           <artifactId>maven-javadoc-plugin</artifactId>
-          <version>3.2.0</version>
+          <version>3.3.0</version>
         </plugin>
         <plugin>
           <artifactId>maven-jar-plugin</artifactId>
@@ -559,29 +553,20 @@
         </plugin>
         <plugin>
           <artifactId>maven-failsafe-plugin</artifactId>
-          <version>3.0.0-M4</version>
+          <version>3.0.0-M5</version>
         </plugin>
         <plugin>
           <artifactId>maven-surefire-plugin</artifactId>
-          <version>3.0.0-M4</version>
-        </plugin>
-        <plugin>
-          <artifactId>maven-release-plugin</artifactId>
-          <version>3.0.0-M1</version>
+          <version>3.0.0-M5</version>
         </plugin>
         <plugin>
           <artifactId>maven-shade-plugin</artifactId>
-          <version>3.2.3</version>
-        </plugin>
-        <plugin>
-          <groupId>org.codehaus.mojo</groupId>
-          <artifactId>build-helper-maven-plugin</artifactId>
-          <version>3.1.0</version>
+          <version>3.2.4</version>
         </plugin>
         <plugin>
           <groupId>org.jacoco</groupId>
           <artifactId>jacoco-maven-plugin</artifactId>
-          <version>0.8.5</version>
+          <version>0.8.7</version>
           <executions>
             <execution>
               <goals>
@@ -606,6 +591,16 @@
                 <requireMavenVersion>
                   <version>[3.3.9,)</version>
                 </requireMavenVersion>
+                <requireSameVersions>
+                  <dependencies>
+                    <dependency>io.grpc</dependency>
+                  </dependencies>
+                </requireSameVersions>
+                <requireSameVersions>
+                  <dependencies>
+                    <dependency>com.google.protobuf</dependency>
+                  </dependencies>
+                </requireSameVersions>
               </rules>
             </configuration>
           </execution>
@@ -618,8 +613,8 @@
             <exclude>**/*IntegrationTest.java</exclude>
           </excludes>
           <reuseForks>false</reuseForks>
-          <forkCount>2</forkCount>
-          <argLine>@{argLine} -mx3g</argLine>
+          <forkCount>3</forkCount>
+          <argLine>-Xmx3g @{argLine}</argLine>
           <reportNameSuffix>sponge_log</reportNameSuffix>
         </configuration>
       </plugin>
@@ -637,13 +632,41 @@
             <path>
               <groupId>com.google.auto.service</groupId>
               <artifactId>auto-service</artifactId>
-              <version>1.0-rc6</version>
+              <version>1.0-rc7</version>
             </path>
           </annotationProcessorPaths>
         </configuration>
       </plugin>
       <plugin>
-        <artifactId>maven-release-plugin</artifactId>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>2.12.2</version>
+        <configuration>
+          <ratchetFrom>master</ratchetFrom>
+          <formats>
+            <format>
+              <includes>
+                <include>*.md</include>
+                <include>.gitignore</include>
+              </includes>
+              <trimTrailingWhitespace/>
+              <endWithNewline/>
+            </format>
+          </formats>
+          <java>
+            <googleJavaFormat>
+              <version>1.7</version>
+            </googleJavaFormat>
+          </java>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <phase>compile</phase>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

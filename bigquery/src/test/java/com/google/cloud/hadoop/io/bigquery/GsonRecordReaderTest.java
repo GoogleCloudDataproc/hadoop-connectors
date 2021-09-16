@@ -111,9 +111,8 @@ public class GsonRecordReaderTest {
   @Test
   public void testGetCurrentValue() throws Exception {
     // Create Json objects from text values.
-    JsonParser jsonParser = new JsonParser();
-    JsonObject json1 = (JsonObject) jsonParser.parse(value1.toString());
-    JsonObject json2 = (JsonObject) jsonParser.parse(value2.toString());
+    JsonObject json1 = (JsonObject) JsonParser.parseString(value1.toString());
+    JsonObject json2 = (JsonObject) JsonParser.parseString(value2.toString());
 
     // Load RecordReader with multiple records. Set length of input split to 60 chars.
     GsonRecordReader multipleRecordReader = getRecordReader(60);
@@ -180,6 +179,7 @@ public class GsonRecordReaderTest {
 
     // Write values to file.
     Path mockPath = new Path("gs://test_bucket/test-object");
+    ghfs.mkdirs(new Path("gs://test_bucket/"));
     writeFile(ghfs, mockPath, (value1 + "\n" + value2 + "\n").getBytes(UTF_8));
 
     // Create a new InputSplit containing the values.

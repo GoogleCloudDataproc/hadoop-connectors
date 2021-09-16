@@ -128,7 +128,6 @@ public class GoogleHadoopFileSystemDelegationTokensTest {
     Configuration config = new Configuration();
 
     config.set(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(), "test_project");
-    config.setInt(GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_BUFFER_SIZE.getKey(), 512);
     config.setLong(GoogleHadoopFileSystemConfiguration.BLOCK_SIZE.getKey(), 1024);
 
     // Token binding config

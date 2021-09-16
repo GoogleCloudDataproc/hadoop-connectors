@@ -55,7 +55,8 @@ public class ForwardingGoogleCloudStorageTest {
   private static final List<UpdatableItemInfo> TEST_ITEM_INFOS = Lists.newArrayList(TEST_ITEM_INFO);
 
   /** Sample create object options. */
-  private static final CreateObjectOptions TEST_OBJECT_OPTIONS = new CreateObjectOptions(false);
+  private static final CreateObjectOptions TEST_OBJECT_OPTIONS =
+      CreateObjectOptions.DEFAULT_NO_OVERWRITE;
 
   /** Sample create bucket options. */
   private static final CreateBucketOptions TEST_BUCKET_OPTIONS =
@@ -95,7 +96,8 @@ public class ForwardingGoogleCloudStorageTest {
   public void testCreateWithResource() throws IOException {
     gcs.create(TEST_STORAGE_RESOURCE_ID);
 
-    verify(mockGcsDelegate).create(eq(TEST_STORAGE_RESOURCE_ID));
+    verify(mockGcsDelegate)
+        .create(eq(TEST_STORAGE_RESOURCE_ID), eq(CreateObjectOptions.DEFAULT_OVERWRITE));
   }
 
   @Test
@@ -139,7 +141,8 @@ public class ForwardingGoogleCloudStorageTest {
   public void testOpen() throws IOException {
     gcs.open(TEST_STORAGE_RESOURCE_ID);
 
-    verify(mockGcsDelegate).open(eq(TEST_STORAGE_RESOURCE_ID));
+    verify(mockGcsDelegate)
+        .open(eq(TEST_STORAGE_RESOURCE_ID), eq(GoogleCloudStorageReadOptions.DEFAULT));
   }
 
   @Test
@@ -151,16 +154,16 @@ public class ForwardingGoogleCloudStorageTest {
 
   @Test
   public void testCreateWithBucket() throws IOException {
-    gcs.create(TEST_STRING);
+    gcs.createBucket(TEST_STRING);
 
-    verify(mockGcsDelegate).create(eq(TEST_STRING));
+    verify(mockGcsDelegate).createBucket(eq(TEST_STRING), eq(CreateBucketOptions.DEFAULT));
   }
 
   @Test
   public void testCreateWithBucketAndOptions() throws IOException {
-    gcs.create(TEST_STRING, TEST_BUCKET_OPTIONS);
+    gcs.createBucket(TEST_STRING, TEST_BUCKET_OPTIONS);
 
-    verify(mockGcsDelegate).create(eq(TEST_STRING), eq(TEST_BUCKET_OPTIONS));
+    verify(mockGcsDelegate).createBucket(eq(TEST_STRING), eq(TEST_BUCKET_OPTIONS));
   }
 
   @Test
@@ -200,33 +203,37 @@ public class ForwardingGoogleCloudStorageTest {
   }
 
   @Test
-  public void testListObjectNames() throws IOException {
-    gcs.listObjectNames(TEST_STRING, TEST_STRING, TEST_STRING);
-
-    verify(mockGcsDelegate).listObjectNames(eq(TEST_STRING), eq(TEST_STRING), eq(TEST_STRING));
-  }
-
-  @Test
-  public void testListObjectNamesWithMax() throws IOException {
-    gcs.listObjectNames(TEST_STRING, TEST_STRING, TEST_STRING, 1L);
+  public void testListObjectInfo() throws IOException {
+    gcs.listObjectInfo(TEST_STRING, TEST_STRING);
 
     verify(mockGcsDelegate)
-        .listObjectNames(eq(TEST_STRING), eq(TEST_STRING), eq(TEST_STRING), eq(1L));
-  }
-
-  @Test
-  public void testListObjectInfo() throws IOException {
-    gcs.listObjectInfo(TEST_STRING, TEST_STRING, TEST_STRING);
-
-    verify(mockGcsDelegate).listObjectInfo(eq(TEST_STRING), eq(TEST_STRING), eq(TEST_STRING));
+        .listObjectInfo(eq(TEST_STRING), eq(TEST_STRING), eq(ListObjectOptions.DEFAULT));
   }
 
   @Test
   public void testListObjectInfoWithMax() throws IOException {
-    gcs.listObjectInfo(TEST_STRING, TEST_STRING, TEST_STRING, 1L);
+    gcs.listObjectInfo(TEST_STRING, TEST_STRING, ListObjectOptions.DEFAULT);
 
     verify(mockGcsDelegate)
-        .listObjectInfo(eq(TEST_STRING), eq(TEST_STRING), eq(TEST_STRING), eq(1L));
+        .listObjectInfo(eq(TEST_STRING), eq(TEST_STRING), eq(ListObjectOptions.DEFAULT));
+  }
+
+  @Test
+  public void testListObjectInfoPage() throws IOException {
+    gcs.listObjectInfoPage(TEST_STRING, TEST_STRING, TEST_STRING);
+
+    verify(mockGcsDelegate)
+        .listObjectInfoPage(
+            eq(TEST_STRING), eq(TEST_STRING), eq(ListObjectOptions.DEFAULT), eq(TEST_STRING));
+  }
+
+  @Test
+  public void testListObjectInfoPageWithMax() throws IOException {
+    gcs.listObjectInfoPage(TEST_STRING, TEST_STRING, ListObjectOptions.DEFAULT, TEST_STRING);
+
+    verify(mockGcsDelegate)
+        .listObjectInfoPage(
+            eq(TEST_STRING), eq(TEST_STRING), eq(ListObjectOptions.DEFAULT), eq(TEST_STRING));
   }
 
   @Test

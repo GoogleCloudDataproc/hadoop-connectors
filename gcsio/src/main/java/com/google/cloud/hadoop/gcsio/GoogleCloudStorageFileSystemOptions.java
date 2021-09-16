@@ -22,15 +22,18 @@ import javax.annotation.Nullable;
 @AutoValue
 public abstract class GoogleCloudStorageFileSystemOptions {
 
+  public static GoogleCloudStorageFileSystemOptions DEFAULT = builder().build();
+
   public static Builder builder() {
     return new AutoValue_GoogleCloudStorageFileSystemOptions.Builder()
+        .setBucketDeleteEnabled(false)
+        .setCloudStorageOptions(GoogleCloudStorageOptions.DEFAULT)
+        .setCooperativeLockingEnabled(false)
+        .setEnsureNoConflictingItems(true)
+        .setMarkerFilePattern((String) null)
         .setPerformanceCacheEnabled(false)
         .setPerformanceCacheOptions(PerformanceCachingGoogleCloudStorageOptions.DEFAULT)
-        .setCloudStorageOptions(GoogleCloudStorageOptions.DEFAULT)
-        .setBucketDeleteEnabled(false)
-        .setMarkerFilePattern((String) null)
-        .setStatusParallelEnabled(false)
-        .setCooperativeLockingEnabled(false);
+        .setStatusParallelEnabled(true);
   }
 
   public abstract Builder toBuilder();
@@ -49,6 +52,8 @@ public abstract class GoogleCloudStorageFileSystemOptions {
   public abstract boolean isStatusParallelEnabled();
 
   public abstract boolean isCooperativeLockingEnabled();
+
+  public abstract boolean isEnsureNoConflictingItems();
 
   public void throwIfNotValid() {
     getCloudStorageOptions().throwIfNotValid();
@@ -81,6 +86,8 @@ public abstract class GoogleCloudStorageFileSystemOptions {
     public abstract Builder setStatusParallelEnabled(boolean statusParallelEnabled);
 
     public abstract Builder setCooperativeLockingEnabled(boolean cooperativeLockingEnabled);
+
+    public abstract Builder setEnsureNoConflictingItems(boolean ensureNoConflictingItems);
 
     public abstract GoogleCloudStorageFileSystemOptions build();
   }

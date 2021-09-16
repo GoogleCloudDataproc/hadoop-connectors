@@ -18,8 +18,6 @@ import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHe
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.writeObject;
 import static com.google.common.truth.Truth.assertThat;
 
-import com.google.api.client.auth.oauth2.Credential;
-import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
@@ -52,10 +50,9 @@ public class CsekEncryptionIntegrationTest {
     String bucketName = BUCKET_HELPER.getUniqueBucketName("upload-and-get");
     StorageResourceId resourceId = new StorageResourceId(bucketName, "obj");
 
-    gcs.create(bucketName);
+    gcs.createBucket(bucketName);
     gcs.createEmptyObject(
-        resourceId,
-        new CreateObjectOptions(true, "text/plain", CreateObjectOptions.EMPTY_METADATA));
+        resourceId, CreateObjectOptions.builder().setContentType("text/plain").build());
 
     assertThat(gcs.getItemInfo(resourceId).getContentType()).isEqualTo("text/plain");
   }
@@ -70,12 +67,10 @@ public class CsekEncryptionIntegrationTest {
                 .build());
 
     String srcBucketName = BUCKET_HELPER.getUniqueBucketName("rewrite-src");
-    gcs.create(srcBucketName);
+    gcs.createBucket(srcBucketName);
 
     String dstBucketName = BUCKET_HELPER.getUniqueBucketName("rewrite-dst");
-    // Create destination bucket with different location and storage class,
-    // because this is supported by rewrite but not copy requests
-    gcs.create(dstBucketName, CreateBucketOptions.builder().setStorageClass("coldline").build());
+    gcs.createBucket(dstBucketName);
 
     StorageResourceId srcResourceId = new StorageResourceId(srcBucketName, "encryptedObject");
     int partitionsCount = 32;
@@ -92,8 +87,7 @@ public class CsekEncryptionIntegrationTest {
 
   private static GoogleCloudStorageImpl makeStorage(GoogleCloudStorageOptions options)
       throws IOException {
-    Credential credential = GoogleCloudStorageTestHelper.getCredential();
-    return new GoogleCloudStorageImpl(options, credential);
+    return new GoogleCloudStorageImpl(options, GoogleCloudStorageTestHelper.getCredential());
   }
 
   private static GoogleCloudStorageOptions.Builder getCsekStorageOptions() {

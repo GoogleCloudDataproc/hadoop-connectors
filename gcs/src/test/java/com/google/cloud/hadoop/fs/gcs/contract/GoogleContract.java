@@ -22,7 +22,10 @@ import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE
 
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
+import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.AbstractBondedFSContract;
 
 /** Contract of GoogleHadoopFileSystem via scheme "gs". */
@@ -36,8 +39,6 @@ public class GoogleContract extends AbstractBondedFSContract {
     super(conf);
     addConfResource(CONTRACT_XML);
     conf.set("fs.contract.test.fs.gs", "gs://" + bucketHelper.getUniqueBucketPrefix());
-    // TODO: remove when GCS fixes non-retriable "410 Gone" responses
-    conf.setInt("fs.gs.outputstream.upload.cache.size", 1024 * 1024);
 
     TestConfiguration testConf = TestConfiguration.getInstance();
     if (testConf.getProjectId() != null) {
@@ -51,6 +52,13 @@ public class GoogleContract extends AbstractBondedFSContract {
           GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_KEYFILE_SUFFIX.getKey(),
           testConf.getPrivateKeyFile());
     }
+  }
+
+  @Override
+  public void init() throws IOException {
+    super.init();
+    FileSystem testFs = getTestFileSystem();
+    testFs.mkdirs(new Path(testFs.getUri()));
   }
 
   @Override

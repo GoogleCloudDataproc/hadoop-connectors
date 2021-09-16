@@ -12,56 +12,64 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import com.google.api.client.util.BackOff;
+import com.google.auth.Credentials;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.BackOffFactory;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.google.storage.v1.ChecksummedData;
-import com.google.google.storage.v1.InsertObjectRequest;
-import com.google.google.storage.v1.InsertObjectSpec;
-import com.google.google.storage.v1.Object;
-import com.google.google.storage.v1.ObjectChecksums;
-import com.google.google.storage.v1.QueryWriteStatusRequest;
-import com.google.google.storage.v1.QueryWriteStatusResponse;
-import com.google.google.storage.v1.StartResumableWriteRequest;
-import com.google.google.storage.v1.StartResumableWriteResponse;
-import com.google.google.storage.v1.StorageGrpc;
-import com.google.google.storage.v1.StorageGrpc.StorageImplBase;
-import com.google.google.storage.v1.StorageGrpc.StorageStub;
+import com.google.common.collect.Lists;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.Int64Value;
 import com.google.protobuf.Timestamp;
-import com.google.protobuf.UInt32Value;
+import com.google.storage.v2.ChecksummedData;
+import com.google.storage.v2.Object;
+import com.google.storage.v2.ObjectChecksums;
+import com.google.storage.v2.QueryWriteStatusRequest;
+import com.google.storage.v2.QueryWriteStatusResponse;
+import com.google.storage.v2.StartResumableWriteRequest;
+import com.google.storage.v2.StartResumableWriteResponse;
+import com.google.storage.v2.StorageGrpc;
+import com.google.storage.v2.StorageGrpc.StorageImplBase;
+import com.google.storage.v2.StorageGrpc.StorageStub;
+import com.google.storage.v2.WriteObjectRequest;
+import com.google.storage.v2.WriteObjectResponse;
+import com.google.storage.v2.WriteObjectSpec;
+import io.grpc.ManagedChannelBuilder;
+import io.grpc.Status;
+import io.grpc.StatusException;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
+import io.grpc.stub.AbstractStub;
 import io.grpc.stub.StreamObserver;
-import io.grpc.testing.GrpcCleanupRule;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
-import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnit4.class)
 public final class GoogleCloudStorageGrpcWriteChannelTest {
-  private static final String BUCKET_NAME = "bucket-name";
+
+  private static final int GCS_MINIMUM_CHUNK_SIZE = 256 * 1024;
+  private static final String V1_BUCKET_NAME = "bucket-name";
+  private static final String BUCKET_NAME = GrpcChannelUtils.toV2BucketName(V1_BUCKET_NAME);
   private static final String OBJECT_NAME = "object-name";
   private static final String UPLOAD_ID = "upload-id";
   private static final String CONTENT_TYPE = "image/jpeg";
-  private static final Map<String, String> OBJECT_METADATA = new HashMap<>();
   private static final StartResumableWriteRequest START_REQUEST =
       StartResumableWriteRequest.newBuilder()
-          .setInsertObjectSpec(
-              InsertObjectSpec.newBuilder()
+          .setWriteObjectSpec(
+              WriteObjectSpec.newBuilder()
                   .setResource(
                       Object.newBuilder()
                           .setBucket(BUCKET_NAME)
@@ -71,47 +79,49 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   private static final QueryWriteStatusRequest WRITE_STATUS_REQUEST =
       QueryWriteStatusRequest.newBuilder().setUploadId(UPLOAD_ID).build();
 
-  @Rule public final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
-
   private StorageStub stub;
   private FakeService fakeService;
   private ExecutorService executor = Executors.newCachedThreadPool();
+  @Mock private Credentials mockCredentials;
 
   @Before
   public void setUp() throws Exception {
+    MockitoAnnotations.initMocks(this);
     fakeService = spy(new FakeService());
     String serverName = InProcessServerBuilder.generateName();
-    grpcCleanup.register(
-        InProcessServerBuilder.forName(serverName)
-            .directExecutor()
-            .addService(fakeService)
-            .build()
-            .start());
+    InProcessServerBuilder.forName(serverName)
+        .directExecutor()
+        .addService(fakeService)
+        .build()
+        .start();
     stub =
-        StorageGrpc.newStub(
-            grpcCleanup.register(
-                InProcessChannelBuilder.forName(serverName).directExecutor().build()));
+        StorageGrpc.newStub(InProcessChannelBuilder.forName(serverName).directExecutor().build());
   }
 
   @Test
-  public void writeSendsSingleInsertObjectRequest() throws Exception {
-    GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
+  public void writeSendsSingleInsertObjectRequestWithChecksums() throws Exception {
+    AsyncWriteChannelOptions options =
+        AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
+    ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
+    GoogleCloudStorageGrpcWriteChannel writeChannel =
+        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
+    fakeService.setQueryWriteStatusResponses(
+        ImmutableList.of(
+                QueryWriteStatusResponse.newBuilder().setCommittedSize(0).build(),
+                QueryWriteStatusResponse.newBuilder().setCommittedSize(0).build())
+            .iterator());
 
     ByteString data = ByteString.copyFromUtf8("test data");
     writeChannel.initialize();
     writeChannel.write(data.asReadOnlyByteBuffer());
     writeChannel.close();
 
-    InsertObjectRequest expectedInsertRequest =
-        InsertObjectRequest.newBuilder()
+    WriteObjectRequest expectedInsertRequest =
+        WriteObjectRequest.newBuilder()
             .setUploadId(UPLOAD_ID)
             .setChecksummedData(
-                ChecksummedData.newBuilder()
-                    .setContent(data)
-                    .setCrc32C(UInt32Value.newBuilder().setValue(uInt32Value(863614154))))
-            .setObjectChecksums(
-                ObjectChecksums.newBuilder()
-                    .setCrc32C(UInt32Value.newBuilder().setValue(uInt32Value(863614154))))
+                ChecksummedData.newBuilder().setContent(data).setCrc32C((uInt32Value(863614154))))
+            .setObjectChecksums(ObjectChecksums.newBuilder().setCrc32C((uInt32Value(863614154))))
             .setFinishWrite(true)
             .build();
 
@@ -124,17 +134,17 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   public void writeSendsSingleInsertObjectRequestWithoutChecksums() throws Exception {
     AsyncWriteChannelOptions options =
         AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(false).build();
-    ObjectWriteConditions writeConditions = new ObjectWriteConditions();
+    ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, Optional.absent());
+        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
 
     ByteString data = ByteString.copyFromUtf8("test data");
     writeChannel.initialize();
     writeChannel.write(data.asReadOnlyByteBuffer());
     writeChannel.close();
 
-    InsertObjectRequest expectedInsertRequest =
-        InsertObjectRequest.newBuilder()
+    WriteObjectRequest expectedInsertRequest =
+        WriteObjectRequest.newBuilder()
             .setUploadId(UPLOAD_ID)
             .setChecksummedData(ChecksummedData.newBuilder().setContent(data))
             .setFinishWrite(true)
@@ -148,20 +158,23 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   @Test
   public void writeSendsMultipleInsertObjectRequests() throws Exception {
     GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
-    int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
-                QueryWriteStatusResponse.newBuilder().setCommittedSize(chunkSize).build(),
-                QueryWriteStatusResponse.newBuilder().setCommittedSize(2 * chunkSize).build())
+                QueryWriteStatusResponse.newBuilder()
+                    .setCommittedSize(GCS_MINIMUM_CHUNK_SIZE)
+                    .build(),
+                QueryWriteStatusResponse.newBuilder()
+                    .setCommittedSize(2 * GCS_MINIMUM_CHUNK_SIZE)
+                    .build())
             .iterator());
 
-    ByteString data = createTestData(chunkSize * 5 / 2);
+    ByteString data = createTestData(GCS_MINIMUM_CHUNK_SIZE * 5 / 2);
     writeChannel.initialize();
     writeChannel.write(data.asReadOnlyByteBuffer());
     writeChannel.close();
 
-    ArgumentCaptor<InsertObjectRequest> requestCaptor =
-        ArgumentCaptor.forClass(InsertObjectRequest.class);
+    ArgumentCaptor<WriteObjectRequest> requestCaptor =
+        ArgumentCaptor.forClass(WriteObjectRequest.class);
 
     verify(fakeService, times(1)).startResumableWrite(eq(START_REQUEST), any());
     verify(fakeService.insertRequestObserver, times(1)).onNext(requestCaptor.capture());
@@ -172,23 +185,26 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   public void writeSendsMultipleInsertObjectRequestsWithChecksums() throws Exception {
     AsyncWriteChannelOptions options =
         AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
-    ObjectWriteConditions writeConditions = new ObjectWriteConditions();
+    ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, Optional.absent());
-    int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
+        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
-                QueryWriteStatusResponse.newBuilder().setCommittedSize(chunkSize).build(),
-                QueryWriteStatusResponse.newBuilder().setCommittedSize(2 * chunkSize).build())
+                QueryWriteStatusResponse.newBuilder()
+                    .setCommittedSize(GCS_MINIMUM_CHUNK_SIZE)
+                    .build(),
+                QueryWriteStatusResponse.newBuilder()
+                    .setCommittedSize(2 * GCS_MINIMUM_CHUNK_SIZE)
+                    .build())
             .iterator());
 
-    ByteString data = createTestData(chunkSize * 5 / 2);
+    ByteString data = createTestData(GCS_MINIMUM_CHUNK_SIZE * 5 / 2);
     writeChannel.initialize();
     writeChannel.write(data.asReadOnlyByteBuffer());
     writeChannel.close();
 
-    ArgumentCaptor<InsertObjectRequest> requestCaptor =
-        ArgumentCaptor.forClass(InsertObjectRequest.class);
+    ArgumentCaptor<WriteObjectRequest> requestCaptor =
+        ArgumentCaptor.forClass(WriteObjectRequest.class);
 
     verify(fakeService, times(1)).startResumableWrite(eq(START_REQUEST), any());
     verify(fakeService.insertRequestObserver, times(1)).onNext(requestCaptor.capture());
@@ -198,19 +214,20 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   @Test
   public void writeHandlesUncommittedData() throws Exception {
     GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
-    int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
-                QueryWriteStatusResponse.newBuilder().setCommittedSize(chunkSize * 3 / 4).build())
+                QueryWriteStatusResponse.newBuilder()
+                    .setCommittedSize(GCS_MINIMUM_CHUNK_SIZE * 3 / 4)
+                    .build())
             .iterator());
 
-    ByteString data = createTestData(chunkSize * 3 / 2);
+    ByteString data = createTestData(GCS_MINIMUM_CHUNK_SIZE * 3 / 2);
     writeChannel.initialize();
     writeChannel.write(data.asReadOnlyByteBuffer());
     writeChannel.close();
 
-    ArgumentCaptor<InsertObjectRequest> requestCaptor =
-        ArgumentCaptor.forClass(InsertObjectRequest.class);
+    ArgumentCaptor<WriteObjectRequest> requestCaptor =
+        ArgumentCaptor.forClass(WriteObjectRequest.class);
 
     verify(fakeService, times(1)).startResumableWrite(eq(START_REQUEST), any());
     // TODO(b/150892988): Use this mock when implement resuming after a transient error.
@@ -223,9 +240,9 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   public void writeUsesContentGenerationIfProvided() throws Exception {
     AsyncWriteChannelOptions options = AsyncWriteChannelOptions.builder().build();
     ObjectWriteConditions writeConditions =
-        new ObjectWriteConditions(Optional.of(1L), Optional.absent());
+        ObjectWriteConditions.builder().setContentGenerationMatch(1L).build();
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, Optional.absent());
+        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
 
     ByteString data = ByteString.copyFromUtf8("test data");
     writeChannel.initialize();
@@ -233,9 +250,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     writeChannel.close();
 
     StartResumableWriteRequest.Builder expectedRequestBuilder = START_REQUEST.toBuilder();
-    expectedRequestBuilder
-        .getInsertObjectSpecBuilder()
-        .setIfGenerationMatch(Int64Value.newBuilder().setValue(1L));
+    expectedRequestBuilder.getWriteObjectSpecBuilder().setIfGenerationMatch(1L);
     verify(fakeService, times(1)).startResumableWrite(eq(expectedRequestBuilder.build()), any());
   }
 
@@ -243,9 +258,9 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   public void writeUsesMetaGenerationIfProvided() throws Exception {
     AsyncWriteChannelOptions options = AsyncWriteChannelOptions.builder().build();
     ObjectWriteConditions writeConditions =
-        new ObjectWriteConditions(Optional.absent(), Optional.of(1L));
+        ObjectWriteConditions.builder().setMetaGenerationMatch(1L).build();
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, Optional.absent());
+        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
 
     ByteString data = ByteString.copyFromUtf8("test data");
     writeChannel.initialize();
@@ -253,18 +268,16 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     writeChannel.close();
 
     StartResumableWriteRequest.Builder expectedRequestBuilder = START_REQUEST.toBuilder();
-    expectedRequestBuilder
-        .getInsertObjectSpecBuilder()
-        .setIfMetagenerationMatch(Int64Value.newBuilder().setValue(1L));
+    expectedRequestBuilder.getWriteObjectSpecBuilder().setIfMetagenerationMatch(1L);
     verify(fakeService, times(1)).startResumableWrite(eq(expectedRequestBuilder.build()), any());
   }
 
   @Test
   public void writeUsesRequesterPaysProjectIfProvided() throws Exception {
     AsyncWriteChannelOptions options = AsyncWriteChannelOptions.builder().build();
-    ObjectWriteConditions writeConditions = new ObjectWriteConditions();
+    ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
     GoogleCloudStorageGrpcWriteChannel writeChannel =
-        newWriteChannel(options, writeConditions, Optional.of("project-id"));
+        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ "project-id");
 
     ByteString data = ByteString.copyFromUtf8("test data");
     writeChannel.initialize();
@@ -272,7 +285,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     writeChannel.close();
 
     StartResumableWriteRequest.Builder expectedRequestBuilder = START_REQUEST.toBuilder();
-    expectedRequestBuilder.getInsertObjectSpecBuilder().setUserProject("project-id");
+    expectedRequestBuilder.getCommonRequestParamsBuilder().setUserProject("project-id");
     verify(fakeService, times(1)).startResumableWrite(eq(expectedRequestBuilder.build()), any());
   }
 
@@ -301,9 +314,8 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   @Test
   public void writeHandlesErrorOnQueryWriteStatusRequest() throws Exception {
     GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
-    int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
     fakeService.setQueryWriteStatusException(new IOException("Test error!"));
-    ByteString data = createTestData(chunkSize * 2);
+    ByteString data = createTestData(GCS_MINIMUM_CHUNK_SIZE * 2);
 
     writeChannel.initialize();
     writeChannel.write(data.asReadOnlyByteBuffer());
@@ -312,14 +324,15 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   @Test
   public void writeHandlesErrorOnInsertRequestWithUncommittedData() throws Exception {
     GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
-    int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
     fakeService.setInsertRequestException(new IOException("Error!"));
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
-                QueryWriteStatusResponse.newBuilder().setCommittedSize(chunkSize * 3 / 4).build())
+                QueryWriteStatusResponse.newBuilder()
+                    .setCommittedSize(GCS_MINIMUM_CHUNK_SIZE * 3 / 4)
+                    .build())
             .iterator());
 
-    ByteString data = createTestData(chunkSize * 3 / 2);
+    ByteString data = createTestData(GCS_MINIMUM_CHUNK_SIZE * 3 / 2);
     writeChannel.initialize();
     writeChannel.write(data.asReadOnlyByteBuffer());
 
@@ -329,13 +342,15 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   @Test
   public void writeHandlesErrorOnInsertRequestWithoutUncommittedData() throws Exception {
     GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
-    int chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE;
     fakeService.setInsertRequestException(new IOException("Error!"));
     fakeService.setQueryWriteStatusResponses(
-        ImmutableList.of(QueryWriteStatusResponse.newBuilder().setCommittedSize(chunkSize).build())
+        ImmutableList.of(
+                QueryWriteStatusResponse.newBuilder()
+                    .setCommittedSize(GCS_MINIMUM_CHUNK_SIZE)
+                    .build())
             .iterator());
 
-    ByteString data = createTestData(chunkSize);
+    ByteString data = createTestData(GCS_MINIMUM_CHUNK_SIZE);
     writeChannel.initialize();
     writeChannel.write(data.asReadOnlyByteBuffer());
 
@@ -343,24 +358,82 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   }
 
   @Test
-  public void writeHandlesErrorOnInsertRequestWithLongUncommittedData() throws Exception {
-    GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
-    long chunkSize = GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE * 1024L * 1024L;
-    fakeService.setInsertRequestException(new IOException("Error!"));
-    fakeService.setResumeFromInsertException(true);
+  public void writeOneChunkWithSingleErrorAndResume() throws Exception {
+    AsyncWriteChannelOptions options =
+        AsyncWriteChannelOptions.builder().setUploadChunkSize(GCS_MINIMUM_CHUNK_SIZE).build();
+    ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
+    GoogleCloudStorageGrpcWriteChannel writeChannel =
+        newWriteChannel(
+            options, writeConditions, /* requesterPaysProject= */ null, () -> BackOff.ZERO_BACKOFF);
+    fakeService.setInsertObjectExceptions(
+        ImmutableList.of(new StatusException(Status.DEADLINE_EXCEEDED)));
     fakeService.setQueryWriteStatusResponses(
-        ImmutableList.of(
-                QueryWriteStatusResponse.newBuilder().setCommittedSize(chunkSize * 3 / 4).build())
+        ImmutableList.of(QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build())
             .iterator());
+    ByteString chunk = createTestData(GCS_MINIMUM_CHUNK_SIZE);
+    ArgumentCaptor<WriteObjectRequest> requestCaptor =
+        ArgumentCaptor.forClass(WriteObjectRequest.class);
 
-    ByteString data = createTestData(GoogleCloudStorageGrpcWriteChannel.GCS_MINIMUM_CHUNK_SIZE);
     writeChannel.initialize();
-    writeChannel.write(data.asReadOnlyByteBuffer());
+    writeChannel.write(chunk.asReadOnlyByteBuffer());
     writeChannel.close();
 
     verify(fakeService, times(1)).startResumableWrite(eq(START_REQUEST), any());
-    verify(fakeService, atLeast(1)).queryWriteStatus(eq(WRITE_STATUS_REQUEST), any());
+    verify(fakeService, times(1)).queryWriteStatus(eq(WRITE_STATUS_REQUEST), any());
+    verify(fakeService.insertRequestObserver, atLeast(1)).onNext(requestCaptor.capture());
+    // TODO(hgong): Figure out a way to check the expected requests and actual reqeusts builder.
+    // assertEquals(expectedRequests, requestCaptor.getAllValues());
     verify(fakeService.insertRequestObserver, atLeast(1)).onCompleted();
+  }
+
+  @Test
+  public void writeOneChunkWithSingleErrorFailedToResume() throws Exception {
+    AsyncWriteChannelOptions options =
+        AsyncWriteChannelOptions.builder().setUploadChunkSize(GCS_MINIMUM_CHUNK_SIZE).build();
+    ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
+    GoogleCloudStorageGrpcWriteChannel writeChannel =
+        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
+    fakeService.setInsertObjectExceptions(
+        ImmutableList.of(new StatusException(Status.DEADLINE_EXCEEDED)));
+    fakeService.setQueryWriteStatusResponses(
+        ImmutableList.of(QueryWriteStatusResponse.newBuilder().setCommittedSize(-1).build())
+            .iterator());
+    ByteString chunk = createTestData(GCS_MINIMUM_CHUNK_SIZE);
+
+    writeChannel.initialize();
+    writeChannel.write(chunk.asReadOnlyByteBuffer());
+    assertThrows(IOException.class, writeChannel::close);
+  }
+
+  @Test
+  public void retryInsertOnIOException() throws Exception {
+    AsyncWriteChannelOptions options =
+        AsyncWriteChannelOptions.builder().setUploadChunkSize(GCS_MINIMUM_CHUNK_SIZE).build();
+    ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
+    GoogleCloudStorageGrpcWriteChannel writeChannel =
+        newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
+    fakeService.setInsertObjectExceptions(
+        ImmutableList.of(
+            new StatusException(Status.DEADLINE_EXCEEDED),
+            new StatusException(Status.DEADLINE_EXCEEDED),
+            new StatusException(Status.DEADLINE_EXCEEDED),
+            new StatusException(Status.DEADLINE_EXCEEDED),
+            new StatusException(Status.DEADLINE_EXCEEDED)));
+    fakeService.setQueryWriteStatusResponses(
+        ImmutableList.of(
+                QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build(),
+                QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build(),
+                QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build(),
+                QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build())
+            .iterator());
+    ByteString chunk = createTestData(GCS_MINIMUM_CHUNK_SIZE);
+
+    writeChannel.initialize();
+    writeChannel.write(chunk.asReadOnlyByteBuffer());
+
+    assertThrows(IOException.class, writeChannel::close);
+
+    // TODO: assert number of retires;
   }
 
   @Test
@@ -393,17 +466,27 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
 
   @Test
   public void getItemInfoReturnsCorrectItemInfo() throws Exception {
+    byte[] expectedMd5Hash = {
+      -109, 66, -75, 122, -93, -111, 86, -26, 54, -45, -55, -64, 0, 58, 115, -21
+    };
+    byte[] expectedCrc32C = {51, 121, -76, -54};
+
     fakeService.setObject(
-        FakeService.DEFAULT_OBJECT.toBuilder()
+        FakeService.DEFAULT_OBJECT
+            .toBuilder()
             .setSize(9)
             .setGeneration(1)
             .setMetageneration(2)
-            .setTimeCreated(Timestamp.newBuilder().setSeconds(1560485630).setNanos(7000000))
-            .setUpdated(Timestamp.newBuilder().setSeconds(1560495630).setNanos(123000000))
+            .setCreateTime(Timestamp.newBuilder().setSeconds(1560485630).setNanos(7000000))
+            .setUpdateTime(Timestamp.newBuilder().setSeconds(1560495630).setNanos(123000000))
+            .setContentType(CONTENT_TYPE)
             .setContentEncoding("content-encoding")
             .putMetadata("metadata-key-1", "dGVzdC1tZXRhZGF0YQ==")
-            .setMd5Hash("k0K1eqORVuY208nAADpz6w==")
-            .setCrc32C(UInt32Value.newBuilder().setValue(uInt32Value(863614154)))
+            .setChecksums(
+                ObjectChecksums.newBuilder()
+                    .setMd5Hash(ByteString.copyFrom(expectedMd5Hash))
+                    .setCrc32C(uInt32Value(863614154))
+                    .build())
             .build());
     GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
 
@@ -413,22 +496,16 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     writeChannel.close();
     GoogleCloudStorageItemInfo itemInfo = writeChannel.getItemInfo();
 
-    byte[] expectedMd5Hash = {
-      -109, 66, -75, 122, -93, -111, 86, -26, 54, -45, -55, -64, 0, 58, 115, -21
-    };
-    byte[] expectedCrc32C = {51, 121, -76, -54};
     Map<String, byte[]> expectedMetadata =
         ImmutableMap.of(
             "metadata-key-1",
             new byte[] {116, 101, 115, 116, 45, 109, 101, 116, 97, 100, 97, 116, 97});
     GoogleCloudStorageItemInfo expectedItemInfo =
-        new GoogleCloudStorageItemInfo(
-            new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+        GoogleCloudStorageItemInfo.createObject(
+            new StorageResourceId(V1_BUCKET_NAME, OBJECT_NAME),
             1560485630007L,
             1560495630123L,
             /* size= */ 9,
-            /* location= */ null,
-            /* storageClass= */ null,
             CONTENT_TYPE,
             "content-encoding",
             expectedMetadata,
@@ -477,23 +554,32 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   private GoogleCloudStorageGrpcWriteChannel newWriteChannel(
       AsyncWriteChannelOptions options,
       ObjectWriteConditions writeConditions,
-      Optional<String> requesterPaysProject) {
+      String requesterPaysProject) {
+    return newWriteChannel(
+        options, writeConditions, requesterPaysProject, () -> BackOff.STOP_BACKOFF);
+  }
+
+  private GoogleCloudStorageGrpcWriteChannel newWriteChannel(
+      AsyncWriteChannelOptions options,
+      ObjectWriteConditions writeConditions,
+      String requesterPaysProject,
+      BackOffFactory backOffFactory) {
     return new GoogleCloudStorageGrpcWriteChannel(
+        new FakeStubProvider(mockCredentials),
         executor,
-        stub,
-        new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
         options,
+        new StorageResourceId(V1_BUCKET_NAME, OBJECT_NAME),
+        CreateObjectOptions.DEFAULT_NO_OVERWRITE.toBuilder().setContentType(CONTENT_TYPE).build(),
         writeConditions,
         requesterPaysProject,
-        OBJECT_METADATA,
-        CONTENT_TYPE);
+        backOffFactory);
   }
 
   private GoogleCloudStorageGrpcWriteChannel newWriteChannel() {
     AsyncWriteChannelOptions options = AsyncWriteChannelOptions.builder().build();
-    ObjectWriteConditions writeConditions = new ObjectWriteConditions();
+    ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
 
-    return newWriteChannel(options, writeConditions, Optional.absent());
+    return newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
   }
 
   /* Returns an int with the same bytes as the uint32 representation of value. */
@@ -515,7 +601,33 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     return ByteString.copyFrom(result);
   }
 
+  private static class FakeGrpcDecorator implements StorageStubProvider.GrpcDecorator {
+
+    @Override
+    public ManagedChannelBuilder<?> createChannelBuilder(String target) {
+      return null;
+    }
+
+    @Override
+    public AbstractStub<?> applyCallOption(AbstractStub<?> stub) {
+      return stub;
+    }
+  }
+
+  private class FakeStubProvider extends StorageStubProvider {
+
+    FakeStubProvider(Credentials credentials) {
+      super(GoogleCloudStorageOptions.DEFAULT, null, new FakeGrpcDecorator());
+    }
+
+    @Override
+    public StorageStub newAsyncStub() {
+      return stub;
+    }
+  }
+
   private static class FakeService extends StorageImplBase {
+
     static final Object DEFAULT_OBJECT =
         Object.newBuilder()
             .setBucket(BUCKET_NAME)
@@ -527,6 +639,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     InsertRequestObserver insertRequestObserver = spy(new InsertRequestObserver());
 
     private Throwable startRequestException;
+    private List<Throwable> insertObjectExceptions;
     private Throwable queryWriteStatusException;
     private Iterator<QueryWriteStatusResponse> queryWriteStatusResponses;
 
@@ -548,7 +661,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     public void queryWriteStatus(
         QueryWriteStatusRequest request,
         StreamObserver<QueryWriteStatusResponse> responseObserver) {
-      if (queryWriteStatusException != null) {
+      if (queryWriteStatusException != null && queryWriteStatusResponses.hasNext()) {
         responseObserver.onError(queryWriteStatusException);
       } else {
         QueryWriteStatusResponse response = queryWriteStatusResponses.next();
@@ -558,14 +671,24 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     }
 
     @Override
-    public StreamObserver<InsertObjectRequest> insertObject(
-        StreamObserver<Object> responseObserver) {
+    public StreamObserver<WriteObjectRequest> writeObject(
+        StreamObserver<WriteObjectResponse> responseObserver) {
+      if (insertObjectExceptions != null && insertObjectExceptions.size() > 0) {
+        Throwable throwable = insertObjectExceptions.remove(0);
+        if (!throwable.getClass().isAssignableFrom(Throwable.class)
+            || throwable.getCause() != null) {
+          insertRequestObserver.insertRequestException = throwable;
+          insertRequestObserver.resumeFromInsertException = true;
+        }
+      }
       insertRequestObserver.responseObserver = responseObserver;
       return insertRequestObserver;
     }
 
     public void setObject(Object object) {
       this.insertRequestObserver.object = object;
+      this.insertRequestObserver.writeObjectResponse =
+          WriteObjectResponse.newBuilder().setResource(object).build();
     }
 
     void setQueryWriteStatusResponses(Iterator<QueryWriteStatusResponse> responses) {
@@ -584,34 +707,40 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
       insertRequestObserver.insertRequestException = t;
     }
 
-    void setResumeFromInsertException(boolean resumable) {
-      insertRequestObserver.resumeFromInsertException = resumable;
+    public void setInsertObjectExceptions(List<Throwable> insertObjectExceptions) {
+      // Make a copy so caller can pass in an immutable list (this implementation needs to
+      // update the list).
+      this.insertObjectExceptions = Lists.newArrayList(insertObjectExceptions);
     }
 
-    private static class InsertRequestObserver implements StreamObserver<InsertObjectRequest> {
-      private StreamObserver<Object> responseObserver;
+    private static class InsertRequestObserver implements StreamObserver<WriteObjectRequest> {
+
+      private StreamObserver<WriteObjectResponse> responseObserver;
       private Object object = DEFAULT_OBJECT;
+      WriteObjectResponse writeObjectResponse =
+          WriteObjectResponse.newBuilder().setResource(object).build();
       Throwable insertRequestException;
       boolean resumeFromInsertException = false;
 
       @Override
-      public void onNext(InsertObjectRequest request) {
+      public void onNext(WriteObjectRequest request) {
         if (insertRequestException != null) {
           responseObserver.onError(insertRequestException);
           if (resumeFromInsertException) {
             insertRequestException = null;
           }
+        } else {
+          responseObserver.onNext(writeObjectResponse);
         }
       }
 
       @Override
       public void onError(Throwable t) {
-        responseObserver.onCompleted();
+        responseObserver.onError(t);
       }
 
       @Override
       public void onCompleted() {
-        responseObserver.onNext(object);
         responseObserver.onCompleted();
       }
     }

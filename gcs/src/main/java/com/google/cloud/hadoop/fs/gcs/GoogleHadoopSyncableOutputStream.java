@@ -80,13 +80,10 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
   // the way we pick temp file names and already ensured directories for the destination file,
   // we can optimize tempfile creation by skipping various directory checks.
   private static final CreateFileOptions TEMPFILE_CREATE_OPTIONS =
-      new CreateFileOptions(
-          /* overwriteExisting= */ false,
-          CreateFileOptions.DEFAULT_CONTENT_TYPE,
-          CreateFileOptions.EMPTY_ATTRIBUTES,
-          /* checkNoDirectoryConflict= */ false,
-          /* ensureParentDirectoriesExist= */ false,
-          /* existingGenerationId= */ 0L);
+      CreateFileOptions.DEFAULT_NO_OVERWRITE.toBuilder()
+          .setEnsureNoDirectoryConflict(false)
+          .setOverwriteGenerationId(0)
+          .build();
 
   // Deletion of temporary files occurs asynchronously for performance reasons, but in-flight
   // deletions are awaited on close() so as long as all output streams are closed, there should
@@ -156,7 +153,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
       SyncableOutputStreamOptions options,
       ExecutorService cleanupThreadpool)
       throws IOException {
-    logger.atFine().log(
+    logger.atFiner().log(
         "GoogleHadoopSyncableOutputStream(gcsPath: %s, createFileOptions:  %s, options: %s)",
         gcsPath, createFileOptions, options);
     this.ghfs = ghfs;
@@ -206,10 +203,10 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
 
   @Override
   public void close() throws IOException {
-    logger.atFine().log(
+    logger.atFiner().log(
         "close(): Current tail file: %s final destination: %s", curGcsPath, finalGcsPath);
     if (!isOpen()) {
-      logger.atFinest().log("close(): Ignoring; stream already closed.");
+      logger.atFiner().log("close(): Ignoring; stream already closed.");
       return;
     }
     commitCurrentFile();
@@ -220,7 +217,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
     curGcsPath = null;
     curDelegate = null;
 
-    logger.atFine().log("close(): Awaiting %s deletionFutures", deletionFutures.size());
+    logger.atFiner().log("close(): Awaiting %s deletionFutures", deletionFutures.size());
     for (Future<?> deletion : deletionFutures) {
       try {
         deletion.get();
@@ -270,7 +267,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
   public void hsync() throws IOException {
     long startTimeNs = System.nanoTime();
     if (syncRateLimiter != null) {
-      logger.atFine().log(
+      logger.atFiner().log(
           "hsync(): Rate limited (%s) with blocking permit acquisition for %s",
           syncRateLimiter, finalGcsPath);
       syncRateLimiter.acquire();
@@ -280,7 +277,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
 
   /** Internal implementation of hsync, can be reused by hflush() as well. */
   private void hsyncInternal(long startTimeNs) throws IOException {
-    logger.atFine().log(
+    logger.atFiner().log(
         "hsync(): Committing tail file %s to final destination %s", curGcsPath, finalGcsPath);
     throwIfNotOpen();
 
@@ -291,14 +288,14 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
     ++curComponentIndex;
     curGcsPath = getNextTemporaryPath();
 
-    logger.atFine().log(
+    logger.atFiner().log(
         "hsync(): Opening next temporary tail file %s as component number %s",
         curGcsPath, curComponentIndex);
     curDelegate =
         new GoogleHadoopOutputStream(ghfs, curGcsPath, statistics, TEMPFILE_CREATE_OPTIONS);
 
     long finishTimeNs = System.nanoTime();
-    logger.atFine().log("Took %d ns to sync() for %s", finishTimeNs - startTimeNs, finalGcsPath);
+    logger.atFiner().log("Took %d ns to sync() for %s", finishTimeNs - startTimeNs, finalGcsPath);
   }
 
   private void commitCurrentFile() throws IOException {
@@ -311,11 +308,11 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
     if (innerChannel instanceof GoogleCloudStorageItemInfo.Provider) {
       generationId = ((GoogleCloudStorageItemInfo.Provider) innerChannel)
           .getItemInfo().getContentGeneration();
-      logger.atFine().log(
+      logger.atFiner().log(
           "innerChannel is GoogleCloudStorageItemInfo.Provider; closed generationId %s.",
           generationId);
     } else {
-      logger.atFine().log("innerChannel NOT instanceof provider: %s", innerChannel.getClass());
+      logger.atFiner().log("innerChannel NOT instanceof provider: %s", innerChannel.getClass());
     }
 
     // On the first component, curGcsPath will equal finalGcsPath, and no compose() call is

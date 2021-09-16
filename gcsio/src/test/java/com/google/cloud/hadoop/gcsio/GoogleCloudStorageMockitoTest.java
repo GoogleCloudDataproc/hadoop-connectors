@@ -86,6 +86,9 @@ public class GoogleCloudStorageMockitoTest {
   private static final String PROJECT_ID = "google.com:foo-project";
   private static final String BUCKET_NAME = "foo-bucket";
   private static final String OBJECT_NAME = "bar-object";
+  private static final String OBJECT_FIELDS =
+      "bucket,name,timeCreated,updated,generation,metageneration,size,contentType,contentEncoding"
+          + ",md5Hash,crc32c,metadata";
 
   private ExecutorService executorService;
 
@@ -167,6 +170,7 @@ public class GoogleCloudStorageMockitoTest {
 
   protected void setupNonConflictedWrite(Answer<StorageObject> answer) throws IOException {
     when(mockStorageObjects.get(BUCKET_NAME, OBJECT_NAME)).thenReturn(mockStorageObjectsGet);
+    when(mockStorageObjectsGet.setFields(anyString())).thenReturn(mockStorageObjectsGet);
     when(mockStorageObjectsGet.execute()).thenThrow(new IOException("NotFound"));
     when(mockErrorExtractor.itemNotFound(any(IOException.class))).thenReturn(true);
     when(mockStorageObjectsInsert.execute()).thenAnswer(answer);
@@ -216,6 +220,8 @@ public class GoogleCloudStorageMockitoTest {
     when(mockStorageObjects.insert(
             eq(BUCKET_NAME), any(StorageObject.class), any(AbstractInputStreamContent.class)))
         .thenReturn(mockStorageObjectsInsert);
+    when(mockStorageObjectsInsert.setName(eq(OBJECT_NAME))).thenReturn(mockStorageObjectsInsert);
+    when(mockStorageObjectsInsert.setKmsKeyName(any())).thenReturn(mockStorageObjectsInsert);
 
     // Set up the mock Insert to wait forever.
     CountDownLatch waitForEverLatch = new CountDownLatch(1);
@@ -261,10 +267,12 @@ public class GoogleCloudStorageMockitoTest {
     verify(mockStorageObjects)
         .insert(eq(BUCKET_NAME), any(StorageObject.class), any(AbstractInputStreamContent.class));
     verify(mockStorageObjectsInsert).setName(eq(OBJECT_NAME));
+    verify(mockStorageObjectsInsert).setKmsKeyName(any());
     verify(mockStorageObjectsInsert).setDisableGZipContent(eq(true));
     verify(mockClientRequestHelper).setChunkSize(any(Storage.Objects.Insert.class), anyInt());
     verify(mockStorageObjectsInsert).setIfGenerationMatch(eq(0L));
     verify(mockStorageObjects).get(eq(BUCKET_NAME), eq(OBJECT_NAME));
+    verify(mockStorageObjectsGet).setFields(eq(OBJECT_FIELDS));
     verify(mockStorageObjectsGet).execute();
     verify(mockErrorExtractor).itemNotFound(any(IOException.class));
     verify(mockStorageObjectsInsert).execute();
@@ -282,6 +290,8 @@ public class GoogleCloudStorageMockitoTest {
     when(mockStorageObjects.insert(
             eq(BUCKET_NAME), any(StorageObject.class), any(AbstractInputStreamContent.class)))
         .thenReturn(mockStorageObjectsInsert);
+    when(mockStorageObjectsInsert.setName(eq(OBJECT_NAME))).thenReturn(mockStorageObjectsInsert);
+    when(mockStorageObjectsInsert.setKmsKeyName(any())).thenReturn(mockStorageObjectsInsert);
 
     // Set up the mock Insert to throw an exception when execute() is called.
     RuntimeException fakeException = new RuntimeException("Fake exception");
@@ -301,8 +311,10 @@ public class GoogleCloudStorageMockitoTest {
     verify(mockErrorExtractor, atLeastOnce()).itemNotFound(any(IOException.class));
     verify(mockStorageObjectsGet).execute();
     verify(mockStorageObjectsInsert).setName(eq(OBJECT_NAME));
+    verify(mockStorageObjectsInsert).setKmsKeyName(any());
     verify(mockStorageObjectsInsert).setDisableGZipContent(eq(true));
     verify(mockStorageObjects).get(anyString(), anyString());
+    verify(mockStorageObjectsGet).setFields(eq(OBJECT_FIELDS));
     verify(mockClientRequestHelper).setChunkSize(any(Storage.Objects.Insert.class), anyInt());
     verify(mockStorageObjectsInsert).setIfGenerationMatch(anyLong());
   }
@@ -323,6 +335,8 @@ public class GoogleCloudStorageMockitoTest {
     when(mockStorageObjects.insert(
             eq(BUCKET_NAME), any(StorageObject.class), any(AbstractInputStreamContent.class)))
         .thenReturn(mockStorageObjectsInsert);
+    when(mockStorageObjectsInsert.setName(eq(OBJECT_NAME))).thenReturn(mockStorageObjectsInsert);
+    when(mockStorageObjectsInsert.setKmsKeyName(any())).thenReturn(mockStorageObjectsInsert);
 
     WritableByteChannel writeChannel = gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
     assertThat(writeChannel.isOpen()).isTrue();
@@ -334,8 +348,10 @@ public class GoogleCloudStorageMockitoTest {
     verify(mockStorageObjects)
         .insert(eq(BUCKET_NAME), any(StorageObject.class), any(AbstractInputStreamContent.class));
     verify(mockStorageObjects).get(BUCKET_NAME, OBJECT_NAME);
+    verify(mockStorageObjectsGet).setFields(eq(OBJECT_FIELDS));
     verify(mockStorageObjectsGet).execute();
     verify(mockStorageObjectsInsert).setName(eq(OBJECT_NAME));
+    verify(mockStorageObjectsInsert).setKmsKeyName(any());
     verify(mockStorageObjectsInsert).setDisableGZipContent(eq(true));
     verify(mockStorageObjectsInsert).setIfGenerationMatch(eq(0L));
     verify(mockErrorExtractor).itemNotFound(any(IOException.class));
@@ -367,6 +383,7 @@ public class GoogleCloudStorageMockitoTest {
     when(mockStorage.objects()).thenReturn(mockStorageObjects);
     when(mockStorageObjects.get(eq(BUCKET_NAME), eq(OBJECT_NAME)))
         .thenReturn(mockStorageObjectsGet);
+    when(mockStorageObjectsGet.setFields(anyString())).thenReturn(mockStorageObjectsGet);
     when(mockClientRequestHelper.getRequestHeaders(eq(mockStorageObjectsGet)))
         .thenReturn(mockHeaders);
     when(mockStorageObjectsGet.execute())
@@ -484,6 +501,7 @@ public class GoogleCloudStorageMockitoTest {
     verify(mockStorage, times(4)).objects();
     verify(mockStorageObjects, times(2)).delete(eq(BUCKET_NAME), eq(OBJECT_NAME));
     verify(mockStorageObjects, times(2)).get(eq(BUCKET_NAME), eq(OBJECT_NAME));
+    verify(mockStorageObjectsGet, times(2)).setFields(eq("generation"));
     verify(mockStorageObjectsDelete, times(2)).setIfGenerationMatch(eq(1L));
     verify(mockBatchHelper, times(4)).queue(any(), any());
     verify(mockErrorExtractor, times(2)).itemNotFound(any(IOException.class));
@@ -592,6 +610,7 @@ public class GoogleCloudStorageMockitoTest {
     when(mockStorage.objects()).thenReturn(mockStorageObjects);
     when(mockStorageObjects.get(eq(BUCKET_NAME), eq(OBJECT_NAME)))
         .thenReturn(mockStorageObjectsGet);
+    when(mockStorageObjectsGet.setFields(anyString())).thenReturn(mockStorageObjectsGet);
     doAnswer(
             invocation -> {
               Object[] args = invocation.getArguments();
@@ -631,6 +650,7 @@ public class GoogleCloudStorageMockitoTest {
     verify(mockBatchHelper).queue(eq(mockStorageBucketsGet), any());
     verify(mockStorage).objects();
     verify(mockStorageObjects).get(eq(BUCKET_NAME), eq(OBJECT_NAME));
+    verify(mockStorageObjectsGet).setFields(eq(OBJECT_FIELDS));
     verify(mockBatchHelper).queue(eq(mockStorageObjectsGet), any());
     verify(mockErrorExtractor, times(2)).itemNotFound(any(IOException.class));
     verify(mockBatchHelper).flush();
@@ -677,6 +697,7 @@ public class GoogleCloudStorageMockitoTest {
     verify(mockHeaders).setRange(eq("bytes=0-"));
     verify(mockHeaders).setRange(eq("bytes=3-"));
     verify(mockStorageObjectsGet, times(2)).setGeneration(any());
+    verify(mockStorageObjectsGet).setFields(eq(OBJECT_FIELDS));
     verify(mockStorageObjectsGet).execute();
     verify(mockStorageObjectsGet, times(2)).executeMedia();
     verify(mockExceptionStream, times(2)).read(any(byte[].class), eq(0), anyInt());

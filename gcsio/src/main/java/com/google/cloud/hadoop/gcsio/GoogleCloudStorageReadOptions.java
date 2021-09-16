@@ -42,11 +42,13 @@ public abstract class GoogleCloudStorageReadOptions {
   public static final int DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS = 2 * 60 * 1000;
   public static final boolean DEFAULT_FAST_FAIL_ON_NOT_FOUND = true;
   public static final boolean DEFAULT_SUPPORT_GZIP_ENCODING = true;
-  public static final int DEFAULT_BUFFER_SIZE = 0;
-  public static final long DEFAULT_INPLACE_SEEK_LIMIT = 0L;
+  public static final long DEFAULT_INPLACE_SEEK_LIMIT = 8 * 1024 * 1024;
   public static final Fadvise DEFAULT_FADVISE = Fadvise.SEQUENTIAL;
-  public static final int DEFAULT_MIN_RANGE_REQUEST_SIZE = 512 * 1024;
+  public static final int DEFAULT_MIN_RANGE_REQUEST_SIZE = 2 * 1024 * 1024;
   public static final boolean GRPC_CHECKSUMS_ENABLED_DEFAULT = false;
+  public static final long DEFAULT_GRPC_READ_TIMEOUT_MILLIS = 20 * 60 * 1000;
+  public static final long DEFAULT_GRPC_READ_METADATA_TIMEOUT_MILLIS = 60 * 1000;
+  public static final boolean DEFAULT_GRPC_READ_ZEROCOPY_ENABLED = true;
 
   // Default builder should be initialized after default values,
   // otherwise it will access not initialized default values.
@@ -61,11 +63,13 @@ public abstract class GoogleCloudStorageReadOptions {
         .setBackoffMaxElapsedTimeMillis(DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS)
         .setFastFailOnNotFound(DEFAULT_FAST_FAIL_ON_NOT_FOUND)
         .setSupportGzipEncoding(DEFAULT_SUPPORT_GZIP_ENCODING)
-        .setBufferSize(DEFAULT_BUFFER_SIZE)
         .setInplaceSeekLimit(DEFAULT_INPLACE_SEEK_LIMIT)
         .setFadvise(DEFAULT_FADVISE)
         .setMinRangeRequestSize(DEFAULT_MIN_RANGE_REQUEST_SIZE)
-        .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT);
+        .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT)
+        .setGrpcReadTimeoutMillis(DEFAULT_GRPC_READ_TIMEOUT_MILLIS)
+        .setGrpcReadMetadataTimeoutMillis(DEFAULT_GRPC_READ_METADATA_TIMEOUT_MILLIS)
+        .setGrpcReadZeroCopyEnabled(DEFAULT_GRPC_READ_ZEROCOPY_ENABLED);
   }
 
   public abstract Builder toBuilder();
@@ -91,9 +95,6 @@ public abstract class GoogleCloudStorageReadOptions {
   /** See {@link Builder#setSupportGzipEncoding}. */
   public abstract boolean getSupportGzipEncoding();
 
-  /** See {@link Builder#setBufferSize}. */
-  public abstract int getBufferSize();
-
   /** See {@link Builder#setInplaceSeekLimit}. */
   public abstract long getInplaceSeekLimit();
 
@@ -109,6 +110,15 @@ public abstract class GoogleCloudStorageReadOptions {
   /** See {@link Builder#setGrpcServerAddress}. */
   @Nullable
   public abstract String getGrpcServerAddress();
+
+  /** See {@link Builder#setGrpcReadTimeoutMillis}. */
+  public abstract long getGrpcReadTimeoutMillis();
+
+  /** See {@link Builder#setGrpcReadMetadataTimeoutMillis}. */
+  public abstract long getGrpcReadMetadataTimeoutMillis();
+
+  /** See {@link Builder#setGrpcReadZeroCopyEnabled}. */
+  public abstract boolean isGrpcReadZeroCopyEnabled();
 
   /** Mutable builder for GoogleCloudStorageReadOptions. */
   @AutoValue.Builder
@@ -163,14 +173,6 @@ public abstract class GoogleCloudStorageReadOptions {
     public abstract Builder setSupportGzipEncoding(boolean supportGzipEncoding);
 
     /**
-     * If set to a positive value, low-level streams will be wrapped inside a BufferedInputStream of
-     * this size. Otherwise no buffer will be created to wrap the low-level streams. Note that the
-     * low-level streams may or may not have their own additional buffering layers independent of
-     * this setting.
-     */
-    public abstract Builder setBufferSize(int bufferSize);
-
-    /**
      * If seeking to a new position which is within this number of bytes in front of the current
      * position, then we will skip forward by reading and discarding the necessary amount of bytes
      * rather than trying to open a brand-new underlying stream.
@@ -186,7 +188,7 @@ public abstract class GoogleCloudStorageReadOptions {
      *   <li>{@code AUTO} - automatically switches to {@code RANDOM} mode if backward read or
      *       forward read for more than {@link #setInplaceSeekLimit} bytes is detected.
      *   <li>{@code RANDOM} - sends HTTP requests with {@code Range} header set to greater of
-     *       provided reade buffer by user or {@link #setBufferSize}.
+     *       provided reade buffer by user.
      *   <li>{@code SEQUENTIAL} - sends HTTP requests with unbounded {@code Range} header.
      * </ul>
      */
@@ -209,6 +211,15 @@ public abstract class GoogleCloudStorageReadOptions {
 
     /** Sets the property to override the default GCS gRPC server address. */
     public abstract Builder setGrpcServerAddress(String grpcServerAddress);
+
+    /** Sets the property to override the default GCS gRPC read stream timeout. */
+    public abstract Builder setGrpcReadTimeoutMillis(long grpcReadTimeoutMillis);
+
+    /** Sets the property to override the default timeout for GCS metadata reads from gRPC. */
+    public abstract Builder setGrpcReadMetadataTimeoutMillis(long grpcReadMetadataTimeoutMillis);
+
+    /** Sets the property to use the zero-copy deserializer for gRPC read. */
+    public abstract Builder setGrpcReadZeroCopyEnabled(boolean grpcReadZeroCopyEnabled);
 
     abstract GoogleCloudStorageReadOptions autoBuild();
 

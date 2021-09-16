@@ -23,18 +23,24 @@ import static org.junit.Assert.fail;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
+import com.google.cloud.hadoop.util.CheckedFunction;
 import com.google.cloud.hadoop.util.CredentialFactory;
 import com.google.cloud.hadoop.util.CredentialOptions;
+import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
@@ -55,6 +61,14 @@ public class GoogleCloudStorageTestHelper {
 
   private static final int BUFFER_SIZE_MAX_BYTES = 32 * 1024 * 1024;
 
+  public static GoogleCloudStorage createGoogleCloudStorage() {
+    try {
+      return new GoogleCloudStorageImpl(getStandardOptionBuilder().build(), getCredential());
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to create GoogleCloudStorage instance", e);
+    }
+  }
+
   public static Credential getCredential() throws IOException {
     CredentialOptions credentialOptions =
         CredentialOptions.builder()
@@ -64,7 +78,7 @@ public class GoogleCloudStorageTestHelper {
     CredentialFactory credentialFactory = new CredentialFactory(credentialOptions);
 
     try {
-      return credentialFactory.getCredential(CredentialFactory.GCS_SCOPES);
+      return credentialFactory.getCredential(CredentialFactory.DEFAULT_SCOPES);
     } catch (GeneralSecurityException e) {
       throw new IOException("Failed to create test credentials", e);
     }
@@ -73,9 +87,7 @@ public class GoogleCloudStorageTestHelper {
   public static GoogleCloudStorageOptions.Builder getStandardOptionBuilder() {
     return GoogleCloudStorageOptions.builder()
         .setAppName(GoogleCloudStorageTestHelper.APP_NAME)
-        .setProjectId(checkNotNull(TestConfiguration.getInstance().getProjectId()))
-        .setMaxListItemsPerCall(50)
-        .setMaxRequestsPerBatch(2);
+        .setProjectId(checkNotNull(TestConfiguration.getInstance().getProjectId()));
   }
 
   /** More efficient version of checking byte arrays than using Assert.assertArrayEquals. */
@@ -90,14 +102,17 @@ public class GoogleCloudStorageTestHelper {
     }
 
     if (expected.length != actual.length) {
-      fail(String.format(
-          "Length mismatch: expected: %d, actual: %d", expected.length, actual.length));
+      fail(
+          String.format(
+              "Length mismatch: expected: %d, actual: %d", expected.length, actual.length));
     }
 
     for (int i = 0; i < expected.length; ++i) {
       if (expected[i] != actual[i]) {
-        fail(String.format(
-            "Mismatch at index %d. expected: 0x%02x, actual: 0x%02x", i, expected[i], actual[i]));
+        fail(
+            String.format(
+                "Mismatch at index %d. expected: 0x%02x, actual: 0x%02x",
+                i, expected[i], actual[i]));
       }
     }
   }
@@ -109,7 +124,21 @@ public class GoogleCloudStorageTestHelper {
   }
 
   public static void assertObjectContent(
-      GoogleCloudStorage gcs, StorageResourceId id, byte[] expectedBytes, int expectedBytesCount)
+      GoogleCloudStorage gcs,
+      StorageResourceId resourceId,
+      GoogleCloudStorageReadOptions readOptions,
+      byte[] expectedBytes)
+      throws IOException {
+    assertObjectContent(gcs, resourceId, readOptions, expectedBytes, /* expectedBytesCount= */ 1);
+  }
+
+  public static void assertObjectContent(
+      GoogleCloudStorage gcs,
+      StorageResourceId id,
+      GoogleCloudStorageReadOptions readOptions,
+      byte[] expectedBytes,
+      int expectedBytesCount,
+      int offset)
       throws IOException {
     checkArgument(expectedBytesCount > 0, "expectedBytesCount should be greater than 0");
 
@@ -117,7 +146,10 @@ public class GoogleCloudStorageTestHelper {
     long expectedBytesTotalLength = (long) expectedBytesLength * expectedBytesCount;
     ByteBuffer buffer = ByteBuffer.allocate(Math.min(BUFFER_SIZE_MAX_BYTES, expectedBytesLength));
     long totalRead = 0;
-    try (ReadableByteChannel channel = gcs.open(id)) {
+    try (SeekableByteChannel channel = gcs.open(id, readOptions)) {
+      if (offset > 0) {
+        channel.position(offset);
+      }
       int read = channel.read(buffer);
       while (read > 0) {
         totalRead += read;
@@ -134,6 +166,23 @@ public class GoogleCloudStorageTestHelper {
     }
 
     assertWithMessage("Bytes read mismatch").that(totalRead).isEqualTo(expectedBytesTotalLength);
+  }
+
+  public static void assertObjectContent(
+      GoogleCloudStorage gcs,
+      StorageResourceId id,
+      GoogleCloudStorageReadOptions readOptions,
+      byte[] expectedBytes,
+      int expectedBytesCount)
+      throws IOException {
+    assertObjectContent(gcs, id, readOptions, expectedBytes, expectedBytesCount, /* offset= */ 0);
+  }
+
+  public static void assertObjectContent(
+      GoogleCloudStorage gcs, StorageResourceId id, byte[] expectedBytes, int expectedBytesCount)
+      throws IOException {
+    assertObjectContent(
+        gcs, id, GoogleCloudStorageReadOptions.DEFAULT, expectedBytes, expectedBytesCount);
   }
 
   private static byte[] getExpectedBytesRead(byte[] expectedBytes, long totalRead, int read) {
@@ -164,20 +213,25 @@ public class GoogleCloudStorageTestHelper {
   public static byte[] writeObject(
       GoogleCloudStorage gcs, StorageResourceId resourceId, int partitionSize, int partitionsCount)
       throws IOException {
+    return writeObject(gcs.create(resourceId), partitionSize, partitionsCount);
+  }
+
+  public static byte[] writeObject(
+      WritableByteChannel channel, int partitionSize, int partitionsCount) throws IOException {
     checkArgument(partitionsCount > 0, "partitionsCount should be greater than 0");
 
     byte[] partition = new byte[partitionSize];
     fillBytes(partition);
 
     long startTime = System.currentTimeMillis();
-    try (WritableByteChannel channel = gcs.create(resourceId)) {
+    try (WritableByteChannel ignore = channel) {
       for (int i = 0; i < partitionsCount; i++) {
         channel.write(ByteBuffer.wrap(partition));
       }
     }
     long endTime = System.currentTimeMillis();
     logger.atInfo().log(
-        "Took %s milliseconds to write %s", (endTime - startTime), partitionsCount * partitionSize);
+        "Took %sms to write %sB", (endTime - startTime), (long) partitionsCount * partitionSize);
     return partition;
   }
 
@@ -203,7 +257,7 @@ public class GoogleCloudStorageTestHelper {
     }
 
     private static String makeBucketName(String prefix) {
-      String username = System.getProperty("user.name", "unknown").replace("-", "");
+      String username = System.getProperty("user.name", "unknown").replaceAll("[-.]", "");
       username = username.substring(0, Math.min(username.length(), 10));
       String uuidSuffix = UUID.randomUUID().toString().substring(0, 8);
       return prefix + DELIMITER + username + DELIMITER + uuidSuffix;
@@ -249,7 +303,12 @@ public class GoogleCloudStorageTestHelper {
               .flatMap(
                   bucket -> {
                     try {
-                      return storage.listObjectInfo(bucket, null, null).stream();
+                      return storage
+                          .listObjectInfo(
+                              bucket,
+                              /* objectNamePrefix= */ null,
+                              ListObjectOptions.DEFAULT_FLAT_LIST)
+                          .stream();
                     } catch (IOException e) {
                       throw new RuntimeException(e);
                     }
@@ -268,6 +327,24 @@ public class GoogleCloudStorageTestHelper {
       }
 
       logger.atInfo().log("GCS cleaned up in %s seconds", storageStopwatch.elapsed().getSeconds());
+    }
+  }
+
+  public static class TrackingStorageWrapper<T> {
+
+    public final TrackingHttpRequestInitializer requestsTracker;
+    public final T delegate;
+
+    public TrackingStorageWrapper(
+        GoogleCloudStorageOptions options,
+        CheckedFunction<TrackingHttpRequestInitializer, T, IOException> delegateStorageFn)
+        throws IOException {
+      this.requestsTracker =
+          new TrackingHttpRequestInitializer(
+              new RetryHttpInitializer(
+                  GoogleCloudStorageTestHelper.getCredential(),
+                  options.toRetryHttpInitializerOptions()));
+      this.delegate = delegateStorageFn.apply(this.requestsTracker);
     }
   }
 }

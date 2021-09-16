@@ -1,6 +1,28 @@
-### 1.2.0 - 2020-XX-XX
+### 2.0.0 - 2022-XX-XX
+
+1.  Remove Hadoop 2.x support.
+
+1.  Update all dependencies to the latest versions.
+
+### 1.2.0 - 2021-01-06
 
 1.  Update all dependencies to latest versions.
+
+1.  Fix BigQuery job status retrieval in non-US locations.
+
+1.  Use default logging backend for Google Flogger instead of Slf4j.
+
+1.  Remove unused `mapred.bq.output.buffer.size` configuration property.
+
+1.  Fix unauthenticated access support (`mapred.bq.auth.null.enable=true`).
+
+1.  Remove obsolete configuration properties and related functionality:
+
+    ```
+    mapred.bq.auth.client.id
+    mapred.bq.auth.client.file
+    mapred.bq.auth.client.secret
+    ```
 
 ### 1.1.1 - 2020-03-11
 

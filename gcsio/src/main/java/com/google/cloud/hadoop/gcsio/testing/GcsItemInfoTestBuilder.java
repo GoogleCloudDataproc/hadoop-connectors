@@ -32,8 +32,6 @@ public abstract class GcsItemInfoTestBuilder {
         .setCreationTime(System.currentTimeMillis())
         .setModificationTime(System.currentTimeMillis())
         .setSize(12_456)
-        .setLocation("us-central-1")
-        .setStorageClass("standard")
         .setContentType("application/octet-stream")
         .setContentEncoding(null)
         .setMetadata(ImmutableMap.of("foo-test-meta", new byte[] {8, 33}))
@@ -49,12 +47,6 @@ public abstract class GcsItemInfoTestBuilder {
   public abstract long getModificationTime();
 
   public abstract long getSize();
-
-  @Nullable
-  public abstract String getLocation();
-
-  @Nullable
-  public abstract String getStorageClass();
 
   @Nullable
   public abstract String getContentType();
@@ -81,10 +73,6 @@ public abstract class GcsItemInfoTestBuilder {
 
     public abstract Builder setSize(long size);
 
-    public abstract Builder setLocation(String location);
-
-    public abstract Builder setStorageClass(String storageClass);
-
     public abstract Builder setContentType(String contentType);
 
     public abstract Builder setContentEncoding(String contentEncoding);
@@ -102,13 +90,11 @@ public abstract class GcsItemInfoTestBuilder {
 
     public GoogleCloudStorageItemInfo build() {
       GcsItemInfoTestBuilder instance = autoBuild();
-      return new GoogleCloudStorageItemInfo(
+      return GoogleCloudStorageItemInfo.createObject(
           instance.getStorageResourceId(),
           instance.getCreationTime(),
           instance.getModificationTime(),
           instance.getSize(),
-          instance.getLocation(),
-          instance.getStorageClass(),
           instance.getContentType(),
           instance.getContentEncoding(),
           instance.getMetadata(),

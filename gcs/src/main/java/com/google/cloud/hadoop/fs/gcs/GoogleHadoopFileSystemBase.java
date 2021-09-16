@@ -18,58 +18,69 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType.FLUSHABLE_COMPOSITE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONCURRENT_GLOB_ENABLE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_OVERRIDE_FILE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.CONFIG_KEY_PREFIXES;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_FLAT_GLOB_ENABLE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GLOB_ALGORITHM;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_LAZY_INITIALIZATION_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_TYPE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT;
-import static com.google.cloud.hadoop.gcsio.CreateFileOptions.DEFAULT_NO_OVERWRITE;
+import static com.google.cloud.hadoop.gcsio.CreateFileOptions.DEFAULT_OVERWRITE;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.flogger.LazyArgs.lazy;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.concurrent.Executors.newFixedThreadPool;
 
 import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
+import com.google.api.client.http.HttpTransport;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
+import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.gcsio.ListFileOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
 import com.google.cloud.hadoop.gcsio.UriPaths;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
+import com.google.cloud.hadoop.util.AccessTokenProvider.AccessTokenType;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.CredentialFactory;
+import com.google.cloud.hadoop.util.CredentialFactory.CredentialHttpRetryInitializer;
 import com.google.cloud.hadoop.util.CredentialFromAccessTokenProviderClassFactory;
+import com.google.cloud.hadoop.util.GoogleCredentialWithIamAccessToken;
 import com.google.cloud.hadoop.util.HadoopCredentialConfiguration;
+import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.PropertyUtil;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
+import com.google.common.base.Ascii;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.DataInput;
 import java.io.DataOutput;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -82,23 +93,19 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import org.apache.commons.codec.binary.Hex;
+import java.util.stream.Stream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -145,6 +152,15 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
+  static final String SCHEME = GoogleCloudStorageFileSystem.SCHEME;
+
+  // Request only object fields that are used in Hadoop FileStatus:
+  // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
+  private static final String OBJECT_FIELDS = "bucket,name,size,updated";
+
+  private static final ListFileOptions LIST_OPTIONS =
+      ListFileOptions.DEFAULT.toBuilder().setFields(OBJECT_FIELDS).build();
+
   /**
    * Available types for use with {@link
    * GoogleHadoopFileSystemConfiguration#GCS_OUTPUT_STREAM_TYPE}.
@@ -159,7 +175,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * Available GCS checksum types for use with {@link
    * GoogleHadoopFileSystemConfiguration#GCS_FILE_CHECKSUM_TYPE}.
    */
-  public static enum GcsFileChecksumType {
+  public enum GcsFileChecksumType {
     NONE(null, 0),
     CRC32C("COMPOSITE-CRC32C", 4),
     MD5("MD5", 16);
@@ -179,6 +195,16 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     public int getByteLength() {
       return byteLength;
     }
+  }
+
+  /**
+   * Available GCS glob algorithms for use with {@link
+   * GoogleHadoopFileSystemConfiguration#GCS_GLOB_ALGORITHM}.
+   */
+  public enum GlobAlgorithm {
+    CONCURRENT,
+    DEFAULT,
+    FLAT
   }
 
   /** Default value of replication factor. */
@@ -218,11 +244,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   private static final ThreadFactory DAEMON_THREAD_FACTORY =
       new ThreadFactoryBuilder().setNameFormat("ghfs-thread-%d").setDaemon(true).build();
 
-  @VisibleForTesting
-  boolean enableFlatGlob = GCS_FLAT_GLOB_ENABLE.getDefault();
-
-  @VisibleForTesting
-  boolean enableConcurrentGlob = GCS_CONCURRENT_GLOB_ENABLE.getDefault();
+  @VisibleForTesting GlobAlgorithm globAlgorithm = GCS_GLOB_ALGORITHM.getDefault();
 
   private GcsFileChecksumType checksumType = GCS_FILE_CHECKSUM_TYPE.getDefault();
 
@@ -253,80 +275,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   /** The fixed reported permission of all files. */
   private FsPermission reportedPermissions;
-
-  /** Map of counter values */
-  protected final ImmutableMap<Counter, AtomicLong> counters = createCounterMap();
-
-  protected ImmutableMap<Counter, AtomicLong> createCounterMap() {
-    EnumMap<Counter, AtomicLong> countersMap = new EnumMap<>(Counter.class);
-    for (Counter counter : ALL_COUNTERS) {
-      countersMap.put(counter, new AtomicLong());
-    }
-    return Maps.immutableEnumMap(countersMap);
-  }
-
-  /**
-   * Defines names of counters we track for each operation.
-   *
-   * There are two types of counters:
-   * -- METHOD_NAME      : Number of successful invocations of method METHOD.
-   * -- METHOD_NAME_TIME : Total inclusive time spent in method METHOD.
-   */
-  public enum Counter {
-    APPEND,
-    APPEND_TIME,
-    CREATE,
-    CREATE_TIME,
-    DELETE,
-    DELETE_TIME,
-    GET_FILE_CHECKSUM,
-    GET_FILE_CHECKSUM_TIME,
-    GET_FILE_STATUS,
-    GET_FILE_STATUS_TIME,
-    INIT,
-    INIT_TIME,
-    INPUT_STREAM,
-    INPUT_STREAM_TIME,
-    LIST_STATUS,
-    LIST_STATUS_TIME,
-    MKDIRS,
-    MKDIRS_TIME,
-    OPEN,
-    OPEN_TIME,
-    OUTPUT_STREAM,
-    OUTPUT_STREAM_TIME,
-    READ1,
-    READ1_TIME,
-    READ,
-    READ_TIME,
-    READ_FROM_CHANNEL,
-    READ_FROM_CHANNEL_TIME,
-    READ_CLOSE,
-    READ_CLOSE_TIME,
-    READ_POS,
-    READ_POS_TIME,
-    RENAME,
-    RENAME_TIME,
-    SEEK,
-    SEEK_TIME,
-    SET_WD,
-    SET_WD_TIME,
-    WRITE1,
-    WRITE1_TIME,
-    WRITE,
-    WRITE_TIME,
-    WRITE_CLOSE,
-    WRITE_CLOSE_TIME,
-  }
-
-  /**
-   * Set of all counters.
-   *
-   * <p>It is used for performance optimization instead of `Counter.values`, because
-   * `Counter.values` returns new array on each invocation.
-   */
-  private static final ImmutableSet<Counter> ALL_COUNTERS =
-      Sets.immutableEnumSet(EnumSet.allOf(Counter.class));
 
   /**
    * GCS {@link FileChecksum} which takes constructor parameters to define the return values of the
@@ -372,7 +320,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     @Override
     public String toString() {
-      return getAlgorithmName() + ": " + (bytes == null ? null : new String(Hex.encodeHex(bytes)));
+      return String.format(
+          "%s: %s", getAlgorithmName(), bytes == null ? null : BaseEncoding.base16().encode(bytes));
     }
   }
 
@@ -467,7 +416,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     }
 
     Path result = new Path(uri.getScheme(), uri.getAuthority(), strippedPath);
-    logger.atFinest().log("makeQualified(path: %s): %s", path, result);
+    logger.atFiner().log("makeQualified(path: %s): %s", path, result);
     return result;
   }
 
@@ -487,52 +436,26 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   }
 
   /**
-   * See {@link #initialize(URI, Configuration, boolean)} for details; calls with third arg
-   * defaulting to 'true' for initializing the superclass.
+   * Initializes this file system instance.
+   *
+   * <p>Note: The path passed to this method could be path of any file/directory. It does not matter
+   * because the only thing we check is whether it uses 'gs' scheme. The rest is ignored.
    *
    * @param path URI of a file/directory within this file system.
    * @param config Hadoop configuration.
    */
   @Override
   public void initialize(URI path, Configuration config) throws IOException {
-    initialize(path, config, /* initSuperclass= */ true);
-  }
+    logger.atFiner().log("initialize(path: %s, config: %s)", path, config);
 
-  /**
-   * Initializes this file system instance.
-   *
-   * Note:
-   * The path passed to this method could be path of any file/directory.
-   * It does not matter because the only thing we check is whether
-   * it uses 'gs' scheme. The rest is ignored.
-   *
-   * @param path URI of a file/directory within this file system.
-   * @param config Hadoop configuration.
-   * @param initSuperclass if false, doesn't call super.initialize(path, config); avoids
-   *     registering a global Statistics object for this instance.
-   */
-  public void initialize(URI path, Configuration config, boolean initSuperclass)
-      throws IOException {
-    long startTime = System.nanoTime();
-    Preconditions.checkArgument(path != null, "path must not be null");
-    Preconditions.checkArgument(config != null, "config must not be null");
-    Preconditions.checkArgument(path.getScheme() != null, "scheme of path must not be null");
-    if (!path.getScheme().equals(getScheme())) {
-      throw new IllegalArgumentException("URI scheme not supported: " + path);
-    }
+    checkArgument(path != null, "path must not be null");
+    checkArgument(config != null, "config must not be null");
+    checkArgument(path.getScheme() != null, "scheme of path must not be null");
+    checkArgument(path.getScheme().equals(getScheme()), "URI scheme not supported: %s", path);
+
+    super.initialize(path, config);
+
     initUri = path;
-    logger.atFine().log(
-        "initialize(path: %s, config: %s, initSuperclass: %b)", path, config, initSuperclass);
-
-    if (initSuperclass) {
-      super.initialize(path, config);
-    } else {
-      logger.atFiner().log(
-          "Initializing 'statistics' as an instance not attached to the static FileSystem map");
-      // Provide an ephemeral Statistics object to avoid NPE, but still avoid registering a global
-      // statistics object.
-      statistics = new Statistics(getScheme());
-    }
 
     // Set this configuration as the default config for this instance; configure()
     // will perform some file-system-specific adjustments, but the original should
@@ -543,10 +466,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     initializeDelegationTokenSupport(config, path);
 
     configure(config);
-
-    long duration = System.nanoTime() - startTime;
-    increment(Counter.INIT);
-    increment(Counter.INIT_TIME, duration);
   }
 
   /**
@@ -557,22 +476,32 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * @throws IOException
    */
   private void initializeDelegationTokenSupport(Configuration config, URI path) throws IOException {
-    logger.atFine().log("initializeDelegationTokenSupport(config: %s, path: %s)", config, path);
+    logger.atFiner().log("initializeDelegationTokenSupport(config: %s, path: %s)", config, path);
     // Load delegation token binding, if support is configured
+    if (isNullOrEmpty(DELEGATION_TOKEN_BINDING_CLASS.get(config, config::get))) {
+      return;
+    }
+
     GcsDelegationTokens dts = new GcsDelegationTokens();
     Text service = new Text(getScheme() + "://" + path.getAuthority());
     dts.bindToFileSystem(this, service);
-    try {
-      dts.init(config);
-      delegationTokens = dts;
-      if (delegationTokens.isBoundToDT()) {
-        logger.atFine().log(
-            "initializeDelegationTokenSupport(config: %s, path: %s):"
-                + " using existing delegation token",
-            config, path);
+    dts.init(config);
+    dts.start();
+    delegationTokens = dts;
+    if (delegationTokens.isBoundToDT()) {
+      logger.atFine().log(
+          "initializeDelegationTokenSupport(config: %s, path: %s): using existing delegation token",
+          config, path);
+    }
+  }
+
+  private void stopDelegationTokens() {
+    if (delegationTokens != null) {
+      try {
+        delegationTokens.close();
+      } catch (IOException e) {
+        logger.atSevere().withCause(e).log("Failed to stop delegation tokens support");
       }
-    } catch (IllegalStateException e) {
-      logger.atFiner().withCause(e).log("Failed to initialize delegation token support");
     }
   }
 
@@ -590,15 +519,30 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   protected int getDefaultPort() {
     int result = -1;
-    logger.atFinest().log("getDefaultPort(): %d", result);
+    logger.atFiner().log("getDefaultPort(): %d", result);
     return result;
+  }
+
+  public boolean hasPathCapability(Path path, String capability) throws IOException {
+    switch (validatePathCapabilityArgs(path, capability)) {
+      // TODO: remove string literals in favor of Constants in CommonPathCapabilities.java
+      // from Hadoop 3 when Hadoop 2 is no longer supported
+      case "fs.capability.paths.append":
+      case "fs.capability.paths.concat":
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  private static String validatePathCapabilityArgs(Path path, String capability) {
+    checkNotNull(path);
+    checkArgument(!isNullOrEmpty(capability), "capability parameter is empty string");
+    return Ascii.toLowerCase(capability);
   }
 
   /**
    * Opens the given file for reading.
-   *
-   * <p>Note: This function overrides the given bufferSize value with a higher number unless further
-   * overridden using configuration parameter {@code fs.gs.inputstream.buffer.size}.
    *
    * @param hadoopPath File to open.
    * @param bufferSize Size of buffer to use for IO.
@@ -608,8 +552,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public FSDataInputStream open(Path hadoopPath, int bufferSize) throws IOException {
-    long startTime = System.nanoTime();
-    Preconditions.checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
 
@@ -620,9 +563,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     GoogleHadoopFSInputStream in =
         new GoogleHadoopFSInputStream(this, gcsPath, readChannelOptions, statistics);
 
-    long duration = System.nanoTime() - startTime;
-    increment(Counter.OPEN);
-    increment(Counter.OPEN_TIME, duration);
     return new FSDataInputStream(in);
   }
 
@@ -654,13 +594,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       long blockSize,
       Progressable progress)
       throws IOException {
-
-    long startTime = System.nanoTime();
-    Preconditions.checkArgument(hadoopPath != null, "hadoopPath must not be null");
-    Preconditions.checkArgument(
-        replication > 0, "replication must be a positive integer: %s", replication);
-    Preconditions.checkArgument(
-        blockSize > 0, "blockSize must be a positive integer: %s", blockSize);
+    checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    checkArgument(replication > 0, "replication must be a positive integer: %s", replication);
+    checkArgument(blockSize > 0, "blockSize must be a positive integer: %s", blockSize);
 
     checkOpen();
 
@@ -676,7 +612,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       case BASIC:
         out =
             new GoogleHadoopOutputStream(
-                this, gcsPath, statistics, new CreateFileOptions(overwrite));
+                this,
+                gcsPath,
+                statistics,
+                CreateFileOptions.builder().setOverwriteExisting(overwrite).build());
         break;
       case FLUSHABLE_COMPOSITE:
         SyncableOutputStreamOptions flushableOutputStreamOptions =
@@ -691,7 +630,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 this,
                 gcsPath,
                 statistics,
-                new CreateFileOptions(overwrite),
+                CreateFileOptions.builder().setOverwriteExisting(overwrite).build(),
                 flushableOutputStreamOptions);
         break;
       case SYNCABLE_COMPOSITE:
@@ -706,7 +645,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 this,
                 gcsPath,
                 statistics,
-                new CreateFileOptions(overwrite),
+                CreateFileOptions.builder().setOverwriteExisting(overwrite).build(),
                 syncableOutputStreamOptions);
         break;
       default:
@@ -716,10 +655,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 GCS_OUTPUT_STREAM_TYPE.getKey(), type));
     }
 
-    long duration = System.nanoTime() - startTime;
-    increment(Counter.CREATE);
-    increment(Counter.CREATE_TIME, duration);
-    return new FSDataOutputStream(out, null);
+    return new FSDataOutputStream(out, /* stats= */ null);
   }
 
   /** {@inheritDoc} */
@@ -735,8 +671,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       throws IOException {
     URI gcsPath = getGcsPath(checkNotNull(hadoopPath, "hadoopPath must not be null"));
     URI parentGcsPath = UriPaths.getParentPath(gcsPath);
-    GoogleCloudStorageItemInfo parentInfo = getGcsFs().getFileInfo(parentGcsPath).getItemInfo();
-    if (!parentInfo.isRoot() && !parentInfo.isBucket() && !parentInfo.exists()) {
+    if (!getGcsFs().getFileInfo(parentGcsPath).exists()) {
       throw new FileNotFoundException(
           String.format(
               "Can not create '%s' file, because parent folder does not exist: %s",
@@ -764,8 +699,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public FSDataOutputStream append(Path hadoopPath, int bufferSize, Progressable progress)
       throws IOException {
-    long startTime = System.nanoTime();
-    Preconditions.checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     logger.atFiner().log(
         "append(hadoopPath: %s, bufferSize: %d [ignored])", hadoopPath, bufferSize);
@@ -780,16 +714,11 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
             .setSyncOnFlushEnabled(
                 GCS_OUTPUT_STREAM_TYPE.get(getConf(), getConf()::getEnum) == FLUSHABLE_COMPOSITE)
             .build();
-    FSDataOutputStream appendStream =
-        new FSDataOutputStream(
-            new GoogleHadoopSyncableOutputStream(
-                this, filePath, statistics, DEFAULT_NO_OVERWRITE, syncableOutputStreamOptions),
-            statistics);
 
-    long duration = System.nanoTime() - startTime;
-    increment(Counter.APPEND);
-    increment(Counter.APPEND_TIME, duration);
-    return appendStream;
+    return new FSDataOutputStream(
+        new GoogleHadoopSyncableOutputStream(
+            this, filePath, statistics, DEFAULT_OVERWRITE, syncableOutputStreamOptions),
+        statistics);
   }
 
   /**
@@ -812,14 +741,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     List<List<URI>> partitions =
         Lists.partition(srcPaths, GoogleCloudStorage.MAX_COMPOSE_OBJECTS - 1);
-    logger.atFinest().log("concat(tgt: %s, %d partitions: %s)", tgt, partitions.size(), partitions);
+    logger.atFiner().log("concat(tgt: %s, %d partitions: %s)", tgt, partitions.size(), partitions);
     for (List<URI> partition : partitions) {
       // We need to include the target in the list of sources to compose since
       // the GCS FS compose operation will overwrite the target, whereas the Hadoop
       // concat operation appends to the target.
       List<URI> sources = Lists.newArrayList(tgtPath);
       sources.addAll(partition);
-      getGcsFs().compose(sources, tgtPath, CreateFileOptions.DEFAULT_CONTENT_TYPE);
+      getGcsFs().compose(sources, tgtPath, CreateObjectOptions.CONTENT_TYPE_DEFAULT);
     }
   }
 
@@ -834,8 +763,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
-    Preconditions.checkArgument(src != null, "src must not be null");
-    Preconditions.checkArgument(dst != null, "dst must not be null");
+    checkArgument(src != null, "src must not be null");
+    checkArgument(dst != null, "dst must not be null");
 
     // Even though the underlying GCSFS will also throw an IAE if src is root, since our filesystem
     // root happens to equal the global root, we want to explicitly check it here since derived
@@ -864,10 +793,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * @throws IOException if an error occurs.
    */
   void renameInternal(Path src, Path dst) throws IOException {
-    Preconditions.checkArgument(src != null, "src must not be null");
-    Preconditions.checkArgument(dst != null, "dst must not be null");
-
-    long startTime = System.nanoTime();
+    checkArgument(src != null, "src must not be null");
+    checkArgument(dst != null, "dst must not be null");
 
     checkOpen();
 
@@ -876,9 +803,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     getGcsFs().rename(srcPath, dstPath);
 
-    long duration = System.nanoTime() - startTime;
-    increment(Counter.RENAME);
-    increment(Counter.RENAME_TIME, duration);
     logger.atFiner().log("rename(src: %s, dst: %s): true", src, dst);
   }
 
@@ -894,8 +818,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public boolean delete(Path hadoopPath, boolean recursive) throws IOException {
-    long startTime = System.nanoTime();
-    Preconditions.checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
 
@@ -912,10 +835,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
           "delete(hadoopPath: %s, recursive: %b): false [failed]", hadoopPath, recursive);
       return false;
     }
-
-    long duration = System.nanoTime() - startTime;
-    increment(Counter.DELETE);
-    increment(Counter.DELETE_TIME, duration);
     logger.atFiner().log("delete(hadoopPath: %s, recursive: %b): true", hadoopPath, recursive);
     return true;
   }
@@ -931,18 +850,17 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public FileStatus[] listStatus(Path hadoopPath)
       throws IOException {
-    long startTime = System.nanoTime();
-    Preconditions.checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
 
-    logger.atFinest().log("listStatus(hadoopPath: %s)", hadoopPath);
+    logger.atFiner().log("listStatus(hadoopPath: %s)", hadoopPath);
 
     URI gcsPath = getGcsPath(hadoopPath);
     List<FileStatus> status;
 
     try {
-      List<FileInfo> fileInfos = getGcsFs().listFileInfo(gcsPath);
+      List<FileInfo> fileInfos = getGcsFs().listFileInfo(gcsPath, LIST_OPTIONS);
       status = new ArrayList<>(fileInfos.size());
       String userName = getUgiUserName();
       for (FileInfo fileInfo : fileInfos) {
@@ -955,10 +873,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                       "listStatus(hadoopPath: %s): '%s' does not exist.", hadoopPath, gcsPath))
               .initCause(fnfe);
     }
-
-    long duration = System.nanoTime() - startTime;
-    increment(Counter.LIST_STATUS);
-    increment(Counter.LIST_STATUS_TIME, duration);
     return status.toArray(new FileStatus[0]);
   }
 
@@ -969,8 +883,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public void setWorkingDirectory(Path hadoopPath) {
-    long startTime = System.nanoTime();
-    Preconditions.checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     URI gcsPath = UriPaths.toDirectory(getGcsPath(hadoopPath));
     Path newPath = getHadoopPath(gcsPath);
@@ -981,11 +894,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     // better performance.
 
     workingDirectory = newPath;
-    logger.atFinest().log("setWorkingDirectory(hadoopPath: %s): %s", hadoopPath, workingDirectory);
-
-    long duration = System.nanoTime() - startTime;
-    increment(Counter.SET_WD);
-    increment(Counter.SET_WD_TIME, duration);
+    logger.atFiner().log("setWorkingDirectory(hadoopPath: %s): %s", hadoopPath, workingDirectory);
   }
 
   /**
@@ -995,7 +904,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public Path getWorkingDirectory() {
-    logger.atFinest().log("getWorkingDirectory(): %s", workingDirectory);
+    logger.atFiner().log("getWorkingDirectory(): %s", workingDirectory);
     return workingDirectory;
   }
 
@@ -1011,9 +920,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public boolean mkdirs(Path hadoopPath, FsPermission permission)
       throws IOException {
-
-    long startTime = System.nanoTime();
-    Preconditions.checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
 
@@ -1028,10 +935,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                       "mkdirs(hadoopPath: %s, permission: %s): failed", hadoopPath, permission))
               .initCause(faee);
     }
-
-    long duration = System.nanoTime() - startTime;
-    increment(Counter.MKDIRS);
-    increment(Counter.MKDIRS_TIME, duration);
     logger.atFiner().log("mkdirs(hadoopPath: %s, permission: %s): true", hadoopPath, permission);
     return true;
   }
@@ -1055,9 +958,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public FileStatus getFileStatus(Path hadoopPath)
       throws IOException {
-
-    long startTime = System.nanoTime();
-    Preconditions.checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
 
@@ -1069,16 +970,11 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
               "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
     }
     String userName = getUgiUserName();
-    FileStatus status = getFileStatus(fileInfo, userName);
-
-    long duration = System.nanoTime() - startTime;
-    increment(Counter.GET_FILE_STATUS);
-    increment(Counter.GET_FILE_STATUS_TIME, duration);
-    return status;
+    return getFileStatus(fileInfo, userName);
   }
 
   /** Gets FileStatus corresponding to the given FileInfo value. */
-  private FileStatus getFileStatus(FileInfo fileInfo, String userName) throws IOException {
+  private FileStatus getFileStatus(FileInfo fileInfo, String userName) {
     // GCS does not provide modification time. It only provides creation time.
     // It works for objects because they are immutable once created.
     FileStatus status =
@@ -1093,7 +989,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
             /* owner= */ userName,
             /* group= */ userName,
             getHadoopPath(fileInfo.getPath()));
-    logger.atFinest().log(
+    logger.atFiner().log(
         "getFileStatus(path: %s, userName: %s): %s",
         fileInfo.getPath(), userName, lazy(() -> fileStatusToString(status)));
     return status;
@@ -1108,8 +1004,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   boolean couldUseFlatGlob(Path fixedPath) {
     // Only works for filesystems where the base Hadoop Path scheme matches the underlying URI
     // scheme for GCS.
-    if (!getUri().getScheme().equals(GoogleCloudStorageFileSystem.SCHEME)) {
-      logger.atFinest().log(
+    if (!getUri().getScheme().equals(SCHEME)) {
+      logger.atFine().log(
           "Flat glob is on, but doesn't work for scheme '%s', using default behavior.",
           getUri().getScheme());
       return false;
@@ -1118,14 +1014,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     // The full pattern should have a wildcard, otherwise there's no point doing the flat glob.
     GlobPattern fullPattern = new GlobPattern(fixedPath.toString());
     if (!fullPattern.hasWildcard()) {
-      logger.atFinest().log(
+      logger.atFine().log(
           "Flat glob is on, but Path '%s' has no wildcard, using default behavior.", fixedPath);
       return false;
     }
 
     // To use a flat glob, there must be an authority defined.
-    if (Strings.isNullOrEmpty(fixedPath.toUri().getAuthority())) {
-      logger.atFinest().log(
+    if (isNullOrEmpty(fixedPath.toUri().getAuthority())) {
+      logger.atFine().log(
           "Flat glob is on, but Path '%s' has a empty authority, using default behavior.",
           fixedPath);
       return false;
@@ -1134,7 +1030,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     // And the authority must not contain a wildcard.
     GlobPattern authorityPattern = new GlobPattern(fixedPath.toUri().getAuthority());
     if (authorityPattern.hasWildcard()) {
-      logger.atFinest().log(
+      logger.atFine().log(
           "Flat glob is on, but Path '%s' has a wildcard authority, using default behavior.",
           fixedPath);
       return false;
@@ -1200,13 +1096,13 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     Path encodedFixedPath = getHadoopPath(getGcsPath(encodedPath));
     // Decode URI-encoded path back into a glob path.
     Path fixedPath = new Path(URI.create(encodedFixedPath.toString()));
-    logger.atFinest().log("fixed path pattern: %s => %s", pathPattern, fixedPath);
+    logger.atFiner().log("fixed path pattern: %s => %s", pathPattern, fixedPath);
 
-    if (enableConcurrentGlob && couldUseFlatGlob(fixedPath)) {
+    if (globAlgorithm == GlobAlgorithm.CONCURRENT && couldUseFlatGlob(fixedPath)) {
       return concurrentGlobInternal(fixedPath, filter);
     }
 
-    if (enableFlatGlob && couldUseFlatGlob(fixedPath)) {
+    if (globAlgorithm == GlobAlgorithm.FLAT && couldUseFlatGlob(fixedPath)) {
       return flatGlobInternal(fixedPath, filter);
     }
 
@@ -1219,19 +1115,19 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   private FileStatus[] concurrentGlobInternal(Path fixedPath, PathFilter filter)
       throws IOException {
-    ExecutorService executorService = Executors.newFixedThreadPool(2, DAEMON_THREAD_FACTORY);
-    Callable<FileStatus[]> flatGlobTask = () -> flatGlobInternal(fixedPath, filter);
-    Callable<FileStatus[]> nonFlatGlobTask = () -> super.globStatus(fixedPath, filter);
-
+    ExecutorService globExecutor = newFixedThreadPool(2, DAEMON_THREAD_FACTORY);
     try {
-      return executorService.invokeAny(Arrays.asList(flatGlobTask, nonFlatGlobTask));
-    } catch (InterruptedException | ExecutionException e) {
-      if (e instanceof InterruptedException) {
-        Thread.currentThread().interrupt();
-      }
-      throw new IOException("Concurrent glob execution failed", e);
+      return globExecutor.invokeAny(
+          ImmutableList.of(
+              () -> flatGlobInternal(fixedPath, filter),
+              () -> super.globStatus(fixedPath, filter)));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IOException(String.format("Concurrent glob execution failed: %s", e), e);
+    } catch (ExecutionException e) {
+      throw new IOException(String.format("Concurrent glob execution failed: %s", e.getCause()), e);
     } finally {
-      executorService.shutdownNow();
+      globExecutor.shutdownNow();
     }
   }
 
@@ -1249,14 +1145,13 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     }
 
     // Get everything matching the non-glob prefix.
-    logger.atFinest().log("Listing everything with '%s' prefix", prefixUri);
+    logger.atFiner().log("Listing everything with '%s' prefix", prefixUri);
     List<FileStatus> matchedStatuses = null;
     String pageToken = null;
     do {
-      ListPage<FileInfo> infoPage = getGcsFs().listAllFileInfoForPrefixPage(prefixUri, pageToken);
+      ListPage<FileInfo> infoPage =
+          getGcsFs().listFileInfoForPrefixPage(prefixUri, LIST_OPTIONS, pageToken);
 
-      // TODO: Are implicit directories really always needed for globbing?
-      //  Probably they should be inferred only when fs.gs.implicit.dir.infer.enable is true.
       Collection<FileStatus> statusPage =
           toFileStatusesWithImplicitDirectories(infoPage.getItems());
 
@@ -1320,7 +1215,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       URI parentPath = UriPaths.getParentPath(fileInfo.getPath());
       while (parentPath != null && !parentPath.equals(GoogleCloudStorageFileSystem.GCS_ROOT)) {
         if (!filePaths.contains(parentPath)) {
-          logger.atFinest().log("Adding fake entry for missing parent path '%s'", parentPath);
+          logger.atFiner().log("Adding fake entry for missing parent path '%s'", parentPath);
           StorageResourceId id = StorageResourceId.fromUriPath(parentPath, true);
 
           GoogleCloudStorageItemInfo fakeItemInfo =
@@ -1352,7 +1247,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public Path getHomeDirectory() {
     Path result = new Path(getFileSystemRoot(), getHomeDirectorySubpath());
-    logger.atFinest().log("getHomeDirectory(): %s", result);
+    logger.atFiner().log("getHomeDirectory(): %s", result);
     return result;
   }
 
@@ -1384,7 +1279,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     if (delegationTokens != null) {
       service = delegationTokens.getService().toString();
     }
-    logger.atFinest().log("getCanonicalServiceName(): %s", service);
+    logger.atFiner().log("getCanonicalServiceName(): %s", service);
     return service;
   }
 
@@ -1394,56 +1289,41 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   }
 
   /**
-   * Increments by 1 the counter indicated by key.
+   * Loads an {@link AccessTokenProvider} implementation. If the user provided an
+   * AbstractDelegationTokenBinding we get the AccessTokenProvider, otherwise if a class name is
+   * provided (See {@link HadoopCredentialConfiguration#ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX} then we
+   * use it, otherwise it's null.
    */
-  void increment(Counter key) {
-    increment(key, 1);
-  }
+  private AccessTokenProvider getAccessTokenProvider(Configuration config) throws IOException {
+    // Check if delegation token support is configured
+    AccessTokenProvider accessTokenProvider =
+        delegationTokens != null
+            // If so, use the delegation token to acquire the Google credentials
+            ? delegationTokens.getAccessTokenProvider()
+            // If delegation token support is not configured, check if a
+            // custom AccessTokenProvider implementation is configured
+            : HadoopCredentialConfiguration.getAccessTokenProvider(
+                config, ImmutableList.of(GCS_CONFIG_PREFIX));
 
-  /**
-   * Adds value to the counter indicated by key.
-   */
-  void increment(Counter key, long value) {
-    counters.get(key).addAndGet(value);
-  }
-
-  /**
-   * Gets value of all counters as a formatted string.
-   */
-  @VisibleForTesting
-  String countersToString() {
-    StringBuilder sb = new StringBuilder();
-    sb.append("\n");
-    double numNanoSecPerSec = TimeUnit.SECONDS.toNanos(1);
-    String timeSuffix = "_TIME";
-    for (Counter c : Counter.values()) {
-      String name = c.toString();
-      if (!name.endsWith(timeSuffix)) {
-        // Log invocation counter.
-        long count = counters.get(c).get();
-        sb.append(String.format("%20s = %d calls\n", name, count));
-
-        // Log duration counter.
-        String timeCounterName = name + timeSuffix;
-        double totalTime =
-            counters.get(Enum.valueOf(Counter.class, timeCounterName)).get()
-                / numNanoSecPerSec;
-        sb.append(String.format("%20s = %.2f sec\n", timeCounterName, totalTime));
-
-        // Compute and log average duration per call (== total duration / num invocations).
-        String avgName = name + " avg.";
-        double avg = totalTime / count;
-        sb.append(String.format("%20s = %.2f sec / call\n\n", avgName, avg));
+    if (accessTokenProvider != null) {
+      if (accessTokenProvider.getAccessTokenType() == AccessTokenType.DOWNSCOPED) {
+        checkArgument(
+            HadoopCredentialConfiguration.ENABLE_NULL_CREDENTIAL_SUFFIX
+                    .withPrefixes(
+                        HadoopCredentialConfiguration.getConfigKeyPrefixes(GCS_CONFIG_PREFIX))
+                    .get(config, config::getBoolean)
+                && !HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX
+                    .withPrefixes(
+                        HadoopCredentialConfiguration.getConfigKeyPrefixes(GCS_CONFIG_PREFIX))
+                    .get(config, config::getBoolean),
+            "When using DOWNSCOPED access token, `fs.gs.auth.null.enabled` should"
+                + " be set to true and `fs.gs.auth.service.account.enable` should be set to false");
       }
-    }
-    return sb.toString();
-  }
 
-  /**
-   * Logs values of all counters.
-   */
-  private void logCounters() {
-    logger.atFine().log("%s", lazy(this::countersToString));
+      accessTokenProvider.setConf(config);
+    }
+
+    return accessTokenProvider;
   }
 
   /**
@@ -1452,38 +1332,128 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * build a credential with access token provided by this provider; Otherwise obtain credential
    * through {@link HadoopCredentialConfiguration#getCredentialFactory(Configuration, String...)}.
    */
-  private Credential getCredential(Configuration config)
+  private Credential getCredential(
+      Configuration config,
+      GoogleCloudStorageFileSystemOptions gcsFsOptions,
+      AccessTokenProvider accessTokenProvider)
       throws IOException, GeneralSecurityException {
-    Credential credential = null;
+    Credential credential;
 
-    // Check if delegation token support is configured
-    if (delegationTokens != null) {
-      // If so, use the delegation token to acquire the Google credentials
-      AccessTokenProvider atp = delegationTokens.getAccessTokenProvider();
-      if (atp != null) {
-        atp.setConf(config);
-        credential =
-            CredentialFromAccessTokenProviderClassFactory.credential(
-                atp, CredentialFactory.GCS_SCOPES);
-      }
-    } else {
+    if (accessTokenProvider == null) {
       // If delegation token support is not configured, check if a
       // custom AccessTokenProvider implementation is configured, and attempt
       // to acquire the Google credentials using it
       credential =
           CredentialFromAccessTokenProviderClassFactory.credential(
-              config, ImmutableList.of(GCS_CONFIG_PREFIX), CredentialFactory.GCS_SCOPES);
+              config, ImmutableList.of(GCS_CONFIG_PREFIX), CredentialFactory.DEFAULT_SCOPES);
 
       if (credential == null) {
         // Finally, if no credentials have been acquired at this point, employ
         // the default mechanism.
         credential =
             HadoopCredentialConfiguration.getCredentialFactory(config, GCS_CONFIG_PREFIX)
-                .getCredential(CredentialFactory.GCS_SCOPES);
+                .getCredential(CredentialFactory.DEFAULT_SCOPES);
+      }
+    } else {
+      switch (accessTokenProvider.getAccessTokenType()) {
+        case GENERIC:
+          // check if an AccessTokenProvider is configured
+          // if so, try to get the credentials through the access token provider
+          credential =
+              CredentialFromAccessTokenProviderClassFactory.credential(
+                  accessTokenProvider, CredentialFactory.DEFAULT_SCOPES);
+          break;
+        case DOWNSCOPED:
+          // If the AccessTokenType is set to DOWNSCOPED`, Credential will be generated
+          // when GCS requests are created.
+          credential = null;
+          break;
+        default:
+          throw new IllegalStateException(
+              String.format(
+                  "Unknown AccessTokenType: %s", accessTokenProvider.getAccessTokenType()));
       }
     }
 
-    return credential;
+    // If impersonation service account exists, then use current credential to request access token
+    // for the impersonating service account.
+    return getImpersonatedCredential(config, gcsFsOptions, credential).orElse(credential);
+  }
+
+  /**
+   * Generate a {@link Credential} from the internal access token provider based on the service
+   * account to impersonate.
+   */
+  private static Optional<Credential> getImpersonatedCredential(
+      Configuration config, GoogleCloudStorageFileSystemOptions gcsFsOptions, Credential credential)
+      throws IOException {
+    Map<String, String> userImpersonationServiceAccounts =
+        USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
+            .withPrefixes(CONFIG_KEY_PREFIXES)
+            .getPropsWithPrefix(config);
+    Map<String, String> groupImpersonationServiceAccounts =
+        GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
+            .withPrefixes(CONFIG_KEY_PREFIXES)
+            .getPropsWithPrefix(config);
+    String impersonationServiceAccount =
+        IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
+            .withPrefixes(CONFIG_KEY_PREFIXES)
+            .get(config, config::get);
+
+    // Exit early if impersonation is not configured
+    if (userImpersonationServiceAccounts.isEmpty()
+        && groupImpersonationServiceAccounts.isEmpty()
+        && isNullOrEmpty(impersonationServiceAccount)) {
+      return Optional.empty();
+    }
+
+    UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
+    Optional<String> serviceAccountToImpersonate =
+        Stream.of(
+                () ->
+                    getServiceAccountToImpersonateForUserGroup(
+                        userImpersonationServiceAccounts,
+                        ImmutableList.of(currentUser.getShortUserName())),
+                () ->
+                    getServiceAccountToImpersonateForUserGroup(
+                        groupImpersonationServiceAccounts,
+                        ImmutableList.copyOf(currentUser.getGroupNames())),
+                (Supplier<Optional<String>>) () -> Optional.ofNullable(impersonationServiceAccount))
+            .map(Supplier::get)
+            .filter(Optional::isPresent)
+            .map(Optional::get)
+            .filter(sa -> !isNullOrEmpty(sa))
+            .findFirst();
+
+    if (serviceAccountToImpersonate.isPresent()) {
+      GoogleCloudStorageOptions options = gcsFsOptions.getCloudStorageOptions();
+      HttpTransport httpTransport =
+          HttpTransportFactory.createHttpTransport(
+              options.getTransportType(),
+              options.getProxyAddress(),
+              options.getProxyUsername(),
+              options.getProxyPassword());
+      GoogleCredential impersonatedCredential =
+          new GoogleCredentialWithIamAccessToken(
+              httpTransport,
+              new CredentialHttpRetryInitializer(credential),
+              serviceAccountToImpersonate.get(),
+              CredentialFactory.DEFAULT_SCOPES);
+      logger.atFine().log(
+          "Impersonating '%s' service account for '%s' user",
+          serviceAccountToImpersonate.get(), currentUser);
+      return Optional.of(impersonatedCredential.createScoped(CredentialFactory.DEFAULT_SCOPES));
+    }
+
+    return Optional.empty();
+  }
+
+  private static Optional<String> getServiceAccountToImpersonateForUserGroup(
+      Map<String, String> serviceAccountMapping, List<String> userGroups) {
+    return serviceAccountMapping.entrySet().stream()
+        .filter(e -> userGroups.contains(e.getKey()))
+        .map(Map.Entry::getValue)
+        .findFirst();
   }
 
   /**
@@ -1492,14 +1462,12 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * @param config Hadoop configuration object.
    */
   private synchronized void configure(Configuration config) throws IOException {
-    logger.atFine().log("GHFS_ID=%s: configure(config: %s)", GHFS_ID, config);
+    logger.atFiner().log("GHFS_ID=%s: configure(config: %s)", GHFS_ID, config);
 
-    overrideConfigFromFile(config);
     // Set this configuration as the default config for this instance.
     setConf(config);
 
-    enableFlatGlob = GCS_FLAT_GLOB_ENABLE.get(config, config::getBoolean);
-    enableConcurrentGlob = GCS_CONCURRENT_GLOB_ENABLE.get(config, config::getBoolean);
+    globAlgorithm = GCS_GLOB_ALGORITHM.get(config, config::getEnum);
     checksumType = GCS_FILE_CHECKSUM_TYPE.get(config, config::getEnum);
     defaultBlockSize = BLOCK_SIZE.get(config, config::getLong);
     reportedPermissions = new FsPermission(PERMISSIONS_TO_REPORT.get(config, config::get));
@@ -1532,30 +1500,26 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     }
   }
 
-  /**
-   * If overrides file configured, update properties from override file into {@link Configuration}
-   * object
-   */
-  private void overrideConfigFromFile(Configuration config) throws IOException {
-    String configFile = GCS_CONFIG_OVERRIDE_FILE.get(config, config::get);
-    if (configFile != null) {
-      config.addResource(new FileInputStream(configFile));
-    }
-  }
-
   private GoogleCloudStorageFileSystem createGcsFs(Configuration config) throws IOException {
+    GoogleCloudStorageFileSystemOptions gcsFsOptions =
+        GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
+
+    AccessTokenProvider accessTokenProvider = getAccessTokenProvider(config);
+
     Credential credential;
     try {
-      credential = getCredential(config);
+      credential = getCredential(config, gcsFsOptions, accessTokenProvider);
     } catch (GeneralSecurityException e) {
       throw new RuntimeException(e);
     }
 
-    GoogleCloudStorageFileSystemOptions gcsFsOptions =
-        GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config)
-            .build();
-
-    return new GoogleCloudStorageFileSystem(credential, gcsFsOptions);
+    return new GoogleCloudStorageFileSystem(
+        credential,
+        accessTokenProvider != null
+                && accessTokenProvider.getAccessTokenType() == AccessTokenType.DOWNSCOPED
+            ? accessBoundaries -> accessTokenProvider.getAccessToken(accessBoundaries).getToken()
+            : null,
+        gcsFsOptions);
   }
 
   /**
@@ -1574,7 +1538,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     Path newWorkingDirectory;
     String configWorkingDirectory = GCS_WORKING_DIRECTORY.get(config, config::get);
-    if (Strings.isNullOrEmpty(configWorkingDirectory)) {
+    if (isNullOrEmpty(configWorkingDirectory)) {
       newWorkingDirectory = getDefaultWorkingDirectory();
       logger.atWarning().log(
           "No working directory configured, using default: '%s'", newWorkingDirectory);
@@ -1585,7 +1549,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     // Use the public method to ensure proper behavior of normalizing and resolving the new
     // working directory relative to the initial filesystem-root directory.
     setWorkingDirectory(newWorkingDirectory);
-    logger.atFinest().log(
+    logger.atFiner().log(
         "Configured working directory: %s = %s",
         GCS_WORKING_DIRECTORY.getKey(), getWorkingDirectory());
   }
@@ -1619,14 +1583,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   @Override
   protected void processDeleteOnExit() {
-    logger.atFinest().log("processDeleteOnExit()");
+    logger.atFiner().log("processDeleteOnExit()");
     super.processDeleteOnExit();
   }
 
   @Override
   public ContentSummary getContentSummary(Path f) throws IOException {
     ContentSummary result = super.getContentSummary(f);
-    logger.atFinest().log("getContentSummary(path: %s): %b", f, result);
+    logger.atFiner().log("getContentSummary(path: %s): %b", f, result);
     return result;
   }
 
@@ -1687,7 +1651,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   @Override
   public void close() throws IOException {
-    logger.atFinest().log("close()");
+    logger.atFiner().log("close()");
     super.close();
 
     // NB: We must *first* have the superclass close() before we close the underlying gcsFsSupplier
@@ -1699,27 +1663,27 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       }
       gcsFsSupplier = null;
     }
-    logCounters();
+
+    stopDelegationTokens();
   }
 
   @Override
   public long getUsed() throws IOException {
     long result = super.getUsed();
-    logger.atFinest().log("getUsed(): %s", result);
+    logger.atFiner().log("getUsed(): %s", result);
     return result;
   }
 
   @Override
   public long getDefaultBlockSize() {
     long result = defaultBlockSize;
-    logger.atFinest().log("getDefaultBlockSize(): %d", result);
+    logger.atFiner().log("getDefaultBlockSize(): %d", result);
     return result;
   }
 
   @Override
   public FileChecksum getFileChecksum(Path hadoopPath) throws IOException {
-    long startTime = System.nanoTime();
-    Preconditions.checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
 
@@ -1731,12 +1695,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
               "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
     }
     FileChecksum checksum = getFileChecksum(checksumType, fileInfo);
-    logger.atFinest().log(
+    logger.atFiner().log(
         "getFileChecksum(hadoopPath: %s [gcsPath: %s]): %s", hadoopPath, gcsPath, checksum);
-
-    long duration = System.nanoTime() - startTime;
-    increment(Counter.GET_FILE_CHECKSUM);
-    increment(Counter.GET_FILE_CHECKSUM_TIME, duration);
     return checksum;
   }
 
@@ -1746,37 +1706,34 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       case NONE:
         return null;
       case CRC32C:
-        return new GcsFileChecksum(
-            type, fileInfo.getItemInfo().getVerificationAttributes().getCrc32c());
+        return new GcsFileChecksum(type, fileInfo.getCrc32cChecksum());
       case MD5:
-        return new GcsFileChecksum(
-            type, fileInfo.getItemInfo().getVerificationAttributes().getMd5hash());
+        return new GcsFileChecksum(type, fileInfo.getMd5Checksum());
     }
     throw new IOException("Unrecognized GcsFileChecksumType: " + type);
   }
 
   @Override
   public void setVerifyChecksum(boolean verifyChecksum) {
-    logger.atFinest().log("setVerifyChecksum(verifyChecksum: %s)", verifyChecksum);
+    logger.atFiner().log("setVerifyChecksum(verifyChecksum: %s)", verifyChecksum);
     super.setVerifyChecksum(verifyChecksum);
   }
 
   @Override
   public void setPermission(Path p, FsPermission permission) throws IOException {
-    logger.atFinest().log("setPermission(path: %s, permission: %s)", p, permission);
+    logger.atFiner().log("setPermission(path: %s, permission: %s)", p, permission);
     super.setPermission(p, permission);
   }
 
   @Override
   public void setOwner(Path p, String username, String groupname) throws IOException {
-    logger.atFinest().log(
-        "setOwner(path: %s, username: %s, groupname: %s)", p, username, groupname);
+    logger.atFiner().log("setOwner(path: %s, username: %s, groupname: %s)", p, username, groupname);
     super.setOwner(p, username, groupname);
   }
 
   @Override
   public void setTimes(Path p, long mtime, long atime) throws IOException {
-    logger.atFinest().log("setTimes(path: %s, mtime: %d, atime: %d)", p, mtime, atime);
+    logger.atFiner().log("setTimes(path: %s, mtime: %d, atime: %d)", p, mtime, atime);
     super.setTimes(p, mtime, atime);
   }
 
@@ -1882,7 +1839,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     UpdatableItemInfo updateInfo =
         new UpdatableItemInfo(
-            fileInfo.getItemInfo().getResourceId(),
+            StorageResourceId.fromUriPath(fileInfo.getPath(), /* allowEmptyObjectName= */ false),
             ImmutableMap.of(xAttrKey, getXAttrValue(value)));
     getGcsFs().getGcs().updateItems(ImmutableList.of(updateInfo));
   }
@@ -1898,7 +1855,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     Map<String, byte[]> xAttrToRemove = new HashMap<>();
     xAttrToRemove.put(getXAttrKey(name), null);
     UpdatableItemInfo updateInfo =
-        new UpdatableItemInfo(fileInfo.getItemInfo().getResourceId(), xAttrToRemove);
+        new UpdatableItemInfo(
+            StorageResourceId.fromUriPath(fileInfo.getPath(), /* allowEmptyObjectName= */ false),
+            xAttrToRemove);
     getGcsFs().getGcs().updateItems(ImmutableList.of(updateInfo));
   }
 

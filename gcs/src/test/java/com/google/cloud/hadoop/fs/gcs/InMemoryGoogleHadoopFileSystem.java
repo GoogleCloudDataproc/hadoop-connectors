@@ -14,7 +14,10 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
+
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import java.io.IOException;
 import java.net.URI;
@@ -48,7 +51,15 @@ public class InMemoryGoogleHadoopFileSystem
     if (inMemoryGcsFs != null) {
       return inMemoryGcsFs;
     }
-    return new GoogleCloudStorageFileSystem(new InMemoryGoogleCloudStorage());
+    try {
+      return new GoogleCloudStorageFileSystem(
+          InMemoryGoogleCloudStorage::new,
+          GoogleCloudStorageFileSystemOptions.builder()
+              .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
+              .build());
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to create GoogleCloudStorageFileSystem", e);
+    }
   }
 
   /**

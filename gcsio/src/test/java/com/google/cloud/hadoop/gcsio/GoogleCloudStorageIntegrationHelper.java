@@ -48,9 +48,6 @@ import java.util.concurrent.TimeUnit;
 /** Integration tests for GoogleCloudStorage class. */
 public abstract class GoogleCloudStorageIntegrationHelper {
 
-  // Application name for OAuth.
-  public static final String APP_NAME = "GCS-test";
-
   // Prefix used for naming test buckets.
   private static final String TEST_BUCKET_NAME_PREFIX = "gcsio-test";
 
@@ -116,8 +113,7 @@ public abstract class GoogleCloudStorageIntegrationHelper {
    * @return number of bytes written
    */
   public int writeTextFile(URI path, String text) throws IOException {
-    byte[] textBytes = text.getBytes(UTF_8);
-    return writeFile(path, textBytes, 1);
+    return writeFile(path, text.getBytes(UTF_8), /* numWrites= */ 1);
   }
 
   /**
@@ -133,8 +129,12 @@ public abstract class GoogleCloudStorageIntegrationHelper {
    * @return number of bytes written
    */
   protected int writeTextFileOverwriting(URI path, String text) throws IOException {
-    byte[] textBytes = text.getBytes(UTF_8);
-    return writeFileOverwriting(path, textBytes, 1);
+    return writeFileOverwriting(path, text.getBytes(UTF_8), /* numWrites= */ 1);
+  }
+
+  protected int writeFile(URI path, String text, int numWrites, boolean overwrite)
+      throws IOException {
+    return writeFile(path, text.getBytes(UTF_8), numWrites, overwrite);
   }
 
   /**
@@ -151,7 +151,7 @@ public abstract class GoogleCloudStorageIntegrationHelper {
     int totalBytesWritten = 0;
 
     try (WritableByteChannel writeChannel =
-        create(path, new CreateFileOptions(overwriteExisting))) {
+        create(path, CreateFileOptions.builder().setOverwriteExisting(overwriteExisting).build())) {
       for (int i = 0; i < numWrites; i++) {
         int numBytesWritten = writeChannel.write(ByteBuffer.wrap(buffer));
         assertWithMessage("could not write the entire buffer")
@@ -374,7 +374,7 @@ public abstract class GoogleCloudStorageIntegrationHelper {
   }
 
   /** Creates objects with the given names in the given bucket. */
-  private void createObjects(final String bucketName, String[] objectNames) throws Exception {
+  public void createObjects(String bucketName, String... objectNames) throws Exception {
     final ExecutorService threadPool = Executors.newCachedThreadPool();
     final CountDownLatch counter = new CountDownLatch(objectNames.length);
     List<Future<?>> futures = new ArrayList<>();

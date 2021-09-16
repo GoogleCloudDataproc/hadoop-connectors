@@ -15,7 +15,6 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_INFER_IMPLICIT_DIRECTORIES_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE;
 import static com.google.cloud.hadoop.gcsio.testing.TestConfiguration.GCS_TEST_PROJECT_ID;
@@ -31,8 +30,6 @@ public final class GoogleHadoopFileSystemIntegrationHelper {
 
   private static final String ENV_VAR_MSG_FMT = "Environment variable %s should be set";
 
-  public static final String APP_NAME = "GHFS-test";
-
   public static GoogleHadoopFileSystem createGhfs(URI path, Configuration config) throws Exception {
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
     ghfs.initialize(path, config);
@@ -46,7 +43,6 @@ public final class GoogleHadoopFileSystemIntegrationHelper {
   public static Configuration getTestConfig() {
     Configuration config = new Configuration();
     config.setBoolean(GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.getKey(), true);
-    config.setBoolean(GCS_INFER_IMPLICIT_DIRECTORIES_ENABLE.getKey(), false);
     // Allow buckets to be deleted in test cleanup:
     config.setBoolean(GoogleHadoopFileSystemConfiguration.GCE_BUCKET_DELETE_ENABLE.getKey(), true);
 

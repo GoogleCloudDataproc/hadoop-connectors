@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.common.flogger.GoogleLogger;
 import java.io.BufferedOutputStream;
@@ -24,6 +25,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
 import java.nio.channels.Channels;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.WritableByteChannel;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileSystem;
@@ -33,9 +35,6 @@ class GoogleHadoopOutputStream extends OutputStream {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  // Instance of GoogleHadoopFileSystemBase.
-  private GoogleHadoopFileSystemBase ghfs;
-
   // All store IO access goes through this.
   private WritableByteChannel channel;
 
@@ -43,14 +42,11 @@ class GoogleHadoopOutputStream extends OutputStream {
   private OutputStream out;
 
   // Path of the file to write to.
-  private URI gcsPath;
+  private final URI gcsPath;
 
   // Statistics tracker provided by the parent GoogleHadoopFileSystemBase for recording
   // numbers of bytes written.
   private final FileSystem.Statistics statistics;
-
-  // Time of initialization
-  private long initTime;
 
   /**
    * Constructs an instance of GoogleHadoopOutputStream object.
@@ -66,25 +62,24 @@ class GoogleHadoopOutputStream extends OutputStream {
       FileSystem.Statistics statistics,
       CreateFileOptions createFileOptions)
       throws IOException {
-    logger.atFine().log(
-        "GoogleHadoopOutputStream(gcsPath:%s, createFileOptions: %s)", gcsPath, createFileOptions);
-    this.ghfs = ghfs;
+    logger.atFiner().log(
+        "GoogleHadoopOutputStream(gcsPath: %s, createFileOptions: %s)", gcsPath, createFileOptions);
     this.gcsPath = gcsPath;
     this.statistics = statistics;
-    this.initTime = System.nanoTime();
-    this.channel = createChannel(ghfs, gcsPath, createFileOptions);
-    this.out =
-        createOutputStream(this.channel, ghfs.getGcsFs().getOptions().getCloudStorageOptions());
+    GoogleCloudStorageFileSystem gcsfs = ghfs.getGcsFs();
+    this.channel = createChannel(gcsfs, gcsPath, createFileOptions);
+    this.out = createOutputStream(this.channel, gcsfs.getOptions().getCloudStorageOptions());
   }
 
   private static WritableByteChannel createChannel(
-      GoogleHadoopFileSystemBase ghfs, URI gcsPath, CreateFileOptions options) throws IOException {
+      GoogleCloudStorageFileSystem gcsfs, URI gcsPath, CreateFileOptions options)
+      throws IOException {
     try {
-      return ghfs.getGcsFs().create(gcsPath, options);
+      return gcsfs.create(gcsPath, options);
     } catch (java.nio.file.FileAlreadyExistsException e) {
-      // Need to convert to the Hadoop flavor of FileAlreadyExistsException.
       throw (FileAlreadyExistsException)
-          new FileAlreadyExistsException("'" + gcsPath + "' already exists").initCause(e);
+          new FileAlreadyExistsException(String.format("'%s' already exists", gcsPath))
+              .initCause(e);
     }
   }
 
@@ -98,12 +93,10 @@ class GoogleHadoopOutputStream extends OutputStream {
   /** Writes the specified byte to this output stream. */
   @Override
   public void write(int b) throws IOException {
-    long startTime = System.nanoTime();
+    throwIfNotOpen();
     out.write(b);
     statistics.incrementBytesWritten(1);
-    long duration = System.nanoTime() - startTime;
-    ghfs.increment(GoogleHadoopFileSystemBase.Counter.WRITE1);
-    ghfs.increment(GoogleHadoopFileSystemBase.Counter.WRITE1_TIME, duration);
+    statistics.incrementWriteOps(1);
   }
 
   /**
@@ -111,32 +104,33 @@ class GoogleHadoopOutputStream extends OutputStream {
    */
   @Override
   public void write(byte[] b, int offset, int len) throws IOException {
-    long startTime = System.nanoTime();
+    throwIfNotOpen();
     out.write(b, offset, len);
     statistics.incrementBytesWritten(len);
-    long duration = System.nanoTime() - startTime;
-    ghfs.increment(GoogleHadoopFileSystemBase.Counter.WRITE);
-    ghfs.increment(GoogleHadoopFileSystemBase.Counter.WRITE_TIME, duration);
+    statistics.incrementWriteOps(1);
   }
 
   /** Closes this output stream and releases any system resources associated with this stream. */
   @Override
   public void close() throws IOException {
+    logger.atFiner().log("close(%s)", gcsPath);
     if (out != null) {
       try {
-        long startTime = System.nanoTime();
         out.close();
-        long duration = System.nanoTime() - startTime;
-        ghfs.increment(GoogleHadoopFileSystemBase.Counter.WRITE_CLOSE);
-        ghfs.increment(GoogleHadoopFileSystemBase.Counter.WRITE_CLOSE_TIME, duration);
-        long streamDuration = System.nanoTime() - initTime;
-        ghfs.increment(GoogleHadoopFileSystemBase.Counter.OUTPUT_STREAM);
-        ghfs.increment(GoogleHadoopFileSystemBase.Counter.OUTPUT_STREAM_TIME, streamDuration);
-        logger.atFine().log("close(%s)", gcsPath);
       } finally {
         out = null;
         channel = null;
       }
+    }
+  }
+
+  private boolean isOpen() {
+    return out != null;
+  }
+
+  private void throwIfNotOpen() throws IOException {
+    if (!isOpen()) {
+      throw new ClosedChannelException();
     }
   }
 

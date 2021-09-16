@@ -84,8 +84,10 @@ public class FederatedBigQueryOutputCommitterTest {
   private static final TaskAttemptID TEST_TASK_ATTEMPT_ID =
       new TaskAttemptID(new TaskID("sample_task", 100, false, 200), 1);
 
+  private static final String TEST_BUCKET_STRING = "gs://test_bucket";
+
   /** Sample raw output path for data. */
-  private static final String TEST_OUTPUT_PATH_STRING = "gs://test_bucket/test_directory/";
+  private static final String TEST_OUTPUT_PATH_STRING = TEST_BUCKET_STRING + "/test_directory/";
 
   /** Sample output file. */
   private static final String TEST_OUTPUT_FILE_STRING = TEST_OUTPUT_PATH_STRING + "test_file";
@@ -124,6 +126,7 @@ public class FederatedBigQueryOutputCommitterTest {
 
     // Create the file system.
     ghfs = new InMemoryGoogleHadoopFileSystem();
+    ghfs.mkdirs(new Path(TEST_BUCKET_STRING));
 
     // Setup the configuration.
     job = Job.getInstance(InMemoryGoogleHadoopFileSystem.getSampleConfiguration());
@@ -162,6 +165,7 @@ public class FederatedBigQueryOutputCommitterTest {
 
   /** Helper method to create basic valid output based. */
   private void generateSampleFiles() throws IOException {
+    ghfs.mkdirs(outputSampleFilePath.getParent());
     ghfs.createNewFile(outputSampleFilePath);
     assertThat(ghfs.exists(outputPath)).isTrue();
     assertThat(ghfs.exists(outputSampleFilePath)).isTrue();

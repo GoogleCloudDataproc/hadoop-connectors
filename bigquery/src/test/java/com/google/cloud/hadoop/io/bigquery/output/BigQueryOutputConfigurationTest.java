@@ -26,14 +26,12 @@ import java.io.IOException;
 import java.util.Optional;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnit4.class)
@@ -97,8 +95,6 @@ public class BigQueryOutputConfigurationTest {
 
   /** The Job Configuration for testing. */
   private static Configuration conf;
-
-  @Mock private JobID mockJobID;
 
   /** Set up before all classes. */
   @Before

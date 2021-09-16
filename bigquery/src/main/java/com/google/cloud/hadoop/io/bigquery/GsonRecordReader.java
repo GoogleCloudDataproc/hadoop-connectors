@@ -49,9 +49,6 @@ public class GsonRecordReader extends RecordReader<LongWritable, JsonObject> {
   // Total key, value pairs read.
   private int count;
 
-  // Used to parse the JsonObject from the LineRecordReader output.
-  private JsonParser jsonParser;
-
   /**
    * Called once at initialization to initialize the RecordReader.
    *
@@ -71,8 +68,6 @@ public class GsonRecordReader extends RecordReader<LongWritable, JsonObject> {
         "InputSplit genericSplit should be an instance of FileSplit.");
     // Get FileSplit.
     FileSplit fileSplit = (FileSplit) genericSplit;
-    // Create the JsonParser.
-    jsonParser = new JsonParser();
     // Initialize the LineRecordReader.
     lineReader = new LineRecordReader();
     lineReader.initialize(fileSplit, context);
@@ -97,7 +92,7 @@ public class GsonRecordReader extends RecordReader<LongWritable, JsonObject> {
     // Get the next line.
     currentKey.set(lineReader.getCurrentKey().get());
     Text lineValue = lineReader.getCurrentValue();
-    currentValue = jsonParser.parse(lineValue.toString()).getAsJsonObject();
+    currentValue = JsonParser.parseString(lineValue.toString()).getAsJsonObject();
     // Increment count of key, value pairs.
     count++;
     return true;

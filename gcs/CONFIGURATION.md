@@ -27,12 +27,6 @@
     Maximum number of bytes rewritten in a single rewrite request when
     `fs.gs.copy.with.rewrite.enable` is set to `true`.
 
-*   `fs.gs.config.override.file` (not set by default)
-
-    Override configuration file path. Properties defined in this file overrides
-    the properties defined in `core-site.xml` and values passed from command
-    line.
-
 *   `fs.gs.reported.permissions` (default: `700`)
 
     Permissions that are reported for a file or directory to have regardless of
@@ -45,10 +39,10 @@
 
 *   `fs.gs.bucket.delete.enable` (default: `false`)
 
-    If true, recursive delete on a path that refers to a Cloud Storage bucket
+    If `true`, recursive delete on a path that refers to a Cloud Storage bucket
     itself or delete on that path when it is empty will result in deletion of
-    the bucket itself. If false, any operation that normally would have deleted
-    the bucket will be ignored. Setting to `false` preserves the typical
+    the bucket itself. If `false`, any operation that normally would have
+    deleted the bucket will be ignored. Setting to `false` preserves the typical
     behavior of `rm -rf /` which translates to deleting everything inside of
     root, but without clobbering the filesystem authority corresponding to that
     root path in the process.
@@ -60,10 +54,10 @@
     return `null` for that file. Supported checksum types are `NONE`, `CRC32C`
     and `MD5`
 
-*   `fs.gs.status.parallel.enable` (default: `false`)
+*   `fs.gs.status.parallel.enable` (default: `true`)
 
-    If true, executes Cloud Storage object requests in FileSystem listStatus and
-    getFileStatus methods in parallel to reduce latency.
+    If `true`, executes Cloud Storage object requests in `FileSystem`'s
+    `listStatus` and `getFileStatus` methods in parallel to reduce latency.
 
 *   `fs.gs.lazy.init.enable` (default: `false`)
 
@@ -75,24 +69,28 @@
     behavior of the connector or the underlying GCS objects. However it will
     affect the number of splits Hadoop MapReduce uses for a given input.
 
-*   `fs.gs.implicit.dir.infer.enable` (default: `true`)
+*   `fs.gs.create.items.conflict.check.enable` (default: `true`)
 
-    Enables automatic inference of implicit directories. If set to true,
-    connector creates and return in-memory directory objects on the fly when no
-    backing object exists, but it could be inferred that it should exist because
-    there are files with the same prefix.
+    Enables a check that ensures that conflicting directories do not exist when
+    creating files and conflicting files do not exist when creating directories.
 
-*   `fs.gs.glob.flatlist.enable` (default: `true`)
+*   `fs.gs.glob.algorithm` (default: `CONCURRENT`)
 
-    Whether or not to prepopulate potential glob matches in a single list
-    request to minimize calls to GCS in nested glob cases.
+    Glob search algorithm to use in Hadoop
+    [FileSystem.globStatus](https://hadoop.apache.org/docs/r3.3.0/api/org/apache/hadoop/fs/FileSystem.html#globStatus-org.apache.hadoop.fs.Path-)
+    method.
 
-*   `fs.gs.glob.concurrent.enable` (default: `true`)
+    Valid values:
 
-    Enables concurrent execution of flat and regular glob search algorithms in
-    two parallel threads to improve globbing performance. Whichever algorithm
-    will finish first that result will be returned and the other algorithm
-    execution one will be interrupted.
+    *   `FLAT` - fetch potential glob matches in a single list request to
+        minimize calls to GCS in nested glob cases.
+
+    *   `DEFAULT` - use default Hadoop glob search algorithm implementation.
+
+    *   `CONCURRENT` - enables concurrent execution of flat and default glob
+        search algorithms in two parallel threads to improve globbing
+        performance. Whichever algorithm will finish first that result will be
+        returned, and the other algorithm execution will be interrupted.
 
 *   `fs.gs.max.requests.per.batch` (default: `15`)
 
@@ -102,16 +100,6 @@
 *   `fs.gs.batch.threads` (default: `15`)
 
     Maximum number of threads used to execute batch requests in parallel.
-
-*   `fs.gs.copy.max.requests.per.batch` (default: `15`)
-
-    Maximum number of Cloud Storage requests that could be sent in a single
-    batch request for copy operations.
-
-*   `fs.gs.copy.batch.threads` (default: `15`)
-
-    Maximum number of threads used to execute batch requests in parallel for
-    copy operations.
 
 *   `fs.gs.list.max.items.per.call` (default: `1024`)
 
@@ -138,13 +126,11 @@
     fs.gs.storage.http.headers.another-custom-header=another_custom_value
     ```
 
-### Encryption (CSEK)
+### Encryption ([CSEK](https://cloud.google.com/storage/docs/encryption/customer-supplied-keys))
 
 *   `fs.gs.encryption.algorithm` (not set by default)
 
-    The encryption algorithm to use. For
-    [CSEK](https://cloud.google.com/storage/docs/encryption/customer-supplied-keys)
-    only `AES256` value is supported.
+    The encryption algorithm to use. For CSEK only `AES256` value is supported.
 
 *   `fs.gs.encryption.key` (not set by default)
 
@@ -164,7 +150,7 @@ provider.
 
 *   `fs.gs.auth.access.token.provider.impl` (not set by default)
 
-    The implementation of the AccessTokenProvider interface used for GCS
+    The implementation of the `AccessTokenProvider` interface used for GCS
     Connector.
 
 *   `fs.gs.auth.service.account.enable` (default: `true`)
@@ -225,31 +211,59 @@ exist at the same path on all nodes
     The PKCS12 (p12) certificate file of the service account used for GCS access
     when `fs.gs.auth.service.account.enable` is `true`.
 
-#### Client secret authentication
+#### Service account impersonation
 
-The following properties are required when `fs.gs.auth.service.account.enable`
-is `false`.
+Service account impersonation can be configured for a specific user name and a
+group name, or for all users by default using below properties:
 
-*   `fs.gs.auth.client.id` (not set by default)
+*   `fs.gs.auth.impersonation.service.account.for.user.<USER_NAME>` (not set by
+    default)
 
-    The client ID for GCS access in the OAuth 2.0 installed application flow
-    (when `fs.gs.auth.service.account.enable` is `false`).
+    The service account impersonation for a specific user.
 
-*   `fs.gs.auth.client.secret` (not set by default)
+*   `fs.gs.auth.impersonation.service.account.for.group.<GROUP_NAME>` (not set
+    by default)
 
-    The client secret for GCS access in the OAuth 2.0 installed application flow
-    (when `fs.gs.auth.service.account.enable` is `false`).
+    The service account impersonation for a specific group.
 
-*   `fs.gs.auth.client.file` (not set by default)
+*   `fs.gs.auth.impersonation.service.account` (not set by default)
 
-    The client credential file for GCS access in the OAuth 2.0 installed
-    application flow (when `fs.gs.auth.service.account.enable` is `false`).
+    Default service account impersonation for all users.
+
+If any of the above properties are set then the service account specified will
+be impersonated by generating a short-lived credential when accessing Google
+Cloud Storage.
+
+Configured authentication method will be used to authenticate the request to
+generate this short-lived credential.
+
+If more than one property is set then the service account associated with the
+user name will take precedence over the service account associated with the
+group name for a matching user and group, which in turn will take precedence
+over default service account impersonation.
+
+### Authorization
+
+When configured, a specified authorization handler will be used to authorize
+Cloud Storage API requests before executing them. The handler will throw
+`AccessDeniedException` for rejected requests if user does not have enough
+permissions (not authorized) to execute these requests.
+
+*   `fs.gs.authorization.handler.impl` (not set by default)
+
+    Enable authorization handler. If this property is set, the specified
+    authorization handler will be used. GCS connector will use the specified
+    authorization handler to check if a user has enough permission to perform a
+    GCS resource access request before granting access.
+
+*   `fs.gs.authorization.handler.properties.<PROPERTY>=<VALUE>` (not set by
+    default)
+
+    Properties for the authorization handler. All the properties set with this
+    prefix will be set to the handler after instantiation before calling any
+    Cloud Storage requests handling methods.
 
 ### IO configuration
-
-*   `fs.gs.inputstream.buffer.size` (default: `0`)
-
-    The number of bytes in read buffers.
 
 *   `fs.gs.inputstream.fast.fail.on.not.found.enable` (default: `true`)
 
@@ -322,7 +336,7 @@ is `false`.
     support for advanced features like `hsync()` and different performance
     characteristics.
 
-    Valid options:
+    Valid values:
 
     *   `BASIC` - stream is closest analogue to direct wrapper around low-level
         HTTP stream into GCS.
@@ -437,7 +451,7 @@ is `false`.
     are performed by reading and discarding bytes in-place rather than opening a
     new underlying stream.
 
-*   `fs.gs.inputstream.min.range.request.size` (default: `524288`)
+*   `fs.gs.inputstream.min.range.request.size` (default: `2097152`)
 
     Minimum size in bytes of the read range for Cloud Storage request when
     opening a new stream to read an object.

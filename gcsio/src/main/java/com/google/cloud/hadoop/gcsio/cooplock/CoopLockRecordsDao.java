@@ -78,7 +78,7 @@ public class CoopLockRecordsDao {
   private static final Gson GSON = createGson();
 
   private static final CreateObjectOptions CREATE_NEW_OBJECT_OPTIONS =
-      new CreateObjectOptions(/* overwriteExisting= */ false);
+      CreateObjectOptions.DEFAULT_NO_OVERWRITE;
 
   private final GoogleCloudStorageImpl gcs;
   private final CooperativeLockingOptions options;

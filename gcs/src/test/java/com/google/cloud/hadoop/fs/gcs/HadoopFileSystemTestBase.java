@@ -17,11 +17,13 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest;
 import com.google.cloud.hadoop.gcsio.StringPaths;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
@@ -32,6 +34,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -67,6 +73,8 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   public static void postCreateInit(HadoopFileSystemIntegrationHelper helper)
       throws IOException {
     ghfsHelper = helper;
+    ghfsHelper.ghfs.mkdirs(
+        new Path(ghfsHelper.ghfsFileSystemDescriptor.getFileSystemRoot().toUri()));
     GoogleCloudStorageFileSystemIntegrationTest.postCreateInit(ghfsHelper);
 
     // Ensures that we do not accidentally end up testing wrong functionality.
@@ -127,16 +135,19 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
 
       Instant currentTime = Instant.now();
       Instant modificationTime = Instant.ofEpochMilli(fileStatus.getModificationTime());
-      // We must subtract 1000, because some FileSystems, like LocalFileSystem, have only
-      // second granularity, so we might have something like testStartTime == 1234123
-      // and modificationTime == 1234000. Unfortunately, "Instant" doesn't support easy
-      // conversions between units to clip to the "second" precision.
-      // Alternatively, we should just use TimeUnit and formally convert "toSeconds".
-      assertWithMessage(
-              "Stale file? testStartTime: %s modificationTime: %s bucket: '%s' object: '%s'",
-              testStartTime, modificationTime, bucketName, objectName)
-          .that(modificationTime)
-          .isAtLeast(testStartTime.minusMillis(1000));
+      // Ignore modification time for inferred directories that always set to 0
+      if (!expectedToBeDir || fileStatus.getModificationTime() != 0) {
+        // We must subtract 1000, because some FileSystems, like LocalFileSystem, have only
+        // second granularity, so we might have something like testStartTime == 1234123
+        // and modificationTime == 1234000. Unfortunately, "Instant" doesn't support easy
+        // conversions between units to clip to the "second" precision.
+        // Alternatively, we should just use TimeUnit and formally convert "toSeconds".
+        assertWithMessage(
+                "Stale file? testStartTime: %s modificationTime: %s bucket: '%s' object: '%s'",
+                testStartTime, modificationTime, bucketName, objectName)
+            .that(modificationTime)
+            .isAtLeast(testStartTime.minusMillis(1000));
+      }
       assertWithMessage(
               "Clock skew? currentTime: %s modificationTime: %s bucket: '%s' object: '%s'",
               currentTime, modificationTime, bucketName, objectName)
@@ -148,10 +159,10 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   /**
    * Validates FileStatus for the given item.
    *
-   * <p>See {@link GoogleCloudStorageIntegrationTest#listObjectNamesAndGetItemInfo()} for more info.
+   * <p>See {@link #testGetAndListFileInfo()} for more info.
    */
   @Override
-  protected void validateGetItemInfo(String bucketName, String objectName, boolean expectedToExist)
+  protected void validateGetFileInfo(String bucketName, String objectName, boolean expectedToExist)
       throws IOException {
     URI path = ghfsHelper.getPath(bucketName, objectName, true);
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
@@ -174,15 +185,16 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   /**
    * Validates FileInfo returned by listFileInfo().
    *
-   * See {@link GoogleCloudStorage.listObjectNamesAndGetItemInfo()} for more info.
+   * <p>See {@link #testGetAndListFileInfo()} for more info.
    */
   @Override
-  protected void validateListNamesAndInfo(
-      String bucketName, String objectNamePrefix,
-      boolean pathExpectedToExist, String... expectedListedNames)
+  protected void validateListFileInfo(
+      String bucketName,
+      String objectNamePrefix,
+      boolean expectedToExist,
+      String... expectedListedNames)
       throws IOException {
-    boolean childPathsExpectedToExist =
-        pathExpectedToExist && (expectedListedNames != null);
+    boolean childPathsExpectedToExist = expectedToExist && (expectedListedNames != null);
     boolean listRoot = bucketName == null;
 
     // Prepare list of expected paths.
@@ -218,18 +230,18 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     } catch (FileNotFoundException fnfe) {
       fileStatus = null;
       assertWithMessage("Hadoop path %s expected to exist", hadoopPath)
-          .that(pathExpectedToExist)
+          .that(expectedToExist)
           .isFalse();
     }
 
     if (!ghfsFileSystemDescriptor.getScheme().equals("file")) {
       assertWithMessage("Hadoop path %s", hadoopPath)
           .that(fileStatus != null)
-          .isEqualTo(pathExpectedToExist);
+          .isEqualTo(expectedToExist);
     } else {
       // LocalFileSystem -> ChecksumFileSystem will return an empty array instead of null for
       // nonexistent paths.
-      if (!pathExpectedToExist && fileStatus != null) {
+      if (!expectedToExist && fileStatus != null) {
         assertThat(fileStatus).isEmpty();
       }
     }
@@ -269,10 +281,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
     ghfsHelper.writeFile(hadoopPath, "file text", 1, /* overwrite= */ true);
-    FSDataInputStream readStream =
-        ghfs.open(
-            hadoopPath,
-            GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_BUFFER_SIZE.getDefault());
+    FSDataInputStream readStream = ghfs.open(hadoopPath);
     byte[] buffer = new byte[1];
 
     // Verify that normal read works.
@@ -344,13 +353,9 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     renameHelper(new HdfsBehavior());
   }
 
-  /**
-   * Validates that we can / cannot overwrite a file.
-   */
+  /** Validates that we can / cannot overwrite a file. */
   @Test
-  public void testOverwrite()
-      throws IOException {
-
+  public void testOverwrite() throws IOException {
     // Get a temp path and ensure that it does not already exist.
     URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
@@ -358,15 +363,67 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
 
     // Create a file.
     String text = "Hello World!";
-    int numBytesWritten = ghfsHelper.writeFile(hadoopPath, text, 1, /* overwrite= */ false);
+    int numBytesWritten =
+        ghfsHelper.writeFile(hadoopPath, text, /* numWrites= */ 1, /* overwrite= */ false);
     assertThat(numBytesWritten).isEqualTo(text.getBytes(UTF_8).length);
 
     // Try to create the same file again with overwrite == false.
     assertThrows(
-        IOException.class, () -> ghfsHelper.writeFile(hadoopPath, text, 1, /* overwrite= */ false));
+        IOException.class,
+        () -> ghfsHelper.writeFile(hadoopPath, text, /* numWrites= */ 1, /* overwrite= */ false));
+
+    // Try to create the same file again with overwrite == true.
+    String textToOverwrite = "World Hello!";
+    ghfsHelper.writeFile(hadoopPath, textToOverwrite, /* numWrites= */ 1, /* overwrite= */ true);
+
+    String readText = ghfsHelper.readTextFile(hadoopPath);
+    assertThat(readText).isEqualTo(textToOverwrite);
   }
 
-  /** Validates append(). */
+  @Test
+  public void testConcurrentCreationWithoutOverwrite_onlyOneSucceeds() throws Exception {
+    // Get a temp path and ensure that it does not already exist.
+    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
+    assertThrows(FileNotFoundException.class, () -> ghfs.getFileStatus(hadoopPath));
+
+    List<String> texts = ImmutableList.of("Hello World!", "World Hello! Long");
+
+    ExecutorService executorService = Executors.newFixedThreadPool(2);
+    List<Future<Integer>> futures =
+        executorService.invokeAll(
+            ImmutableList.of(
+                () ->
+                    ghfsHelper.writeFile(
+                        hadoopPath, texts.get(0), /* numWrites= */ 1, /* overwrite= */ false),
+                () ->
+                    ghfsHelper.writeFile(
+                        hadoopPath, texts.get(1), /* numWrites= */ 1, /* overwrite= */ false)));
+    executorService.shutdown();
+
+    assertThat(executorService.awaitTermination(1, MINUTES)).isTrue();
+
+    // Verify at least one creation request succeeded.
+    String readText = ghfsHelper.readTextFile(hadoopPath);
+    assertThat(ImmutableList.of(readText)).containsAnyIn(texts);
+
+    // One future should fail and one succeed
+    for (int i = 0; i < futures.size(); i++) {
+      Future<Integer> future = futures.get(i);
+      String text = texts.get(i);
+      if (readText.equals(text)) {
+        assertThat(future.get()).isEqualTo(text.length());
+      } else {
+        assertThrows(ExecutionException.class, future::get);
+      }
+    }
+
+    // Verify it can be overwritten by another creation.
+    String text = "World!";
+    ghfsHelper.writeFile(hadoopPath, text, /* numWrites= */ 1, /* overwrite= */ true);
+    assertThat(ghfsHelper.readTextFile(hadoopPath)).isEqualTo("World!");
+  }
+
   @Test
   public void testAppend() throws IOException {
     URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
@@ -405,10 +462,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     int numBytesWritten = ghfsHelper.writeFile(hadoopPath, text, 1, /* overwrite= */ false);
 
     // Verify that position is at 0 for a newly opened stream.
-    try (FSDataInputStream readStream =
-        ghfs.open(
-            hadoopPath,
-            GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_BUFFER_SIZE.getDefault())) {
+    try (FSDataInputStream readStream = ghfs.open(hadoopPath)) {
       assertThat(readStream.getPos()).isEqualTo(0);
 
       // Verify that position advances by 2 after reading 2 bytes.
@@ -687,8 +741,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     wddList.add(WorkingDirData.absolute(ghfsHelper, "d1/d11/", "d1/d11/"));
 
     // Set working directory to an existing directory (bucket).
-    wddList.add(WorkingDirData.absolute(
-        ghfsHelper, (String) null, (String) null));
+    wddList.add(WorkingDirData.absolute(ghfsHelper, null, null));
 
     return wddList;
   }

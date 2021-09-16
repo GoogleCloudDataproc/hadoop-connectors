@@ -34,9 +34,11 @@ import com.google.api.services.bigquery.model.TableReference;
 import com.google.api.services.bigquery.model.TableSchema;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.common.collect.ImmutableList;
-import com.google.common.flogger.LoggerConfig;
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -52,6 +54,8 @@ import org.mockito.stubbing.Answer;
 /** Unit tests for BigQueryHelper. */
 @RunWith(JUnit4.class)
 public class BigQueryHelperTest {
+
+  private static final Set<Logger> configuredLoggers = new HashSet<>();
 
   /** Verify exceptions are being thrown. */
   // Mocks for Bigquery API objects.
@@ -96,7 +100,9 @@ public class BigQueryHelperTest {
   @Before
   public void setUp() throws IOException {
     MockitoAnnotations.initMocks(this);
-    LoggerConfig.getConfig(GsonBigQueryInputFormat.class).setLevel(Level.FINE);
+
+    configuredLoggers.add(Logger.getLogger(GsonBigQueryInputFormat.class.getName()));
+    configuredLoggers.forEach(l -> l.setLevel(Level.FINE));
 
     // Create fake job reference.
     JobReference fakeJobReference = new JobReference().setProjectId(jobProjectId).setJobId(jobId);
@@ -116,7 +122,7 @@ public class BigQueryHelperTest {
     // Mock getting Bigquery job.
     when(mockBigqueryJobs.get(any(String.class), any(String.class)))
         .thenReturn(mockBigqueryJobsGet);
-    when(mockBigqueryJobsGet.setLocation(any(String.class))).thenReturn(mockBigqueryJobsGet);
+    when(mockBigqueryJobsGet.setLocation(any())).thenReturn(mockBigqueryJobsGet);
 
     // Mock inserting Bigquery job.
     when(mockBigqueryJobs.insert(any(String.class), any(Job.class)))
@@ -355,6 +361,7 @@ public class BigQueryHelperTest {
     assertThat(job).isEqualTo(jobHandle);
     verify(mockBigqueryJobsInsert, times(1)).execute();
     verify(mockBigqueryJobs, times(1)).get(eq(jobProjectId), eq(jobId));
+    verify(mockBigqueryJobsGet, times(1)).setLocation(eq(null));
     verify(mockBigqueryJobsGet, times(1)).execute();
     verify(mockErrorExtractor).itemAlreadyExists(eq(fakeConflictException));
   }

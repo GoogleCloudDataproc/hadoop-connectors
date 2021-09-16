@@ -54,7 +54,13 @@ public abstract class AsyncWriteChannelOptions {
   public static final boolean DIRECT_UPLOAD_ENABLED_DEFAULT = false;
 
   /** Default of whether to enabled checksums for gRPC. */
-  public static final boolean GRPC_CHECKSUMS_ENABLED_DEFAULT = true;
+  public static final boolean GRPC_CHECKSUMS_ENABLED_DEFAULT = false;
+
+  /** Default timeout for grpc write stream. */
+  public static final long DEFAULT_GRPC_WRITE_TIMEOUT = 10 * 60 * 1000;
+
+  /** Default number of insert requests to retain, in case we need to rewind and resume an upload */
+  public static final long DEFAULT_NUM_REQUESTS_BUFFERED_GRPC = 20;
 
   public static final PipeType PIPE_TYPE_DEFAULT = PipeType.IO_STREAM_PIPE;
 
@@ -68,7 +74,9 @@ public abstract class AsyncWriteChannelOptions {
         .setUploadChunkSize(UPLOAD_CHUNK_SIZE_DEFAULT)
         .setUploadCacheSize(UPLOAD_CACHE_SIZE_DEFAULT)
         .setDirectUploadEnabled(DIRECT_UPLOAD_ENABLED_DEFAULT)
-        .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT);
+        .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT)
+        .setGrpcWriteTimeout(DEFAULT_GRPC_WRITE_TIMEOUT)
+        .setNumberOfBufferedRequests(DEFAULT_NUM_REQUESTS_BUFFERED_GRPC);
   }
 
   public abstract Builder toBuilder();
@@ -87,6 +95,10 @@ public abstract class AsyncWriteChannelOptions {
 
   public abstract boolean isGrpcChecksumsEnabled();
 
+  public abstract long getGrpcWriteTimeout();
+
+  public abstract long getNumberOfBufferedRequests();
+
   /** Mutable builder for the GoogleCloudStorageWriteChannelOptions class. */
   @AutoValue.Builder
   public abstract static class Builder {
@@ -102,6 +114,16 @@ public abstract class AsyncWriteChannelOptions {
     public abstract Builder setUploadCacheSize(int uploadCacheSize);
 
     public abstract Builder setDirectUploadEnabled(boolean directUploadEnabled);
+
+    public abstract Builder setGrpcWriteTimeout(long grpcWriteTimeout);
+
+    public abstract Builder setNumberOfBufferedRequests(long numberOfBufferedRequests);
+
+    /**
+     * Enable gRPC checksumming. On by default. It is strongly recommended to leave this enabled, to
+     * protect against possible data corruption caused by software bugs.
+     */
+    public abstract Builder setGrpcChecksumsEnabled(boolean grpcChecksumsEnabled);
 
     abstract AsyncWriteChannelOptions autoBuild();
 
@@ -125,14 +147,5 @@ public abstract class AsyncWriteChannelOptions {
             UPLOAD_CHUNK_SIZE_GRANULARITY, chunkSize);
       }
     }
-
-    /**
-     * Enable gRPC checksumming. On by default. It is strongly recommended to leave this enabled, to
-     * protect against possible data corruption caused by software bugs.
-     *
-     * @param grpcChecksumsEnabled
-     * @return the Builder
-     */
-    public abstract Builder setGrpcChecksumsEnabled(boolean grpcChecksumsEnabled);
   }
 }

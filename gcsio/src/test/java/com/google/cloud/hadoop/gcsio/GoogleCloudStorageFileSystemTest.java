@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
@@ -57,8 +58,9 @@ public class GoogleCloudStorageFileSystemTest
           if (gcsfs == null) {
             gcsfs =
                 new GoogleCloudStorageFileSystem(
-                    new InMemoryGoogleCloudStorage(),
+                    InMemoryGoogleCloudStorage::new,
                     GoogleCloudStorageFileSystemOptions.builder()
+                        .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
                         .setMarkerFilePattern("_(FAILURE|SUCCESS)")
                         .build());
             gcs = gcsfs.getGcs();
@@ -134,10 +136,8 @@ public class GoogleCloudStorageFileSystemTest
     optionsBuilder.setCloudStorageOptions(
         options.getCloudStorageOptions().toBuilder().setAppName("appName").build());
 
-    // Verify that credential == null throws IllegalArgumentException.
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> new GoogleCloudStorageFileSystem((Credential) null, optionsBuilder.build()));
+    // Verify that credential == null works - this is required for unauthenticated access.
+    new GoogleCloudStorageFileSystem((Credential) null, optionsBuilder.build());
 
     // Verify that fake projectId/appName and empty cred does not throw.
     setDefaultValidOptions(optionsBuilder);
@@ -410,34 +410,17 @@ public class GoogleCloudStorageFileSystemTest
   public void testCreateNoParentDirectories()
       throws URISyntaxException, IOException {
     String bucketName = sharedBucketName1;
-    gcsfs.create(
-        new URI("gs://" + bucketName + "/no/parent/dirs/exist/a.txt"),
-        new CreateFileOptions(
-            false,  // overwriteExisting
-            CreateFileOptions.DEFAULT_CONTENT_TYPE,
-            CreateFileOptions.EMPTY_ATTRIBUTES,
-            true,  // checkNoDirectoryConflict
-            false,  // ensureParentDirectoriesExist
-            StorageResourceId.UNKNOWN_GENERATION_ID))
-      .close();
+    String testDir = "no/parent/dirs";
+
+    gcsfs.create(new URI(String.format("gs://%s/%s/exist/a.txt", bucketName, testDir))).close();
+
+    GoogleCloudStorage gcs = gcsfs.getGcs();
     assertThat(
-            gcsfs
-                .getGcs()
-                .getItemInfo(new StorageResourceId(bucketName, "no/parent/dirs/exist/a.txt"))
-                .exists())
+            gcs.getItemInfo(new StorageResourceId(bucketName, testDir + "/exist/a.txt")).exists())
         .isTrue();
-    assertThat(
-            gcsfs
-                .getGcs()
-                .getItemInfo(new StorageResourceId(bucketName, "no/parent/dirs/exist/"))
-                .exists())
+    assertThat(gcs.getItemInfo(new StorageResourceId(bucketName, testDir + "/exist/")).exists())
         .isFalse();
-    assertThat(
-            gcsfs
-                .getGcs()
-                .getItemInfo(new StorageResourceId(bucketName, "no/parent/dirs/"))
-                .exists())
-        .isFalse();
+    assertThat(gcs.getItemInfo(new StorageResourceId(bucketName, testDir)).exists()).isFalse();
   }
 
   @Test
@@ -445,15 +428,10 @@ public class GoogleCloudStorageFileSystemTest
       throws URISyntaxException, IOException {
     String bucketName = sharedBucketName1;
     gcsfs.mkdirs(new URI("gs://" + bucketName + "/conflicting-dirname"));
-    gcsfs.create(
-        new URI("gs://" + bucketName + "/conflicting-dirname"),
-        new CreateFileOptions(
-            false,  // overwriteExisting
-            CreateFileOptions.DEFAULT_CONTENT_TYPE,
-            CreateFileOptions.EMPTY_ATTRIBUTES,
-            false,  // checkNoDirectoryConflict
-            true,  // ensureParentDirectoriesExist
-            StorageResourceId.UNKNOWN_GENERATION_ID))
+    gcsfs
+        .create(
+            new URI("gs://" + bucketName + "/conflicting-dirname"),
+            CreateFileOptions.builder().setEnsureNoDirectoryConflict(false).build())
         .close();
 
     // This is a "shoot yourself in the foot" use case, but working as intended if

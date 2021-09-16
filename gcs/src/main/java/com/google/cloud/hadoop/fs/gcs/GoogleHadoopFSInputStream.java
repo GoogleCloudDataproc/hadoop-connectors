@@ -32,9 +32,6 @@ class GoogleHadoopFSInputStream extends FSInputStream {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  // Instance of GoogleHadoopFileSystemBase.
-  private GoogleHadoopFileSystemBase ghfs;
-
   // All store IO access goes through this.
   private final SeekableByteChannel channel;
 
@@ -47,9 +44,6 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   // Statistics tracker provided by the parent GoogleHadoopFileSystemBase for recording
   // numbers of bytes read.
   private final FileSystem.Statistics statistics;
-
-  // Time of initialization
-  private long initTime;
 
   // Used for single-byte reads.
   private final byte[] singleReadBuf = new byte[1];
@@ -68,12 +62,10 @@ class GoogleHadoopFSInputStream extends FSInputStream {
       GoogleCloudStorageReadOptions readOptions,
       FileSystem.Statistics statistics)
       throws IOException {
-    logger.atFine().log(
+    logger.atFiner().log(
         "GoogleHadoopFSInputStream(gcsPath: %s, readOptions: %s)", gcsPath, readOptions);
-    this.ghfs = ghfs;
     this.gcsPath = gcsPath;
     this.statistics = statistics;
-    this.initTime = System.nanoTime();
     this.totalBytesRead = 0;
     this.channel = ghfs.getGcsFs().open(gcsPath, readOptions);
   }
@@ -86,8 +78,6 @@ class GoogleHadoopFSInputStream extends FSInputStream {
    */
   @Override
   public synchronized int read() throws IOException {
-    long startTime = System.nanoTime();
-
     // TODO(user): Wrap this in a while-loop if we ever introduce a non-blocking mode for the
     // underlying channel.
     int numRead = channel.read(ByteBuffer.wrap(singleReadBuf));
@@ -104,9 +94,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
 
     totalBytesRead++;
     statistics.incrementBytesRead(1);
-    long duration = System.nanoTime() - startTime;
-    ghfs.increment(GoogleHadoopFileSystemBase.Counter.READ1);
-    ghfs.increment(GoogleHadoopFileSystemBase.Counter.READ1_TIME, duration);
+    statistics.incrementReadOps(1);
     return (b & 0xff);
   }
 
@@ -122,7 +110,6 @@ class GoogleHadoopFSInputStream extends FSInputStream {
    */
   @Override
   public synchronized int read(byte[] buf, int offset, int length) throws IOException {
-    long startTime = System.nanoTime();
     Preconditions.checkNotNull(buf, "buf must not be null");
     if (offset < 0 || length < 0 || length > buf.length - offset) {
       throw new IndexOutOfBoundsException();
@@ -133,12 +120,10 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     if (numRead > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
       statistics.incrementBytesRead(numRead);
+      statistics.incrementReadOps(1);
       totalBytesRead += numRead;
     }
 
-    long duration = System.nanoTime() - startTime;
-    ghfs.increment(GoogleHadoopFileSystemBase.Counter.READ);
-    ghfs.increment(GoogleHadoopFileSystemBase.Counter.READ_TIME, duration);
     return numRead;
   }
 
@@ -157,7 +142,6 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   @Override
   public synchronized int read(long position, byte[] buf, int offset, int length)
       throws IOException {
-    long startTime = System.nanoTime();
     int result = super.read(position, buf, offset, length);
 
     if (result > 0) {
@@ -165,10 +149,6 @@ class GoogleHadoopFSInputStream extends FSInputStream {
       statistics.incrementBytesRead(result);
       totalBytesRead += result;
     }
-
-    long duration = System.nanoTime() - startTime;
-    ghfs.increment(GoogleHadoopFileSystemBase.Counter.READ_POS);
-    ghfs.increment(GoogleHadoopFileSystemBase.Counter.READ_POS_TIME, duration);
     return result;
   }
 
@@ -181,7 +161,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   @Override
   public synchronized long getPos() throws IOException {
     long pos = channel.position();
-    logger.atFine().log("getPos(): %d", pos);
+    logger.atFiner().log("getPos(): %d", pos);
     return pos;
   }
 
@@ -193,16 +173,12 @@ class GoogleHadoopFSInputStream extends FSInputStream {
    */
   @Override
   public synchronized void seek(long pos) throws IOException {
-    long startTime = System.nanoTime();
-    logger.atFine().log("seek(%d)", pos);
+    logger.atFiner().log("seek(%d)", pos);
     try {
       channel.position(pos);
     } catch (IllegalArgumentException e) {
       throw new IOException(e);
     }
-    long duration = System.nanoTime() - startTime;
-    ghfs.increment(GoogleHadoopFileSystemBase.Counter.SEEK);
-    ghfs.increment(GoogleHadoopFileSystemBase.Counter.SEEK_TIME, duration);
   }
 
   /**
@@ -222,17 +198,10 @@ class GoogleHadoopFSInputStream extends FSInputStream {
    */
   @Override
   public synchronized void close() throws IOException {
-    logger.atFinest().log("close(): %s", gcsPath);
+    logger.atFiner().log("close(): %s", gcsPath);
     if (channel != null) {
-      long startTime = System.nanoTime();
-      logger.atFine().log("Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
+      logger.atFiner().log("Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
       channel.close();
-      long duration = System.nanoTime() - startTime;
-      ghfs.increment(GoogleHadoopFileSystemBase.Counter.READ_CLOSE);
-      ghfs.increment(GoogleHadoopFileSystemBase.Counter.READ_CLOSE_TIME, duration);
-      long streamDuration = System.nanoTime() - initTime;
-      ghfs.increment(GoogleHadoopFileSystemBase.Counter.INPUT_STREAM);
-      ghfs.increment(GoogleHadoopFileSystemBase.Counter.INPUT_STREAM_TIME, streamDuration);
     }
   }
 

@@ -19,12 +19,12 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.HTTP_TRA
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.JSON_FACTORY;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.OBJECT_NAME;
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 
 import com.google.api.client.http.InputStreamContent;
 import com.google.api.services.storage.Storage;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
-import com.google.common.util.concurrent.MoreExecutors;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import org.junit.Test;
@@ -41,17 +41,13 @@ public class GoogleCloudStorageWriteChannelTest {
 
     GoogleCloudStorageWriteChannel writeChannel =
         new GoogleCloudStorageWriteChannel(
-            MoreExecutors.newDirectExecutorService(),
             new Storage(HTTP_TRANSPORT, JSON_FACTORY, r -> {}),
             new ClientRequestHelper<>(),
-            BUCKET_NAME,
-            OBJECT_NAME,
-            "content-type",
-            /* contentEncoding= */ null,
-            kmsKeyName,
+            newDirectExecutorService(),
             AsyncWriteChannelOptions.DEFAULT,
-            new ObjectWriteConditions(),
-            /* objectMetadata= */ null);
+            new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+            CreateObjectOptions.DEFAULT_NO_OVERWRITE.toBuilder().setKmsKeyName(kmsKeyName).build(),
+            ObjectWriteConditions.NONE);
 
     Storage.Objects.Insert request =
         writeChannel.createRequest(

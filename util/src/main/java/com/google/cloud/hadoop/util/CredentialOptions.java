@@ -68,17 +68,6 @@ public abstract class CredentialOptions {
   @Nullable
   public abstract String getServiceAccountJsonKeyFile();
 
-  // The following 3 parameters are used for client authentication
-
-  @Nullable
-  public abstract RedactedString getClientId();
-
-  @Nullable
-  public abstract RedactedString getClientSecret();
-
-  @Nullable
-  public abstract String getOAuthCredentialFile();
-
   public abstract boolean isNullCredentialEnabled();
 
   public abstract HttpTransportType getTransportType();
@@ -110,12 +99,6 @@ public abstract class CredentialOptions {
     public abstract Builder setServiceAccountKeyFile(String serviceAccountKeyFile);
 
     public abstract Builder setServiceAccountJsonKeyFile(String serviceAccountJsonKeyFile);
-
-    public abstract Builder setClientId(RedactedString clientId);
-
-    public abstract Builder setClientSecret(RedactedString clientSecret);
-
-    public abstract Builder setOAuthCredentialFile(String oAuthCredentialFile);
 
     public abstract Builder setNullCredentialEnabled(boolean nullCredentialEnabled);
 
@@ -169,13 +152,6 @@ public abstract class CredentialOptions {
               !isNullOrEmpty(options.getServiceAccountEmail()),
               "Email must be set if using service account auth and a key file is specified.");
         }
-      } else if (options.getClientId() != null) {
-        checkArgument(
-            options.getClientSecret() != null,
-            "clientSecret must be set if using OAuth-based Installed App authentication.");
-        checkArgument(
-            !isNullOrEmpty(options.getOAuthCredentialFile()),
-            "credentialFile must be set if using OAuth-based Installed App authentication.");
       } else {
         checkArgument(
             options.isNullCredentialEnabled(),

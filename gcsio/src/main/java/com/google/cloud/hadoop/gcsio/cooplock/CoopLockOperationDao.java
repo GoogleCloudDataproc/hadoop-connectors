@@ -16,7 +16,6 @@
 
 package com.google.cloud.hadoop.gcsio.cooplock;
 
-import static com.google.cloud.hadoop.gcsio.CreateObjectOptions.EMPTY_METADATA;
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao.LOCK_DIRECTORY;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -69,9 +68,12 @@ public class CoopLockOperationDao {
   private static final String OPERATION_LOCK_FILE_FORMAT = "%s_%s_%s.lock";
 
   private static final CreateObjectOptions CREATE_OBJECT_OPTIONS =
-      new CreateObjectOptions(/* overwriteExisting= */ false, "application/text", EMPTY_METADATA);
+      CreateObjectOptions.DEFAULT_NO_OVERWRITE
+          .toBuilder()
+          .setContentType("application/text")
+          .build();
   private static final CreateObjectOptions UPDATE_OBJECT_OPTIONS =
-      new CreateObjectOptions(/* overwriteExisting= */ true, "application/text", EMPTY_METADATA);
+      CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder().setContentType("application/text").build();
 
   private static final int LOCK_MODIFY_RETRY_BACK_OFF_MILLIS = 1_100;
 
@@ -118,7 +120,7 @@ public class CoopLockOperationDao {
                         .setResource(resourceId.toString()))));
     List<String> logRecords =
         Streams.concat(itemsToDelete.stream(), bucketsToDelete.stream())
-            .map(i -> i.getItemInfo().getResourceId().toString())
+            .map(i -> i.getPath().toString())
             .collect(toImmutableList());
     writeOperationFile(
         resourceId.getBucketName(),
@@ -361,7 +363,7 @@ public class CoopLockOperationDao {
   private static RenameOperationLogRecord toRenameOperationLogRecord(
       Map.Entry<FileInfo, URI> record) {
     return new RenameOperationLogRecord()
-        .setSrc(record.getKey().getItemInfo().getResourceId().toString())
+        .setSrc(record.getKey().getPath().toString())
         .setDst(record.getValue().toString());
   }
 

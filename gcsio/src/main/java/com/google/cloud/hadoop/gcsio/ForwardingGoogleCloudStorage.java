@@ -45,83 +45,65 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
 
   @Override
   public GoogleCloudStorageOptions getOptions() {
-    logger.atFine().log("%s.getOptions()", delegateClassName);
+    logger.atFiner().log("%s.getOptions()", delegateClassName);
     return delegate.getOptions();
-  }
-
-  @Override
-  public WritableByteChannel create(StorageResourceId resourceId) throws IOException {
-    logger.atFine().log("%s.create(%s)", delegateClassName, resourceId);
-    return delegate.create(resourceId);
   }
 
   @Override
   public WritableByteChannel create(StorageResourceId resourceId, CreateObjectOptions options)
       throws IOException {
-    logger.atFine().log("%s.create(%s, %s)", delegateClassName, resourceId, options);
+    logger.atFiner().log("%s.create(%s, %s)", delegateClassName, resourceId, options);
     return delegate.create(resourceId, options);
   }
 
   @Override
-  public void create(String bucketName) throws IOException {
-    logger.atFine().log("%s.create(%s)", delegateClassName, bucketName);
-    delegate.create(bucketName);
-  }
-
-  @Override
-  public void create(String bucketName, CreateBucketOptions options) throws IOException {
-    logger.atFine().log("%s.create(%s, %s)", delegateClassName, bucketName, options);
-    delegate.create(bucketName, options);
+  public void createBucket(String bucketName, CreateBucketOptions options) throws IOException {
+    logger.atFiner().log("%s.createBucket(%s, %s)", delegateClassName, bucketName, options);
+    delegate.createBucket(bucketName, options);
   }
 
   @Override
   public void createEmptyObject(StorageResourceId resourceId) throws IOException {
-    logger.atFine().log("%s.createEmptyObject(%s)", delegateClassName, resourceId);
+    logger.atFiner().log("%s.createEmptyObject(%s)", delegateClassName, resourceId);
     delegate.createEmptyObject(resourceId);
   }
 
   @Override
   public void createEmptyObject(StorageResourceId resourceId, CreateObjectOptions options)
       throws IOException {
-    logger.atFine().log("%s.createEmptyObject(%s, %s)", delegateClassName, resourceId, options);
+    logger.atFiner().log("%s.createEmptyObject(%s, %s)", delegateClassName, resourceId, options);
     delegate.createEmptyObject(resourceId, options);
   }
 
   @Override
   public void createEmptyObjects(List<StorageResourceId> resourceIds) throws IOException {
-    logger.atFine().log("%s.createEmptyObjects(%s)", delegateClassName, resourceIds);
+    logger.atFiner().log("%s.createEmptyObjects(%s)", delegateClassName, resourceIds);
     delegate.createEmptyObjects(resourceIds);
   }
 
   @Override
   public void createEmptyObjects(List<StorageResourceId> resourceIds, CreateObjectOptions options)
       throws IOException {
-    logger.atFine().log("%s.createEmptyObjects(%s, %s)", delegateClassName, resourceIds, options);
+    logger.atFiner().log("%s.createEmptyObjects(%s, %s)", delegateClassName, resourceIds, options);
     delegate.createEmptyObjects(resourceIds, options);
-  }
-
-  @Override
-  public SeekableByteChannel open(StorageResourceId resourceId) throws IOException {
-    logger.atFine().log("%s.open(%s)", delegateClassName, resourceId);
-    return delegate.open(resourceId);
   }
 
   @Override
   public SeekableByteChannel open(
       StorageResourceId resourceId, GoogleCloudStorageReadOptions readOptions) throws IOException {
-    logger.atFine().log("%s.open(%s, %s)", delegateClassName, resourceId, readOptions);
+    logger.atFiner().log("%s.open(%s, %s)", delegateClassName, resourceId, readOptions);
     return delegate.open(resourceId, readOptions);
   }
 
   @Override
   public void deleteBuckets(List<String> bucketNames) throws IOException {
-    logger.atFine().log("%s.deleteBuckets(%s)", delegateClassName, bucketNames);
+    logger.atFiner().log("%s.deleteBuckets(%s)", delegateClassName, bucketNames);
     delegate.deleteBuckets(bucketNames);
   }
 
   @Override
   public void deleteObjects(List<StorageResourceId> fullObjectNames) throws IOException {
-    logger.atFine().log("%s.deleteObjects(%s)", delegateClassName, fullObjectNames);
+    logger.atFiner().log("%s.deleteObjects(%s)", delegateClassName, fullObjectNames);
     delegate.deleteObjects(fullObjectNames);
   }
 
@@ -132,7 +114,7 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
       String dstBucketName,
       List<String> dstObjectNames)
       throws IOException {
-    logger.atFine().log(
+    logger.atFiner().log(
         "%s.copy(%s, %s, %s, %s)",
         delegateClassName, srcBucketName, srcObjectNames, dstBucketName, dstObjectNames);
     delegate.copy(srcBucketName, srcObjectNames, dstBucketName, dstObjectNames);
@@ -140,87 +122,59 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
 
   @Override
   public List<String> listBucketNames() throws IOException {
-    logger.atFine().log("%s.listBucketNames()", delegateClassName);
+    logger.atFiner().log("%s.listBucketNames()", delegateClassName);
     return delegate.listBucketNames();
   }
 
   @Override
   public List<GoogleCloudStorageItemInfo> listBucketInfo() throws IOException {
-    logger.atFine().log("%s.listBucketInfo()", delegateClassName);
+    logger.atFiner().log("%s.listBucketInfo()", delegateClassName);
     return delegate.listBucketInfo();
   }
 
   @Override
-  public List<String> listObjectNames(String bucketName, String objectNamePrefix, String delimiter)
-      throws IOException {
-    logger.atFine().log(
-        "%s.listObjectNames(%s, %s, %s)",
-        delegateClassName, bucketName, objectNamePrefix, delimiter);
-    return delegate.listObjectNames(bucketName, objectNamePrefix, delimiter);
-  }
-
-  @Override
-  public List<String> listObjectNames(
-      String bucketName, String objectNamePrefix, String delimiter, long maxResults)
-      throws IOException {
-    logger.atFine().log(
-        "%s.listObjectNames(%s, %s, %s, %s)",
-        delegateClassName, bucketName, objectNamePrefix, delimiter, maxResults);
-    return delegate.listObjectNames(bucketName, objectNamePrefix, delimiter, maxResults);
-  }
-
-  @Override
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
-      String bucketName, String objectNamePrefix, String delimiter) throws IOException {
-    logger.atFine().log(
+      String bucketName, String objectNamePrefix, ListObjectOptions listOptions)
+      throws IOException {
+    logger.atFiner().log(
         "%s.listObjectInfo(%s, %s, %s)",
-        delegateClassName, bucketName, objectNamePrefix, delimiter);
-    return delegate.listObjectInfo(bucketName, objectNamePrefix, delimiter);
-  }
-
-  @Override
-  public List<GoogleCloudStorageItemInfo> listObjectInfo(
-      String bucketName, String objectNamePrefix, String delimiter, long maxResults)
-      throws IOException {
-    logger.atFine().log(
-        "%s.listObjectInfo(%s, %s, %s, %s)",
-        delegateClassName, bucketName, objectNamePrefix, delimiter, maxResults);
-    return delegate.listObjectInfo(bucketName, objectNamePrefix, delimiter, maxResults);
+        delegateClassName, bucketName, objectNamePrefix, listOptions);
+    return delegate.listObjectInfo(bucketName, objectNamePrefix, listOptions);
   }
 
   @Override
   public ListPage<GoogleCloudStorageItemInfo> listObjectInfoPage(
-      String bucketName, String objectNamePrefix, String delimiter, String pageToken)
+      String bucketName, String objectNamePrefix, ListObjectOptions listOptions, String pageToken)
       throws IOException {
-    logger.atFine().log(
+    logger.atFiner().log(
         "%s.listObjectInfoPage(%s, %s, %s, %s)",
-        delegateClassName, bucketName, objectNamePrefix, delimiter, pageToken);
-    return delegate.listObjectInfoPage(bucketName, objectNamePrefix, delimiter, pageToken);
+        delegateClassName, bucketName, objectNamePrefix, listOptions, pageToken);
+    return delegate.listObjectInfoPage(bucketName, objectNamePrefix, listOptions, pageToken);
   }
 
   @Override
   public GoogleCloudStorageItemInfo getItemInfo(StorageResourceId resourceId) throws IOException {
-    logger.atFine().log("%s.getItemInfo(%s)", delegateClassName, resourceId);
+    logger.atFiner().log("%s.getItemInfo(%s)", delegateClassName, resourceId);
     return delegate.getItemInfo(resourceId);
   }
 
   @Override
   public List<GoogleCloudStorageItemInfo> getItemInfos(List<StorageResourceId> resourceIds)
       throws IOException {
-    logger.atFine().log("%s.getItemInfos(%s)", delegateClassName, resourceIds);
+    logger.atFiner().log("%s.getItemInfos(%s)", delegateClassName, resourceIds);
     return delegate.getItemInfos(resourceIds);
   }
 
   @Override
   public List<GoogleCloudStorageItemInfo> updateItems(List<UpdatableItemInfo> itemInfoList)
       throws IOException {
-    logger.atFine().log("%s.updateItems(%s)", delegateClassName, itemInfoList);
+    logger.atFiner().log("%s.updateItems(%s)", delegateClassName, itemInfoList);
     return delegate.updateItems(itemInfoList);
   }
 
   @Override
   public void close() {
-    logger.atFine().log("%s.close()", delegateClassName);
+    logger.atFiner().log("%s.close()", delegateClassName);
     delegate.close();
   }
 
@@ -228,7 +182,7 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   public void compose(
       String bucketName, List<String> sources, String destination, String contentType)
       throws IOException {
-    logger.atFine().log(
+    logger.atFiner().log(
         "%s.compose(%s, %s, %s, %s)",
         delegateClassName, bucketName, sources, destination, contentType);
     delegate.compose(bucketName, sources, destination, contentType);
@@ -238,7 +192,7 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   public GoogleCloudStorageItemInfo composeObjects(
       List<StorageResourceId> sources, StorageResourceId destination, CreateObjectOptions options)
       throws IOException {
-    logger.atFine().log(
+    logger.atFiner().log(
         "%s.composeObjects(%s, %s, %s)", delegateClassName, sources, destination, options);
     return delegate.composeObjects(sources, destination, options);
   }

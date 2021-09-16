@@ -182,10 +182,6 @@ public class BigQueryConfiguration {
   public static final HadoopConfigurationProperty<Boolean> OUTPUT_CLEANUP_TEMP =
       new HadoopConfigurationProperty<>("mapred.bq.output.gcs.cleanup", true);
 
-  /** Size of the output buffer, in bytes, to use for BigQuery output. */
-  public static final HadoopConfigurationProperty<Integer> OUTPUT_WRITE_BUFFER_SIZE =
-      new HadoopConfigurationProperty<>("mapred.bq.output.buffer.size", 64 * 1024 * 1024);
-
   /**
    * Configure the location of the temporary dataset. Currently supported values are "US" and "EU".
    */

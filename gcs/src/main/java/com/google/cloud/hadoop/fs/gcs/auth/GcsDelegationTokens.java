@@ -31,9 +31,11 @@ import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.delegation.web.DelegationTokenIdentifier;
+import org.apache.hadoop.service.AbstractService;
+import org.apache.hadoop.service.ServiceOperations;
 
 /** Manages delegation tokens for files system */
-public class GcsDelegationTokens {
+public class GcsDelegationTokens extends AbstractService {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
@@ -50,17 +52,19 @@ public class GcsDelegationTokens {
   /** Dynamically loaded token binding; lifecycle matches this object. */
   private AbstractDelegationTokenBinding tokenBinding;
 
-  private AccessTokenProvider accessTokenProvider = null;
+  private AccessTokenProvider accessTokenProvider;
 
   /** Active Delegation token. */
-  private Token<DelegationTokenIdentifier> boundDT = null;
+  private Token<DelegationTokenIdentifier> boundDT;
 
   public GcsDelegationTokens() throws IOException {
+    super("GCSDelegationTokens");
     user = UserGroupInformation.getCurrentUser();
   }
 
-  public void init(Configuration conf) {
-    String tokenBindingImpl = conf.get(DELEGATION_TOKEN_BINDING_CLASS.getKey());
+  @Override
+  public void serviceInit(Configuration conf) throws Exception {
+    String tokenBindingImpl = DELEGATION_TOKEN_BINDING_CLASS.get(conf, conf::get);
 
     checkState(tokenBindingImpl != null, "Delegation Tokens are not configured");
 
@@ -69,13 +73,33 @@ public class GcsDelegationTokens {
       AbstractDelegationTokenBinding binding =
           (AbstractDelegationTokenBinding) bindingClass.getDeclaredConstructor().newInstance();
       binding.bindToFileSystem(fileSystem, getService());
+      binding.init(conf);
       tokenBinding = binding;
       logger.atFine().log(
           "Filesystem %s is using delegation tokens of kind %s",
           getService(), tokenBinding.getKind());
-      bindToAnyDelegationToken();
     } catch (Exception e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  protected void serviceStart() throws Exception {
+    super.serviceStart();
+    tokenBinding.start();
+    bindToAnyDelegationToken();
+    logger.atFiner().log(
+        "GCS Delegation support token %s with %s",
+        isBoundToDT() ? getBoundDT().decodeIdentifier() : "none", tokenBinding.getService());
+  }
+
+  @Override
+  protected void serviceStop() throws Exception {
+    logger.atFiner().log("Stopping GCS delegation tokens");
+    try {
+      super.serviceStop();
+    } finally {
+      ServiceOperations.stopQuietly(tokenBinding);
     }
   }
 
@@ -96,7 +120,7 @@ public class GcsDelegationTokens {
    */
   public AccessTokenProvider deployUnbonded() throws IOException {
     checkState(!isBoundToDT(), "Already Bound to a delegation token");
-    logger.atFine().log("No delegation tokens present: using direct authentication");
+    logger.atFiner().log("No delegation tokens present: using direct authentication");
     accessTokenProvider = tokenBinding.deployUnbonded();
     return accessTokenProvider;
   }
@@ -208,7 +232,7 @@ public class GcsDelegationTokens {
    */
   @SuppressWarnings("OptionalGetWithoutIsPresent")
   public Token<DelegationTokenIdentifier> getBoundOrNewDT(String renewer) throws IOException {
-    logger.atFine().log("Delegation token requested");
+    logger.atFiner().log("Delegation token requested");
     if (isBoundToDT()) {
       // the FS was created on startup with a token, so return it.
       logger.atFine().log("Returning current token");
@@ -262,7 +286,7 @@ public class GcsDelegationTokens {
   @SuppressWarnings("unchecked") // safe by contract of lookupToken()
   private static Token<DelegationTokenIdentifier> lookupToken(
       Credentials credentials, Text service, Text kind) throws DelegationTokenIOException {
-    logger.atFine().log("Looking for token for service %s in credentials", service);
+    logger.atFiner().log("Looking for token for service %s in credentials", service);
     Token<?> token = credentials.getToken(service);
     if (token != null) {
       Text tokenKind = token.getKind();
@@ -276,7 +300,7 @@ public class GcsDelegationTokens {
       throw DelegationTokenIOException.tokenMismatch(service, kind, tokenKind);
     }
     // A token for the service was not found
-    logger.atFine().log("No token found for %s", service);
+    logger.atFiner().log("No token found for %s", service);
     return null;
   }
 
