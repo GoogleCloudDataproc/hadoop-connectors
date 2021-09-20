@@ -46,10 +46,23 @@ public class AvroRecordReaderTest {
   @Before
   public void setup() throws IOException {
     Schema schema =
-        SchemaBuilder.record("BigQueryRecord").fields()
-            .name("key").type().stringBuilder().endString().noDefault()
-            .name("value1").type().stringBuilder().endString().noDefault()
-            .name("value2").type().intBuilder().endInt().noDefault()
+        SchemaBuilder.record("BigQueryRecord")
+            .fields()
+            .name("key")
+            .type()
+            .stringBuilder()
+            .endString()
+            .noDefault()
+            .name("value1")
+            .type()
+            .stringBuilder()
+            .endString()
+            .noDefault()
+            .name("value2")
+            .type()
+            .intBuilder()
+            .endInt()
+            .noDefault()
             .endRecord();
 
     GenericDatumWriter<GenericData.Record> recordWriter = new GenericDatumWriter<>(schema);
