@@ -18,9 +18,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractContractOpenTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 
-/**
- * GCS contract tests covering file open using in-memory fakes.
- */
+/** GCS contract tests covering file open using in-memory fakes. */
 public class TestInMemoryGoogleContractOpen extends AbstractContractOpenTest {
 
   @Override

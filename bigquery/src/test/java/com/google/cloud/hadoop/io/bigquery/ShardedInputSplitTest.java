@@ -26,9 +26,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/**
- * Unit tests for ShardedInputSplit.
- */
+/** Unit tests for ShardedInputSplit. */
 @RunWith(JUnit4.class)
 public class ShardedInputSplitTest {
   private Path shardPath1;
@@ -36,7 +34,7 @@ public class ShardedInputSplitTest {
 
   private long numRecords1;
   private long numRecords2;
-  
+
   private ShardedInputSplit split1;
   private ShardedInputSplit split2;
 
@@ -51,30 +49,26 @@ public class ShardedInputSplitTest {
   }
 
   @Test
-  public void testGetLocations()
-      throws IOException {
+  public void testGetLocations() throws IOException {
     // No notion of locations for now; return empty but non-null array.
     assertThat(split1.getLocations()).isNotNull();
     assertThat(split1.getLocations()).isEmpty();
   }
 
   @Test
-  public void testBasicFields()
-      throws IOException {
+  public void testBasicFields() throws IOException {
     assertThat(split1.getShardDirectoryAndPattern()).isEqualTo(shardPath1);
     assertThat(split1.getLength()).isEqualTo(numRecords1);
   }
 
   @Test
-  public void testToString()
-      throws IOException {
+  public void testToString() throws IOException {
     assertThat(split1.toString()).contains(shardPath1.toString());
     assertThat(split1.toString()).contains(Long.toString(numRecords1));
   }
 
   @Test
-  public void testSerializeAndDeserializeSingle()
-      throws IOException {
+  public void testSerializeAndDeserializeSingle() throws IOException {
     ByteArrayOutputStream byteOut = new ByteArrayOutputStream();
     DataOutputStream dataOut = new DataOutputStream(byteOut);
 
@@ -92,8 +86,7 @@ public class ShardedInputSplitTest {
   }
 
   @Test
-  public void testSerializeAndDeserializeMultiple()
-      throws IOException {
+  public void testSerializeAndDeserializeMultiple() throws IOException {
     ByteArrayOutputStream byteOut = new ByteArrayOutputStream();
     DataOutputStream dataOut = new DataOutputStream(byteOut);
 

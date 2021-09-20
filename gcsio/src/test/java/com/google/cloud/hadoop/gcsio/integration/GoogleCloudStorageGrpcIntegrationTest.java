@@ -45,7 +45,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
       AsyncWriteChannelOptions asyncWriteChannelOptions) throws IOException {
     return new GoogleCloudStorageImpl(
         GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-            .setWriteChannelOptions(asyncWriteChannelOptions).setGrpcEnabled(true).build(),
+            .setWriteChannelOptions(asyncWriteChannelOptions)
+            .setGrpcEnabled(true)
+            .build(),
         GoogleCloudStorageTestHelper.getCredential());
   }
 
@@ -158,202 +160,239 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testOpenObjectWithChecksum() throws IOException {
-    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder()
-        .setGrpcChecksumsEnabled(true).build();
+    AsyncWriteChannelOptions asyncWriteChannelOptions =
+        AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
-    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME,
-        "testOpenObjectWithChecksum_Object");
+    StorageResourceId objectToCreate =
+        new StorageResourceId(BUCKET_NAME, "testOpenObjectWithChecksum_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
 
-    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder()
-        .setGrpcChecksumsEnabled(true).build();
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setGrpcChecksumsEnabled(true).build();
     assertObjectContent(rawStorage, objectToCreate, readOptions, objectBytes);
   }
 
   @Test
   public void testOpenObjectWithSeek() throws IOException {
-    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder()
-        .setGrpcChecksumsEnabled(true).build();
+    AsyncWriteChannelOptions asyncWriteChannelOptions =
+        AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
-    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME,
-        "testOpenObjectWithSeek_Object");
+    StorageResourceId objectToCreate =
+        new StorageResourceId(BUCKET_NAME, "testOpenObjectWithSeek_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
     int offset = 10;
     byte[] trimmedObjectBytes = Arrays.copyOfRange(objectBytes, offset, objectBytes.length);
-    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder()
-        .setGrpcChecksumsEnabled(true).build();
-    assertObjectContent(rawStorage, objectToCreate, readOptions,
-        trimmedObjectBytes, /* expectedBytesCount= */1, offset);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setGrpcChecksumsEnabled(true).build();
+    assertObjectContent(
+        rawStorage,
+        objectToCreate,
+        readOptions,
+        trimmedObjectBytes,
+        /* expectedBytesCount= */ 1,
+        offset);
   }
 
   @Test
   public void testOpenObjectWithSeekOverBounds() throws IOException {
-    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder()
-        .setGrpcChecksumsEnabled(true).build();
+    AsyncWriteChannelOptions asyncWriteChannelOptions =
+        AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
-    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME,
-        "testOpenObjectWithSeekOverBounds_Object");
+    StorageResourceId objectToCreate =
+        new StorageResourceId(BUCKET_NAME, "testOpenObjectWithSeekOverBounds_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 4 * 1024 * 1024);
     int offset = 3 * 1024 * 1024;
     byte[] trimmedObjectBytes = Arrays.copyOfRange(objectBytes, offset, objectBytes.length);
-    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder()
-        .setGrpcChecksumsEnabled(true).build();
-    assertObjectContent(rawStorage, objectToCreate, readOptions,
-        trimmedObjectBytes, /* expectedBytesCount= */1, offset);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setGrpcChecksumsEnabled(true).build();
+    assertObjectContent(
+        rawStorage,
+        objectToCreate,
+        readOptions,
+        trimmedObjectBytes,
+        /* expectedBytesCount= */ 1,
+        offset);
   }
 
   @Test
   public void testOpenObjectWithSeekLimits() throws IOException {
-    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder()
-        .setGrpcChecksumsEnabled(true).build();
+    AsyncWriteChannelOptions asyncWriteChannelOptions =
+        AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
-    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME,
-        "testOpenObjectWithSeekOverBounds_Object");
-    byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */  1024);
+    StorageResourceId objectToCreate =
+        new StorageResourceId(BUCKET_NAME, "testOpenObjectWithSeekOverBounds_Object");
+    byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 1024);
     int offset = 100;
     byte[] trimmedObjectBytes = Arrays.copyOfRange(objectBytes, offset, objectBytes.length);
-    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder()
-        .setInplaceSeekLimit(50)
-        .setGrpcChecksumsEnabled(true).build();
-    assertObjectContent(rawStorage, objectToCreate, readOptions,
-        trimmedObjectBytes, /* expectedBytesCount= */1, offset);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder()
+            .setInplaceSeekLimit(50)
+            .setGrpcChecksumsEnabled(true)
+            .build();
+    assertObjectContent(
+        rawStorage,
+        objectToCreate,
+        readOptions,
+        trimmedObjectBytes,
+        /* expectedBytesCount= */ 1,
+        offset);
   }
 
   @Test
   public void testReadFooterDataWithGrpcChecksums() throws IOException {
-    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder()
-        .setGrpcChecksumsEnabled(true).build();
+    AsyncWriteChannelOptions asyncWriteChannelOptions =
+        AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
-    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME,
-        "testOpenObjectWithSeekToFooter_Object");
+    StorageResourceId objectToCreate =
+        new StorageResourceId(BUCKET_NAME, "testOpenObjectWithSeekToFooter_Object");
     int objectSize = 1024;
-    byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */  objectSize);
+    byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ objectSize);
     int minRangeRequestSize = 200;
     int offset = objectSize - minRangeRequestSize / 2;
     byte[] trimmedObjectBytes = Arrays.copyOfRange(objectBytes, offset, objectBytes.length);
-    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder()
-        .setInplaceSeekLimit(50)
-        .setMinRangeRequestSize(minRangeRequestSize)
-        .setFadvise(Fadvise.RANDOM)
-        .setGrpcChecksumsEnabled(true).build();
-    assertObjectContent(rawStorage, objectToCreate, readOptions,
-        trimmedObjectBytes, /* expectedBytesCount= */1, offset);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder()
+            .setInplaceSeekLimit(50)
+            .setMinRangeRequestSize(minRangeRequestSize)
+            .setFadvise(Fadvise.RANDOM)
+            .setGrpcChecksumsEnabled(true)
+            .build();
+    assertObjectContent(
+        rawStorage,
+        objectToCreate,
+        readOptions,
+        trimmedObjectBytes,
+        /* expectedBytesCount= */ 1,
+        offset);
   }
 
   @Test
   public void testReadCachedFooterData() throws IOException {
-    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder()
-        .build();
+    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
-    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME,
-        "testReadCachedFooterData_Object");
+    StorageResourceId objectToCreate =
+        new StorageResourceId(BUCKET_NAME, "testReadCachedFooterData_Object");
     int objectSize = 10 * 1024 * 1024;
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ objectSize);
 
     int minRangeRequestSize = 200;
     int footerOffset = objectSize - minRangeRequestSize / 2;
     byte[] trimmedObjectBytes = Arrays.copyOfRange(objectBytes, footerOffset, objectBytes.length);
-    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder()
-        .setMinRangeRequestSize(minRangeRequestSize)
-        .build();
-    assertObjectContent(rawStorage, objectToCreate, readOptions,
-        trimmedObjectBytes, /* expectedBytesCount= */1, footerOffset);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(minRangeRequestSize).build();
+    assertObjectContent(
+        rawStorage,
+        objectToCreate,
+        readOptions,
+        trimmedObjectBytes,
+        /* expectedBytesCount= */ 1,
+        footerOffset);
   }
 
   @Test
   public void testReadSeekToFooterData() throws IOException {
-    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder()
-        .build();
+    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
-    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME,
-        "testReadSeekToFooterData_Object");
+    StorageResourceId objectToCreate =
+        new StorageResourceId(BUCKET_NAME, "testReadSeekToFooterData_Object");
     int objectSize = 1024;
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ objectSize);
 
     int minRangeRequestSize = 200;
     int offset = objectSize - minRangeRequestSize / 4;
     byte[] trimmedObjectBytes = Arrays.copyOfRange(objectBytes, offset, objectBytes.length);
-    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder()
-        .setMinRangeRequestSize(minRangeRequestSize)
-        .build();
-    assertObjectContent(rawStorage, objectToCreate, readOptions,
-        trimmedObjectBytes, /* expectedBytesCount= */1, offset);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(minRangeRequestSize).build();
+    assertObjectContent(
+        rawStorage,
+        objectToCreate,
+        readOptions,
+        trimmedObjectBytes,
+        /* expectedBytesCount= */ 1,
+        offset);
   }
 
   @Test
   public void testReadObjectCachedAsFooter() throws IOException {
-    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder()
-        .build();
+    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
-    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME,
-        "testReadSeekToFooterData_Object");
+    StorageResourceId objectToCreate =
+        new StorageResourceId(BUCKET_NAME, "testReadSeekToFooterData_Object");
     int objectSize = 1024;
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ objectSize);
 
     int minRangeRequestSize = 4 * 1024;
     int offset = 0;
     byte[] trimmedObjectBytes = Arrays.copyOfRange(objectBytes, offset, objectBytes.length);
-    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder()
-        .setMinRangeRequestSize(minRangeRequestSize)
-        .build();
-    assertObjectContent(rawStorage, objectToCreate, readOptions,
-        trimmedObjectBytes, /* expectedBytesCount= */1, offset);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(minRangeRequestSize).build();
+    assertObjectContent(
+        rawStorage,
+        objectToCreate,
+        readOptions,
+        trimmedObjectBytes,
+        /* expectedBytesCount= */ 1,
+        offset);
   }
 
   @Test
   public void testPartialReadFooterDataWithSingleChunk() throws IOException {
-    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder()
-        .build();
+    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
-    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME,
-        "testPartialReadFooterDataWithSingleChunk_Object");
+    StorageResourceId objectToCreate =
+        new StorageResourceId(BUCKET_NAME, "testPartialReadFooterDataWithSingleChunk_Object");
     int objectSize = 2 * 1024 * 1024;
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ objectSize);
 
     int minRangeRequestSize = 1024; // server responds in 2MB chunks by default
     int readOffset = objectSize / 2;
     byte[] trimmedObjectBytes = Arrays.copyOfRange(objectBytes, readOffset, objectBytes.length);
-    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder()
-        .setMinRangeRequestSize(minRangeRequestSize)
-        .build();
-    assertObjectContent(rawStorage, objectToCreate, readOptions,
-        trimmedObjectBytes, /* expectedBytesCount= */1, readOffset);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(minRangeRequestSize).build();
+    assertObjectContent(
+        rawStorage,
+        objectToCreate,
+        readOptions,
+        trimmedObjectBytes,
+        /* expectedBytesCount= */ 1,
+        readOffset);
   }
 
   @Test
   public void testPartialReadFooterDataWithMultipleChunks() throws IOException {
-    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder()
-        .build();
+    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
-    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME,
-        "testPartialReadFooterDataWithMultipleChunks_Object");
+    StorageResourceId objectToCreate =
+        new StorageResourceId(BUCKET_NAME, "testPartialReadFooterDataWithMultipleChunks_Object");
     int objectSize = 10 * 1024 * 1024;
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ objectSize);
 
     int minRangeRequestSize = 4 * 1024; // server responds in 2MB chunks by default
     int readOffset = objectSize / 2;
     byte[] trimmedObjectBytes = Arrays.copyOfRange(objectBytes, readOffset, objectBytes.length);
-    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder()
-        .setMinRangeRequestSize(minRangeRequestSize)
-        .build();
-    assertObjectContent(rawStorage, objectToCreate, readOptions,
-        trimmedObjectBytes, /* expectedBytesCount= */1, readOffset);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(minRangeRequestSize).build();
+    assertObjectContent(
+        rawStorage,
+        objectToCreate,
+        readOptions,
+        trimmedObjectBytes,
+        /* expectedBytesCount= */ 1,
+        readOffset);
   }
 
   @Test
   public void testPartialReadFooterDataWithinSegment() throws IOException {
-    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder()
-        .build();
+    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
-    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME,
-        "testPartialReadFooterDataWithinSegment_Object");
+    StorageResourceId objectToCreate =
+        new StorageResourceId(BUCKET_NAME, "testPartialReadFooterDataWithinSegment_Object");
     int objectSize = 10 * 1024;
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ objectSize);
 
     int minRangeRequestSize = 4 * 1024;
-    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder()
-        .setMinRangeRequestSize(minRangeRequestSize)
-        .build();
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(minRangeRequestSize).build();
     int readOffset = 7 * 1024;
     try (SeekableByteChannel readChannel = rawStorage.open(objectToCreate, readOptions)) {
       byte[] segmentBytes = new byte[100];
@@ -397,11 +436,11 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testReadSeekToOffsetGreaterThanMinRangeRequestSize() throws IOException {
-    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder()
-        .build();
+    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
-    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME,
-        "testReadSeekToOffsetGreaterThanMinRangeRequestSize_Object");
+    StorageResourceId objectToCreate =
+        new StorageResourceId(
+            BUCKET_NAME, "testReadSeekToOffsetGreaterThanMinRangeRequestSize_Object");
     int objectSize = 20 * 1024;
     int inPlaceSeekLimit = 8 * 1024;
     int minRangeRequestSize = 4 * 1024;
@@ -413,14 +452,15 @@ public class GoogleCloudStorageGrpcIntegrationTest {
             .setInplaceSeekLimit(inPlaceSeekLimit)
             .setMinRangeRequestSize(minRangeRequestSize)
             .setGrpcChecksumsEnabled(false)
-            .setFadvise(Fadvise.RANDOM).build();
+            .setFadvise(Fadvise.RANDOM)
+            .build();
     SeekableByteChannel readableByteChannel = rawStorage.open(objectToCreate, readOptions);
     int newPosition = 7 * 1024;
     readableByteChannel.position(newPosition);
     ByteBuffer readBuffer = ByteBuffer.wrap(readArray);
     int bytesRead = readableByteChannel.read(readBuffer);
-    byte[] trimmedObjectBytes = Arrays
-        .copyOfRange(objectBytes, newPosition, newPosition + totalBytes);
+    byte[] trimmedObjectBytes =
+        Arrays.copyOfRange(objectBytes, newPosition, newPosition + totalBytes);
     byte[] readBufferByteArray = Arrays.copyOf(readBuffer.array(), readBuffer.limit());
 
     assertEquals(totalBytes, bytesRead);
@@ -429,11 +469,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testReadBeyondRangeWithFadviseRandom() throws IOException {
-    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder()
-        .build();
+    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
-    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME,
-        "testReadBeyondRangeWithFadviseRandom_Object");
+    StorageResourceId objectToCreate =
+        new StorageResourceId(BUCKET_NAME, "testReadBeyondRangeWithFadviseRandom_Object");
     int objectSize = 20 * 1024;
     int inPlaceSeekLimit = 8 * 1024;
     int minRangeRequestSize = 4 * 1024;
@@ -445,14 +484,15 @@ public class GoogleCloudStorageGrpcIntegrationTest {
             .setInplaceSeekLimit(inPlaceSeekLimit)
             .setMinRangeRequestSize(minRangeRequestSize)
             .setGrpcChecksumsEnabled(false)
-            .setFadvise(Fadvise.RANDOM).build();
+            .setFadvise(Fadvise.RANDOM)
+            .build();
     SeekableByteChannel readableByteChannel = rawStorage.open(objectToCreate, readOptions);
     int newPosition = 7 * 1024;
     readableByteChannel.position(newPosition);
     ByteBuffer readBuffer = ByteBuffer.wrap(readArray);
     int bytesRead = readableByteChannel.read(readBuffer);
-    byte[] trimmedObjectBytes = Arrays
-        .copyOfRange(objectBytes, newPosition, newPosition + totalBytes);
+    byte[] trimmedObjectBytes =
+        Arrays.copyOfRange(objectBytes, newPosition, newPosition + totalBytes);
     byte[] readBufferByteArray = Arrays.copyOf(readBuffer.array(), readBuffer.limit());
 
     assertEquals(totalBytes, bytesRead);
@@ -461,11 +501,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testReadBeyondRangeWithFadviseAuto() throws IOException {
-    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder()
-        .build();
+    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
-    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME,
-        "testReadBeyondRangeWithFadviseAuto_Object");
+    StorageResourceId objectToCreate =
+        new StorageResourceId(BUCKET_NAME, "testReadBeyondRangeWithFadviseAuto_Object");
     int objectSize = 20 * 1024;
     int inPlaceSeekLimit = 8 * 1024;
     int minRangeRequestSize = 4 * 1024;
@@ -477,14 +516,15 @@ public class GoogleCloudStorageGrpcIntegrationTest {
             .setInplaceSeekLimit(inPlaceSeekLimit)
             .setMinRangeRequestSize(minRangeRequestSize)
             .setGrpcChecksumsEnabled(false)
-            .setFadvise(Fadvise.AUTO).build();
+            .setFadvise(Fadvise.AUTO)
+            .build();
     SeekableByteChannel readableByteChannel = rawStorage.open(objectToCreate, readOptions);
     int newPosition = 7 * 1024;
     readableByteChannel.position(newPosition);
     ByteBuffer readBuffer = ByteBuffer.wrap(readArray);
     int bytesRead = readableByteChannel.read(readBuffer);
-    byte[] trimmedObjectBytes = Arrays
-        .copyOfRange(objectBytes, newPosition, newPosition + totalBytes);
+    byte[] trimmedObjectBytes =
+        Arrays.copyOfRange(objectBytes, newPosition, newPosition + totalBytes);
     byte[] readBufferByteArray = Arrays.copyOf(readBuffer.array(), readBuffer.limit());
 
     assertEquals(totalBytes, bytesRead);
@@ -493,11 +533,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testReadBeyondRangeWithFadviseSequential() throws IOException {
-    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder()
-        .build();
+    AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
-    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME,
-        "testReadBeyondRangeWithFadviseSequential_Object");
+    StorageResourceId objectToCreate =
+        new StorageResourceId(BUCKET_NAME, "testReadBeyondRangeWithFadviseSequential_Object");
     int objectSize = 20 * 1024;
     int inPlaceSeekLimit = 8 * 1024;
     int minRangeRequestSize = 4 * 1024;
@@ -509,14 +548,15 @@ public class GoogleCloudStorageGrpcIntegrationTest {
             .setInplaceSeekLimit(inPlaceSeekLimit)
             .setMinRangeRequestSize(minRangeRequestSize)
             .setGrpcChecksumsEnabled(false)
-            .setFadvise(Fadvise.SEQUENTIAL).build();
+            .setFadvise(Fadvise.SEQUENTIAL)
+            .build();
     SeekableByteChannel readableByteChannel = rawStorage.open(objectToCreate, readOptions);
     int newPosition = 7 * 1024;
     readableByteChannel.position(newPosition);
     ByteBuffer readBuffer = ByteBuffer.wrap(readArray);
     int bytesRead = readableByteChannel.read(readBuffer);
-    byte[] trimmedObjectBytes = Arrays
-        .copyOfRange(objectBytes, newPosition, newPosition + totalBytes);
+    byte[] trimmedObjectBytes =
+        Arrays.copyOfRange(objectBytes, newPosition, newPosition + totalBytes);
     byte[] readBufferByteArray = Arrays.copyOf(readBuffer.array(), readBuffer.limit());
 
     assertEquals(totalBytes, bytesRead);

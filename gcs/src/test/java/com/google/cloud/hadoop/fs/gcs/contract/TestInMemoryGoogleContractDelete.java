@@ -18,9 +18,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractContractDeleteTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 
-/**
- * GCS contract tests covering file delete using in-memory fakes.
- */
+/** GCS contract tests covering file delete using in-memory fakes. */
 public class TestInMemoryGoogleContractDelete extends AbstractContractDeleteTest {
 
   @Override

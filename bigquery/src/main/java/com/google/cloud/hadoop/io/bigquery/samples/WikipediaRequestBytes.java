@@ -34,17 +34,10 @@ import org.apache.hadoop.util.GenericOptionsParser;
 
 /**
  * Sample MapReduce which computes SUM(bytes_transferred) grouping by "title" from a
- * wikipedia_pageviews table. The following is the BigQuery schema of the table:
- *   datetime_epoch INTEGER NULLABLE
- *   year INTEGER NULLABLE
- *   month INTEGER NULLABLE
- *   day INTEGER NULLABLE
- *   hour INTEGER NULLABLE
- *   wikimedia_project STRING NULLABLE
- *   language STRING NULLABLE
- *   title STRING NULLABLE
- *   views INTEGER NULLABLE
- *   bytes_transferred INTEGER NULLABLE
+ * wikipedia_pageviews table. The following is the BigQuery schema of the table: datetime_epoch
+ * INTEGER NULLABLE year INTEGER NULLABLE month INTEGER NULLABLE day INTEGER NULLABLE hour INTEGER
+ * NULLABLE wikimedia_project STRING NULLABLE language STRING NULLABLE title STRING NULLABLE views
+ * INTEGER NULLABLE bytes_transferred INTEGER NULLABLE
  */
 public class WikipediaRequestBytes {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();

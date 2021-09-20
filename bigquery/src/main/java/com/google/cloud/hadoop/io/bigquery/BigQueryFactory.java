@@ -34,9 +34,7 @@ import java.security.GeneralSecurityException;
 import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 
-/**
- * Helper class to get BigQuery from environment credentials.
- */
+/** Helper class to get BigQuery from environment credentials. */
 public class BigQueryFactory {
 
   // BigQuery scopes for OAUTH.
@@ -71,8 +69,9 @@ public class BigQueryFactory {
   public static final BigQueryFactory INSTANCE = new BigQueryFactory();
 
   static {
-    VERSION = PropertyUtil.getPropertyOrDefault(
-        BigQueryFactory.class, PROPERTIES_FILE, VERSION_PROPERTY, UNKNOWN_VERSION);
+    VERSION =
+        PropertyUtil.getPropertyOrDefault(
+            BigQueryFactory.class, PROPERTIES_FILE, VERSION_PROPERTY, UNKNOWN_VERSION);
     logger.atInfo().log("BigQuery connector version %s", VERSION);
     BQC_ID = String.format("Hadoop BigQuery Connector/%s", VERSION);
   }
@@ -83,6 +82,7 @@ public class BigQueryFactory {
 
   /**
    * Construct credentials from the passed Configuration.
+   *
    * @throws IOException on IO Error.
    * @throws GeneralSecurityException on General Security Error.
    */
@@ -99,9 +99,7 @@ public class BigQueryFactory {
         .getCredential(BIGQUERY_OAUTH_SCOPES);
   }
 
-  /**
-   * Constructs a BigQueryHelper from a raw Bigquery constructed with {@link #getBigQuery}.
-   */
+  /** Constructs a BigQueryHelper from a raw Bigquery constructed with {@link #getBigQuery}. */
   public BigQueryHelper getBigQueryHelper(Configuration config)
       throws GeneralSecurityException, IOException {
     return new BigQueryHelper(getBigQuery(config));
@@ -113,8 +111,7 @@ public class BigQueryFactory {
    * @throws IOException on IO Error.
    * @throws GeneralSecurityException on General Security Error.
    */
-  public Bigquery getBigQuery(Configuration config)
-      throws GeneralSecurityException, IOException {
+  public Bigquery getBigQuery(Configuration config) throws GeneralSecurityException, IOException {
     logger.atInfo().log("Creating BigQuery from default credential.");
     Credential credential = createBigQueryCredential(config);
     // Use the credential to create an authorized BigQuery client
@@ -127,9 +124,10 @@ public class BigQueryFactory {
     logger.atInfo().log("Creating BigQuery from given credential.");
     // Use the credential to create an authorized BigQuery client
     if (credential != null) {
-      return new Bigquery
-          .Builder(HTTP_TRANSPORT, JSON_FACTORY, new RetryHttpInitializer(credential, appName))
-          .setApplicationName(appName).build();
+      return new Bigquery.Builder(
+              HTTP_TRANSPORT, JSON_FACTORY, new RetryHttpInitializer(credential, appName))
+          .setApplicationName(appName)
+          .build();
     }
     return new Bigquery.Builder(HTTP_TRANSPORT, JSON_FACTORY, /* httpRequestInitializer= */ null)
         .setRootUrl(BQ_ROOT_URL.get(config, config::get))

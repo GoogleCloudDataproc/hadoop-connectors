@@ -637,7 +637,6 @@
         <artifactId>spotless-maven-plugin</artifactId>
         <version>2.12.2</version>
         <configuration>
-          <ratchetFrom>branch-2.2.x</ratchetFrom>
           <formats>
             <format>
               <includes>

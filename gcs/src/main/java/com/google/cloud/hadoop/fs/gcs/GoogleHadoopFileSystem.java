@@ -51,8 +51,8 @@ public class GoogleHadoopFileSystem extends GoogleHadoopFileSystemBase {
   private String rootBucket;
 
   /**
-   * Constructs an instance of GoogleHadoopFileSystem; the internal
-   * GoogleCloudStorageFileSystem will be set up with config settings when initialize() is called.
+   * Constructs an instance of GoogleHadoopFileSystem; the internal GoogleCloudStorageFileSystem
+   * will be set up with config settings when initialize() is called.
    */
   public GoogleHadoopFileSystem() {
     super();
@@ -96,25 +96,21 @@ public class GoogleHadoopFileSystem extends GoogleHadoopFileSystemBase {
             "Wrong bucket: %s, in path: %s, expected bucket: %s", bucket, path, rootBucket));
   }
 
-  /**
-   * Get the name of the bucket in which file system is rooted.
-   */
+  /** Get the name of the bucket in which file system is rooted. */
   @VisibleForTesting
   String getRootBucketName() {
     return rootBucket;
   }
 
-  /**
-   * Override to allow a homedir subpath which sits directly on our FileSystem root.
-   */
+  /** Override to allow a homedir subpath which sits directly on our FileSystem root. */
   @Override
   protected String getHomeDirectorySubpath() {
     return "user/" + System.getProperty("user.name");
   }
 
   /**
-   * Validates GCS Path belongs to this file system. The bucket must
-   * match the root bucket provided at initialization time.
+   * Validates GCS Path belongs to this file system. The bucket must match the root bucket provided
+   * at initialization time.
    */
   @Override
   public Path getHadoopPath(URI gcsPath) {
@@ -132,7 +128,8 @@ public class GoogleHadoopFileSystem extends GoogleHadoopFileSystemBase {
     checkArgument(
         resourceId.getBucketName().equals(rootBucket),
         "Authority of URI '%s' doesn't match root bucket '%s'",
-        resourceId.getBucketName(), rootBucket);
+        resourceId.getBucketName(),
+        rootBucket);
 
     Path hadoopPath = new Path(getScheme() + "://" + rootBucket + '/' + resourceId.getObjectName());
     logger.atFiner().log("getHadoopPath(gcsPath: %s): %s", gcsPath, hadoopPath);
@@ -140,8 +137,8 @@ public class GoogleHadoopFileSystem extends GoogleHadoopFileSystemBase {
   }
 
   /**
-   * Translates a "gs:/" style hadoopPath (or relative path which is not fully-qualified) into
-   * the appropriate GCS path which is compatible with the underlying GcsFs or gsutil.
+   * Translates a "gs:/" style hadoopPath (or relative path which is not fully-qualified) into the
+   * appropriate GCS path which is compatible with the underlying GcsFs or gsutil.
    */
   @Override
   public URI getGcsPath(Path hadoopPath) {
@@ -166,8 +163,8 @@ public class GoogleHadoopFileSystem extends GoogleHadoopFileSystemBase {
   }
 
   /**
-   * As the global-rooted FileSystem, our hadoop-path "scheme" is exactly equal to the general
-   * GCS scheme.
+   * As the global-rooted FileSystem, our hadoop-path "scheme" is exactly equal to the general GCS
+   * scheme.
    */
   @Override
   public String getScheme() {
@@ -179,9 +176,7 @@ public class GoogleHadoopFileSystem extends GoogleHadoopFileSystemBase {
     return new Path(getScheme() + "://" + rootBucket + '/');
   }
 
-  /**
-   * Gets the default value of working directory.
-   */
+  /** Gets the default value of working directory. */
   @Override
   public Path getDefaultWorkingDirectory() {
     return getFileSystemRoot();

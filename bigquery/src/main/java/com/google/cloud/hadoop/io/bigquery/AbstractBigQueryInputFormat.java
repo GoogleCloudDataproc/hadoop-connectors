@@ -47,11 +47,12 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
  * Abstract base class for BigQuery input formats. This class is expected to take care of performing
  * BigQuery exports to temporary tables, BigQuery exports to GCS and cleaning up any files or tables
  * that either of those processes create.
+ *
  * @param <K> Key type
  * @param <V> Value type
  */
-public abstract class AbstractBigQueryInputFormat<K, V>
-    extends InputFormat<K, V> implements DelegateRecordReaderFactory<K, V> {
+public abstract class AbstractBigQueryInputFormat<K, V> extends InputFormat<K, V>
+    implements DelegateRecordReaderFactory<K, V> {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
@@ -60,26 +61,20 @@ public abstract class AbstractBigQueryInputFormat<K, V>
       new HadoopConfigurationProperty<>(
           "mapreduce.inputformat.class", AbstractBigQueryInputFormat.class);
 
-  /**
-   * The keyword for the type of BigQueryTable store externally.
-   */
+  /** The keyword for the type of BigQueryTable store externally. */
   public static final String EXTERNAL_TABLE_TYPE = "EXTERNAL";
 
   // Used by UnshardedExportToCloudStorage
   private InputFormat<LongWritable, Text> delegateInputFormat;
 
-  /**
-   * Configure the BigQuery input table for a job
-   */
+  /** Configure the BigQuery input table for a job */
   public static void setInputTable(
       Configuration configuration, String projectId, String datasetId, String tableId)
       throws IOException {
     BigQueryConfiguration.configureBigQueryInput(configuration, projectId, datasetId, tableId);
   }
 
-  /**
-   * Configure the BigQuery input table for a job
-   */
+  /** Configure the BigQuery input table for a job */
   public static void setInputTable(Configuration configuration, TableReference tableReference)
       throws IOException {
     setInputTable(
@@ -89,9 +84,7 @@ public abstract class AbstractBigQueryInputFormat<K, V>
         tableReference.getTableId());
   }
 
-  /**
-   * Configure a directory to which we will export BigQuery data
-   */
+  /** Configure a directory to which we will export BigQuery data */
   public static void setTemporaryCloudStorageDirectory(Configuration configuration, String path) {
     configuration.set(TEMP_GCS_PATH.getKey(), path);
   }
@@ -136,12 +129,9 @@ public abstract class AbstractBigQueryInputFormat<K, V>
         BigQueryConfiguration.getTemporaryPathRoot(configuration, context.getJobID());
     configuration.set(TEMP_GCS_PATH.getKey(), exportPath);
 
-    Export export = constructExport(
-        configuration,
-        getExportFileFormat(),
-        exportPath,
-        bigQueryHelper,
-        delegateInputFormat);
+    Export export =
+        constructExport(
+            configuration, getExportFileFormat(), exportPath, bigQueryHelper, delegateInputFormat);
     export.prepare();
 
     // Invoke the export, maybe wait for it to complete.
@@ -169,14 +159,13 @@ public abstract class AbstractBigQueryInputFormat<K, V>
     return createRecordReader(inputSplit, taskAttemptContext.getConfiguration());
   }
 
-  public RecordReader<K, V> createRecordReader(
-      InputSplit inputSplit, Configuration configuration)
+  public RecordReader<K, V> createRecordReader(InputSplit inputSplit, Configuration configuration)
       throws IOException, InterruptedException {
     Preconditions.checkArgument(
         inputSplit instanceof UnshardedInputSplit,
         "Split should be instance of UnshardedInputSplit.");
-      logger.atFine().log("createRecordReader -> createDelegateRecordReader()");
-      return createDelegateRecordReader(inputSplit, configuration);
+    logger.atFine().log("createRecordReader -> createDelegateRecordReader()");
+    return createDelegateRecordReader(inputSplit, configuration);
   }
 
   private static Export constructExport(
@@ -196,16 +185,17 @@ public abstract class AbstractBigQueryInputFormat<K, V>
     String datasetId = mandatoryConfig.get(INPUT_DATASET_ID.getKey());
     String tableName = mandatoryConfig.get(INPUT_TABLE_ID.getKey());
 
-    TableReference exportTableReference = new TableReference()
-        .setDatasetId(datasetId)
-        .setProjectId(inputProjectId)
-        .setTableId(tableName);
+    TableReference exportTableReference =
+        new TableReference()
+            .setDatasetId(datasetId)
+            .setProjectId(inputProjectId)
+            .setTableId(tableName);
     Table table = bigQueryHelper.getTable(exportTableReference);
 
     if (EXTERNAL_TABLE_TYPE.equals(table.getType())) {
-        logger.atInfo().log("Table is already external, so skipping export");
-        return new NoopFederatedExportToCloudStorage(
-            configuration, format, bigQueryHelper, jobProjectId, table, delegateInputFormat);
+      logger.atInfo().log("Table is already external, so skipping export");
+      return new NoopFederatedExportToCloudStorage(
+          configuration, format, bigQueryHelper, jobProjectId, table, delegateInputFormat);
     }
 
     return new UnshardedExportToCloudStorage(
@@ -221,9 +211,9 @@ public abstract class AbstractBigQueryInputFormat<K, V>
   /**
    * Cleans up relevant temporary resources associated with a job which used the
    * GsonBigQueryInputFormat; this should be called explicitly after the completion of the entire
-   * job. Possibly cleans up intermediate export tables if configured to use one due to
-   * specifying a BigQuery "query" for the input. Cleans up the GCS directoriy where BigQuery
-   * exported its files for reading.
+   * job. Possibly cleans up intermediate export tables if configured to use one due to specifying a
+   * BigQuery "query" for the input. Cleans up the GCS directoriy where BigQuery exported its files
+   * for reading.
    */
   public static void cleanupJob(Configuration configuration, JobID jobId) throws IOException {
     String exportPathRoot = BigQueryConfiguration.getTemporaryPathRoot(configuration, jobId);
@@ -251,8 +241,8 @@ public abstract class AbstractBigQueryInputFormat<K, V>
 
     String gcsPath = getMandatoryConfig(config, TEMP_GCS_PATH);
 
-    Export export = constructExport(
-        config, getExportFileFormat(config), gcsPath, bigQueryHelper, null);
+    Export export =
+        constructExport(config, getExportFileFormat(config), gcsPath, bigQueryHelper, null);
 
     try {
       export.cleanupExport();
@@ -278,9 +268,7 @@ public abstract class AbstractBigQueryInputFormat<K, V>
     return factory.getBigQuery(config);
   }
 
-  /**
-   * Helper method to override for testing.
-   */
+  /** Helper method to override for testing. */
   protected BigQueryHelper getBigQueryHelper(Configuration config)
       throws GeneralSecurityException, IOException {
     BigQueryFactory factory = new BigQueryFactory();
