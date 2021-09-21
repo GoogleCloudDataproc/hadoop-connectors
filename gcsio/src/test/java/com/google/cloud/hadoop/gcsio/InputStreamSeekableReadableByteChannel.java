@@ -15,7 +15,6 @@
 package com.google.cloud.hadoop.gcsio;
 
 import com.google.common.base.Preconditions;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -25,14 +24,12 @@ import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
 
 /**
- * InputStreamSeekableReadableByteChannel is an adaptor from any InputStream which returns true
- * for markSupported() to expose the SeekableReadableByteChannel interface. Each call to
- * position(long) my require skipping over the entire contents of the InputStream, so this
- * adaptor will not be efficient if the underlying InputStream does not support efficient
- * random access.
+ * InputStreamSeekableReadableByteChannel is an adaptor from any InputStream which returns true for
+ * markSupported() to expose the SeekableReadableByteChannel interface. Each call to position(long)
+ * my require skipping over the entire contents of the InputStream, so this adaptor will not be
+ * efficient if the underlying InputStream does not support efficient random access.
  */
-public class InputStreamSeekableReadableByteChannel
-    implements SeekableByteChannel {
+public class InputStreamSeekableReadableByteChannel implements SeekableByteChannel {
   // Underlying InputStream provided at construction time; must return true for markSupported().
   private final InputStream readStream;
 
@@ -48,10 +45,10 @@ public class InputStreamSeekableReadableByteChannel
   private int position;
 
   /**
-   * @param readStream The underlying InputStream providing this channel's data. It must return
-   *     true for markSupported(). The position of this channel is defined relative to the
-   *     current position of the InputStream; any bytes previously read out of the InputStream
-   *     already will be invisible to this channel.
+   * @param readStream The underlying InputStream providing this channel's data. It must return true
+   *     for markSupported(). The position of this channel is defined relative to the current
+   *     position of the InputStream; any bytes previously read out of the InputStream already will
+   *     be invisible to this channel.
    * @param maxBytesToRead The total number of bytes this channel can read out of the InputStream.
    */
   public InputStreamSeekableReadableByteChannel(InputStream readStream, int maxBytesToRead) {
@@ -67,22 +64,20 @@ public class InputStreamSeekableReadableByteChannel
     this.readStream = readStream;
     this.maxBytesToRead = maxBytesToRead;
 
-    // Seeking will be relative to the current position in the stream; 
+    // Seeking will be relative to the current position in the stream;
     readStream.mark(this.maxBytesToRead);
     this.readChannelDelegate = Channels.newChannel(this.readStream);
     this.position = 0;
   }
 
   @Override
-  public long position()
-      throws IOException {
+  public long position() throws IOException {
     throwIfNotOpen();
     return position;
   }
 
   @Override
-  public SeekableByteChannel position(long newPosition)
-      throws IOException {
+  public SeekableByteChannel position(long newPosition) throws IOException {
     throwIfNotOpen();
 
     // Validate: 0 <= newPosition < size.
@@ -99,8 +94,7 @@ public class InputStreamSeekableReadableByteChannel
   }
 
   @Override
-  public long size()
-      throws IOException {
+  public long size() throws IOException {
     throwIfNotOpen();
     return maxBytesToRead;
   }
@@ -134,12 +128,12 @@ public class InputStreamSeekableReadableByteChannel
   public SeekableByteChannel truncate(long size) throws IOException {
     throw new UnsupportedOperationException("Cannot mutate read-only channel");
   }
-  
+
   @Override
   public int write(ByteBuffer src) throws IOException {
     throw new UnsupportedOperationException("Cannot mutate read-only channel");
   }
-  
+
   @Override
   public void close() throws IOException {
     readChannelDelegate.close();
@@ -150,11 +144,8 @@ public class InputStreamSeekableReadableByteChannel
     return readChannelDelegate.isOpen();
   }
 
-  /**
-   * Throws if this channel is not currently open.
-   */
-  private void throwIfNotOpen()
-      throws IOException {
+  /** Throws if this channel is not currently open. */
+  private void throwIfNotOpen() throws IOException {
     if (!isOpen()) {
       throw new ClosedChannelException();
     }

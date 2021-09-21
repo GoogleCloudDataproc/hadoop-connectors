@@ -83,7 +83,8 @@ public class CoopLockLoadIntegrationTest {
   @Test
   public void moveDirectory_loadTest() throws Exception {
     GoogleCloudStorageFileSystemOptions gcsFsOptions =
-        newGcsFsOptions().toBuilder()
+        newGcsFsOptions()
+            .toBuilder()
             .setCloudStorageOptions(gcsOptions.toBuilder().setMaxHttpRequestRetries(0).build())
             .build();
     GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, httpRequestInitializer);

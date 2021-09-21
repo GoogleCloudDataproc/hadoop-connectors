@@ -27,9 +27,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/**
- * Unit tests for ConfigurationUtil class.
- */
+/** Unit tests for ConfigurationUtil class. */
 @RunWith(JUnit4.class)
 public class ConfigurationUtilTest {
   private static final HadoopConfigurationProperty<String> PROPERTY_ONE =
@@ -39,9 +37,7 @@ public class ConfigurationUtilTest {
       new HadoopConfigurationProperty<>("test-key2");
   private static final String VALUE_TWO = "test-value2";
 
-  /**
-   * Verifies getMandatoryConfig method for single strings.
-   */
+  /** Verifies getMandatoryConfig method for single strings. */
   @Test
   public void testSingleStringGetMandatoryConfig() throws IOException {
     // Test null value.
@@ -57,9 +53,7 @@ public class ConfigurationUtilTest {
     assertThat(getMandatoryConfig(config, PROPERTY_ONE)).isEqualTo(VALUE_ONE);
   }
 
-  /**
-   * Verifies getMandatoryConfig method for a list of strings.
-   */
+  /** Verifies getMandatoryConfig method for a list of strings. */
   @Test
   public void testListGetMandatoryConfig() throws IOException {
     // Test one null value.

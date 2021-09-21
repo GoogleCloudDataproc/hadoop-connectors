@@ -26,7 +26,7 @@ import org.junit.runners.JUnit4;
 /**
  * Unit tests for BigQueryFactory.
  *
- * TODO(user): implement manual integration tests to check for successful connections.
+ * <p>TODO(user): implement manual integration tests to check for successful connections.
  */
 @RunWith(JUnit4.class)
 public class BigQueryFactoryTest {

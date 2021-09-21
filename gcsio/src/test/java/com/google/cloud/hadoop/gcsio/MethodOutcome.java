@@ -16,20 +16,21 @@ package com.google.cloud.hadoop.gcsio;
 
 /**
  * MethodOutcome encapsulates the possible outcomes of calling a method which returns a boolean
- * value; either "return true", "return false", or "throw exception"; the latter case will also
- * have an associated expected Exception class.
+ * value; either "return true", "return false", or "throw exception"; the latter case will also have
+ * an associated expected Exception class.
  */
 public class MethodOutcome {
   /**
-   * The possible high-level categories of outcomes which are mutually exclusive; this way, there
-   * is no need to worry about whether some boolean is necessarily "true" or "false" in the case
-   * of an exception being thrown, since there will be no return value in such a case.
+   * The possible high-level categories of outcomes which are mutually exclusive; this way, there is
+   * no need to worry about whether some boolean is necessarily "true" or "false" in the case of an
+   * exception being thrown, since there will be no return value in such a case.
    */
   public static enum Type {
     RETURNS_TRUE,
     RETURNS_FALSE,
     THROWS_EXCEPTION
   }
+
   private Type expectedOutcome;
   private Class<? extends Exception> expectedExceptionClass;
 
@@ -38,8 +39,7 @@ public class MethodOutcome {
     this.expectedExceptionClass = null;
   }
 
-  public MethodOutcome(
-      Type expectedOutcome, Class<? extends Exception> expectedExceptionClass) {
+  public MethodOutcome(Type expectedOutcome, Class<? extends Exception> expectedExceptionClass) {
     this.expectedOutcome = expectedOutcome;
     this.expectedExceptionClass = expectedExceptionClass;
   }
@@ -57,16 +57,12 @@ public class MethodOutcome {
     }
   }
 
-  /**
-   * Accessor for expected Type enum.
-   */
+  /** Accessor for expected Type enum. */
   public Type getType() {
     return expectedOutcome;
   }
 
-  /**
-   * Accessor for expected Exception class.
-   */
+  /** Accessor for expected Exception class. */
   public Class<? extends Exception> getExceptionClass() {
     return expectedExceptionClass;
   }

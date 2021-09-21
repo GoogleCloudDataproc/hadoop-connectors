@@ -80,7 +80,8 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
   // the way we pick temp file names and already ensured directories for the destination file,
   // we can optimize tempfile creation by skipping various directory checks.
   private static final CreateFileOptions TEMPFILE_CREATE_OPTIONS =
-      CreateFileOptions.DEFAULT_NO_OVERWRITE.toBuilder()
+      CreateFileOptions.DEFAULT_NO_OVERWRITE
+          .toBuilder()
           .setEnsureNoDirectoryConflict(false)
           .setOverwriteGenerationId(0)
           .build();
@@ -306,8 +307,8 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
 
     long generationId = StorageResourceId.UNKNOWN_GENERATION_ID;
     if (innerChannel instanceof GoogleCloudStorageItemInfo.Provider) {
-      generationId = ((GoogleCloudStorageItemInfo.Provider) innerChannel)
-          .getItemInfo().getContentGeneration();
+      generationId =
+          ((GoogleCloudStorageItemInfo.Provider) innerChannel).getItemInfo().getContentGeneration();
       logger.atFiner().log(
           "innerChannel is GoogleCloudStorageItemInfo.Provider; closed generationId %s.",
           generationId);
@@ -324,14 +325,18 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
       final StorageResourceId tempResourceId =
           StorageResourceId.fromStringPath(curGcsPath.toString(), generationId);
       if (!destResourceId.getBucketName().equals(tempResourceId.getBucketName())) {
-        throw new IllegalStateException(String.format(
-            "Destination bucket in path '%s' doesn't match temp file bucket in path '%s'",
-            finalGcsPath, curGcsPath));
+        throw new IllegalStateException(
+            String.format(
+                "Destination bucket in path '%s' doesn't match temp file bucket in path '%s'",
+                finalGcsPath, curGcsPath));
       }
-      GoogleCloudStorageItemInfo composedObject = ghfs.getGcsFs().getGcs().composeObjects(
-          ImmutableList.of(destResourceId, tempResourceId),
-          destResourceId,
-          GoogleCloudStorageFileSystem.objectOptionsFromFileOptions(fileOptions));
+      GoogleCloudStorageItemInfo composedObject =
+          ghfs.getGcsFs()
+              .getGcs()
+              .composeObjects(
+                  ImmutableList.of(destResourceId, tempResourceId),
+                  destResourceId,
+                  GoogleCloudStorageFileSystem.objectOptionsFromFileOptions(fileOptions));
       curDestGenerationId = composedObject.getContentGeneration();
       deletionFutures.add(
           cleanupThreadpool.submit(
@@ -346,16 +351,19 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
     }
   }
 
-  /**
-   * Returns URI to be used for the next "tail" file in the series.
-   */
+  /** Returns URI to be used for the next "tail" file in the series. */
   private URI getNextTemporaryPath() {
     Path basePath = ghfs.getHadoopPath(finalGcsPath);
     Path baseDir = basePath.getParent();
-    Path tempPath = new Path(
-        baseDir,
-        String.format("%s%s.%d.%s",
-            TEMPFILE_PREFIX, basePath.getName(), curComponentIndex, UUID.randomUUID().toString()));
+    Path tempPath =
+        new Path(
+            baseDir,
+            String.format(
+                "%s%s.%d.%s",
+                TEMPFILE_PREFIX,
+                basePath.getName(),
+                curComponentIndex,
+                UUID.randomUUID().toString()));
     return ghfs.getGcsPath(tempPath);
   }
 

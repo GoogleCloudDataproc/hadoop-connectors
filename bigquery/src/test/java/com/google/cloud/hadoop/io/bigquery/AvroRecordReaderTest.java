@@ -39,18 +39,30 @@ public class AvroRecordReaderTest {
 
   private static final int RECORD_COUNT = 50;
   private static final int AUTO_SYNC_INTERVAL = 32; /* Auto sync every 32 bytes */
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
+  @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
   private File testAvroFile;
   private List<String> allAddedKeys;
 
   @Before
   public void setup() throws IOException {
     Schema schema =
-        SchemaBuilder.record("BigQueryRecord").fields()
-            .name("key").type().stringBuilder().endString().noDefault()
-            .name("value1").type().stringBuilder().endString().noDefault()
-            .name("value2").type().intBuilder().endInt().noDefault()
+        SchemaBuilder.record("BigQueryRecord")
+            .fields()
+            .name("key")
+            .type()
+            .stringBuilder()
+            .endString()
+            .noDefault()
+            .name("value1")
+            .type()
+            .stringBuilder()
+            .endString()
+            .noDefault()
+            .name("value2")
+            .type()
+            .intBuilder()
+            .endInt()
+            .noDefault()
             .endRecord();
 
     GenericDatumWriter<GenericData.Record> recordWriter = new GenericDatumWriter<>(schema);
@@ -93,7 +105,7 @@ public class AvroRecordReaderTest {
   public void testSingleSplit() throws IOException {
     FileSplit fileSplit =
         new FileSplit(
-            new Path("file", null,  testAvroFile.getAbsolutePath()),
+            new Path("file", null, testAvroFile.getAbsolutePath()),
             0,
             testAvroFile.length(),
             new String[0]);
@@ -107,7 +119,7 @@ public class AvroRecordReaderTest {
   public void testMultipleSplits() throws IOException {
     long fileLength = testAvroFile.length();
     List<FileSplit> splits = new ArrayList<>();
-    Path hadoopPath = new Path("file", null,  testAvroFile.getAbsolutePath());
+    Path hadoopPath = new Path("file", null, testAvroFile.getAbsolutePath());
 
     for (int blockStart = 0; blockStart < fileLength; blockStart += AUTO_SYNC_INTERVAL) {
       splits.add(new FileSplit(hadoopPath, blockStart, AUTO_SYNC_INTERVAL, new String[0]));
@@ -123,8 +135,7 @@ public class AvroRecordReaderTest {
         int recordsInSplit = keysInSplit.size();
         totalFileRecords += recordsInSplit;
         // Not all 'blocks' contain records, but none should have all records
-        Truth.assertThat(recordsInSplit)
-            .isLessThan(RECORD_COUNT);
+        Truth.assertThat(recordsInSplit).isLessThan(RECORD_COUNT);
       }
     }
 

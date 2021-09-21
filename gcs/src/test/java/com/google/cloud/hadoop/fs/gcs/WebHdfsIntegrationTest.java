@@ -32,9 +32,9 @@ import org.junit.runners.JUnit4;
 /**
  * Integration tests for HDFS.
  *
- * <p>This class allows running all tests in HadoopFileSystemTestBase
- * against HDFS through WebHDFS protocol. This allows us to determine if HDFS behavior is different
- * from GHFS behavior and if so, fix GHFS to match HDFS behavior.
+ * <p>This class allows running all tests in HadoopFileSystemTestBase against HDFS through WebHDFS
+ * protocol. This allows us to determine if HDFS behavior is different from GHFS behavior and if so,
+ * fix GHFS to match HDFS behavior.
  *
  * <p>We enable it by mapping paths used by GHFS tests to HDFS paths.
  *
@@ -91,11 +91,8 @@ public class WebHdfsIntegrationTest extends HadoopFileSystemTestBase {
         }
       };
 
-  /**
-   * Perform initialization after creating test instances.
-   */
-  public static void postCreateInit()
-      throws IOException {
+  /** Perform initialization after creating test instances. */
+  public static void postCreateInit() throws IOException {
     HadoopFileSystemTestBase.postCreateInit();
   }
 
@@ -121,24 +118,22 @@ public class WebHdfsIntegrationTest extends HadoopFileSystemTestBase {
   @Test
   @Override
   public void testRename() throws Exception {
-    renameHelper(new HdfsBehavior() {
-        @Override
-        public MethodOutcome renameRootOutcome() {
-          // Unlike HDFS which returns false, WebHdfs throws when trying to rename root.
-          return new MethodOutcome(
-              MethodOutcome.Type.THROWS_EXCEPTION, IOException.class);
-        }
-      });
+    renameHelper(
+        new HdfsBehavior() {
+          @Override
+          public MethodOutcome renameRootOutcome() {
+            // Unlike HDFS which returns false, WebHdfs throws when trying to rename root.
+            return new MethodOutcome(MethodOutcome.Type.THROWS_EXCEPTION, IOException.class);
+          }
+        });
   }
 
   // -----------------------------------------------------------------
 
-  /**
-   * Validates getDefaultReplication().
-   */
-  @Test @Override
-  public void testGetDefaultReplication()
-      throws IOException {
+  /** Validates getDefaultReplication(). */
+  @Test
+  @Override
+  public void testGetDefaultReplication() throws IOException {
     assertWithMessage("Expected default replication factor >= 1")
         .that(ghfs.getDefaultReplication() >= 1)
         .isTrue();
@@ -180,27 +175,23 @@ public class WebHdfsIntegrationTest extends HadoopFileSystemTestBase {
   /**
    * Validates partial reads.
    *
-   * Note:
-   * WebHDFS implementation has a bug that does not handle partial reads correctly.
+   * <p>Note: WebHDFS implementation has a bug that does not handle partial reads correctly.
    * TODO(user): do not ignore this test once the bug is fixed.
    */
-  @Test @Override
-  public void testReadPartialObject()
-      throws IOException {
-  }
+  @Test
+  @Override
+  public void testReadPartialObject() throws IOException {}
 
   /**
    * Validates functionality related to getting/setting current position.
    *
-   * Note:
-   * WebHDFS implementation has a bug that does not handle partial reads correctly.
-   * testFilePosition test contains code that performs partial reads.
-   * TODO(user): do not ignore this test once the bug is fixed.
+   * <p>Note: WebHDFS implementation has a bug that does not handle partial reads correctly.
+   * testFilePosition test contains code that performs partial reads. TODO(user): do not ignore this
+   * test once the bug is fixed.
    */
-  @Test @Override
-  public void testFilePosition()
-      throws IOException {
-  }
+  @Test
+  @Override
+  public void testFilePosition() throws IOException {}
 
   // -----------------------------------------------------------------
   // Inherited tests that we suppress because they do not make sense

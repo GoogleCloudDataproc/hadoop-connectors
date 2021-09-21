@@ -63,15 +63,11 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   protected static HadoopFileSystemIntegrationHelper ghfsHelper;
 
   public static void postCreateInit() throws IOException {
-    postCreateInit(
-        new HadoopFileSystemIntegrationHelper(ghfs, ghfsFileSystemDescriptor));
+    postCreateInit(new HadoopFileSystemIntegrationHelper(ghfs, ghfsFileSystemDescriptor));
   }
 
-  /**
-   * Perform initialization after creating test instances.
-   */
-  public static void postCreateInit(HadoopFileSystemIntegrationHelper helper)
-      throws IOException {
+  /** Perform initialization after creating test instances. */
+  public static void postCreateInit(HadoopFileSystemIntegrationHelper helper) throws IOException {
     ghfsHelper = helper;
     ghfsHelper.ghfs.mkdirs(
         new Path(ghfsHelper.ghfsFileSystemDescriptor.getFileSystemRoot().toUri()));
@@ -107,8 +103,8 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   // -----------------------------------------------------------------
 
   /**
-   * Actual logic for validating the GoogleHadoopFileSystemBase-specific FileStatus returned
-   * by getFileStatus() or listStatus().
+   * Actual logic for validating the GoogleHadoopFileSystemBase-specific FileStatus returned by
+   * getFileStatus() or listStatus().
    */
   private void validateFileStatusInternal(
       String bucketName, String objectName, boolean expectedToExist, FileStatus fileStatus)
@@ -119,8 +115,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
 
     if (fileStatus != null) {
       // File/dir exists, check its attributes.
-      long expectedSize =
-          ghfsHelper.getExpectedObjectSize(objectName, expectedToExist);
+      long expectedSize = ghfsHelper.getExpectedObjectSize(objectName, expectedToExist);
       if (expectedSize != Long.MIN_VALUE) {
         assertWithMessage("%s", fileStatus.getPath())
             .that(fileStatus.getLen())
@@ -214,8 +209,9 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
           pathComponents[0] = bucketName;
           pathComponents[1] = expectedListedName;
         }
-        Path expectedPath = ghfsHelper.castAsHadoopPath(
-            ghfsHelper.getPath(pathComponents[0], pathComponents[1], true));
+        Path expectedPath =
+            ghfsHelper.castAsHadoopPath(
+                ghfsHelper.getPath(pathComponents[0], pathComponents[1], true));
         expectedPaths.add(expectedPath);
         pathToComponents.put(expectedPath, pathComponents);
       }
@@ -272,12 +268,9 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   // -----------------------------------------------------------------
   // Tests that test behavior at GHFS layer.
 
-  /**
-   * Tests read() when invalid arguments are passed.
-   */
+  /** Tests read() when invalid arguments are passed. */
   @Test
-  public void testReadInvalidArgs()
-      throws IOException {
+  public void testReadInvalidArgs() throws IOException {
     URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
     ghfsHelper.writeFile(hadoopPath, "file text", 1, /* overwrite= */ true);
@@ -302,18 +295,18 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   }
 
   private void testReadInvalidArgsHelper(
-      FSDataInputStream readStream, byte[] buffer, int offset, int length,
+      FSDataInputStream readStream,
+      byte[] buffer,
+      int offset,
+      int length,
       Class<? extends Exception> exceptionClass) {
     Exception e = assertThrows(Exception.class, () -> readStream.read(buffer, offset, length));
     assertThat(e).isInstanceOf(exceptionClass);
   }
 
-  /**
-   * Writes a file one byte at a time (exercises write(byte b)).
-   */
+  /** Writes a file one byte at a time (exercises write(byte b)). */
   @Test
-  public void testWrite1Byte()
-      throws IOException {
+  public void testWrite1Byte() throws IOException {
     String text = "Hello World!";
     byte[] textBytes = text.getBytes(UTF_8);
     URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
@@ -327,8 +320,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     writeStream.close();
 
     // Read the file back and verify contents.
-    String readText =
-        ghfsHelper.readTextFile(hadoopPath, 0, textBytes.length, true);
+    String readText = ghfsHelper.readTextFile(hadoopPath, 0, textBytes.length, true);
     assertWithMessage("testWrite1Byte: write-read mismatch").that(readText).isEqualTo(text);
   }
 
@@ -438,22 +430,16 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     assertThat(ghfsHelper.readTextFile(hadoopPath)).isEqualTo("content_appended");
   }
 
-  /**
-   * Validates getDefaultReplication().
-   */
+  /** Validates getDefaultReplication(). */
   @Test
-  public void testGetDefaultReplication()
-      throws IOException {
+  public void testGetDefaultReplication() throws IOException {
     assertThat(ghfs.getDefaultReplication())
         .isEqualTo(GoogleHadoopFileSystemBase.REPLICATION_FACTOR_DEFAULT);
   }
 
-  /**
-   * Validates functionality related to getting/setting current position.
-   */
+  /** Validates functionality related to getting/setting current position. */
   @Test
-  public void testFilePosition()
-      throws IOException {
+  public void testFilePosition() throws IOException {
 
     // Write an object.
     URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
@@ -519,12 +505,11 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   }
 
   /**
-   * More comprehensive testing of various "seek" calls backwards and forwards and around
-   * the edge cases related to buffer sizes.
+   * More comprehensive testing of various "seek" calls backwards and forwards and around the edge
+   * cases related to buffer sizes.
    */
   @Test
-  public void testFilePositionInDepthSeeks()
-      throws IOException {
+  public void testFilePositionInDepthSeeks() throws IOException {
     // Write an object.
     URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
@@ -622,13 +607,12 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   }
 
   /**
-   * Validates when paths already contain a pre-escaped substring, e.g. file:///foo%3Abar/baz,
-   * that the FileSystem doesn't accidentally unescape it along the way, e.g. translating into
+   * Validates when paths already contain a pre-escaped substring, e.g. file:///foo%3Abar/baz, that
+   * the FileSystem doesn't accidentally unescape it along the way, e.g. translating into
    * file:///foo:bar/baz.
    */
   @Test
-  public void testPreemptivelyEscapedPaths()
-      throws IOException {
+  public void testPreemptivelyEscapedPaths() throws IOException {
     URI parentUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path parentPath = ghfsHelper.castAsHadoopPath(parentUri);
     Path escapedPath = new Path(parentPath, new Path("foo%3Abar"));
@@ -643,9 +627,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     assertThat(ghfs.delete(parentPath, true)).isTrue();
   }
 
-  /**
-   * Contains data needed for testing the setWorkingDirectory() operation.
-   */
+  /** Contains data needed for testing the setWorkingDirectory() operation. */
   static class WorkingDirData {
 
     // Path passed to setWorkingDirectory().
@@ -658,8 +640,8 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     /**
      * Constructs an instance of WorkingDirData.
      *
-     * The given path and expectedPath are used without further modification.
-     * The caller decides whether to pass absolute or relative paths.
+     * <p>The given path and expectedPath are used without further modification. The caller decides
+     * whether to pass absolute or relative paths.
      */
     private WorkingDirData(Path path, Path expectedPath) {
       this.path = path;
@@ -669,13 +651,14 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     /**
      * Constructs an instance of WorkingDirData.
      *
-     * The given objectName is converted to an absolute path by combining it with
-     * the default test bucket. The resulting path is passed to setWorkingDirectory().
-     * Similarly the expectedObjectName is also converted to an absolute path.
+     * <p>The given objectName is converted to an absolute path by combining it with the default
+     * test bucket. The resulting path is passed to setWorkingDirectory(). Similarly the
+     * expectedObjectName is also converted to an absolute path.
      */
     static WorkingDirData absolute(
         HadoopFileSystemIntegrationHelper ghfsHelper,
-        String objectName, String expectedObjectName) {
+        String objectName,
+        String expectedObjectName) {
       return new WorkingDirData(
           ghfsHelper.createSchemeCompatibleHadoopPath(sharedBucketName1, objectName),
           ghfsHelper.createSchemeCompatibleHadoopPath(sharedBucketName1, expectedObjectName));
@@ -684,8 +667,8 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     /**
      * Constructs an instance of WorkingDirData.
      *
-     * The given objectName is converted to an absolute path by combining it with
-     * the default test bucket. The resulting path is passed to setWorkingDirectory().
+     * <p>The given objectName is converted to an absolute path by combining it with the default
+     * test bucket. The resulting path is passed to setWorkingDirectory().
      */
     static WorkingDirData absolute(
         HadoopFileSystemIntegrationHelper ghfsHelper, String objectName) {
@@ -696,8 +679,8 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     /**
      * Constructs an instance of WorkingDirData.
      *
-     * The given path and expectedPath are used without further modification.
-     * The caller decides whether to pass absolute or relative paths.
+     * <p>The given path and expectedPath are used without further modification. The caller decides
+     * whether to pass absolute or relative paths.
      */
     static WorkingDirData any(Path path, Path expectedPath) {
       return new WorkingDirData(path, expectedPath);
@@ -711,10 +694,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   protected List<WorkingDirData> setUpWorkingDirectoryTest() throws Exception {
     // Objects created for this test.
     String[] objectNames = {
-      "f1",
-      "d0/",
-      "d1/f1",
-      "d1/d11/f1",
+      "f1", "d0/", "d1/f1", "d1/d11/f1",
     };
 
     // -------------------------------------------------------
@@ -735,7 +715,6 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
 
     // Set working directory to an existing directory (non-empty).
     wddList.add(WorkingDirData.absolute(ghfsHelper, "d1/", "d1/"));
-
 
     // Set working directory to an existing directory (multi-level).
     wddList.add(WorkingDirData.absolute(ghfsHelper, "d1/d11/", "d1/d11/"));

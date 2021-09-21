@@ -42,8 +42,7 @@ import org.junit.runners.JUnit4;
  * bucket/object semantics.
  */
 @RunWith(JUnit4.class)
-public class GoogleCloudStorageFileSystemTest
-    extends GoogleCloudStorageFileSystemIntegrationTest {
+public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSystemIntegrationTest {
 
   @ClassRule
   public static NotInheritableExternalResource storageResource =
@@ -91,9 +90,7 @@ public class GoogleCloudStorageFileSystemTest
             .build());
   }
 
-  /**
-   * Validates constructor.
-   */
+  /** Validates constructor. */
   @Test
   public void testConstructor() throws IOException {
     GoogleCredential cred = new GoogleCredential();
@@ -114,7 +111,9 @@ public class GoogleCloudStorageFileSystemTest
     new GoogleCloudStorageFileSystem(cred, optionsBuilder.build());
 
     optionsBuilder.setCloudStorageOptions(
-        options.getCloudStorageOptions().toBuilder()
+        options
+            .getCloudStorageOptions()
+            .toBuilder()
             .setProjectId("projectId")
             .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
             .build());
@@ -228,10 +227,7 @@ public class GoogleCloudStorageFileSystemTest
     }
 
     String[] validPaths = {
-      "gs:/",
-      "gs://bucket/obj",
-      "gs://bucket/obj/",
-      "gs://bucket/obj/bar",
+      "gs:/", "gs://bucket/obj", "gs://bucket/obj/", "gs://bucket/obj/bar",
     };
 
     for (String validPath : validPaths) {
@@ -244,12 +240,9 @@ public class GoogleCloudStorageFileSystemTest
         () -> UriPaths.fromStringPathComponents(invalidBucketName, null, true));
   }
 
-  /**
-   * Verify getItemName().
-   */
+  /** Verify getItemName(). */
   @Test
-  public void testGetItemName()
-      throws URISyntaxException {
+  public void testGetItemName() throws URISyntaxException {
     // Trailing slashes are effectively stripped for returned bucket names, but not for object
     // names.
     String[] inputPaths = {
@@ -263,13 +256,7 @@ public class GoogleCloudStorageFileSystemTest
     };
 
     String[] expectedNames = {
-      null,
-      "my-bucket",
-      "my-bucket",
-      "foo",
-      "foo/",
-      "bar",
-      "bar/",
+      null, "my-bucket", "my-bucket", "foo", "foo/", "bar", "bar/",
     };
 
     List<String> actualNames = new ArrayList<>();
@@ -279,12 +266,9 @@ public class GoogleCloudStorageFileSystemTest
     assertThat(actualNames.toArray(new String[0])).isEqualTo(expectedNames);
   }
 
-  /**
-   * Verify getParentPath().
-   */
+  /** Verify getParentPath(). */
   @Test
-  public void testGetParentPathEdgeCases()
-      throws URISyntaxException {
+  public void testGetParentPathEdgeCases() throws URISyntaxException {
     URI[] inputPaths = {
       new URI("gs:/"),
       new URI("gs://my-bucket"),
@@ -332,8 +316,7 @@ public class GoogleCloudStorageFileSystemTest
     }
 
     String[] validBucketNames = {
-      "foo",
-      "foo/",
+      "foo", "foo/",
     };
 
     for (String bucketName : validBucketNames) {
@@ -372,9 +355,7 @@ public class GoogleCloudStorageFileSystemTest
     StringPaths.validateObjectName("", true);
 
     String[] validObjectNames = {
-      "foo",
-      "foo/bar",
-      "foo/bar/",
+      "foo", "foo/bar", "foo/bar/",
     };
 
     for (String objectName : validObjectNames) {
@@ -382,24 +363,18 @@ public class GoogleCloudStorageFileSystemTest
     }
   }
 
-  /**
-   * Verify misc cases for FileInfo.
-   */
+  /** Verify misc cases for FileInfo. */
   @Test
-  public void testFileInfo()
-      throws IOException {
+  public void testFileInfo() throws IOException {
     assertThat(gcsfs.getFileInfo(GoogleCloudStorageFileSystem.GCS_ROOT).getPath())
         .isEqualTo(GoogleCloudStorageFileSystem.GCS_ROOT);
     assertThat(gcsfs.getFileInfo(GoogleCloudStorageFileSystem.GCS_ROOT).getItemInfo())
         .isEqualTo(GoogleCloudStorageItemInfo.ROOT_INFO);
   }
 
-  /**
-   * Verify misc cases for create/open.
-   */
+  /** Verify misc cases for create/open. */
   @Test
-  public void testMiscCreateAndOpen()
-      throws URISyntaxException, IOException {
+  public void testMiscCreateAndOpen() throws URISyntaxException, IOException {
     URI dirPath = new URI("gs://foo/bar/");
     assertThrows(IOException.class, () -> gcsfs.create(dirPath));
 
@@ -407,8 +382,7 @@ public class GoogleCloudStorageFileSystemTest
   }
 
   @Test
-  public void testCreateNoParentDirectories()
-      throws URISyntaxException, IOException {
+  public void testCreateNoParentDirectories() throws URISyntaxException, IOException {
     String bucketName = sharedBucketName1;
     String testDir = "no/parent/dirs";
 

@@ -28,9 +28,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
-/**
- * An abstract base class for BigQuery exports to GCS for use by MapReduce job setup
- */
+/** An abstract base class for BigQuery exports to GCS for use by MapReduce job setup */
 public abstract class AbstractExportToCloudStorage implements Export {
 
   public static final String DESTINATION_FORMAT_KEY = "destinationFormat";
@@ -103,9 +101,10 @@ public abstract class AbstractExportToCloudStorage implements Export {
       logger.atFine().log("Got response '%s'", response);
       exportJobReference = response.getJobReference();
     } catch (IOException e) {
-      String error = String.format(
-          "Error while exporting table %s",
-          BigQueryStrings.toString(tableToExport.getTableReference()));
+      String error =
+          String.format(
+              "Error while exporting table %s",
+              BigQueryStrings.toString(tableToExport.getTableReference()));
       throw new IOException(error, e);
     }
   }

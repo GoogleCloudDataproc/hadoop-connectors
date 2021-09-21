@@ -35,7 +35,7 @@ public class GoogleHadoopFileSystemContractTest extends FileSystemContractBaseTe
   /**
    * Gets the default working directory of GHBRFS used by testWorkingDirectory().
    *
-   * Note that the real default working directory of GHBRFS is gs:/. That value causes
+   * <p>Note that the real default working directory of GHBRFS is gs:/. That value causes
    * testWorkingDirectory to fail because it is an incorrectly written test (it assumes that default
    * working directory is always a non-root directory). Therefore we use a non-root directory below.
    */

@@ -22,11 +22,10 @@ import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.RecordReader;
 
 /**
- * GsonBigQueryInputFormat provides access to BigQuery tables via exports to GCS in the form of
- * gson JsonObjects as mapper values.
+ * GsonBigQueryInputFormat provides access to BigQuery tables via exports to GCS in the form of gson
+ * JsonObjects as mapper values.
  */
-public class GsonBigQueryInputFormat
-    extends AbstractBigQueryInputFormat<LongWritable, JsonObject> {
+public class GsonBigQueryInputFormat extends AbstractBigQueryInputFormat<LongWritable, JsonObject> {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   @Override
