@@ -34,10 +34,25 @@ import org.apache.hadoop.util.GenericOptionsParser;
 
 /**
  * Sample MapReduce which computes SUM(bytes_transferred) grouping by "title" from a
- * wikipedia_pageviews table. The following is the BigQuery schema of the table: datetime_epoch
- * INTEGER NULLABLE year INTEGER NULLABLE month INTEGER NULLABLE day INTEGER NULLABLE hour INTEGER
- * NULLABLE wikimedia_project STRING NULLABLE language STRING NULLABLE title STRING NULLABLE views
- * INTEGER NULLABLE bytes_transferred INTEGER NULLABLE
+ * wikipedia_pageviews table. The following is the BigQuery schema of the table:
+ *
+ * <table>
+ *   <thead>
+ *     <tr> <th>column_name</th> <th>data_type</th> <th>is_nullable</th> </tr>
+ *   <thead>
+ *   <tbody>
+ *   <tr> <td> datetime_epoch </td> <td> INTEGER </td> <td> NULLABLE </td> </tr>
+ *   <tr> <td> year </td> <td> INTEGER</td> <td> NULLABLE</td> </tr>
+ *   <tr> <td> month </td> <td> INTEGER</td> <td> NULLABLE</td> </tr>
+ *   <tr> <td> day </td> <td> INTEGER</td> <td> NULLABLE</td> </tr>
+ *   <tr> <td> hour </td> <td> INTEGER</td> <td> NULLABLE</td> </tr>
+ *   <tr> <td> wikimedia_project </td> <td> STRING</td><td> NULLABLE</td> </tr>
+ *   <tr> <td> language </td> <td> STRING</td> <td> NULLABLE</td> </tr>
+ *   <tr> <td> title </td> <td> STRING</td> <td> NULLABLE</td> </tr>
+ *   <tr> <td> views </td> <td> INTEGER</td> <td> NULLABLE</td> </tr>
+ *   <tr> <td> bytes_transferred </td> <td> INTEGER</td> <td> NULLABLE</td> </tr>
+ *    </tbody>
+ *   </table>
  */
 public class WikipediaRequestBytes {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
