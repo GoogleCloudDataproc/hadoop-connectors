@@ -394,10 +394,20 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
    */
   @Test
   public void testGetAndListFileInfo() throws Exception {
+    // fmt:off
     // Objects created for this test.
     String[] objectNames = {
-      "o1", "o2", "d0/", "d1/o11", "d1/o12", "d1/d10/", "d1/d11/o111", "d2/o21", "d2/o22",
+        "o1",
+        "o2",
+        "d0/",
+        "d1/o11",
+        "d1/o12",
+        "d1/d10/",
+        "d1/d11/o111",
+        "d2/o21",
+        "d2/o22",
     };
+    // fmt:on
 
     String dirDoesNotExist = "does-not-exist/";
     String objDoesNotExist = "does-not-exist";
@@ -582,10 +592,16 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   public void deleteHelper(DeletionBehavior behavior) throws Exception {
     String bucketName = sharedBucketName1;
 
+    // fmt:off
     // Objects created for this test.
     String[] objectNames = {
-      "f1", "d0/", "d1/f1", "d1/d0/", "d1/d11/f1",
+      "f1",
+      "d0/",
+      "d1/f1",
+      "d1/d0/",
+      "d1/d11/f1",
     };
+    // fmt:on
 
     // -------------------------------------------------------
     // Create test objects.
@@ -775,10 +791,14 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   public void mkdirsHelper(MkdirsBehavior behavior) throws Exception {
     String bucketName = sharedBucketName1;
 
+    // fmt:off
     // Objects created for this test.
     String[] objectNames = {
-      "f1", "d0/", "d1/f11",
+      "f1",
+      "d0/",
+      "d1/f11",
     };
+    // fmt:on
 
     // -------------------------------------------------------
     // Create test objects.
@@ -879,10 +899,13 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   @Test
   public void testGetFileInfos() throws Exception {
     String bucketName = sharedBucketName1;
+    // fmt:off
     // Objects created for this test.
     String[] objectNames = {
-      "f1", "d0/",
+      "f1",
+      "d0/",
     };
+    // fmt:on
 
     // -------------------------------------------------------
     // Create test objects.
