@@ -64,10 +64,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
         testConf.getProjectId(), testConf.getServiceAccount(), testConf.getPrivateKeyFile());
   }
 
-  /**
-   * Helper to load GHFS-specific config values other than those from
-   * the environment.
-   */
+  /** Helper to load GHFS-specific config values other than those from the environment. */
   protected static Configuration loadConfig(
       String projectId, String serviceAccount, String privateKeyFile) {
     assertWithMessage("Expected value for env var %s", TestConfiguration.GCS_TEST_PROJECT_ID)
@@ -106,15 +103,13 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
   public abstract void testCheckPathFailure();
 
   @Test
-  public abstract void testInitializeSuccess()
-      throws IOException, URISyntaxException;
+  public abstract void testInitializeSuccess() throws IOException, URISyntaxException;
 
   @Test
   public abstract void testInitializeWithWorkingDirectory() throws Exception;
 
   @Test
-  public abstract void testConfigureBucketsSuccess()
-      throws URISyntaxException, IOException;
+  public abstract void testConfigureBucketsSuccess() throws URISyntaxException, IOException;
 
   @Test
   public abstract void testConfigureBucketsWithRootBucketButNoSystemBucket() throws IOException;
@@ -139,9 +134,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
         .isEqualTo(new URI("gs://" + myghfs.getUri().getAuthority() + "/buck%5Eet/object"));
   }
 
-  /**
-   * Verifies that test config can be accessed through the FS instance.
-   */
+  /** Verifies that test config can be accessed through the FS instance. */
   @Test
   public void testConfig() {
     GoogleHadoopFileSystemBase myghfs = (GoogleHadoopFileSystemBase) ghfs;
@@ -155,9 +148,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
         .isEqualTo(GoogleHadoopFileSystemConfiguration.BLOCK_SIZE.getDefault());
   }
 
-  /**
-   * Tests getCanonicalServiceName().
-   */
+  /** Tests getCanonicalServiceName(). */
   @Test
   public void testGetCanonicalServiceName() {
     assertThat(ghfs.getCanonicalServiceName()).isNull();
@@ -341,7 +332,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     String workingParent = fsRoot + "working/";
     String workingDir = workingParent + "dir";
     myGhfs.setWorkingDirectory(new Path(workingDir));
-    Map<String, String > qualifiedPaths = new HashMap<>();
+    Map<String, String> qualifiedPaths = new HashMap<>();
     qualifiedPaths.put("/", fsRoot);
     qualifiedPaths.put("/foo", fsRoot + "foo");
     qualifiedPaths.put("/foo/bar", fsRoot + "foo/bar");
@@ -384,9 +375,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     if (fsRootUri.getAuthority() != null) {
       // When the path to qualify is of the form gs://somebucket, we want to qualify
       // it as gs://someBucket/
-      qualifiedPaths.put(
-          fsRoot.substring(0, fsRoot.length() - 1),
-          fsRoot);
+      qualifiedPaths.put(fsRoot.substring(0, fsRoot.length() - 1), fsRoot);
     }
 
     for (String unqualifiedString : qualifiedPaths.keySet()) {
@@ -396,17 +385,15 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     }
   }
 
-  /**
-   * Validates makeQualified() when working directory is root.
-   */
+  /** Validates makeQualified() when working directory is root. */
   @Test
-  public void testMakeQualifiedRoot()  {
+  public void testMakeQualifiedRoot() {
     GoogleHadoopFileSystemBase myGhfs = (GoogleHadoopFileSystemBase) ghfs;
     myGhfs.setWorkingDirectory(myGhfs.getFileSystemRoot());
     Path fsRootPath = myGhfs.getFileSystemRoot();
     URI fsRootUri = fsRootPath.toUri();
     String fsRoot = fsRootPath.toString();
-    Map<String, String > qualifiedPaths = new HashMap<>();
+    Map<String, String> qualifiedPaths = new HashMap<>();
     qualifiedPaths.put("/", fsRoot);
     qualifiedPaths.put("/foo", fsRoot + "foo");
     qualifiedPaths.put("/foo/bar", fsRoot + "foo/bar");
@@ -449,9 +436,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     if (fsRootUri.getAuthority() != null) {
       // When the path to qualify is of the form gs://somebucket, we want to qualify
       // it as gs://someBucket/
-      qualifiedPaths.put(
-          fsRoot.substring(0, fsRoot.length() - 1),
-          fsRoot);
+      qualifiedPaths.put(fsRoot.substring(0, fsRoot.length() - 1), fsRoot);
     }
 
     for (String unqualifiedString : qualifiedPaths.keySet()) {
@@ -499,7 +484,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
       ghfs.getContentSummary(tempFilePath);
       ghfs.getDelegationToken("foo");
       ghfs.copyFromLocalFile(false, true, localTempFilePath, tempDirPath);
-      ghfs.copyFromLocalFile(false, true, new Path[] { localTempFilePath }, tempDirPath);
+      ghfs.copyFromLocalFile(false, true, new Path[] {localTempFilePath}, tempDirPath);
       localTempFile.delete();
       ghfs.copyToLocalFile(true, tempFilePath, localTempDirPath);
       File localCopiedFile = new File(localTempDirPath.toString(), tempFilePath.getName());

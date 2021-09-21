@@ -21,16 +21,12 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/**
- * Unittests for BigQueryStrings formatting/parsing of BigQuery-related data structures.
- */
+/** Unittests for BigQueryStrings formatting/parsing of BigQuery-related data structures. */
 @RunWith(JUnit4.class)
 public class BigQueryStringsTest {
   @Test
   public void testTableReferenceToStringWithNoProjectId() {
-    TableReference tableRef = new TableReference()
-        .setDatasetId("foo")
-        .setTableId("bar");
+    TableReference tableRef = new TableReference().setDatasetId("foo").setTableId("bar");
     assertThat(BigQueryStrings.toString(tableRef)).isEqualTo("foo.bar");
 
     // Empty string doesn't cause a leading ':'.
@@ -40,46 +36,36 @@ public class BigQueryStringsTest {
 
   @Test
   public void testTableReferenceToStringWithProjectId() {
-    TableReference tableRef = new TableReference()
-        .setProjectId("foo-proj")
-        .setDatasetId("foo")
-        .setTableId("bar");
+    TableReference tableRef =
+        new TableReference().setProjectId("foo-proj").setDatasetId("foo").setTableId("bar");
     assertThat(BigQueryStrings.toString(tableRef)).isEqualTo("foo-proj:foo.bar");
   }
 
   @Test
   public void testToStringThrowsWhenTableIdIsNull() {
-    TableReference tableRef = new TableReference()
-        .setProjectId("foo-proj")
-        .setDatasetId("foo")
-        .setTableId(null);
+    TableReference tableRef =
+        new TableReference().setProjectId("foo-proj").setDatasetId("foo").setTableId(null);
     assertThrows(IllegalArgumentException.class, () -> BigQueryStrings.toString(tableRef));
   }
 
   @Test
   public void testToStringThrowsWhenTableIdIsEmpty() {
-    TableReference tableRef = new TableReference()
-        .setProjectId("foo-proj")
-        .setDatasetId("foo")
-        .setTableId("");
+    TableReference tableRef =
+        new TableReference().setProjectId("foo-proj").setDatasetId("foo").setTableId("");
     assertThrows(IllegalArgumentException.class, () -> BigQueryStrings.toString(tableRef));
   }
 
   @Test
   public void testToStringThrowsWhenDatasetIsNull() {
-    TableReference tableRef = new TableReference()
-        .setProjectId("foo-proj")
-        .setDatasetId(null)
-        .setTableId("tableId");
+    TableReference tableRef =
+        new TableReference().setProjectId("foo-proj").setDatasetId(null).setTableId("tableId");
     assertThrows(IllegalArgumentException.class, () -> BigQueryStrings.toString(tableRef));
   }
 
   @Test
   public void testToStringThrowsWhenDatasetIsEmpty() {
-    TableReference tableRef = new TableReference()
-        .setProjectId("foo-proj")
-        .setDatasetId("")
-        .setTableId("tableId");
+    TableReference tableRef =
+        new TableReference().setProjectId("foo-proj").setDatasetId("").setTableId("tableId");
     assertThrows(IllegalArgumentException.class, () -> BigQueryStrings.toString(tableRef));
   }
 

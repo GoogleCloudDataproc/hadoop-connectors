@@ -47,9 +47,7 @@ public class HadoopFileSystemIntegrationHelper
   FileSystem ghfs;
   FileSystemDescriptor ghfsFileSystemDescriptor;
 
-  /**
-   * FS statistics mode.
-   */
+  /** FS statistics mode. */
   public enum FileSystemStatistics {
     // No statistics available.
     NONE,
@@ -81,19 +79,14 @@ public class HadoopFileSystemIntegrationHelper
     this.ghfsFileSystemDescriptor = ghfsFileSystemDescriptor;
   }
 
-  /**
-   * Turn off statistics collection.
-   */
+  /** Turn off statistics collection. */
   public void setIgnoreStatistics() {
     statistics = FileSystemStatistics.IGNORE;
   }
 
-  /**
-   * Renames src path to dst path.
-   */
+  /** Renames src path to dst path. */
   @Override
-  protected boolean rename(URI src, URI dst)
-      throws IOException {
+  protected boolean rename(URI src, URI dst) throws IOException {
     Path srcHadoopPath = castAsHadoopPath(src);
     Path dstHadoopPath = castAsHadoopPath(dst);
 
@@ -134,12 +127,9 @@ public class HadoopFileSystemIntegrationHelper
     return ghfs.mkdirs(hadoopPath);
   }
 
-  /**
-   * Indicates whether the given path exists.
-   */
+  /** Indicates whether the given path exists. */
   @Override
-  protected boolean exists(URI path)
-      throws IOException {
+  protected boolean exists(URI path) throws IOException {
     Path hadoopPath = castAsHadoopPath(path);
     try {
       ghfs.getFileStatus(hadoopPath);
@@ -149,12 +139,9 @@ public class HadoopFileSystemIntegrationHelper
     }
   }
 
-  /**
-   * Indicates whether the given path is directory.
-   */
+  /** Indicates whether the given path is directory. */
   @Override
-  protected boolean isDirectory(URI path)
-      throws IOException {
+  protected boolean isDirectory(URI path) throws IOException {
     Path hadoopPath = castAsHadoopPath(path);
     try {
       FileStatus status = ghfs.getFileStatus(hadoopPath);
@@ -164,12 +151,9 @@ public class HadoopFileSystemIntegrationHelper
     }
   }
 
-  /**
-   * Opens the given object for reading.
-   */
+  /** Opens the given object for reading. */
   @Override
-  protected SeekableByteChannel open(String bucketName, String objectName)
-      throws IOException {
+  protected SeekableByteChannel open(String bucketName, String objectName) throws IOException {
     return null;
   }
 
@@ -186,11 +170,8 @@ public class HadoopFileSystemIntegrationHelper
     return readTextFile(hadoopPath);
   }
 
-  /**
-   * Helper which reads the entire file as a String.
-   */
-  protected String readTextFile(Path hadoopPath)
-      throws IOException {
+  /** Helper which reads the entire file as a String. */
+  protected String readTextFile(Path hadoopPath) throws IOException {
     FSDataInputStream readStream = null;
     byte[] readBuffer = new byte[1024];
     StringBuilder returnBuffer = new StringBuilder();
@@ -211,9 +192,8 @@ public class HadoopFileSystemIntegrationHelper
   }
 
   /**
-   * Helper that reads text from the given bucket+object at the given offset
-   * and returns it. If checkOverflow is true, it will make sure that
-   * no more than 'len' bytes were read.
+   * Helper that reads text from the given bucket+object at the given offset and returns it. If
+   * checkOverflow is true, it will make sure that no more than 'len' bytes were read.
    */
   @Override
   protected String readTextFile(
@@ -224,22 +204,19 @@ public class HadoopFileSystemIntegrationHelper
   }
 
   /**
-   * Helper that reads text from the given file at the given offset
-   * and returns it. If checkOverflow is true, it will make sure that
-   * no more than 'len' bytes were read.
+   * Helper that reads text from the given file at the given offset and returns it. If checkOverflow
+   * is true, it will make sure that no more than 'len' bytes were read.
    */
-  protected String readTextFile(
-      Path hadoopPath, int offset, int len, boolean checkOverflow)
+  protected String readTextFile(Path hadoopPath, int offset, int len, boolean checkOverflow)
       throws IOException {
     String text = null;
     FSDataInputStream readStream = null;
     long fileSystemBytesRead = 0;
-    FileSystem.Statistics stats = FileSystem.getStatistics(
-        ghfsFileSystemDescriptor.getScheme(), ghfs.getClass());
+    FileSystem.Statistics stats =
+        FileSystem.getStatistics(ghfsFileSystemDescriptor.getScheme(), ghfs.getClass());
     if (stats != null) {
       // Let it be null in case no stats have been added for our scheme yet.
-      fileSystemBytesRead =
-          stats.getBytesRead();
+      fileSystemBytesRead = stats.getBytesRead();
     }
 
     try {
@@ -262,8 +239,7 @@ public class HadoopFileSystemIntegrationHelper
     }
 
     // After the read, the stats better be non-null for our ghfs scheme.
-    stats = FileSystem.getStatistics(
-        ghfsFileSystemDescriptor.getScheme(), ghfs.getClass());
+    stats = FileSystem.getStatistics(ghfsFileSystemDescriptor.getScheme(), ghfs.getClass());
     assertThat(stats).isNotNull();
     long endFileSystemBytesRead = stats.getBytesRead();
     int bytesReadStats = (int) (endFileSystemBytesRead - fileSystemBytesRead);
@@ -285,22 +261,16 @@ public class HadoopFileSystemIntegrationHelper
     return text;
   }
 
-  /**
-   * Creates a directory.
-   */
+  /** Creates a directory. */
   @Override
-  protected void mkdir(String bucketName, String objectName)
-      throws IOException {
+  protected void mkdir(String bucketName, String objectName) throws IOException {
     Path path = createSchemeCompatibleHadoopPath(bucketName, objectName);
     ghfs.mkdirs(path);
   }
 
-  /**
-   * Creates a directory.
-   */
+  /** Creates a directory. */
   @Override
-  protected void mkdir(String bucketName)
-      throws IOException {
+  protected void mkdir(String bucketName) throws IOException {
     Path path = createSchemeCompatibleHadoopPath(bucketName, null);
     ghfs.mkdirs(path);
   }
@@ -387,11 +357,8 @@ public class HadoopFileSystemIntegrationHelper
         : new Path(ghfsFileSystemDescriptor.getFileSystemRoot(), new Path(authority, childPath));
   }
 
-  /**
-   * Lists status of file(s) at the given path.
-   */
-  protected FileStatus[] listStatus(Path hadoopPath)
-      throws IOException {
+  /** Lists status of file(s) at the given path. */
+  protected FileStatus[] listStatus(Path hadoopPath) throws IOException {
     return ghfs.listStatus(hadoopPath);
   }
 
@@ -441,12 +408,11 @@ public class HadoopFileSystemIntegrationHelper
     int totalBytesWritten = 0;
 
     long fileSystemBytesWritten = 0;
-    FileSystem.Statistics stats = FileSystem.getStatistics(
-        ghfsFileSystemDescriptor.getScheme(), ghfs.getClass());
+    FileSystem.Statistics stats =
+        FileSystem.getStatistics(ghfsFileSystemDescriptor.getScheme(), ghfs.getClass());
     if (stats != null) {
       // Let it be null in case no stats have been added for our scheme yet.
-      fileSystemBytesWritten =
-          stats.getBytesWritten();
+      fileSystemBytesWritten = stats.getBytesWritten();
     }
     try (FSDataOutputStream writeStream =
         ghfs.create(
@@ -467,8 +433,7 @@ public class HadoopFileSystemIntegrationHelper
     // After the write, the stats better be non-null for our ghfs scheme.
     stats = FileSystem.getStatistics(ghfsFileSystemDescriptor.getScheme(), ghfs.getClass());
     assertThat(stats).isNotNull();
-    long endFileSystemBytesWritten =
-        stats.getBytesWritten();
+    long endFileSystemBytesWritten = stats.getBytesWritten();
     int bytesWrittenStats = (int) (endFileSystemBytesWritten - fileSystemBytesWritten);
     if (statistics == FileSystemStatistics.EXACT) {
       assertWithMessage("FS statistics mismatch fetched from class '%s'", ghfs.getClass())

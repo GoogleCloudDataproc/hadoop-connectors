@@ -16,17 +16,13 @@ package com.google.cloud.hadoop.gcsio;
 
 /**
  * MkdirsBehavior distills out the fine-grained expected behavior of a FileSystem in various
- * edge/error cases; implementations associated with each possible FileSystem thus encapsulate
- * the minor differences in behavior in mkdirs() calls.
+ * edge/error cases; implementations associated with each possible FileSystem thus encapsulate the
+ * minor differences in behavior in mkdirs() calls.
  */
 public interface MkdirsBehavior {
-  /**
-   * Returns the MethodOutcome of trying to mkdirs root.
-   */
+  /** Returns the MethodOutcome of trying to mkdirs root. */
   MethodOutcome mkdirsRootOutcome();
 
-  /**
-   * Returns the MethodOutcome of trying mkdirs if a file of the same name already exists.
-   */
+  /** Returns the MethodOutcome of trying mkdirs if a file of the same name already exists. */
   MethodOutcome fileAlreadyExistsOutcome();
 }

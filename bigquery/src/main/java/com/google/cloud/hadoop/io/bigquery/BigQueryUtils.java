@@ -149,10 +149,12 @@ public class BigQueryUtils {
       // Set the name and type.
       checkArgument(
           jsonObject.get("name") != null,
-          "Expected non-null entry for key 'name' in JsonObject '%s'", jsonObject);
+          "Expected non-null entry for key 'name' in JsonObject '%s'",
+          jsonObject);
       checkArgument(
           jsonObject.get("type") != null,
-          "Expected non-null entry for key 'type' in JsonObject '%s'", jsonObject);
+          "Expected non-null entry for key 'type' in JsonObject '%s'",
+          jsonObject);
       TableFieldSchema fieldDef = new TableFieldSchema();
       fieldDef.setName(jsonObject.get("name").getAsString());
       fieldDef.setType(jsonObject.get("type").getAsString());

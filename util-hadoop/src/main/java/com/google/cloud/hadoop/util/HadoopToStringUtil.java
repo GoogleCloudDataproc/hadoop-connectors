@@ -71,5 +71,4 @@ public class HadoopToStringUtil {
     result += " Jar:" + input.getJar();
     return result;
   }
-
 }

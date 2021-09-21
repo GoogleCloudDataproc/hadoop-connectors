@@ -168,8 +168,7 @@ public abstract class AbstractBigQueryIoIntegrationTestBase<T> {
   }
 
   @Before
-  public void setUp()
-      throws IOException, GeneralSecurityException {
+  public void setUp() throws IOException, GeneralSecurityException {
     MockitoAnnotations.initMocks(this);
 
     configuredLoggers.add(Logger.getLogger(GsonBigQueryInputFormat.class.getName()));
@@ -220,10 +219,8 @@ public abstract class AbstractBigQueryIoIntegrationTestBase<T> {
     config.clear();
     setConfigForGcsFromBigquerySettings();
 
-    when(mockTaskAttemptContext.getConfiguration())
-        .thenReturn(config);
-    when(mockJobContext.getConfiguration())
-        .thenReturn(config);
+    when(mockTaskAttemptContext.getConfiguration()).thenReturn(config);
+    when(mockJobContext.getConfiguration()).thenReturn(config);
 
     // Have a realistic-looking fake TaskAttemptID.
     int taskNumber = 3;
@@ -233,8 +230,7 @@ public abstract class AbstractBigQueryIoIntegrationTestBase<T> {
     JobID jobId = new JobID(jobIdString, jobNumber);
     TaskAttemptID taskAttemptId =
         new TaskAttemptID(new TaskID(jobId, false, taskNumber), taskAttempt);
-    when(mockTaskAttemptContext.getTaskAttemptID())
-        .thenReturn(taskAttemptId);
+    when(mockTaskAttemptContext.getTaskAttemptID()).thenReturn(taskAttemptId);
     when(mockJobContext.getJobID()).thenReturn(jobId);
 
     testTable = testId + "_table_" + jobIdString;

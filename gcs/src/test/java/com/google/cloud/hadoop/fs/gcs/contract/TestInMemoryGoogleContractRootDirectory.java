@@ -18,9 +18,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractContractRootDirectoryTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 
-/**
- * GCS contract tests covering file root directory using in-memory fakes.
- */
+/** GCS contract tests covering file root directory using in-memory fakes. */
 public class TestInMemoryGoogleContractRootDirectory extends AbstractContractRootDirectoryTest {
 
   @Override

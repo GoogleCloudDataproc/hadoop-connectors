@@ -22,23 +22,21 @@ import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpResponseInterceptor;
 import com.google.api.client.http.HttpUnsuccessfulResponseHandler;
 import com.google.common.collect.ImmutableList;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * {@link HttpRequestInitializer} that composes handlers and interceptors
- * supplied by component handlers. All interceptors in a chain are executed.
- * All handlers are executed until a handler returns true from its handle
- * method. If an initializer configures other parameters on request, last
- * initializer to do so wins.
+ * {@link HttpRequestInitializer} that composes handlers and interceptors supplied by component
+ * handlers. All interceptors in a chain are executed. All handlers are executed until a handler
+ * returns true from its handle method. If an initializer configures other parameters on request,
+ * last initializer to do so wins.
  */
 public class ChainingHttpRequestInitializer implements HttpRequestInitializer {
 
   private final List<HttpRequestInitializer> initializers;
 
-  public ChainingHttpRequestInitializer(HttpRequestInitializer...initializers) {
+  public ChainingHttpRequestInitializer(HttpRequestInitializer... initializers) {
     this.initializers = ImmutableList.copyOf(initializers);
   }
 
@@ -67,14 +65,11 @@ public class ChainingHttpRequestInitializer implements HttpRequestInitializer {
         request.setResponseInterceptor(null);
       }
     }
-    request.setIOExceptionHandler(
-        makeIoExceptionHandler(ioExceptionHandlers));
+    request.setIOExceptionHandler(makeIoExceptionHandler(ioExceptionHandlers));
     request.setUnsuccessfulResponseHandler(
         makeUnsuccessfulResponseHandler(unsuccessfulResponseHandlers));
-    request.setInterceptor(
-        makeInterceptor(interceptors));
-    request.setResponseInterceptor(
-        makeResponseInterceptor(responseInterceptors));
+    request.setInterceptor(makeInterceptor(interceptors));
+    request.setResponseInterceptor(makeResponseInterceptor(responseInterceptors));
   }
 
   private HttpResponseInterceptor makeResponseInterceptor(
@@ -105,8 +100,8 @@ public class ChainingHttpRequestInitializer implements HttpRequestInitializer {
       final Iterable<HttpUnsuccessfulResponseHandler> unsuccessfulResponseHandlers) {
     return new HttpUnsuccessfulResponseHandler() {
       @Override
-      public boolean handleResponse(HttpRequest request, HttpResponse response,
-          boolean supportsRetry) throws IOException {
+      public boolean handleResponse(
+          HttpRequest request, HttpResponse response, boolean supportsRetry) throws IOException {
         for (HttpUnsuccessfulResponseHandler handler : unsuccessfulResponseHandlers) {
           if (handler.handleResponse(request, response, supportsRetry)) {
             return true;

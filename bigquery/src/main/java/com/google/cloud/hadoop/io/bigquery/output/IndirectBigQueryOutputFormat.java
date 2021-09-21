@@ -25,8 +25,7 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
  * locally.
  */
 @InterfaceStability.Unstable
-public class IndirectBigQueryOutputFormat<K, V>
-    extends ForwardingBigQueryFileOutputFormat<K, V> {
+public class IndirectBigQueryOutputFormat<K, V> extends ForwardingBigQueryFileOutputFormat<K, V> {
 
   /** Wraps the delegate's committer in a {@link IndirectBigQueryOutputCommitter}. */
   @Override

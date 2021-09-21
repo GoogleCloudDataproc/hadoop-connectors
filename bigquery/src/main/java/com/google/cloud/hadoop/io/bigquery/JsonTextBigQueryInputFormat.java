@@ -23,8 +23,8 @@ import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.lib.input.LineRecordReader;
 
 /**
- * An input format that provides BigQuery JSON as lines of text as they are written to the export
- * by BigQuery.
+ * An input format that provides BigQuery JSON as lines of text as they are written to the export by
+ * BigQuery.
  */
 public class JsonTextBigQueryInputFormat extends AbstractBigQueryInputFormat<LongWritable, Text> {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
