@@ -43,6 +43,7 @@ import com.google.api.client.util.Data;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.Sleeper;
 import com.google.api.services.storage.Storage;
+import com.google.api.services.storage.Storage.Objects.Copy;
 import com.google.api.services.storage.Storage.Objects.Insert;
 import com.google.api.services.storage.StorageRequest;
 import com.google.api.services.storage.model.Bucket;
@@ -165,6 +166,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   /** A factory for producing BackOff objects. */
   public interface BackOffFactory {
+
     BackOffFactory DEFAULT =
         () -> new RetryBoundedBackOff(new ExponentialBackOff(), /* maxRetries= */ 10);
 
@@ -958,16 +960,15 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param gcsImpl A GoogleCloudStorage for retrieving bucket info via getItemInfo, but only if
    *     srcBucketName != dstBucketName; passed as a parameter so that this static method can be
    *     used by other implementations of GoogleCloudStorage that want to preserve the validation
-   *     behavior of GoogleCloudStorageImpl, including disallowing cross-location copies.
    */
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
   // @VisibleForTesting
   public static void validateCopyArguments(
       String srcBucketName,
-      List<String> srcObjectNames,
+      List<StorageResourceId> srcObjectNames,
       String dstBucketName,
-      List<String> dstObjectNames,
+      List<StorageResourceId> dstObjectNames,
       GoogleCloudStorage gcsImpl)
       throws IOException {
     Preconditions.checkArgument(
@@ -1008,15 +1009,17 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
     for (int i = 0; i < srcObjectNames.size(); i++) {
       Preconditions.checkArgument(
-          !isNullOrEmpty(srcObjectNames.get(i)), "srcObjectName must not be null or empty");
+          !isNullOrEmpty(srcObjectNames.get(i).getObjectName()),
+          "srcObjectName must not be null or empty");
       Preconditions.checkArgument(
-          !isNullOrEmpty(dstObjectNames.get(i)), "dstObjectName must not be null or empty");
+          !isNullOrEmpty(dstObjectNames.get(i).getObjectName()),
+          "dstObjectName must not be null or empty");
       if (srcBucketName.equals(dstBucketName)
-          && srcObjectNames.get(i).equals(dstObjectNames.get(i))) {
+          && srcObjectNames.get(i).getObjectName().equals(dstObjectNames.get(i).getObjectName())) {
         throw new IllegalArgumentException(
             String.format(
                 "Copy destination must be different from source for %s.",
-                StringPaths.fromComponents(srcBucketName, srcObjectNames.get(i))));
+                StringPaths.fromComponents(srcBucketName, srcObjectNames.get(i).getObjectName())));
       }
     }
   }
@@ -1028,13 +1031,17 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @Override
   public void copy(
       String srcBucketName,
-      List<String> srcObjectNames,
       String dstBucketName,
-      List<String> dstObjectNames)
+      List<StorageResourceId> srcObjects,
+      List<StorageResourceId> dstObjects)
       throws IOException {
-    validateCopyArguments(srcBucketName, srcObjectNames, dstBucketName, dstObjectNames, this);
 
-    if (srcObjectNames.isEmpty()) {
+    Preconditions.checkArgument(srcObjects != null, "srcObjects must not be null");
+    Preconditions.checkArgument(dstObjects != null, "dstObjects must not be null");
+
+    validateCopyArguments(srcBucketName, srcObjects, dstBucketName, dstObjects, this);
+
+    if (srcObjects.isEmpty()) {
       return;
     }
 
@@ -1048,10 +1055,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             httpRequestInitializer,
             storage,
             storageOptions.getMaxRequestsPerBatch(),
-            srcObjectNames.size(),
+            srcObjects.size(),
             storageOptions.getBatchThreads());
 
-    for (int i = 0; i < srcObjectNames.size(); i++) {
+    for (int i = 0; i < srcObjects.size(); i++) {
       if (storageOptions.isCopyWithRewriteEnabled()) {
         // Rewrite request has the same effect as Copy, but it can handle moving
         // large objects that may potentially timeout a Copy request.
@@ -1059,17 +1066,18 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             batchHelper,
             innerExceptions,
             srcBucketName,
-            srcObjectNames.get(i),
+            srcObjects.get(i).getObjectName(),
             dstBucketName,
-            dstObjectNames.get(i));
+            dstObjects.get(i).getObjectName());
       } else {
         copyInternal(
             batchHelper,
             innerExceptions,
             srcBucketName,
-            srcObjectNames.get(i),
+            srcObjects.get(i).getObjectName(),
+            srcObjects.get(i).getGenerationId(),
             dstBucketName,
-            dstObjectNames.get(i));
+            dstObjects.get(i).getObjectName());
       }
     }
 
@@ -1158,15 +1166,18 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       final KeySetView<IOException, Boolean> innerExceptions,
       final String srcBucketName,
       final String srcObjectName,
+      final long srcContentGeneration,
       final String dstBucketName,
       final String dstObjectName)
       throws IOException {
-    Storage.Objects.Copy copyObject =
-        initializeRequest(
-            storage
-                .objects()
-                .copy(srcBucketName, srcObjectName, dstBucketName, dstObjectName, null),
-            srcBucketName);
+    Copy copy =
+        storage.objects().copy(srcBucketName, srcObjectName, dstBucketName, dstObjectName, null);
+
+    if (srcContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
+      copy.setIfGenerationMatch(srcContentGeneration);
+    }
+
+    Storage.Objects.Copy copyObject = initializeRequest(copy, srcBucketName);
 
     batchHelper.queue(
         copyObject,
@@ -2207,7 +2218,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param request the storage request to be initialized before send out
    * @param bucketName the bucket name the storage request accesses
    * @return the initialized storage request.
-   * @throws IOException
    */
   @VisibleForTesting
   <RequestT extends StorageRequest<?>> RequestT initializeRequest(

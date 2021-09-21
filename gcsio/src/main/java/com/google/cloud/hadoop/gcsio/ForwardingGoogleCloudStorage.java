@@ -121,6 +121,19 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
+  public void copy(
+      String srcBucketName,
+      String dstBucketName,
+      List<StorageResourceId> srcObjects,
+      List<StorageResourceId> dstObjects)
+      throws IOException {
+    logger.atFiner().log(
+        "%s.copy(%s, %s, %s, %s)",
+        delegateClassName, srcBucketName, srcObjects, dstBucketName, dstObjects);
+    delegate.copy(srcBucketName, dstBucketName, srcObjects, dstObjects);
+  }
+
+  @Override
   public List<String> listBucketNames() throws IOException {
     logger.atFiner().log("%s.listBucketNames()", delegateClassName);
     return delegate.listBucketNames();

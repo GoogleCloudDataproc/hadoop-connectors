@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Interface for exposing the Google Cloud Storage API behavior in a way more amenable to writing
@@ -193,11 +194,41 @@ public interface GoogleCloudStorage {
    *     exist
    * @throws IOException in all other error cases
    */
-  void copy(
+  default void copy(
       String srcBucketName,
       List<String> srcObjectNames,
       String dstBucketName,
       List<String> dstObjectNames)
+      throws IOException {
+    List<StorageResourceId> srcObjects =
+        srcObjectNames.stream()
+            .map(srcObjectName -> new StorageResourceId(srcBucketName, srcObjectName))
+            .collect(Collectors.toList());
+    List<StorageResourceId> dstObjects =
+        srcObjectNames.stream()
+            .map(dstObjectName -> new StorageResourceId(dstBucketName, dstObjectName))
+            .collect(Collectors.toList());
+    copy(srcBucketName, dstBucketName, srcObjects, dstObjects);
+  }
+
+  /**
+   * Copies metadata of the given objects. After the copy is successfully complete, each object blob
+   * is reachable by two different names. Copying between two different locations or between two
+   * different storage classes is not allowed.
+   *
+   * @param srcBucketName name of the bucket containing the objects to copy
+   * @param dstBucketName name of the bucket to copy to
+   * @param srcObjects list of the objects to copy
+   * @param dstObjects list of the objects after copy
+   * @throws java.io.FileNotFoundException if the source object or the destination bucket does not
+   *     exist
+   * @throws IOException in all other error cases
+   */
+  void copy(
+      String srcBucketName,
+      String dstBucketName,
+      List<StorageResourceId> srcObjects,
+      List<StorageResourceId> dstObjects)
       throws IOException;
 
   /** Gets a list of names of buckets in this project. */

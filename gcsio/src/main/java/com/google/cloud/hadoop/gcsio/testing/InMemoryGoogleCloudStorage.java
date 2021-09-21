@@ -310,14 +310,15 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public synchronized void copy(
+  public void copy(
       String srcBucketName,
-      List<String> srcObjectNames,
       String dstBucketName,
-      List<String> dstObjectNames)
+      List<StorageResourceId> srcObjects,
+      List<StorageResourceId> dstObjects)
       throws IOException {
+
     GoogleCloudStorageImpl.validateCopyArguments(
-        srcBucketName, srcObjectNames, dstBucketName, dstObjectNames, this);
+        srcBucketName, srcObjects, dstBucketName, dstObjects, this);
 
     // Gather FileNotFoundExceptions for individual objects, but only throw a single combined
     // exception at the end.
@@ -326,22 +327,25 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     List<IOException> innerExceptions = new ArrayList<>();
 
     // Perform the copy operations.
-    for (int i = 0; i < srcObjectNames.size(); i++) {
+    for (int i = 0; i < srcObjects.size(); i++) {
       // Due to the metadata-copy semantics of GCS, we copy the object container, but not the
       // byte[]
       // contents; the write-once constraint means this behavior is indistinguishable from a
       // deep
       // copy, but the behavior might have to become complicated if GCS ever supports appends.
-      if (!getItemInfo(new StorageResourceId(srcBucketName, srcObjectNames.get(i))).exists()) {
+      if (!getItemInfo(new StorageResourceId(srcBucketName, srcObjects.get(i).getObjectName()))
+          .exists()) {
         innerExceptions.add(
-            createFileNotFoundException(srcBucketName, srcObjectNames.get(i), /* cause= */ null));
+            createFileNotFoundException(
+                srcBucketName, srcObjects.get(i).getObjectName(), /* cause= */ null));
         continue;
       }
 
-      InMemoryObjectEntry srcObject = bucketLookup.get(srcBucketName).get(srcObjectNames.get(i));
+      InMemoryObjectEntry srcObject =
+          bucketLookup.get(srcBucketName).get(srcObjects.get(i).getObjectName());
       bucketLookup
           .get(dstBucketName)
-          .add(srcObject.getShallowCopy(dstBucketName, dstObjectNames.get(i)));
+          .add(srcObject.getShallowCopy(dstBucketName, dstObjects.get(i).getObjectName()));
     }
 
     if (innerExceptions.size() > 0) {

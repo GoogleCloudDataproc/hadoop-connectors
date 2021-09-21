@@ -140,7 +140,6 @@ public class GoogleCloudStorageFileSystem {
    * @param credential OAuth2 credential that allows access to GCS.
    * @param options Options for how this filesystem should operate and configure its underlying
    *     storage.
-   * @throws IOException
    */
   public GoogleCloudStorageFileSystem(
       Credential credential, GoogleCloudStorageFileSystemOptions options) throws IOException {
@@ -158,7 +157,6 @@ public class GoogleCloudStorageFileSystem {
    * @param downscopedAccessTokenFn Function that generates downscoped access token.
    * @param options Options for how this filesystem should operate and configure its underlying
    *     storage.
-   * @throws IOException
    */
   public GoogleCloudStorageFileSystem(
       Credential credential,
@@ -344,7 +342,6 @@ public class GoogleCloudStorageFileSystem {
    * @param path Path of the item to delete.
    * @param recursive If true, all sub-items are also deleted.
    * @throws FileNotFoundException if the given path does not exist.
-   * @throws IOException
    */
   public void delete(URI path, boolean recursive) throws IOException {
     Preconditions.checkNotNull(path, "path can not be null");
@@ -450,7 +447,6 @@ public class GoogleCloudStorageFileSystem {
    *
    * @param path Path of the item to check.
    * @return true if the given item exists, false otherwise.
-   * @throws IOException
    */
   public boolean exists(URI path) throws IOException {
     logger.atFiner().log("exists(path: %s)", path);
@@ -462,7 +458,6 @@ public class GoogleCloudStorageFileSystem {
    * Similar to 'mkdir -p' command.
    *
    * @param path Path of the directory to create.
-   * @throws IOException
    */
   public void mkdirs(URI path) throws IOException {
     logger.atFiner().log("mkdirs(path: %s)", path);
@@ -629,17 +624,23 @@ public class GoogleCloudStorageFileSystem {
       StorageResourceId dstResourceId =
           StorageResourceId.fromUriPath(dst, /* allowEmptyObjectName= */ true);
 
-      gcs.copy(
-          srcResourceId.getBucketName(), ImmutableList.of(srcResourceId.getObjectName()),
-          dstResourceId.getBucketName(), ImmutableList.of(dstResourceId.getObjectName()));
+      long srcContentGeneration = srcInfo.getItemInfo().getContentGeneration();
+      StorageResourceId sourceObject =
+          new StorageResourceId(
+              srcInfo.getItemInfo().getBucketName(),
+              srcInfo.getItemInfo().getObjectName(),
+              srcContentGeneration);
+      StorageResourceId destinationObject =
+          new StorageResourceId(
+              dstInfo.getItemInfo().getBucketName(), dstInfo.getItemInfo().getObjectName());
 
-      // TODO(b/110833109): populate generation ID in StorageResourceId when getting info
-      gcs.deleteObjects(
-          ImmutableList.of(
-              new StorageResourceId(
-                  srcInfo.getItemInfo().getBucketName(),
-                  srcInfo.getItemInfo().getObjectName(),
-                  srcInfo.getItemInfo().getContentGeneration())));
+      gcs.copy(
+          srcResourceId.getBucketName(),
+          dstResourceId.getBucketName(),
+          ImmutableList.of(sourceObject),
+          ImmutableList.of(destinationObject));
+
+      gcs.deleteObjects(ImmutableList.of(sourceObject));
     }
 
     repairImplicitDirectory(srcParentInfoFuture);
