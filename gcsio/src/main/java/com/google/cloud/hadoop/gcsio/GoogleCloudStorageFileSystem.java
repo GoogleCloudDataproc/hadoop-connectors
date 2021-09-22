@@ -624,28 +624,20 @@ public class GoogleCloudStorageFileSystem {
       StorageResourceId dstResourceId =
           StorageResourceId.fromUriPath(dst, /* allowEmptyObjectName= */ true);
 
-      long srcContentGeneration = srcInfo.getItemInfo().getContentGeneration();
-      StorageResourceId sourceObject =
-          new StorageResourceId(
-              srcInfo.getItemInfo().getBucketName(),
-              srcInfo.getItemInfo().getObjectName(),
-              srcContentGeneration);
-      StorageResourceId destinationObject =
-          new StorageResourceId(
-              dstInfo.getItemInfo().getBucketName(),
-              dstInfo.getItemInfo().getObjectName(),
-              /* generationId= */ 0L);
-
       gcs.copy(
           srcResourceId.getBucketName(),
           dstResourceId.getBucketName(),
-          ImmutableList.of(sourceObject),
-          ImmutableList.of(destinationObject));
+          ImmutableList.of(srcResourceId),
+          ImmutableList.of(
+              new StorageResourceId(
+                  dstResourceId.getBucketName(),
+                  dstResourceId.getObjectName(),
+                  /* generationId= */ 0)));
 
       try {
-        gcs.deleteObjects(ImmutableList.of(sourceObject));
+        gcs.deleteObjects(ImmutableList.of(srcResourceId));
       } catch (IOException e) {
-        deleteSilently(destinationObject);
+        deleteSilently(dstResourceId);
         throw e;
       }
     }
