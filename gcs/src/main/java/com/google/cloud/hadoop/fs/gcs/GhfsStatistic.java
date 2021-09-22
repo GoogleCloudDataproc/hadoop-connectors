@@ -26,14 +26,13 @@ import org.apache.hadoop.fs.statistics.StreamStatisticNames;
 
 /**
  * Statistics which are collected in GCS. Counter and duration statistics are published in {@link
- * GoogleHadoopFileSystemBase#getStorageStatistics()}. and as metrics in {@link
- * GhfsInstrumentation}.
+ * GoogleHadoopFileSystemBase} and as metrics in {@link GhfsInstrumentation}.
  *
  * <p>Where possible, stream names come from {@link StreamStatisticNames} and {@link
  * StoreStatisticNames}
  */
 @InterfaceStability.Unstable
-enum GhfsStatistic {
+public enum GhfsStatistic {
 
   /** FileSystem Level statistics */
   FILES_CREATED(
@@ -114,7 +113,25 @@ enum GhfsStatistic {
   STREAM_WRITE_BYTES(
       StreamStatisticNames.STREAM_WRITE_BYTES,
       "Count of bytes written to output stream" + " (including all not yet uploaded)",
-      TYPE_COUNTER);
+      TYPE_COUNTER),
+
+  /** The XAttr API metrics are all durations */
+  INVOCATION_XATTR_GET_MAP(
+      StoreStatisticNames.OP_XATTR_GET_MAP, "Calls of getXAttrs(Path path)", TYPE_DURATION),
+  INVOCATION_XATTR_GET_NAMED(
+      StoreStatisticNames.OP_XATTR_GET_NAMED, "Calls of getXAttr(Path, String)", TYPE_DURATION),
+  INVOCATION_XATTR_GET_NAMED_MAP(
+      StoreStatisticNames.OP_XATTR_GET_NAMED_MAP, "Calls of xattr()", TYPE_DURATION),
+  INVOCATION_OP_XATTR_LIST(
+      StoreStatisticNames.OP_XATTR_LIST,
+      "Calls of getXAttrs(Path path, List<String> names)",
+      TYPE_DURATION),
+
+  /** Delegation Token Operations. */
+  DELEGATION_TOKENS_ISSUED(
+      StoreStatisticNames.DELEGATION_TOKENS_ISSUED,
+      "Count of delegation tokens issued",
+      TYPE_DURATION);
 
   /** A map used to support the {@link #fromSymbol(String)} call. */
   private static final Map<String, GhfsStatistic> SYMBOL_MAP =

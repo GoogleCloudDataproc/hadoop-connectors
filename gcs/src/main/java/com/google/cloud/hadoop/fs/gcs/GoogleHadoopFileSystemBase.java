@@ -40,6 +40,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.flogger.LazyArgs.lazy;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.Executors.newFixedThreadPool;
+import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
@@ -1743,7 +1744,11 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     checkNotNull(path, "path should not be null");
     checkNotNull(name, "name should not be null");
 
-    Map<String, byte[]> attributes = getGcsFs().getFileInfo(getGcsPath(path)).getAttributes();
+    Map<String, byte[]> attributes =
+        trackDuration(
+            instrumentation,
+            GhfsStatistic.INVOCATION_XATTR_GET_NAMED.getSymbol(),
+            () -> getGcsFs().getFileInfo(getGcsPath(path)).getAttributes());
     String xAttrKey = getXAttrKey(name);
     byte[] xAttr =
         attributes.containsKey(xAttrKey) ? getXAttrValue(attributes.get(xAttrKey)) : null;
@@ -1760,12 +1765,16 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
     Map<String, byte[]> xAttrs =
-        fileInfo.getAttributes().entrySet().stream()
-            .filter(a -> isXAttr(a.getKey()))
-            .collect(
-                HashMap::new,
-                (m, a) -> m.put(getXAttrName(a.getKey()), getXAttrValue(a.getValue())),
-                Map::putAll);
+        trackDuration(
+            instrumentation,
+            GhfsStatistic.INVOCATION_XATTR_GET_MAP.getSymbol(),
+            () ->
+                fileInfo.getAttributes().entrySet().stream()
+                    .filter(a -> isXAttr(a.getKey()))
+                    .collect(
+                        HashMap::new,
+                        (m, a) -> m.put(getXAttrName(a.getKey()), getXAttrValue(a.getValue())),
+                        Map::putAll));
 
     logger.atFiner().log("getXAttrs(path: %s): %s", path, xAttrs);
     return xAttrs;
@@ -1783,9 +1792,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     } else {
       Set<String> namesSet = new HashSet<>(names);
       xAttrs =
-          getXAttrs(path).entrySet().stream()
-              .filter(a -> namesSet.contains(a.getKey()))
-              .collect(HashMap::new, (m, a) -> m.put(a.getKey(), a.getValue()), Map::putAll);
+          trackDuration(
+              instrumentation,
+              GhfsStatistic.INVOCATION_XATTR_GET_NAMED_MAP.getSymbol(),
+              () ->
+                  getXAttrs(path).entrySet().stream()
+                      .filter(a -> namesSet.contains(a.getKey()))
+                      .collect(
+                          HashMap::new, (m, a) -> m.put(a.getKey(), a.getValue()), Map::putAll));
     }
 
     logger.atFiner().log("getXAttrs(path: %s, names: %s): %s", path, names, xAttrs);
@@ -1797,14 +1811,15 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   public List<String> listXAttrs(Path path) throws IOException {
     checkNotNull(path, "path should not be null");
 
-    FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
-
     List<String> xAttrs =
-        fileInfo.getAttributes().keySet().stream()
-            .filter(this::isXAttr)
-            .map(this::getXAttrName)
-            .collect(Collectors.toCollection(ArrayList::new));
-
+        trackDuration(
+            instrumentation,
+            GhfsStatistic.INVOCATION_OP_XATTR_LIST.getSymbol(),
+            () ->
+                getGcsFs().getFileInfo(getGcsPath(path)).getAttributes().keySet().stream()
+                    .filter(this::isXAttr)
+                    .map(this::getXAttrName)
+                    .collect(Collectors.toCollection(ArrayList::new)));
     logger.atFiner().log("listXAttrs(path: %s): %s", path, xAttrs);
     return xAttrs;
   }
