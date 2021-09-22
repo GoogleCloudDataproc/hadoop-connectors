@@ -632,7 +632,9 @@ public class GoogleCloudStorageFileSystem {
               srcContentGeneration);
       StorageResourceId destinationObject =
           new StorageResourceId(
-              dstInfo.getItemInfo().getBucketName(), dstInfo.getItemInfo().getObjectName());
+              dstInfo.getItemInfo().getBucketName(),
+              dstInfo.getItemInfo().getObjectName(),
+              /* generationId= */ 0L);
 
       gcs.copy(
           srcResourceId.getBucketName(),
@@ -640,10 +642,24 @@ public class GoogleCloudStorageFileSystem {
           ImmutableList.of(sourceObject),
           ImmutableList.of(destinationObject));
 
-      gcs.deleteObjects(ImmutableList.of(sourceObject));
+      try {
+        gcs.deleteObjects(ImmutableList.of(sourceObject));
+      } catch (IOException e) {
+        deleteSilently(destinationObject);
+        throw e;
+      }
     }
 
     repairImplicitDirectory(srcParentInfoFuture);
+  }
+
+  private void deleteSilently(StorageResourceId destinationObject) throws IOException {
+    try {
+      gcs.deleteObjects(ImmutableList.of(destinationObject));
+    } catch (IOException ioException) {
+      logger.atFiner().log(
+          "Deletion of %s failed ", destinationObject.getObjectName(), ioException);
+    }
   }
 
   private URI getDstUri(FileInfo srcInfo, FileInfo dstInfo, @Nullable FileInfo dstParentInfo)

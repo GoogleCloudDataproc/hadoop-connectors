@@ -1027,8 +1027,13 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
                 bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null),
             getRequestString(bucketName, dirObject + "/"),
             copyRequestString(
-                bucketName, dirObject + "/f1", bucketName, dirObject + "/f2", "copyTo"),
-            deleteRequestString(bucketName, dirObject + "/f1", 1));
+                bucketName,
+                dirObject + "/f1",
+                bucketName,
+                dirObject + "/f2",
+                "copyTo",
+                /* generationId= */ 1),
+            deleteRequestString(bucketName, dirObject + "/f1", 2));
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isFalse();
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f2"))).isTrue();
@@ -1065,8 +1070,13 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
             listRequestWithTrailingDelimiter(
                 bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null),
             copyRequestString(
-                bucketName, dirObject + "/f1", bucketName, dirObject + "/f2", "copyTo"),
-            deleteRequestString(bucketName, dirObject + "/f1", /* generationId= */ 1));
+                bucketName,
+                dirObject + "/f1",
+                bucketName,
+                dirObject + "/f2",
+                "copyTo",
+                /* generationId= */ 1),
+            deleteRequestString(bucketName, dirObject + "/f1", /* generationId= */ 2));
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isFalse();
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f2"))).isTrue();

@@ -1075,7 +1075,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             innerExceptions,
             srcBucketName,
             srcObjects.get(i).getObjectName(),
-            srcObjects.get(i).getGenerationId(),
+            dstObjects.get(i).getGenerationId(),
             dstBucketName,
             dstObjects.get(i).getObjectName());
       }
@@ -1166,15 +1166,15 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       final KeySetView<IOException, Boolean> innerExceptions,
       final String srcBucketName,
       final String srcObjectName,
-      final long srcContentGeneration,
+      final long dstContentGeneration,
       final String dstBucketName,
       final String dstObjectName)
       throws IOException {
     Copy copy =
         storage.objects().copy(srcBucketName, srcObjectName, dstBucketName, dstObjectName, null);
 
-    if (srcContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
-      copy.setIfGenerationMatch(0L);
+    if (dstContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
+      copy.setIfGenerationMatch(dstContentGeneration);
     }
 
     Storage.Objects.Copy copyObject = initializeRequest(copy, srcBucketName);
