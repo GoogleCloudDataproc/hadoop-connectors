@@ -630,8 +630,6 @@ public class GoogleCloudStorageFileSystem {
           StorageResourceId.fromUriPath(dst, /* allowEmptyObjectName= */ true);
 
       gcs.copy(
-          srcResourceId.getBucketName(),
-          dstResourceId.getBucketName(),
           ImmutableList.of(srcResourceId),
           ImmutableList.of(
               new StorageResourceId(

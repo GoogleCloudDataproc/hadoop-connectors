@@ -966,21 +966,32 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // Please check that removing it is correct, and remove this comment along with it.
   // @VisibleForTesting
   public static void validateCopyArguments(
-      String srcBucketName,
-      List<StorageResourceId> srcObjectNames,
-      String dstBucketName,
-      List<StorageResourceId> dstObjectNames,
+      List<StorageResourceId> srcObjects,
+      List<StorageResourceId> dstObjects,
       GoogleCloudStorage gcsImpl)
       throws IOException {
+
+    checkNotNull(srcObjects, "srcObjects must not be null");
+    checkNotNull(dstObjects, "dstObjects must not be null");
     Preconditions.checkArgument(
-        !isNullOrEmpty(srcBucketName), "srcBucketName must not be null or empty");
-    Preconditions.checkArgument(
-        !isNullOrEmpty(dstBucketName), "dstBucketName must not be null or empty");
-    Preconditions.checkArgument(srcObjectNames != null, "srcObjectNames must not be null");
-    Preconditions.checkArgument(dstObjectNames != null, "dstObjectNames must not be null");
-    Preconditions.checkArgument(
-        srcObjectNames.size() == dstObjectNames.size(),
-        "Must supply same number of elements in srcObjectNames and dstObjectNames");
+        srcObjects.size() == dstObjects.size(),
+        "Must supply same number of elements in srcObjects and dstObjects");
+
+    if (srcObjects.isEmpty()) {
+      return;
+    }
+
+    String srcBucketName = srcObjects.get(0).getBucketName();
+    String dstBucketName = dstObjects.get(0).getBucketName();
+
+    for (int i = 0; i < srcObjects.size(); i++) {
+      if (!srcBucketName.equals(srcObjects.get(i).getBucketName()))
+        throw new UnsupportedOperationException(
+            "This operation is not supported across multiple source locations");
+      if (!dstBucketName.equals(dstObjects.get(i).getBucketName()))
+        throw new UnsupportedOperationException(
+            "This operation is not supported across multiple destination locations");
+    }
 
     // Avoid copy across locations or storage classes.
     if (!srcBucketName.equals(dstBucketName)) {
@@ -1008,19 +1019,19 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         }
       }
     }
-    for (int i = 0; i < srcObjectNames.size(); i++) {
+    for (int i = 0; i < srcObjects.size(); i++) {
       Preconditions.checkArgument(
-          !isNullOrEmpty(srcObjectNames.get(i).getObjectName()),
+          !isNullOrEmpty(srcObjects.get(i).getObjectName()),
           "srcObjectName must not be null or empty");
       Preconditions.checkArgument(
-          !isNullOrEmpty(dstObjectNames.get(i).getObjectName()),
+          !isNullOrEmpty(dstObjects.get(i).getObjectName()),
           "dstObjectName must not be null or empty");
       if (srcBucketName.equals(dstBucketName)
-          && srcObjectNames.get(i).getObjectName().equals(dstObjectNames.get(i).getObjectName())) {
+          && srcObjects.get(i).getObjectName().equals(dstObjects.get(i).getObjectName())) {
         throw new IllegalArgumentException(
             String.format(
                 "Copy destination must be different from source for %s.",
-                StringPaths.fromComponents(srcBucketName, srcObjectNames.get(i).getObjectName())));
+                StringPaths.fromComponents(srcBucketName, srcObjects.get(i).getObjectName())));
       }
     }
   }
@@ -1030,17 +1041,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * behavior.
    */
   @Override
-  public void copy(
-      String srcBucketName,
-      String dstBucketName,
-      List<StorageResourceId> srcObjects,
-      List<StorageResourceId> dstObjects)
+  public void copy(List<StorageResourceId> srcObjects, List<StorageResourceId> dstObjects)
       throws IOException {
 
-    Preconditions.checkArgument(srcObjects != null, "srcObjects must not be null");
-    Preconditions.checkArgument(dstObjects != null, "dstObjects must not be null");
-
-    validateCopyArguments(srcBucketName, srcObjects, dstBucketName, dstObjects, this);
+    validateCopyArguments(srcObjects, dstObjects, this);
 
     if (srcObjects.isEmpty()) {
       return;
@@ -1066,18 +1070,18 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         rewriteInternal(
             batchHelper,
             innerExceptions,
-            srcBucketName,
+            srcObjects.get(i).getBucketName(),
             srcObjects.get(i).getObjectName(),
-            dstBucketName,
+            dstObjects.get(i).getBucketName(),
             dstObjects.get(i).getObjectName());
       } else {
         copyInternal(
             batchHelper,
             innerExceptions,
-            srcBucketName,
+            srcObjects.get(i).getBucketName(),
             srcObjects.get(i).getObjectName(),
             dstObjects.get(i).getGenerationId(),
-            dstBucketName,
+            dstObjects.get(i).getBucketName(),
             dstObjects.get(i).getObjectName());
       }
     }

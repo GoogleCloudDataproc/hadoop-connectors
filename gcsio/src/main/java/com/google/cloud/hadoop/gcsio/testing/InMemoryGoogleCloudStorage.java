@@ -311,14 +311,12 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
   @Override
   public void copy(
-      String srcBucketName,
-      String dstBucketName,
       List<StorageResourceId> srcObjects,
       List<StorageResourceId> dstObjects)
       throws IOException {
 
     GoogleCloudStorageImpl.validateCopyArguments(
-        srcBucketName, srcObjects, dstBucketName, dstObjects, this);
+         srcObjects,  dstObjects, this);
 
     // Gather FileNotFoundExceptions for individual objects, but only throw a single combined
     // exception at the end.
@@ -333,6 +331,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
       // contents; the write-once constraint means this behavior is indistinguishable from a
       // deep
       // copy, but the behavior might have to become complicated if GCS ever supports appends.
+      String srcBucketName = srcObjects.get(i).getBucketName();
       if (!getItemInfo(new StorageResourceId(srcBucketName, srcObjects.get(i).getObjectName()))
           .exists()) {
         innerExceptions.add(
@@ -343,6 +342,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
       InMemoryObjectEntry srcObject =
           bucketLookup.get(srcBucketName).get(srcObjects.get(i).getObjectName());
+      String dstBucketName = dstObjects.get(i).getBucketName();
       bucketLookup
           .get(dstBucketName)
           .add(srcObject.getShallowCopy(dstBucketName, dstObjects.get(i).getObjectName()));

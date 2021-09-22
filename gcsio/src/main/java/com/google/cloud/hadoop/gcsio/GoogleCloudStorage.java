@@ -16,7 +16,8 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import com.google.common.base.Preconditions;
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
@@ -201,8 +202,8 @@ public interface GoogleCloudStorage {
       String dstBucketName,
       List<String> dstObjectNames)
       throws IOException {
-    Preconditions.checkArgument(srcObjectNames != null, "srcObjectNames must not be null");
-    Preconditions.checkArgument(dstObjectNames != null, "dstObjectNames must not be null");
+    checkNotNull(srcObjectNames, "srcObjectNames must not be null");
+    checkNotNull(dstObjectNames, "dstObjectNames must not be null");
 
     List<StorageResourceId> srcObjects =
         srcObjectNames.stream()
@@ -212,7 +213,7 @@ public interface GoogleCloudStorage {
         dstObjectNames.stream()
             .map(dstObjectName -> new StorageResourceId(dstBucketName, dstObjectName))
             .collect(Collectors.toList());
-    copy(srcBucketName, dstBucketName, srcObjects, dstObjects);
+    copy(srcObjects, dstObjects);
   }
 
   /**
@@ -220,19 +221,13 @@ public interface GoogleCloudStorage {
    * is reachable by two different names. Copying between two different locations or between two
    * different storage classes is not allowed.
    *
-   * @param srcBucketName name of the bucket containing the objects to copy
-   * @param dstBucketName name of the bucket to copy to
    * @param srcObjects list of the objects to copy
    * @param dstObjects list of the objects after copy
    * @throws java.io.FileNotFoundException if the source object or the destination bucket does not
    *     exist
    * @throws IOException in all other error cases
    */
-  void copy(
-      String srcBucketName,
-      String dstBucketName,
-      List<StorageResourceId> srcObjects,
-      List<StorageResourceId> dstObjects)
+  void copy(List<StorageResourceId> srcObjects, List<StorageResourceId> dstObjects)
       throws IOException;
 
   /** Gets a list of names of buckets in this project. */
