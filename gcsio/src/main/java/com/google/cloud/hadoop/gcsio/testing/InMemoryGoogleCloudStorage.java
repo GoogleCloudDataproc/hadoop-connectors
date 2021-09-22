@@ -310,13 +310,10 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public void copy(
-      List<StorageResourceId> srcObjects,
-      List<StorageResourceId> dstObjects)
+  public void copy(List<StorageResourceId> srcObjects, List<StorageResourceId> dstObjects)
       throws IOException {
 
-    GoogleCloudStorageImpl.validateCopyArguments(
-         srcObjects,  dstObjects, this);
+    GoogleCloudStorageImpl.validateCopyArguments(srcObjects, dstObjects, this);
 
     // Gather FileNotFoundExceptions for individual objects, but only throw a single combined
     // exception at the end.
