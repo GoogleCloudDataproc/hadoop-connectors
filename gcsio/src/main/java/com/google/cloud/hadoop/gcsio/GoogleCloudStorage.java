@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
@@ -200,6 +201,9 @@ public interface GoogleCloudStorage {
       String dstBucketName,
       List<String> dstObjectNames)
       throws IOException {
+    Preconditions.checkArgument(srcObjectNames != null, "srcObjectNames must not be null");
+    Preconditions.checkArgument(dstObjectNames != null, "dstObjectNames must not be null");
+
     List<StorageResourceId> srcObjects =
         srcObjectNames.stream()
             .map(srcObjectName -> new StorageResourceId(srcBucketName, srcObjectName))

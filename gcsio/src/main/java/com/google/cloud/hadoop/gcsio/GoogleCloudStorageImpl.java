@@ -1174,7 +1174,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         storage.objects().copy(srcBucketName, srcObjectName, dstBucketName, dstObjectName, null);
 
     if (srcContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
-      copy.setIfGenerationMatch(srcContentGeneration);
+      copy.setIfGenerationMatch(0L);
     }
 
     Storage.Objects.Copy copyObject = initializeRequest(copy, srcBucketName);
