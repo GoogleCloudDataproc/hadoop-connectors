@@ -161,11 +161,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     postCreateInit(new GoogleCloudStorageFileSystemIntegrationHelper(gcsfs));
   }
 
-  /**
-   * Perform initialization after creating test instances.
-   */
-  public static void postCreateInit(
-      GoogleCloudStorageFileSystemIntegrationHelper helper)
+  /** Perform initialization after creating test instances. */
+  public static void postCreateInit(GoogleCloudStorageFileSystemIntegrationHelper helper)
       throws IOException {
     testStartTime = Instant.now();
 
@@ -324,9 +321,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   // Tests added by this class.
   // -----------------------------------------------------------------
 
-  /**
-   * Contains data needed for testing the delete() operation.
-   */
+  /** Contains data needed for testing the delete() operation. */
   private static class DeleteData {
 
     // Description of test case.
@@ -350,12 +345,12 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     // Objects expected to be deleted after the operation.
     List<String> objectsExpectedToBeDeleted;
 
-    /**
-     * Constructs an instance of the DeleteData class.
-     */
+    /** Constructs an instance of the DeleteData class. */
     DeleteData(
         String description,
-        String bucketName, String objectName, boolean recursive,
+        String bucketName,
+        String objectName,
+        boolean recursive,
         MethodOutcome expectedOutcome,
         List<String> objectsExpectedToExist,
         List<String> objectsExpectedToBeDeleted) {
@@ -373,21 +368,21 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   /** Validates delete(). */
   @Test
   public void testDelete() throws Exception {
-    deleteHelper(new DeletionBehavior() {
-      @Override
-      public MethodOutcome nonEmptyDeleteOutcome() {
-        // GCSFS throws IOException on non-recursive delete of non-empty dir.
-        return new MethodOutcome(
-            MethodOutcome.Type.THROWS_EXCEPTION, IOException.class);
-      }
+    deleteHelper(
+        new DeletionBehavior() {
+          @Override
+          public MethodOutcome nonEmptyDeleteOutcome() {
+            // GCSFS throws IOException on non-recursive delete of non-empty dir.
+            return new MethodOutcome(MethodOutcome.Type.THROWS_EXCEPTION, IOException.class);
+          }
 
-      @Override
-      public MethodOutcome nonExistentDeleteOutcome() {
-        // GCSFS throws FileNotFoundException if deleting a non-existent file.
-        return new MethodOutcome(
-            MethodOutcome.Type.THROWS_EXCEPTION, FileNotFoundException.class);
-      }
-    });
+          @Override
+          public MethodOutcome nonExistentDeleteOutcome() {
+            // GCSFS throws FileNotFoundException if deleting a non-existent file.
+            return new MethodOutcome(
+                MethodOutcome.Type.THROWS_EXCEPTION, FileNotFoundException.class);
+          }
+        });
   }
 
   /**
@@ -399,6 +394,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
    */
   @Test
   public void testGetAndListFileInfo() throws Exception {
+    // fmt:off
     // Objects created for this test.
     String[] objectNames = {
         "o1",
@@ -411,6 +407,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
         "d2/o21",
         "d2/o22",
     };
+    // fmt:on
 
     String dirDoesNotExist = "does-not-exist/";
     String objDoesNotExist = "does-not-exist";
@@ -496,39 +493,32 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
         null, null, /* expectedToExist= */ true, sharedBucketName1, sharedBucketName2, testBucket);
   }
 
-  @Test @SuppressWarnings("EqualsIncompatibleType")
+  @Test
+  @SuppressWarnings("EqualsIncompatibleType")
   public void testGoogleCloudStorageItemInfoNegativeEquality() {
     // Assert that .equals with an incorrect type returns false and does not throw.
     assertThat(GoogleCloudStorageItemInfo.ROOT_INFO.equals("non-item-info")).isFalse();
   }
 
-  /**
-   * Validates simple write and read operations.
-   */
+  /** Validates simple write and read operations. */
   @Test
-  public void testWriteAndReadObject()
-      throws IOException {
+  public void testWriteAndReadObject() throws IOException {
     String bucketName = sharedBucketName1;
     String message = "Hello world!\n";
 
     // Write an object.
-    int numBytesWritten = gcsiHelper.writeTextFile(
-        bucketName, objectName, message);
+    int numBytesWritten = gcsiHelper.writeTextFile(bucketName, objectName, message);
 
     // Read the whole object.
-    String message2 = gcsiHelper.readTextFile(
-        bucketName, objectName, 0, numBytesWritten, true);
+    String message2 = gcsiHelper.readTextFile(bucketName, objectName, 0, numBytesWritten, true);
 
     // Verify we read what we wrote.
     assertThat(message2).isEqualTo(message);
   }
 
-  /**
-   * Validates partial reads.
-   */
+  /** Validates partial reads. */
   @Test
-  public void testReadPartialObject()
-      throws IOException {
+  public void testReadPartialObject() throws IOException {
     String bucketName = sharedBucketName1;
     String message = "Hello world!\n";
 
@@ -536,11 +526,10 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     gcsiHelper.writeTextFile(bucketName, objectName, message);
 
     // Read the whole object in 2 parts.
-    int offset = 6;  // chosen arbitrarily.
-    String message1 = gcsiHelper.readTextFile(
-        bucketName, objectName, 0, offset, false);
-    String message2 = gcsiHelper.readTextFile(
-        bucketName, objectName, offset, message.length() - offset, true);
+    int offset = 6; // chosen arbitrarily.
+    String message1 = gcsiHelper.readTextFile(bucketName, objectName, 0, offset, false);
+    String message2 =
+        gcsiHelper.readTextFile(bucketName, objectName, offset, message.length() - offset, true);
 
     // Verify we read what we wrote.
     assertWithMessage("partial read mismatch")
@@ -603,6 +592,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   public void deleteHelper(DeletionBehavior behavior) throws Exception {
     String bucketName = sharedBucketName1;
 
+    // fmt:off
     // Objects created for this test.
     String[] objectNames = {
       "f1",
@@ -611,6 +601,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
       "d1/d0/",
       "d1/d11/f1",
     };
+    // fmt:on
 
     // -------------------------------------------------------
     // Create test objects.
@@ -629,68 +620,92 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     String dirDoesNotExist = "does-not-exist";
 
     // Delete an item that does not exist.
-    deleteData.add(new DeleteData(
-        "Delete an object that does not exist: file",
-        bucketName, doesNotExist, false,
-        behavior.nonExistentDeleteOutcome(),  // expected outcome
-        null,  // expected to exist
-        null));  // expected to be deleted
-    deleteData.add(new DeleteData(
-        "Delete an object that does not exist: dir",
-        bucketName, dirDoesNotExist, false,
-        behavior.nonExistentDeleteOutcome(),  // expected outcome
-        null,  // expected to exist
-        null));  // expected to be deleted
-    deleteData.add(new DeleteData(
-        "Delete a bucket that does not exist",
-        doesNotExist, doesNotExist, false,
-        behavior.nonExistentDeleteOutcome(),  // expected outcome
-        null,  // expected to exist
-        null));  // expected to be deleted
+    deleteData.add(
+        new DeleteData(
+            "Delete an object that does not exist: file",
+            bucketName,
+            doesNotExist,
+            false,
+            behavior.nonExistentDeleteOutcome(), // expected outcome
+            null, // expected to exist
+            null)); // expected to be deleted
+    deleteData.add(
+        new DeleteData(
+            "Delete an object that does not exist: dir",
+            bucketName,
+            dirDoesNotExist,
+            false,
+            behavior.nonExistentDeleteOutcome(), // expected outcome
+            null, // expected to exist
+            null)); // expected to be deleted
+    deleteData.add(
+        new DeleteData(
+            "Delete a bucket that does not exist",
+            doesNotExist,
+            doesNotExist,
+            false,
+            behavior.nonExistentDeleteOutcome(), // expected outcome
+            null, // expected to exist
+            null)); // expected to be deleted
 
     // Delete an empty directory.
-    deleteData.add(new DeleteData(
-        "Delete an empty directory",
-        bucketName, "d0/", true,
-        new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE),  // expected outcome
-        null,  // expected to exist
-        Lists.newArrayList("d0/")));  // expected to be deleted
+    deleteData.add(
+        new DeleteData(
+            "Delete an empty directory",
+            bucketName,
+            "d0/",
+            true,
+            new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE), // expected outcome
+            null, // expected to exist
+            Lists.newArrayList("d0/"))); // expected to be deleted
 
     // Delete a non-empty directory (recursive == false).
-    deleteData.add(new DeleteData(
-        "Delete a non-empty directory (recursive == false)",
-        bucketName, "d1/", false,
-        behavior.nonEmptyDeleteOutcome(),  // expected outcome
-        Lists.newArrayList("d1/", "d1/f1", "d1/d0/", "d1/d11/f1"),  // expected to exist
-        null));  // expected to be deleted
+    deleteData.add(
+        new DeleteData(
+            "Delete a non-empty directory (recursive == false)",
+            bucketName,
+            "d1/",
+            false,
+            behavior.nonEmptyDeleteOutcome(), // expected outcome
+            Lists.newArrayList("d1/", "d1/f1", "d1/d0/", "d1/d11/f1"), // expected to exist
+            null)); // expected to be deleted
 
     // Delete a non-empty directory (recursive == true).
-    deleteData.add(new DeleteData(
-        "Delete a non-empty directory (recursive == true)",
-        bucketName, "d1/", true,
-        new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE),  // expected outcome
-        null,  // expected to exist
-        Lists.newArrayList("d1/", "d1/f1", "d1/d0/", "d1/d11/f1")));  // expected to be deleted
+    deleteData.add(
+        new DeleteData(
+            "Delete a non-empty directory (recursive == true)",
+            bucketName,
+            "d1/",
+            true,
+            new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE), // expected outcome
+            null, // expected to exist
+            Lists.newArrayList("d1/", "d1/f1", "d1/d0/", "d1/d11/f1"))); // expected to be deleted
 
     // Delete a non-empty bucket (recursive == false).
-    deleteData.add(new DeleteData(
-        "Delete a non-empty bucket (recursive == false)",
-        tempBucket, null, false,
-        behavior.nonEmptyDeleteOutcome(),  // expected outcome
-        Lists.newArrayList(
-            // expected to exist
-            "f1", "d0/", "d1/", "d1/f1", "d1/d0/", "d1/d11/f1"),
-        null));  // expected to be deleted
+    deleteData.add(
+        new DeleteData(
+            "Delete a non-empty bucket (recursive == false)",
+            tempBucket,
+            null,
+            false,
+            behavior.nonEmptyDeleteOutcome(), // expected outcome
+            Lists.newArrayList(
+                // expected to exist
+                "f1", "d0/", "d1/", "d1/f1", "d1/d0/", "d1/d11/f1"),
+            null)); // expected to be deleted
 
     // Delete a non-empty bucket (recursive == true).
-    deleteData.add(new DeleteData(
-        "Delete a non-empty bucket (recursive == true)",
-        tempBucket, null, true,
-        new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE),  // expected outcome
-        null,  // expected to exist
-        Lists.newArrayList(
-            // expected to be deleted
-            "f1", "d0/", "d1/", "d1/f1", "d1/d0/", "d1/d11/f1")));
+    deleteData.add(
+        new DeleteData(
+            "Delete a non-empty bucket (recursive == true)",
+            tempBucket,
+            null,
+            true,
+            new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE), // expected outcome
+            null, // expected to exist
+            Lists.newArrayList(
+                // expected to be deleted
+                "f1", "d0/", "d1/", "d1/f1", "d1/d0/", "d1/d11/f1")));
 
     // -------------------------------------------------------
     // Call delete() for each path and verify the expected behavior.
@@ -742,8 +757,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   public void testMkdirAndCreateFileOfSameName() throws Exception {
     String bucketName = sharedBucketName1;
     String uniqueDirName = "dir-" + UUID.randomUUID();
-    gcsiHelper.mkdir(
-        bucketName, uniqueDirName + GoogleCloudStorage.PATH_DELIMITER);
+    gcsiHelper.mkdir(bucketName, uniqueDirName + GoogleCloudStorage.PATH_DELIMITER);
     IOException ioe =
         assertThrows(
             IOException.class,
@@ -759,29 +773,32 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   /** Validates mkdirs(). */
   @Test
   public void testMkdirs() throws Exception {
-    mkdirsHelper(new MkdirsBehavior() {
-      @Override
-      public MethodOutcome mkdirsRootOutcome() {
-        return new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE);
-      }
+    mkdirsHelper(
+        new MkdirsBehavior() {
+          @Override
+          public MethodOutcome mkdirsRootOutcome() {
+            return new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE);
+          }
 
-      @Override
-      public MethodOutcome fileAlreadyExistsOutcome() {
-        return new MethodOutcome(MethodOutcome.Type.THROWS_EXCEPTION, IOException.class);
-      }
-    });
+          @Override
+          public MethodOutcome fileAlreadyExistsOutcome() {
+            return new MethodOutcome(MethodOutcome.Type.THROWS_EXCEPTION, IOException.class);
+          }
+        });
   }
 
   /** Validates mkdirs(). */
   public void mkdirsHelper(MkdirsBehavior behavior) throws Exception {
     String bucketName = sharedBucketName1;
 
+    // fmt:off
     // Objects created for this test.
     String[] objectNames = {
       "f1",
       "d0/",
       "d1/f11",
     };
+    // fmt:on
 
     // -------------------------------------------------------
     // Create test objects.
@@ -798,37 +815,40 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     dirData.put(GoogleCloudStorageFileSystem.GCS_ROOT, behavior.mkdirsRootOutcome());
 
     // Verify that no exception is thrown when directory already exists.
-    dirData.put(gcsiHelper.getPath(bucketName, "d0/"),
-        new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE));
-    dirData.put(gcsiHelper.getPath(bucketName, "d0"),
-        new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE));
+    dirData.put(
+        gcsiHelper.getPath(bucketName, "d0/"), new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE));
+    dirData.put(
+        gcsiHelper.getPath(bucketName, "d0"), new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE));
 
     // Expect IOException if a file with the given name already exists.
-    dirData.put(gcsiHelper.getPath(bucketName, "f1/"),
-        behavior.fileAlreadyExistsOutcome());
-    dirData.put(gcsiHelper.getPath(bucketName, "d1/f11/d3/"),
-        behavior.fileAlreadyExistsOutcome());
+    dirData.put(gcsiHelper.getPath(bucketName, "f1/"), behavior.fileAlreadyExistsOutcome());
+    dirData.put(gcsiHelper.getPath(bucketName, "d1/f11/d3/"), behavior.fileAlreadyExistsOutcome());
 
     // Some intermediate directories exist (but not all).
-    dirData.put(gcsiHelper.getPath(bucketName, "d1/d2/d3/"),
-                new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE));
+    dirData.put(
+        gcsiHelper.getPath(bucketName, "d1/d2/d3/"),
+        new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE));
 
     // No intermediate directories exist.
-    dirData.put(gcsiHelper.getPath(bucketName, "dA/dB/dC/"),
-                new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE));
+    dirData.put(
+        gcsiHelper.getPath(bucketName, "dA/dB/dC/"),
+        new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE));
 
     // Trying to create the same dirs again is a no-op.
-    dirData.put(gcsiHelper.getPath(bucketName, "dA/dB/dC/"),
-                new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE));
+    dirData.put(
+        gcsiHelper.getPath(bucketName, "dA/dB/dC/"),
+        new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE));
 
     // Make paths that include making a top-level directory (bucket).
     String uniqueBucketName = gcsiHelper.getUniqueBucketName("mkdir-1");
-    dirData.put(gcsiHelper.getPath(uniqueBucketName, null),
-                new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE));
+    dirData.put(
+        gcsiHelper.getPath(uniqueBucketName, null),
+        new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE));
 
     // Create the same bucket again, should be no-op.
-    dirData.put(gcsiHelper.getPath(uniqueBucketName, null),
-                new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE));
+    dirData.put(
+        gcsiHelper.getPath(uniqueBucketName, null),
+        new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE));
 
     // Make a path where the bucket is a non-existent parent directory.
     String uniqueBucketName2 = gcsiHelper.getUniqueBucketName("mkdir-2");
@@ -879,11 +899,13 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   @Test
   public void testGetFileInfos() throws Exception {
     String bucketName = sharedBucketName1;
+    // fmt:off
     // Objects created for this test.
     String[] objectNames = {
       "f1",
       "d0/",
     };
+    // fmt:on
 
     // -------------------------------------------------------
     // Create test objects.
@@ -931,9 +953,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
         .isEqualTo(new StorageResourceId(bucketName));
   }
 
-  /**
-   * Contains data needed for testing the rename() operation.
-   */
+  /** Contains data needed for testing the rename() operation. */
   private static class RenameData {
 
     // Description of test case.
@@ -963,12 +983,13 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     // Objects expected to be deleted after the operation.
     List<String> objectsExpectedToBeDeleted;
 
-    /**
-     * Constructs an instance of the RenameData class.
-     */
-    RenameData(String description,
-        String srcBucketName, String srcObjectName,
-        String dstBucketName, String dstObjectName,
+    /** Constructs an instance of the RenameData class. */
+    RenameData(
+        String description,
+        String srcBucketName,
+        String srcObjectName,
+        String dstBucketName,
+        String dstObjectName,
         MethodOutcome expectedOutcome,
         List<String> objectsExpectedToExistSrc,
         List<String> objectsExpectedToExistDst,
@@ -989,56 +1010,54 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   /** Validates rename(). */
   @Test
   public void testRename() throws Exception {
-    renameHelper(new RenameBehavior() {
-      @Override
-      public MethodOutcome renameFileIntoRootOutcome() {
-        // GCSFS throws IOException on rename into root.
-        return new MethodOutcome(
-            MethodOutcome.Type.THROWS_EXCEPTION, IOException.class);
-      }
+    renameHelper(
+        new RenameBehavior() {
+          @Override
+          public MethodOutcome renameFileIntoRootOutcome() {
+            // GCSFS throws IOException on rename into root.
+            return new MethodOutcome(MethodOutcome.Type.THROWS_EXCEPTION, IOException.class);
+          }
 
-      @Override
-      public MethodOutcome renameRootOutcome() {
-        // GCSFS throws IllegalArgumentException on rename of root.
-        return new MethodOutcome(
-            MethodOutcome.Type.THROWS_EXCEPTION, IllegalArgumentException.class);
-      }
+          @Override
+          public MethodOutcome renameRootOutcome() {
+            // GCSFS throws IllegalArgumentException on rename of root.
+            return new MethodOutcome(
+                MethodOutcome.Type.THROWS_EXCEPTION, IllegalArgumentException.class);
+          }
 
-      @Override
-      public MethodOutcome nonExistentSourceOutcome() {
-        // GCSFS throws FileNotFoundException on nonexistent src.
-        return new MethodOutcome(
-            MethodOutcome.Type.THROWS_EXCEPTION, FileNotFoundException.class);
-      }
+          @Override
+          public MethodOutcome nonExistentSourceOutcome() {
+            // GCSFS throws FileNotFoundException on nonexistent src.
+            return new MethodOutcome(
+                MethodOutcome.Type.THROWS_EXCEPTION, FileNotFoundException.class);
+          }
 
-      @Override
-      public MethodOutcome destinationFileExistsSrcIsFileOutcome() {
-        // GCSFS throws IOException if dst already exists, is a file, and src is also a file.
-        return new MethodOutcome(
-            MethodOutcome.Type.THROWS_EXCEPTION, IOException.class);
-      }
+          @Override
+          public MethodOutcome destinationFileExistsSrcIsFileOutcome() {
+            // GCSFS throws IOException if dst already exists, is a file, and src is also a file.
+            return new MethodOutcome(MethodOutcome.Type.THROWS_EXCEPTION, IOException.class);
+          }
 
-      @Override
-      public MethodOutcome destinationFileExistsSrcIsDirectoryOutcome() {
-        // GCSFS throws IOException if dst already exists, is a file, and src is a directory.
-        return new MethodOutcome(
-            MethodOutcome.Type.THROWS_EXCEPTION, IOException.class);
-      }
+          @Override
+          public MethodOutcome destinationFileExistsSrcIsDirectoryOutcome() {
+            // GCSFS throws IOException if dst already exists, is a file, and src is a directory.
+            return new MethodOutcome(MethodOutcome.Type.THROWS_EXCEPTION, IOException.class);
+          }
 
-      @Override
-      public MethodOutcome nonExistentDestinationFileParentOutcome() {
-        // GCSFS throws FileNotFoundException if a parent of file dst doesn't exist.
-        return new MethodOutcome(
-            MethodOutcome.Type.THROWS_EXCEPTION, FileNotFoundException.class);
-      }
+          @Override
+          public MethodOutcome nonExistentDestinationFileParentOutcome() {
+            // GCSFS throws FileNotFoundException if a parent of file dst doesn't exist.
+            return new MethodOutcome(
+                MethodOutcome.Type.THROWS_EXCEPTION, FileNotFoundException.class);
+          }
 
-      @Override
-      public MethodOutcome nonExistentDestinationDirectoryParentOutcome() {
-        // GCSFS throws FileNotFoundException if a parent of directory dst doesn't exist.
-        return new MethodOutcome(
-            MethodOutcome.Type.THROWS_EXCEPTION, FileNotFoundException.class);
-      }
-    });
+          @Override
+          public MethodOutcome nonExistentDestinationDirectoryParentOutcome() {
+            // GCSFS throws FileNotFoundException if a parent of directory dst doesn't exist.
+            return new MethodOutcome(
+                MethodOutcome.Type.THROWS_EXCEPTION, FileNotFoundException.class);
+          }
+        });
   }
 
   /** Validates rename(). */
@@ -1082,9 +1101,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     };
 
     // Objects created in other bucket for this test.
-    String[] otherObjectNames = {
-      "td0/"
-    };
+    String[] otherObjectNames = {"td0/"};
 
     // -------------------------------------------------------
     // Create test objects.
@@ -1102,192 +1119,249 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     // TODO(user) : add test case for dst under src (not allowed)
 
     // src == root.
-    renameData.add(new RenameData(
-        "src == root",
-        null, null,
-        otherBucketName, doesNotExist,
-        behavior.renameRootOutcome(),  // expected outcome
-        null,  // expected to exist in src
-        null,  // expected to exist in dst
-        null));  // expected to be deleted
+    renameData.add(
+        new RenameData(
+            "src == root",
+            null,
+            null,
+            otherBucketName,
+            doesNotExist,
+            behavior.renameRootOutcome(), // expected outcome
+            null, // expected to exist in src
+            null, // expected to exist in dst
+            null)); // expected to be deleted
 
     // src does not exist.
-    renameData.add(new RenameData(
-        "src does not exist: 1",
-        bucketName, doesNotExist,
-        otherBucketName, doesNotExist,
-        behavior.nonExistentSourceOutcome(),  // expected outcome
-        null,  // expected to exist in src
-        null,  // expected to exist in dst
-        null));  // expected to be deleted
-    renameData.add(new RenameData(
-        "src does not exist: 2",
-        bucketName, dirDoesNotExist,
-        otherBucketName, dirDoesNotExist,
-        behavior.nonExistentSourceOutcome(),  // expected outcome
-        null,  // expected to exist in src
-        null,  // expected to exist in dst
-        null));  // expected to be deleted
-    renameData.add(new RenameData(
-        "src does not exist: 3",
-        doesNotExist, doesNotExist,
-        otherBucketName, doesNotExist,
-        behavior.nonExistentSourceOutcome(),  // expected outcome
-        null,  // expected to exist in src
-        null,  // expected to exist in dst
-        null));  // expected to be deleted
+    renameData.add(
+        new RenameData(
+            "src does not exist: 1",
+            bucketName,
+            doesNotExist,
+            otherBucketName,
+            doesNotExist,
+            behavior.nonExistentSourceOutcome(), // expected outcome
+            null, // expected to exist in src
+            null, // expected to exist in dst
+            null)); // expected to be deleted
+    renameData.add(
+        new RenameData(
+            "src does not exist: 2",
+            bucketName,
+            dirDoesNotExist,
+            otherBucketName,
+            dirDoesNotExist,
+            behavior.nonExistentSourceOutcome(), // expected outcome
+            null, // expected to exist in src
+            null, // expected to exist in dst
+            null)); // expected to be deleted
+    renameData.add(
+        new RenameData(
+            "src does not exist: 3",
+            doesNotExist,
+            doesNotExist,
+            otherBucketName,
+            doesNotExist,
+            behavior.nonExistentSourceOutcome(), // expected outcome
+            null, // expected to exist in src
+            null, // expected to exist in dst
+            null)); // expected to be deleted
 
     // dst is a file that already exists.
     if (behavior.destinationFileExistsSrcIsFileOutcome().getType()
         == MethodOutcome.Type.RETURNS_TRUE) {
-      renameData.add(new RenameData(
-          "dst is a file that already exists: 1",
-          bucketName, "f1",
-          bucketName, "f2",
-          behavior.destinationFileExistsSrcIsFileOutcome(),  // expected outcome
-          null,  // expected to exist in src
-          Lists.newArrayList("f2"),  // expected to exist in dst
-          Lists.newArrayList("f1")));  // expected to be deleted
+      renameData.add(
+          new RenameData(
+              "dst is a file that already exists: 1",
+              bucketName,
+              "f1",
+              bucketName,
+              "f2",
+              behavior.destinationFileExistsSrcIsFileOutcome(), // expected outcome
+              null, // expected to exist in src
+              Lists.newArrayList("f2"), // expected to exist in dst
+              Lists.newArrayList("f1"))); // expected to be deleted
     } else {
-      renameData.add(new RenameData(
-          "dst is a file that already exists: 1",
-          bucketName, "f1",
-          bucketName, "f2",
-          behavior.destinationFileExistsSrcIsFileOutcome(),  // expected outcome
-          Lists.newArrayList("f1"),  // expected to exist in src
-          Lists.newArrayList("f2"),  // expected to exist in dst
-          null));  // expected to be deleted
+      renameData.add(
+          new RenameData(
+              "dst is a file that already exists: 1",
+              bucketName,
+              "f1",
+              bucketName,
+              "f2",
+              behavior.destinationFileExistsSrcIsFileOutcome(), // expected outcome
+              Lists.newArrayList("f1"), // expected to exist in src
+              Lists.newArrayList("f2"), // expected to exist in dst
+              null)); // expected to be deleted
     }
 
-    renameData.add(new RenameData(
-        "dst is a file that already exists: 2",
-        bucketName, "d0/",
-        bucketName, "f2",
-        behavior.destinationFileExistsSrcIsDirectoryOutcome(),  // expected outcome
-        Lists.newArrayList("d0/"),  // expected to exist in src
-        Lists.newArrayList("f2"),  // expected to exist in dst
-        null));  // expected to be deleted
+    renameData.add(
+        new RenameData(
+            "dst is a file that already exists: 2",
+            bucketName,
+            "d0/",
+            bucketName,
+            "f2",
+            behavior.destinationFileExistsSrcIsDirectoryOutcome(), // expected outcome
+            Lists.newArrayList("d0/"), // expected to exist in src
+            Lists.newArrayList("f2"), // expected to exist in dst
+            null)); // expected to be deleted
 
     // Parent of destination does not exist.
-    renameData.add(new RenameData(
-        "Parent of destination does not exist: 1",
-        bucketName, "f1",
-        bucketName, "does-not-exist/f1",
-        behavior.nonExistentDestinationFileParentOutcome(),  // expected outcome
-        null,  // expected to exist in src
-        null,  // expected to exist in dst
-        null));  // expected to be deleted
+    renameData.add(
+        new RenameData(
+            "Parent of destination does not exist: 1",
+            bucketName,
+            "f1",
+            bucketName,
+            "does-not-exist/f1",
+            behavior.nonExistentDestinationFileParentOutcome(), // expected outcome
+            null, // expected to exist in src
+            null, // expected to exist in dst
+            null)); // expected to be deleted
 
     if (behavior.nonExistentDestinationDirectoryParentOutcome().getType()
         == MethodOutcome.Type.RETURNS_TRUE) {
-      renameData.add(new RenameData(
-          "Parent of destination does not exist: 2",
-          bucketName, "d0-b/",
-          bucketName, "does-not-exist2/d0-b/",
-          behavior.nonExistentDestinationDirectoryParentOutcome(),  // expected outcome
-          null,  // expected to exist in src
-          Lists.newArrayList("does-not-exist2/d0-b/"),  // expected to exist in dst
-          Lists.newArrayList("d0-b/")));  // expected to be deleted
+      renameData.add(
+          new RenameData(
+              "Parent of destination does not exist: 2",
+              bucketName,
+              "d0-b/",
+              bucketName,
+              "does-not-exist2/d0-b/",
+              behavior.nonExistentDestinationDirectoryParentOutcome(), // expected outcome
+              null, // expected to exist in src
+              Lists.newArrayList("does-not-exist2/d0-b/"), // expected to exist in dst
+              Lists.newArrayList("d0-b/"))); // expected to be deleted
     } else {
-      renameData.add(new RenameData(
-          "Parent of destination does not exist: 2",
-          bucketName, "d0-b/",
-          bucketName, "does-not-exist2/d0-b/",
-          behavior.nonExistentDestinationDirectoryParentOutcome(),  // expected outcome
-          Lists.newArrayList("d0-b/"),  // expected to exist in src
-          null,  // expected to exist in dst
-          null));  // expected to be deleted
+      renameData.add(
+          new RenameData(
+              "Parent of destination does not exist: 2",
+              bucketName,
+              "d0-b/",
+              bucketName,
+              "does-not-exist2/d0-b/",
+              behavior.nonExistentDestinationDirectoryParentOutcome(), // expected outcome
+              Lists.newArrayList("d0-b/"), // expected to exist in src
+              null, // expected to exist in dst
+              null)); // expected to be deleted
     }
-
 
     // This test case fails for LocalFileSystem; it clobbers the destination instead.
     // TODO(user): Make the MethodOutcome able to encompass high-level behaviors.
-    renameData.add(new RenameData(
-        "destination is a dir that exists and non-empty: 2",
-        bucketName, "d1-h/",
-        bucketName, "td0-a",
-        new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE),  // expected outcome
-        Lists.newArrayList("td0-a/", "td0-a/d1-h/", "td0-a/d1-h/f1"),  // expected to exist in src
-        null,  // expected to exist in dst
-        Lists.newArrayList("d1-h/", "d1-h/f1")));  // expected to be deleted
+    renameData.add(
+        new RenameData(
+            "destination is a dir that exists and non-empty: 2",
+            bucketName,
+            "d1-h/",
+            bucketName,
+            "td0-a",
+            new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE), // expected outcome
+            Lists.newArrayList(
+                "td0-a/", "td0-a/d1-h/", "td0-a/d1-h/f1"), // expected to exist in src
+            null, // expected to exist in dst
+            Lists.newArrayList("d1-h/", "d1-h/f1"))); // expected to be deleted
 
     // Rename a dir: destination is a dir that does not exist
-    renameData.add(new RenameData(
-        "destination is a dir that does not exist",
-        bucketName, "d1-b/",
-        bucketName, "td0-x/",
-        new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE),  // expected outcome
-        Lists.newArrayList("td0-x/", "td0-x/f1"),  // expected to exist in src
-        null,  // expected to exist in dst
-        Lists.newArrayList("d1-b/", "d1-b/f1")));  // expected to be deleted
+    renameData.add(
+        new RenameData(
+            "destination is a dir that does not exist",
+            bucketName,
+            "d1-b/",
+            bucketName,
+            "td0-x/",
+            new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE), // expected outcome
+            Lists.newArrayList("td0-x/", "td0-x/f1"), // expected to exist in src
+            null, // expected to exist in dst
+            Lists.newArrayList("d1-b/", "d1-b/f1"))); // expected to be deleted
 
     // Rename a dir: destination is a file that does not exist
-    renameData.add(new RenameData(
-        "destination is a file that does not exist",
-        bucketName, "d1-c/",
-        bucketName, "td0-a/df",
-        new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE),  // expected outcome
-        Lists.newArrayList("td0-a/", "td0-a/df/", "td0-a/df/f1"),  // expected to exist in src
-        null,  // expected to exist in dst
-        Lists.newArrayList("d1-c/", "d1-c/f1")));  // expected to be deleted
+    renameData.add(
+        new RenameData(
+            "destination is a file that does not exist",
+            bucketName,
+            "d1-c/",
+            bucketName,
+            "td0-a/df",
+            new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE), // expected outcome
+            Lists.newArrayList("td0-a/", "td0-a/df/", "td0-a/df/f1"), // expected to exist in src
+            null, // expected to exist in dst
+            Lists.newArrayList("d1-c/", "d1-c/f1"))); // expected to be deleted
 
     // Rename a file: destination is a file that does not exist
-    renameData.add(new RenameData(
-        "destination is a file that does not exist",
-        bucketName, "d1-d/f1",
-        bucketName, "td0-a/f1-x",
-        new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE),  // expected outcome
-        Lists.newArrayList("d1-d/", "td0-a/", "td0-a/f1-x"),  // expected to exist in src
-        null,  // expected to exist in dst
-        Lists.newArrayList("d1-d/f1")));  // expected to be deleted
+    renameData.add(
+        new RenameData(
+            "destination is a file that does not exist",
+            bucketName,
+            "d1-d/f1",
+            bucketName,
+            "td0-a/f1-x",
+            new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE), // expected outcome
+            Lists.newArrayList("d1-d/", "td0-a/", "td0-a/f1-x"), // expected to exist in src
+            null, // expected to exist in dst
+            Lists.newArrayList("d1-d/f1"))); // expected to be deleted
 
     // Rename a file: destination is root.
     if (behavior.renameFileIntoRootOutcome().getType() == MethodOutcome.Type.RETURNS_TRUE) {
       // TODO(user): Refactor the way assertPathsExist so that it can check for existence in
       // root as well.
-      renameData.add(new RenameData(
-          "file : destination is root",
-          bucketName, "d1-i/f1",
-          null, null,
-          behavior.renameFileIntoRootOutcome(),  // expected outcome
-          Lists.newArrayList("d1-i/"),  // expected to exist in src
-          null,  // expected to exist in dst
-          Lists.newArrayList("d1-i/f1")));  // expected to be deleted
+      renameData.add(
+          new RenameData(
+              "file : destination is root",
+              bucketName,
+              "d1-i/f1",
+              null,
+              null,
+              behavior.renameFileIntoRootOutcome(), // expected outcome
+              Lists.newArrayList("d1-i/"), // expected to exist in src
+              null, // expected to exist in dst
+              Lists.newArrayList("d1-i/f1"))); // expected to be deleted
     } else {
-      renameData.add(new RenameData(
-          "file : destination is root",
-          bucketName, "d1-i/f1",
-          null, null,
-          behavior.renameFileIntoRootOutcome(),  // expected outcome
-          Lists.newArrayList("d1-i/", "d1-i/f1"),  // expected to exist in src
-          null,  // expected to exist in dst
-          null));  // expected to be deleted
+      renameData.add(
+          new RenameData(
+              "file : destination is root",
+              bucketName,
+              "d1-i/f1",
+              null,
+              null,
+              behavior.renameFileIntoRootOutcome(), // expected outcome
+              Lists.newArrayList("d1-i/", "d1-i/f1"), // expected to exist in src
+              null, // expected to exist in dst
+              null)); // expected to be deleted
     }
 
-
     // Rename a file: src is a directory with a multi-level sub-directory.
-    renameData.add(new RenameData(
-        "src is a directory with a multi-level subdirectory; dst is a directory which exists.",
-        bucketName, "n1-src/",
-        bucketName, "n1-dst/",
-        new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE),
-        Lists.newArrayList("n1-dst/", "n1-dst/n1-src/d1/", "n1-dst/n1-src/d1/f1"),
-        null,
-        Lists.newArrayList("n1-src/", "n1-src/d1/", "n1-src/d1/f1")));
+    renameData.add(
+        new RenameData(
+            "src is a directory with a multi-level subdirectory; dst is a directory which exists.",
+            bucketName,
+            "n1-src/",
+            bucketName,
+            "n1-dst/",
+            new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE),
+            Lists.newArrayList("n1-dst/", "n1-dst/n1-src/d1/", "n1-dst/n1-src/d1/f1"),
+            null,
+            Lists.newArrayList("n1-src/", "n1-src/d1/", "n1-src/d1/f1")));
 
     // Rename a file: src is a directory with a multi-level sub-directory.
     // Similar to the previous case but with more levels involved.
-    renameData.add(new RenameData(
-        "src is a directory with a multi-level subdirectory; dst is a directory which exists - 2",
-        bucketName, "n2-src/",
-        bucketName, "n2-dst/",
-        new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE),
-        Lists.newArrayList("n2-dst/", "n2-dst/f1",
-            "n2-dst/n2-src/d0/", "n2-dst/n2-src/f1",
-            "n2-dst/n2-src/d1/f1", "n2-dst/n2-src/d2/d21/d211/f1"),
-        null,
-        Lists.newArrayList("n2-src/", "n2-src/d0/", "n2-src/f1",
-            "n2-src/d1/f1", "n2-src/d2/d21/d211/f1")));
+    renameData.add(
+        new RenameData(
+            "src is a directory with a multi-level subdirectory; dst is a directory which exists - 2",
+            bucketName,
+            "n2-src/",
+            bucketName,
+            "n2-dst/",
+            new MethodOutcome(MethodOutcome.Type.RETURNS_TRUE),
+            Lists.newArrayList(
+                "n2-dst/",
+                "n2-dst/f1",
+                "n2-dst/n2-src/d0/",
+                "n2-dst/n2-src/f1",
+                "n2-dst/n2-src/d1/f1",
+                "n2-dst/n2-src/d2/d21/d211/f1"),
+            null,
+            Lists.newArrayList(
+                "n2-src/", "n2-src/d0/", "n2-src/f1", "n2-src/d1/f1", "n2-src/d2/d21/d211/f1")));
 
     // -------------------------------------------------------
     // Call rename() for each path and verify the expected behavior.
@@ -1424,7 +1498,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
                 });
       }
 
-        checkDestCounter.await();
+      checkDestCounter.await();
 
       if (!errorList.isEmpty()) {
         AssertionError error = new AssertionError();
@@ -1448,10 +1522,10 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     // TODO(user): Split out separate test cases, extract a suitable variant of RenameData to
     // follow same pattern of iterating over subcases.
     String[] fileNames = {
-        "test-recursive/oldA/B/file2",
-        "test-recursive/oldA/file1",
-        "test-flat/oldA/aaa",
-        "test-flat/oldA/b"
+      "test-recursive/oldA/B/file2",
+      "test-recursive/oldA/file1",
+      "test-flat/oldA/aaa",
+      "test-flat/oldA/b"
     };
 
     // Create the objects; their contents will be their own object names as an ASCII string.
@@ -1460,14 +1534,15 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // Check original file existence.
     String testDescRecursive = "Rename of directory with file1 and subdirectory with file2";
-    List<String> originalObjects = ImmutableList.of(
-        "test-recursive/",
-        "test-recursive/oldA/",
-        "test-recursive/oldA/B/",
-        "test-recursive/oldA/B/file2",
-        "test-recursive/oldA/file1",
-        "test-flat/oldA/aaa",
-        "test-flat/oldA/b");
+    List<String> originalObjects =
+        ImmutableList.of(
+            "test-recursive/",
+            "test-recursive/oldA/",
+            "test-recursive/oldA/B/",
+            "test-recursive/oldA/B/file2",
+            "test-recursive/oldA/file1",
+            "test-flat/oldA/aaa",
+            "test-flat/oldA/b");
     assertPathsExist(testDescRecursive, bucketName, originalObjects, true);
 
     // Check original file content.
@@ -1490,14 +1565,15 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     }
 
     // Check resulting file existence.
-    List<String> resultingObjects = ImmutableList.of(
-        "test-recursive/",
-        "test-recursive/newA/",
-        "test-recursive/newA/B/",
-        "test-recursive/newA/B/file2",
-        "test-recursive/newA/file1",
-        "test-flat/newA/aaa",
-        "test-flat/newA/b");
+    List<String> resultingObjects =
+        ImmutableList.of(
+            "test-recursive/",
+            "test-recursive/newA/",
+            "test-recursive/newA/B/",
+            "test-recursive/newA/B/file2",
+            "test-recursive/newA/file1",
+            "test-flat/newA/aaa",
+            "test-flat/newA/b");
     assertPathsExist(testDescRecursive, bucketName, resultingObjects, true);
 
     // Check resulting file content.
@@ -1507,13 +1583,14 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     }
 
     // Things which mustn't exist anymore.
-    List<String> deletedObjects = ImmutableList.of(
-        "test-recursive/oldA/",
-        "test-recursive/oldA/B/",
-        "test-recursive/oldA/B/file2",
-        "test-recursive/oldA/file1",
-        "test-flat/oldA/aaa",
-        "test-flat/oldA/b");
+    List<String> deletedObjects =
+        ImmutableList.of(
+            "test-recursive/oldA/",
+            "test-recursive/oldA/B/",
+            "test-recursive/oldA/B/file2",
+            "test-recursive/oldA/file1",
+            "test-flat/oldA/aaa",
+            "test-flat/oldA/b");
     assertPathsExist(testDescRecursive, bucketName, deletedObjects, false);
   }
 
@@ -1525,8 +1602,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
             .build();
 
     URI testFilePath = gcsiHelper.getPath(sharedBucketName1, "test-file-creation-attributes.txt");
-    try (WritableByteChannel channel =
-        gcsfs.create(testFilePath, createFileOptions)) {
+    try (WritableByteChannel channel = gcsfs.create(testFilePath, createFileOptions)) {
       assertThat(channel).isNotNull();
     }
 
@@ -1602,15 +1678,13 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     byte[] expectedOutput = "content1content2".getBytes(UTF_8);
     ByteBuffer actualOutput = ByteBuffer.allocate(expectedOutput.length);
     try (SeekableByteChannel destinationChannel =
-            gcsiHelper.open(bucketName, "test-compose/destination")) {
+        gcsiHelper.open(bucketName, "test-compose/destination")) {
       destinationChannel.read(actualOutput);
     }
     assertThat(actualOutput.array()).isEqualTo(expectedOutput);
   }
 
-  /**
-   * Gets a unique path of a non-existent file.
-   */
+  /** Gets a unique path of a non-existent file. */
   public static URI getTempFilePath() {
     return gcsiHelper.getPath(sharedBucketName1, "file-" + UUID.randomUUID());
   }
@@ -1636,22 +1710,26 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   }
 
   /**
-   * If the given paths are expected to exist then asserts that they do,
-   * otherwise asserts that they do not exist.
+   * If the given paths are expected to exist then asserts that they do, otherwise asserts that they
+   * do not exist.
    */
   private void assertPathsExist(
-      String testCaseDescription, String bucketName,
-      List<String> objectNames, boolean expectedToExist)
+      String testCaseDescription,
+      String bucketName,
+      List<String> objectNames,
+      boolean expectedToExist)
       throws IOException {
     if (objectNames != null) {
       for (String object : objectNames) {
         URI path = gcsiHelper.getPath(bucketName, object);
-        String msg = String.format("test-case: %s :: %s: %s",
-            testCaseDescription,
-            (expectedToExist
-                ? "Path expected to exist but not found"
-                : "Path expected to not exist but found"),
-            path.toString());
+        String msg =
+            String.format(
+                "test-case: %s :: %s: %s",
+                testCaseDescription,
+                (expectedToExist
+                    ? "Path expected to exist but not found"
+                    : "Path expected to not exist but found"),
+                path.toString());
         assertWithMessage(msg).that(gcsiHelper.exists(path)).isEqualTo(expectedToExist);
       }
     }

@@ -642,7 +642,6 @@
         <artifactId>spotless-maven-plugin</artifactId>
         <version>2.12.2</version>
         <configuration>
-          <ratchetFrom>master</ratchetFrom>
           <formats>
             <format>
               <includes>
@@ -654,6 +653,10 @@
             </format>
           </formats>
           <java>
+            <toggleOffOn>
+              <off>fmt:off</off>
+              <on>fmt:on</on>
+            </toggleOffOn>
             <googleJavaFormat>
               <version>1.7</version>
             </googleJavaFormat>
