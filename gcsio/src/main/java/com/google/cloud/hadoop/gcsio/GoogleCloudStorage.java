@@ -205,7 +205,7 @@ public interface GoogleCloudStorage {
             .map(srcObjectName -> new StorageResourceId(srcBucketName, srcObjectName))
             .collect(Collectors.toList());
     List<StorageResourceId> dstObjects =
-        srcObjectNames.stream()
+        dstObjectNames.stream()
             .map(dstObjectName -> new StorageResourceId(dstBucketName, dstObjectName))
             .collect(Collectors.toList());
     copy(srcBucketName, dstBucketName, srcObjects, dstObjects);
