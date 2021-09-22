@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Google Inc. All Rights Reserved.
+ * Copyright 2021 Google Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GHFSStatisticTypeEnum.TYPE_DURATION;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatisticTypeEnum.TYPE_DURATION;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -25,15 +25,14 @@ import org.apache.hadoop.fs.statistics.StoreStatisticNames;
 import org.apache.hadoop.fs.statistics.StreamStatisticNames;
 
 /**
- * Statistic which are collected in S3A. Counter and duration statistics are published in {@link
- * GoogleHadoopFileSystemBase#getStorageStatistics()}. and as metrics in {@link
- * GHFSInstrumentation}.
+ * Statistic which are collected in GCS. Counter and duration statistics are published in {@link
+ * GoogleHadoopFileSystemBase}. and as metrics in {@link GhfsInstrumentation}.
  *
  * <p>Where possible, stream names come from {@link StreamStatisticNames} and {@link
  * StoreStatisticNames}
  */
 @InterfaceStability.Unstable
-enum GHFSStatistic {
+enum GhfsStatistic {
   /** Low-level duration counters */
   ACTION_HTTP_HEAD_REQUEST(
       StoreStatisticNames.ACTION_HTTP_HEAD_REQUEST, "HEAD request.", TYPE_DURATION),
@@ -41,11 +40,11 @@ enum GHFSStatistic {
       StoreStatisticNames.ACTION_HTTP_GET_REQUEST, "GET request.", TYPE_DURATION);
 
   /** A map used to support the {@link #fromSymbol(String)} call. */
-  private static final Map<String, GHFSStatistic> SYMBOL_MAP =
-      new HashMap<>(GHFSStatistic.values().length);
+  private static final Map<String, GhfsStatistic> SYMBOL_MAP =
+      new HashMap<>(GhfsStatistic.values().length);
 
   static {
-    for (GHFSStatistic stat : values()) {
+    for (GhfsStatistic stat : values()) {
       SYMBOL_MAP.put(stat.getSymbol(), stat);
     }
   }
@@ -57,7 +56,7 @@ enum GHFSStatistic {
    * @param description description.
    * @param type type
    */
-  GHFSStatistic(String symbol, String description, GHFSStatisticTypeEnum type) {
+  GhfsStatistic(String symbol, String description, GhfsStatisticTypeEnum type) {
     this.symbol = symbol;
     this.description = description;
     this.type = type;
@@ -70,7 +69,7 @@ enum GHFSStatistic {
   private final String description;
 
   /** Statistic type. */
-  private final GHFSStatisticTypeEnum type;
+  private final GhfsStatisticTypeEnum type;
 
   public String getSymbol() {
     return symbol;
@@ -82,7 +81,7 @@ enum GHFSStatistic {
    * @param symbol statistic to look up
    * @return the value or null.
    */
-  public static GHFSStatistic fromSymbol(String symbol) {
+  public static GhfsStatistic fromSymbol(String symbol) {
     return SYMBOL_MAP.get(symbol);
   }
 
@@ -105,7 +104,7 @@ enum GHFSStatistic {
    *
    * @return the type.
    */
-  public GHFSStatisticTypeEnum getType() {
+  public GhfsStatisticTypeEnum getType() {
     return type;
   }
 }

@@ -279,7 +279,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   private FsPermission reportedPermissions;
 
   /** Instrumentation to get the statistics. */
-  private GHFSInstrumentation instrumentation;
+  private GhfsInstrumentation instrumentation;
 
   /**
    * GCS {@link FileChecksum} which takes constructor parameters to define the return values of the
@@ -470,12 +470,12 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     initializeDelegationTokenSupport(config, path);
 
     // Initialize the instrumentation
-    instrumentation = new GHFSInstrumentation(path);
+    instrumentation = new GhfsInstrumentation(path);
 
     configure(config);
   }
 
-  public GHFSInstrumentation getInstrumentation() {
+  public GhfsInstrumentation getInstrumentation() {
     return this.instrumentation;
   }
 
@@ -680,10 +680,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     URI parentGcsPath = UriPaths.getParentPath(gcsPath);
     DurationTracker get_tracker =
         getDurationTrackerFactory()
-            .trackDuration(GHFSStatistic.ACTION_HTTP_GET_REQUEST.getSymbol());
+            .trackDuration(GhfsStatistic.ACTION_HTTP_GET_REQUEST.getSymbol());
     DurationTracker head_tracker =
         getDurationTrackerFactory()
-            .trackDuration(GHFSStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol());
+            .trackDuration(GhfsStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol());
 
     if (!getGcsFs().getFileInfo(parentGcsPath).exists()) {
       throw new FileNotFoundException(
@@ -833,10 +833,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     URI dstPath = getGcsPath(dst);
     DurationTracker get_tracker =
         getDurationTrackerFactory()
-            .trackDuration(GHFSStatistic.ACTION_HTTP_GET_REQUEST.getSymbol());
+            .trackDuration(GhfsStatistic.ACTION_HTTP_GET_REQUEST.getSymbol());
     DurationTracker head_tracker =
         getDurationTrackerFactory()
-            .trackDuration(GHFSStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol());
+            .trackDuration(GhfsStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol());
     try {
       getGcsFs().rename(srcPath, dstPath);
     } catch (Exception e) {
@@ -875,10 +875,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     DurationTracker get_tracker =
         getDurationTrackerFactory()
-            .trackDuration(GHFSStatistic.ACTION_HTTP_GET_REQUEST.getSymbol());
+            .trackDuration(GhfsStatistic.ACTION_HTTP_GET_REQUEST.getSymbol());
     DurationTracker head_tracker =
         getDurationTrackerFactory()
-            .trackDuration(GHFSStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol());
+            .trackDuration(GhfsStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol());
 
     URI gcsPath = getGcsPath(hadoopPath);
     try {
@@ -1032,10 +1032,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
     DurationTracker get_tracker =
         getDurationTrackerFactory()
-            .trackDuration(GHFSStatistic.ACTION_HTTP_GET_REQUEST.getSymbol());
+            .trackDuration(GhfsStatistic.ACTION_HTTP_GET_REQUEST.getSymbol());
     DurationTracker head_tracker =
         getDurationTrackerFactory()
-            .trackDuration(GHFSStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol());
+            .trackDuration(GhfsStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol());
 
     if (!fileInfo.exists()) {
       throw new FileNotFoundException(
@@ -1767,10 +1767,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     final FileInfo fileInfo;
     DurationTracker get_tracker =
         getDurationTrackerFactory()
-            .trackDuration(GHFSStatistic.ACTION_HTTP_GET_REQUEST.getSymbol());
+            .trackDuration(GhfsStatistic.ACTION_HTTP_GET_REQUEST.getSymbol());
     DurationTracker head_tracker =
         getDurationTrackerFactory()
-            .trackDuration(GHFSStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol());
+            .trackDuration(GhfsStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol());
 
     URI gcsPath = getGcsPath(hadoopPath);
     try {
@@ -1849,10 +1849,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     byte[] xAttr;
     DurationTracker get_tracker =
         getDurationTrackerFactory()
-            .trackDuration(GHFSStatistic.ACTION_HTTP_GET_REQUEST.getSymbol());
+            .trackDuration(GhfsStatistic.ACTION_HTTP_GET_REQUEST.getSymbol());
     DurationTracker head_tracker =
         getDurationTrackerFactory()
-            .trackDuration(GHFSStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol());
+            .trackDuration(GhfsStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol());
 
     try {
       attributes = getGcsFs().getFileInfo(getGcsPath(path)).getAttributes();
@@ -1887,10 +1887,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     DurationTracker get_tracker =
         getDurationTrackerFactory()
-            .trackDuration(GHFSStatistic.ACTION_HTTP_GET_REQUEST.getSymbol());
+            .trackDuration(GhfsStatistic.ACTION_HTTP_GET_REQUEST.getSymbol());
     DurationTracker head_tracker =
         getDurationTrackerFactory()
-            .trackDuration(GHFSStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol());
+            .trackDuration(GhfsStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol());
     try {
       FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
       xAttrs =
@@ -1948,10 +1948,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     List<String> xAttrs;
     DurationTracker get_tracker =
         getDurationTrackerFactory()
-            .trackDuration(GHFSStatistic.ACTION_HTTP_GET_REQUEST.getSymbol());
+            .trackDuration(GhfsStatistic.ACTION_HTTP_GET_REQUEST.getSymbol());
     DurationTracker head_tracker =
         getDurationTrackerFactory()
-            .trackDuration(GHFSStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol());
+            .trackDuration(GhfsStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol());
 
     try {
       FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
@@ -2024,10 +2024,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     checkNotNull(name, "name should not be null");
     DurationTracker get_tracker =
         getDurationTrackerFactory()
-            .trackDuration(GHFSStatistic.ACTION_HTTP_GET_REQUEST.getSymbol());
+            .trackDuration(GhfsStatistic.ACTION_HTTP_GET_REQUEST.getSymbol());
     DurationTracker head_tracker =
         getDurationTrackerFactory()
-            .trackDuration(GHFSStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol());
+            .trackDuration(GhfsStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol());
 
     try {
       FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));

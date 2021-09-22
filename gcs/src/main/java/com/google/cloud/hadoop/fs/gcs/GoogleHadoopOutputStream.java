@@ -51,7 +51,7 @@ class GoogleHadoopOutputStream extends OutputStream {
   // numbers of bytes written.
   private final FileSystem.Statistics statistics;
 
-  private GHFSInstrumentation instrumentation;
+  private GhfsInstrumentation instrumentation;
   /**
    * Constructs an instance of GoogleHadoopOutputStream object.
    *
@@ -94,14 +94,14 @@ class GoogleHadoopOutputStream extends OutputStream {
       GoogleCloudStorageFileSystem gcsfs,
       URI gcsPath,
       CreateFileOptions options,
-      GHFSInstrumentation instrumentation)
+      GhfsInstrumentation instrumentation)
       throws IOException {
     DurationTrackerFactory durationTrackerFactory =
         instrumentation != null ? instrumentation.getDurationTrackerFactory() : null;
     DurationTracker get_tracker =
-        durationTrackerFactory.trackDuration(GHFSStatistic.ACTION_HTTP_GET_REQUEST.getSymbol());
+        durationTrackerFactory.trackDuration(GhfsStatistic.ACTION_HTTP_GET_REQUEST.getSymbol());
     DurationTracker head_tracker =
-        durationTrackerFactory.trackDuration(GHFSStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol());
+        durationTrackerFactory.trackDuration(GhfsStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol());
 
     try {
 
