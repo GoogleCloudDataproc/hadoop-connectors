@@ -90,18 +90,7 @@ import java.net.URI;
 import java.nio.file.DirectoryNotEmptyException;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -589,6 +578,13 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     unboundedThreadPool.allowCoreThreadTimeOut(true);
   }
 
+  public GoogleHadoopFileStatus getGcsFileStatus(FileStatus fileStatus) {
+    if (fileStatus instanceof GoogleHadoopFileStatus) {
+      return (GoogleHadoopFileStatus) fileStatus;
+    }
+    return null;
+  }
+
   @Override
   public CompletableFuture<FSDataInputStream> openFileWithOptions(
       final Path rawPath, final OpenFileParameters parameters) throws IOException {
@@ -596,20 +592,41 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     Set<String> mandatoryKeys = parameters.getMandatoryKeys();
     AbstractFSBuilderImpl.rejectUnknownMandatoryKeys(
         mandatoryKeys, Collections.emptySet(), "for " + path);
-    StorageResourceId storageResourceId = StorageResourceId.fromUriPath(rawPath.toUri(), false);
-    GoogleCloudStorageItemInfo itemInfo = this.getGcsFs().getGcs().getItemInfo(storageResourceId);
+    FileStatus fileStatus = parameters.getStatus();
+    GoogleCloudStorageItemInfo itemInfo = null;
+    GoogleHadoopFileStatus gcsFileStatus;
+    if (fileStatus != null) {
+      gcsFileStatus = getGcsFileStatus(fileStatus);
+      if (gcsFileStatus != null) {
+        itemInfo = gcsFileStatus.getItemInfo();
+      }
+    } else {
+      return super.openFileWithOptions(rawPath, parameters);
+    }
     checkNotNull(itemInfo, "Item info cannot be null");
     logger.atFine().log("ItemInfo :%s", itemInfo);
     logger.atFine().log("File exists: %s", itemInfo.getResourceId());
     CompletableFuture<FSDataInputStream> result = new CompletableFuture<>();
     try {
+      GoogleCloudStorageItemInfo finalItemInfo = itemInfo;
       return unboundedThreadPool
-          .submit(() -> LambdaUtils.eval(result, () -> open(itemInfo, parameters.getBufferSize())))
+          .submit(
+              () -> LambdaUtils.eval(result, () -> open(finalItemInfo, parameters.getBufferSize())))
           .get();
     } catch (InterruptedException e) {
       e.printStackTrace();
+      try {
+        throw new InterruptedException();
+      } catch (InterruptedException interruptedException) {
+        interruptedException.printStackTrace();
+      }
     } catch (ExecutionException e) {
       e.printStackTrace();
+      try {
+        throw e;
+      } catch (ExecutionException interruptedException) {
+        interruptedException.printStackTrace();
+      }
     }
     return result;
   }
@@ -1031,21 +1048,17 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   }
 
   /** Gets FileStatus corresponding to the given FileInfo value. */
-  private FileStatus getFileStatus(FileInfo fileInfo, String userName) {
+  private GoogleHadoopFileStatus getFileStatus(FileInfo fileInfo, String userName) {
     // GCS does not provide modification time. It only provides creation time.
     // It works for objects because they are immutable once created.
-    FileStatus status =
-        new FileStatus(
-            fileInfo.getSize(),
-            fileInfo.isDirectory(),
+    GoogleHadoopFileStatus status =
+        new GoogleHadoopFileStatus(
+            fileInfo,
+            getHadoopPath(fileInfo.getPath()),
             REPLICATION_FACTOR_DEFAULT,
             defaultBlockSize,
-            /* modificationTime= */ fileInfo.getModificationTime(),
-            /* accessTime= */ fileInfo.getModificationTime(),
             reportedPermissions,
-            /* owner= */ userName,
-            /* group= */ userName,
-            getHadoopPath(fileInfo.getPath()));
+            userName);
     logger.atFiner().log(
         "getFileStatus(path: %s, userName: %s): %s",
         fileInfo.getPath(), userName, lazy(() -> fileStatusToString(status)));
