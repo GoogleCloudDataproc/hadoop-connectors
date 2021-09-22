@@ -640,7 +640,12 @@ public class GoogleCloudStorageFileSystem {
                   /* generationId= */ 0)));
 
       try {
-        gcs.deleteObjects(ImmutableList.of(srcResourceId));
+        gcs.deleteObjects(
+            ImmutableList.of(
+                new StorageResourceId(
+                    srcInfo.getItemInfo().getBucketName(),
+                    srcInfo.getItemInfo().getObjectName(),
+                    srcInfo.getItemInfo().getContentGeneration())));
       } catch (IOException e) {
         deleteSilently(dstResourceId);
         throw e;
