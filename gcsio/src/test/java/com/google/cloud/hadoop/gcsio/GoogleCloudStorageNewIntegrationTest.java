@@ -1344,9 +1344,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(new String(readContent, UTF_8)).isEqualTo("content");
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(testBucket, testFile.getObjectName()),
-            getMediaRequestString(testBucket, testFile.getObjectName(), generationId));
+        .containsExactly(getMediaRequestString(testBucket, testFile.getObjectName(), generationId));
   }
 
   @Test
