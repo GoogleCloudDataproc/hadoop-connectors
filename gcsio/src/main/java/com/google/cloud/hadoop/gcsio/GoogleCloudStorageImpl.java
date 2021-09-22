@@ -960,6 +960,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param gcsImpl A GoogleCloudStorage for retrieving bucket info via getItemInfo, but only if
    *     srcBucketName != dstBucketName; passed as a parameter so that this static method can be
    *     used by other implementations of GoogleCloudStorage that want to preserve the validation
+   *     behavior of GoogleCloudStorageImpl, including disallowing cross-location copies.
    */
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
@@ -2218,6 +2219,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param request the storage request to be initialized before send out
    * @param bucketName the bucket name the storage request accesses
    * @return the initialized storage request.
+   * @throws IOException
    */
   @VisibleForTesting
   <RequestT extends StorageRequest<?>> RequestT initializeRequest(
