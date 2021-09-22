@@ -1322,14 +1322,12 @@ public class GoogleCloudStorageNewIntegrationTest {
       throws Exception {
     String testBucket = gcsfsIHelper.sharedBucketName1;
     StorageResourceId testFile = new StorageResourceId(testBucket, getTestResource());
-    StorageObject storageObject = newStorageObject(testBucket, getTestResource());
-    GoogleCloudStorageItemInfo itemInfo = gcsfsIHelper.gcs.getItemInfo(testFile);
     try (OutputStream os =
         new GZIPOutputStream(
             Channels.newOutputStream(gcsfsIHelper.gcs.create(testFile, GZIP_CREATE_OPTIONS)))) {
       os.write("content".getBytes(UTF_8));
     }
-
+    GoogleCloudStorageItemInfo itemInfo = gcsfsIHelper.gcs.getItemInfo(testFile);
     long generationId = gcsfsIHelper.gcs.getItemInfo(testFile).getContentGeneration();
 
     TrackingHttpRequestInitializer gcsRequestsTracker =

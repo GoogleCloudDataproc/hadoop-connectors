@@ -148,7 +148,7 @@ public class GoogleCloudStorageImplTest {
             getRequestString(
                 itemInfo.getBucketName(),
                 itemInfo.getObjectName(),
-                /* fields= */ "contentEncoding,generation,size"));
+                /* fields= */ "bucket,name,timeCreated,updated,generation,metageneration,size,contentType,contentEncoding,md5Hash,crc32c,metadata"));
   }
 
   @Test
