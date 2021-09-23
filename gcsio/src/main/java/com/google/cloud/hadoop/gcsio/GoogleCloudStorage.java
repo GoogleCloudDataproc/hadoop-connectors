@@ -196,25 +196,12 @@ public interface GoogleCloudStorage {
    *     exist
    * @throws IOException in all other error cases
    */
-  default void copy(
+  void copy(
       String srcBucketName,
       List<String> srcObjectNames,
       String dstBucketName,
       List<String> dstObjectNames)
-      throws IOException {
-    checkArgument(srcObjectNames != null, "srcObjectNames must not be null");
-    checkArgument(dstObjectNames != null, "dstObjectNames must not be null");
-
-    List<StorageResourceId> srcObjects =
-        srcObjectNames.stream()
-            .map(srcObjectName -> new StorageResourceId(srcBucketName, srcObjectName))
-            .collect(Collectors.toList());
-    List<StorageResourceId> dstObjects =
-        dstObjectNames.stream()
-            .map(dstObjectName -> new StorageResourceId(dstBucketName, dstObjectName))
-            .collect(Collectors.toList());
-    copy(srcObjects, dstObjects);
-  }
+      throws IOException;
 
   /**
    * Copies metadata of the given objects. After the copy is successfully complete, each object blob
@@ -227,8 +214,31 @@ public interface GoogleCloudStorage {
    *     exist
    * @throws IOException in all other error cases
    */
-  void copy(List<StorageResourceId> srcObjects, List<StorageResourceId> dstObjects)
-      throws IOException;
+  default void copy(List<StorageResourceId> srcObjects, List<StorageResourceId> dstObjects)
+      throws IOException {
+    checkArgument(srcObjects != null, "srcObjects must not be null");
+    checkArgument(dstObjects != null, "dstObjects must not be null");
+
+    List<String> srcObjectNames =
+        srcObjects.stream().map(StorageResourceId::getObjectName).collect(Collectors.toList());
+    List<String> dstObjectNames =
+        dstObjects.stream().map(StorageResourceId::getObjectName).collect(Collectors.toList());
+    String srcBucketName = srcObjects.get(0).getBucketName();
+    String dstBucketName = dstObjects.get(0).getBucketName();
+
+    for (int i = 0; i < srcObjects.size(); i++) {
+      if (!srcBucketName.equals(srcObjects.get(i).getBucketName()))
+        throw new UnsupportedOperationException(
+            "This operation is not supported across multiple source locations");
+      if (!dstBucketName.equals(dstObjects.get(i).getBucketName()))
+        throw new UnsupportedOperationException(
+            "This operation is not supported across multiple destination locations");
+    }
+    if (srcObjectNames.isEmpty()) {
+      return;
+    }
+    copy(srcBucketName, srcObjectNames, dstBucketName, dstObjectNames);
+  }
 
   /** Gets a list of names of buckets in this project. */
   List<String> listBucketNames() throws IOException;

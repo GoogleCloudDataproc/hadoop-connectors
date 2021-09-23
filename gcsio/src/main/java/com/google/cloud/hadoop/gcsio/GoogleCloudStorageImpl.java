@@ -103,6 +103,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 /**
@@ -162,6 +163,24 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           "Failed to parse base64 encoded attribute value %s - %s", value, iae);
       return null;
     }
+  }
+
+  public static void validateCopyArguments(
+      String srcBucketName,
+      List<String> srcObjectNames,
+      String dstBucketName,
+      List<String> dstObjectNames,
+      GoogleCloudStorage googleCloudStorage)
+      throws IOException {
+    List<StorageResourceId> srcObjects =
+        srcObjectNames.stream()
+            .map(srcObjectName -> new StorageResourceId(srcBucketName, srcObjectName))
+            .collect(Collectors.toList());
+    List<StorageResourceId> dstObjects =
+        dstObjectNames.stream()
+            .map(dstObjectName -> new StorageResourceId(dstBucketName, dstObjectName))
+            .collect(Collectors.toList());
+    validateCopyArguments(srcObjects, dstObjects, googleCloudStorage);
   }
 
   /** A factory for producing BackOff objects. */
@@ -1034,6 +1053,34 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                 StringPaths.fromComponents(srcBucketName, srcObjects.get(i).getObjectName())));
       }
     }
+  }
+
+  /**
+   * See {@link GoogleCloudStorage#copy(String, List, String, List)} for details about expected
+   * behavior.
+   */
+  @Override
+  public void copy(
+      String srcBucketName,
+      List<String> srcObjectNames,
+      String dstBucketName,
+      List<String> dstObjectNames)
+      throws IOException {
+    checkArgument(srcObjectNames != null, "srcObjectNames must not be null");
+    checkArgument(dstObjectNames != null, "dstObjectNames must not be null");
+
+    List<StorageResourceId> srcObjects =
+        srcObjectNames.stream()
+            .map(srcObjectName -> new StorageResourceId(srcBucketName, srcObjectName))
+            .collect(Collectors.toList());
+    List<StorageResourceId> dstObjects =
+        dstObjectNames.stream()
+            .map(dstObjectName -> new StorageResourceId(dstBucketName, dstObjectName))
+            .collect(Collectors.toList());
+    if (srcObjectNames.isEmpty()) {
+      return;
+    }
+    copy(srcObjects, dstObjects);
   }
 
   /**
