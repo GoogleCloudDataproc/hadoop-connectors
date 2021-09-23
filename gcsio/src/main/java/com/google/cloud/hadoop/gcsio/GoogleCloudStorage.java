@@ -229,10 +229,10 @@ public interface GoogleCloudStorage {
     for (int i = 0; i < srcObjects.size(); i++) {
       if (!srcBucketName.equals(srcObjects.get(i).getBucketName()))
         throw new UnsupportedOperationException(
-            "This operation is not supported across multiple source locations");
+            "This operation is not supported across multiple source buckets");
       if (!dstBucketName.equals(dstObjects.get(i).getBucketName()))
         throw new UnsupportedOperationException(
-            "This operation is not supported across multiple destination locations");
+            "This operation is not supported across multiple destination buckets");
     }
     if (srcObjectNames.isEmpty()) {
       return;
