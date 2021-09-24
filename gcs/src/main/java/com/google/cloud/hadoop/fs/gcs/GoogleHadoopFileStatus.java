@@ -2,7 +2,6 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
-import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -28,31 +27,7 @@ public class GoogleHadoopFileStatus extends FileStatus {
         /* owner= */ userName,
         /* group= */ userName,
         filePath);
-    if (fileInfo.exists()) {
-      if (!fileInfo.isDirectory()) {
-        this.itemInfo =
-            GoogleCloudStorageItemInfo.createObject(
-                StorageResourceId.fromStringPath(filePath.toString()),
-                fileInfo.getCreationTime(),
-                fileInfo.getModificationTime(),
-                fileInfo.getSize(),
-                fileInfo.getContentType(),
-                fileInfo.getContentEncoding(),
-                fileInfo.getAttributes(),
-                fileInfo.getContentGeneration(),
-                fileInfo.getMetaGeneration(),
-                fileInfo.getVerifyingAttributes());
-      } else {
-
-        this.itemInfo =
-            GoogleCloudStorageItemInfo.createInferredDirectory(
-                StorageResourceId.fromStringPath(filePath.toString()));
-      }
-    } else {
-      this.itemInfo =
-          GoogleCloudStorageItemInfo.createNotFound(
-              StorageResourceId.fromStringPath(filePath.toString()));
-    }
+    this.itemInfo = fileInfo.getItemInfo();
   }
 
   GoogleCloudStorageItemInfo getItemInfo() {

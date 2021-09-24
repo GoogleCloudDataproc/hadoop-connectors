@@ -120,7 +120,6 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.BlockingThreadPoolExecutorService;
-import org.apache.hadoop.util.LambdaUtils;
 import org.apache.hadoop.util.Progressable;
 
 /**
@@ -273,7 +272,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   protected long defaultBlockSize = BLOCK_SIZE.getDefault();
   /** The fixed reported permission of all files. */
   private FsPermission reportedPermissions;
-
+  /** Execute completable future for input stream */
   private ThreadPoolExecutor unboundedThreadPool;
   /**
    * GCS {@link FileChecksum} which takes constructor parameters to define the return values of the
@@ -595,38 +594,28 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     FileStatus fileStatus = parameters.getStatus();
     GoogleCloudStorageItemInfo itemInfo = null;
     GoogleHadoopFileStatus gcsFileStatus;
+    CompletableFuture<FSDataInputStream> result = new CompletableFuture<>();
     if (fileStatus != null) {
       gcsFileStatus = getGcsFileStatus(fileStatus);
       if (gcsFileStatus != null) {
         itemInfo = gcsFileStatus.getItemInfo();
       }
+      checkNotNull(itemInfo, "Item info cannot be null");
+      logger.atFine().log("ItemInfo :%s", itemInfo);
+      logger.atFine().log("File exists: %s", itemInfo.getResourceId());
+      GoogleCloudStorageItemInfo finalItemInfo = itemInfo;
+      result =
+          CompletableFuture.supplyAsync(
+              () -> {
+                try {
+                  return open(finalItemInfo, parameters.getBufferSize());
+                } catch (IOException e) {
+                  logger.atFine().log(e.toString());
+                }
+                return null;
+              });
     } else {
       return super.openFileWithOptions(rawPath, parameters);
-    }
-    checkNotNull(itemInfo, "Item info cannot be null");
-    logger.atFine().log("ItemInfo :%s", itemInfo);
-    logger.atFine().log("File exists: %s", itemInfo.getResourceId());
-    CompletableFuture<FSDataInputStream> result = new CompletableFuture<>();
-    try {
-      GoogleCloudStorageItemInfo finalItemInfo = itemInfo;
-      return unboundedThreadPool
-          .submit(
-              () -> LambdaUtils.eval(result, () -> open(finalItemInfo, parameters.getBufferSize())))
-          .get();
-    } catch (InterruptedException e) {
-      e.printStackTrace();
-      try {
-        throw new InterruptedException();
-      } catch (InterruptedException interruptedException) {
-        interruptedException.printStackTrace();
-      }
-    } catch (ExecutionException e) {
-      e.printStackTrace();
-      try {
-        throw e;
-      } catch (ExecutionException interruptedException) {
-        interruptedException.printStackTrace();
-      }
     }
     return result;
   }
