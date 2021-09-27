@@ -59,6 +59,12 @@ public enum GhfsStatistic {
   INVOCATION_OPEN(StoreStatisticNames.OP_OPEN, "Calls of open()", TYPE_COUNTER),
   INVOCATION_RENAME(StoreStatisticNames.OP_RENAME, "Calls of rename()", TYPE_COUNTER),
 
+  /** Object IO */
+  OBJECT_DELETE_OBJECTS(
+      StoreStatisticNames.OBJECT_DELETE_OBJECTS,
+      "Objects deleted in delete requests",
+      TYPE_COUNTER),
+
   /** Stream Reads */
   STREAM_READ_BYTES(
       StreamStatisticNames.STREAM_READ_BYTES,

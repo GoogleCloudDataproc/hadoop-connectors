@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createJsonResponseException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInferredDirectory;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.OBJECT_DELETE_OBJECTS;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -85,14 +86,7 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.CountDownLatch;
@@ -147,6 +141,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           "metadata");
 
   private static final String LIST_OBJECT_FIELDS_FORMAT = "items(%s),prefixes,nextPageToken";
+
+  // To track the object statistics
+  private HashMap<GoogleCloudStorageStatistics, Long> objectStatistics =
+      new HashMap<GoogleCloudStorageStatistics, Long>();
 
   // A function to encode metadata map values
   static String encodeMetadataValues(byte[] bytes) {
@@ -799,6 +797,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   public void deleteObject(StorageResourceId resourceId, long metaGeneration) throws IOException {
     String bucketName = resourceId.getBucketName();
+    if (objectStatistics.get(OBJECT_DELETE_OBJECTS) == null) {
+      objectStatistics.put(OBJECT_DELETE_OBJECTS, 1L);
+    } else {
+      objectStatistics.put(OBJECT_DELETE_OBJECTS, objectStatistics.get(OBJECT_DELETE_OBJECTS) + 1L);
+    }
     Storage.Objects.Delete deleteObject =
         initializeRequest(
                 storage.objects().delete(bucketName, resourceId.getObjectName()), bucketName)
@@ -835,6 +838,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     for (StorageResourceId fullObjectName : fullObjectNames) {
       queueSingleObjectDelete(fullObjectName, innerExceptions, batchHelper, 1);
+      if (objectStatistics.get(OBJECT_DELETE_OBJECTS) == null) {
+        objectStatistics.put(OBJECT_DELETE_OBJECTS, 1L);
+      } else {
+        objectStatistics.put(
+            OBJECT_DELETE_OBJECTS, objectStatistics.get(OBJECT_DELETE_OBJECTS) + 1L);
+      }
     }
 
     batchHelper.flush();
@@ -2314,5 +2323,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     if (userProjectField != null) {
       request.set(USER_PROJECT_FIELD_NAME, projectId);
     }
+  }
+
+  @Override
+  public long getObjectStatistics(GoogleCloudStorageStatistics key) {
+    return objectStatistics.get(key);
   }
 }
