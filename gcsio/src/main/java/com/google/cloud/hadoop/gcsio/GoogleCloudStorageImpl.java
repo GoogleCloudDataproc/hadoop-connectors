@@ -89,6 +89,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -1068,19 +1069,17 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       throws IOException {
     checkArgument(srcObjectNames != null, "srcObjectNames must not be null");
     checkArgument(dstObjectNames != null, "dstObjectNames must not be null");
+    checkArgument(
+        srcObjectNames.size() == dstObjectNames.size(),
+        "Must supply same number of elements in srcObjects and dstObjects");
 
-    List<StorageResourceId> srcObjects =
-        srcObjectNames.stream()
-            .map(srcObjectName -> new StorageResourceId(srcBucketName, srcObjectName))
-            .collect(Collectors.toList());
-    List<StorageResourceId> dstObjects =
-        dstObjectNames.stream()
-            .map(dstObjectName -> new StorageResourceId(dstBucketName, dstObjectName))
-            .collect(Collectors.toList());
-    if (srcObjectNames.isEmpty()) {
-      return;
+    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap = new HashMap<>();
+    for (int i = 0; i < srcObjectNames.size(); i++) {
+      sourceToDestinationObjectsMap.put(
+          new StorageResourceId(srcBucketName, srcObjectNames.get(i)),
+          new StorageResourceId(dstBucketName, dstObjectNames.get(i)));
     }
-    copy(srcObjects, dstObjects);
+    copy(sourceToDestinationObjectsMap);
   }
 
   /**
@@ -1088,9 +1087,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * behavior.
    */
   @Override
-  public void copy(List<StorageResourceId> srcObjects, List<StorageResourceId> dstObjects)
+  public void copy(Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
       throws IOException {
 
+    List<StorageResourceId> srcObjects = new ArrayList<>(sourceToDestinationObjectsMap.keySet());
+    List<StorageResourceId> dstObjects = new ArrayList<>(sourceToDestinationObjectsMap.values());
     validateCopyArguments(srcObjects, dstObjects, this);
 
     if (srcObjects.isEmpty()) {

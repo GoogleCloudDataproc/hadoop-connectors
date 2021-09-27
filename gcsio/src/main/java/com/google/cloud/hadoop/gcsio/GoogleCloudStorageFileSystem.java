@@ -52,6 +52,7 @@ import java.nio.file.FileAlreadyExistsException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -629,13 +630,14 @@ public class GoogleCloudStorageFileSystem {
       StorageResourceId dstResourceId =
           StorageResourceId.fromUriPath(dst, /* allowEmptyObjectName= */ true);
 
-      gcs.copy(
-          ImmutableList.of(srcResourceId),
-          ImmutableList.of(
-              new StorageResourceId(
-                  dstResourceId.getBucketName(),
-                  dstResourceId.getObjectName(),
-                  /* generationId= */ 0)));
+      StorageResourceId destinationObject =
+          new StorageResourceId(
+              dstResourceId.getBucketName(),
+              dstResourceId.getObjectName(),
+              /* generationId= */ 0); // set generationId = 0 to ensure no live version on gcs
+      Map<StorageResourceId, StorageResourceId> srcToDstMap = new HashMap<>();
+      srcToDstMap.put(srcResourceId, destinationObject);
+      gcs.copy(srcToDstMap);
 
       gcs.deleteObjects(
           ImmutableList.of(

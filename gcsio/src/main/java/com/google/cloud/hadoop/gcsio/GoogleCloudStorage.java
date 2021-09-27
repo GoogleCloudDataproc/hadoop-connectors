@@ -21,8 +21,11 @@ import static com.google.common.base.Preconditions.checkArgument;
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Optional;
 
 /**
  * Interface for exposing the Google Cloud Storage API behavior in a way more amenable to writing
@@ -208,35 +211,38 @@ public interface GoogleCloudStorage {
    * is reachable by two different names. Copying between two different locations or between two
    * different storage classes is not allowed.
    *
-   * @param srcObjects list of the objects to copy
-   * @param dstObjects list of the objects after copy
+   * @param sourceToDestinationObjectsMap map of destination objects to be copied, keyed by source
    * @throws java.io.FileNotFoundException if the source object or the destination bucket does not
    *     exist
    * @throws IOException in all other error cases
    */
-  default void copy(List<StorageResourceId> srcObjects, List<StorageResourceId> dstObjects)
+  default void copy(Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
       throws IOException {
-    checkArgument(srcObjects != null, "srcObjects must not be null");
-    checkArgument(dstObjects != null, "dstObjects must not be null");
-
-    List<String> srcObjectNames =
-        srcObjects.stream().map(StorageResourceId::getObjectName).collect(Collectors.toList());
-    List<String> dstObjectNames =
-        dstObjects.stream().map(StorageResourceId::getObjectName).collect(Collectors.toList());
-    String srcBucketName = srcObjects.get(0).getBucketName();
-    String dstBucketName = dstObjects.get(0).getBucketName();
-
-    for (int i = 0; i < srcObjects.size(); i++) {
-      if (!srcBucketName.equals(srcObjects.get(i).getBucketName()))
-        throw new UnsupportedOperationException(
-            "This operation is not supported across multiple source buckets");
-      if (!dstBucketName.equals(dstObjects.get(i).getBucketName()))
-        throw new UnsupportedOperationException(
-            "This operation is not supported across multiple destination buckets");
-    }
-    if (srcObjectNames.isEmpty()) {
+    checkArgument(
+        sourceToDestinationObjectsMap != null, "sourceToDestinationObjectsMap must not be null");
+    if (sourceToDestinationObjectsMap.isEmpty()) {
       return;
     }
+
+    List<String> srcObjectNames = new ArrayList<>();
+    List<String> dstObjectNames = new ArrayList<>();
+
+    Optional<Entry<StorageResourceId, StorageResourceId>> first =
+        sourceToDestinationObjectsMap.entrySet().stream().findFirst();
+    String srcBucketName = first.get().getKey().getBucketName();
+    String dstBucketName = first.get().getValue().getBucketName();
+
+    sourceToDestinationObjectsMap.forEach(
+        (source, destination) -> {
+          if (!srcBucketName.equals(source.getBucketName()))
+            throw new UnsupportedOperationException(
+                "This operation is not supported across multiple source buckets");
+          if (!dstBucketName.equals(destination.getBucketName()))
+            throw new UnsupportedOperationException(
+                "This operation is not supported across multiple destination buckets");
+          srcObjectNames.add(source.getObjectName());
+          dstObjectNames.add(destination.getObjectName());
+        });
     copy(srcBucketName, srcObjectNames, dstBucketName, dstObjectNames);
   }
 
