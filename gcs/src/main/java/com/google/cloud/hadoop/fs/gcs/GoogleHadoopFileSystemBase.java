@@ -39,6 +39,7 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.flogger.LazyArgs.lazy;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
@@ -108,17 +109,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.ContentSummary;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileAlreadyExistsException;
-import org.apache.hadoop.fs.FileChecksum;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.GlobPattern;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.PathFilter;
-import org.apache.hadoop.fs.XAttrSetFlag;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
@@ -233,6 +224,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   /** Instrumentation to track Statistics */
   private GhfsInstrumentation instrumentation;
+
+  /** Storage Statistics Bonded to the instrumentation. */
+  private GhfsStorageStatistics storageStatistics;
 
   static {
     VERSION =
@@ -472,6 +466,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     // Initialize the instrumentation
     this.instrumentation = new GhfsInstrumentation(path);
+
+    this.storageStatistics = createStorageStatistics(requireNonNull((getIOStatistics())));
 
     configure(config);
   }
@@ -1939,5 +1935,27 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   protected void incrementStatistic(GhfsStatistic statistic, long count) {
     instrumentation.incrementCounter(statistic, count);
+  }
+
+  /**
+   * Create the storage statistics or bind to an existing one.
+   *
+   * @param ioStatistics IOStatistics to build the storage statistics from.
+   * @return a storage statistics instance; expected to be that of the FS.
+   */
+  protected static GhfsStorageStatistics createStorageStatistics(final IOStatistics ioStatistics) {
+    return (GhfsStorageStatistics)
+        GlobalStorageStatistics.INSTANCE.put(
+            GhfsStorageStatistics.NAME, () -> new GhfsStorageStatistics(ioStatistics));
+  }
+
+  /**
+   * Get the storage statistics of this filesystem.
+   *
+   * @return the storage statistics
+   */
+  @Override
+  public GhfsStorageStatistics getStorageStatistics() {
+    return this.storageStatistics;
   }
 }
