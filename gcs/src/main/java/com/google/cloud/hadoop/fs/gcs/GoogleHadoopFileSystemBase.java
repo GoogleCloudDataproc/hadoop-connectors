@@ -127,6 +127,8 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
+import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.RemoteIterator;
 
 /**
  * This class provides a Hadoop compatible File System on top of Google Cloud Storage (GCS).
@@ -840,8 +842,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
               .getObjectStatistics(GoogleCloudStorageStatistics.OBJECT_DELETE_OBJECTS));
 
     } catch (DirectoryNotEmptyException e) {
+      incrementStatistic(GhfsStatistic.FILES_DELETE_REJECTED);
       throw e;
     } catch (IOException e) {
+      incrementStatistic(GhfsStatistic.FILES_DELETE_REJECTED);
       if (ApiErrorExtractor.INSTANCE.requestFailure(e)) {
         throw e;
       }
@@ -1898,11 +1902,20 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   private byte[] getXAttrValue(byte[] value) {
     return value == null ? XATTR_NULL_VALUE : value;
   }
-  /** Override superclass so as to add statistic collection. {@inheritDoc} */
+
+  /** Override superclass so as to add statistic collection. */
   @Override
   public boolean exists(Path f) throws IOException {
     entryPoint(GhfsStatistic.INVOCATION_EXISTS);
     return super.exists(f);
+  }
+
+  /** Override superclass so as to add statistic collection. */
+  @Override
+  public RemoteIterator<LocatedFileStatus> listLocatedStatus(final Path f)
+      throws FileNotFoundException, IOException {
+    entryPoint(GhfsStatistic.INVOCATION_LIST_LOCATED_STATUS);
+    return super.listLocatedStatus(f);
   }
 
   public GhfsInstrumentation getInstrumentation() {

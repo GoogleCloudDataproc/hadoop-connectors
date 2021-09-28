@@ -39,6 +39,10 @@ public enum GhfsStatistic {
       "files_created", "Total number of files created through the object store.", TYPE_COUNTER),
   FILES_DELETED(
       "files_deleted", "Total number of files deleted from the object store.", TYPE_COUNTER),
+  FILES_DELETE_REJECTED(
+      "files_delete_rejected",
+      "Total number of files whose delete request was rejected",
+      TYPE_COUNTER),
   INVOCATION_COPY_FROM_LOCAL_FILE(
       StoreStatisticNames.OP_COPY_FROM_LOCAL_FILE, "Calls of copyFromLocalFile()", TYPE_COUNTER),
   INVOCATION_CREATE(StoreStatisticNames.OP_CREATE, "Calls of create()", TYPE_COUNTER),
@@ -58,6 +62,8 @@ public enum GhfsStatistic {
   INVOCATION_MKDIRS(StoreStatisticNames.OP_MKDIRS, "Calls of mkdirs()", TYPE_COUNTER),
   INVOCATION_OPEN(StoreStatisticNames.OP_OPEN, "Calls of open()", TYPE_COUNTER),
   INVOCATION_RENAME(StoreStatisticNames.OP_RENAME, "Calls of rename()", TYPE_COUNTER),
+  INVOCATION_LIST_LOCATED_STATUS(
+      StoreStatisticNames.OP_LIST_LOCATED_STATUS, "Calls of listLocatedStatus()", TYPE_COUNTER),
 
   /** Object IO */
   OBJECT_DELETE_OBJECTS(
