@@ -54,4 +54,10 @@ interface GhfsOutputStreamStatistics extends Closeable, GhfsStatisticInterface {
   void writeException();
 
   long getWriteExceptions();
+
+  /** Syncable.hflush() has been invoked. */
+  void hflushInvoked();
+
+  /** Syncable.hsync() has been invoked. */
+  void hsyncInvoked();
 }

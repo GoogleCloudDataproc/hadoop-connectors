@@ -945,6 +945,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
               .initCause(faee);
     }
     logger.atFiner().log("mkdirs(hadoopPath: %s, permission: %s): true", hadoopPath, permission);
+    instrumentation.directoryCreated();
     return true;
   }
 
