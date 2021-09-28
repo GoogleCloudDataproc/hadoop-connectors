@@ -131,42 +131,7 @@ public class FileInfo {
     VerificationAttributes verificationAttributes = itemInfo.getVerificationAttributes();
     return verificationAttributes == null ? null : verificationAttributes.getMd5hash();
   }
-
-  //  /** Returns location of the file */
-  //  public String getLocation() {
-  //    return itemInfo.getLocation();
-  //  }
-  //
-  //  /** Returns storage class of the file */
-  //  public String getStorageClass() {
-  //    return itemInfo.getStorageClass();
-  //  }
-  //
-  //  /** Returns the content type of the file */
-  //  public String getContentType() {
-  //    return itemInfo.getContentType();
-  //  }
-  //
-  //  /** Returns content encoding of the given file */
-  //  public String getContentEncoding() {
-  //    return itemInfo.getContentEncoding();
-  //  }
-  //
-  //  /** Returns content generation of the given file */
-  //  public long getContentGeneration() {
-  //    return itemInfo.getContentGeneration();
-  //  }
-  //
-  //  /** Returns meta generation of the given file */
-  //  public long getMetaGeneration() {
-  //    return itemInfo.getMetaGeneration();
-  //  }
-  //
-  //  /** Returns verification attributes of the given file */
-  //  public VerificationAttributes getVerifyingAttributes() {
-  //    return itemInfo.getVerificationAttributes();
-  //  }
-
+  
   /** Gets information about the underlying item. */
   public GoogleCloudStorageItemInfo getItemInfo() {
     return itemInfo;
