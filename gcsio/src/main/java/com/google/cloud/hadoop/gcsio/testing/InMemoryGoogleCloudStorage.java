@@ -30,6 +30,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStrings;
 import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
@@ -534,5 +535,10 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     destChannel.write(ByteBuffer.wrap(tempOutput.toByteArray()));
     destChannel.close();
     return getItemInfo(destination);
+  }
+
+  @Override
+  public long getObjectStatistics(GoogleCloudStorageStatistics key) {
+    return 0;
   }
 }

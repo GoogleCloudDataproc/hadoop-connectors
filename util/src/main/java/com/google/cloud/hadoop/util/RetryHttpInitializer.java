@@ -203,7 +203,8 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
   public RetryHttpInitializer(Credential credential, String defaultUserAgent) {
     this(
         credential,
-        RetryHttpInitializerOptions.DEFAULT.toBuilder()
+        RetryHttpInitializerOptions.DEFAULT
+            .toBuilder()
             .setDefaultUserAgent(defaultUserAgent)
             .build());
   }

@@ -343,6 +343,13 @@ public interface GoogleCloudStorage {
       throws IOException;
 
   /**
+   * To get the value object related statistics from GCS
+   *
+   * @param key name of the object related statistics key
+   */
+  public long getObjectStatistics(GoogleCloudStorageStatistics key);
+
+  /**
    * Composes inputs into a single GCS object. This performs a GCS Compose. Objects will be composed
    * according to the order they appear in the input. The destination object will have metadata set
    * according to {@code options}. Overwrite semantics for the destination object will follow the

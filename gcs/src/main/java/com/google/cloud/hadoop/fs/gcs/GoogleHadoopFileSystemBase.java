@@ -56,6 +56,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.ListFileOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
@@ -832,6 +833,12 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     try {
       entryPoint(GhfsStatistic.INVOCATION_DELETE);
       getGcsFs().delete(gcsPath, recursive);
+      incrementStatistic(
+          GhfsStatistic.OBJECT_DELETE_OBJECTS,
+          getGcsFs()
+              .getGcs()
+              .getObjectStatistics(GoogleCloudStorageStatistics.OBJECT_DELETE_OBJECTS));
+
     } catch (DirectoryNotEmptyException e) {
       throw e;
     } catch (IOException e) {

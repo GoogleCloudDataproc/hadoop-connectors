@@ -45,13 +45,14 @@ public class AvroRecordReaderTest {
 
   @Before
   public void setup() throws IOException {
+    // fmt:off
     Schema schema =
         SchemaBuilder.record("BigQueryRecord").fields()
             .name("key").type().stringBuilder().endString().noDefault()
             .name("value1").type().stringBuilder().endString().noDefault()
             .name("value2").type().intBuilder().endInt().noDefault()
             .endRecord();
-
+    // fmt:on
     GenericDatumWriter<GenericData.Record> recordWriter = new GenericDatumWriter<>(schema);
     testAvroFile = temporaryFolder.newFile("TestAvroFile");
     if (testAvroFile.exists()) {
