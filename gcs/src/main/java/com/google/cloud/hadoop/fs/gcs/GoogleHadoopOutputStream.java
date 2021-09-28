@@ -145,4 +145,8 @@ class GoogleHadoopOutputStream extends OutputStream {
   WritableByteChannel getInternalChannel() {
     return channel;
   }
+
+  public GhfsOutputStreamStatistics getStreamStatistics() {
+    return this.streamStatistics;
+  }
 }

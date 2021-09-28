@@ -17,7 +17,7 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStatistics;
-import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
+import static org.apache.hadoop.fs.statistics.StoreStatisticNames.*;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.iostatisticsStore;
 
 import com.google.common.flogger.GoogleLogger;
@@ -66,7 +66,7 @@ import org.apache.hadoop.metrics2.lib.MutableMetric;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-class GhfsInstrumentation
+public class GhfsInstrumentation
     implements Closeable, MetricsSource, IOStatisticsSource, DurationTrackerFactory {
   public static final String CONTEXT = "gcsFilesystem";
   public static final String METRICS_SYSTEM_NAME = "google-hadoop-file-system";
@@ -356,6 +356,16 @@ class GhfsInstrumentation
   /** Indicate that GCS created a file. */
   public void fileCreated() {
     incrementCounter(GhfsStatistic.FILES_CREATED, 1);
+  }
+
+  /** Indicate that GCS created a directory. */
+  public void directoryCreated() {
+    incrementCounter(GhfsStatistic.DIRECTORIES_CREATED, 1);
+  }
+
+  /** Indicate that GCS just deleted a directory. */
+  public void directoryDeleted() {
+    incrementCounter(GhfsStatistic.DIRECTORIES_DELETED, 1);
   }
 
   /**
@@ -697,7 +707,9 @@ class GhfsInstrumentation
           iostatisticsStore()
               .withCounters(
                   GhfsStatistic.STREAM_WRITE_BYTES.getSymbol(),
-                  GhfsStatistic.STREAM_WRITE_EXCEPTIONS.getSymbol())
+                  GhfsStatistic.STREAM_WRITE_EXCEPTIONS.getSymbol(),
+                  GhfsStatistic.INVOCATION_HFLUSH.getSymbol(),
+                  GhfsStatistic.INVOCATION_HSYNC.getSymbol())
               .build();
       setIOStatistics(st);
       // these are extracted to avoid lookups on heavily used counters.
@@ -739,6 +751,16 @@ class GhfsInstrumentation
       writeExceptions.incrementAndGet();
     }
 
+    @Override
+    public void hflushInvoked() {
+      incCounter(GhfsStatistic.INVOCATION_HFLUSH.getSymbol(), 1);
+    }
+
+    @Override
+    public void hsyncInvoked() {
+      incCounter(GhfsStatistic.INVOCATION_HSYNC.getSymbol(), 1);
+    }
+
     /**
      * Get the current count of bytes written.
      *
@@ -766,5 +788,68 @@ class GhfsInstrumentation
         source.lookupCounterValue(StreamStatisticNames.STREAM_WRITE_EXCEPTIONS));
     // merge in all the IOStatistics
     this.getIOStatistics().aggregate(source.getIOStatistics());
+  }
+
+  /**
+   * Create a delegation token statistics instance.
+   *
+   * @return an instance of delegation token statistics
+   */
+  public DelegationTokenStatistics newDelegationTokenStatistics() {
+    return new DelegationTokenStatisticsImpl();
+  }
+
+  /**
+   * Instrumentation exported to S3A Delegation Token support. The {@link #tokenIssued()} call is a
+   * no-op; This statistics class doesn't collect any local statistics. Instead it directly updates
+   * the S3A Instrumentation.
+   */
+  private final class DelegationTokenStatisticsImpl extends AbstractGhfsStatisticsSource
+      implements DelegationTokenStatistics {
+
+    private DelegationTokenStatisticsImpl() {
+      IOStatisticsStore st =
+          iostatisticsStore()
+              .withCounters(GhfsStatistic.DELEGATION_TOKENS_ISSUED.getSymbol())
+              .build();
+    }
+
+    /**
+     * Get the inner class's IO Statistics. This is needed to avoid findbugs warnings about
+     * ambiguity.
+     *
+     * @return the Input Stream's statistics.
+     */
+    private IOStatisticsStore localIOStatistics() {
+      return DelegationTokenStatisticsImpl.super.getIOStatistics();
+    }
+
+    /**
+     * Merge in the statistics of a single output stream into the filesystem-wide statistics.
+     *
+     * @param source stream statistics
+     */
+    private void mergeDelegationTokenStatistics(DelegationTokenStatistics source) {
+
+      // merge in all the IOStatistics
+      this.getIOStatistics().aggregate(source.getIOStatistics());
+    }
+
+    @Override
+    public void tokenIssued() {
+      mergeDelegationTokenStatistics(this);
+    }
+
+    @Override
+    public DurationTracker trackDuration(final String key, final long count) {
+      return getDurationTrackerFactory().trackDuration(key, count);
+    }
+
+    @Override
+    public void close() {
+      // provided the stream is closed in the worker thread, this will
+      // ensure that the thread-specific worker stats are updated.
+      mergeDelegationTokenStatistics(this);
+    }
   }
 }

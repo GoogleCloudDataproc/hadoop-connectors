@@ -35,6 +35,14 @@ import org.apache.hadoop.fs.statistics.StreamStatisticNames;
 public enum GhfsStatistic {
 
   /** FileSystem Level statistics */
+  DIRECTORIES_CREATED(
+      "directories_created",
+      "Total number of directories created through the object store.",
+      TYPE_COUNTER),
+  DIRECTORIES_DELETED(
+      "directories_deleted",
+      "Total number of directories deleted through the object store.",
+      TYPE_COUNTER),
   FILES_CREATED(
       "files_created", "Total number of files created through the object store.", TYPE_COUNTER),
   FILES_DELETED(
@@ -57,6 +65,8 @@ public enum GhfsStatistic {
   INVOCATION_GET_FILE_STATUS(
       StoreStatisticNames.OP_GET_FILE_STATUS, "Calls of getFileStatus()", TYPE_COUNTER),
   INVOCATION_GLOB_STATUS(StoreStatisticNames.OP_GLOB_STATUS, "Calls of globStatus()", TYPE_COUNTER),
+  INVOCATION_HFLUSH(StoreStatisticNames.OP_HFLUSH, "Calls of hflush()", TYPE_COUNTER),
+  INVOCATION_HSYNC(StoreStatisticNames.OP_HSYNC, "Calls of hsync()", TYPE_COUNTER),
   INVOCATION_LIST_FILES(StoreStatisticNames.OP_LIST_FILES, "Calls of listFiles()", TYPE_COUNTER),
   INVOCATION_LIST_STATUS(StoreStatisticNames.OP_LIST_STATUS, "Calls of listStatus()", TYPE_COUNTER),
   INVOCATION_MKDIRS(StoreStatisticNames.OP_MKDIRS, "Calls of mkdirs()", TYPE_COUNTER),
