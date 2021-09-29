@@ -1063,7 +1063,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         srcObjectNames.size() == dstObjectNames.size(),
         "Must supply same number of elements in srcObjects and dstObjects");
 
-    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap = new HashMap<>();
+    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap =
+        new HashMap<>(srcObjectNames.size());
     for (int i = 0; i < srcObjectNames.size(); i++) {
       sourceToDestinationObjectsMap.put(
           new StorageResourceId(srcBucketName, srcObjectNames.get(i)),
