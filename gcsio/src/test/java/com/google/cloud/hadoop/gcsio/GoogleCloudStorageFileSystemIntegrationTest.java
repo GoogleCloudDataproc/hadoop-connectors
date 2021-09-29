@@ -397,7 +397,15 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     // fmt:off
     // Objects created for this test.
     String[] objectNames = {
-      "o1", "o2", "d0/", "d1/o11", "d1/o12", "d1/d10/", "d1/d11/o111", "d2/o21", "d2/o22",
+        "o1",
+        "o2",
+        "d0/",
+        "d1/o11",
+        "d1/o12",
+        "d1/d10/",
+        "d1/d11/o111",
+        "d2/o21",
+        "d2/o22",
     };
     // fmt:on
 
@@ -562,49 +570,6 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     }
   }
 
-  @Test
-  public void read_failure_ifObjectWasModifiedDuringRead_itemInfo() throws IOException {
-    URI testObject = gcsiHelper.getUniqueObjectUri("generation-strict");
-    String message1 = "Hello world!\n";
-    String message2 = "Sayonara world!\n";
-
-    gcsiHelper.writeTextFile(testObject, message1);
-    int offset = 5;
-    // These read options force the readChannel to open stream again on second read.
-    GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder()
-            .setFadvise(Fadvise.RANDOM)
-            .setMinRangeRequestSize(0)
-            .build();
-    GoogleCloudStorageItemInfo itemInfo =
-        GoogleCloudStorageItemInfo.createNotFound(StorageResourceId.fromUriPath(testObject, false));
-    FileNotFoundException expected =
-        assertThrows(FileNotFoundException.class, () -> gcsiHelper.open(itemInfo, readOptions));
-    assertThat(expected)
-        .hasMessageThat()
-        .contains(
-            "Note, it is possible that the live version is still available"
-                + " but the requested generation is deleted.");
-  }
-
-  @Test
-  public void read_failure_ifItemInfoNull_itemInfo() throws IOException {
-    URI testObject = gcsiHelper.getUniqueObjectUri("generation-strict");
-    String message1 = "Hello world!\n";
-    gcsiHelper.writeTextFile(testObject, message1);
-    // These read options force the readChannel to open stream again on second read.
-    GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder()
-            .setFadvise(Fadvise.RANDOM)
-            .setMinRangeRequestSize(0)
-            .build();
-    NullPointerException expected =
-        assertThrows(
-            NullPointerException.class,
-            () -> gcsiHelper.open(((GoogleCloudStorageItemInfo) null), readOptions));
-    assertThat(expected).hasMessageThat().contains("null");
-  }
-
   /** Validates that we cannot open a non-existent object. */
   @Test
   public void testOpenNonExistentObject() throws IOException {
@@ -630,7 +595,11 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     // fmt:off
     // Objects created for this test.
     String[] objectNames = {
-      "f1", "d0/", "d1/f1", "d1/d0/", "d1/d11/f1",
+      "f1",
+      "d0/",
+      "d1/f1",
+      "d1/d0/",
+      "d1/d11/f1",
     };
     // fmt:on
 
@@ -825,7 +794,9 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     // fmt:off
     // Objects created for this test.
     String[] objectNames = {
-      "f1", "d0/", "d1/f11",
+      "f1",
+      "d0/",
+      "d1/f11",
     };
     // fmt:on
 
@@ -931,7 +902,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     // fmt:off
     // Objects created for this test.
     String[] objectNames = {
-      "f1", "d0/",
+      "f1",
+      "d0/",
     };
     // fmt:on
 
