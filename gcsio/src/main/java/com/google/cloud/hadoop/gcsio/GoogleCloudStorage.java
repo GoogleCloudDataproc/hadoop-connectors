@@ -224,8 +224,8 @@ public interface GoogleCloudStorage {
       return;
     }
 
-    List<String> srcObjectNames = new ArrayList<>();
-    List<String> dstObjectNames = new ArrayList<>();
+    List<String> srcObjectNames = new ArrayList<>(sourceToDestinationObjectsMap.size());
+    List<String> dstObjectNames = new ArrayList<>(sourceToDestinationObjectsMap.size());
 
     Optional<Entry<StorageResourceId, StorageResourceId>> first =
         sourceToDestinationObjectsMap.entrySet().stream().findFirst();
