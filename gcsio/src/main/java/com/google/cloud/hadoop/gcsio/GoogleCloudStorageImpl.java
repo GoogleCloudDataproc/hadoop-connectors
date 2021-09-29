@@ -1000,6 +1000,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       return;
     }
 
+    Map<StorageResourceId, GoogleCloudStorageItemInfo> bucketInfoCache =
+        new ConcurrentHashMap<>(sourceToDestinationObjectsMap.size());
+
     for (Entry<StorageResourceId, StorageResourceId> entry :
         sourceToDestinationObjectsMap.entrySet()) {
       StorageResourceId source = entry.getKey();
@@ -1008,14 +1011,16 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       String dstBucketName = destination.getBucketName();
       // Avoid copy across locations or storage classes.
       if (!srcBucketName.equals(dstBucketName)) {
+        StorageResourceId srcBucketResourceId = new StorageResourceId(srcBucketName);
         GoogleCloudStorageItemInfo srcBucketInfo =
-            gcsImpl.getItemInfo(new StorageResourceId(srcBucketName));
+            getGoogleCloudStorageItemInfo(gcsImpl, bucketInfoCache, srcBucketResourceId);
         if (!srcBucketInfo.exists()) {
           throw new FileNotFoundException("Bucket not found: " + srcBucketName);
         }
 
+        StorageResourceId dstBucketResourceId = new StorageResourceId(dstBucketName);
         GoogleCloudStorageItemInfo dstBucketInfo =
-            gcsImpl.getItemInfo(new StorageResourceId(dstBucketName));
+            getGoogleCloudStorageItemInfo(gcsImpl, bucketInfoCache, dstBucketResourceId);
         if (!dstBucketInfo.exists()) {
           throw new FileNotFoundException("Bucket not found: " + dstBucketName);
         }
@@ -1044,6 +1049,21 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                 StringPaths.fromComponents(srcBucketName, source.getObjectName())));
       }
     }
+  }
+
+  private static GoogleCloudStorageItemInfo getGoogleCloudStorageItemInfo(
+      GoogleCloudStorage gcsImpl,
+      Map<StorageResourceId, GoogleCloudStorageItemInfo> bucketInfoCache,
+      StorageResourceId resourceId)
+      throws IOException {
+    GoogleCloudStorageItemInfo storageItemInfo;
+    if (bucketInfoCache.containsKey(resourceId)) {
+      storageItemInfo = bucketInfoCache.get(resourceId);
+    } else {
+      storageItemInfo = gcsImpl.getItemInfo(resourceId);
+      bucketInfoCache.put(resourceId, storageItemInfo);
+    }
+    return storageItemInfo;
   }
 
   /**
