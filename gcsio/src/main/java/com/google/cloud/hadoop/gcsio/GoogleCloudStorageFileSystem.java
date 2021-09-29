@@ -186,8 +186,7 @@ public class GoogleCloudStorageFileSystem {
     this(gcsFn.apply(options.getCloudStorageOptions()), options);
   }
 
-  @VisibleForTesting
-  public GoogleCloudStorageFileSystem(
+  private GoogleCloudStorageFileSystem(
       GoogleCloudStorage gcs, GoogleCloudStorageFileSystemOptions options) {
     checkArgument(
         gcs.getOptions() == options.getCloudStorageOptions(),
@@ -325,6 +324,14 @@ public class GoogleCloudStorageFileSystem {
     return gcs.open(resourceId, readOptions);
   }
 
+  /**
+   * * Opens an object for reading using item info.
+   *
+   * @param itemInfo
+   * @param readOptions
+   * @return
+   * @throws IOException
+   */
   public SeekableByteChannel open(
       GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
       throws IOException {

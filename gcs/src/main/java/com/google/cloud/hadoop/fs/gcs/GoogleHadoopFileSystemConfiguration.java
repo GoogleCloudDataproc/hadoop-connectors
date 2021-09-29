@@ -94,9 +94,10 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Long> BLOCK_SIZE =
       new HadoopConfigurationProperty<>("fs.gs.block.size", 64 * 1024 * 1024L);
 
+  /** Configuration key to specify maximum threads permissible for the system */
   public static final HadoopConfigurationProperty<Integer> DEFAULT_MAX_THREADS =
       new HadoopConfigurationProperty<Integer>("fs.gs.default.max.threads", 16);
-
+  /** Configuration key to specify maximum time to avoid the killing of thread */
   public static final HadoopConfigurationProperty<Integer> KEEP_ALIVE_TIME =
       new HadoopConfigurationProperty<Integer>("fs.gs.keep.alive.time", 60);
 

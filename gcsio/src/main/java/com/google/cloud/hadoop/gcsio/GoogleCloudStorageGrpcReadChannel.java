@@ -134,6 +134,17 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         stubProvider, storage, errorExtractor, resourceId, readOptions, BackOffFactory.DEFAULT);
   }
 
+  /**
+   * Used to open given file using item info
+   *
+   * @param stubProvider
+   * @param storage
+   * @param errorExtractor
+   * @param itemInfo
+   * @param readOptions
+   * @return
+   * @throws IOException
+   */
   public static GoogleCloudStorageGrpcReadChannel open(
       StorageStubProvider stubProvider,
       Storage storage,
@@ -234,6 +245,17 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         backOffFactory);
   }
 
+  /**
+   * Overloaded implementation of openChannel with item info to reduce an object metadata call
+   *
+   * @param stubProvider
+   * @param storage
+   * @param itemInfo
+   * @param readOptions
+   * @param backOffFactory
+   * @return
+   * @throws IOException
+   */
   private static GoogleCloudStorageGrpcReadChannel openChannel(
       StorageStubProvider stubProvider,
       Storage storage,

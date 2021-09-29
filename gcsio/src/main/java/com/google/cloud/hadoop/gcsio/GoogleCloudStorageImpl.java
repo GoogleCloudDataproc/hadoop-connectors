@@ -783,6 +783,14 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     };
   }
 
+  /**
+   * Opens a file using item info and can check if file exists or not even before opening the file
+   *
+   * @param itemInfo
+   * @param readOptions
+   * @return
+   * @throws IOException
+   */
   @Override
   public SeekableByteChannel open(
       final GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)

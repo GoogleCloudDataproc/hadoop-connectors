@@ -120,6 +120,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.BlockingThreadPoolExecutorService;
+import org.apache.hadoop.util.LambdaUtils;
 import org.apache.hadoop.util.Progressable;
 
 /**
@@ -272,8 +273,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   protected long defaultBlockSize = BLOCK_SIZE.getDefault();
   /** The fixed reported permission of all files. */
   private FsPermission reportedPermissions;
-  /** Execute completable future for input stream */
-  private ThreadPoolExecutor unboundedThreadPool;
   /**
    * GCS {@link FileChecksum} which takes constructor parameters to define the return values of the
    * various abstract methods of {@link FileChecksum}.
@@ -461,7 +460,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     // Initialize the delegation token support, if it is configured
     initializeDelegationTokenSupport(config, path);
-    initThreadPools();
     configure(config);
   }
 
@@ -559,14 +557,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     return new FSDataInputStream(in);
   }
   // Conf not used in the method for sometime, as some changes need to be made for laters
-  private void initThreadPools() {
+  private ThreadPoolExecutor initThreadPools() {
     int maxThreads = DEFAULT_MAX_THREADS.getDefault();
     if (maxThreads < 2) {
       logger.atWarning().log("Maximum number of threads should at least be 2.");
       maxThreads = 2;
     }
     int keepAliveTime = KEEP_ALIVE_TIME.getDefault();
-    unboundedThreadPool =
+    ThreadPoolExecutor unboundedThreadPool =
         new ThreadPoolExecutor(
             maxThreads,
             Integer.MAX_VALUE,
@@ -575,6 +573,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
             new LinkedBlockingQueue<>(),
             BlockingThreadPoolExecutorService.newDaemonThreadFactory("gcs-transfer-unbounded"));
     unboundedThreadPool.allowCoreThreadTimeOut(true);
+    return unboundedThreadPool;
   }
 
   public GoogleHadoopFileStatus getGcsFileStatus(FileStatus fileStatus) {
@@ -595,6 +594,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     GoogleCloudStorageItemInfo itemInfo = null;
     GoogleHadoopFileStatus gcsFileStatus;
     CompletableFuture<FSDataInputStream> result = new CompletableFuture<>();
+    // Checking if fileStatus is null and calling the super implementation
     if (fileStatus != null) {
       gcsFileStatus = getGcsFileStatus(fileStatus);
       if (gcsFileStatus != null) {
@@ -604,16 +604,16 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       logger.atFine().log("ItemInfo :%s", itemInfo);
       logger.atFine().log("File exists: %s", itemInfo.getResourceId());
       GoogleCloudStorageItemInfo finalItemInfo = itemInfo;
-      result =
-          CompletableFuture.supplyAsync(
-              () -> {
-                try {
-                  return open(finalItemInfo, parameters.getBufferSize());
-                } catch (IOException e) {
-                  logger.atFine().log(e.toString());
-                }
-                return null;
-              });
+      ThreadPoolExecutor unboundedThreadPool = initThreadPools();
+      try {
+        return unboundedThreadPool
+            .submit(
+                () ->
+                    LambdaUtils.eval(result, () -> open(finalItemInfo, parameters.getBufferSize())))
+            .get();
+      } catch (InterruptedException | ExecutionException e) {
+        logger.atFine().log(e.getMessage());
+      }
     } else {
       return super.openFileWithOptions(rawPath, parameters);
     }
@@ -1037,6 +1037,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   }
 
   /** Gets FileStatus corresponding to the given FileInfo value. */
+  /**
+   * Returns modified GoogleHadoopFileStatus instead of FileStatus to facilitate access of
+   * additional information to handle information about file when opened with options
+   */
   private GoogleHadoopFileStatus getFileStatus(FileInfo fileInfo, String userName) {
     // GCS does not provide modification time. It only provides creation time.
     // It works for objects because they are immutable once created.

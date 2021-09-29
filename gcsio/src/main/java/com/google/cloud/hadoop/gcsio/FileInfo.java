@@ -131,7 +131,7 @@ public class FileInfo {
     VerificationAttributes verificationAttributes = itemInfo.getVerificationAttributes();
     return verificationAttributes == null ? null : verificationAttributes.getMd5hash();
   }
-  
+
   /** Gets information about the underlying item. */
   public GoogleCloudStorageItemInfo getItemInfo() {
     return itemInfo;

@@ -72,6 +72,15 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     this.channel = ghfs.getGcsFs().open(gcsPath, readOptions);
   }
 
+  /**
+   * Constructs an instance of GoogleHadoopFSInputStream object with item info
+   *
+   * @param ghfs
+   * @param itemInfo
+   * @param readOptions
+   * @param statistics
+   * @throws IOException
+   */
   GoogleHadoopFSInputStream(
       GoogleHadoopFileSystemBase ghfs,
       GoogleCloudStorageItemInfo itemInfo,
