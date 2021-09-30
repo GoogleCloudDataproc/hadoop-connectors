@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.List;
+import java.util.Map;
 
 /** A class that wraps a {@link GoogleCloudStorage} object, delegating all calls to it. */
 public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
@@ -118,6 +119,13 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
         "%s.copy(%s, %s, %s, %s)",
         delegateClassName, srcBucketName, srcObjectNames, dstBucketName, dstObjectNames);
     delegate.copy(srcBucketName, srcObjectNames, dstBucketName, dstObjectNames);
+  }
+
+  @Override
+  public void copy(Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
+      throws IOException {
+    logger.atFiner().log("%s.copy(%s)", delegateClassName, sourceToDestinationObjectsMap);
+    delegate.copy(sourceToDestinationObjectsMap);
   }
 
   @Override
