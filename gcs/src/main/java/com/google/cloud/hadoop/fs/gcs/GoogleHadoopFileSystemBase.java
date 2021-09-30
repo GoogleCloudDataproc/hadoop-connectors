@@ -467,6 +467,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     // Initialize the instrumentation
     this.instrumentation = new GhfsInstrumentation(path);
 
+    //used to update and track the storage statistics
     this.storageStatistics = createStorageStatistics(requireNonNull((getIOStatistics())));
 
     configure(config);
