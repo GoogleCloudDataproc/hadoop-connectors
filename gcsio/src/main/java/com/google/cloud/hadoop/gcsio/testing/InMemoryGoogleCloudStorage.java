@@ -537,6 +537,11 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     return getItemInfo(destination);
   }
 
+  /**
+   * Get the Value of the statistics
+   * @param key name of the object related statistics key
+   * @return
+   */
   @Override
   public long getObjectStatistics(GoogleCloudStorageStatistics key) {
     return 0;

@@ -18,7 +18,10 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import java.io.Closeable;
 
-/** OutPutStream Statistics */
+/**
+ * Statistics updated by a {@link GoogleHadoopOutputStream} during its use. It also contains
+ * getters for tests.
+ */
 interface GhfsOutputStreamStatistics extends Closeable, GhfsStatisticInterface {
   /**
    * Record bytes written.
@@ -53,6 +56,7 @@ interface GhfsOutputStreamStatistics extends Closeable, GhfsStatisticInterface {
   /** An ignored stream write exception was received. */
   void writeException();
 
+  /** The total number of stream write exception. */
   long getWriteExceptions();
 
   /** Syncable.hflush() has been invoked. */

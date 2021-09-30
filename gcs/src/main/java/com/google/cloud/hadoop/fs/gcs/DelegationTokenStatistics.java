@@ -16,11 +16,9 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import java.io.Closeable;
+public interface DelegationTokenStatistics extends GhfsStatisticInterface{
 
-/** Instrumentation exported to for S3A Delegation Token support. */
-public interface DelegationTokenStatistics extends Closeable, GhfsStatisticInterface {
+    /** A token has been issued. */
+    void tokenIssued();
 
-  /** A token has been issued. */
-  void tokenIssued();
 }

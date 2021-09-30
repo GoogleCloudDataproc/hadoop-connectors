@@ -19,5 +19,6 @@ package com.google.cloud.hadoop.fs.gcs;
 import org.apache.hadoop.fs.statistics.DurationTrackerFactory;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 
-/** Base Interface for GHFS Statistics, as a way of managing them. */
+/** Base Interface for GoogleHadoopFileSystem Statistics, as a way of
+ * managing Input Stream Statistics and Output Stream Statistics. */
 public interface GhfsStatisticInterface extends IOStatisticsSource, DurationTrackerFactory {}

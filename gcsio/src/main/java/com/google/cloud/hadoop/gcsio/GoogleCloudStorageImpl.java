@@ -797,6 +797,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   public void deleteObject(StorageResourceId resourceId, long metaGeneration) throws IOException {
     String bucketName = resourceId.getBucketName();
+    // T0 update the statistics of number of objects deleted
     if (objectStatistics.get(OBJECT_DELETE_OBJECTS) == null) {
       objectStatistics.put(OBJECT_DELETE_OBJECTS, 1L);
     } else {
@@ -838,6 +839,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     for (StorageResourceId fullObjectName : fullObjectNames) {
       queueSingleObjectDelete(fullObjectName, innerExceptions, batchHelper, 1);
+
+      // update the statistics of number of objects deleted
       if (objectStatistics.get(OBJECT_DELETE_OBJECTS) == null) {
         objectStatistics.put(OBJECT_DELETE_OBJECTS, 1L);
       } else {

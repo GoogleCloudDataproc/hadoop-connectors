@@ -18,15 +18,15 @@ package com.google.cloud.hadoop.fs.gcs;
 
 /** Enum of statistic types. */
 public enum GhfsStatisticTypeEnum {
-  /** Counter. */
+
+  /** Counter.
+   * Counts the number of occurrences of each operation*/
   TYPE_COUNTER,
 
-  /** Duration. */
+  /** Duration.
+   * Duration for the execution of opertaion */
   TYPE_DURATION,
 
   /** Gauge. */
-  TYPE_GAUGE,
-
-  /** Quantile. */
-  TYPE_QUANTILE,
+  TYPE_GAUGE
 }

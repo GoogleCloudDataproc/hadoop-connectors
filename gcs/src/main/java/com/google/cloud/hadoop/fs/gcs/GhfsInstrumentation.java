@@ -47,16 +47,6 @@ import org.apache.hadoop.metrics2.lib.MutableMetric;
 /**
  * Instrumentation of GCS.
  *
- * <p>History
- *
- * <ol>
- *   <li>HADOOP-13028. Initial implementation. Derived from the {@code S3AInstrumentation}.
- *   <li>Broadly (and directly) used in gcs. The use of direct references causes "problems" in
- *       mocking tests.
- *   <li>HADOOP-16830. IOStatistics. Move to an interface and implementation design for the
- *       different inner classes.
- * </ol>
- *
  * <p>Counters and metrics are generally addressed in code by their name or {@link GhfsStatistic}
  * key. There <i>may</i> be some Statistics which do not have an entry here. To avoid attempts to
  * access such counters failing, the operations to increment/query metric values are designed to
@@ -68,22 +58,63 @@ import org.apache.hadoop.metrics2.lib.MutableMetric;
 @InterfaceStability.Evolving
 public class GhfsInstrumentation
     implements Closeable, MetricsSource, IOStatisticsSource, DurationTrackerFactory {
+  private static final String METRICS_SOURCE_BASENAME = "GCSMetrics";
+
+  /**
+   * {@value} Currently all gcs metrics are placed in a single
+   * "context". Distinct contexts may be used in the future.
+   */
   public static final String CONTEXT = "gcsFilesystem";
+
+  /**
+   * {@value} The name of the gcs-specific metrics
+   * system instance used for gcs metrics.
+   */
   public static final String METRICS_SYSTEM_NAME = "google-hadoop-file-system";
+
+  /**
+   * {@value} The name of a field added to metrics
+   * records that uniquely identifies a specific FileSystem instance.
+   */
   public static final String METRIC_TAG_FILESYSTEM_ID = "gcsFilesystemId";
+
+  /**
+   * {@value} The name of a field added to metrics records
+   * that indicates the hostname portion of the FS URL.
+   */
   public static final String METRIC_TAG_BUCKET = "bucket";
+
+  /** metricsSystemLock must be used to synchronize modifications to
+   metricsSystem and the following counters. */
   private static final Object METRICS_SYSTEM_LOCK = new Object();
-  private final MetricsRegistry registry =
-      new MetricsRegistry("googleHadoopFilesystem").setContext(CONTEXT);
-  private IOStatisticsStore instanceIOStatistics;
-  private DurationTrackerFactory durationTrackerFactory;
+  private static MetricsSystem metricsSystem = null;
   private static int metricsSourceNameCounter = 0;
   private static int metricsSourceActiveCounter = 0;
+
+  private final MetricsRegistry registry =
+      new MetricsRegistry("googleHadoopFilesystem").setContext(CONTEXT);
+
+  /**
+   * This is the IOStatistics store for the GoogleHadoopFileSystem
+   * instance.
+   * It is not kept in sync with the rest of the Ghfsinstrumentation.
+   * Most inner statistics implementation classes only update this
+   * store when it is pushed back, such as as in close().
+   */
+  private IOStatisticsStore instanceIOStatistics;
+
+  /** Duration Tracker Factory for the Instrumentation */
+  private DurationTrackerFactory durationTrackerFactory;
+
   private String metricsSourceName;
-  private static final String METRICS_SOURCE_BASENAME = "GCSMetrics";
-  private static MetricsSystem metricsSystem = null;
+
+
   private static final GoogleLogger LOG = GoogleLogger.forEnclosingClass();
 
+  /**
+   * Construct the instrumentation for a filesystem.
+   * @param name URI of filesystem.
+   */
   public GhfsInstrumentation(URI name) {
     UUID fileSystemInstanceID = UUID.randomUUID();
     registry.tag(
@@ -174,6 +205,10 @@ public class GhfsInstrumentation
     metricsSystem.register(metricsSourceName, "", this);
   }
 
+  /**
+   * Get the metrics system.
+   * @return metricsSystem
+   */
   public MetricsSystem getMetricsSystem() {
     synchronized (METRICS_SYSTEM_LOCK) {
       if (metricsSystem == null) {
@@ -234,6 +269,10 @@ public class GhfsInstrumentation
     return gauge(op.getSymbol(), op.getDescription());
   }
 
+  /**
+   * Get the metrics registry.
+   * @return the registry
+   */
   public MetricsRegistry getRegistry() {
     return registry;
   }
@@ -249,20 +288,20 @@ public class GhfsInstrumentation
     return metric;
   }
 
+  /**
+   * Lookup a counter by name. Return null if it is not known.
+   * @param name counter name
+   * @return the counter
+   * @throws IllegalStateException if the metric is not a counter
+   */
   private MutableCounterLong lookupCounter(String name) {
     MutableMetric metric = lookupMetric(name);
     if (metric == null) {
       return null;
     }
     if (!(metric instanceof MutableCounterLong)) {
-      throw new IllegalStateException(
-          "Metric "
-              + name
-              + " is not a MutableCounterLong: "
-              + metric
-              + " (type: "
-              + metric.getClass()
-              + ")");
+      throw new IllegalStateException(String.format("Metric %s is not a " +
+              "MutableCounterLong: %s (type: %s)",name,metric,metric.getClass()));
     }
     return (MutableCounterLong) metric;
   }
@@ -282,8 +321,13 @@ public class GhfsInstrumentation
     }
   }
 
+  /**
+   * A duration tracker which updates a mutable counter with a metric.
+   * The metric is updated with the count on start; after a failure
+   * the failures count is incremented by one.
+   */
   private final class MetricUpdatingDurationTracker implements DurationTracker {
-
+    /** Name of the statistics value to be updated */
     private final String symbol;
 
     private boolean failed;
@@ -317,6 +361,14 @@ public class GhfsInstrumentation
 
   private final class MetricDurationTrackerFactory implements DurationTrackerFactory {
 
+    /**
+     * The duration tracker updates the metrics with the count and IOStatistics will full duration
+     * information.
+     *
+     * @param key statistic key prefix
+     * @param count #of times to increment the matching counter in this operation.
+     * @return a duration tracker.
+     */
     @Override
     public DurationTracker trackDuration(final String key, final long count) {
       return new MetricUpdatingDurationTracker(key, count);
@@ -512,7 +564,7 @@ public class GhfsInstrumentation
     }
 
     /**
-     * {@inheritDoc}. Increments the number of seek operations, and backward seek operations. The
+     * Increments the number of seek operations, and backward seek operations. The
      * offset is inverted and used as the increment of {@link #bytesBackwardsOnSeek}.
      */
     @Override
@@ -523,7 +575,7 @@ public class GhfsInstrumentation
     }
 
     /**
-     * {@inheritDoc}. Increment the number of seek and forward seek operations, as well as counters
+     * Increment the number of seek and forward seek operations, as well as counters
      * of bytes skipped in seek, where appropriate.
      */
     @Override
@@ -535,13 +587,13 @@ public class GhfsInstrumentation
       }
     }
 
-    /** {@inheritDoc}. */
+    /** An ignored stream read exception was received. */
     @Override
     public void readException() {
       readExceptions.incrementAndGet();
     }
 
-    /** {@inheritDoc}. If the byte counter is positive, increment bytesRead and totalBytesRead. */
+    /** If the byte counter is positive, increment bytesRead and totalBytesRead. */
     @Override
     public void bytesRead(long bytes) {
       if (bytes > 0) {
@@ -550,13 +602,19 @@ public class GhfsInstrumentation
       }
     }
 
+    /**
+     * A read() operation in the input stream has started.
+     *
+     * @param pos starting position of the read
+     * @param len length of bytes to read
+     */
     @Override
     public void readOperationStarted(long pos, long len) {
       readOperations.incrementAndGet();
     }
 
     /**
-     * {@inheritDoc}. If more data was requested than was actually returned, this was an incomplete
+     * If more data was requested than was actually returned, this was an incomplete
      * read. Increment {@link #readsIncomplete}.
      */
     @Override
@@ -575,56 +633,103 @@ public class GhfsInstrumentation
       merge(true);
     }
 
+    /**
+     * The total number of times the input stream has been closed.
+     * @return the number of close calls.
+     */
     @Override
     public long getCloseOperations() {
       return lookupCounterValue(StreamStatisticNames.STREAM_READ_CLOSE_OPERATIONS);
     }
 
+    /**
+     * The total number of executed seek operations which went forward in an input stream.
+     * @return the number of Forward seek operations.
+     */
     @Override
     public long getForwardSeekOperations() {
       return lookupCounterValue(StreamStatisticNames.STREAM_READ_SEEK_FORWARD_OPERATIONS);
     }
 
+    /**
+     * The total number of executed seek operations which went backward in an input stream.
+     * @return the number of Backward seek operations
+     */
     @Override
     public long getBackwardSeekOperations() {
       return lookupCounterValue(StreamStatisticNames.STREAM_READ_SEEK_BACKWARD_OPERATIONS);
     }
 
+    /**
+     * The bytes read in read() operations.
+     *
+     * @return the number of bytes returned to the caller.
+     */
     @Override
     public long getBytesRead() {
       return lookupCounterValue(StreamStatisticNames.STREAM_READ_BYTES);
     }
 
+    /**
+     * The total number of bytes read, including all read and discarded when closing streams or
+     * skipped during seek calls.
+     *
+     * @return the total number of bytes read from GHFS.
+     */
     @Override
     public long getTotalBytesRead() {
       return lookupCounterValue(StreamStatisticNames.STREAM_READ_TOTAL_BYTES);
     }
 
+    /**
+     * The total number of bytes skipped during seek calls.
+     * @return the number of bytes skipped.
+     */
     @Override
     public long getBytesSkippedOnSeek() {
       return lookupCounterValue(StreamStatisticNames.STREAM_READ_SEEK_BYTES_SKIPPED);
     }
 
+    /**
+     * The total number of bytes skipped during backward seek calls.
+     * @return the number of bytes skipped.
+     */
     @Override
     public long getBytesBackwardsOnSeek() {
       return lookupCounterValue(StreamStatisticNames.STREAM_READ_SEEK_BYTES_BACKWARDS);
     }
 
+    /**
+     * The total number of seek operations in an input stream
+     * @return the number of bytes skipped.
+     */
     @Override
     public long getSeekOperations() {
       return lookupCounterValue(StreamStatisticNames.STREAM_READ_SEEK_OPERATIONS);
     }
 
+    /**
+     * The total number of exceptions raised during input stream reads
+     * @return the count of read Exceptions.
+     */
     @Override
     public long getReadExceptions() {
       return lookupCounterValue(StreamStatisticNames.STREAM_READ_EXCEPTIONS);
     }
 
+    /**
+     * The total number of times the read() operation in an input stream has been called.
+     * @return the count of read operations.
+     */
     @Override
     public long getReadOperations() {
       return lookupCounterValue(StreamStatisticNames.STREAM_READ_OPERATIONS);
     }
 
+    /**
+     * The total number of Incomplete read() operations
+     * @return the count of Incomplete read operations.
+     */
     @Override
     public long getReadsIncomplete() {
       return lookupCounterValue(StreamStatisticNames.STREAM_READ_OPERATIONS_INCOMPLETE);
@@ -655,8 +760,10 @@ public class GhfsInstrumentation
         // increment the filesystem statistics for this thread.
         if (filesystemStatistics != null) {
           long t = getTotalBytesRead();
+          int readOperations = (int)getReadOperations();
           filesystemStatistics.incrementBytesRead(t);
           filesystemStatistics.incrementBytesReadByDistance(DISTANCE, t);
+          filesystemStatistics.incrementReadOps(readOperations);
         }
       }
     }
@@ -669,6 +776,7 @@ public class GhfsInstrumentation
       // iterate through all the counters
       localIOStatistics().counters().keySet().stream().forEach(e -> promoteIOCounter(e));
     }
+
     /**
      * Propagate a counter from the instance-level statistics to the GHFS instrumentation,
      * subtracting the previous merged value.
@@ -733,6 +841,9 @@ public class GhfsInstrumentation
       // provided the stream is closed in the worker thread, this will
       // ensure that the thread-specific worker stats are updated.
       mergeOutputStreamStatistics(this);
+      if (filesystemStatistics != null) {
+        filesystemStatistics.incrementBytesWritten(getBytesWritten());
+      }
     }
 
     /**
@@ -745,17 +856,19 @@ public class GhfsInstrumentation
       bytesWritten.addAndGet(count);
     }
 
-    /** {@inheritDoc}. */
+    /** An ignored stream write exception was received. */
     @Override
     public void writeException() {
       writeExceptions.incrementAndGet();
     }
 
+    /** Syncable.hflush() has been invoked. */
     @Override
     public void hflushInvoked() {
       incCounter(GhfsStatistic.INVOCATION_HFLUSH.getSymbol(), 1);
     }
 
+    /** Syncable.hsync() has been invoked. */
     @Override
     public void hsyncInvoked() {
       incCounter(GhfsStatistic.INVOCATION_HSYNC.getSymbol(), 1);
@@ -771,6 +884,10 @@ public class GhfsInstrumentation
       return bytesWritten.get();
     }
 
+    /**
+     * The total number of exceptions raised during ouput stream write
+     * @return the count of write Exceptions.
+     */
     @Override
     public long getWriteExceptions() {
       return lookupCounterValue(StreamStatisticNames.STREAM_WRITE_EXCEPTIONS);
@@ -800,9 +917,10 @@ public class GhfsInstrumentation
   }
 
   /**
-   * Instrumentation exported to S3A Delegation Token support. The {@link #tokenIssued()} call is a
-   * no-op; This statistics class doesn't collect any local statistics. Instead it directly updates
-   * the S3A Instrumentation.
+   * Instrumentation exported to GCS Delegation Token support.
+   * The {@link #tokenIssued()}  call is a no-op;
+   * This statistics class doesn't collect any local statistics. Instead it directly updates
+   * the Ghfs Instrumentation
    */
   private final class DelegationTokenStatisticsImpl extends AbstractGhfsStatisticsSource
       implements DelegationTokenStatistics {
@@ -835,21 +953,24 @@ public class GhfsInstrumentation
       this.getIOStatistics().aggregate(source.getIOStatistics());
     }
 
+    /** A token has been issued. */
     @Override
     public void tokenIssued() {
-      mergeDelegationTokenStatistics(this);
+
     }
 
+    /**
+     * The duration tracker updates the metrics with the count and IOStatistics will full duration
+     * information.
+     *
+     * @param key statistic key prefix
+     * @param count #of times to increment the matching counter in this operation.
+     * @return a duration tracker.
+     */
     @Override
     public DurationTracker trackDuration(final String key, final long count) {
       return getDurationTrackerFactory().trackDuration(key, count);
     }
 
-    @Override
-    public void close() {
-      // provided the stream is closed in the worker thread, this will
-      // ensure that the thread-specific worker stats are updated.
-      mergeDelegationTokenStatistics(this);
-    }
   }
 }

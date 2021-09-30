@@ -246,6 +246,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
   @Override
   public void hflush() throws IOException {
     long startTimeNs = System.nanoTime();
+    //update the output stream statistics of hflush()
     incrementhflushStatistics();
     if (!options.isSyncOnFlushEnabled()) {
       logger.atWarning().log(
@@ -282,6 +283,8 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
     logger.atFiner().log(
         "hsync(): Committing tail file %s to final destination %s", curGcsPath, finalGcsPath);
     throwIfNotOpen();
+
+    //update the output stream statistics of hsync()
     incrementhsyncStatistics();
     commitCurrentFile();
 
@@ -378,10 +381,16 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
     }
   }
 
+  /**
+   * Increment the count of hflush() operation
+   */
   public void incrementhflushStatistics() {
     curDelegate.getStreamStatistics().hflushInvoked();
   }
 
+  /**
+   * Increment the count of hsync() operation
+   */
   public void incrementhsyncStatistics() {
     curDelegate.getStreamStatistics().hsyncInvoked();
   }

@@ -69,6 +69,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
         "GoogleHadoopFSInputStream(gcsPath: %s, readOptions: %s)", gcsPath, readOptions);
     this.gcsPath = gcsPath;
     this.statistics = statistics;
+    // used to track the input stream related iostatistics
     this.streamStatistics = ghfs.getInstrumentation().newInputStreamStatistics(statistics);
     this.totalBytesRead = 0;
     this.channel = ghfs.getGcsFs().open(gcsPath, readOptions);
@@ -84,12 +85,14 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   public synchronized int read() throws IOException {
     // TODO(user): Wrap this in a while-loop if we ever introduce a non-blocking mode for the
     // underlying channel.
+    // update the statistics of read operation
     streamStatistics.readOperationStarted(getPos(), 1);
     int numRead = channel.read(ByteBuffer.wrap(singleReadBuf));
     if (numRead == -1) {
       return -1;
     }
     if (numRead != 1) {
+      //update the statistics of read Exception
       streamStatistics.readException();
       streamStatistics.readOperationCompleted(1, numRead);
       throw new IOException(
@@ -98,11 +101,10 @@ class GoogleHadoopFSInputStream extends FSInputStream {
               numRead, gcsPath, channel.position()));
     }
     byte b = singleReadBuf[0];
-
     totalBytesRead++;
-    statistics.incrementBytesRead(1);
-    statistics.incrementReadOps(1);
+    //update the statistics of number of bytes read
     streamStatistics.bytesRead(1);
+    //update the statistics of read operation completion
     streamStatistics.readOperationCompleted(1, numRead);
     return (b & 0xff);
   }
@@ -123,18 +125,21 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     if (offset < 0 || length < 0 || length > buf.length - offset) {
       throw new IndexOutOfBoundsException();
     }
+
+    // update the statistics of read operation
     streamStatistics.readOperationStarted(getPos(), length);
     int numRead = channel.read(ByteBuffer.wrap(buf, offset, length));
 
     if (numRead > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
-      statistics.incrementBytesRead(numRead);
-      statistics.incrementReadOps(1);
+      //update the statistics of number of bytes read
       streamStatistics.bytesRead(numRead);
       totalBytesRead += numRead;
     } else {
+      //update the statistics of read Exception
       streamStatistics.readException();
     }
+    //update the statistics of read operation completion
     streamStatistics.readOperationCompleted(length, numRead);
     return numRead;
   }
@@ -154,17 +159,21 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   @Override
   public synchronized int read(long position, byte[] buf, int offset, int length)
       throws IOException {
+
+    // update the statistics of read operation
     streamStatistics.readOperationStarted(position, length);
     int result = super.read(position, buf, offset, length);
 
     if (result > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
-      statistics.incrementBytesRead(result);
+      //update the statistics of number of bytes read
       streamStatistics.bytesRead(result);
       totalBytesRead += result;
     } else {
+      //update the statistics of read Exception
       streamStatistics.readException();
     }
+    //update the statistics of read operation completion
     streamStatistics.readOperationCompleted(length, result);
     return result;
   }
@@ -226,6 +235,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     if (channel != null) {
       logger.atFiner().log("Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
       channel.close();
+      //to merge the current stream statistics with the instrumentation
       streamStatistics.close();
     }
   }

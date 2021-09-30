@@ -70,6 +70,7 @@ class GoogleHadoopOutputStream extends OutputStream {
     this.gcsPath = gcsPath;
     this.statistics = statistics;
     GoogleCloudStorageFileSystem gcsfs = ghfs.getGcsFs();
+    // used to track the output stream related statistics
     this.streamStatistics = ghfs.getInstrumentation().newOutputStreamStatistics(statistics);
     this.channel = createChannel(gcsfs, gcsPath, createFileOptions);
     this.out = createOutputStream(this.channel, gcsfs.getOptions().getCloudStorageOptions());
@@ -99,8 +100,8 @@ class GoogleHadoopOutputStream extends OutputStream {
   public void write(int b) throws IOException {
     throwIfNotOpen();
     out.write(b);
-    statistics.incrementBytesWritten(1);
     statistics.incrementWriteOps(1);
+    //update the statistics of number of bytes written
     streamStatistics.writeBytes(1);
   }
 
@@ -111,8 +112,8 @@ class GoogleHadoopOutputStream extends OutputStream {
   public void write(byte[] b, int offset, int len) throws IOException {
     throwIfNotOpen();
     out.write(b, offset, len);
-    statistics.incrementBytesWritten(len);
     statistics.incrementWriteOps(1);
+    //update the statistics of number of bytes written
     streamStatistics.writeBytes(len);
   }
 
@@ -123,6 +124,7 @@ class GoogleHadoopOutputStream extends OutputStream {
     if (out != null) {
       try {
         out.close();
+        // merge the current output stream statistics with instrumentation
         streamStatistics.close();
       } finally {
         out = null;
@@ -137,6 +139,7 @@ class GoogleHadoopOutputStream extends OutputStream {
 
   private void throwIfNotOpen() throws IOException {
     if (!isOpen()) {
+      //update the statistics of write Exception
       streamStatistics.writeException();
       throw new ClosedChannelException();
     }
@@ -146,6 +149,10 @@ class GoogleHadoopOutputStream extends OutputStream {
     return channel;
   }
 
+  /**
+   * Get the current output stream statistics
+   * @return
+   */
   public GhfsOutputStreamStatistics getStreamStatistics() {
     return this.streamStatistics;
   }

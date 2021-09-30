@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Google Inc. All Rights Reserved.
+ * Copyright 2021 Google Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,10 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+/**
+ * Statistics which are collected in GCSIO.
+ */
 public enum GoogleCloudStorageStatistics {
-  OBJECT_DELETE_OBJECTS
+    //number of objects deleted
+    OBJECT_DELETE_OBJECTS
 }

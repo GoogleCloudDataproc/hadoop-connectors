@@ -239,6 +239,7 @@ public class GcsDelegationTokens extends AbstractService {
   @SuppressWarnings("OptionalGetWithoutIsPresent")
   public Token<DelegationTokenIdentifier> getBoundOrNewDT(String renewer) throws IOException {
     logger.atFiner().log("Delegation token requested");
+    // statistics to update the instrumentation whenever the delegation token is created
     stats = fileSystem.getInstrumentation().newDelegationTokenStatistics();
     if (isBoundToDT()) {
       // the FS was created on startup with a token, so return it.
@@ -250,6 +251,8 @@ public class GcsDelegationTokens extends AbstractService {
     // issued DTs are not cached so that long-lived filesystems can
     // reliably issue session/role tokens.
     Token<DelegationTokenIdentifier> token = null;
+    // Duration is tracked while creating a new Delegation token
+    // and update the  IOStatistics
     try {
       token =
           trackDuration(

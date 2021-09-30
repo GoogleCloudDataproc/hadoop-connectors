@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import com.google.common.base.MoreObjects;
 import org.apache.hadoop.fs.statistics.DurationTracker;
 import org.apache.hadoop.fs.statistics.DurationTrackerFactory;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
@@ -28,21 +29,17 @@ import org.apache.hadoop.fs.statistics.impl.IOStatisticsStore;
  * similar names; the short ones always refer to the inner class and not any superclass method.
  */
 abstract class AbstractGhfsStatisticsSource implements IOStatisticsSource, DurationTrackerFactory {
+  /** IOStatisticsStore to  track the statistics */
   private IOStatisticsStore ioStatistics;
 
   protected AbstractGhfsStatisticsSource() {}
-
-  @Override
-  public IOStatisticsStore getIOStatistics() {
-    return ioStatistics;
-  }
 
   /**
    * Setter. this must be called in the subclass constructor with whatever
    *
    * @param statistics statistics to set
    */
-  protected void setIOStatistics(final IOStatisticsStore statistics) {
+  protected void setIOStatistics(IOStatisticsStore statistics) {
     this.ioStatistics = statistics;
   }
 
@@ -57,8 +54,7 @@ abstract class AbstractGhfsStatisticsSource implements IOStatisticsSource, Durat
   }
 
   /**
-   * DefaultGHFSClientFactoryDefaultGHFSClientFactory Increment a named counter by 1.
-   *
+   * Increment a named counter by 1.
    * @param name counter name
    * @param value value to increment by
    * @return the updated value or, if the counter is unknown: 0
@@ -67,34 +63,73 @@ abstract class AbstractGhfsStatisticsSource implements IOStatisticsSource, Durat
     return ioStatistics.incrementCounter(name, value);
   }
 
-  /** {@inheritDoc} */
+  /**
+   * Get the value of a counter.
+   *
+   * @param name counter name
+   * @return the value or null if no matching counter was found.
+   */
   public Long lookupCounterValue(final String name) {
     return ioStatistics.counters().get(name);
   }
 
-  /** {@inheritDoc} */
+  /**
+   * Get the value of a gauge.
+   *
+   * @param name gauge name
+   * @return the value or null if no matching gauge was found.
+   */
   public Long lookupGaugeValue(final String name) {
     return ioStatistics.gauges().get(name);
   }
+
+  /**
+   * Increment the value of a gauge.
+   * @param name gauge name
+   * @param v value to increment
+   * @return the value or 0 if no matching gauge was found.
+   */
 
   public long incGauge(String name, long v) {
     return ioStatistics.incrementGauge(name, v);
   }
 
+  /**
+   * Increment the value of a gauge by 1.
+   * @param name gauge name
+   * @return the value or 0 if no matching gauge was found.
+   */
   public long incGauge(String name) {
     return incGauge(name, 1);
   }
 
   @Override
   public String toString() {
-    final StringBuilder sb = new StringBuilder(this.getClass().getSimpleName() + "{");
-    sb.append(ioStatistics);
-    sb.append('}');
-    return sb.toString();
+    return MoreObjects.toStringHelper(this.getClass().getSimpleName())
+            .add("IOStatistics ",ioStatistics)
+            .toString();
   }
 
+  /**
+   * The duration tracker updates the metrics with the count
+   * and IOStatistics will full duration information.
+   * @param key statistic key prefix
+   * @param count  #of times to increment the matching counter in this
+   * operation.
+   * @return a duration tracker.
+   */
   @Override
   public DurationTracker trackDuration(final String key, final long count) {
     return getIOStatistics().trackDuration(key, count);
   }
+
+  /**
+   * Get the instance IO Statistics.
+   * @return IOstatistics.
+   */
+  @Override
+  public IOStatisticsStore getIOStatistics() {
+    return ioStatistics;
+  }
+
 }

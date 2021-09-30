@@ -187,6 +187,7 @@ public enum GhfsStatistic {
   /** Statistic type. */
   private final GhfsStatisticTypeEnum type;
 
+  /** the name of the statistic */
   public String getSymbol() {
     return symbol;
   }
@@ -201,6 +202,7 @@ public enum GhfsStatistic {
     return SYMBOL_MAP.get(symbol);
   }
 
+  /** The description of the Statistic */
   public String getDescription() {
     return description;
   }
