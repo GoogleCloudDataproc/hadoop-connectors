@@ -38,6 +38,7 @@ import com.google.cloud.hadoop.util.LazyExecutorService;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
@@ -627,13 +628,11 @@ public class GoogleCloudStorageFileSystem {
       StorageResourceId srcResourceId =
           StorageResourceId.fromUriPath(src, /* allowEmptyObjectName= */ true);
       StorageResourceId dstResourceId =
-          StorageResourceId.fromUriPath(dst, /* allowEmptyObjectName= */ true);
+          StorageResourceId.fromUriPath(
+              dst, /* allowEmptyObjectName= */ true, /* generationId= */ 0L);
 
-      gcs.copy(
-          srcResourceId.getBucketName(), ImmutableList.of(srcResourceId.getObjectName()),
-          dstResourceId.getBucketName(), ImmutableList.of(dstResourceId.getObjectName()));
+      gcs.copy(ImmutableMap.of(srcResourceId, dstResourceId));
 
-      // TODO(b/110833109): populate generation ID in StorageResourceId when getting info
       gcs.deleteObjects(
           ImmutableList.of(
               new StorageResourceId(

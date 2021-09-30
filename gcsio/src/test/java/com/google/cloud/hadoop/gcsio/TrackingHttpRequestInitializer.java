@@ -53,6 +53,9 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   private static final String POST_COPY_REQUEST_FORMAT =
       "POST:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o/%s/%s/b/%s/o/%s";
 
+  private static final String POST_COPY_REQUEST_WITH_METADATA_FORMAT =
+      "POST:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o/%s/%s/b/%s/o/%s?ifGenerationMatch=%s";
+
   private static final String UPLOAD_REQUEST_FORMAT =
       "POST:"
           + GOOGLEAPIS_ENDPOINT
@@ -260,6 +263,43 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         requestType,
         dstBucket,
         urlEncode(dstObject));
+  }
+
+  public static String copyRequestString(
+      String srcBucket,
+      String srcObject,
+      String dstBucket,
+      String dstObject,
+      String requestType,
+      Integer generationId) {
+    return copyRequestString(
+        srcBucket,
+        srcObject,
+        dstBucket,
+        dstObject,
+        requestType,
+        generationId,
+        /* replaceGenerationId= */ true);
+  }
+
+  public static String copyRequestString(
+      String srcBucket,
+      String srcObject,
+      String dstBucket,
+      String dstObject,
+      String requestType,
+      Integer generationId,
+      boolean replaceGenerationId) {
+    String request =
+        String.format(
+            POST_COPY_REQUEST_WITH_METADATA_FORMAT,
+            srcBucket,
+            urlEncode(srcObject),
+            requestType,
+            dstBucket,
+            urlEncode(dstObject),
+            replaceGenerationId ? "generationId_" + generationId : generationId);
+    return generationId == null ? request.replaceAll("ifGenerationMatch=[^&]+&", "") : request;
   }
 
   public static String uploadRequestString(String bucketName, String object, Integer generationId) {
