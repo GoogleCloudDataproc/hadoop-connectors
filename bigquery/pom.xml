@@ -54,12 +54,11 @@
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-mapreduce-client-common</artifactId>
         </dependency>
-        <!-- tests use some classes that were added in Avro 1.8 -->
+        <!-- we use classes that were added in Avro 1.8 -->
         <dependency>
           <groupId>org.apache.avro</groupId>
           <artifactId>avro</artifactId>
           <version>1.8.2</version>
-          <scope>test</scope>
         </dependency>
       </dependencies>
     </profile>
@@ -293,6 +292,7 @@
                   <include>io.grpc</include>
                   <include>io.opencensus</include>
                   <include>io.perfmark</include>
+                  <include>org.apache.avro</include>
                   <include>org.apache.httpcomponents</include>
                   <include>org.threeten</include>
                   <!-- needed by http client and versions conflict -->
