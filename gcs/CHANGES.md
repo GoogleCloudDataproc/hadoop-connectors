@@ -6,9 +6,9 @@
 
 1.  Restore compatibility with pre-2.8 Hadoop versions.
 
-1. Migrate gRPC channels to GCS v2 APIs.
+1.  Migrate gRPC channels to GCS v2 APIs.
 
-1. Add zero-copy deserializer for gRPC reads, toggled with option:
+1.  Add zero-copy deserializer for gRPC reads, toggled with option:
 
     ```
     fs.gs.grpc.read.zerocopy.enable (default : true)
