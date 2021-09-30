@@ -1000,7 +1000,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       return;
     }
 
-    Map<StorageResourceId, GoogleCloudStorageItemInfo> bucketInfoCache = new HashMap<>();
+    Map<StorageResourceId, GoogleCloudStorageItemInfo> bucketInfoCache =
+        new ConcurrentHashMap<>(sourceToDestinationObjectsMap.size());
 
     for (Entry<StorageResourceId, StorageResourceId> entry :
         sourceToDestinationObjectsMap.entrySet()) {
@@ -1055,12 +1056,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       Map<StorageResourceId, GoogleCloudStorageItemInfo> bucketInfoCache,
       StorageResourceId resourceId)
       throws IOException {
-    GoogleCloudStorageItemInfo storageItemInfo = bucketInfoCache.get(resourceId);
-    if (storageItemInfo != null) {
-      return storageItemInfo;
+    GoogleCloudStorageItemInfo storageItemInfo;
+    if (bucketInfoCache.containsKey(resourceId)) {
+      storageItemInfo = bucketInfoCache.get(resourceId);
+    } else {
+      storageItemInfo = gcsImpl.getItemInfo(resourceId);
+      bucketInfoCache.put(resourceId, storageItemInfo);
     }
-    storageItemInfo = gcsImpl.getItemInfo(resourceId);
-    bucketInfoCache.put(resourceId, storageItemInfo);
     return storageItemInfo;
   }
 
