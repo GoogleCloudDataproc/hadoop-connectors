@@ -90,7 +90,18 @@ import java.net.URI;
 import java.nio.file.DirectoryNotEmptyException;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -605,19 +616,12 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       logger.atFine().log("File exists: %s", itemInfo.getResourceId());
       GoogleCloudStorageItemInfo finalItemInfo = itemInfo;
       ThreadPoolExecutor unboundedThreadPool = initThreadPools();
-      try {
-        return unboundedThreadPool
-            .submit(
-                () ->
-                    LambdaUtils.eval(result, () -> open(finalItemInfo, parameters.getBufferSize())))
-            .get();
-      } catch (InterruptedException | ExecutionException e) {
-        logger.atFine().log(e.getMessage());
-      }
+      unboundedThreadPool.submit(
+          () -> LambdaUtils.eval(result, () -> open(finalItemInfo, parameters.getBufferSize())));
+      return result;
     } else {
       return super.openFileWithOptions(rawPath, parameters);
     }
-    return result;
   }
 
   protected FSDataInputStream open(GoogleCloudStorageItemInfo itemInfo, int bufferSize)
