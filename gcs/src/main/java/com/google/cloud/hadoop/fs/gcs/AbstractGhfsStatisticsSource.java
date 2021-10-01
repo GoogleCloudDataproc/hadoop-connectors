@@ -29,7 +29,7 @@ import org.apache.hadoop.fs.statistics.impl.IOStatisticsStore;
  * similar names; the short ones always refer to the inner class and not any superclass method.
  */
 abstract class AbstractGhfsStatisticsSource implements IOStatisticsSource, DurationTrackerFactory {
-  /** IOStatisticsStore to  track the statistics */
+  /** IOStatisticsStore to track the statistics */
   private IOStatisticsStore ioStatistics;
 
   protected AbstractGhfsStatisticsSource() {}
@@ -55,6 +55,7 @@ abstract class AbstractGhfsStatisticsSource implements IOStatisticsSource, Durat
 
   /**
    * Increment a named counter by 1.
+   *
    * @param name counter name
    * @param value value to increment by
    * @return the updated value or, if the counter is unknown: 0
@@ -85,17 +86,18 @@ abstract class AbstractGhfsStatisticsSource implements IOStatisticsSource, Durat
 
   /**
    * Increment the value of a gauge.
+   *
    * @param name gauge name
    * @param v value to increment
    * @return the value or 0 if no matching gauge was found.
    */
-
   public long incGauge(String name, long v) {
     return ioStatistics.incrementGauge(name, v);
   }
 
   /**
    * Increment the value of a gauge by 1.
+   *
    * @param name gauge name
    * @return the value or 0 if no matching gauge was found.
    */
@@ -106,16 +108,16 @@ abstract class AbstractGhfsStatisticsSource implements IOStatisticsSource, Durat
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this.getClass().getSimpleName())
-            .add("IOStatistics ",ioStatistics)
-            .toString();
+        .add("IOStatistics ", ioStatistics)
+        .toString();
   }
 
   /**
-   * The duration tracker updates the metrics with the count
-   * and IOStatistics will full duration information.
+   * The duration tracker updates the metrics with the count and IOStatistics will full duration
+   * information.
+   *
    * @param key statistic key prefix
-   * @param count  #of times to increment the matching counter in this
-   * operation.
+   * @param count #of times to increment the matching counter in this operation.
    * @return a duration tracker.
    */
   @Override
@@ -125,11 +127,11 @@ abstract class AbstractGhfsStatisticsSource implements IOStatisticsSource, Durat
 
   /**
    * Get the instance IO Statistics.
+   *
    * @return IOstatistics.
    */
   @Override
   public IOStatisticsStore getIOStatistics() {
     return ioStatistics;
   }
-
 }

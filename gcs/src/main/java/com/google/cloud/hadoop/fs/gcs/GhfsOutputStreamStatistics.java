@@ -19,8 +19,8 @@ package com.google.cloud.hadoop.fs.gcs;
 import java.io.Closeable;
 
 /**
- * Statistics updated by a {@link GoogleHadoopOutputStream} during its use. It also contains
- * getters for tests.
+ * Statistics updated by a {@link GoogleHadoopOutputStream} during its use. It also contains getters
+ * for tests.
  */
 interface GhfsOutputStreamStatistics extends Closeable, GhfsStatisticInterface {
   /**

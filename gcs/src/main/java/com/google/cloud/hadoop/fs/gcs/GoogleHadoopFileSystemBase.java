@@ -1774,7 +1774,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     checkNotNull(path, "path should not be null");
     checkNotNull(name, "name should not be null");
 
-    //track the duration and update the statistics of getXAttr()
+    // track the duration and update the statistics of getXAttr()
     Map<String, byte[]> attributes =
         trackDuration(
             instrumentation,
@@ -1796,7 +1796,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
 
-    //track the duration and update the statistics of getXAttrs()
+    // track the duration and update the statistics of getXAttrs()
     Map<String, byte[]> xAttrs =
         trackDuration(
             instrumentation,
@@ -1825,7 +1825,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     } else {
       Set<String> namesSet = new HashSet<>(names);
 
-      //track the duration and update the statistics of getXAttrs()
+      // track the duration and update the statistics of getXAttrs()
       xAttrs =
           trackDuration(
               instrumentation,
@@ -1846,7 +1846,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   public List<String> listXAttrs(Path path) throws IOException {
     checkNotNull(path, "path should not be null");
 
-    //track the duration and update the statistics of listXAttrs()
+    // track the duration and update the statistics of listXAttrs()
     List<String> xAttrs =
         trackDuration(
             instrumentation,

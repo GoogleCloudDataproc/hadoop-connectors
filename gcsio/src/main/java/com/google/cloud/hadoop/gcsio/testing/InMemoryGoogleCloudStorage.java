@@ -539,6 +539,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
   /**
    * Get the Value of the statistics
+   *
    * @param key name of the object related statistics key
    * @return
    */

@@ -109,6 +109,7 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
 
   /**
    * get the value of the statistics
+   *
    * @param key name of the object related statistics key
    * @return
    */

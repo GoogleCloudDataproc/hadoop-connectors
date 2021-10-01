@@ -101,7 +101,7 @@ class GoogleHadoopOutputStream extends OutputStream {
     throwIfNotOpen();
     out.write(b);
     statistics.incrementWriteOps(1);
-    //update the statistics of number of bytes written
+    // update the statistics of number of bytes written
     streamStatistics.writeBytes(1);
   }
 
@@ -113,7 +113,7 @@ class GoogleHadoopOutputStream extends OutputStream {
     throwIfNotOpen();
     out.write(b, offset, len);
     statistics.incrementWriteOps(1);
-    //update the statistics of number of bytes written
+    // update the statistics of number of bytes written
     streamStatistics.writeBytes(len);
   }
 
@@ -139,7 +139,7 @@ class GoogleHadoopOutputStream extends OutputStream {
 
   private void throwIfNotOpen() throws IOException {
     if (!isOpen()) {
-      //update the statistics of write Exception
+      // update the statistics of write Exception
       streamStatistics.writeException();
       throw new ClosedChannelException();
     }
@@ -151,6 +151,7 @@ class GoogleHadoopOutputStream extends OutputStream {
 
   /**
    * Get the current output stream statistics
+   *
    * @return
    */
   public GhfsOutputStreamStatistics getStreamStatistics() {

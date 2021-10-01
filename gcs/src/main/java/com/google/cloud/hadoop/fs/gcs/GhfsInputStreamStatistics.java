@@ -66,9 +66,7 @@ interface GhfsInputStreamStatistics extends AutoCloseable, GhfsStatisticInterfac
   @Override
   void close();
 
-  /**
-   * The bytes read in read() operations.
-   */
+  /** The bytes read in read() operations. */
   long getBytesRead();
 
   /**
@@ -77,49 +75,31 @@ interface GhfsInputStreamStatistics extends AutoCloseable, GhfsStatisticInterfac
    */
   long getTotalBytesRead();
 
-  /**
-   * The total number of bytes skipped during seek calls.
-   */
+  /** The total number of bytes skipped during seek calls. */
   long getBytesSkippedOnSeek();
 
-  /**
-   * The total number of bytes skipped during backward seek calls.
-   */
+  /** The total number of bytes skipped during backward seek calls. */
   long getBytesBackwardsOnSeek();
 
-  /**
-   * The total number of seek operations in an input stream
-   */
+  /** The total number of seek operations in an input stream */
   long getSeekOperations();
 
-  /**
-   * The total number of exceptions raised during input stream reads.
-   */
+  /** The total number of exceptions raised during input stream reads. */
   long getReadExceptions();
 
-  /**
-   * The total number of times the read() operation in an input stream has been called.
-   */
+  /** The total number of times the read() operation in an input stream has been called. */
   long getReadOperations();
 
-  /**
-   * The total number of Incomplete read() operations
-   */
+  /** The total number of Incomplete read() operations */
   long getReadsIncomplete();
 
-  /**
-   * The total number of times the input stream has been closed.
-   */
+  /** The total number of times the input stream has been closed. */
   long getCloseOperations();
 
-  /**
-   * The total number of executed seek operations which went forward in an input stream.
-   */
+  /** The total number of executed seek operations which went forward in an input stream. */
   long getForwardSeekOperations();
 
-  /**
-   * The total number of executed seek operations which went backward in an input stream.
-   */
+  /** The total number of executed seek operations which went backward in an input stream. */
   long getBackwardSeekOperations();
 
   /**

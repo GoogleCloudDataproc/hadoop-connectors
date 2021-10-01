@@ -16,9 +16,8 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-public interface DelegationTokenStatistics extends GhfsStatisticInterface{
+public interface DelegationTokenStatistics extends GhfsStatisticInterface {
 
-    /** A token has been issued. */
-    void tokenIssued();
-
+  /** A token has been issued. */
+  void tokenIssued();
 }

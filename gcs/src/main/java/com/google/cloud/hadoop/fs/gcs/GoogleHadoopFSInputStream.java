@@ -92,7 +92,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
       return -1;
     }
     if (numRead != 1) {
-      //update the statistics of read Exception
+      // update the statistics of read Exception
       streamStatistics.readException();
       streamStatistics.readOperationCompleted(1, numRead);
       throw new IOException(
@@ -102,9 +102,9 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     }
     byte b = singleReadBuf[0];
     totalBytesRead++;
-    //update the statistics of number of bytes read
+    // update the statistics of number of bytes read
     streamStatistics.bytesRead(1);
-    //update the statistics of read operation completion
+    // update the statistics of read operation completion
     streamStatistics.readOperationCompleted(1, numRead);
     return (b & 0xff);
   }
@@ -132,14 +132,14 @@ class GoogleHadoopFSInputStream extends FSInputStream {
 
     if (numRead > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
-      //update the statistics of number of bytes read
+      // update the statistics of number of bytes read
       streamStatistics.bytesRead(numRead);
       totalBytesRead += numRead;
     } else {
-      //update the statistics of read Exception
+      // update the statistics of read Exception
       streamStatistics.readException();
     }
-    //update the statistics of read operation completion
+    // update the statistics of read operation completion
     streamStatistics.readOperationCompleted(length, numRead);
     return numRead;
   }
@@ -166,14 +166,14 @@ class GoogleHadoopFSInputStream extends FSInputStream {
 
     if (result > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
-      //update the statistics of number of bytes read
+      // update the statistics of number of bytes read
       streamStatistics.bytesRead(result);
       totalBytesRead += result;
     } else {
-      //update the statistics of read Exception
+      // update the statistics of read Exception
       streamStatistics.readException();
     }
-    //update the statistics of read operation completion
+    // update the statistics of read operation completion
     streamStatistics.readOperationCompleted(length, result);
     return result;
   }
@@ -235,7 +235,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     if (channel != null) {
       logger.atFiner().log("Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
       channel.close();
-      //to merge the current stream statistics with the instrumentation
+      // to merge the current stream statistics with the instrumentation
       streamStatistics.close();
     }
   }
