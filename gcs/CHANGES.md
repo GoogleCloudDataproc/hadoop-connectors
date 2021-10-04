@@ -1,10 +1,18 @@
-### 2.2.3 - 2021-XX-XX
+### 2.2.3 - 2021-10-01
 
 1.  Update all dependencies to latest versions.
 
 1.  Add support for downscoped tokens in `AccessTokenProvider`.
 
 1.  Restore compatibility with pre-2.8 Hadoop versions.
+
+1.  Migrate gRPC channels to GCS v2 APIs.
+
+1.  Add zero-copy deserializer for gRPC reads, toggled with option:
+
+    ```
+    fs.gs.grpc.read.zerocopy.enable (default : true)
+    ```
 
 ### 2.2.2 - 2021-06-25
 
