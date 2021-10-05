@@ -269,7 +269,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
   private static BackOff getDefaultBackOff() {
     return new ExponentialBackOff.Builder()
-        // Set initial timeout to 1.25 seconds to have a 1 second minimum initial intervgal
+        // Set initial timeout to 1.25 seconds to have a 1 second minimum initial interval
         // after 0.2 randomization factor will be applied
         .setInitialIntervalMillis(1_250)
         .setMultiplier(1.6)
