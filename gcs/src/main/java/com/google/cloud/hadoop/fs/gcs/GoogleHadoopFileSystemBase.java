@@ -567,14 +567,18 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     return new FSDataInputStream(in);
   }
-  // Conf not used in the method for sometime, as some changes need to be made for laters
+
+  /**
+   * Inititates a thread pool to enable calling of callable or method to handle future response
+   * @return ThreadPoolExecutor object to run a callable or method */
   private ThreadPoolExecutor initThreadPools() {
-    int maxThreads = DEFAULT_MAX_THREADS.getDefault();
+    Configuration config = getConf();
+    int maxThreads = DEFAULT_MAX_THREADS.get(config, config::getInt);
     if (maxThreads < 2) {
       logger.atWarning().log("Maximum number of threads should at least be 2.");
       maxThreads = 2;
     }
-    int keepAliveTime = KEEP_ALIVE_TIME.getDefault();
+    int keepAliveTime = KEEP_ALIVE_TIME.get(config, config::getInt);
     ThreadPoolExecutor unboundedThreadPool =
         new ThreadPoolExecutor(
             maxThreads,
@@ -587,13 +591,26 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     return unboundedThreadPool;
   }
 
-  public GoogleHadoopFileStatus getGcsFileStatus(FileStatus fileStatus) {
+  /**
+   * Checks if a given file status is an instance of GoogleHadoopFileStatus
+   * @param fileStatus
+   * @return
+   */
+  private GoogleHadoopFileStatus getGcsFileStatus(FileStatus fileStatus) {
     if (fileStatus instanceof GoogleHadoopFileStatus) {
       return (GoogleHadoopFileStatus) fileStatus;
     }
     return null;
   }
-
+  /**
+   * Initiate the open operation.
+   * This is invoked from both the FileSystem and FileContext APIs
+   * @param rawPath path to the file
+   * @param parameters open file parameters from the builder.
+   * @return a future which will evaluate to the opened file.
+   * @throws IOException failure to resolve the link.
+   * @throws IllegalArgumentException unknown mandatory key
+   */
   @Override
   public CompletableFuture<FSDataInputStream> openFileWithOptions(
       final Path rawPath, final OpenFileParameters parameters) throws IOException {
@@ -606,7 +623,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     GoogleHadoopFileStatus gcsFileStatus;
     CompletableFuture<FSDataInputStream> result = new CompletableFuture<>();
     // Checking if fileStatus is null and calling the super implementation
-    if (fileStatus != null) {
+    if (fileStatus == null) {
+      return super.openFileWithOptions(rawPath, parameters);
+    } else {
       gcsFileStatus = getGcsFileStatus(fileStatus);
       if (gcsFileStatus != null) {
         itemInfo = gcsFileStatus.getItemInfo();
@@ -619,11 +638,13 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       unboundedThreadPool.submit(
           () -> LambdaUtils.eval(result, () -> open(finalItemInfo, parameters.getBufferSize())));
       return result;
-    } else {
-      return super.openFileWithOptions(rawPath, parameters);
     }
   }
-
+  /**
+   * Opens an FSDataInputStream at the indicated GoogleCloudStorageItemInfo.
+   * @param itemInfo the item info of file to open
+   * @param bufferSize the size of the buffer to be used.
+   */
   protected FSDataInputStream open(GoogleCloudStorageItemInfo itemInfo, int bufferSize)
       throws IOException {
     checkOpen();

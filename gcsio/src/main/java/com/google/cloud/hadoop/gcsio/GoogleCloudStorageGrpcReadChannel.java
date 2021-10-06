@@ -212,35 +212,16 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       GoogleCloudStorageReadOptions readOptions,
       BackOffFactory backOffFactory)
       throws IOException {
-    StorageBlockingStub stub = stubProvider.newBlockingStub();
     // TODO(b/135138893): We can avoid this call by adding metadata to a read request.
     //      That will save about 40ms per read.
     Preconditions.checkArgument(storage != null, "GCS json client cannot be null");
     GoogleCloudStorageItemInfo itemInfo =
         getObjectMetadata(resourceId, errorExtractor, backOffFactory, storage);
     Preconditions.checkArgument(itemInfo != null, "object metadata cannot be null");
-    // The non-gRPC read channel has special support for gzip. This channel doesn't
-    // decompress gzip-encoded objects on the fly, so best to fail fast rather than return
-    // gibberish unexpectedly.
-    String contentEncoding = itemInfo.getContentEncoding();
-    if (contentEncoding != null && contentEncoding.contains("gzip")) {
-      throw new IOException(
-          "Cannot read GZIP encoded files - content encoding support is disabled.");
-    }
-
-    int prefetchSizeInBytes = readOptions.getMinRangeRequestSize() / 2;
-    long footerOffsetInBytes = Math.max(0, (itemInfo.getSize() - prefetchSizeInBytes));
-
-    ByteString footerContent = getFooterContent(resourceId, readOptions, stub, footerOffsetInBytes);
-
-    return new GoogleCloudStorageGrpcReadChannel(
-        stub,
+    return openChannel(
         stubProvider,
-        resourceId,
-        itemInfo.getContentGeneration(),
-        itemInfo.getSize(),
-        footerOffsetInBytes,
-        footerContent,
+        storage,
+        itemInfo,
         readOptions,
         backOffFactory);
   }

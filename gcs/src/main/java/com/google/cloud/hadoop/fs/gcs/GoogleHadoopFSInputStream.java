@@ -75,11 +75,10 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   /**
    * Constructs an instance of GoogleHadoopFSInputStream object with item info
    *
-   * @param ghfs
-   * @param itemInfo
-   * @param readOptions
-   * @param statistics
-   * @throws IOException
+   * @param ghfs Instance of GoogleHadoopFileSystemBase.
+   * @param itemInfo Item info or the metadata of the file to read from.
+   * @param statistics File system statistics object.
+   * @throws IOException if an IO error occurs.
    */
   GoogleHadoopFSInputStream(
       GoogleHadoopFileSystemBase ghfs,

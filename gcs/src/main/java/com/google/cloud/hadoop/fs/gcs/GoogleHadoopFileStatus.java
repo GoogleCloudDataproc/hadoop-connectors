@@ -37,7 +37,7 @@ public class GoogleHadoopFileStatus extends FileStatus {
    *
    * @param fileInfo
    * @param filePath
-   * @param REPLICATION_FACTOR_DEFAULT
+   * @param blockReplication
    * @param defaultBlockSize
    * @param reportedPermissions
    * @param userName
@@ -45,15 +45,15 @@ public class GoogleHadoopFileStatus extends FileStatus {
   GoogleHadoopFileStatus(
       FileInfo fileInfo,
       Path filePath,
-      int REPLICATION_FACTOR_DEFAULT,
+      int blockReplication,
       long defaultBlockSize,
       FsPermission reportedPermissions,
       String userName) {
-    // Retaining the actual constructor of the parent FileStatus
+    // Constructs an instance of GoogleHadoopFileStatus using the provided FileStatus
     super(
         fileInfo.getSize(),
         fileInfo.isDirectory(),
-        REPLICATION_FACTOR_DEFAULT,
+        blockReplication,
         defaultBlockSize,
         /* modificationTime= */ fileInfo.getModificationTime(),
         /* accessTime= */ fileInfo.getModificationTime(),
@@ -61,11 +61,10 @@ public class GoogleHadoopFileStatus extends FileStatus {
         /* owner= */ userName,
         /* group= */ userName,
         filePath);
-    // Adding item info that will be used for open() call
     this.itemInfo = fileInfo.getItemInfo();
   }
 
-  /** Returns the given files GCS Item Info */
+  /** Returns GCS ItemInfo for the corresponding GoogleHadoopFileStatus instance */
   GoogleCloudStorageItemInfo getItemInfo() {
     return this.itemInfo;
   }
