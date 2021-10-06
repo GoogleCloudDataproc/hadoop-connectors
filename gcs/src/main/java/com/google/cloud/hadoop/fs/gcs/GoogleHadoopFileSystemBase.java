@@ -570,7 +570,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   /**
    * Inititates a thread pool to enable calling of callable or method to handle future response
-   * @return ThreadPoolExecutor object to run a callable or method */
+   *
+   * @return ThreadPoolExecutor object to run a callable or method
+   */
   private ThreadPoolExecutor initThreadPools() {
     Configuration config = getConf();
     int maxThreads = DEFAULT_MAX_THREADS.get(config, config::getInt);
@@ -593,6 +595,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   /**
    * Checks if a given file status is an instance of GoogleHadoopFileStatus
+   *
    * @param fileStatus
    * @return
    */
@@ -603,8 +606,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     return null;
   }
   /**
-   * Initiate the open operation.
-   * This is invoked from both the FileSystem and FileContext APIs
+   * Initiate the open operation. This is invoked from both the FileSystem and FileContext APIs
+   *
    * @param rawPath path to the file
    * @param parameters open file parameters from the builder.
    * @return a future which will evaluate to the opened file.
@@ -642,6 +645,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   }
   /**
    * Opens an FSDataInputStream at the indicated GoogleCloudStorageItemInfo.
+   *
    * @param itemInfo the item info of file to open
    * @param bufferSize the size of the buffer to be used.
    */

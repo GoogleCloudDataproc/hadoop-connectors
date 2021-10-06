@@ -218,12 +218,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     GoogleCloudStorageItemInfo itemInfo =
         getObjectMetadata(resourceId, errorExtractor, backOffFactory, storage);
     Preconditions.checkArgument(itemInfo != null, "object metadata cannot be null");
-    return openChannel(
-        stubProvider,
-        storage,
-        itemInfo,
-        readOptions,
-        backOffFactory);
+    return openChannel(stubProvider, storage, itemInfo, readOptions, backOffFactory);
   }
 
   /**
