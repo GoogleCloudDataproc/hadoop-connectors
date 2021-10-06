@@ -26,9 +26,11 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.statistics.IOStatistics;
+import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 
 /** A seekable and positionable FSInputStream that provides read access to a file. */
-class GoogleHadoopFSInputStream extends FSInputStream {
+class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSource {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
@@ -51,6 +53,9 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   // Statistics tracker of Input Stream
   private final GhfsInputStreamStatistics streamStatistics;
 
+  // IO Statistics tracker from Input stream
+  private final IOStatistics iostatistics;
+
   /**
    * Constructs an instance of GoogleHadoopFSInputStream object.
    *
@@ -71,6 +76,8 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     this.statistics = statistics;
     // used to track the input stream related iostatistics
     this.streamStatistics = ghfs.getInstrumentation().newInputStreamStatistics(statistics);
+    // used to track IOstatistics in input stream
+    this.iostatistics = streamStatistics.getIOStatistics();
     this.totalBytesRead = 0;
     this.channel = ghfs.getGcsFs().open(gcsPath, readOptions);
   }
@@ -257,5 +264,15 @@ class GoogleHadoopFSInputStream extends FSInputStream {
       throw new ClosedChannelException();
     }
     return super.available();
+  }
+
+  /**
+   * Get the current IOStatistics from output stream
+   *
+   * @return
+   */
+  @Override
+  public IOStatistics getIOStatistics() {
+    return iostatistics;
   }
 }
