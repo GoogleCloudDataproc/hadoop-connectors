@@ -16,11 +16,14 @@
 
 package com.google.cloud.hadoop.fs.gcs.auth;
 
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DELEGATION_TOKENS_ISSUED;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
+import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
+import com.google.cloud.hadoop.fs.gcs.DelegationTokenStatistics;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.common.flogger.GoogleLogger;
@@ -56,6 +59,9 @@ public class GcsDelegationTokens extends AbstractService {
 
   /** Active Delegation token. */
   private Token<DelegationTokenIdentifier> boundDT;
+
+  /** Statistics for the operations. */
+  private DelegationTokenStatistics stats;
 
   public GcsDelegationTokens() throws IOException {
     super("GCSDelegationTokens");
@@ -233,6 +239,8 @@ public class GcsDelegationTokens extends AbstractService {
   @SuppressWarnings("OptionalGetWithoutIsPresent")
   public Token<DelegationTokenIdentifier> getBoundOrNewDT(String renewer) throws IOException {
     logger.atFiner().log("Delegation token requested");
+    // statistics to update the instrumentation whenever the delegation token is created
+    stats = fileSystem.getInstrumentation().newDelegationTokenStatistics();
     if (isBoundToDT()) {
       // the FS was created on startup with a token, so return it.
       logger.atFine().log("Returning current token");
@@ -242,7 +250,22 @@ public class GcsDelegationTokens extends AbstractService {
     // not bound to a token, so create a new one.
     // issued DTs are not cached so that long-lived filesystems can
     // reliably issue session/role tokens.
-    return tokenBinding.createDelegationToken(renewer);
+    Token<DelegationTokenIdentifier> token = null;
+    // Duration is tracked while creating a new Delegation token
+    // and update the  IOStatistics
+    try {
+      token =
+          trackDuration(
+              stats,
+              DELEGATION_TOKENS_ISSUED.getSymbol(),
+              () -> tokenBinding.createDelegationToken(renewer));
+      if (token != null) {
+        noteTokenCreated(token);
+      }
+    } catch (Exception e) {
+      logger.atInfo().log("Error in Delegation Token Creation");
+    }
+    return token;
   }
 
   /**
@@ -307,5 +330,15 @@ public class GcsDelegationTokens extends AbstractService {
   private void validateAccessTokenProvider() {
     checkState(
         accessTokenProvider == null, "GCP Delegation tokens has already been bound/deployed");
+  }
+
+  /**
+   * Note that a token has been created; increment counters and statistics.
+   *
+   * @param token token created
+   */
+  private void noteTokenCreated(final Token<DelegationTokenIdentifier> token) {
+    logger.atInfo().log("Created S3 Delegation Token");
+    stats.tokenIssued();
   }
 }

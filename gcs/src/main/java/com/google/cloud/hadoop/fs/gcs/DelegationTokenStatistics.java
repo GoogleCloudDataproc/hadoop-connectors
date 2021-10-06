@@ -16,15 +16,8 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-/** Enum of statistic types. */
-public enum GhfsStatisticTypeEnum {
+public interface DelegationTokenStatistics extends GhfsStatisticInterface {
 
-  /** Counter. Counts the number of occurrences of each operation */
-  TYPE_COUNTER,
-
-  /** Duration. Duration for the execution of opertaion */
-  TYPE_DURATION,
-
-  /** Gauge. */
-  TYPE_GAUGE
+  /** A token has been issued. */
+  void tokenIssued();
 }

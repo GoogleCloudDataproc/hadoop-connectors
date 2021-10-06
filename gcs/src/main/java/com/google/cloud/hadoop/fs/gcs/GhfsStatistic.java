@@ -35,10 +35,22 @@ import org.apache.hadoop.fs.statistics.StreamStatisticNames;
 public enum GhfsStatistic {
 
   /** FileSystem Level statistics */
+  DIRECTORIES_CREATED(
+      "directories_created",
+      "Total number of directories created through the object store.",
+      TYPE_COUNTER),
+  DIRECTORIES_DELETED(
+      "directories_deleted",
+      "Total number of directories deleted through the object store.",
+      TYPE_COUNTER),
   FILES_CREATED(
       "files_created", "Total number of files created through the object store.", TYPE_COUNTER),
   FILES_DELETED(
       "files_deleted", "Total number of files deleted from the object store.", TYPE_COUNTER),
+  FILES_DELETE_REJECTED(
+      "files_delete_rejected",
+      "Total number of files whose delete request was rejected",
+      TYPE_COUNTER),
   INVOCATION_COPY_FROM_LOCAL_FILE(
       StoreStatisticNames.OP_COPY_FROM_LOCAL_FILE, "Calls of copyFromLocalFile()", TYPE_COUNTER),
   INVOCATION_CREATE(StoreStatisticNames.OP_CREATE, "Calls of create()", TYPE_COUNTER),
@@ -53,11 +65,21 @@ public enum GhfsStatistic {
   INVOCATION_GET_FILE_STATUS(
       StoreStatisticNames.OP_GET_FILE_STATUS, "Calls of getFileStatus()", TYPE_COUNTER),
   INVOCATION_GLOB_STATUS(StoreStatisticNames.OP_GLOB_STATUS, "Calls of globStatus()", TYPE_COUNTER),
+  INVOCATION_HFLUSH(StoreStatisticNames.OP_HFLUSH, "Calls of hflush()", TYPE_COUNTER),
+  INVOCATION_HSYNC(StoreStatisticNames.OP_HSYNC, "Calls of hsync()", TYPE_COUNTER),
   INVOCATION_LIST_FILES(StoreStatisticNames.OP_LIST_FILES, "Calls of listFiles()", TYPE_COUNTER),
   INVOCATION_LIST_STATUS(StoreStatisticNames.OP_LIST_STATUS, "Calls of listStatus()", TYPE_COUNTER),
   INVOCATION_MKDIRS(StoreStatisticNames.OP_MKDIRS, "Calls of mkdirs()", TYPE_COUNTER),
   INVOCATION_OPEN(StoreStatisticNames.OP_OPEN, "Calls of open()", TYPE_COUNTER),
   INVOCATION_RENAME(StoreStatisticNames.OP_RENAME, "Calls of rename()", TYPE_COUNTER),
+  INVOCATION_LIST_LOCATED_STATUS(
+      StoreStatisticNames.OP_LIST_LOCATED_STATUS, "Calls of listLocatedStatus()", TYPE_COUNTER),
+
+  /** Object IO */
+  OBJECT_DELETE_OBJECTS(
+      StoreStatisticNames.OBJECT_DELETE_OBJECTS,
+      "Objects deleted in delete requests",
+      TYPE_COUNTER),
 
   /** Stream Reads */
   STREAM_READ_BYTES(
@@ -165,6 +187,7 @@ public enum GhfsStatistic {
   /** Statistic type. */
   private final GhfsStatisticTypeEnum type;
 
+  /** the name of the statistic */
   public String getSymbol() {
     return symbol;
   }
@@ -179,6 +202,7 @@ public enum GhfsStatistic {
     return SYMBOL_MAP.get(symbol);
   }
 
+  /** The description of the Statistic */
   public String getDescription() {
     return description;
   }

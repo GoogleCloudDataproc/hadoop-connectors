@@ -29,9 +29,11 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.WritableByteChannel;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.statistics.IOStatistics;
+import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 
 /** A buffered output stream that allows writing to a GCS object. */
-class GoogleHadoopOutputStream extends OutputStream {
+class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSource {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
@@ -50,6 +52,9 @@ class GoogleHadoopOutputStream extends OutputStream {
 
   // Statistics tracker for outputstream related statistics
   private GhfsOutputStreamStatistics streamStatistics;
+
+  // IO Statistics tracker from Output Stream
+  private final IOStatistics iostatistics;
 
   /**
    * Constructs an instance of GoogleHadoopOutputStream object.
@@ -70,7 +75,10 @@ class GoogleHadoopOutputStream extends OutputStream {
     this.gcsPath = gcsPath;
     this.statistics = statistics;
     GoogleCloudStorageFileSystem gcsfs = ghfs.getGcsFs();
+    // used to track the output stream related statistics
     this.streamStatistics = ghfs.getInstrumentation().newOutputStreamStatistics(statistics);
+    // used to track IOstatistics in ouput stream
+    this.iostatistics = streamStatistics.getIOStatistics();
     this.channel = createChannel(gcsfs, gcsPath, createFileOptions);
     this.out = createOutputStream(this.channel, gcsfs.getOptions().getCloudStorageOptions());
   }
@@ -99,8 +107,8 @@ class GoogleHadoopOutputStream extends OutputStream {
   public void write(int b) throws IOException {
     throwIfNotOpen();
     out.write(b);
-    statistics.incrementBytesWritten(1);
     statistics.incrementWriteOps(1);
+    // update the statistics of number of bytes written
     streamStatistics.writeBytes(1);
   }
 
@@ -111,8 +119,8 @@ class GoogleHadoopOutputStream extends OutputStream {
   public void write(byte[] b, int offset, int len) throws IOException {
     throwIfNotOpen();
     out.write(b, offset, len);
-    statistics.incrementBytesWritten(len);
     statistics.incrementWriteOps(1);
+    // update the statistics of number of bytes written
     streamStatistics.writeBytes(len);
   }
 
@@ -123,6 +131,7 @@ class GoogleHadoopOutputStream extends OutputStream {
     if (out != null) {
       try {
         out.close();
+        // merge the current output stream statistics with instrumentation
         streamStatistics.close();
       } finally {
         out = null;
@@ -137,6 +146,7 @@ class GoogleHadoopOutputStream extends OutputStream {
 
   private void throwIfNotOpen() throws IOException {
     if (!isOpen()) {
+      // update the statistics of write Exception
       streamStatistics.writeException();
       throw new ClosedChannelException();
     }
@@ -144,5 +154,24 @@ class GoogleHadoopOutputStream extends OutputStream {
 
   WritableByteChannel getInternalChannel() {
     return channel;
+  }
+
+  /**
+   * Get the current output stream statistics
+   *
+   * @return
+   */
+  public GhfsOutputStreamStatistics getStreamStatistics() {
+    return this.streamStatistics;
+  }
+
+  /**
+   * Get the current IOStatistics from output stream
+   *
+   * @return
+   */
+  @Override
+  public IOStatistics getIOStatistics() {
+    return iostatistics;
   }
 }
