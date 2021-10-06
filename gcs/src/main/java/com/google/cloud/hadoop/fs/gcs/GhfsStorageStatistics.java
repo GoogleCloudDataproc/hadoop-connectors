@@ -32,15 +32,14 @@ public class GhfsStorageStatistics extends StorageStatisticsFromIOStatistics {
 
   /**
    * Create the Storage Statistics instance from the IOStatistics
+   *
    * @param ioStatistics
    */
   public GhfsStorageStatistics(final IOStatistics ioStatistics) {
     super(NAME, "Ghfs", ioStatistics);
   }
 
-  /**
-   * Create the instance of Empty storage Statistics
-   */
+  /** Create the instance of Empty storage Statistics */
   public GhfsStorageStatistics() {
     super(NAME, "Ghfs", emptyStatistics());
   }

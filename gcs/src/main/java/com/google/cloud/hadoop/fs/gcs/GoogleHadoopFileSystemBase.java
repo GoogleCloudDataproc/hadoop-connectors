@@ -118,6 +118,7 @@ import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.GlobPattern;
+import org.apache.hadoop.fs.GlobalStorageStatistics;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
@@ -126,7 +127,6 @@ import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
-import org.apache.hadoop.fs.GlobalStorageStatistics;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -481,7 +481,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     // Initialize the instrumentation
     this.instrumentation = new GhfsInstrumentation(path);
 
-    //used to update and track the storage statistics
+    // used to update and track the storage statistics
     this.storageStatistics = createStorageStatistics(requireNonNull((getIOStatistics())));
 
     configure(config);
