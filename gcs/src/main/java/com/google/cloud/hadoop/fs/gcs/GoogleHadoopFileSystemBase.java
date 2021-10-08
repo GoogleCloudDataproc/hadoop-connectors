@@ -2020,6 +2020,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public GhfsStorageStatistics getStorageStatistics() {
-    return this.storageStatistics;
+    return storageStatistics;
   }
 }

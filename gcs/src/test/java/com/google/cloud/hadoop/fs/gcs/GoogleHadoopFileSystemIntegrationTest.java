@@ -36,6 +36,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
+import com.google.common.collect.ImmutableList;
 import com.google.common.hash.Hashing;
 import com.google.common.primitives.Ints;
 import java.io.FileNotFoundException;
@@ -243,6 +244,28 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     IllegalArgumentException exception =
         assertThrows(IllegalArgumentException.class, () -> myGhfs.open((Path) null, 1));
     assertThat(exception).hasMessageThat().startsWith("hadoopPath must not be null");
+  }
+
+  @Test
+  public void open_storageStatistics() throws IOException {
+    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
+
+    Path testRoot = new Path("/directory1/");
+    myGhfs.mkdirs(testRoot);
+
+    FSDataOutputStream fout = myGhfs.create(new Path("/directory1/file1"));
+
+    fout.writeBytes("data");
+    fout.close();
+    myGhfs.open(new Path("/directory1/file1"));
+    GhfsStorageStatistics ss1 = myGhfs.getStorageStatistics();
+    System.out.println("STORAGE STATS ***");
+    System.out.println(ss1.getLong("op_create"));
+    System.out.println(ss1.isTracked("op_list_located_status"));
+    System.out.println(ss1.getLong("op_list_located_status"));
+    System.out.println(ss1.isTracked("op_open"));
+    System.out.println(ss1.getLong("op_open"));
+    assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
   }
 
   @Test
@@ -622,6 +645,181 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
     // Verify that config settings were set correctly.
     assertThat(fs.initUri).isEqualTo(initUri);
+  }
+
+  @Test
+  public void create_storage_statistics() throws IOException {
+    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
+    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
+    GhfsStorageStatistics StorageStats = myGhfs.getStorageStatistics();
+
+    try (FSDataOutputStream fout = myGhfs.create(filePath, true, 1, (short) 1, 1)) {
+      fout.writeBytes("Test Content");
+      fout.close();
+    }
+    assertThat(StorageStats.isTracked("op_create")).isTrue();
+    assertThat(StorageStats.isTracked("files_created")).isTrue();
+    assertThat(myGhfs.delete(filePath)).isTrue();
+  }
+
+  @Test
+  public void listLocatedStatus_storage_statistics() throws IOException {
+    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
+    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
+    GhfsStorageStatistics StorageStats = myGhfs.getStorageStatistics();
+
+    try (FSDataOutputStream fout = myGhfs.create(filePath, true, 1, (short) 1, 1)) {
+      fout.writeBytes("Test Content");
+      fout.close();
+      myGhfs.listLocatedStatus(filePath);
+      assertThat(StorageStats.isTracked("op_list_located_status")).isTrue();
+    }
+
+    assertThat(myGhfs.delete(filePath)).isTrue();
+  }
+
+  @Test
+  public void open_storage_statistics() throws IOException {
+    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
+    GhfsStorageStatistics StorageStats = myGhfs.getStorageStatistics();
+    Path testRoot = new Path("/directory1/");
+    myGhfs.mkdirs(testRoot);
+    FSDataOutputStream fout = myGhfs.create(new Path("/directory1/file1"));
+    fout.writeBytes("data");
+    fout.close();
+    myGhfs.open(new Path("/directory1/file1"));
+    assertThat(StorageStats.isTracked("op_open")).isTrue();
+    assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
+  }
+
+  @Test
+  public void delete_storage_statistics() throws IOException {
+    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
+    GhfsStorageStatistics StorageStats = myGhfs.getStorageStatistics();
+    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
+    myGhfs.delete(filePath);
+    assertThat(StorageStats.isTracked("op_delete")).isTrue();
+  }
+
+  @Test
+  public void mkdirs_storage_statistics() throws IOException {
+    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
+    GhfsStorageStatistics StorageStats = myGhfs.getStorageStatistics();
+    assertThat(StorageStats.isTracked("op_mkdirs")).isTrue();
+  }
+
+  @Test
+  public void GlobStatus_statistics() throws IOException {
+    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
+    GhfsStorageStatistics StorageStats = myGhfs.getStorageStatistics();
+    Path testRoot = new Path("/directory1/");
+    myGhfs.mkdirs(testRoot);
+    myGhfs.mkdirs(new Path("/directory1/subdirectory1"));
+    myGhfs.create(new Path("/directory1/subdirectory1/file1")).writeBytes("data");
+    myGhfs.globStatus(new Path("/d*"));
+    assertThat(StorageStats.isTracked("op_glob_status")).isTrue();
+    assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
+  }
+
+  @Test
+  public void getFileStatus_statistics() throws IOException {
+    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
+    GhfsStorageStatistics StorageStats = myGhfs.getStorageStatistics();
+    Path testRoot = new Path("/directory1/");
+    myGhfs.mkdirs(testRoot);
+    FSDataOutputStream fout = myGhfs.create(new Path("/directory1/file1"));
+    fout.writeBytes("data");
+    fout.close();
+    myGhfs.getFileStatus(new Path("/directory1/file1"));
+    assertThat(StorageStats.isTracked("op_get_file_status")).isTrue();
+    assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
+  }
+
+  @Test
+  public void createNonRecursive_statistics() throws IOException {
+    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
+    GhfsStorageStatistics StorageStats = myGhfs.getStorageStatistics();
+    Path testRoot = new Path("/directory1/");
+    myGhfs.mkdirs(testRoot);
+    Path filePath = new Path("/directory1/file1");
+    try (FSDataOutputStream createNonRecursiveOutputStream =
+        myGhfs.createNonRecursive(filePath, true, 1, (short) 1, 1, () -> {})) {
+      createNonRecursiveOutputStream.write(1);
+    }
+    assertThat(StorageStats.isTracked("op_create_non_recursive")).isTrue();
+    assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
+  }
+
+  @Test
+  public void getFileChecksum_statistics() throws IOException {
+    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
+    GhfsStorageStatistics StorageStats = myGhfs.getStorageStatistics();
+    Path testRoot = new Path("/directory1/");
+    myGhfs.mkdirs(testRoot);
+    Path filePath = new Path("/directory1/file1");
+    FSDataOutputStream fout = myGhfs.create(new Path("/directory1/file1"));
+    fout.writeBytes("data");
+    fout.close();
+    myGhfs.getFileChecksum(filePath);
+    assertThat(StorageStats.isTracked("op_get_file_checksum")).isTrue();
+    assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
+  }
+
+  @Test
+  public void rename_statistics() throws IOException {
+    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
+    GhfsStorageStatistics StorageStats = myGhfs.getStorageStatistics();
+    Path testRoot = new Path("/directory1/");
+    myGhfs.mkdirs(testRoot);
+    Path source = new Path("/directory1/file1");
+    myGhfs.create(source).writeBytes("data");
+    Path dest = new Path("/directory1/file2");
+    myGhfs.rename(source, dest);
+    assertThat(StorageStats.isTracked("op_rename")).isTrue();
+    assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
+  }
+
+  @Test
+  public void exists_statistics() throws IOException {
+    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
+    GhfsStorageStatistics StorageStats = myGhfs.getStorageStatistics();
+    Path testRoot = new Path("/directory1/");
+    myGhfs.mkdirs(testRoot);
+    Path filePath = new Path("/directory1/file1");
+    myGhfs.create(filePath).writeBytes("data");
+    myGhfs.exists(filePath);
+    assertThat(StorageStats.isTracked("op_exists")).isTrue();
+    assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
+  }
+
+  @Test
+  public void xattr_storage_statistics() throws IOException {
+    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
+    Path testRoot = new Path("/directory1/");
+    myGhfs.mkdirs(testRoot);
+    Path filePath = new Path("/directory1/file1");
+    GhfsStorageStatistics StorageStats = myGhfs.getStorageStatistics();
+    myGhfs.create(filePath).writeBytes("data");
+
+    myGhfs.getXAttrs(filePath);
+    assertThat(StorageStats.isTracked("op_xattr_get_map")).isTrue();
+
+    myGhfs.getXAttr(filePath, "test-xattr_statistics");
+    assertThat(StorageStats.isTracked("op_xattr_get_named")).isTrue();
+
+    myGhfs.getXAttrs(
+        filePath,
+        ImmutableList.of("test-xattr-statistics", "test-xattr-statistics1", "test-xattr"));
+
+    assertThat(StorageStats.isTracked("op_xattr_get_named_map")).isTrue();
+
+    myGhfs.listXAttrs(filePath);
+    assertThat(StorageStats.isTracked("op_xattr_list")).isTrue();
+
+    assertThat(myGhfs.delete(testRoot, true)).isTrue();
   }
 
   /** Validates that exception thrown if no root bucket is specified. */
@@ -1175,6 +1373,12 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
     FileStatus[] fileStatuses = fs.listStatus(new Path(publicBucket));
 
+    // Storage Statistics Test for listStatus
+    GhfsStorageStatistics StorageStats = ((GoogleHadoopFileSystem) fs).getStorageStatistics();
+
+    assertThat(StorageStats.isTracked("op_list_files")).isTrue();
+    assertThat(StorageStats.isTracked("op_list_status")).isTrue();
+
     assertThat(fileStatuses).isNotEmpty();
   }
 
@@ -1191,5 +1395,19 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     FileStatus[] fileStatuses = fs.listStatus(new Path(publicBucket));
 
     assertThat(fileStatuses).isNotEmpty();
+  }
+
+  private static void initializeInMemoryFileSystem(FileSystem ghfs, String initUriString)
+      throws IOException {
+    URI initUri;
+    try {
+      initUri = new URI(initUriString);
+    } catch (URISyntaxException e) {
+      throw new IllegalArgumentException(e);
+    }
+    Configuration config = new Configuration();
+    ghfs.initialize(initUri, config);
+    // Create test bucket
+    ghfs.mkdirs(new Path(initUriString));
   }
 }

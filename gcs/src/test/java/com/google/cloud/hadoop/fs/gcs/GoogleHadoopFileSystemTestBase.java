@@ -446,6 +446,30 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     }
   }
 
+  @Test
+  public void CopyFromLocalFileStorageStatisticsTest() throws IOException {
+    // Temporary file in GHFS.
+    URI tempFileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path tempFilePath = ghfsHelper.castAsHadoopPath(tempFileUri);
+    Path tempDirPath = tempFilePath.getParent();
+    String text = "Hello World!";
+    ghfsHelper.writeFile(tempFilePath, text, 1, /* overwrite= */ false);
+    GhfsStorageStatistics StorageStats = ((GoogleHadoopFileSystem) ghfs).getStorageStatistics();
+
+    // Temporary file in local FS.
+    File localTempFile = File.createTempFile("ghfs-test-", null);
+    Path localTempFilePath = new Path(localTempFile.getPath());
+
+    // Test the IOStatitsics of copyFromLocalFile(delSrc,overwrite,src,dst)
+    ghfs.copyFromLocalFile(false, true, localTempFilePath, tempDirPath);
+
+    assertThat((StorageStats.isTracked("op_copy_from_local_file"))).isTrue();
+
+    if (localTempFile.exists()) {
+      localTempFile.delete();
+    }
+  }
+
   /**
    * We override certain methods in FileSystem simply to provide debug tracing. (Search for
    * "Overridden functions for debug tracing" in GoogleHadoopFileSystemBase.java). We do not add or
