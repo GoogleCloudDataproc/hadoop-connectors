@@ -390,4 +390,9 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
   public void incrementhsyncStatistics() {
     curDelegate.getStreamStatistics().hsyncInvoked();
   }
+
+  /** Get the current stream statistics. For Testing */
+  public GhfsOutputStreamStatistics getStatistics() {
+    return curDelegate.getStreamStatistics();
+  }
 }

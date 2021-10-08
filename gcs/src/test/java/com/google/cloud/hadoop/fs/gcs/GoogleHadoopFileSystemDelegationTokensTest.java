@@ -124,6 +124,17 @@ public class GoogleHadoopFileSystemDelegationTokensTest {
     assertThat(token.getToken()).isEqualTo("qWDAWFA3WWFAWFAWFAW3FAWF3AWF3WFAF33GR5G5");
   }
 
+  @Test
+  public void testDelegationTokenStatistics() throws IOException {
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+    fs.initialize(new Path("gs://test/").toUri(), loadConfig());
+
+    Token<?> dt = fs.getDelegationToken("current-user");
+    assertThat(fs.getIOStatistics().counters().get("op_get_delegation_token")).isEqualTo(1);
+    assertThat(fs.getIOStatistics().counters().get("delegation_tokens_issued")).isEqualTo(1);
+    fs.close();
+  }
+
   private Configuration loadConfig() {
     Configuration config = new Configuration();
 

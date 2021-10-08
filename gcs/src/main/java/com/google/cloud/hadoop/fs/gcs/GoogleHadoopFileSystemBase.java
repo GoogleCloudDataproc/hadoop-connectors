@@ -992,6 +992,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     checkOpen();
 
+    // Update the statistics of getFileStatus()
+    entryPoint(GhfsStatistic.INVOCATION_GET_FILE_STATUS);
+
     URI gcsPath = getGcsPath(hadoopPath);
     FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
     if (!fileInfo.exists()) {
@@ -1000,8 +1003,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
               "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
     }
     String userName = getUgiUserName();
-    // Update the statistics of getFileStatus()
-    entryPoint(GhfsStatistic.INVOCATION_GET_FILE_STATUS);
     return getFileStatus(fileInfo, userName);
   }
 
@@ -1118,6 +1119,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   public FileStatus[] globStatus(Path pathPattern, PathFilter filter) throws IOException {
     checkOpen();
 
+    // Update the statistics of globStatus()
+    entryPoint(GhfsStatistic.INVOCATION_GLOB_STATUS);
+
     logger.atFiner().log("globStatus(pathPattern: %s, filter: %s)", pathPattern, filter);
     // URI does not handle glob expressions nicely, for the purpose of
     // fully-qualifying a path we can URI-encode them.
@@ -1137,8 +1141,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     if (globAlgorithm == GlobAlgorithm.FLAT && couldUseFlatGlob(fixedPath)) {
       return flatGlobInternal(fixedPath, filter);
     }
-    // Update the statistics of globStatus()
-    entryPoint(GhfsStatistic.INVOCATION_GLOB_STATUS);
+
     return super.globStatus(fixedPath, filter);
   }
 
