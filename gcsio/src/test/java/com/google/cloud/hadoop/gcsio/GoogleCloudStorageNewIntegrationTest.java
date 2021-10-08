@@ -37,7 +37,6 @@ import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.util.DateTime;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
@@ -47,7 +46,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.io.BaseEncoding;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.SeekableByteChannel;
@@ -1302,19 +1300,6 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(getRequestString(testBucket, testFile.getObjectName()));
-  }
-
-  static StorageObject newStorageObject(String bucketName, String objectName) {
-    Random r = new Random();
-    return new StorageObject()
-        .setBucket(bucketName)
-        .setName(objectName)
-        .setSize(BigInteger.valueOf(r.nextInt(Integer.MAX_VALUE)))
-        .setStorageClass("standard")
-        .setGeneration((long) r.nextInt(Integer.MAX_VALUE))
-        .setMetageneration((long) r.nextInt(Integer.MAX_VALUE))
-        .setTimeCreated(new DateTime(new Date()))
-        .setUpdated(new DateTime(new Date()));
   }
 
   @Test

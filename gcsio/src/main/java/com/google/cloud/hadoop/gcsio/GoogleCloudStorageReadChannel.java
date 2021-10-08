@@ -184,7 +184,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
    * @param gcs storage object instance
    * @param itemInfo contains metadata information about the file
    * @param requestHelper a ClientRequestHelper used to set any extra headers
-   * @param readOptions fine-grained options specifying things like retry settings, buffering, etc.s
+   * @param readOptions fine-grained options specifying things like retry settings, buffering, etc.
    * @throws IOException IOException on IO error
    */
   public GoogleCloudStorageReadChannel(

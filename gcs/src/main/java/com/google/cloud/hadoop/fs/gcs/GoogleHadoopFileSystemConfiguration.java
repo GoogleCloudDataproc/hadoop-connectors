@@ -94,13 +94,6 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Long> BLOCK_SIZE =
       new HadoopConfigurationProperty<>("fs.gs.block.size", 64 * 1024 * 1024L);
 
-  /** Configuration key to specify maximum threads permissible for the system */
-  public static final HadoopConfigurationProperty<Integer> DEFAULT_MAX_THREADS =
-      new HadoopConfigurationProperty<Integer>("fs.gs.default.max.threads", 16);
-  /** Configuration key to specify maximum time to avoid the killing of thread */
-  public static final HadoopConfigurationProperty<Integer> KEEP_ALIVE_TIME =
-      new HadoopConfigurationProperty<Integer>("fs.gs.keep.alive.time", 60);
-
   /** Configuration key for Delegation Token binding class. Default value: none */
   public static final HadoopConfigurationProperty<String> DELEGATION_TOKEN_BINDING_CLASS =
       new HadoopConfigurationProperty<>("fs.gs.delegation.token.binding");
@@ -434,7 +427,7 @@ public class GoogleHadoopFileSystemConfiguration {
 
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
-  @VisibleForTesting
+  // @VisibleForTesting
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setCloudStorageOptions(getGcsOptionsBuilder(config).build())

@@ -134,8 +134,6 @@ public class GoogleCloudStorageImplTest {
 
     TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
-    StorageObject storageObject =
-        newStorageObject(resourceId.getBucketName(), resourceId.getObjectName());
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
     GoogleCloudStorageItemInfo itemInfo = trackingGcs.delegate.getItemInfo(resourceId);

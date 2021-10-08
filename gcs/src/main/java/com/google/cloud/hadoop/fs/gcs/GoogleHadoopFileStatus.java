@@ -28,7 +28,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
  * <p>Additional support for File Status to access GoogleCloudStorageItemInfo that reduces requests
  * to gcs
  */
-public class GoogleHadoopFileStatus extends FileStatus {
+class GoogleHadoopFileStatus extends FileStatus {
   // Meta data of gcs file from file info to be used when opening file with status
   private final GoogleCloudStorageItemInfo itemInfo;
 

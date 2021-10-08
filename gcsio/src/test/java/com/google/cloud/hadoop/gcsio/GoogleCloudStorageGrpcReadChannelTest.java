@@ -1476,7 +1476,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     // If the user hasn't mandated fail fast, it is permissible for either open() or read() to
     // raise this exception.
     IOException thrown = assertThrows(IOException.class, () -> newReadChannel(itemInfo, options));
-    assertThat(thrown).hasCauseThat().hasMessageThat().contains("Item not found");
+    assertThat(thrown).hasCauseThat().hasMessageThat().contains("File not found");
   }
 
   @Test

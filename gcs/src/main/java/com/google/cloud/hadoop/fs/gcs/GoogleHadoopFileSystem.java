@@ -66,6 +66,7 @@ public class GoogleHadoopFileSystem extends GoogleHadoopFileSystemBase {
   GoogleHadoopFileSystem(GoogleCloudStorageFileSystem gcsfs) {
     super(gcsfs);
   }
+
   /** Sets and validates the root bucket. */
   @Override
   @VisibleForTesting

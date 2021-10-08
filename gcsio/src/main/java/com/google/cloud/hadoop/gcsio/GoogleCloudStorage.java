@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
@@ -191,6 +192,7 @@ public interface GoogleCloudStorage {
   default SeekableByteChannel open(
       GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
       throws IOException {
+    checkNotNull(itemInfo, "Item info cannot be null");
     return open(itemInfo.getResourceId(), readOptions);
   }
   /**

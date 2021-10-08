@@ -44,6 +44,7 @@ import io.grpc.MethodDescriptor;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import java.io.EOFException;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -137,13 +138,14 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   /**
    * Used to open given file using item info
    *
-   * @param stubProvider
-   * @param storage
+   * @param stubProvider gRPC stub for accessing the Storage gRPC API
+   * @param storage store and retrieve data object
    * @param errorExtractor
-   * @param itemInfo
-   * @param readOptions
-   * @return
-   * @throws IOException
+   * @param itemInfo contains metadata information about the file
+   * @param readOptions readOptions fine-grained options specifying things like retry settings,
+   *     buffering, etc.
+   * @return gRPC read channel
+   * @throws IOException IOException on IO Error
    */
   public static GoogleCloudStorageGrpcReadChannel open(
       StorageStubProvider stubProvider,
@@ -182,6 +184,21 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     }
   }
 
+  /**
+   * The gRPC API's GetObjectMedia call does not provide a generation number, so to ensure
+   * consistent reads, we need to begin by checking the current generation number with a separate
+   * call.
+   *
+   * @param stubProvider gRPC stub for accessing the Storage gRPC API
+   * @param storage store and retrieve data object
+   * @param errorExtractor
+   * @param itemInfo contains metadata information about the file
+   * @param readOptions readOptions fine-grained options specifying things like retry settings,
+   *     buffering, etc.
+   * @param backOffFactory
+   * @return gRPC read channel
+   * @throws IOException IOException on IO Error
+   */
   static GoogleCloudStorageGrpcReadChannel open(
       StorageStubProvider stubProvider,
       Storage storage,
@@ -190,9 +207,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       GoogleCloudStorageReadOptions readOptions,
       BackOffFactory backOffFactory)
       throws IOException {
-    // The gRPC API's GetObjectMedia call does not provide a generation number, so to ensure
-    // consistent reads, we need to begin by checking the current generation number with a separate
-    // call.
+
     try {
       return ResilientOperation.retry(
           () -> openChannel(stubProvider, storage, itemInfo, readOptions, backOffFactory),
@@ -224,13 +239,14 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   /**
    * Overloaded implementation of openChannel with item info to reduce an object metadata call
    *
-   * @param stubProvider
-   * @param storage
-   * @param itemInfo
-   * @param readOptions
+   * @param stubProvider gRPC stub for accessing the Storage gRPC API
+   * @param storage store and retrieve data object
+   * @param itemInfo contains metadata information about the file
+   * @param readOptions readOptions fine-grained options specifying things like retry settings,
+   *     buffering, etc.
    * @param backOffFactory
-   * @return
-   * @throws IOException
+   * @return gRPC read channel
+   * @throws IOException IOException on IO Error
    */
   private static GoogleCloudStorageGrpcReadChannel openChannel(
       StorageStubProvider stubProvider,
@@ -246,7 +262,10 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     // decompress gzip-encoded objects on the fly, so best to fail fast rather than return
     // gibberish unexpectedly.
     if (!itemInfo.exists()) {
-      throw new IOException("Item not found");
+      throw new FileNotFoundException(
+          String.format(
+              "%s not found: %s",
+              itemInfo.isDirectory() ? "Directory" : "File", itemInfo.getResourceId()));
     }
     String contentEncoding = itemInfo.getContentEncoding();
     if (contentEncoding != null && contentEncoding.contains("gzip")) {
