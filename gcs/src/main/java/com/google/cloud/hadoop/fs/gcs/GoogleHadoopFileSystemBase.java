@@ -100,7 +100,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -575,7 +581,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
             /* keepAliveTime= */ 30,
             TimeUnit.SECONDS,
             new SynchronousQueue<>(),
-            new ThreadFactoryBuilder().setNameFormat("gcsfs-misc-%d").setDaemon(true).build());
+            new ThreadFactoryBuilder().setNameFormat("ghfs-misc-%d").setDaemon(true).build());
     service.allowCoreThreadTimeOut(true);
     // allowCoreThreadTimeOut needs to be enabled for cases where the encapsulating class does not
     return service;
@@ -587,10 +593,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * @return
    */
   private GoogleCloudStorageItemInfo getItemInfo(FileStatus fileStatus) {
-    if (fileStatus instanceof GoogleHadoopFileStatus) {
-      return ((GoogleHadoopFileStatus) fileStatus).getItemInfo();
-    }
-    return null;
+    return fileStatus instanceof GoogleHadoopFileStatus
+        ? ((GoogleHadoopFileStatus) fileStatus).getItemInfo()
+        : null;
   }
   /**
    * Initiate the open operation. This is invoked from both the FileSystem and FileContext APIs
@@ -612,7 +617,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     GoogleCloudStorageItemInfo itemInfo = null;
     GoogleHadoopFileStatus gcsFileStatus;
     CompletableFuture<FSDataInputStream> result = new CompletableFuture<>();
-    // Checking if fileStatus is null and calling the super implementation
     if (fileStatus == null) {
       return super.openFileWithOptions(rawPath, parameters);
     }
