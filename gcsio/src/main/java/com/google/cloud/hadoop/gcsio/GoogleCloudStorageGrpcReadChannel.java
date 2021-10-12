@@ -147,7 +147,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
    * @return gRPC read channel
    * @throws IOException IOException on IO Error
    */
-  public static GoogleCloudStorageGrpcReadChannel open(
+  static GoogleCloudStorageGrpcReadChannel open(
       StorageStubProvider stubProvider,
       Storage storage,
       ApiErrorExtractor errorExtractor,

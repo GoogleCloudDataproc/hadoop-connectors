@@ -609,23 +609,19 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public CompletableFuture<FSDataInputStream> openFileWithOptions(
       final Path rawPath, final OpenFileParameters parameters) throws IOException {
+    logger.atFiner().log("Path to be opened: %s, Parameters: %s ", rawPath, parameters.toString());
     final Path path = makeQualified(rawPath);
     Set<String> mandatoryKeys = parameters.getMandatoryKeys();
     AbstractFSBuilderImpl.rejectUnknownMandatoryKeys(
         mandatoryKeys, Collections.emptySet(), "for " + path);
     FileStatus fileStatus = parameters.getStatus();
     GoogleCloudStorageItemInfo itemInfo = null;
-    GoogleHadoopFileStatus gcsFileStatus;
     CompletableFuture<FSDataInputStream> result = new CompletableFuture<>();
-    if (fileStatus == null) {
+    if (fileStatus == null || getItemInfo(fileStatus) == null) {
       return super.openFileWithOptions(rawPath, parameters);
     }
     itemInfo = getItemInfo(fileStatus);
-    if (itemInfo == null) {
-      return super.openFileWithOptions(rawPath, parameters);
-    }
-    logger.atFine().log("ItemInfo :%s", itemInfo);
-    logger.atFine().log("File exists: %s", itemInfo.getResourceId());
+    logger.atFine().log("ItemInfo :%s, File exists: %s", itemInfo, itemInfo.getResourceId());
     GoogleCloudStorageItemInfo finalItemInfo = itemInfo;
     ThreadPoolExecutor unboundedThreadPool = (ThreadPoolExecutor) createCachedExecutor();
     unboundedThreadPool.submit(
