@@ -25,6 +25,7 @@ import com.google.api.services.storage.model.Bucket;
 import com.google.api.services.storage.model.ComposeRequest;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.util.AccessBoundary;
+import com.google.cloud.hadoop.util.AccessBoundary.Action;
 import java.io.IOException;
 import java.security.InvalidParameterException;
 import java.util.List;
@@ -62,7 +63,7 @@ public class StorageRequestToAccessBoundaryConverterTest {
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
     assertThat(results)
-        .containsExactly(AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, "LIST_OBJECTS"));
+        .containsExactly(AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, Action.LIST_OBJECTS));
   }
 
   @Test
@@ -72,7 +73,8 @@ public class StorageRequestToAccessBoundaryConverterTest {
     List<AccessBoundary> results =
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
-    assertThat(results).containsExactly(AccessBoundary.create(BUCKET_NAME, "/", "LIST_OBJECTS"));
+    assertThat(results)
+        .containsExactly(AccessBoundary.create(BUCKET_NAME, "/", Action.LIST_OBJECTS));
   }
 
   @Test
@@ -84,7 +86,7 @@ public class StorageRequestToAccessBoundaryConverterTest {
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
     assertThat(results)
-        .containsExactly(AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, "WRITE_OBJECTS"));
+        .containsExactly(AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, Action.WRITE_OBJECTS));
   }
 
   @Test
@@ -102,10 +104,10 @@ public class StorageRequestToAccessBoundaryConverterTest {
 
     assertThat(results)
         .containsExactly(
-            AccessBoundary.create(BUCKET_NAME, OBJECT_NAME + "-" + 0, "READ_OBJECTS"),
-            AccessBoundary.create(BUCKET_NAME, OBJECT_NAME + "-" + 1, "READ_OBJECTS"),
-            AccessBoundary.create(BUCKET_NAME, OBJECT_NAME + "-" + 2, "READ_OBJECTS"),
-            AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, "WRITE_OBJECTS"));
+            AccessBoundary.create(BUCKET_NAME, OBJECT_NAME + "-" + 0, Action.READ_OBJECTS),
+            AccessBoundary.create(BUCKET_NAME, OBJECT_NAME + "-" + 1, Action.READ_OBJECTS),
+            AccessBoundary.create(BUCKET_NAME, OBJECT_NAME + "-" + 2, Action.READ_OBJECTS),
+            AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, Action.WRITE_OBJECTS));
   }
 
   @Test
@@ -116,7 +118,7 @@ public class StorageRequestToAccessBoundaryConverterTest {
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
     assertThat(results)
-        .containsExactly(AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, "READ_OBJECTS"));
+        .containsExactly(AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, Action.READ_OBJECTS));
   }
 
   @Test
@@ -126,7 +128,7 @@ public class StorageRequestToAccessBoundaryConverterTest {
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
     assertThat(results)
-        .containsExactly(AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, "DELETE_OBJECTS"));
+        .containsExactly(AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, Action.DELETE_OBJECTS));
   }
 
   @Test
@@ -142,8 +144,8 @@ public class StorageRequestToAccessBoundaryConverterTest {
 
     assertThat(results)
         .containsExactly(
-            AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, "READ_OBJECTS"),
-            AccessBoundary.create(BUCKET_NAME_DST, OBJECT_NAME_DST, "WRITE_OBJECTS"));
+            AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, Action.READ_OBJECTS),
+            AccessBoundary.create(BUCKET_NAME_DST, OBJECT_NAME_DST, Action.WRITE_OBJECTS));
   }
 
   @Test
@@ -157,8 +159,8 @@ public class StorageRequestToAccessBoundaryConverterTest {
 
     assertThat(results)
         .containsExactly(
-            AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, "READ_OBJECTS"),
-            AccessBoundary.create(BUCKET_NAME_DST, OBJECT_NAME_DST, "WRITE_OBJECTS"));
+            AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, Action.READ_OBJECTS),
+            AccessBoundary.create(BUCKET_NAME_DST, OBJECT_NAME_DST, Action.WRITE_OBJECTS));
   }
 
   @Test
@@ -170,7 +172,7 @@ public class StorageRequestToAccessBoundaryConverterTest {
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
     assertThat(results)
-        .containsExactly(AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, "MODIFY_OBJECTS"));
+        .containsExactly(AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, Action.MODIFY_OBJECTS));
   }
 
   @Test
@@ -180,7 +182,8 @@ public class StorageRequestToAccessBoundaryConverterTest {
     List<AccessBoundary> results =
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
-    assertThat(results).containsExactly(AccessBoundary.create(BUCKET_NAME, "/", "GET_BUCKETS"));
+    assertThat(results)
+        .containsExactly(AccessBoundary.create(BUCKET_NAME, "/", Action.GET_BUCKETS));
   }
 
   @Test
@@ -192,7 +195,8 @@ public class StorageRequestToAccessBoundaryConverterTest {
     List<AccessBoundary> results =
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
-    assertThat(results).containsExactly(AccessBoundary.create(BUCKET_NAME, "/", "CREATE_BUCKETS"));
+    assertThat(results)
+        .containsExactly(AccessBoundary.create(BUCKET_NAME, "/", Action.CREATE_BUCKETS));
   }
 
   @Test
@@ -202,7 +206,8 @@ public class StorageRequestToAccessBoundaryConverterTest {
     List<AccessBoundary> results =
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
-    assertThat(results).containsExactly(AccessBoundary.create(BUCKET_NAME, "/", "DELETE_BUCKETS"));
+    assertThat(results)
+        .containsExactly(AccessBoundary.create(BUCKET_NAME, "/", Action.DELETE_BUCKETS));
   }
 
   @Test
@@ -212,7 +217,7 @@ public class StorageRequestToAccessBoundaryConverterTest {
     List<AccessBoundary> results =
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
-    assertThat(results).containsExactly(AccessBoundary.create("", "", "LIST_BUCKETS"));
+    assertThat(results).containsExactly(AccessBoundary.create("", "", Action.LIST_BUCKETS));
   }
 
   @Test

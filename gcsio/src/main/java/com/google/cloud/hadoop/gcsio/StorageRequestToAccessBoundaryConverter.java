@@ -21,6 +21,7 @@ import com.google.api.services.storage.model.Bucket;
 import com.google.api.services.storage.model.ComposeRequest;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.util.AccessBoundary;
+import com.google.cloud.hadoop.util.AccessBoundary.Action;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.security.InvalidParameterException;
@@ -77,13 +78,13 @@ class StorageRequestToAccessBoundaryConverter {
     }
 
     return Collections.singletonList(
-        AccessBoundary.create(request.getBucket(), prefix, "LIST_OBJECTS"));
+        AccessBoundary.create(request.getBucket(), prefix, Action.LIST_OBJECTS));
   }
 
   private static List<AccessBoundary> translateObjectInsertRequest(Storage.Objects.Insert request) {
     String path = ((StorageObject) getData(request)).getName();
     return Collections.singletonList(
-        AccessBoundary.create(request.getBucket(), path, "WRITE_OBJECTS"));
+        AccessBoundary.create(request.getBucket(), path, Action.WRITE_OBJECTS));
   }
 
   private static List<AccessBoundary> translateObjectComposeRequest(
@@ -96,22 +97,22 @@ class StorageRequestToAccessBoundaryConverter {
             source ->
                 listBuilder.add(
                     AccessBoundary.create(
-                        request.getDestinationBucket(), source.getName(), "READ_OBJECTS")));
+                        request.getDestinationBucket(), source.getName(), Action.READ_OBJECTS)));
     // Write access on the destination
     listBuilder.add(
         AccessBoundary.create(
-            request.getDestinationBucket(), request.getDestinationObject(), "WRITE_OBJECTS"));
+            request.getDestinationBucket(), request.getDestinationObject(), Action.WRITE_OBJECTS));
     return listBuilder.build();
   }
 
   private static List<AccessBoundary> translateObjectGetRequest(Storage.Objects.Get request) {
     return Collections.singletonList(
-        AccessBoundary.create(request.getBucket(), request.getObject(), "READ_OBJECTS"));
+        AccessBoundary.create(request.getBucket(), request.getObject(), Action.READ_OBJECTS));
   }
 
   private static List<AccessBoundary> translateObjectDeleteRequest(Storage.Objects.Delete request) {
     return Collections.singletonList(
-        AccessBoundary.create(request.getBucket(), request.getObject(), "DELETE_OBJECTS"));
+        AccessBoundary.create(request.getBucket(), request.getObject(), Action.DELETE_OBJECTS));
   }
 
   private static List<AccessBoundary> translateObjectRewriteRequest(
@@ -119,10 +120,10 @@ class StorageRequestToAccessBoundaryConverter {
     ImmutableList.Builder<AccessBoundary> listBuilder = ImmutableList.builder();
     listBuilder.add(
         AccessBoundary.create(
-            request.getSourceBucket(), request.getSourceObject(), "READ_OBJECTS"));
+            request.getSourceBucket(), request.getSourceObject(), Action.READ_OBJECTS));
     listBuilder.add(
         AccessBoundary.create(
-            request.getDestinationBucket(), request.getDestinationObject(), "WRITE_OBJECTS"));
+            request.getDestinationBucket(), request.getDestinationObject(), Action.WRITE_OBJECTS));
     return listBuilder.build();
   }
 
@@ -130,35 +131,35 @@ class StorageRequestToAccessBoundaryConverter {
     ImmutableList.Builder<AccessBoundary> listBuilder = ImmutableList.builder();
     listBuilder.add(
         AccessBoundary.create(
-            request.getSourceBucket(), request.getSourceObject(), "READ_OBJECTS"));
+            request.getSourceBucket(), request.getSourceObject(), Action.READ_OBJECTS));
     listBuilder.add(
         AccessBoundary.create(
-            request.getDestinationBucket(), request.getDestinationObject(), "WRITE_OBJECTS"));
+            request.getDestinationBucket(), request.getDestinationObject(), Action.WRITE_OBJECTS));
     return listBuilder.build();
   }
 
   private static List<AccessBoundary> translateObjectPatchRequest(Storage.Objects.Patch request) {
     return Collections.singletonList(
-        AccessBoundary.create(request.getBucket(), request.getObject(), "MODIFY_OBJECTS"));
+        AccessBoundary.create(request.getBucket(), request.getObject(), Action.MODIFY_OBJECTS));
   }
 
   private static List<AccessBoundary> translateBucketGetRequest(Storage.Buckets.Get request) {
     return Collections.singletonList(
-        AccessBoundary.create(request.getBucket(), "/", "GET_BUCKETS"));
+        AccessBoundary.create(request.getBucket(), "/", Action.GET_BUCKETS));
   }
 
   private static List<AccessBoundary> translateBucketInsertRequest(Storage.Buckets.Insert request) {
     String bucketName = ((Bucket) getData(request)).getName();
-    return Collections.singletonList(AccessBoundary.create(bucketName, "/", "CREATE_BUCKETS"));
+    return Collections.singletonList(AccessBoundary.create(bucketName, "/", Action.CREATE_BUCKETS));
   }
 
   private static List<AccessBoundary> translateBucketDeleteRequest(Storage.Buckets.Delete request) {
     return Collections.singletonList(
-        AccessBoundary.create(request.getBucket(), "/", "DELETE_BUCKETS"));
+        AccessBoundary.create(request.getBucket(), "/", Action.DELETE_BUCKETS));
   }
 
   private static List<AccessBoundary> translateBucketListRequest(Storage.Buckets.List request) {
-    return Collections.singletonList(AccessBoundary.create("", "", "LIST_BUCKETS"));
+    return Collections.singletonList(AccessBoundary.create("", "", Action.LIST_BUCKETS));
   }
 
   private static Object getData(StorageRequest<?> request) {
