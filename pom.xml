@@ -318,8 +318,10 @@
       </dependency>
       <dependency>
         <groupId>com.google.auth</groupId>
-        <artifactId>google-auth-library-oauth2-http</artifactId>
+        <artifactId>google-auth-library-bom</artifactId>
         <version>${google.auth.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>com.google.apis</groupId>
