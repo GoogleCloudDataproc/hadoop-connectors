@@ -90,7 +90,7 @@
     <google.api-bigquery.version>v2-rev20210617-${google.api-client-libraries.version}</google.api-bigquery.version>
     <google.api-iamcredentials.version>v1-rev20210326-${google.api-client-libraries.version}</google.api-iamcredentials.version>
     <google.api-storage.version>v1-rev20210127-${google.api-client-libraries.version}</google.api-storage.version>
-    <google.auth.version>0.26.0</google.auth.version>
+    <google.auth.version>1.2.0</google.auth.version>
     <google.auto-value.version>1.8.1</google.auto-value.version>
     <google.cloud-bigquerystorage.version>1.22.5</google.cloud-bigquerystorage.version>
     <google.cloud-storage.grpc.version>2.0.1-alpha</google.cloud-storage.grpc.version>
@@ -293,6 +293,11 @@
         <groupId>com.google.oauth-client</groupId>
         <artifactId>google-oauth-client</artifactId>
         <version>${google.oauth-client.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.auth</groupId>
+        <artifactId>google-auth-library-credentials</artifactId>
+        <version>${google.auth.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.auth</groupId>
