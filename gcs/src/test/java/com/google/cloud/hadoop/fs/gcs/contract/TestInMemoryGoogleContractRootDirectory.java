@@ -14,8 +14,6 @@
 
 package com.google.cloud.hadoop.fs.gcs.contract;
 
-import static org.apache.hadoop.fs.contract.ContractTestUtils.*;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractContractRootDirectoryTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;

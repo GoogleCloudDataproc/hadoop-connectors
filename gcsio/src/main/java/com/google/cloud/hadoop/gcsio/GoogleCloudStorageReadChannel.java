@@ -171,6 +171,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     this.errorExtractor = errorExtractor;
     this.readOptions = readOptions;
     this.resourceId = resourceId;
+
     // Initialize metadata if available.
     GoogleCloudStorageItemInfo info = getInitialMetadata();
     if (info != null) {

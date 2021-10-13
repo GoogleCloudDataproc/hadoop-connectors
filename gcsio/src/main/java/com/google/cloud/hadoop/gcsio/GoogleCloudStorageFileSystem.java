@@ -83,6 +83,7 @@ import javax.annotation.Nullable;
 public class GoogleCloudStorageFileSystem {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
   // URI scheme for GCS.
   public static final String SCHEME = "gs";
 
@@ -327,10 +328,11 @@ public class GoogleCloudStorageFileSystem {
   /**
    * * Opens an object for reading using item info.
    *
-   * @param itemInfo
-   * @param readOptions
-   * @return
-   * @throws IOException
+   * @param itemInfo contains metadata information about the file
+   * @param readOptions readOptions fine-grained options specifying things like retry settings,
+   *     buffering, etc.
+   * @return Seekable Byte Channel to enable file open
+   * @throws IOException IOException on IO Error
    */
   public SeekableByteChannel open(
       GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
@@ -342,7 +344,7 @@ public class GoogleCloudStorageFileSystem {
     checkArgument(
         !itemInfo.isDirectory(),
         "Cannot open a directory for reading: %s",
-        FileInfo.fromItemInfo(itemInfo).getPath());
+        itemInfo.getResourceId());
     return gcs.open(itemInfo, readOptions);
   }
 
