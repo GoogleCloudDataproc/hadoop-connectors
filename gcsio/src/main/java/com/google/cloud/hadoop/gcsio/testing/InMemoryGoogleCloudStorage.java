@@ -76,7 +76,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
   @Override
   public long getStatistics(GoogleCloudStorageStatistics key) {
-    return 0;
+    return 0L;
   }
 
   private boolean validateBucketName(String bucketName) {

@@ -29,6 +29,7 @@ import static java.util.Comparator.comparing;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
 import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.client.http.HttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationDelete;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationRename;
@@ -173,7 +174,20 @@ public class GoogleCloudStorageFileSystem {
         options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }
-
+  /** Newly added */
+  public GoogleCloudStorageFileSystem(
+      GoogleCloudStorageFileSystemOptions options,
+      HttpRequestInitializer httpRequestInitializer,
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
+      throws IOException {
+    this(
+        new GoogleCloudStorageImpl(
+            checkNotNull(options, "options must not be null").getCloudStorageOptions(),
+            httpRequestInitializer,
+            downscopedAccessTokenFn),
+        options);
+    logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
+  }
   /**
    * Constructs a GoogleCloudStorageFilesystem based on an already-configured underlying
    * GoogleCloudStorage {@code gcs}. Any options pertaining to GCS creation will be ignored.

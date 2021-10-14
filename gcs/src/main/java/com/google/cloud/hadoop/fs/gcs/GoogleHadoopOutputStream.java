@@ -19,7 +19,6 @@ package com.google.cloud.hadoop.fs.gcs;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.common.flogger.GoogleLogger;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
@@ -30,8 +29,6 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.WritableByteChannel;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.statistics.DurationTracker;
-import org.apache.hadoop.fs.statistics.DurationTrackerFactory;
 
 /** A buffered output stream that allows writing to a GCS object. */
 class GoogleHadoopOutputStream extends OutputStream {
@@ -96,41 +93,13 @@ class GoogleHadoopOutputStream extends OutputStream {
       CreateFileOptions options,
       GhfsInstrumentation instrumentation)
       throws IOException {
-    DurationTrackerFactory durationTrackerFactory =
-        instrumentation != null ? instrumentation.getDurationTrackerFactory() : null;
-    DurationTracker get_tracker =
-        durationTrackerFactory.trackDuration(GhfsStatistic.ACTION_HTTP_GET_REQUEST.getSymbol());
-    DurationTracker head_tracker =
-        durationTrackerFactory.trackDuration(GhfsStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol());
 
     try {
-
       return gcsfs.create(gcsPath, options);
     } catch (java.nio.file.FileAlreadyExistsException e) {
       throw (FileAlreadyExistsException)
           new FileAlreadyExistsException(String.format("'%s' already exists", gcsPath))
               .initCause(e);
-
-    } finally {
-      if (gcsfs
-              .getGcs()
-              .getStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES)
-          > 0) {
-        get_tracker.failed();
-        get_tracker.close();
-      } else {
-        get_tracker.close();
-      }
-      if (gcsfs
-              .getGcs()
-              .getStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST_FAILURES)
-          > 0) {
-        head_tracker.failed();
-        head_tracker.close();
-      } else if (gcsfs.getGcs().getStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST)
-          > 0) {
-        head_tracker.close();
-      }
     }
   }
 

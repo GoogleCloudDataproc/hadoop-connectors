@@ -324,6 +324,33 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     assertWithMessage("testWrite1Byte: write-read mismatch").that(readText).isEqualTo(text);
   }
 
+  /** Validates HTTP Get Statistics */
+  public void testHttpStatistics() throws IOException {
+    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
+    String text = "Hello World!";
+    int numBytesWritten = ghfsHelper.writeFile(hadoopPath, text, 1, /* overwrite= */ false);
+
+    try (FSDataInputStream readStream = ghfs.open(hadoopPath)) {
+
+      //  Check the statistics of method read().
+      readStream.read();
+    }
+    ghfs.close();
+    assertThat(
+            ((GoogleHadoopFileSystem) ghfs)
+                .getIOStatistics()
+                .counters()
+                .get("action_http_get_request"))
+        .isGreaterThan(1);
+    assertThat(
+            ((GoogleHadoopFileSystem) ghfs)
+                .getIOStatistics()
+                .counters()
+                .get("action_http_get_request_failures"))
+        .isEqualTo(0);
+  }
+
   /** Validates delete(). */
   @Test
   @Override

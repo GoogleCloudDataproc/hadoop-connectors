@@ -16,7 +16,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatisticTypeEnum.TYPE_DURATION;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatisticTypeEnum.TYPE_COUNTER;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -33,11 +33,11 @@ import org.apache.hadoop.fs.statistics.StreamStatisticNames;
  */
 @InterfaceStability.Unstable
 enum GhfsStatistic {
-  /** Low-level duration counters */
+  /** Http Request counters */
   ACTION_HTTP_HEAD_REQUEST(
-      StoreStatisticNames.ACTION_HTTP_HEAD_REQUEST, "HEAD request.", TYPE_DURATION),
+      StoreStatisticNames.ACTION_HTTP_HEAD_REQUEST, "HEAD request.", TYPE_COUNTER),
   ACTION_HTTP_GET_REQUEST(
-      StoreStatisticNames.ACTION_HTTP_GET_REQUEST, "GET request.", TYPE_DURATION);
+      StoreStatisticNames.ACTION_HTTP_GET_REQUEST, "GET request.", TYPE_COUNTER);
 
   /** A map used to support the {@link #fromSymbol(String)} call. */
   private static final Map<String, GhfsStatistic> SYMBOL_MAP =

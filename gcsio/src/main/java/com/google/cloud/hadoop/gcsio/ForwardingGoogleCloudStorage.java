@@ -109,7 +109,7 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
 
   @Override
   public long getStatistics(GoogleCloudStorageStatistics key) {
-    return 0;
+    return 0L;
   }
 
   @Override

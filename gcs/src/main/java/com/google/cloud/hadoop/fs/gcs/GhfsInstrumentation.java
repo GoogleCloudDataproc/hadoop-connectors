@@ -37,43 +37,72 @@ import org.apache.hadoop.metrics2.lib.*;
 /**
  * Instrumentation of GCS.
  *
- * <p>History
- *
- * <ol>
- *   <li>HADOOP-13028. Initial implementation. Derived from the {@code S3AInstrumentation}.
- *   <li>Broadly (and directly) used in gcs. The use of direct references causes "problems" in
- *       mocking tests.
- *   <li>HADOOP-16830. IOStatistics. Move to an interface and implementation design for the
- *       different inner classes.
- * </ol>
- *
  * <p>Counters and metrics are generally addressed in code by their name or {@link GhfsStatistic}
  * key. There <i>may</i> be some Statistics which do not have an entry here. To avoid attempts to
  * access such counters failing, the operations to increment/query metric values are designed to
  * handle lookup failures.
- *
- * <p>GoogleHadoopFileSystem StorageStatistics are dynamically derived from the IOStatistics.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 class GhfsInstrumentation
     implements Closeable, MetricsSource, IOStatisticsSource, DurationTrackerFactory {
-  public static final String CONTEXT = "DFSClient";
-  public static final String METRICS_SYSTEM_NAME = "google-hadoop-file-system";
-  public static final String METRIC_TAG_FILESYSTEM_ID = "gcsFilesystemId";
-  public static final String METRIC_TAG_BUCKET = "bucket";
-  private static final Object METRICS_SYSTEM_LOCK = new Object();
-  private final MetricsRegistry registry =
-      new MetricsRegistry("googleHadoopFilesystem").setContext(CONTEXT);
-  private IOStatisticsStore instanceIOStatistics;
-  private DurationTrackerFactory durationTrackerFactory;
-  private static int metricsSourceNameCounter = 0;
-  private static int metricsSourceActiveCounter = 0;
-  private String metricsSourceName;
-  private static final String METRICS_SOURCE_BASENAME = "GCSMetrics";
-  private static MetricsSystem metricsSystem = null;
+
   private static final GoogleLogger LOG = GoogleLogger.forEnclosingClass();
 
+  /**
+   * {@value} Currently all gcs metrics are placed in a single "context". Distinct contexts may be
+   * used in the future.
+   */
+  public static final String CONTEXT = "DFSClient";
+
+  /** {@value} The name of the gcs-specific metrics system instance used for gcs metrics. */
+  public static final String METRICS_SYSTEM_NAME = "google-hadoop-file-system";
+
+  /**
+   * {@value} The name of a field added to metrics records that uniquely identifies a specific
+   * FileSystem instance.
+   */
+  public static final String METRIC_TAG_FILESYSTEM_ID = "gcsFilesystemId";
+
+  /**
+   * {@value} The name of a field added to metrics records that indicates the hostname portion of
+   * the FS URL.
+   */
+  public static final String METRIC_TAG_BUCKET = "bucket";
+
+  /**
+   * metricsSystemLock must be used to synchronize modifications to metricsSystem and the following
+   * counters.
+   */
+  private static final Object METRICS_SYSTEM_LOCK = new Object();
+
+  private static int metricsSourceNameCounter = 0;
+  private static int metricsSourceActiveCounter = 0;
+
+  private static MetricsSystem metricsSystem = null;
+
+  private final MetricsRegistry registry =
+      new MetricsRegistry("googleHadoopFilesystem").setContext(CONTEXT);
+
+  /**
+   * This is the IOStatistics store for the GoogleHadoopFileSystem instance. It is not kept in sync
+   * with the rest of the Ghfsinstrumentation. Most inner statistics implementation classes only
+   * update this store when it is pushed back, such as as in close().
+   */
+  private IOStatisticsStore instanceIOStatistics;
+
+  /** Duration Tracker Factory for the Instrumentation */
+  private DurationTrackerFactory durationTrackerFactory;
+
+  private String metricsSourceName;
+
+  private static final String METRICS_SOURCE_BASENAME = "GCSMetrics";
+
+  /**
+   * Construct the instrumentation for a filesystem.
+   *
+   * @param name URI of filesystem.
+   */
   public GhfsInstrumentation(URI name) {
     UUID fileSystemInstanceID = UUID.randomUUID();
     registry.tag(
@@ -239,6 +268,13 @@ class GhfsInstrumentation
     return metric;
   }
 
+  /**
+   * Lookup a counter by name. Return null if it is not known.
+   *
+   * @param name counter name
+   * @return the counter
+   * @throws IllegalStateException if the metric is not a counter
+   */
   private MutableCounterLong lookupCounter(String name) {
     MutableMetric metric = lookupMetric(name);
     if (metric == null) {
@@ -272,6 +308,20 @@ class GhfsInstrumentation
     }
   }
 
+  /**
+   * Increments a Mutable counter for request failure
+   *
+   * @param symbol counter name.
+   * @param count increment value
+   */
+  public void incrementFailureStatistics(String symbol, Long count) {
+    incrementMutableCounter(symbol + SUFFIX_FAILURES, count);
+  }
+
+  /**
+   * A duration tracker which updates a mutable counter with a metric. The metric is updated with
+   * the count on start; after a failure the failures count is incremented by one.
+   */
   private final class MetricUpdatingDurationTracker implements DurationTracker {
 
     private final String symbol;
@@ -296,6 +346,7 @@ class GhfsInstrumentation
       }
     }
   }
+
   /**
    * Get the duration tracker factory.
    *
@@ -335,7 +386,7 @@ class GhfsInstrumentation
    * @param duration how long did it take
    */
   public void recordDuration(
-          final GhfsStatistic op, final boolean success, final Duration duration) {
+      final GhfsStatistic op, final boolean success, final Duration duration) {
     String name = op.getSymbol() + (success ? "" : SUFFIX_FAILURES);
     instanceIOStatistics.addTimedOperation(name, duration);
   }
