@@ -140,7 +140,7 @@ class StorageRequestToAccessBoundaryConverter {
 
   private static List<AccessBoundary> translateObjectPatchRequest(Storage.Objects.Patch request) {
     return Collections.singletonList(
-        AccessBoundary.create(request.getBucket(), request.getObject(), Action.MODIFY_OBJECTS));
+        AccessBoundary.create(request.getBucket(), request.getObject(), Action.EDIT_OBJECTS));
   }
 
   private static List<AccessBoundary> translateBucketGetRequest(Storage.Buckets.Get request) {

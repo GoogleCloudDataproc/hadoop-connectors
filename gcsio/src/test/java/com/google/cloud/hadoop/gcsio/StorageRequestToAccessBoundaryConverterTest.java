@@ -172,7 +172,7 @@ public class StorageRequestToAccessBoundaryConverterTest {
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
     assertThat(results)
-        .containsExactly(AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, Action.MODIFY_OBJECTS));
+        .containsExactly(AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, Action.EDIT_OBJECTS));
   }
 
   @Test
