@@ -133,6 +133,22 @@ public class StorageResourceId {
   }
 
   /**
+   * Constructor for a StorageResourceId representing a full StorageObject, including bucketName and
+   * objectName.
+   *
+   * @param bucketName The bucket name of the resource. Must be non-empty and non-null.
+   * @param generationId The generationId to be used with precondition checks when using this
+   *     StorageResourceId as an identifier for mutation requests.
+   */
+  public StorageResourceId(String bucketName, long generationId) {
+    checkArgument(!Strings.isNullOrEmpty(bucketName), "bucketName must not be null or empty");
+    this.bucketName = bucketName;
+    this.objectName = null;
+    this.stringPath = StringPaths.fromComponents(bucketName, objectName);
+    this.generationId = generationId;
+  }
+
+  /**
    * Returns true if this StorageResourceId represents a GCS StorageObject; if true, both {@code
    * getBucketName} and {@code getObjectName} will be non-empty and non-null.
    */
@@ -261,6 +277,19 @@ public class StorageResourceId {
    * @return a StorageResourceId that may be the GCS root, a Bucket, or a StorageObject.
    */
   public static StorageResourceId fromUriPath(URI path, boolean allowEmptyObjectName) {
+    return fromUriPath(path, allowEmptyObjectName, UNKNOWN_GENERATION_ID);
+  }
+
+  /**
+   * Validates the given URI and if valid, returns the associated StorageResourceId.
+   *
+   * @param path The GCS URI to validate.
+   * @param allowEmptyObjectName If true, a missing object name is not considered invalid.
+   * @param generationId The generationId to be used with precondition checks when using this
+   * @return a StorageResourceId that may be the GCS root, a Bucket, or a StorageObject.
+   */
+  public static StorageResourceId fromUriPath(
+      URI path, boolean allowEmptyObjectName, long generationId) {
     logger.atFiner().log("fromUriPath('%s', %s)", path, allowEmptyObjectName);
     checkNotNull(path);
 
@@ -281,7 +310,7 @@ public class StorageResourceId {
     String objectName = StringPaths.validateObjectName(path.getPath(), allowEmptyObjectName);
 
     return isNullOrEmpty(objectName)
-        ? new StorageResourceId(bucketName)
-        : new StorageResourceId(bucketName, objectName);
+        ? new StorageResourceId(bucketName, generationId)
+        : new StorageResourceId(bucketName, objectName, generationId);
   }
 }
