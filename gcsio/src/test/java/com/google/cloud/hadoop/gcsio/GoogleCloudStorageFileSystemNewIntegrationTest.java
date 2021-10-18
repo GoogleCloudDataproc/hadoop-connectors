@@ -1027,8 +1027,13 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
                 bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null),
             getRequestString(bucketName, dirObject + "/"),
             copyRequestString(
-                bucketName, dirObject + "/f1", bucketName, dirObject + "/f2", "copyTo"),
-            deleteRequestString(bucketName, dirObject + "/f1", 1));
+                bucketName,
+                dirObject + "/f1",
+                bucketName,
+                dirObject + "/f2",
+                "copyTo",
+                /* generationId= */ 1),
+            deleteRequestString(bucketName, dirObject + "/f1", 2));
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isFalse();
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f2"))).isTrue();
@@ -1065,10 +1070,51 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
             listRequestWithTrailingDelimiter(
                 bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null),
             copyRequestString(
-                bucketName, dirObject + "/f1", bucketName, dirObject + "/f2", "copyTo"),
-            deleteRequestString(bucketName, dirObject + "/f1", /* generationId= */ 1));
+                bucketName,
+                dirObject + "/f1",
+                bucketName,
+                dirObject + "/f2",
+                "copyTo",
+                /* generationId= */ 1),
+            deleteRequestString(bucketName, dirObject + "/f1", /* generationId= */ 2));
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isFalse();
+    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f2"))).isTrue();
+  }
+
+  @Test
+  public void rename_file_shouldFailIfFileExists() throws Exception {
+    GoogleCloudStorageFileSystemOptions gcsFsOptions = newGcsFsOptions().build();
+
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsFsOptions, gcsRequestsTracker);
+
+    String bucketName = gcsfsIHelper.sharedBucketName1;
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = getTestResource();
+
+    gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "/f1");
+    gcsfsIHelper.createObjectsWithSubdirs(bucketName, dirObject + "/f2");
+
+    assertThrows(
+        IOException.class,
+        () -> {
+          gcsFs.rename(bucketUri.resolve(dirObject + "/f1"), bucketUri.resolve(dirObject + "/f2"));
+        });
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(bucketName, dirObject + "/f1"),
+            listRequestWithTrailingDelimiter(
+                bucketName, dirObject + "/f1/", /* maxResults= */ 1, /* pageToken= */ null),
+            getRequestString(bucketName, dirObject + "/f2"),
+            listRequestWithTrailingDelimiter(
+                bucketName, dirObject + "/f2/", /* maxResults= */ 1, /* pageToken= */ null),
+            listRequestWithTrailingDelimiter(
+                bucketName, dirObject + "/", /* maxResults= */ 1, /* pageToken= */ null));
+
+    assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f1"))).isTrue();
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/f2"))).isTrue();
   }
 

@@ -43,6 +43,7 @@ import com.google.api.client.util.Data;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.Sleeper;
 import com.google.api.services.storage.Storage;
+import com.google.api.services.storage.Storage.Objects.Copy;
 import com.google.api.services.storage.Storage.Objects.Insert;
 import com.google.api.services.storage.StorageRequest;
 import com.google.api.services.storage.model.Bucket;
@@ -85,7 +86,16 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.CountDownLatch;
@@ -156,8 +166,31 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
   }
 
+  public static void validateCopyArguments(
+      String srcBucketName,
+      List<String> srcObjectNames,
+      String dstBucketName,
+      List<String> dstObjectNames,
+      GoogleCloudStorage googleCloudStorage)
+      throws IOException {
+    checkArgument(srcObjectNames != null, "srcObjectNames must not be null");
+    checkArgument(dstObjectNames != null, "dstObjectNames must not be null");
+    checkArgument(
+        srcObjectNames.size() == dstObjectNames.size(),
+        "Must supply same number of elements in srcObjects and dstObjects");
+    Map<StorageResourceId, StorageResourceId> srcToDestObjectsMap =
+        new HashMap<>(srcObjectNames.size());
+    for (int i = 0; i < srcObjectNames.size(); i++) {
+      srcToDestObjectsMap.put(
+          new StorageResourceId(srcBucketName, srcObjectNames.get(i)),
+          new StorageResourceId(dstBucketName, dstObjectNames.get(i)));
+    }
+    validateCopyArguments(srcToDestObjectsMap, googleCloudStorage);
+  }
+
   /** A factory for producing BackOff objects. */
   public interface BackOffFactory {
+
     BackOffFactory DEFAULT =
         () -> new RetryBoundedBackOff(new ExponentialBackOff(), /* maxRetries= */ 10);
 
@@ -963,61 +996,78 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // Please check that removing it is correct, and remove this comment along with it.
   // @VisibleForTesting
   public static void validateCopyArguments(
-      String srcBucketName,
-      List<String> srcObjectNames,
-      String dstBucketName,
-      List<String> dstObjectNames,
+      Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap,
       GoogleCloudStorage gcsImpl)
       throws IOException {
-    Preconditions.checkArgument(
-        !isNullOrEmpty(srcBucketName), "srcBucketName must not be null or empty");
-    Preconditions.checkArgument(
-        !isNullOrEmpty(dstBucketName), "dstBucketName must not be null or empty");
-    Preconditions.checkArgument(srcObjectNames != null, "srcObjectNames must not be null");
-    Preconditions.checkArgument(dstObjectNames != null, "dstObjectNames must not be null");
-    Preconditions.checkArgument(
-        srcObjectNames.size() == dstObjectNames.size(),
-        "Must supply same number of elements in srcObjectNames and dstObjectNames");
 
-    // Avoid copy across locations or storage classes.
-    if (!srcBucketName.equals(dstBucketName)) {
-      GoogleCloudStorageItemInfo srcBucketInfo =
-          gcsImpl.getItemInfo(new StorageResourceId(srcBucketName));
-      if (!srcBucketInfo.exists()) {
-        throw new FileNotFoundException("Bucket not found: " + srcBucketName);
-      }
+    checkNotNull(sourceToDestinationObjectsMap, "srcObjects must not be null");
 
-      GoogleCloudStorageItemInfo dstBucketInfo =
-          gcsImpl.getItemInfo(new StorageResourceId(dstBucketName));
-      if (!dstBucketInfo.exists()) {
-        throw new FileNotFoundException("Bucket not found: " + dstBucketName);
-      }
-
-      if (!gcsImpl.getOptions().isCopyWithRewriteEnabled()) {
-        if (!srcBucketInfo.getLocation().equals(dstBucketInfo.getLocation())) {
-          throw new UnsupportedOperationException(
-              "This operation is not supported across two different storage locations.");
-        }
-
-        if (!srcBucketInfo.getStorageClass().equals(dstBucketInfo.getStorageClass())) {
-          throw new UnsupportedOperationException(
-              "This operation is not supported across two different storage classes.");
-        }
-      }
+    if (sourceToDestinationObjectsMap.isEmpty()) {
+      return;
     }
-    for (int i = 0; i < srcObjectNames.size(); i++) {
-      Preconditions.checkArgument(
-          !isNullOrEmpty(srcObjectNames.get(i)), "srcObjectName must not be null or empty");
-      Preconditions.checkArgument(
-          !isNullOrEmpty(dstObjectNames.get(i)), "dstObjectName must not be null or empty");
+
+    Map<StorageResourceId, GoogleCloudStorageItemInfo> bucketInfoCache = new HashMap<>();
+
+    for (Entry<StorageResourceId, StorageResourceId> entry :
+        sourceToDestinationObjectsMap.entrySet()) {
+      StorageResourceId source = entry.getKey();
+      StorageResourceId destination = entry.getValue();
+      String srcBucketName = source.getBucketName();
+      String dstBucketName = destination.getBucketName();
+      // Avoid copy across locations or storage classes.
+      if (!srcBucketName.equals(dstBucketName)) {
+        StorageResourceId srcBucketResourceId = new StorageResourceId(srcBucketName);
+        GoogleCloudStorageItemInfo srcBucketInfo =
+            getGoogleCloudStorageItemInfo(gcsImpl, bucketInfoCache, srcBucketResourceId);
+        if (!srcBucketInfo.exists()) {
+          throw new FileNotFoundException("Bucket not found: " + srcBucketName);
+        }
+
+        StorageResourceId dstBucketResourceId = new StorageResourceId(dstBucketName);
+        GoogleCloudStorageItemInfo dstBucketInfo =
+            getGoogleCloudStorageItemInfo(gcsImpl, bucketInfoCache, dstBucketResourceId);
+        if (!dstBucketInfo.exists()) {
+          throw new FileNotFoundException("Bucket not found: " + dstBucketName);
+        }
+
+        if (!gcsImpl.getOptions().isCopyWithRewriteEnabled()) {
+          if (!srcBucketInfo.getLocation().equals(dstBucketInfo.getLocation())) {
+            throw new UnsupportedOperationException(
+                "This operation is not supported across two different storage locations.");
+          }
+
+          if (!srcBucketInfo.getStorageClass().equals(dstBucketInfo.getStorageClass())) {
+            throw new UnsupportedOperationException(
+                "This operation is not supported across two different storage classes.");
+          }
+        }
+      }
+      checkArgument(
+          !isNullOrEmpty(source.getObjectName()), "srcObjectName must not be null or empty");
+      checkArgument(
+          !isNullOrEmpty(destination.getObjectName()), "dstObjectName must not be null or empty");
       if (srcBucketName.equals(dstBucketName)
-          && srcObjectNames.get(i).equals(dstObjectNames.get(i))) {
+          && source.getObjectName().equals(destination.getObjectName())) {
         throw new IllegalArgumentException(
             String.format(
                 "Copy destination must be different from source for %s.",
-                StringPaths.fromComponents(srcBucketName, srcObjectNames.get(i))));
+                StringPaths.fromComponents(srcBucketName, source.getObjectName())));
       }
     }
+  }
+
+  private static GoogleCloudStorageItemInfo getGoogleCloudStorageItemInfo(
+      GoogleCloudStorage gcsImpl,
+      Map<StorageResourceId, GoogleCloudStorageItemInfo> bucketInfoCache,
+      StorageResourceId resourceId)
+      throws IOException {
+    GoogleCloudStorageItemInfo storageItemInfo = bucketInfoCache.get(resourceId);
+    if (storageItemInfo != null) {
+      return storageItemInfo;
+    }
+    storageItemInfo = gcsImpl.getItemInfo(resourceId);
+    bucketInfoCache.put(resourceId, storageItemInfo);
+    return storageItemInfo;
   }
 
   /**
@@ -1031,9 +1081,33 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       String dstBucketName,
       List<String> dstObjectNames)
       throws IOException {
-    validateCopyArguments(srcBucketName, srcObjectNames, dstBucketName, dstObjectNames, this);
+    checkArgument(srcObjectNames != null, "srcObjectNames must not be null");
+    checkArgument(dstObjectNames != null, "dstObjectNames must not be null");
+    checkArgument(
+        srcObjectNames.size() == dstObjectNames.size(),
+        "Must supply same number of elements in srcObjects and dstObjects");
 
-    if (srcObjectNames.isEmpty()) {
+    Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap =
+        new HashMap<>(srcObjectNames.size());
+    for (int i = 0; i < srcObjectNames.size(); i++) {
+      sourceToDestinationObjectsMap.put(
+          new StorageResourceId(srcBucketName, srcObjectNames.get(i)),
+          new StorageResourceId(dstBucketName, dstObjectNames.get(i)));
+    }
+    copy(sourceToDestinationObjectsMap);
+  }
+
+  /**
+   * See {@link GoogleCloudStorage#copy(String, List, String, List)} for details about expected
+   * behavior.
+   */
+  @Override
+  public void copy(Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
+      throws IOException {
+
+    validateCopyArguments(sourceToDestinationObjectsMap, this);
+
+    if (sourceToDestinationObjectsMap.isEmpty()) {
       return;
     }
 
@@ -1047,28 +1121,32 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             httpRequestInitializer,
             storage,
             storageOptions.getMaxRequestsPerBatch(),
-            srcObjectNames.size(),
+            sourceToDestinationObjectsMap.size(),
             storageOptions.getBatchThreads());
 
-    for (int i = 0; i < srcObjectNames.size(); i++) {
+    for (Entry<StorageResourceId, StorageResourceId> entry :
+        sourceToDestinationObjectsMap.entrySet()) {
+      StorageResourceId srcObject = entry.getKey();
+      StorageResourceId dstObject = entry.getValue();
       if (storageOptions.isCopyWithRewriteEnabled()) {
         // Rewrite request has the same effect as Copy, but it can handle moving
         // large objects that may potentially timeout a Copy request.
         rewriteInternal(
             batchHelper,
             innerExceptions,
-            srcBucketName,
-            srcObjectNames.get(i),
-            dstBucketName,
-            dstObjectNames.get(i));
+            srcObject.getBucketName(),
+            srcObject.getObjectName(),
+            dstObject.getBucketName(),
+            dstObject.getObjectName());
       } else {
         copyInternal(
             batchHelper,
             innerExceptions,
-            srcBucketName,
-            srcObjectNames.get(i),
-            dstBucketName,
-            dstObjectNames.get(i));
+            srcObject.getBucketName(),
+            srcObject.getObjectName(),
+            dstObject.getGenerationId(),
+            dstObject.getBucketName(),
+            dstObject.getObjectName());
       }
     }
 
@@ -1157,15 +1235,18 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       final KeySetView<IOException, Boolean> innerExceptions,
       final String srcBucketName,
       final String srcObjectName,
+      final long dstContentGeneration,
       final String dstBucketName,
       final String dstObjectName)
       throws IOException {
-    Storage.Objects.Copy copyObject =
-        initializeRequest(
-            storage
-                .objects()
-                .copy(srcBucketName, srcObjectName, dstBucketName, dstObjectName, null),
-            srcBucketName);
+    Copy copy =
+        storage.objects().copy(srcBucketName, srcObjectName, dstBucketName, dstObjectName, null);
+
+    if (dstContentGeneration != StorageResourceId.UNKNOWN_GENERATION_ID) {
+      copy.setIfGenerationMatch(dstContentGeneration);
+    }
+
+    Storage.Objects.Copy copyObject = initializeRequest(copy, srcBucketName);
 
     batchHelper.queue(
         copyObject,
