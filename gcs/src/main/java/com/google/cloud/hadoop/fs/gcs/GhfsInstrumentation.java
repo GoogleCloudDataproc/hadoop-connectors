@@ -53,7 +53,7 @@ class GhfsInstrumentation
    * {@value} Currently all gcs metrics are placed in a single "context". Distinct contexts may be
    * used in the future.
    */
-  public static final String CONTEXT = "DFSClient";
+  public static final String CONTEXT = "gcsFilesystem";
 
   /** {@value} The name of the gcs-specific metrics system instance used for gcs metrics. */
   public static final String METRICS_SYSTEM_NAME = "google-hadoop-file-system";

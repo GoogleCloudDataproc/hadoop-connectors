@@ -18,7 +18,19 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createF
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.api.client.util.Clock;
-import com.google.cloud.hadoop.gcsio.*;
+import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
+import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStrings;
+import com.google.cloud.hadoop.gcsio.ListObjectOptions;
+import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;

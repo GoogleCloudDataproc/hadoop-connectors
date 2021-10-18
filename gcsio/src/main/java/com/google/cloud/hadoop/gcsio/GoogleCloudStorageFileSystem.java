@@ -175,7 +175,16 @@ public class GoogleCloudStorageFileSystem {
         options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }
-  /** Newly added */
+
+  /**
+   * Constructs an instance of GoogleCloudStorageFileSystem.
+   *
+   * @param options Options for how this filesystem should operate and configure its underlying
+   *     storage.
+   * @param httpRequestInitializer request initializer for requests.
+   * @param downscopedAccessTokenFn Function that generates downscoped access token.
+   * @throws IOException
+   */
   public GoogleCloudStorageFileSystem(
       GoogleCloudStorageFileSystemOptions options,
       HttpRequestInitializer httpRequestInitializer,
@@ -189,6 +198,7 @@ public class GoogleCloudStorageFileSystem {
         options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }
+
   /**
    * Constructs a GoogleCloudStorageFilesystem based on an already-configured underlying
    * GoogleCloudStorage {@code gcs}. Any options pertaining to GCS creation will be ignored.

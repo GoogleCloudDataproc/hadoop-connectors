@@ -1305,6 +1305,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         logger.atFiner().log("listBucketsInternal: next page %s", pageToken);
         listBucket.setPageToken(pageToken);
       }
+
       Buckets items = null;
       try {
         items = listBucket.execute();
@@ -2303,6 +2304,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     return compositeInfo;
   }
 
+  /** Get the value of http related statistics  */
   @Override
   public long getStatistics(GoogleCloudStorageStatistics key) {
     return gcsStatisticsMap.get(key);

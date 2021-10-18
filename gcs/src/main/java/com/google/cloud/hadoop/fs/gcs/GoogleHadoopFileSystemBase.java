@@ -49,6 +49,7 @@ import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.FileInfo;
+import com.google.cloud.hadoop.gcsio.GcsioTrackingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
@@ -61,11 +62,17 @@ import com.google.cloud.hadoop.gcsio.ListFileOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
 import com.google.cloud.hadoop.gcsio.UriPaths;
-import com.google.cloud.hadoop.gcsio.GcsioTrackingHttpRequestInitializer;
-import com.google.cloud.hadoop.util.*;
+import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.AccessTokenProvider.AccessTokenType;
+import com.google.cloud.hadoop.util.ApiErrorExtractor;
+import com.google.cloud.hadoop.util.CredentialFactory;
 import com.google.cloud.hadoop.util.CredentialFactory.CredentialHttpRetryInitializer;
+import com.google.cloud.hadoop.util.CredentialFromAccessTokenProviderClassFactory;
+import com.google.cloud.hadoop.util.GoogleCredentialWithIamAccessToken;
 import com.google.cloud.hadoop.util.HadoopCredentialConfiguration;
+import com.google.cloud.hadoop.util.HttpTransportFactory;
+import com.google.cloud.hadoop.util.PropertyUtil;
+import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ascii;
 import com.google.common.base.Suppliers;
@@ -116,7 +123,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.fs.statistics.DurationTrackerFactory;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -260,6 +266,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   private Supplier<GoogleCloudStorageFileSystem> gcsFsSupplier;
 
   private boolean gcsFsInitialized = false;
+
+  /** To identify whether the filesystem is initialized as lazyFS */
+  public boolean LazyFs = false;
 
   /**
    * Current working directory; overridden in initialize() if {@link
@@ -475,7 +484,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     configure(config);
   }
 
-  public GhfsInstrumentation getInstrumentation() {
+  /** Get the Instrumentation of the instance to track the IOStatistics */
+  GhfsInstrumentation getInstrumentation() {
     return this.instrumentation;
   }
 
@@ -678,14 +688,12 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       throws IOException {
     URI gcsPath = getGcsPath(checkNotNull(hadoopPath, "hadoopPath must not be null"));
     URI parentGcsPath = UriPaths.getParentPath(gcsPath);
-
     if (!getGcsFs().getFileInfo(parentGcsPath).exists()) {
       throw new FileNotFoundException(
           String.format(
               "Can not create '%s' file, because parent folder does not exist: %s",
               gcsPath, parentGcsPath));
     }
-
     return create(
         hadoopPath,
         permission,
@@ -729,11 +737,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
             this, filePath, statistics, DEFAULT_OVERWRITE, syncableOutputStreamOptions),
         statistics);
   }
-  /**
-   * Get the instrumentation's IOStatistics.
-   *
-   * @return statistics
-   */
 
   /**
    * Concat existing files into one file.
@@ -814,7 +817,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     URI srcPath = getGcsPath(src);
     URI dstPath = getGcsPath(dst);
+
     getGcsFs().rename(srcPath, dstPath);
+
     logger.atFiner().log("rename(src: %s, dst: %s): true", src, dst);
   }
 
@@ -970,13 +975,11 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     URI gcsPath = getGcsPath(hadoopPath);
     FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
-
     if (!fileInfo.exists()) {
       throw new FileNotFoundException(
           String.format(
               "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
     }
-
     String userName = getUgiUserName();
     return getFileStatus(fileInfo, userName);
   }
@@ -1461,7 +1464,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
         .findFirst();
   }
 
-  public boolean LazyFs = false;
   /**
    * Configures GHFS using the supplied configuration.
    *
@@ -1478,6 +1480,12 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     defaultBlockSize = BLOCK_SIZE.get(config, config::getLong);
     reportedPermissions = new FsPermission(PERMISSIONS_TO_REPORT.get(config, config::get));
 
+    if (GCS_LAZY_INITIALIZATION_ENABLE.get(config, config::getBoolean)) {
+      this.LazyFs = true;
+    } else {
+      this.LazyFs = false;
+    }
+
     if (gcsFsSupplier == null) {
       if (GCS_LAZY_INITIALIZATION_ENABLE.get(config, config::getBoolean)) {
         this.LazyFs = true;
@@ -1486,26 +1494,22 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 () -> {
                   try {
                     GoogleCloudStorageFileSystem gcsFs = createGcsFs(config);
+
                     configureBuckets(gcsFs);
                     configureWorkingDirectory(config);
                     gcsFsInitialized = true;
+
                     return gcsFs;
                   } catch (IOException e) {
                     throw new RuntimeException("Failed to create GCS FS", e);
                   }
                 });
       } else {
-        this.LazyFs = false;
         setGcsFs(createGcsFs(config));
         configureBuckets(getGcsFs());
         configureWorkingDirectory(config);
       }
     } else {
-      if (GCS_LAZY_INITIALIZATION_ENABLE.get(config, config::getBoolean)) {
-        this.LazyFs = true;
-      } else {
-        this.LazyFs = false;
-      }
       configureBuckets(getGcsFs());
       configureWorkingDirectory(config);
     }
@@ -1662,11 +1666,11 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public void close() throws IOException {
     logger.atFiner().log("close()");
-    System.out.println(LazyFs + " LAZYFS ****");
     if (!this.LazyFs) {
       setHttpStatistics();
     }
     super.close();
+
     // NB: We must *first* have the superclass close() before we close the underlying gcsFsSupplier
     // since the superclass may decide to perform various heavyweight cleanup operations (such as
     // deleteOnExit).
@@ -1734,7 +1738,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
           String.format(
               "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
     }
-
     FileChecksum checksum = getFileChecksum(checksumType, fileInfo);
     logger.atFiner().log(
         "getFileChecksum(hadoopPath: %s [gcsPath: %s]): %s", hadoopPath, gcsPath, checksum);
@@ -1783,6 +1786,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   public byte[] getXAttr(Path path, String name) throws IOException {
     checkNotNull(path, "path should not be null");
     checkNotNull(name, "name should not be null");
+
     Map<String, byte[]> attributes = getGcsFs().getFileInfo(getGcsPath(path)).getAttributes();
     String xAttrKey = getXAttrKey(name);
     byte[] xAttr =
@@ -1797,6 +1801,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public Map<String, byte[]> getXAttrs(Path path) throws IOException {
     checkNotNull(path, "path should not be null");
+
     FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
     Map<String, byte[]> xAttrs =
         fileInfo.getAttributes().entrySet().stream()
@@ -1890,22 +1895,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     checkNotNull(path, "path should not be null");
     checkNotNull(name, "name should not be null");
 
-    try {
-      FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
-      Map<String, byte[]> xAttrToRemove = new HashMap<>();
-      xAttrToRemove.put(getXAttrKey(name), null);
-      UpdatableItemInfo updateInfo =
-          new UpdatableItemInfo(
-              StorageResourceId.fromUriPath(fileInfo.getPath(), /* allowEmptyObjectName= */ false),
-              xAttrToRemove);
-      getGcsFs().getGcs().updateItems(ImmutableList.of(updateInfo));
-    } catch (DirectoryNotEmptyException e) {
-      throw e;
-    } catch (IOException e) {
-      if (ApiErrorExtractor.INSTANCE.requestFailure(e)) {
-        throw e;
-      }
-    }
+    FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
+    Map<String, byte[]> xAttrToRemove = new HashMap<>();
+    xAttrToRemove.put(getXAttrKey(name), null);
+    UpdatableItemInfo updateInfo =
+        new UpdatableItemInfo(
+            StorageResourceId.fromUriPath(fileInfo.getPath(), /* allowEmptyObjectName= */ false),
+            xAttrToRemove);
+    getGcsFs().getGcs().updateItems(ImmutableList.of(updateInfo));
   }
 
   private boolean isXAttr(String key) {
@@ -1924,27 +1921,12 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     return value == null ? XATTR_NULL_VALUE : value;
   }
 
+  /**
+   * Get the instrumentation's IOStatistics.
+   *
+   * @return statistics
+   */
   public IOStatistics getIOStatistics() {
     return instrumentation != null ? instrumentation.getIOStatistics() : null;
-  }
-
-  /**
-   * Get the factory for duration tracking.
-   *
-   * @return a factory from the instrumentation
-   */
-  protected DurationTrackerFactory getDurationTrackerFactory() {
-    return instrumentation != null ? instrumentation.getDurationTrackerFactory() : null;
-  }
-
-  /**
-   * Get the GoogleCloudStorageStatistics.
-   *
-   * @param key
-   * @return statistics value of a key
-   */
-  protected long getGCSStatistics(GoogleCloudStorageStatistics key) {
-    final GoogleCloudStorage delegate = this.getGcsFs().getGcs();
-    return delegate.getStatistics(key);
   }
 }

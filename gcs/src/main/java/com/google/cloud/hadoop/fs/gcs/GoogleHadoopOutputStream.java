@@ -48,7 +48,6 @@ class GoogleHadoopOutputStream extends OutputStream {
   // numbers of bytes written.
   private final FileSystem.Statistics statistics;
 
-  private GhfsInstrumentation instrumentation;
   /**
    * Constructs an instance of GoogleHadoopOutputStream object.
    *
@@ -68,32 +67,13 @@ class GoogleHadoopOutputStream extends OutputStream {
     this.gcsPath = gcsPath;
     this.statistics = statistics;
     GoogleCloudStorageFileSystem gcsfs = ghfs.getGcsFs();
-    this.instrumentation = ghfs.getInstrumentation();
-    // this.channel = createChannel(gcsfs, gcsPath, createFileOptions);
-    this.channel = createChannel(gcsfs, gcsPath, createFileOptions, this.instrumentation);
+    this.channel = createChannel(gcsfs, gcsPath, createFileOptions);
     this.out = createOutputStream(this.channel, gcsfs.getOptions().getCloudStorageOptions());
   }
 
   private static WritableByteChannel createChannel(
       GoogleCloudStorageFileSystem gcsfs, URI gcsPath, CreateFileOptions options)
       throws IOException {
-    try {
-      return gcsfs.create(gcsPath, options);
-    } catch (java.nio.file.FileAlreadyExistsException e) {
-      throw (FileAlreadyExistsException)
-          new FileAlreadyExistsException(String.format("'%s' already exists", gcsPath))
-              .initCause(e);
-    }
-  }
-
-  /* CreateChannel with HTTP Statistics */
-  private static WritableByteChannel createChannel(
-      GoogleCloudStorageFileSystem gcsfs,
-      URI gcsPath,
-      CreateFileOptions options,
-      GhfsInstrumentation instrumentation)
-      throws IOException {
-
     try {
       return gcsfs.create(gcsPath, options);
     } catch (java.nio.file.FileAlreadyExistsException e) {

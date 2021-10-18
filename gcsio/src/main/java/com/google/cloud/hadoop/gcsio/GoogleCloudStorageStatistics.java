@@ -1,5 +1,6 @@
 package com.google.cloud.hadoop.gcsio;
 
+/** Statistics which are collected in GCSIO. */
 public enum GoogleCloudStorageStatistics {
   ACTION_HTTP_GET_REQUEST,
 

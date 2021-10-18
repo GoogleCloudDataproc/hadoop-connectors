@@ -109,11 +109,6 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public long getStatistics(GoogleCloudStorageStatistics key) {
-    return 0L;
-  }
-
-  @Override
   public void copy(
       String srcBucketName,
       List<String> srcObjectNames,
@@ -217,5 +212,11 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
    */
   public GoogleCloudStorage getDelegate() {
     return delegate;
+  }
+
+  /** Get the IOStatistics value */
+  @Override
+  public long getStatistics(GoogleCloudStorageStatistics key) {
+    return 0L;
   }
 }
