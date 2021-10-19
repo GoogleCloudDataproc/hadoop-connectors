@@ -259,6 +259,7 @@
                     <exclude>com.google.cloud.hadoop.util.AccessTokenProvider$AccessTokenType</exclude>
                     <exclude>com.google.cloud.hadoop.util.AccessBoundary</exclude>
                     <exclude>com.google.cloud.hadoop.util.AccessBoundary$Action</exclude>
+                    <exclude>com.google.cloud.hadoop.util.AutoValue_AccessBoundary</exclude>
                   </excludes>
                 </relocation>
                 <relocation>
