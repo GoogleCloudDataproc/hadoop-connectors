@@ -25,9 +25,8 @@ import org.junit.runners.JUnit4;
 public class AccessBoundaryTest {
 
   /**
-   * This test is to confirm the enum names don't change announced.
-   * The Action enum is a downstream contract that shouldn't change current values to avoid breaking
-   * changes.
+   * This test is to confirm the enum names don't change announced. The Action enum is a downstream
+   * contract that shouldn't change current values to avoid breaking changes.
    */
   @Test
   public void Action_enumNames() {
