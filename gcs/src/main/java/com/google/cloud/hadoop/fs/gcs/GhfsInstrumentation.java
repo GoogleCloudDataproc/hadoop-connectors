@@ -17,13 +17,12 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStatistics;
-import static org.apache.hadoop.fs.statistics.StoreStatisticNames.*;
+import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.iostatisticsStore;
 
 import com.google.common.flogger.GoogleLogger;
 import java.io.Closeable;
 import java.net.URI;
-import java.time.Duration;
 import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -64,7 +63,7 @@ public class GhfsInstrumentation
    * {@value} Currently all gcs metrics are placed in a single "context". Distinct contexts may be
    * used in the future.
    */
-  public static final String CONTEXT = "gcsFilesystem";
+  public static final String CONTEXT = "GoogleHadoopFilesystem";
 
   /** {@value} The name of the gcs-specific metrics system instance used for gcs metrics. */
   public static final String METRICS_SYSTEM_NAME = "google-hadoop-file-system";
@@ -121,31 +120,24 @@ public class GhfsInstrumentation
         fileSystemInstanceID.toString());
     registry.tag(METRIC_TAG_BUCKET, "Hostname from the FS URL", name.getHost());
     IOStatisticsStoreBuilder storeBuilder = IOStatisticsBinding.iostatisticsStore();
-    // declare all counter statistics
     EnumSet.allOf(GhfsStatistic.class).stream()
-        .filter(GhfsStatistic -> GhfsStatistic.getType() == GhfsStatisticTypeEnum.TYPE_COUNTER)
         .forEach(
             stat -> {
-              counter(stat);
-              storeBuilder.withCounters(stat.getSymbol());
-            });
-    // declare all gauge statistics
-    EnumSet.allOf(GhfsStatistic.class).stream()
-        .filter(statistic -> statistic.getType() == GhfsStatisticTypeEnum.TYPE_GAUGE)
-        .forEach(
-            stat -> {
-              gauge(stat);
-              storeBuilder.withGauges(stat.getSymbol());
+              // declare all counter statistics
+              if (stat.getType() == GhfsStatisticTypeEnum.TYPE_COUNTER) {
+                counter(stat);
+                storeBuilder.withCounters(stat.getSymbol());
+                // declare all gauge statistics
+              } else if (stat.getType() == GhfsStatisticTypeEnum.TYPE_GAUGE) {
+                gauge(stat);
+                storeBuilder.withGauges(stat.getSymbol());
+                // and durations
+              } else if (stat.getType() == GhfsStatisticTypeEnum.TYPE_DURATION) {
+                duration(stat);
+                storeBuilder.withDurationTracking(stat.getSymbol());
+              }
             });
 
-    // and durations
-    EnumSet.allOf(GhfsStatistic.class).stream()
-        .filter(statistic -> statistic.getType() == GhfsStatisticTypeEnum.TYPE_DURATION)
-        .forEach(
-            stat -> {
-              duration(stat);
-              storeBuilder.withDurationTracking(stat.getSymbol());
-            });
     // register with Hadoop metrics
     registerAsMetricsSource(name);
     // and build the IO Statistics
@@ -614,9 +606,8 @@ public class GhfsInstrumentation
 
     /**
      * {@code close()} merges the stream statistics into the filesystem's instrumentation instance.
-     * The filesystem statistics of {@link #filesystemStatistics} updated with the bytes
-     * read values.
-     * When the input stream is closed, corresponding counters will be updated.
+     * The filesystem statistics of {@link #filesystemStatistics} updated with the bytes read
+     * values. When the input stream is closed, corresponding counters will be updated.
      */
     @Override
     public void close() {
@@ -638,7 +629,6 @@ public class GhfsInstrumentation
         filesystemStatistics.incrementBytesReadByDistance(DISTANCE, t);
         filesystemStatistics.incrementReadOps(readOperations);
       }
-
     }
 
     /**
