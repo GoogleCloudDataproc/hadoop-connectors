@@ -30,27 +30,16 @@ public abstract class AccessBoundary {
   public abstract Action action();
 
   public enum Action {
-    UNSPECIFIED_ACTION("UNSPECIFIED_ACTION"),
-    LIST_OBJECTS("LIST_OBJECTS"),
-    READ_OBJECTS("READ_OBJECTS"),
-    WRITE_OBJECTS("WRITE_OBJECTS"),
+    UNSPECIFIED_ACTION,
+    LIST_OBJECTS,
+    READ_OBJECTS,
+    WRITE_OBJECTS,
     // EDIT_OBJECTS implies READ_OBJECTS and WRITE_OBJECTS
-    EDIT_OBJECTS("EDIT_OBJECTS"),
-    DELETE_OBJECTS("DELETE_OBJECTS"),
-    GET_BUCKETS("GET_BUCKETS"),
-    CREATE_BUCKETS("CREATE_BUCKETS"),
-    DELETE_BUCKETS("DELETE_BUCKETS"),
-    LIST_BUCKETS("LIST_BUCKETS");
-
-    private String name;
-
-    Action(String name) {
-      this.name = name;
-    }
-
-    @Override
-    public String toString() {
-      return this.name;
-    }
+    EDIT_OBJECTS,
+    DELETE_OBJECTS,
+    GET_BUCKETS,
+    CREATE_BUCKETS,
+    DELETE_BUCKETS,
+    LIST_BUCKETS
   }
 }
