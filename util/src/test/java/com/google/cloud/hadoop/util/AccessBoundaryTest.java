@@ -14,7 +14,7 @@
 
 package com.google.cloud.hadoop.util;
 
-import static org.junit.Assert.assertEquals;
+import static com.google.common.truth.Truth.assertThat;
 
 import com.google.cloud.hadoop.util.AccessBoundary.Action;
 import org.junit.Test;
@@ -30,13 +30,13 @@ public class AccessBoundaryTest {
    */
   @Test
   public void Action_enumNames() {
-    assertEquals("LIST_OBJECTS", Action.LIST_OBJECTS.name());
-    assertEquals("READ_OBJECTS", Action.READ_OBJECTS.name());
-    assertEquals("WRITE_OBJECTS", Action.WRITE_OBJECTS.name());
-    assertEquals("EDIT_OBJECTS", Action.EDIT_OBJECTS.name());
-    assertEquals("GET_BUCKETS", Action.GET_BUCKETS.name());
-    assertEquals("CREATE_BUCKETS", Action.CREATE_BUCKETS.name());
-    assertEquals("DELETE_BUCKETS", Action.DELETE_BUCKETS.name());
-    assertEquals("LIST_BUCKETS", Action.LIST_BUCKETS.name());
+    assertThat(Action.LIST_OBJECTS.name()).isEqualTo("LIST_OBJECTS");
+    assertThat(Action.READ_OBJECTS.name()).isEqualTo("READ_OBJECTS");
+    assertThat(Action.WRITE_OBJECTS.name()).isEqualTo("WRITE_OBJECTS");
+    assertThat(Action.EDIT_OBJECTS.name()).isEqualTo("EDIT_OBJECTS");
+    assertThat(Action.GET_BUCKETS.name()).isEqualTo("GET_BUCKETS");
+    assertThat(Action.CREATE_BUCKETS.name()).isEqualTo("CREATE_BUCKETS");
+    assertThat(Action.DELETE_BUCKETS.name()).isEqualTo("DELETE_BUCKETS");
+    assertThat(Action.LIST_BUCKETS.name()).isEqualTo("LIST_BUCKETS");
   }
 }
