@@ -44,6 +44,7 @@ import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.BaseEncoding;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -1350,16 +1351,30 @@ public class GoogleCloudStorageNewIntegrationTest {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
     GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
-
+    GoogleCloudStorageItemInfo itemInfo = gcsfsIHelper.gcs.getItemInfo(testFile);
+    long generationId = gcsfsIHelper.gcs.getItemInfo(testFile).getContentGeneration();
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder().setSupportGzipEncoding(false).build();
-    IOException e = assertThrows(IOException.class, () -> gcs.open(testFile, readOptions));
+    IOException e = assertThrows(IOException.class, () -> gcs.open(itemInfo, readOptions));
     assertThat(e)
         .hasMessageThat()
         .isEqualTo("Cannot read GZIP encoded files - content encoding support is disabled.");
+  }
 
-    assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(getRequestString(testBucket, testFile.getObjectName()));
+  @Test
+  public void open_fails_ifInvalidItemInfo() throws Exception {
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    StorageResourceId testFile = new StorageResourceId(testBucket, getTestResource());
+
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    GoogleCloudStorageItemInfo itemInfo = GoogleCloudStorageItemInfo.createNotFound(testFile);
+    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder().build();
+    FileNotFoundException e =
+        assertThrows(FileNotFoundException.class, () -> gcs.open(itemInfo, readOptions));
+    assertThat(e).hasMessageThat().startsWith("Item not found");
   }
 
   private static List<String> getObjectNames(List<GoogleCloudStorageItemInfo> listedObjects) {

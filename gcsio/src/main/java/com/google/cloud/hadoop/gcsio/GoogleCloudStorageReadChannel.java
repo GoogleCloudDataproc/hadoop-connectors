@@ -188,7 +188,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
    * @param readOptions fine-grained options specifying things like retry settings, buffering, etc.
    * @throws IOException IOException on IO error
    */
-  public GoogleCloudStorageReadChannel(
+  GoogleCloudStorageReadChannel(
       Storage gcs,
       GoogleCloudStorageItemInfo itemInfo,
       ApiErrorExtractor errorExtractor,
