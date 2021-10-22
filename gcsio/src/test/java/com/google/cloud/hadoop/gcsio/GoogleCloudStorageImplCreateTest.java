@@ -15,6 +15,8 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.storage.Storage;
@@ -22,6 +24,8 @@ import com.google.auth.oauth2.ComputeEngineCredentials;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import java.io.IOException;
+import java.util.logging.Level;
+
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -74,5 +78,22 @@ public class GoogleCloudStorageImplCreateTest {
             createStorage());
     assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
         .isInstanceOf(StorageStubProvider.CloudPathGrpcDecorator.class);
+  }
+
+  @Test
+  public void create_debugLoggingConfiguration() throws IOException {
+    GoogleCloudStorageOptions optionWithDebugLoggingEnabled = GoogleCloudStorageOptions.builder()
+        .setAppName("app")
+        .setEnableDebugLogging(true)
+        .build();
+    new GoogleCloudStorageImpl(optionWithDebugLoggingEnabled, createStorage());
+    assertTrue(GoogleCloudStorageImpl.googleLogger.isLoggable(Level.CONFIG));
+
+    GoogleCloudStorageOptions optionWithDebugLoggingDisabled = GoogleCloudStorageOptions.builder()
+        .setAppName("app")
+        .setEnableDebugLogging(false)
+        .build();
+    new GoogleCloudStorageImpl(optionWithDebugLoggingDisabled, createStorage());
+    assertFalse(GoogleCloudStorageImpl.googleLogger.isLoggable(Level.CONFIG));
   }
 }

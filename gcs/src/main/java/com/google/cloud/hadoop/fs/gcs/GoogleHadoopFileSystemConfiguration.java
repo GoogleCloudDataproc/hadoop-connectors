@@ -213,6 +213,10 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Long> GCS_REWRITE_MAX_BYTES_PER_CALL =
       new HadoopConfigurationProperty<>("fs.gs.rewrite.max.bytes.per.call", 512 * 1024 * 1024L);
 
+  /** Configuration key for enabling the debug logging under the com.google package. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_ENABLE_DEBUG_LOGGING =
+      new HadoopConfigurationProperty<>("fs.gs.debug.logging.enable", false);
+
   /** Configuration key for number of items to return per call to the list* GCS RPCs. */
   public static final HadoopConfigurationProperty<Long> GCS_MAX_LIST_ITEMS_PER_CALL =
       new HadoopConfigurationProperty<>("fs.gs.list.max.items.per.call", 1024L);
@@ -451,6 +455,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setAutoRepairImplicitDirectoriesEnabled(
             GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.get(config, config::getBoolean))
         .setCopyWithRewriteEnabled(GCS_COPY_WITH_REWRITE_ENABLE.get(config, config::getBoolean))
+        .setEnableDebugLogging(GCS_ENABLE_DEBUG_LOGGING.get(config, config::getBoolean))
         .setMaxBytesRewrittenPerCall(GCS_REWRITE_MAX_BYTES_PER_CALL.get(config, config::getLong))
         .setTransportType(
             HTTP_TRANSPORT_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::getEnum))
