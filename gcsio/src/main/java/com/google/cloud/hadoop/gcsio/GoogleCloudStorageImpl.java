@@ -746,25 +746,48 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     Preconditions.checkArgument(
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
 
-    if (storageOptions.isGrpcEnabled()) {
-      return GoogleCloudStorageGrpcReadChannel.open(
-          storageStubProvider, storage, errorExtractor, resourceId, readOptions);
-    }
-
     // The underlying channel doesn't initially read data, which means that we won't see a
     // FileNotFoundException until read is called. As a result, in order to find out if the
-    // object
-    // exists, we'll need to do an RPC (metadata or data). A metadata check should be a less
+    // object exists, we'll need to do an RPC (metadata or data). A metadata check should be a less
     // expensive operation than a read data operation.
-    GoogleCloudStorageItemInfo info;
-    if (readOptions.getFastFailOnNotFound()) {
-      info = getItemInfo(resourceId);
-      if (!info.exists()) {
-        throw createFileNotFoundException(
-            resourceId.getBucketName(), resourceId.getObjectName(), /* cause= */ null);
-      }
-    } else {
-      info = null;
+    GoogleCloudStorageItemInfo itemInfo =
+        readOptions.getFastFailOnNotFound() ? getItemInfo(resourceId) : null;
+
+    return open(resourceId, itemInfo, readOptions);
+  }
+
+  /**
+   * See {@link GoogleCloudStorage#open(GoogleCloudStorageItemInfo)} for details about expected
+   * behavior.
+   */
+  public SeekableByteChannel open(
+      GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
+      throws IOException {
+    logger.atFiner().log("open(%s, %s)", itemInfo, readOptions);
+    checkNotNull(itemInfo, "itemInfo should not be null");
+
+    StorageResourceId resourceId = itemInfo.getResourceId();
+    Preconditions.checkArgument(
+        resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
+
+    return open(resourceId, itemInfo, readOptions);
+  }
+
+  private SeekableByteChannel open(
+      StorageResourceId resourceId,
+      GoogleCloudStorageItemInfo itemInfo,
+      GoogleCloudStorageReadOptions readOptions)
+      throws IOException {
+    if (itemInfo != null && !itemInfo.exists()) {
+      throw createFileNotFoundException(
+          resourceId.getBucketName(), resourceId.getObjectName(), /* cause= */ null);
+    }
+    if (storageOptions.isGrpcEnabled()) {
+      return itemInfo == null
+          ? GoogleCloudStorageGrpcReadChannel.open(
+              storageStubProvider, storage, errorExtractor, resourceId, readOptions)
+          : GoogleCloudStorageGrpcReadChannel.open(
+              storageStubProvider, storage, errorExtractor, itemInfo, readOptions);
     }
 
     return new GoogleCloudStorageReadChannel(
@@ -773,7 +796,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       @Override
       @Nullable
       protected GoogleCloudStorageItemInfo getInitialMetadata() {
-        return info;
+        return itemInfo;
       }
 
       @Override

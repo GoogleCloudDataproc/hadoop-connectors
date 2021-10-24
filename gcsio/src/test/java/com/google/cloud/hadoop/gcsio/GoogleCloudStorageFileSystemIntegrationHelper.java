@@ -95,6 +95,13 @@ public class GoogleCloudStorageFileSystemIntegrationHelper
     return gcsfs.open(path, readOptions);
   }
 
+  /** Opens the given object for reading, with the specified read options. */
+  @Override
+  protected SeekableByteChannel open(FileInfo fileInfo, GoogleCloudStorageReadOptions readOptions)
+      throws IOException {
+    return gcsfs.open(fileInfo, readOptions);
+  }
+
   /** Creates a directory. */
   @Override
   protected void mkdir(String bucketName, String objectName) throws IOException {

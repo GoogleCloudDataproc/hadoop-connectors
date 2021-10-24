@@ -169,6 +169,31 @@ public interface GoogleCloudStorage {
       throws IOException;
 
   /**
+   * Opens an object for reading using GoogleCloudStorageItemInfo.
+   *
+   * @param itemInfo identifies a StorageObject
+   * @return a channel for reading from the given object
+   * @throws java.io.FileNotFoundException if the given object does not exist
+   * @throws IOException if object exists but cannot be opened
+   */
+  default SeekableByteChannel open(GoogleCloudStorageItemInfo itemInfo) throws IOException {
+    return open(itemInfo, GoogleCloudStorageReadOptions.DEFAULT);
+  }
+
+  /**
+   * Opens an object for reading using GoogleCloudStorageItemInfo.
+   *
+   * @param itemInfo identifies a StorageObject
+   * @param readOptions Fine-grained options for behaviors of retries, buffering, etc.
+   * @return a channel for reading from the given object
+   * @throws java.io.FileNotFoundException if the given object does not exist
+   * @throws IOException if object exists but cannot be opened
+   */
+  SeekableByteChannel open(
+      GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
+      throws IOException;
+
+  /**
    * Deletes a list of buckets. Does not throw any exception for "bucket not found" errors.
    *
    * @param bucketNames name of the buckets to delete
