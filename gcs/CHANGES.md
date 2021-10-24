@@ -6,6 +6,9 @@
 
 1.  Add support for downscoped tokens in `AccessTokenProvider`.
 
+1.  Implement `FileSystem.openFile` to take advantage of the `FileStatus` if
+    passed.
+
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.

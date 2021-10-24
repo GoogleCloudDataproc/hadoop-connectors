@@ -187,7 +187,8 @@ public class GoogleCloudStorageFileSystem {
     this(gcsFn.apply(options.getCloudStorageOptions()), options);
   }
 
-  private GoogleCloudStorageFileSystem(
+  @VisibleForTesting
+  public GoogleCloudStorageFileSystem(
       GoogleCloudStorage gcs, GoogleCloudStorageFileSystemOptions options) {
     checkArgument(
         gcs.getOptions() == options.getCloudStorageOptions(),
