@@ -9,6 +9,12 @@
 1.  Implement `FileSystem.openFile` to take advantage of the `FileStatus` if
     passed.
 
+1.  Remove support for Apache HTTP transport and related property:
+
+    ```
+    fs.gs.http.transport.type
+    ```
+
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.

@@ -22,7 +22,6 @@ import com.google.auto.value.AutoValue;
 import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
 import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
-import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
@@ -107,7 +106,6 @@ public abstract class GoogleCloudStorageOptions {
         .setMaxHttpRequestRetries(MAX_HTTP_REQUEST_RETRIES)
         .setHttpRequestConnectTimeout(HTTP_REQUEST_CONNECT_TIMEOUT)
         .setHttpRequestReadTimeout(HTTP_REQUEST_READ_TIMEOUT)
-        .setTransportType(HttpTransportFactory.DEFAULT_TRANSPORT_TYPE)
         .setCopyWithRewriteEnabled(COPY_WITH_REWRITE_DEFAULT)
         .setMaxBytesRewrittenPerCall(MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT)
         .setReadChannelOptions(GoogleCloudStorageReadOptions.DEFAULT)
@@ -150,8 +148,6 @@ public abstract class GoogleCloudStorageOptions {
   public abstract int getHttpRequestConnectTimeout();
 
   public abstract int getHttpRequestReadTimeout();
-
-  public abstract HttpTransportFactory.HttpTransportType getTransportType();
 
   @Nullable
   public abstract String getProxyAddress();
@@ -237,8 +233,6 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setHttpRequestConnectTimeout(int httpRequestConnectTimeout);
 
     public abstract Builder setHttpRequestReadTimeout(int httpRequestReadTimeout);
-
-    public abstract Builder setTransportType(HttpTransportFactory.HttpTransportType transportType);
 
     public abstract Builder setProxyAddress(String proxyAddress);
 

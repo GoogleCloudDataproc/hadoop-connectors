@@ -1457,10 +1457,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       GoogleCloudStorageOptions options = gcsFsOptions.getCloudStorageOptions();
       HttpTransport httpTransport =
           HttpTransportFactory.createHttpTransport(
-              options.getTransportType(),
-              options.getProxyAddress(),
-              options.getProxyUsername(),
-              options.getProxyPassword());
+              options.getProxyAddress(), options.getProxyUsername(), options.getProxyPassword());
       GoogleCredential impersonatedCredential =
           new GoogleCredentialWithIamAccessToken(
               httpTransport,

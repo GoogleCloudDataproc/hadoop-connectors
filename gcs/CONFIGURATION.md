@@ -361,11 +361,6 @@ permissions (not authorized) to execute these requests.
 
 ### HTTP transport configuration
 
-*   `fs.gs.http.transport.type` (default: `JAVA_NET`)
-
-    HTTP transport to use for sending Cloud Storage requests. Valid values are
-    `APACHE` or `JAVA_NET`.
-
 *   `fs.gs.application.name.suffix` (not set by default)
 
     Suffix that will be added to HTTP `User-Agent` header set in all Cloud
