@@ -17,7 +17,6 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
@@ -156,17 +155,6 @@ public interface GoogleCloudStorage {
   default SeekableByteChannel open(StorageResourceId resourceId) throws IOException {
     return open(resourceId, GoogleCloudStorageReadOptions.DEFAULT);
   }
-  /**
-   * Opens an object for reading.
-   *
-   * @param itemInfo provides information about the given object
-   * @return a channel for reading from the given object
-   * @throws java.io.FileNotFoundException if the given object does not exist
-   * @throws IOException if object exists but cannot be opened
-   */
-  default SeekableByteChannel open(GoogleCloudStorageItemInfo itemInfo) throws IOException {
-    return open(itemInfo, GoogleCloudStorageReadOptions.DEFAULT);
-  }
 
   /**
    * Opens an object for reading.
@@ -181,20 +169,30 @@ public interface GoogleCloudStorage {
       throws IOException;
 
   /**
-   * Opens an object for reading using GoogleCloudStorageItemInfo
+   * Opens an object for reading using GoogleCloudStorageItemInfo.
    *
-   * @param itemInfo
-   * @param readOptions
+   * @param itemInfo identifies a StorageObject
    * @return a channel for reading from the given object
    * @throws java.io.FileNotFoundException if the given object does not exist
    * @throws IOException if object exists but cannot be opened
    */
-  default SeekableByteChannel open(
-      GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
-      throws IOException {
-    checkNotNull(itemInfo, "Item info cannot be null");
-    return open(itemInfo.getResourceId(), readOptions);
+  default SeekableByteChannel open(GoogleCloudStorageItemInfo itemInfo) throws IOException {
+    return open(itemInfo, GoogleCloudStorageReadOptions.DEFAULT);
   }
+
+  /**
+   * Opens an object for reading using GoogleCloudStorageItemInfo.
+   *
+   * @param itemInfo identifies a StorageObject
+   * @param readOptions Fine-grained options for behaviors of retries, buffering, etc.
+   * @return a channel for reading from the given object
+   * @throws java.io.FileNotFoundException if the given object does not exist
+   * @throws IOException if object exists but cannot be opened
+   */
+  SeekableByteChannel open(
+      GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
+      throws IOException;
+
   /**
    * Deletes a list of buckets. Does not throw any exception for "bucket not found" errors.
    *

@@ -97,10 +97,9 @@ public class GoogleCloudStorageFileSystemIntegrationHelper
 
   /** Opens the given object for reading, with the specified read options. */
   @Override
-  protected SeekableByteChannel open(
-      GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
+  protected SeekableByteChannel open(FileInfo fileInfo, GoogleCloudStorageReadOptions readOptions)
       throws IOException {
-    return gcsfs.open(itemInfo, readOptions);
+    return gcsfs.open(fileInfo, readOptions);
   }
 
   /** Creates a directory. */

@@ -179,31 +179,6 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     }
   }
 
-  /**
-   * Constructs an instance of GoogleCloudStorageReadChannel.
-   *
-   * @param gcs storage object instance
-   * @param itemInfo contains metadata information about the file
-   * @param requestHelper a ClientRequestHelper used to set any extra headers
-   * @param readOptions fine-grained options specifying things like retry settings, buffering, etc.
-   * @throws IOException IOException on IO error
-   */
-  GoogleCloudStorageReadChannel(
-      Storage gcs,
-      GoogleCloudStorageItemInfo itemInfo,
-      ApiErrorExtractor errorExtractor,
-      ClientRequestHelper<StorageObject> requestHelper,
-      @Nonnull GoogleCloudStorageReadOptions readOptions)
-      throws IOException {
-    this.gcs = gcs;
-    this.clientRequestHelper = requestHelper;
-    this.errorExtractor = errorExtractor;
-    this.readOptions = readOptions;
-    this.resourceId = itemInfo.getResourceId();
-    checkNotNull(itemInfo, "Item info: %s cannot be null", itemInfo);
-    initMetadata(itemInfo);
-  }
-
   /** Sets the Sleeper used for sleeping between retries. */
   @VisibleForTesting
   void setSleeper(Sleeper sleeper) {

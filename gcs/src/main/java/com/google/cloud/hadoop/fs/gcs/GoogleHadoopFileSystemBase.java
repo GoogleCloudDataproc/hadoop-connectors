@@ -39,7 +39,6 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.flogger.LazyArgs.lazy;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.concurrent.Executors.newFixedThreadPool;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
@@ -103,10 +102,8 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -250,6 +247,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   private static final ThreadFactory DAEMON_THREAD_FACTORY =
       new ThreadFactoryBuilder().setNameFormat("ghfs-thread-%d").setDaemon(true).build();
+
+  // Thread-pool used for background tasks.
+  private ExecutorService backgroundTasksThreadPool =
+      Executors.newCachedThreadPool(DAEMON_THREAD_FACTORY);
 
   @VisibleForTesting GlobAlgorithm globAlgorithm = GCS_GLOB_ALGORITHM.getDefault();
 
@@ -569,38 +570,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   }
 
   /**
-   * Inititates a thread pool to enable calling of callable or method to handle future response
-   *
-   * @return ThreadPoolExecutor object to run a callable or method
-   */
-  private static ExecutorService createCachedExecutor() {
-    ThreadPoolExecutor service =
-        new ThreadPoolExecutor(
-            /* corePoolSize= */ 2,
-            /* maximumPoolSize= */ Integer.MAX_VALUE,
-            /* keepAliveTime= */ 30,
-            TimeUnit.SECONDS,
-            new SynchronousQueue<>(),
-            new ThreadFactoryBuilder().setNameFormat("ghfs-misc-%d").setDaemon(true).build());
-    service.allowCoreThreadTimeOut(true);
-    // allowCoreThreadTimeOut needs to be enabled for cases where the encapsulating class does not
-    return service;
-  }
-  /**
-   * Checks if a given file status is an instance of GoogleHadoopFileStatus
-   *
-   * @param fileStatus
-   * @return
-   */
-  private GoogleCloudStorageItemInfo getItemInfo(FileStatus fileStatus) {
-    return fileStatus instanceof GoogleHadoopFileStatus
-        ? ((GoogleHadoopFileStatus) fileStatus).getItemInfo()
-        : null;
-  }
-  /**
    * Initiate the open operation. This is invoked from both the FileSystem and FileContext APIs
    *
-   * @param rawPath path to the file
+   * @param hadoopPath path to the file
    * @param parameters open file parameters from the builder.
    * @return a future which will evaluate to the opened file.
    * @throws IOException failure to resolve the link.
@@ -608,45 +580,33 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public CompletableFuture<FSDataInputStream> openFileWithOptions(
-      final Path rawPath, final OpenFileParameters parameters) throws IOException {
-    logger.atFiner().log("Path to be opened: %s, Parameters: %s ", rawPath, parameters.toString());
-    final Path path = makeQualified(rawPath);
-    Set<String> mandatoryKeys = parameters.getMandatoryKeys();
-    AbstractFSBuilderImpl.rejectUnknownMandatoryKeys(
-        mandatoryKeys, Collections.emptySet(), "for " + path);
-    FileStatus fileStatus = parameters.getStatus();
-    GoogleCloudStorageItemInfo itemInfo = null;
-    CompletableFuture<FSDataInputStream> result = new CompletableFuture<>();
-    if (fileStatus == null || getItemInfo(fileStatus) == null) {
-      return super.openFileWithOptions(rawPath, parameters);
-    }
-    itemInfo = getItemInfo(fileStatus);
-    logger.atFine().log("ItemInfo :%s, File exists: %s", itemInfo, itemInfo.getResourceId());
-    GoogleCloudStorageItemInfo finalItemInfo = itemInfo;
-    ThreadPoolExecutor unboundedThreadPool = (ThreadPoolExecutor) createCachedExecutor();
-    unboundedThreadPool.submit(
-        () -> LambdaUtils.eval(result, () -> open(finalItemInfo, parameters.getBufferSize())));
-    return result;
-  }
-  /**
-   * Opens an FSDataInputStream at the indicated GoogleCloudStorageItemInfo.
-   *
-   * @param itemInfo the item info of file to open
-   * @param bufferSize the size of the buffer to be used.
-   */
-  protected FSDataInputStream open(GoogleCloudStorageItemInfo itemInfo, int bufferSize)
-      throws IOException {
+      Path hadoopPath, OpenFileParameters parameters) throws IOException {
+    checkNotNull(hadoopPath, "hadoopPath should not be null");
     checkOpen();
-    logger.atFiner().log("open(itemInfo: %s, bufferSize: %d [ignored])", itemInfo, bufferSize);
-    checkNotNull(itemInfo, "Item info cannot be null");
-    logger.atFine().log("File exists: %s", itemInfo.getResourceId());
-    GoogleCloudStorageReadOptions readChannelOptions =
-        getGcsFs().getOptions().getCloudStorageOptions().getReadChannelOptions();
-    logger.atFiner().log("Read channel options: %s", readChannelOptions);
-    GoogleHadoopFSInputStream in =
-        new GoogleHadoopFSInputStream(this, itemInfo, readChannelOptions, statistics);
+    logger.atFiner().log("Path to be opened: %s, parameters: %s ", hadoopPath, parameters);
 
-    return new FSDataInputStream(in);
+    URI gcsPath = getGcsPath(hadoopPath);
+    AbstractFSBuilderImpl.rejectUnknownMandatoryKeys(
+        parameters.getMandatoryKeys(), Collections.emptySet(), "for " + gcsPath);
+
+    FileStatus fileStatus = parameters.getStatus();
+    FileInfo fileInfo =
+        fileStatus instanceof GoogleHadoopFileStatus
+            ? ((GoogleHadoopFileStatus) fileStatus).getFileInfo()
+            : null;
+    if (fileInfo == null) {
+      return super.openFileWithOptions(hadoopPath, parameters);
+    }
+
+    CompletableFuture<FSDataInputStream> result = new CompletableFuture<>();
+    backgroundTasksThreadPool.submit(
+        () ->
+            LambdaUtils.eval(
+                result,
+                () ->
+                    new FSDataInputStream(
+                        new GoogleHadoopFSInputStream(this, fileInfo, statistics))));
+    return result;
   }
 
   /**
@@ -1052,9 +1012,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   /** Returns FileStatus corresponding to the given FileInfo value. */
   private GoogleHadoopFileStatus getGoogleHadoopFileStatus(FileInfo fileInfo, String userName) {
+    checkNotNull(fileInfo, "fileInfo should not be null");
     // GCS does not provide modification time. It only provides creation time.
     // It works for objects because they are immutable once created.
-    checkNotNull(fileInfo, "File info cannot be null");
     GoogleHadoopFileStatus status =
         new GoogleHadoopFileStatus(
             fileInfo,
@@ -1189,9 +1149,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   private FileStatus[] concurrentGlobInternal(Path fixedPath, PathFilter filter)
       throws IOException {
-    ExecutorService globExecutor = newFixedThreadPool(2, DAEMON_THREAD_FACTORY);
     try {
-      return globExecutor.invokeAny(
+      return backgroundTasksThreadPool.invokeAny(
           ImmutableList.of(
               () -> flatGlobInternal(fixedPath, filter),
               () -> super.globStatus(fixedPath, filter)));
@@ -1200,8 +1159,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       throw new IOException(String.format("Concurrent glob execution failed: %s", e), e);
     } catch (ExecutionException e) {
       throw new IOException(String.format("Concurrent glob execution failed: %s", e.getCause()), e);
-    } finally {
-      globExecutor.shutdownNow();
     }
   }
 
@@ -1731,6 +1688,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     }
 
     stopDelegationTokens();
+
+    backgroundTasksThreadPool.shutdown();
+    backgroundTasksThreadPool = null;
   }
 
   @Override

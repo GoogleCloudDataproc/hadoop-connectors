@@ -326,26 +326,22 @@ public class GoogleCloudStorageFileSystem {
   }
 
   /**
-   * * Opens an object for reading using item info.
+   * Opens an object for reading using {@link FileInfo}.
    *
-   * @param itemInfo contains metadata information about the file
+   * @param fileInfo contains metadata information about the file
    * @param readOptions readOptions fine-grained options specifying things like retry settings,
    *     buffering, etc.
    * @return Seekable Byte Channel to enable file open
    * @throws IOException IOException on IO Error
    */
-  public SeekableByteChannel open(
-      GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
+  public SeekableByteChannel open(FileInfo fileInfo, GoogleCloudStorageReadOptions readOptions)
       throws IOException {
-    logger.atFiner().log("open(Item info : %s, readOptions: %s)", itemInfo, readOptions);
-    checkNotNull(itemInfo, "Item info cannot be null");
-    checkNotNull(
-        UriPaths.fromResourceId(itemInfo.getResourceId(), false), "path should not be null");
+    logger.atFiner().log("open(fileInfo : %s, readOptions: %s)", fileInfo, readOptions);
+    checkNotNull(fileInfo, "fileInfo should not be null");
     checkArgument(
-        !itemInfo.isDirectory(),
-        "Cannot open a directory for reading: %s",
-        itemInfo.getResourceId());
-    return gcs.open(itemInfo, readOptions);
+        !fileInfo.isDirectory(), "Cannot open a directory for reading: %s", fileInfo.getPath());
+
+    return gcs.open(fileInfo.getItemInfo(), readOptions);
   }
 
   /**
@@ -371,7 +367,7 @@ public class GoogleCloudStorageFileSystem {
    * @throws IOException
    */
   public void delete(URI path, boolean recursive) throws IOException {
-    Preconditions.checkNotNull(path, "path can not be null");
+    Preconditions.checkNotNull(path, "path should not be null");
     checkArgument(!path.equals(GCS_ROOT), "Cannot delete root path (%s)", path);
     logger.atFiner().log("delete(path: %s, recursive: %b)", path, recursive);
 

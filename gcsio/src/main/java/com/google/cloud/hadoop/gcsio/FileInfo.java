@@ -133,7 +133,7 @@ public class FileInfo {
   }
 
   /** Gets information about the underlying item. */
-  public GoogleCloudStorageItemInfo getItemInfo() {
+  GoogleCloudStorageItemInfo getItemInfo() {
     return itemInfo;
   }
 

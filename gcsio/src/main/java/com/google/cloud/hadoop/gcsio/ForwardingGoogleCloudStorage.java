@@ -100,8 +100,7 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   public SeekableByteChannel open(
       GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
       throws IOException {
-    logger.atFiner().log(
-        "%s.open(%s, %s)", delegateClassName, itemInfo.getResourceId(), readOptions);
+    logger.atFiner().log("%s.open(%s, %s)", delegateClassName, itemInfo, readOptions);
     return delegate.open(itemInfo, readOptions);
   }
 

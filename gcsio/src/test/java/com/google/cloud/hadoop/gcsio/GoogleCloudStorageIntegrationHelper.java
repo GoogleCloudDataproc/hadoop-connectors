@@ -269,10 +269,9 @@ public abstract class GoogleCloudStorageIntegrationHelper {
   protected abstract SeekableByteChannel open(URI path, GoogleCloudStorageReadOptions readOptions)
       throws IOException;
 
-  /** Opens the given object for reading, with the specified read options. */
+  /** Opens the given object for reading using {@link FileInfo}, with the specified read options. */
   protected abstract SeekableByteChannel open(
-      GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
-      throws IOException;
+      FileInfo fileInfo, GoogleCloudStorageReadOptions readOptions) throws IOException;
 
   /** Opens the given object for writing. */
   protected WritableByteChannel create(URI path) throws IOException {

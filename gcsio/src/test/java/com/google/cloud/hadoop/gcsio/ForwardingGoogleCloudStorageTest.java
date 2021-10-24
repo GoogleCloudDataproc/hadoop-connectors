@@ -19,6 +19,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.List;
@@ -41,7 +42,7 @@ public class ForwardingGoogleCloudStorageTest {
 
   /** Sample storage resource id. */
   private static final StorageResourceId TEST_STORAGE_RESOURCE_ID =
-      new StorageResourceId(TEST_STRING);
+      new StorageResourceId("test-bucket-name", "test/object/name");
 
   /** Sample list of storage resource ids. */
   private static final List<StorageResourceId> TEST_STORAGE_RESOURCE_IDS =
@@ -52,7 +53,17 @@ public class ForwardingGoogleCloudStorageTest {
       new UpdatableItemInfo(TEST_STORAGE_RESOURCE_ID, null);
 
   private static final GoogleCloudStorageItemInfo TEST_GCS_ITEM_INFO =
-      GoogleCloudStorageItemInfo.createInferredDirectory(TEST_STORAGE_RESOURCE_ID);
+      GoogleCloudStorageItemInfo.createObject(
+          TEST_STORAGE_RESOURCE_ID,
+          /* creationTime= */ 100,
+          /* modificationTime= */ 1000,
+          /* size= */ 324,
+          /* contentType= */ "text",
+          /* contentEncoding */ "gzip",
+          /* metadata */ ImmutableMap.of("mkey", new byte[] {1, 6}),
+          /* contentGeneration= */ 122,
+          /* metaGeneration= */ 3,
+          new VerificationAttributes(/* md5hash= */ null, /* crc32c= */ null));
 
   /** Sample list of updatable item infos. */
   private static final List<UpdatableItemInfo> TEST_ITEM_INFOS = Lists.newArrayList(TEST_ITEM_INFO);
@@ -158,12 +169,14 @@ public class ForwardingGoogleCloudStorageTest {
   @Test
   public void testOpenWithItemInfo() throws IllegalArgumentException, IOException {
     gcs.open(TEST_GCS_ITEM_INFO);
+
     verify(mockGcsDelegate).open(eq(TEST_GCS_ITEM_INFO), eq(GoogleCloudStorageReadOptions.DEFAULT));
   }
 
   @Test
   public void testOpenWithItemInfoWithOptions() throws IllegalArgumentException, IOException {
     gcs.open(TEST_GCS_ITEM_INFO, TEST_READ_OPTIONS);
+
     verify(mockGcsDelegate).open(eq(TEST_GCS_ITEM_INFO), eq(TEST_READ_OPTIONS));
   }
 

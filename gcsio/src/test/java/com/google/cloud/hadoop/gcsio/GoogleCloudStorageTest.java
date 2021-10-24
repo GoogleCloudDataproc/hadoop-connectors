@@ -1238,7 +1238,7 @@ public class GoogleCloudStorageTest {
   }
 
   @Test
-  public void testOpenNoSupportGzipEncodingAndNoFailFastOnNotFoundItemInfo() throws Exception {
+  public void testOpenItemInfoNoSupportGzipEncodingAndNoFailFastOnNotFound() throws Exception {
     byte[] testData = {0x01, 0x02, 0x03, 0x05, 0x08};
 
     MockHttpTransport transport = mockTransport(dataResponse(testData));
@@ -1263,23 +1263,6 @@ public class GoogleCloudStorageTest {
     assertThat(actualData).isEqualTo(testData);
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .contains(getMediaRequestString(BUCKET_NAME, OBJECT_NAME, itemInfo.getContentGeneration()));
-  }
-
-  @Test
-  public void testOpenNoSupportGzipEncodingAndFailFastOnNotFoundItemInfo() throws Exception {
-    byte[] testData = {0x01, 0x02, 0x03, 0x05, 0x08};
-
-    MockHttpTransport transport = mockTransport(dataResponse(testData));
-
-    GoogleCloudStorage gcs = mockedGcs(transport);
-
-    GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder()
-            .setSupportGzipEncoding(false)
-            .setFastFailOnNotFound(true)
-            .build();
-    GoogleCloudStorageItemInfo itemInfo = GoogleCloudStorageItemInfo.createNotFound(RESOURCE_ID);
-    assertThrows(FileNotFoundException.class, () -> gcs.open(itemInfo, readOptions));
   }
 
   /** Test in-place forward seeks smaller than seek buffer, smaller than limit. */

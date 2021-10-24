@@ -17,20 +17,18 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import com.google.cloud.hadoop.gcsio.FileInfo;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 
 /**
- * File status for a GCS "file".
+ * {@link FileStatus} for a {@link GoogleHadoopFileSystem} operations.
  *
- * <p>Additional support for File Status to access GoogleCloudStorageItemInfo that reduces requests
- * to gcs
+ * <p>{@link FileStatus} that has access {@link FileInfo} that has additional GCS metadata.
  */
 class GoogleHadoopFileStatus extends FileStatus {
-  // Meta data of gcs file from file info to be used when opening file with status
-  private final GoogleCloudStorageItemInfo itemInfo;
+
+  private final FileInfo fileInfo;
 
   /**
    * Constructs an instance GoogleHadoopFileStatus
@@ -49,7 +47,6 @@ class GoogleHadoopFileStatus extends FileStatus {
       long defaultBlockSize,
       FsPermission reportedPermissions,
       String userName) {
-    // Constructs an instance of GoogleHadoopFileStatus using the provided FileStatus
     super(
         fileInfo.getSize(),
         fileInfo.isDirectory(),
@@ -61,11 +58,11 @@ class GoogleHadoopFileStatus extends FileStatus {
         /* owner= */ userName,
         /* group= */ userName,
         filePath);
-    this.itemInfo = fileInfo.getItemInfo();
+    this.fileInfo = fileInfo;
   }
 
   /** Returns GCS ItemInfo for the corresponding GoogleHadoopFileStatus instance */
-  GoogleCloudStorageItemInfo getItemInfo() {
-    return this.itemInfo;
+  FileInfo getFileInfo() {
+    return fileInfo;
   }
 }
