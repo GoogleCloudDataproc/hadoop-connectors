@@ -25,6 +25,7 @@ import io.grpc.ClientInterceptor;
 import io.grpc.Context;
 import io.grpc.ForwardingClientCall.SimpleForwardingClientCall;
 import io.grpc.ForwardingClientCallListener.SimpleForwardingClientCallListener;
+import io.grpc.Grpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Metadata;
@@ -33,6 +34,7 @@ import io.grpc.Status;
 import io.grpc.alts.GoogleDefaultChannelBuilder;
 import io.grpc.auth.MoreCallCredentials;
 import io.grpc.stub.AbstractStub;
+import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -139,6 +141,35 @@ class StorageStubProvider {
     }
   }
 
+  final class RemoteAddressDebuggingInterceptor implements ClientInterceptor {
+    @Override
+    public <ReqT, RespT> ClientCall<ReqT, RespT> interceptCall(
+        MethodDescriptor<ReqT, RespT> method, CallOptions callOptions, Channel next) {
+      final ClientCall<ReqT, RespT> newCall = next.newCall(method, callOptions);
+      return new SimpleForwardingClientCall<ReqT, RespT>(newCall) {
+        @Override
+        public void start(Listener<RespT> responseListener, Metadata headers) {
+          super.start(
+              new SimpleForwardingClientCallListener<RespT>(responseListener) {
+                @Override
+                public void onClose(Status status, Metadata trailers) {
+                  if (!status.isOk()) {
+                    SocketAddress remoteAddr =
+                        newCall.getAttributes().get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR);
+                    if (remoteAddr != null) {
+                      status =
+                          status.augmentDescription("Remote Address: " + remoteAddr.toString());
+                    }
+                  }
+                  super.onClose(status, trailers);
+                }
+              },
+              headers);
+        }
+      };
+    }
+  }
+
   class ChannelAndRequestCounter {
     private final ManagedChannel channel;
     private final ActiveRequestCounter counter;
@@ -192,6 +223,7 @@ class StorageStubProvider {
             .createChannelBuilder(target)
             .enableRetry()
             .intercept(counter)
+            .intercept(new RemoteAddressDebuggingInterceptor())
             .userAgent(userAgent)
             .build();
     return new ChannelAndRequestCounter(channel, counter);
