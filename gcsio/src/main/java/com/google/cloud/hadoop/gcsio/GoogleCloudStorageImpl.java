@@ -57,7 +57,6 @@ import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.RewriteResponse;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.auth.Credentials;
-import com.google.cloud.hadoop.gcsio.authorization.StorageRequestAuthorizer;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
@@ -261,9 +260,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // Determine if a given IOException is due to rate-limiting.
   private RetryDeterminer<IOException> rateLimitedRetryDeterminer = errorExtractor::rateLimited;
 
-  // Authorization Handler instance.
-  private final StorageRequestAuthorizer storageRequestAuthorizer;
-
   // Function that generates downscoped access token.
   private final Function<List<AccessBoundary>, String> downscopedAccessTokenFn;
 
@@ -385,7 +381,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       }
     }
 
-    this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
   }
 
@@ -400,16 +395,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         .setServicePath(options.getStorageServicePath())
         .setApplicationName(options.getAppName())
         .build();
-  }
-
-  @VisibleForTesting
-  static StorageRequestAuthorizer initializeStorageRequestAuthorizer(
-      GoogleCloudStorageOptions options) {
-    return options.getAuthorizationHandlerImplClass() == null
-        ? null
-        : new StorageRequestAuthorizer(
-            options.getAuthorizationHandlerImplClass(),
-            options.getAuthorizationHandlerProperties());
   }
 
   private ExecutorService createManualBatchingThreadPool() {
@@ -2311,9 +2296,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
       String token = downscopedAccessTokenFn.apply(accessBoundaries);
       request.getRequestHeaders().setAuthorization("Bearer " + token);
-    }
-    if (storageRequestAuthorizer != null) {
-      storageRequestAuthorizer.authorize(request);
     }
     return configureRequest(request, bucketName);
   }

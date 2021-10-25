@@ -9,6 +9,13 @@
 1.  Implement `FileSystem.openFile` to take advantage of the `FileStatus` if
     passed.
 
+1.  Remove an obsolete `AuthorizationHandler` and related properties:
+
+    ```
+    fs.gs.authorization.handler.impl
+    fs.gs.authorization.handler.properties.<AUTHORIZATION_HANDLER_PROPERTY>
+    ```
+
 1.  Remove support for Apache HTTP transport and related property:
 
     ```

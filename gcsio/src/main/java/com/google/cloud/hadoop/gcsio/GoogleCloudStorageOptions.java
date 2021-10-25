@@ -19,7 +19,6 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.services.storage.Storage;
 import com.google.auto.value.AutoValue;
-import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
 import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.RedactedString;
@@ -82,14 +81,6 @@ public abstract class GoogleCloudStorageOptions {
   /** Default setting for GCS HTTP request headers. */
   public static final ImmutableMap<String, String> HTTP_REQUEST_HEADERS_DEFAULT = ImmutableMap.of();
 
-  /** Default setting for authorization handler. */
-  public static final Class<? extends AuthorizationHandler>
-      AUTHORIZATION_HANDLER_IMPL_CLASS_DEFAULT = null;
-
-  /** Default properties for authorization handler. */
-  public static final Map<String, String> AUTHORIZATION_HANDLER_PROPERTIES_DEFAULT =
-      ImmutableMap.of();
-
   public static final GoogleCloudStorageOptions DEFAULT = builder().build();
 
   public static Builder builder() {
@@ -112,9 +103,7 @@ public abstract class GoogleCloudStorageOptions {
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
         .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
         .setCooperativeLockingOptions(CooperativeLockingOptions.DEFAULT)
-        .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT)
-        .setAuthorizationHandlerImplClass(AUTHORIZATION_HANDLER_IMPL_CLASS_DEFAULT)
-        .setAuthorizationHandlerProperties(AUTHORIZATION_HANDLER_PROPERTIES_DEFAULT);
+        .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT);
   }
 
   public abstract Builder toBuilder();
@@ -191,11 +180,6 @@ public abstract class GoogleCloudStorageOptions {
         .build();
   }
 
-  @Nullable
-  public abstract Class<? extends AuthorizationHandler> getAuthorizationHandlerImplClass();
-
-  public abstract Map<String, String> getAuthorizationHandlerProperties();
-
   public void throwIfNotValid() {
     checkArgument(!isNullOrEmpty(getAppName()), "appName must not be null or empty");
   }
@@ -260,11 +244,6 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setEncryptionKey(RedactedString encryptionKey);
 
     public abstract Builder setEncryptionKeyHash(RedactedString encryptionKeyHash);
-
-    public abstract Builder setAuthorizationHandlerImplClass(
-        Class<? extends AuthorizationHandler> authorizationHandlerImpl);
-
-    public abstract Builder setAuthorizationHandlerProperties(Map<String, String> properties);
 
     abstract GoogleCloudStorageOptions autoBuild();
 
