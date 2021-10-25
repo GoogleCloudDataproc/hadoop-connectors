@@ -16,6 +16,12 @@
     fs.gs.authorization.handler.properties.<AUTHORIZATION_HANDLER_PROPERTY>
     ```
 
+1.  Remove support for Apache HTTP transport and related property:
+
+    ```
+    fs.gs.http.transport.type
+    ```
+
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.
