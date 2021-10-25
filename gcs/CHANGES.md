@@ -9,6 +9,13 @@
 1.  Implement `FileSystem.openFile` to take advantage of the `FileStatus` if
     passed.
 
+1.  Remove an obsolete `AuthorizationHandler` and related properties:
+
+    ```
+    fs.gs.authorization.handler.impl
+    fs.gs.authorization.handler.properties.<AUTHORIZATION_HANDLER_PROPERTY>
+    ```
+
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.
