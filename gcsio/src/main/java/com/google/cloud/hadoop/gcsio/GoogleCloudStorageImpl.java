@@ -2309,7 +2309,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     return compositeInfo;
   }
 
-  /** Get the value of http related statistics  */
+  /** Get the value of http related statistics */
   @Override
   public long getStatistics(GoogleCloudStorageStatistics key) {
     return gcsStatisticsMap.get(key);
