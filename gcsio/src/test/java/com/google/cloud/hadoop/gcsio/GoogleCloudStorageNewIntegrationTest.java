@@ -44,6 +44,7 @@ import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.BaseEncoding;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -1276,11 +1277,43 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             getRequestString(testBucket, testFile.getObjectName()),
-            getMediaRequestString(testBucket, testFile.getObjectName(), generationId));
+            getMediaRequestString(testBucket, testFile.getObjectName(), generationId))
+        .inOrder();
   }
 
   @Test
-  public void open_gzipEncoded_succeeds_ifContentEncodingSupportDisabled() throws Exception {
+  public void open_itemInfo_gzipEncoded_succeeds_ifContentEncodingSupportEnabled()
+      throws Exception {
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    StorageResourceId testFile = new StorageResourceId(testBucket, getTestResource());
+    try (OutputStream os =
+        new GZIPOutputStream(
+            Channels.newOutputStream(gcsfsIHelper.gcs.create(testFile, GZIP_CREATE_OPTIONS)))) {
+      os.write("content".getBytes(UTF_8));
+    }
+    GoogleCloudStorageItemInfo itemInfo = gcsfsIHelper.gcs.getItemInfo(testFile);
+
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    byte[] readContent = new byte[7];
+    final GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setSupportGzipEncoding(true).build();
+    try (SeekableByteChannel channel = gcs.open(itemInfo, readOptions)) {
+      channel.read(ByteBuffer.wrap(readContent));
+    }
+
+    assertThat(new String(readContent, UTF_8)).isEqualTo("content");
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            getMediaRequestString(
+                testBucket, testFile.getObjectName(), itemInfo.getContentGeneration()));
+  }
+
+  @Test
+  public void open_gzipEncoded_fails_ifContentEncodingSupportDisabled() throws Exception {
     String testBucket = gcsfsIHelper.sharedBucketName1;
     StorageResourceId testFile = new StorageResourceId(testBucket, getTestResource());
 
@@ -1303,6 +1336,49 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(getRequestString(testBucket, testFile.getObjectName()));
+  }
+
+  @Test
+  public void open_itemInfo_gzipEncoded_fails_ifContentEncodingSupportDisabled() throws Exception {
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    StorageResourceId testFile = new StorageResourceId(testBucket, getTestResource());
+
+    try (OutputStream os =
+        new GZIPOutputStream(
+            Channels.newOutputStream(gcsfsIHelper.gcs.create(testFile, GZIP_CREATE_OPTIONS)))) {
+      os.write("content".getBytes(UTF_8));
+    }
+
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+    GoogleCloudStorageItemInfo itemInfo = gcsfsIHelper.gcs.getItemInfo(testFile);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setSupportGzipEncoding(false).build();
+
+    IOException e = assertThrows(IOException.class, () -> gcs.open(itemInfo, readOptions));
+    assertThat(e)
+        .hasMessageThat()
+        .isEqualTo("Cannot read GZIP encoded files - content encoding support is disabled.");
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings()).isEmpty();
+  }
+
+  @Test
+  public void open_itemInfo_fails_ifInvalidItemInfo() throws Exception {
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    StorageResourceId testFile = new StorageResourceId(testBucket, getTestResource());
+
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
+
+    GoogleCloudStorageItemInfo itemInfo = GoogleCloudStorageItemInfo.createNotFound(testFile);
+    GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder().build();
+    FileNotFoundException e =
+        assertThrows(FileNotFoundException.class, () -> gcs.open(itemInfo, readOptions));
+
+    assertThat(e).hasMessageThat().startsWith("Item not found");
   }
 
   private static List<String> getObjectNames(List<GoogleCloudStorageItemInfo> listedObjects) {

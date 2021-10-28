@@ -14,7 +14,6 @@
 
 package com.google.cloud.hadoop.util;
 
-import com.google.cloud.hadoop.util.HttpTransportFactory.HttpTransportType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -123,14 +122,6 @@ public class HadoopCredentialConfiguration {
   public static final HadoopConfigurationProperty<String> PROXY_PASSWORD_SUFFIX =
       new HadoopConfigurationProperty<>(".proxy.password");
 
-  /**
-   * Configuration key for the name of HttpTransport class to use for connecting to GCS. Must be the
-   * name of an HttpTransportFactory.HttpTransportType (APACHE or JAVA_NET).
-   */
-  public static final HadoopConfigurationProperty<HttpTransportType> HTTP_TRANSPORT_SUFFIX =
-      new HadoopConfigurationProperty<>(
-          ".http.transport.type", CredentialOptions.HTTP_TRANSPORT_TYPE_DEFAULT);
-
   /** Configuration key for the name of the AccessTokenProvider to use to generate AccessTokens. */
   public static final HadoopConfigurationProperty<Class<? extends AccessTokenProvider>>
       ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX =
@@ -192,8 +183,6 @@ public class HadoopCredentialConfiguration {
                 ENABLE_NULL_CREDENTIAL_SUFFIX
                     .withPrefixes(keyPrefixes)
                     .get(config, config::getBoolean))
-            .setTransportType(
-                HTTP_TRANSPORT_SUFFIX.withPrefixes(keyPrefixes).get(config, config::getEnum))
             .setTokenServerUrl(
                 TOKEN_SERVER_URL_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
             .setProxyAddress(

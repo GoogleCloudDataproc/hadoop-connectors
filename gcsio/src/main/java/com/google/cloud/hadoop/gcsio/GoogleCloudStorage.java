@@ -16,10 +16,16 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Optional;
 
 /**
  * Interface for exposing the Google Cloud Storage API behavior in a way more amenable to writing
@@ -163,6 +169,31 @@ public interface GoogleCloudStorage {
       throws IOException;
 
   /**
+   * Opens an object for reading using GoogleCloudStorageItemInfo.
+   *
+   * @param itemInfo identifies a StorageObject
+   * @return a channel for reading from the given object
+   * @throws java.io.FileNotFoundException if the given object does not exist
+   * @throws IOException if object exists but cannot be opened
+   */
+  default SeekableByteChannel open(GoogleCloudStorageItemInfo itemInfo) throws IOException {
+    return open(itemInfo, GoogleCloudStorageReadOptions.DEFAULT);
+  }
+
+  /**
+   * Opens an object for reading using GoogleCloudStorageItemInfo.
+   *
+   * @param itemInfo identifies a StorageObject
+   * @param readOptions Fine-grained options for behaviors of retries, buffering, etc.
+   * @return a channel for reading from the given object
+   * @throws java.io.FileNotFoundException if the given object does not exist
+   * @throws IOException if object exists but cannot be opened
+   */
+  SeekableByteChannel open(
+      GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
+      throws IOException;
+
+  /**
    * Deletes a list of buckets. Does not throw any exception for "bucket not found" errors.
    *
    * @param bucketNames name of the buckets to delete
@@ -199,6 +230,46 @@ public interface GoogleCloudStorage {
       String dstBucketName,
       List<String> dstObjectNames)
       throws IOException;
+
+  /**
+   * Copies metadata of the given objects. After the copy is successfully complete, each object blob
+   * is reachable by two different names. Copying between two different locations or between two
+   * different storage classes is not allowed.
+   *
+   * @param sourceToDestinationObjectsMap map of destination objects to be copied, keyed by source
+   * @throws java.io.FileNotFoundException if the source object or the destination bucket does not
+   *     exist
+   * @throws IOException in all other error cases
+   */
+  default void copy(Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
+      throws IOException {
+    checkArgument(
+        sourceToDestinationObjectsMap != null, "sourceToDestinationObjectsMap must not be null");
+    if (sourceToDestinationObjectsMap.isEmpty()) {
+      return;
+    }
+
+    List<String> srcObjectNames = new ArrayList<>(sourceToDestinationObjectsMap.size());
+    List<String> dstObjectNames = new ArrayList<>(sourceToDestinationObjectsMap.size());
+
+    Optional<Entry<StorageResourceId, StorageResourceId>> first =
+        sourceToDestinationObjectsMap.entrySet().stream().findFirst();
+    String srcBucketName = first.get().getKey().getBucketName();
+    String dstBucketName = first.get().getValue().getBucketName();
+
+    sourceToDestinationObjectsMap.forEach(
+        (source, destination) -> {
+          if (!srcBucketName.equals(source.getBucketName()))
+            throw new UnsupportedOperationException(
+                "This operation is not supported across multiple source buckets");
+          if (!dstBucketName.equals(destination.getBucketName()))
+            throw new UnsupportedOperationException(
+                "This operation is not supported across multiple destination buckets");
+          srcObjectNames.add(source.getObjectName());
+          dstObjectNames.add(destination.getObjectName());
+        });
+    copy(srcBucketName, srcObjectNames, dstBucketName, dstObjectNames);
+  }
 
   /** Gets a list of names of buckets in this project. */
   List<String> listBucketNames() throws IOException;

@@ -14,7 +14,6 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_AUTHORIZATION_HANDLER_IMPL;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_ALGORITHM;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY;
@@ -41,8 +40,6 @@ import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamTyp
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
-import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
-import com.google.cloud.hadoop.gcsio.authorization.FakeAuthorizationHandler;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
 import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.common.collect.ImmutableList;
@@ -62,8 +59,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
       new HashMap<String, Object>() {
         {
           put("fs.gs.application.name.suffix", "");
-          put("fs.gs.authorization.handler.impl", null);
-          put("fs.gs.authorization.handler.properties.", ImmutableMap.of());
           put("fs.gs.batch.threads", 15);
           put("fs.gs.block.size", 64 * 1024 * 1024L);
           put("fs.gs.bucket.delete.enable", false);
@@ -299,33 +294,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
                 .withPrefixes(ImmutableList.of(GCS_CONFIG_PREFIX))
                 .getPropsWithPrefix(config))
         .containsExactly("test-grp", "test-service-account2");
-  }
-
-  @Test
-  public void testGetAuthorizationHandler() {
-    Configuration config = new Configuration();
-    config.setClass(
-        GCS_AUTHORIZATION_HANDLER_IMPL.getKey(),
-        FakeAuthorizationHandler.class,
-        AuthorizationHandler.class);
-
-    GoogleCloudStorageOptions options =
-        GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
-
-    Class<? extends AuthorizationHandler> handler = options.getAuthorizationHandlerImplClass();
-
-    assertThat(handler).isAssignableTo(AuthorizationHandler.class);
-    assertThat(handler).isEqualTo(FakeAuthorizationHandler.class);
-  }
-
-  @Test
-  public void testAuthorizationHandlerClassNotFound() {
-    Configuration config = new Configuration();
-    config.set(GCS_AUTHORIZATION_HANDLER_IMPL.getKey(), "test.class.not.exist");
-
-    assertThrows(
-        RuntimeException.class,
-        () -> GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build());
   }
 
   @Test

@@ -35,11 +35,12 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.Set;
-import org.apache.http.HttpStatus;
 
 public class RetryHttpInitializer implements HttpRequestInitializer {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
+  private static final int HTTP_SC_GONE = 410;
 
   /** HTTP status code indicating too many requests in a given amount of time. */
   private static final int HTTP_SC_TOO_MANY_REQUESTS = 429;
@@ -247,7 +248,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
         new LoggingResponseHandler(
             new CredentialOrBackoffResponseHandler(),
             exceptionHandler,
-            ImmutableSet.of(HttpStatus.SC_GONE, HttpStatus.SC_SERVICE_UNAVAILABLE),
+            ImmutableSet.of(HTTP_SC_GONE, HttpStatusCodes.STATUS_CODE_SERVICE_UNAVAILABLE),
             ImmutableSet.of(HTTP_SC_TOO_MANY_REQUESTS));
     request.setUnsuccessfulResponseHandler(loggingResponseHandler);
     request.setIOExceptionHandler(loggingResponseHandler);
