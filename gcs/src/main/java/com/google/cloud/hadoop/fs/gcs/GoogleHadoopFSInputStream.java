@@ -293,7 +293,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   }
 
   /**
-   * Get the current IOStatistics from output stream
+   * Get the current IOStatistics from input stream
    *
    * @return
    */

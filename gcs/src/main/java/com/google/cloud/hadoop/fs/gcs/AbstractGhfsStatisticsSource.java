@@ -23,19 +23,18 @@ import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 import org.apache.hadoop.fs.statistics.impl.IOStatisticsStore;
 
 /**
- * Base class for implementing IOStatistics sources in the gcs module.
- *
- * <p>A lot of the methods are very terse, because GHFSInstrumentation has verbose methods of
- * similar names; the short ones always refer to the inner class and not any superclass method.
+ * Abstract Base class for IOStatistics. This class is expected to implement IOStatistics Sources in
+ * Input Stream, Output Stream.
  */
 abstract class AbstractGhfsStatisticsSource implements IOStatisticsSource, DurationTrackerFactory {
+
   /** IOStatisticsStore to track the statistics */
   private IOStatisticsStore ioStatistics;
 
   protected AbstractGhfsStatisticsSource() {}
 
   /**
-   * Setter. this must be called in the subclass constructor with whatever
+   * Set the IOStatistics with the iostatistics returned from the subclass.
    *
    * @param statistics statistics to set
    */
@@ -122,7 +121,7 @@ abstract class AbstractGhfsStatisticsSource implements IOStatisticsSource, Durat
    */
   @Override
   public DurationTracker trackDuration(final String key, final long count) {
-    return getIOStatistics().trackDuration(key, count);
+    return ioStatistics.trackDuration(key, count);
   }
 
   /**

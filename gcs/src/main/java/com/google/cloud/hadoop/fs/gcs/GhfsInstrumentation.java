@@ -17,13 +17,12 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStatistics;
-import static org.apache.hadoop.fs.statistics.StoreStatisticNames.*;
+import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.iostatisticsStore;
 
 import com.google.common.flogger.GoogleLogger;
 import java.io.Closeable;
 import java.net.URI;
-import java.time.Duration;
 import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -64,7 +63,7 @@ public class GhfsInstrumentation
    * {@value} Currently all gcs metrics are placed in a single "context". Distinct contexts may be
    * used in the future.
    */
-  public static final String CONTEXT = "gcsFilesystem";
+  public static final String CONTEXT = "GoogleHadoopFilesystem";
 
   /** {@value} The name of the gcs-specific metrics system instance used for gcs metrics. */
   public static final String METRICS_SYSTEM_NAME = "google-hadoop-file-system";
@@ -121,31 +120,24 @@ public class GhfsInstrumentation
         fileSystemInstanceID.toString());
     registry.tag(METRIC_TAG_BUCKET, "Hostname from the FS URL", name.getHost());
     IOStatisticsStoreBuilder storeBuilder = IOStatisticsBinding.iostatisticsStore();
-    // declare all counter statistics
     EnumSet.allOf(GhfsStatistic.class).stream()
-        .filter(GhfsStatistic -> GhfsStatistic.getType() == GhfsStatisticTypeEnum.TYPE_COUNTER)
         .forEach(
             stat -> {
-              counter(stat);
-              storeBuilder.withCounters(stat.getSymbol());
-            });
-    // declare all gauge statistics
-    EnumSet.allOf(GhfsStatistic.class).stream()
-        .filter(statistic -> statistic.getType() == GhfsStatisticTypeEnum.TYPE_GAUGE)
-        .forEach(
-            stat -> {
-              gauge(stat);
-              storeBuilder.withGauges(stat.getSymbol());
+              // declare all counter statistics
+              if (stat.getType() == GhfsStatisticTypeEnum.TYPE_COUNTER) {
+                counter(stat);
+                storeBuilder.withCounters(stat.getSymbol());
+                // declare all gauge statistics
+              } else if (stat.getType() == GhfsStatisticTypeEnum.TYPE_GAUGE) {
+                gauge(stat);
+                storeBuilder.withGauges(stat.getSymbol());
+                // and durations
+              } else if (stat.getType() == GhfsStatisticTypeEnum.TYPE_DURATION) {
+                duration(stat);
+                storeBuilder.withDurationTracking(stat.getSymbol());
+              }
             });
 
-    // and durations
-    EnumSet.allOf(GhfsStatistic.class).stream()
-        .filter(statistic -> statistic.getType() == GhfsStatisticTypeEnum.TYPE_DURATION)
-        .forEach(
-            stat -> {
-              duration(stat);
-              storeBuilder.withDurationTracking(stat.getSymbol());
-            });
     // register with Hadoop metrics
     registerAsMetricsSource(name);
     // and build the IO Statistics
@@ -154,6 +146,24 @@ public class GhfsInstrumentation
     durationTrackerFactory =
         IOStatisticsBinding.pairedTrackerFactory(
             instanceIOStatistics, new MetricDurationTrackerFactory());
+  }
+
+  /**
+   * Register this instance as a metrics source.
+   *
+   * @param name gs:// URI for the associated FileSystem instance
+   */
+  private void registerAsMetricsSource(URI name) {
+    int number;
+    synchronized (METRICS_SYSTEM_LOCK) {
+      getMetricsSystem();
+
+      metricsSourceActiveCounter++;
+      number = ++metricsSourceNameCounter;
+    }
+    String msName = METRICS_SOURCE_BASENAME + number;
+    metricsSourceName = msName + "-" + name.getHost();
+    metricsSystem.register(metricsSourceName, "", this);
   }
 
   public void close() {
@@ -183,24 +193,6 @@ public class GhfsInstrumentation
       incrementMutableCounter(name, count);
       instanceIOStatistics.incrementCounter(name, count);
     }
-  }
-
-  /**
-   * Register this instance as a metrics source.
-   *
-   * @param name gs:// URI for the associated FileSystem instance
-   */
-  private void registerAsMetricsSource(URI name) {
-    int number;
-    synchronized (METRICS_SYSTEM_LOCK) {
-      getMetricsSystem();
-
-      metricsSourceActiveCounter++;
-      number = ++metricsSourceNameCounter;
-    }
-    String msName = METRICS_SOURCE_BASENAME + number;
-    metricsSourceName = msName + "-" + name.getHost();
-    metricsSystem.register(metricsSourceName, "", this);
   }
 
   /**
@@ -388,20 +380,6 @@ public class GhfsInstrumentation
   @Override
   public DurationTracker trackDuration(final String key, final long count) {
     return durationTrackerFactory.trackDuration(key, count);
-  }
-
-  /**
-   * Add the duration as a timed statistic, deriving statistic name from the operation symbol and
-   * the outcome.
-   *
-   * @param op operation
-   * @param success was the operation a success?
-   * @param duration how long did it take
-   */
-  public void recordDuration(
-      final GhfsStatistic op, final boolean success, final Duration duration) {
-    String name = op.getSymbol() + (success ? "" : SUFFIX_FAILURES);
-    instanceIOStatistics.addTimedOperation(name, duration);
   }
 
   @Override
@@ -628,11 +606,29 @@ public class GhfsInstrumentation
 
     /**
      * {@code close()} merges the stream statistics into the filesystem's instrumentation instance.
+     * The filesystem statistics of {@link #filesystemStatistics} updated with the bytes read
+     * values. When the input stream is closed, corresponding counters will be updated.
      */
     @Override
     public void close() {
       increment(StreamStatisticNames.STREAM_READ_CLOSE_OPERATIONS);
-      merge(true);
+
+      IOStatisticsStore ioStatistics = localIOStatistics();
+      promoteInputStreamCountersToMetrics();
+      mergedStats = snapshotIOStatistics(localIOStatistics());
+
+      // stream is being closed.
+      // merge in all the IOStatistics
+      GhfsInstrumentation.this.getIOStatistics().aggregate(ioStatistics);
+
+      // increment the filesystem statistics for this thread.
+      if (filesystemStatistics != null) {
+        long t = getTotalBytesRead();
+        int readOperations = (int) getReadOperations();
+        filesystemStatistics.incrementBytesRead(t);
+        filesystemStatistics.incrementBytesReadByDistance(DISTANCE, t);
+        filesystemStatistics.incrementReadOps(readOperations);
+      }
     }
 
     /**
@@ -744,39 +740,6 @@ public class GhfsInstrumentation
     @Override
     public long getReadsIncomplete() {
       return lookupCounterValue(StreamStatisticNames.STREAM_READ_OPERATIONS_INCOMPLETE);
-    }
-
-    /**
-     * Merge the statistics into the filesystem's instrumentation instance.
-     *
-     * <p>If the merge is invoked because the stream has been closed, then all statistics are
-     * merged, and the filesystem statistics of {@link #filesystemStatistics} updated with the bytes
-     * read values.
-     *
-     * <p>Whichever thread close()d the stream will have its counters updated.
-     *
-     * @param isClosed is this merge invoked because the stream is closed?
-     */
-    private void merge(boolean isClosed) {
-
-      IOStatisticsStore ioStatistics = localIOStatistics();
-      promoteInputStreamCountersToMetrics();
-      mergedStats = snapshotIOStatistics(localIOStatistics());
-
-      if (isClosed) {
-        // stream is being closed.
-        // merge in all the IOStatistics
-        GhfsInstrumentation.this.getIOStatistics().aggregate(ioStatistics);
-
-        // increment the filesystem statistics for this thread.
-        if (filesystemStatistics != null) {
-          long t = getTotalBytesRead();
-          int readOperations = (int) getReadOperations();
-          filesystemStatistics.incrementBytesRead(t);
-          filesystemStatistics.incrementBytesReadByDistance(DISTANCE, t);
-          filesystemStatistics.incrementReadOps(readOperations);
-        }
-      }
     }
 
     /**
