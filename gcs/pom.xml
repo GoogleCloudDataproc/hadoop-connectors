@@ -221,7 +221,6 @@
                   <include>io.grpc</include>
                   <include>io.opencensus</include>
                   <include>io.perfmark</include>
-                  <include>org.apache.httpcomponents</include>
                 </includes>
               </artifactSet>
               <minimizeJar>true</minimizeJar>
@@ -249,10 +248,12 @@
                     <include>com.google.storage.**</include>
                   </includes>
                   <excludes>
-                    <exclude>com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler</exclude>
                     <exclude>com.google.cloud.hadoop.util.AccessTokenProvider</exclude>
                     <exclude>com.google.cloud.hadoop.util.AccessTokenProvider$AccessToken</exclude>
                     <exclude>com.google.cloud.hadoop.util.AccessTokenProvider$AccessTokenType</exclude>
+                    <exclude>com.google.cloud.hadoop.util.AccessBoundary</exclude>
+                    <exclude>com.google.cloud.hadoop.util.AccessBoundary$Action</exclude>
+                    <exclude>com.google.cloud.hadoop.util.AutoValue_AccessBoundary</exclude>
                   </excludes>
                 </relocation>
                 <relocation>
@@ -260,7 +261,6 @@
                   <shadedPattern>com.google.cloud.hadoop.repackaged.gcs.org</shadedPattern>
                   <includes>
                     <include>org.apache.commons.codec.**</include>
-                    <include>org.apache.http.**</include>
                   </includes>
                 </relocation>
                 <!-- Take special care of grpc-netty-shaded, it uses the package

@@ -39,7 +39,6 @@ import com.google.api.client.util.PemReader;
 import com.google.api.client.util.PemReader.Section;
 import com.google.api.client.util.SecurityUtils;
 import com.google.api.services.storage.StorageScopes;
-import com.google.cloud.hadoop.util.HttpTransportFactory.HttpTransportType;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
@@ -213,7 +212,7 @@ public class CredentialFactory {
   private static synchronized HttpTransport getStaticHttpTransport()
       throws IOException, GeneralSecurityException {
     if (staticHttpTransport == null) {
-      staticHttpTransport = HttpTransportFactory.createHttpTransport(HttpTransportType.JAVA_NET);
+      staticHttpTransport = HttpTransportFactory.createHttpTransport();
     }
     return staticHttpTransport;
   }
@@ -424,10 +423,7 @@ public class CredentialFactory {
     if (transport == null) {
       transport =
           HttpTransportFactory.createHttpTransport(
-              options.getTransportType(),
-              options.getProxyAddress(),
-              options.getProxyUsername(),
-              options.getProxyPassword());
+              options.getProxyAddress(), options.getProxyUsername(), options.getProxyPassword());
     }
     return transport;
   }

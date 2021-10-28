@@ -242,27 +242,6 @@ user name will take precedence over the service account associated with the
 group name for a matching user and group, which in turn will take precedence
 over default service account impersonation.
 
-### Authorization
-
-When configured, a specified authorization handler will be used to authorize
-Cloud Storage API requests before executing them. The handler will throw
-`AccessDeniedException` for rejected requests if user does not have enough
-permissions (not authorized) to execute these requests.
-
-*   `fs.gs.authorization.handler.impl` (not set by default)
-
-    Enable authorization handler. If this property is set, the specified
-    authorization handler will be used. GCS connector will use the specified
-    authorization handler to check if a user has enough permission to perform a
-    GCS resource access request before granting access.
-
-*   `fs.gs.authorization.handler.properties.<PROPERTY>=<VALUE>` (not set by
-    default)
-
-    Properties for the authorization handler. All the properties set with this
-    prefix will be set to the handler after instantiation before calling any
-    Cloud Storage requests handling methods.
-
 ### IO configuration
 
 *   `fs.gs.inputstream.fast.fail.on.not.found.enable` (default: `true`)
@@ -360,11 +339,6 @@ permissions (not authorized) to execute these requests.
     block for both streams until an end of a min sync interval.
 
 ### HTTP transport configuration
-
-*   `fs.gs.http.transport.type` (default: `JAVA_NET`)
-
-    HTTP transport to use for sending Cloud Storage requests. Valid values are
-    `APACHE` or `JAVA_NET`.
 
 *   `fs.gs.application.name.suffix` (not set by default)
 

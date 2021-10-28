@@ -18,7 +18,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.api.client.googleapis.GoogleUtils;
 import com.google.api.client.http.HttpTransport;
-import com.google.api.client.http.apache.v2.ApacheHttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
@@ -32,26 +31,10 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.GeneralSecurityException;
 import javax.annotation.Nullable;
-import org.apache.http.HttpHost;
-import org.apache.http.auth.AuthScope;
-import org.apache.http.auth.Credentials;
-import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.client.CredentialsProvider;
-import org.apache.http.impl.client.BasicCredentialsProvider;
-import org.apache.http.impl.client.HttpClientBuilder;
 
 /** Factory for creating HttpTransport types. */
 public class HttpTransportFactory {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-
-  /** Types of HttpTransports the factory can create. */
-  public enum HttpTransportType {
-    APACHE,
-    JAVA_NET,
-  }
-
-  // Default to javanet implementation.
-  public static final HttpTransportType DEFAULT_TRANSPORT_TYPE = HttpTransportType.JAVA_NET;
 
   /**
    * Create an {@link HttpTransport} based on an type class.
@@ -61,9 +44,9 @@ public class HttpTransportFactory {
    * @throws IllegalArgumentException If the proxy address is invalid.
    * @throws IOException If there is an issue connecting to Google's Certification server.
    */
-  public static HttpTransport createHttpTransport(HttpTransportType type) throws IOException {
+  public static HttpTransport createHttpTransport() throws IOException {
     return createHttpTransport(
-        type, /* proxyAddress= */ null, /* proxyUsername= */ null, /* proxyPassword= */ null);
+        /* proxyAddress= */ null, /* proxyUsername= */ null, /* proxyPassword= */ null);
   }
 
   /**
@@ -81,13 +64,12 @@ public class HttpTransportFactory {
    * @throws IOException If there is an issue connecting to Google's Certification server.
    */
   public static HttpTransport createHttpTransport(
-      HttpTransportType type,
       @Nullable String proxyAddress,
       @Nullable RedactedString proxyUsername,
       @Nullable RedactedString proxyPassword)
       throws IOException {
     logger.atFiner().log(
-        "createHttpTransport(%s, %s, %s, %s)", type, proxyAddress, proxyUsername, proxyPassword);
+        "createHttpTransport(%s, %s, %s)", proxyAddress, proxyUsername, proxyPassword);
     checkArgument(
         proxyAddress != null || (proxyUsername == null && proxyPassword == null),
         "if proxyAddress is null then proxyUsername and proxyPassword should be null too");
@@ -96,63 +78,15 @@ public class HttpTransportFactory {
         "both proxyUsername and proxyPassword should be null or not null together");
     URI proxyUri = parseProxyAddress(proxyAddress);
     try {
-      switch (type) {
-        case APACHE:
-          Credentials proxyCredentials =
-              proxyUsername != null
-                  ? new UsernamePasswordCredentials(proxyUsername.value(), proxyPassword.value())
-                  : null;
-          return createApacheHttpTransport(proxyUri, proxyCredentials);
-        case JAVA_NET:
-          PasswordAuthentication proxyAuth =
-              proxyUsername != null
-                  ? new PasswordAuthentication(
-                      proxyUsername.value(), proxyPassword.value().toCharArray())
-                  : null;
-          return createNetHttpTransport(proxyUri, proxyAuth);
-        default:
-          throw new IllegalArgumentException(
-              String.format("Invalid HttpTransport type '%s'", type.name()));
-      }
+      PasswordAuthentication proxyAuth =
+          proxyUsername != null
+              ? new PasswordAuthentication(
+                  proxyUsername.value(), proxyPassword.value().toCharArray())
+              : null;
+      return createNetHttpTransport(proxyUri, proxyAuth);
     } catch (GeneralSecurityException e) {
       throw new IOException(e);
     }
-  }
-
-  /**
-   * Create an {@link ApacheHttpTransport} for calling Google APIs with an optional HTTP proxy.
-   *
-   * @param proxyUri Optional HTTP proxy URI to use with the transport.
-   * @param proxyCredentials Optional HTTP proxy credentials to authenticate with the transport
-   *     proxy.
-   * @return The resulting HttpTransport.
-   * @throws IOException If there is an issue connecting to Google's certification server.
-   * @throws GeneralSecurityException If there is a security issue with the keystore.
-   */
-  public static ApacheHttpTransport createApacheHttpTransport(
-      @Nullable URI proxyUri, @Nullable Credentials proxyCredentials)
-      throws IOException, GeneralSecurityException {
-    checkArgument(
-        proxyUri != null || proxyCredentials == null,
-        "if proxyUri is null than proxyCredentials should be null too");
-
-    HttpClientBuilder httpClientBuilder = ApacheHttpTransport.newDefaultHttpClientBuilder();
-
-    if (proxyUri != null) {
-      httpClientBuilder
-          // Set route planner to null because it overrides proxy configuration.
-          .setRoutePlanner(null)
-          .setProxy(new HttpHost(proxyUri.getHost(), proxyUri.getPort()));
-    }
-
-    if (proxyCredentials != null) {
-      CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
-      credentialsProvider.setCredentials(
-          new AuthScope(proxyUri.getHost(), proxyUri.getPort()), proxyCredentials);
-      httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider);
-    }
-
-    return new ApacheHttpTransport(httpClientBuilder.build());
   }
 
   /**

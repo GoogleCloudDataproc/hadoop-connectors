@@ -16,7 +16,6 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.createItemInfoForBucket;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.createItemInfoForStorageObject;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.initializeStorageRequestAuthorizer;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInferredDirectory;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.HTTP_TRANSPORT;
@@ -69,8 +68,6 @@ import com.google.api.services.storage.model.Buckets;
 import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
-import com.google.cloud.hadoop.gcsio.authorization.FakeAuthorizationHandler;
-import com.google.cloud.hadoop.gcsio.authorization.StorageRequestAuthorizer;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
@@ -1235,6 +1232,34 @@ public class GoogleCloudStorageTest {
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(getMediaRequestString(BUCKET_NAME, OBJECT_NAME))
         .inOrder();
+  }
+
+  @Test
+  public void testOpenItemInfoNoSupportGzipEncodingAndNoFailFastOnNotFound() throws Exception {
+    byte[] testData = {0x01, 0x02, 0x03, 0x05, 0x08};
+
+    MockHttpTransport transport = mockTransport(dataResponse(testData));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder()
+            .setSupportGzipEncoding(false)
+            .setFastFailOnNotFound(false)
+            .build();
+    StorageObject storageObject = newStorageObject(BUCKET_NAME, OBJECT_NAME);
+    GoogleCloudStorageItemInfo itemInfo =
+        GoogleCloudStorageImpl.createItemInfoForStorageObject(RESOURCE_ID, storageObject);
+    GoogleCloudStorageReadChannel readChannel =
+        (GoogleCloudStorageReadChannel) gcs.open(itemInfo, readOptions);
+
+    byte[] actualData = new byte[testData.length];
+    int bytesRead = readChannel.read(ByteBuffer.wrap(actualData));
+
+    assertThat(bytesRead).isEqualTo(testData.length);
+    assertThat(actualData).isEqualTo(testData);
+    assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
+        .contains(getMediaRequestString(BUCKET_NAME, OBJECT_NAME, itemInfo.getContentGeneration()));
   }
 
   /** Test in-place forward seeks smaller than seek buffer, smaller than limit. */
@@ -3372,23 +3397,6 @@ public class GoogleCloudStorageTest {
             getRequestString(BUCKET_NAME, OBJECT_NAME),
             getRequestString(BUCKET_NAME, OBJECT_NAME))
         .inOrder();
-  }
-
-  @Test
-  public void testInstantiateAuthorizationHandler() {
-    GoogleCloudStorageOptions options =
-        GoogleCloudStorageOptions.builder()
-            .setAppName("test-name")
-            .setProjectId("test-project")
-            .setAuthorizationHandlerImplClass(FakeAuthorizationHandler.class)
-            .setAuthorizationHandlerProperties(
-                ImmutableMap.of(
-                    FakeAuthorizationHandler.PROPERTY_KEY, FakeAuthorizationHandler.EXPECTED_VALUE))
-            .build();
-
-    StorageRequestAuthorizer authorizer = initializeStorageRequestAuthorizer(options);
-
-    assertThat(authorizer).isNotNull();
   }
 
   @Test

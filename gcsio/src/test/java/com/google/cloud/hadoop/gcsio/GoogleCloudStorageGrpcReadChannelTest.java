@@ -1461,6 +1461,25 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   }
 
   @Test
+  public void fastFailOnNotFoundFailsByReadWhenDisabledItemInfo() throws IOException {
+    MockHttpTransport transport = mockTransport(jsonErrorResponse(ErrorResponses.NOT_FOUND));
+
+    List<HttpRequest> requests = new ArrayList<>();
+
+    Storage storage = new Storage(transport, JSON_FACTORY, requests::add);
+
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
+    StorageResourceId resourceId =
+        StorageResourceId.fromStringPath("gs://" + BUCKET_NAME + "/" + OBJECT_NAME);
+    GoogleCloudStorageItemInfo itemInfo = GoogleCloudStorageItemInfo.createNotFound(resourceId);
+    // If the user hasn't mandated fail fast, it is permissible for either open() or read() to
+    // raise this exception.
+    IOException thrown = assertThrows(IOException.class, () -> newReadChannel(itemInfo, options));
+    assertThat(thrown).hasCauseThat().hasMessageThat().contains("File not found");
+  }
+
+  @Test
   public void sizeReturnsObjectSize() throws Exception {
     int objectSize = 1234;
     fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(objectSize).build());
@@ -1542,6 +1561,18 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         storage,
         errorExtractor,
         storageResourceId,
+        options,
+        () -> BackOff.STOP_BACKOFF);
+  }
+
+  private GoogleCloudStorageGrpcReadChannel newReadChannel(
+      GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions options)
+      throws IOException {
+    return GoogleCloudStorageGrpcReadChannel.open(
+        new FakeStubProvider(mockCredentials),
+        storage,
+        errorExtractor,
+        itemInfo,
         options,
         () -> BackOff.STOP_BACKOFF);
   }

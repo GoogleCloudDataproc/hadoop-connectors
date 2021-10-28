@@ -39,7 +39,6 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.flogger.LazyArgs.lazy;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.concurrent.Executors.newFixedThreadPool;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
@@ -104,8 +103,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -122,11 +123,14 @@ import org.apache.hadoop.fs.GlobPattern;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.XAttrSetFlag;
+import org.apache.hadoop.fs.impl.AbstractFSBuilderImpl;
+import org.apache.hadoop.fs.impl.OpenFileParameters;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.util.LambdaUtils;
 import org.apache.hadoop.util.Progressable;
 
 /**
@@ -251,6 +255,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   private static final ThreadFactory DAEMON_THREAD_FACTORY =
       new ThreadFactoryBuilder().setNameFormat("ghfs-thread-%d").setDaemon(true).build();
+
+  // Thread-pool used for background tasks.
+  private ExecutorService backgroundTasksThreadPool =
+      Executors.newCachedThreadPool(DAEMON_THREAD_FACTORY);
 
   @VisibleForTesting GlobAlgorithm globAlgorithm = GCS_GLOB_ALGORITHM.getDefault();
 
@@ -584,6 +592,46 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   }
 
   /**
+   * Initiate the open operation. This is invoked from both the FileSystem and FileContext APIs
+   *
+   * @param hadoopPath path to the file
+   * @param parameters open file parameters from the builder.
+   * @return a future which will evaluate to the opened file.
+   * @throws IOException failure to resolve the link.
+   * @throws IllegalArgumentException unknown mandatory key
+   */
+  @Override
+  public CompletableFuture<FSDataInputStream> openFileWithOptions(
+      Path hadoopPath, OpenFileParameters parameters) throws IOException {
+    checkNotNull(hadoopPath, "hadoopPath should not be null");
+    checkOpen();
+    logger.atFiner().log("Path to be opened: %s, parameters: %s ", hadoopPath, parameters);
+
+    URI gcsPath = getGcsPath(hadoopPath);
+    AbstractFSBuilderImpl.rejectUnknownMandatoryKeys(
+        parameters.getMandatoryKeys(), Collections.emptySet(), "for " + gcsPath);
+
+    FileStatus fileStatus = parameters.getStatus();
+    FileInfo fileInfo =
+        fileStatus instanceof GoogleHadoopFileStatus
+            ? ((GoogleHadoopFileStatus) fileStatus).getFileInfo()
+            : null;
+    if (fileInfo == null) {
+      return super.openFileWithOptions(hadoopPath, parameters);
+    }
+
+    CompletableFuture<FSDataInputStream> result = new CompletableFuture<>();
+    backgroundTasksThreadPool.submit(
+        () ->
+            LambdaUtils.eval(
+                result,
+                () ->
+                    new FSDataInputStream(
+                        new GoogleHadoopFSInputStream(this, fileInfo, statistics))));
+    return result;
+  }
+
+  /**
    * Opens the given file for writing.
    *
    * <p>Note: This function overrides the given bufferSize value with a higher number unless further
@@ -879,7 +927,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       status = new ArrayList<>(fileInfos.size());
       String userName = getUgiUserName();
       for (FileInfo fileInfo : fileInfos) {
-        status.add(getFileStatus(fileInfo, userName));
+        status.add(getGoogleHadoopFileStatus(fileInfo, userName));
       }
     } catch (FileNotFoundException fnfe) {
       throw (FileNotFoundException)
@@ -981,27 +1029,24 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
               "%s not found: %s", fileInfo.isDirectory() ? "Directory" : "File", hadoopPath));
     }
     String userName = getUgiUserName();
-    return getFileStatus(fileInfo, userName);
+    return getGoogleHadoopFileStatus(fileInfo, userName);
   }
 
-  /** Gets FileStatus corresponding to the given FileInfo value. */
-  private FileStatus getFileStatus(FileInfo fileInfo, String userName) {
+  /** Returns FileStatus corresponding to the given FileInfo value. */
+  private GoogleHadoopFileStatus getGoogleHadoopFileStatus(FileInfo fileInfo, String userName) {
+    checkNotNull(fileInfo, "fileInfo should not be null");
     // GCS does not provide modification time. It only provides creation time.
     // It works for objects because they are immutable once created.
-    FileStatus status =
-        new FileStatus(
-            fileInfo.getSize(),
-            fileInfo.isDirectory(),
+    GoogleHadoopFileStatus status =
+        new GoogleHadoopFileStatus(
+            fileInfo,
+            getHadoopPath(fileInfo.getPath()),
             REPLICATION_FACTOR_DEFAULT,
             defaultBlockSize,
-            /* modificationTime= */ fileInfo.getModificationTime(),
-            /* accessTime= */ fileInfo.getModificationTime(),
             reportedPermissions,
-            /* owner= */ userName,
-            /* group= */ userName,
-            getHadoopPath(fileInfo.getPath()));
+            userName);
     logger.atFiner().log(
-        "getFileStatus(path: %s, userName: %s): %s",
+        "getGoogleHadoopFileStatus(path: %s, userName: %s): %s",
         fileInfo.getPath(), userName, lazy(() -> fileStatusToString(status)));
     return status;
   }
@@ -1126,9 +1171,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   private FileStatus[] concurrentGlobInternal(Path fixedPath, PathFilter filter)
       throws IOException {
-    ExecutorService globExecutor = newFixedThreadPool(2, DAEMON_THREAD_FACTORY);
     try {
-      return globExecutor.invokeAny(
+      return backgroundTasksThreadPool.invokeAny(
           ImmutableList.of(
               () -> flatGlobInternal(fixedPath, filter),
               () -> super.globStatus(fixedPath, filter)));
@@ -1137,8 +1181,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       throw new IOException(String.format("Concurrent glob execution failed: %s", e), e);
     } catch (ExecutionException e) {
       throw new IOException(String.format("Concurrent glob execution failed: %s", e.getCause()), e);
-    } finally {
-      globExecutor.shutdownNow();
     }
   }
 
@@ -1215,7 +1257,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     String userName = getUgiUserName();
     for (FileInfo fileInfo : fileInfos) {
       filePaths.add(fileInfo.getPath());
-      fileStatuses.add(getFileStatus(fileInfo, userName));
+      fileStatuses.add(getGoogleHadoopFileStatus(fileInfo, userName));
     }
 
     // The flow for populating this doesn't bother to populate metadata entries for parent
@@ -1234,7 +1276,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
           FileInfo fakeFileInfo = FileInfo.fromItemInfo(fakeItemInfo);
 
           filePaths.add(parentPath);
-          fileStatuses.add(getFileStatus(fakeFileInfo, userName));
+          fileStatuses.add(getGoogleHadoopFileStatus(fakeFileInfo, userName));
         }
         parentPath = UriPaths.getParentPath(parentPath);
       }
@@ -1437,10 +1479,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       GoogleCloudStorageOptions options = gcsFsOptions.getCloudStorageOptions();
       HttpTransport httpTransport =
           HttpTransportFactory.createHttpTransport(
-              options.getTransportType(),
-              options.getProxyAddress(),
-              options.getProxyUsername(),
-              options.getProxyPassword());
+              options.getProxyAddress(), options.getProxyUsername(), options.getProxyPassword());
       GoogleCredential impersonatedCredential =
           new GoogleCredentialWithIamAccessToken(
               httpTransport,
@@ -1682,6 +1721,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     }
 
     stopDelegationTokens();
+
+    backgroundTasksThreadPool.shutdown();
+    backgroundTasksThreadPool = null;
   }
 
   /** Set the Value for http get and head request related statistics keys */

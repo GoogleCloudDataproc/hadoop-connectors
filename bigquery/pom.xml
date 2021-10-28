@@ -259,7 +259,6 @@
                   <include>io.grpc</include>
                   <include>io.opencensus</include>
                   <include>io.perfmark</include>
-                  <include>org.apache.httpcomponents</include>
                   <include>org.threeten</include>
                   <!-- needed by http client and versions conflict -->
                   <include>commons-codec:commons-codec</include>
@@ -286,6 +285,9 @@
                     <exclude>com.google.cloud.hadoop.util.AccessTokenProvider</exclude>
                     <exclude>com.google.cloud.hadoop.util.AccessTokenProvider$AccessToken</exclude>
                     <exclude>com.google.cloud.hadoop.util.AccessTokenProvider$AccessTokenType</exclude>
+                    <exclude>com.google.cloud.hadoop.util.AccessBoundary</exclude>
+                    <exclude>com.google.cloud.hadoop.util.AccessBoundary$Action</exclude>
+                    <exclude>com.google.cloud.hadoop.util.AutoValue_AccessBoundary</exclude>
                   </excludes>
                 </relocation>
                 <!-- Take special care of grpc-netty-shaded, it uses the package
@@ -312,7 +314,6 @@
                   <shadedPattern>com.google.cloud.hadoop.repackaged.bigquery.org</shadedPattern>
                   <includes>
                     <include>org.apache.commons.codec.**</include>
-                    <include>org.apache.http.**</include>
                     <include>org.checkerframework.**</include>
                     <include>org.codehaus.mojo.animal_sniffer.**</include>
                     <include>org.joda.**</include>

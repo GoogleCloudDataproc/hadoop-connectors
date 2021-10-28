@@ -203,10 +203,17 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   @Override
   public SeekableByteChannel open(
       StorageResourceId resourceId, GoogleCloudStorageReadOptions readOptions) throws IOException {
-    if (!getItemInfo(resourceId).exists()) {
+    return open(getItemInfo(resourceId), readOptions);
+  }
+
+  @Override
+  public SeekableByteChannel open(
+      GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
+      throws IOException {
+    if (!itemInfo.exists()) {
       IOException notFoundException =
           createFileNotFoundException(
-              resourceId.getBucketName(), resourceId.getObjectName(), /* cause= */ null);
+              itemInfo.getBucketName(), itemInfo.getObjectName(), /* cause= */ null);
 
       if (readOptions.getFastFailOnNotFound()) {
         throw notFoundException;
@@ -262,9 +269,9 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     }
 
     return bucketLookup
-        .get(resourceId.getBucketName())
-        .get(resourceId.getObjectName())
-        .getReadChannel(resourceId.getBucketName(), resourceId.getObjectName(), readOptions);
+        .get(itemInfo.getBucketName())
+        .get(itemInfo.getObjectName())
+        .getReadChannel(itemInfo.getBucketName(), itemInfo.getObjectName(), readOptions);
   }
 
   @Override

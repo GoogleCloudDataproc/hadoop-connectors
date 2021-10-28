@@ -16,6 +16,8 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import com.google.cloud.hadoop.gcsio.FileInfo;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
@@ -68,6 +70,26 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     this.statistics = statistics;
     this.totalBytesRead = 0;
     this.channel = ghfs.getGcsFs().open(gcsPath, readOptions);
+  }
+
+  /**
+   * Constructs an instance of GoogleHadoopFSInputStream object with item info
+   *
+   * @param ghfs Instance of GoogleHadoopFileSystemBase.
+   * @param itemInfo Item info or the metadata of the file to read from.
+   * @param statistics File system statistics object.
+   * @throws IOException if an IO error occurs.
+   */
+  GoogleHadoopFSInputStream(
+      GoogleHadoopFileSystemBase ghfs, FileInfo fileInfo, FileSystem.Statistics statistics)
+      throws IOException {
+    logger.atFiner().log("GoogleHadoopFSInputStream(fileInfo: %s)", fileInfo);
+    this.gcsPath = fileInfo.getPath();
+    this.statistics = statistics;
+    this.totalBytesRead = 0;
+    GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
+    this.channel =
+        gcsFs.open(fileInfo, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
   }
 
   /**

@@ -128,13 +128,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   @Test
   public void testOpenNonExistentItem() throws IOException {
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
-    Throwable throwable =
-        assertThrows(
-            IOException.class,
-            () ->
-                rawStorage.open(
-                    new StorageResourceId(BUCKET_NAME, "testOpenNonExistentItem_Object")));
-    assertThat(throwable).hasCauseThat().hasMessageThat().contains("Item not found");
+    StorageResourceId resourceId =
+        new StorageResourceId(BUCKET_NAME, "testOpenNonExistentItem_Object");
+    IOException exception = assertThrows(IOException.class, () -> rawStorage.open(resourceId));
+    assertThat(exception).hasMessageThat().contains("Item not found");
   }
 
   @Test
