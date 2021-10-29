@@ -522,7 +522,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
             String.format("Failed to get committed write size for '%s'", resourceId), e);
       }
 
-      return responseObserver.getResponse().getPersistedSize();
+      return responseObserver.getResponse().getCommittedSize();
     }
 
     /** Stream observer for single response RPCs. */

@@ -107,8 +107,8 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
         newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
-                QueryWriteStatusResponse.newBuilder().setPersistedSize(0).build(),
-                QueryWriteStatusResponse.newBuilder().setPersistedSize(0).build())
+                QueryWriteStatusResponse.newBuilder().setCommittedSize(0).build(),
+                QueryWriteStatusResponse.newBuilder().setCommittedSize(0).build())
             .iterator());
 
     ByteString data = ByteString.copyFromUtf8("test data");
@@ -161,10 +161,10 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
                 QueryWriteStatusResponse.newBuilder()
-                    .setPersistedSize(GCS_MINIMUM_CHUNK_SIZE)
+                    .setCommittedSize(GCS_MINIMUM_CHUNK_SIZE)
                     .build(),
                 QueryWriteStatusResponse.newBuilder()
-                    .setPersistedSize(2 * GCS_MINIMUM_CHUNK_SIZE)
+                    .setCommittedSize(2 * GCS_MINIMUM_CHUNK_SIZE)
                     .build())
             .iterator());
 
@@ -191,10 +191,10 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
                 QueryWriteStatusResponse.newBuilder()
-                    .setPersistedSize(GCS_MINIMUM_CHUNK_SIZE)
+                    .setCommittedSize(GCS_MINIMUM_CHUNK_SIZE)
                     .build(),
                 QueryWriteStatusResponse.newBuilder()
-                    .setPersistedSize(2 * GCS_MINIMUM_CHUNK_SIZE)
+                    .setCommittedSize(2 * GCS_MINIMUM_CHUNK_SIZE)
                     .build())
             .iterator());
 
@@ -217,7 +217,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
                 QueryWriteStatusResponse.newBuilder()
-                    .setPersistedSize(GCS_MINIMUM_CHUNK_SIZE * 3 / 4)
+                    .setCommittedSize(GCS_MINIMUM_CHUNK_SIZE * 3 / 4)
                     .build())
             .iterator());
 
@@ -328,7 +328,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
                 QueryWriteStatusResponse.newBuilder()
-                    .setPersistedSize(GCS_MINIMUM_CHUNK_SIZE * 3 / 4)
+                    .setCommittedSize(GCS_MINIMUM_CHUNK_SIZE * 3 / 4)
                     .build())
             .iterator());
 
@@ -346,7 +346,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
                 QueryWriteStatusResponse.newBuilder()
-                    .setPersistedSize(GCS_MINIMUM_CHUNK_SIZE)
+                    .setCommittedSize(GCS_MINIMUM_CHUNK_SIZE)
                     .build())
             .iterator());
 
@@ -368,7 +368,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     fakeService.setInsertObjectExceptions(
         ImmutableList.of(new StatusException(Status.DEADLINE_EXCEEDED)));
     fakeService.setQueryWriteStatusResponses(
-        ImmutableList.of(QueryWriteStatusResponse.newBuilder().setPersistedSize(1).build())
+        ImmutableList.of(QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build())
             .iterator());
     ByteString chunk = createTestData(GCS_MINIMUM_CHUNK_SIZE);
     ArgumentCaptor<WriteObjectRequest> requestCaptor =
@@ -396,7 +396,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     fakeService.setInsertObjectExceptions(
         ImmutableList.of(new StatusException(Status.DEADLINE_EXCEEDED)));
     fakeService.setQueryWriteStatusResponses(
-        ImmutableList.of(QueryWriteStatusResponse.newBuilder().setPersistedSize(-1).build())
+        ImmutableList.of(QueryWriteStatusResponse.newBuilder().setCommittedSize(-1).build())
             .iterator());
     ByteString chunk = createTestData(GCS_MINIMUM_CHUNK_SIZE);
 
@@ -421,10 +421,10 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
             new StatusException(Status.DEADLINE_EXCEEDED)));
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
-                QueryWriteStatusResponse.newBuilder().setPersistedSize(1).build(),
-                QueryWriteStatusResponse.newBuilder().setPersistedSize(1).build(),
-                QueryWriteStatusResponse.newBuilder().setPersistedSize(1).build(),
-                QueryWriteStatusResponse.newBuilder().setPersistedSize(1).build())
+                QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build(),
+                QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build(),
+                QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build(),
+                QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build())
             .iterator());
     ByteString chunk = createTestData(GCS_MINIMUM_CHUNK_SIZE);
 
