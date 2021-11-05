@@ -4,7 +4,7 @@
 
 1.  Upgrade Google Auth library to support ExternalAccount.
 
-1.  Decrease log-level for hflush rate-limit warning log message. 
+1.  Decrease log-level for hflush rate-limit warning log message.
 
 ### 2.2.3 - 2021-10-01
 
