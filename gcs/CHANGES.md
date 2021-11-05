@@ -1,4 +1,10 @@
-### 2.2.4 - 2021-XX-XX
+### 2.2.4 - 2021-11-05
+
+1.  Support GCS fine-grained action in AuthorizationHandlers.
+
+1.  Upgrade Google Auth library to support ExternalAccount.
+
+1.  Decrease log-level for hflush rate-limit warning log message. 
 
 ### 2.2.3 - 2021-10-01
 
