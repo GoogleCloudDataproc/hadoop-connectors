@@ -811,7 +811,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       do {
         totalBytesRead += bytesRead;
         bytesRead = footerStream.read(footerContent, totalBytesRead, footerSize - totalBytesRead);
-      } while (bytesRead >= 0 && totalBytesRead <= footerSize);
+      } while (bytesRead >= 0 && totalBytesRead < footerSize);
       checkState(
           footerStream.read() < 0,
           "footerStream should be empty after reading %s bytes from %s bytes for '%s'",
