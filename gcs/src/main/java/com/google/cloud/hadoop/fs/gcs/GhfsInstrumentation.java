@@ -16,6 +16,15 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DELEGATION_TOKENS_ISSUED;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DIRECTORIES_CREATED;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DIRECTORIES_DELETED;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_CREATED;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_DELETED;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HFLUSH;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HSYNC;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_BYTES;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_EXCEPTIONS;
 import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStatistics;
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.iostatisticsStore;
@@ -387,17 +396,17 @@ public class GhfsInstrumentation
 
   /** Indicate that GCS created a file. */
   public void fileCreated() {
-    incrementCounter(GhfsStatistic.FILES_CREATED, 1);
+    incrementCounter(FILES_CREATED, 1);
   }
 
   /** Indicate that GCS created a directory. */
   public void directoryCreated() {
-    incrementCounter(GhfsStatistic.DIRECTORIES_CREATED, 1);
+    incrementCounter(DIRECTORIES_CREATED, 1);
   }
 
   /** Indicate that GCS just deleted a directory. */
   public void directoryDeleted() {
-    incrementCounter(GhfsStatistic.DIRECTORIES_DELETED, 1);
+    incrementCounter(DIRECTORIES_DELETED, 1);
   }
 
   /**
@@ -406,7 +415,7 @@ public class GhfsInstrumentation
    * @param count number of files.
    */
   public void fileDeleted(int count) {
-    incrementCounter(GhfsStatistic.FILES_DELETED, count);
+    incrementCounter(FILES_DELETED, count);
   }
   /**
    * Create a stream input statistics instance.
@@ -530,7 +539,7 @@ public class GhfsInstrumentation
      * @return the new value
      */
     private long increment(String name, long value) {
-      return incCounter(name, value);
+      return incrementCounter(name, value);
     }
 
     /**
@@ -560,11 +569,11 @@ public class GhfsInstrumentation
      */
     @Override
     public void seekForwards(final long skipped) {
-      seekOperations.incrementAndGet();
-      forwardSeekOperations.incrementAndGet();
       if (skipped > 0) {
         bytesSkippedOnSeek.addAndGet(skipped);
       }
+      seekOperations.incrementAndGet();
+      forwardSeekOperations.incrementAndGet();
     }
 
     /** An ignored stream read exception was received. */
@@ -788,10 +797,10 @@ public class GhfsInstrumentation
       IOStatisticsStore st =
           iostatisticsStore()
               .withCounters(
-                  GhfsStatistic.STREAM_WRITE_BYTES.getSymbol(),
-                  GhfsStatistic.STREAM_WRITE_EXCEPTIONS.getSymbol(),
-                  GhfsStatistic.INVOCATION_HFLUSH.getSymbol(),
-                  GhfsStatistic.INVOCATION_HSYNC.getSymbol())
+                  STREAM_WRITE_BYTES.getSymbol(),
+                  STREAM_WRITE_EXCEPTIONS.getSymbol(),
+                  INVOCATION_HFLUSH.getSymbol(),
+                  INVOCATION_HSYNC.getSymbol())
               .build();
       setIOStatistics(st);
       // these are extracted to avoid lookups on heavily used counters.
@@ -839,13 +848,13 @@ public class GhfsInstrumentation
     /** Syncable.hflush() has been invoked. */
     @Override
     public void hflushInvoked() {
-      incCounter(GhfsStatistic.INVOCATION_HFLUSH.getSymbol(), 1);
+      incrementCounter(INVOCATION_HFLUSH.getSymbol(), 1);
     }
 
     /** Syncable.hsync() has been invoked. */
     @Override
     public void hsyncInvoked() {
-      incCounter(GhfsStatistic.INVOCATION_HSYNC.getSymbol(), 1);
+      incrementCounter(INVOCATION_HSYNC.getSymbol(), 1);
     }
 
     /**
@@ -901,9 +910,7 @@ public class GhfsInstrumentation
 
     private DelegationTokenStatisticsImpl() {
       IOStatisticsStore st =
-          iostatisticsStore()
-              .withCounters(GhfsStatistic.DELEGATION_TOKENS_ISSUED.getSymbol())
-              .build();
+          iostatisticsStore().withCounters(DELEGATION_TOKENS_ISSUED.getSymbol()).build();
     }
 
     /**

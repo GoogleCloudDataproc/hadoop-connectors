@@ -286,33 +286,29 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   @Test
   public void create_IOstatistics() throws IOException {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
-    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     assertThat(myGhfs.getIOStatistics().counters().get("op_create")).isEqualTo(0);
     assertThat(myGhfs.getIOStatistics().counters().get("files_created")).isEqualTo(0);
 
-    try (FSDataOutputStream fout = myGhfs.create(filePath, true, 1, (short) 1, 1)) {
+    try (FSDataOutputStream fout = myGhfs.create(new Path("/file1"))) {
       fout.writeBytes("Test Content");
       fout.close();
     }
     assertThat(myGhfs.getIOStatistics().counters().get("op_create")).isEqualTo(1);
     assertThat(myGhfs.getIOStatistics().counters().get("files_created")).isEqualTo(1);
-    assertThat(myGhfs.delete(filePath)).isTrue();
+    assertThat(myGhfs.delete(new Path("/file1"))).isTrue();
   }
 
   @Test
   public void listLocatedStatus_IOstatistics() throws IOException {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
-    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
-    try (FSDataOutputStream fout = myGhfs.create(filePath, true, 1, (short) 1, 1)) {
+
+    try (FSDataOutputStream fout = myGhfs.create(new Path("/file1"))) {
       fout.writeBytes("Test Content");
       fout.close();
-      myGhfs.listLocatedStatus(filePath);
+      myGhfs.listLocatedStatus(new Path("/file1"));
       assertThat(myGhfs.getIOStatistics().counters().get("op_list_located_status")).isEqualTo(1);
     }
-
-    assertThat(myGhfs.delete(filePath)).isTrue();
+    assertThat(myGhfs.delete(new Path("/file1"))).isTrue();
   }
 
   @Test
@@ -374,9 +370,10 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   @Test
   public void delete_IOstatistics() throws IOException {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
-    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
-    myGhfs.delete(filePath);
+    FSDataOutputStream fout = myGhfs.create(new Path("/file1"));
+    fout.writeBytes("data");
+    fout.close();
+    myGhfs.delete(new Path("/file1"));
     assertThat(myGhfs.getIOStatistics().counters().get("op_delete")).isEqualTo(1);
   }
 

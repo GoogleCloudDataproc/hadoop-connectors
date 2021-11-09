@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Interface for exposing the Google Cloud Storage API behavior in a way more amenable to writing
@@ -418,7 +419,7 @@ public interface GoogleCloudStorage {
    *
    * @param key name of the object related statistics key
    */
-  public long getObjectStatistics(GoogleCloudStorageStatistics key);
+  public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key);
 
   /**
    * Composes inputs into a single GCS object. This performs a GCS Compose. Objects will be composed

@@ -48,8 +48,8 @@ abstract class AbstractGhfsStatisticsSource implements IOStatisticsSource, Durat
    * @param name counter name
    * @return the updated value or, if the counter is unknown: 0
    */
-  public long incCounter(String name) {
-    return incCounter(name, 1);
+  public long incrementCounter(String name) {
+    return incrementCounter(name, 1);
   }
 
   /**
@@ -59,7 +59,7 @@ abstract class AbstractGhfsStatisticsSource implements IOStatisticsSource, Durat
    * @param value value to increment by
    * @return the updated value or, if the counter is unknown: 0
    */
-  public long incCounter(String name, long value) {
+  public long incrementCounter(String name, long value) {
     return ioStatistics.incrementCounter(name, value);
   }
 
@@ -90,7 +90,7 @@ abstract class AbstractGhfsStatisticsSource implements IOStatisticsSource, Durat
    * @param v value to increment
    * @return the value or 0 if no matching gauge was found.
    */
-  public long incGauge(String name, long v) {
+  public long incrementGauge(String name, long v) {
     return ioStatistics.incrementGauge(name, v);
   }
 
@@ -100,8 +100,8 @@ abstract class AbstractGhfsStatisticsSource implements IOStatisticsSource, Durat
    * @param name gauge name
    * @return the value or 0 if no matching gauge was found.
    */
-  public long incGauge(String name) {
-    return incGauge(name, 1);
+  public long incrementGauge(String name) {
+    return incrementGauge(name, 1);
   }
 
   @Override

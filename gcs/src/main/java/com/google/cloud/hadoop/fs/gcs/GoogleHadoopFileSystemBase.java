@@ -896,7 +896,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
           GhfsStatistic.OBJECT_DELETE_OBJECTS,
           getGcsFs()
               .getGcs()
-              .getObjectStatistics(GoogleCloudStorageStatistics.OBJECT_DELETE_OBJECTS));
+              .getObjectStatistics(GoogleCloudStorageStatistics.OBJECT_DELETE_OBJECTS)
+              .longValue());
 
     } catch (DirectoryNotEmptyException e) {
       incrementStatistic(GhfsStatistic.FILES_DELETE_REJECTED);

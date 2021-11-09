@@ -46,6 +46,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * InMemoryGoogleCloudStorage overrides the public methods of GoogleCloudStorage by implementing all
@@ -551,7 +552,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
    * @return
    */
   @Override
-  public long getObjectStatistics(GoogleCloudStorageStatistics key) {
-    return 0;
+  public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key) {
+    return new AtomicLong(0);
   }
 }

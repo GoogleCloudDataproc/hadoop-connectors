@@ -104,6 +104,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 
@@ -152,8 +153,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private static final String LIST_OBJECT_FIELDS_FORMAT = "items(%s),prefixes,nextPageToken";
 
   // To track the object statistics
-  private HashMap<GoogleCloudStorageStatistics, Long> objectStatistics =
-      new HashMap<GoogleCloudStorageStatistics, Long>();
+  private HashMap<GoogleCloudStorageStatistics, AtomicLong> objectStatistics =
+      new HashMap<GoogleCloudStorageStatistics, AtomicLong>();
 
   // A function to encode metadata map values
   static String encodeMetadataValues(byte[] bytes) {
@@ -835,12 +836,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   public void deleteObject(StorageResourceId resourceId, long metaGeneration) throws IOException {
     String bucketName = resourceId.getBucketName();
-    // T0 update the statistics of number of objects deleted
-    if (objectStatistics.get(OBJECT_DELETE_OBJECTS) == null) {
-      objectStatistics.put(OBJECT_DELETE_OBJECTS, 1L);
-    } else {
-      objectStatistics.put(OBJECT_DELETE_OBJECTS, objectStatistics.get(OBJECT_DELETE_OBJECTS) + 1L);
-    }
+    // To update the statistics of number of objects deleted
+
+    objectStatistics.putIfAbsent(OBJECT_DELETE_OBJECTS, new AtomicLong(0));
+    objectStatistics.get(OBJECT_DELETE_OBJECTS).incrementAndGet();
     Storage.Objects.Delete deleteObject =
         initializeRequest(
                 storage.objects().delete(bucketName, resourceId.getObjectName()), bucketName)
@@ -879,12 +878,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       queueSingleObjectDelete(fullObjectName, innerExceptions, batchHelper, 1);
 
       // update the statistics of number of objects deleted
-      if (objectStatistics.get(OBJECT_DELETE_OBJECTS) == null) {
-        objectStatistics.put(OBJECT_DELETE_OBJECTS, 1L);
-      } else {
-        objectStatistics.put(
-            OBJECT_DELETE_OBJECTS, objectStatistics.get(OBJECT_DELETE_OBJECTS) + 1L);
-      }
+      objectStatistics.putIfAbsent(OBJECT_DELETE_OBJECTS, new AtomicLong(0));
+      objectStatistics.get(OBJECT_DELETE_OBJECTS).incrementAndGet();
     }
 
     batchHelper.flush();
@@ -2412,7 +2407,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   @Override
-  public long getObjectStatistics(GoogleCloudStorageStatistics key) {
+  public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key) {
     return objectStatistics.get(key);
   }
 }

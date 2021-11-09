@@ -85,8 +85,8 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     try (GoogleHadoopFSInputStream in =
         new GoogleHadoopFSInputStream(ghfs, path, options, statistics)) {
       assertThat(in.read(value, 0, 1)).isEqualTo(1);
-      assertThat(statistics.getReadOps()).isEqualTo(1);
       assertThat(in.read(1, value, 1, 1)).isEqualTo(1);
+      in.close();
       assertThat(statistics.getReadOps()).isEqualTo(2);
     }
 
