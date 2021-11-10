@@ -46,8 +46,8 @@ class StorageStubProvider {
   private final GoogleCloudStorageReadOptions readOptions;
   private final String userAgent;
   private final ExecutorService backgroundTasksThreadPool;
-  private final ManagedChannel channel;
   private final GrpcDecorator grpcDecorator;
+  private ManagedChannel channel;
 
   @VisibleForTesting
   GrpcDecorator getGrpcDecorator() {
@@ -62,7 +62,6 @@ class StorageStubProvider {
     this.userAgent = options.getAppName();
     this.backgroundTasksThreadPool = backgroundTasksThreadPool;
     this.grpcDecorator = checkNotNull(grpcDecorator, "grpcDecorator cannot be null");
-    this.channel = buildManagedChannel();
   }
 
   private ManagedChannel buildManagedChannel() {
@@ -91,6 +90,9 @@ class StorageStubProvider {
   }
 
   private synchronized ManagedChannel getManagedChannel() {
+    if (channel == null) {
+      channel = buildManagedChannel();
+    }
     return channel;
   }
 
