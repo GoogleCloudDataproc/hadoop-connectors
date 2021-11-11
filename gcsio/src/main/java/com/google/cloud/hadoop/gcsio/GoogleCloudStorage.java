@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
@@ -35,7 +36,7 @@ import java.util.Optional;
  * <p>Please read the following document to get familiarity with basic GCS concepts:
  * https://developers.google.com/storage/docs/concepts-techniques
  */
-public interface GoogleCloudStorage {
+public interface GoogleCloudStorage extends Closeable {
 
   /**
    * Pseudo path delimiter.
