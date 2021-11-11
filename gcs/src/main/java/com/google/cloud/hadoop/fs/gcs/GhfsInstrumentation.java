@@ -36,8 +36,6 @@ import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.statistics.*;
 import org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding;
@@ -62,8 +60,6 @@ import org.apache.hadoop.metrics2.lib.MutableMetric;
  *
  * <p>GoogleHadoopFileSystem StorageStatistics are dynamically derived from the IOStatistics.
  */
-@InterfaceAudience.Private
-@InterfaceStability.Evolving
 public class GhfsInstrumentation
     implements Closeable, MetricsSource, IOStatisticsSource, DurationTrackerFactory {
   private static final String METRICS_SOURCE_BASENAME = "GCSMetrics";
@@ -170,13 +166,22 @@ public class GhfsInstrumentation
       metricsSourceActiveCounter++;
       number = ++metricsSourceNameCounter;
     }
-    String msName = METRICS_SOURCE_BASENAME + number;
-    metricsSourceName = msName + "-" + name.getHost();
+    metricsSourceName = METRICS_SOURCE_BASENAME + number + "-" + name.getHost();
     metricsSystem.register(metricsSourceName, "", this);
   }
 
   public void close() {
-    LOG.atFine().log("Close");
+    synchronized (METRICS_SYSTEM_LOCK) {
+      metricsSystem.unregisterSource(metricsSourceName);
+      metricsSourceActiveCounter--;
+      int activeSources = metricsSourceActiveCounter;
+      if (activeSources == 0) {
+        LOG.atInfo().log("Shutting down metrics publisher");
+        metricsSystem.publishMetricsNow();
+        metricsSystem.shutdown();
+        metricsSystem = null;
+      }
+    }
   }
 
   /**
@@ -197,11 +202,12 @@ public class GhfsInstrumentation
    * @param count increment value
    */
   public void incrementCounter(GhfsStatistic op, long count) {
-    if (count != 0) {
-      String name = op.getSymbol();
-      incrementMutableCounter(name, count);
-      instanceIOStatistics.incrementCounter(name, count);
+    if (count == 0) {
+      return;
     }
+    String name = op.getSymbol();
+    incrementMutableCounter(name, count);
+    instanceIOStatistics.incrementCounter(name, count);
   }
 
   /**
@@ -304,7 +310,7 @@ public class GhfsInstrumentation
     if (!(metric instanceof MutableCounterLong)) {
       throw new IllegalStateException(
           String.format(
-              "Metric %s is not a " + "MutableCounterLong: %s (type: %s)",
+              "Metric %s is not a MutableCounterLong: %s (type: %s)",
               name, metric, metric.getClass()));
     }
     return (MutableCounterLong) metric;
