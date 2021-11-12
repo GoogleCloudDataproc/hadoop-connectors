@@ -567,6 +567,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public FSDataInputStream open(Path hadoopPath, int bufferSize) throws IOException {
+    // upadate the statistics of open
+    entryPoint(GhfsStatistic.INVOCATION_OPEN);
+
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
@@ -578,8 +581,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     GoogleHadoopFSInputStream in =
         new GoogleHadoopFSInputStream(this, gcsPath, readChannelOptions, statistics);
 
-    // upadate the statistics of open
-    entryPoint(GhfsStatistic.INVOCATION_OPEN);
     return new FSDataInputStream(in);
   }
 
@@ -857,13 +858,13 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * @throws IOException if an error occurs.
    */
   void renameInternal(Path src, Path dst) throws IOException {
+    // Update the statistics of rename()
+    entryPoint(GhfsStatistic.INVOCATION_RENAME);
+
     checkArgument(src != null, "src must not be null");
     checkArgument(dst != null, "dst must not be null");
 
     checkOpen();
-
-    // Update the statistics of rename()
-    entryPoint(GhfsStatistic.INVOCATION_RENAME);
 
     URI srcPath = getGcsPath(src);
     URI dstPath = getGcsPath(dst);
@@ -883,14 +884,15 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public boolean delete(Path hadoopPath, boolean recursive) throws IOException {
+    // Update the statistics of delete()
+    entryPoint(GhfsStatistic.INVOCATION_DELETE);
+
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
 
     URI gcsPath = getGcsPath(hadoopPath);
     try {
-      // Update the statistics of delete()
-      entryPoint(GhfsStatistic.INVOCATION_DELETE);
       getGcsFs().delete(gcsPath, recursive);
       incrementStatistic(
           GhfsStatistic.OBJECT_DELETE_OBJECTS,
@@ -926,6 +928,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public FileStatus[] listStatus(Path hadoopPath) throws IOException {
+    // Update the statistics of listStatus
+    entryPoint(GhfsStatistic.INVOCATION_LIST_STATUS);
+
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
@@ -936,9 +941,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     List<FileStatus> status;
 
     try {
-      List<FileInfo> fileInfos = getGcsFs().listFileInfo(gcsPath, LIST_OPTIONS);
       // Update the statistics of listFiles
       entryPoint(GhfsStatistic.INVOCATION_LIST_FILES);
+
+      List<FileInfo> fileInfos = getGcsFs().listFileInfo(gcsPath, LIST_OPTIONS);
       status = new ArrayList<>(fileInfos.size());
       String userName = getUgiUserName();
       for (FileInfo fileInfo : fileInfos) {
@@ -951,8 +957,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                       "listStatus(hadoopPath: %s): '%s' does not exist.", hadoopPath, gcsPath))
               .initCause(fnfe);
     }
-    // Update the statistics of listStatus
-    entryPoint(GhfsStatistic.INVOCATION_LIST_STATUS);
     return status.toArray(new FileStatus[0]);
   }
 
@@ -999,14 +1003,15 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public boolean mkdirs(Path hadoopPath, FsPermission permission) throws IOException {
+    // Update the statistics of mkdirs
+    entryPoint(GhfsStatistic.INVOCATION_MKDIRS);
+
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
 
     URI gcsPath = getGcsPath(hadoopPath);
     try {
-      // Update the statistics of mkdirs
-      entryPoint(GhfsStatistic.INVOCATION_MKDIRS);
       getGcsFs().mkdirs(gcsPath);
     } catch (java.nio.file.FileAlreadyExistsException faee) {
       // Need to convert to the Hadoop flavor of FileAlreadyExistsException.
@@ -1037,12 +1042,12 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public FileStatus getFileStatus(Path hadoopPath) throws IOException {
+    // Update the statistics of getFileStatus()
+    entryPoint(GhfsStatistic.INVOCATION_GET_FILE_STATUS);
+
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
-
-    // Update the statistics of getFileStatus()
-    entryPoint(GhfsStatistic.INVOCATION_GET_FILE_STATUS);
 
     URI gcsPath = getGcsPath(hadoopPath);
     FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
@@ -1163,10 +1168,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public FileStatus[] globStatus(Path pathPattern, PathFilter filter) throws IOException {
-    checkOpen();
-
     // Update the statistics of globStatus()
     entryPoint(GhfsStatistic.INVOCATION_GLOB_STATUS);
+
+    checkOpen();
 
     logger.atFiner().log("globStatus(pathPattern: %s, filter: %s)", pathPattern, filter);
     // URI does not handle glob expressions nicely, for the purpose of
@@ -1759,11 +1764,13 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   @Override
   public FileChecksum getFileChecksum(Path hadoopPath) throws IOException {
+    // Update the statistics of getFileChecksum()
+    entryPoint(GhfsStatistic.INVOCATION_GET_FILE_CHECKSUM);
+
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
-    // Update the statistics of getFileChecksum()
-    entryPoint(GhfsStatistic.INVOCATION_GET_FILE_CHECKSUM);
+
     URI gcsPath = getGcsPath(hadoopPath);
     final FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
     if (!fileInfo.exists()) {
@@ -2014,8 +2021,10 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * @param operation The operation to increment
    * @throws IOException if the
    */
-  public void entryPoint(GhfsStatistic operation) throws IOException {
-    checkOpen();
+  public void entryPoint(GhfsStatistic operation) {
+    if (isClosed()) {
+      return;
+    }
     incrementStatistic(operation);
   }
 

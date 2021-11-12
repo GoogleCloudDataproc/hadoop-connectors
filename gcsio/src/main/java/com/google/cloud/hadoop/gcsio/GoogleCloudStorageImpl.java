@@ -19,7 +19,6 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createJsonResponseException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInferredDirectory;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.OBJECT_DELETE_OBJECTS;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -838,8 +837,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     String bucketName = resourceId.getBucketName();
     // To update the statistics of number of objects deleted
 
-    objectStatistics.putIfAbsent(OBJECT_DELETE_OBJECTS, new AtomicLong(0));
-    objectStatistics.get(OBJECT_DELETE_OBJECTS).incrementAndGet();
+    //    objectStatistics.putIfAbsent(OBJECT_DELETE_OBJECTS, new AtomicLong(0));
+    //    objectStatistics.get(OBJECT_DELETE_OBJECTS).incrementAndGet();
     Storage.Objects.Delete deleteObject =
         initializeRequest(
                 storage.objects().delete(bucketName, resourceId.getObjectName()), bucketName)
@@ -878,8 +877,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       queueSingleObjectDelete(fullObjectName, innerExceptions, batchHelper, 1);
 
       // update the statistics of number of objects deleted
-      objectStatistics.putIfAbsent(OBJECT_DELETE_OBJECTS, new AtomicLong(0));
-      objectStatistics.get(OBJECT_DELETE_OBJECTS).incrementAndGet();
+      //      objectStatistics.putIfAbsent(OBJECT_DELETE_OBJECTS, new AtomicLong(0));
+      //      objectStatistics.get(OBJECT_DELETE_OBJECTS).incrementAndGet();
     }
 
     batchHelper.flush();
