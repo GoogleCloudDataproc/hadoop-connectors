@@ -568,7 +568,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
                 requestContext.detach(toReattach);
               }
             } catch (StatusRuntimeException e) {
-              recreateStub(e);
               throw convertError(e, resourceId);
             }
             return null;
@@ -621,7 +620,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
               }
               return moreDataAvailable;
             } catch (StatusRuntimeException e) {
-              recreateStub(e);
               throw convertError(e, resourceId);
             }
           },
@@ -631,13 +629,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     } catch (Exception e) {
       cancelCurrentRequest();
       throw new IOException(String.format("Error reading '%s'", resourceId), e);
-    }
-  }
-
-  private void recreateStub(StatusRuntimeException e) {
-    if (stubProvider.isStubBroken(Status.fromThrowable(e).getCode())) {
-      stubProvider.evictChannelFromPool(stub.getChannel());
-      stub = stubProvider.newBlockingStub();
     }
   }
 
