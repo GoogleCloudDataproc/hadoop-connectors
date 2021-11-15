@@ -339,13 +339,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
       return request;
     }
 
-    private void recreateStub(Status.Code statusCode) {
-      if (stubProvider.isStubBroken(statusCode)) {
-        stubProvider.evictChannelFromPool(stub.getChannel());
-        stub = stubProvider.newAsyncStub();
-      }
-    }
-
     /** Handler for responses from the Insert streaming RPC. */
     private class InsertChunkResponseObserver
         implements ClientResponseObserver<WriteObjectRequest, WriteObjectResponse> {
@@ -395,7 +388,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
       public void onError(Throwable t) {
         Status status = Status.fromThrowable(t);
         Status.Code statusCode = status.getCode();
-        recreateStub(statusCode);
         if (TRANSIENT_ERRORS.contains(statusCode)) {
           transientError = t;
         }
@@ -556,7 +548,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       @Override
       public void onError(Throwable t) {
-        recreateStub(Status.fromThrowable(t).getCode());
         error = new IOException(String.format("Caught exception for '%s'", resourceId), t);
         done.countDown();
       }
