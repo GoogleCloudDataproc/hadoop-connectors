@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCE_BUCKET_DELETE_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID;
@@ -466,7 +467,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
             ((GoogleHadoopFileSystem) ghfs)
                 .getIOStatistics()
                 .counters()
-                .get("op_copy_from_local_file"))
+                .get(INVOCATION_COPY_FROM_LOCAL_FILE.getSymbol()))
         .isEqualTo(1);
 
     // Test the IOStatitsics of copyFromLocalFile(delSrc,overwrite,[] srcs,dst)
@@ -475,7 +476,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
             ((GoogleHadoopFileSystem) ghfs)
                 .getIOStatistics()
                 .counters()
-                .get("op_copy_from_local_file"))
+                .get(INVOCATION_COPY_FROM_LOCAL_FILE.getSymbol()))
         .isEqualTo(2);
 
     if (localTempFile.exists()) {

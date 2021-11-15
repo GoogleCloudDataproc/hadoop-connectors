@@ -14,6 +14,16 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_BYTES;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_CLOSE_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_BACKWARD_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_BYTES_BACKWARDS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_BYTES_SKIPPED;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_FORWARD_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_TOTAL_BYTES;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_BYTES;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -782,54 +792,33 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
 
       //  Check the statistics of method read().
       readStream.read();
-      assertThat(readStream.getIOStatistics().counters().get("stream_read_operations"))
+      assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_OPERATIONS.getSymbol()))
           .isEqualTo(1);
 
-      assertThat(readStream.getIOStatistics().counters().get("stream_read_bytes")).isEqualTo(1);
+      assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_BYTES.getSymbol()))
+          .isEqualTo(1);
 
       // Check the statistics of method read(buf, off, len)
       byte[] readbuffer = new byte[1];
       readStream.read(readbuffer, 0, 1);
-      assertThat(readStream.getIOStatistics().counters().get("stream_read_operations"))
+      assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_OPERATIONS.getSymbol()))
           .isEqualTo(2);
-      assertThat(readStream.getIOStatistics().counters().get("stream_read_total_bytes"))
+      assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_TOTAL_BYTES.getSymbol()))
           .isEqualTo(2);
-      assertThat(readStream.getIOStatistics().counters().get("stream_read_bytes")).isEqualTo(2);
+      assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_BYTES.getSymbol()))
+          .isEqualTo(2);
 
       // Check the statistics of method read(pos, buf, off, len)
       byte[] readbuffer1 = new byte[2];
       readStream.read(2, readbuffer1, 0, 2);
-      assertThat(readStream.getIOStatistics().counters().get("stream_read_operations"))
+      assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_OPERATIONS.getSymbol()))
           .isEqualTo(4);
-      assertThat(readStream.getIOStatistics().counters().get("stream_read_total_bytes"))
+      assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_TOTAL_BYTES.getSymbol()))
           .isEqualTo(6);
-      assertThat(readStream.getIOStatistics().counters().get("stream_read_bytes")).isEqualTo(6);
+      assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_BYTES.getSymbol()))
+          .isEqualTo(6);
 
       // Check the  statistics of read Exception
-      readStream.close();
-    }
-
-    // Check the statistics related to seek() method.
-    try (FSDataInputStream readStream = ghfs.open(hadoopPath)) {
-      // Check the statistics related to Forward seek operations.
-      readStream.seek(7);
-      assertThat(readStream.getIOStatistics().counters().get("stream_read_seek_forward_operations"))
-          .isEqualTo(1);
-      assertThat(readStream.getIOStatistics().counters().get("stream_read_seek_bytes_skipped"))
-          .isEqualTo(7);
-
-      // Check the statistics related to Forward seek operations.
-      readStream.seek(5);
-      assertThat(
-              readStream.getIOStatistics().counters().get("stream_read_seek_backward_operations"))
-          .isEqualTo(1);
-      assertThat(readStream.getIOStatistics().counters().get("stream_read_bytes_backwards_on_seek"))
-          .isEqualTo(2);
-
-      // Check the statistics related to seek operations.
-      assertThat(readStream.getIOStatistics().counters().get("stream_read_seek_operations"))
-          .isEqualTo(2);
-
       readStream.close();
     }
   }
@@ -848,26 +837,42 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     try (FSDataInputStream readStream = ghfs.open(hadoopPath)) {
       // Check the statistics related to Forward seek operations.
       readStream.seek(7);
-      assertThat(readStream.getIOStatistics().counters().get("stream_read_seek_forward_operations"))
+      assertThat(
+              readStream
+                  .getIOStatistics()
+                  .counters()
+                  .get(STREAM_READ_SEEK_FORWARD_OPERATIONS.getSymbol()))
           .isEqualTo(1);
-      assertThat(readStream.getIOStatistics().counters().get("stream_read_seek_bytes_skipped"))
+      assertThat(
+              readStream
+                  .getIOStatistics()
+                  .counters()
+                  .get(STREAM_READ_SEEK_BYTES_SKIPPED.getSymbol()))
           .isEqualTo(7);
 
       // Check the statistics related to Forward seek operations.
       readStream.seek(5);
       assertThat(
-              readStream.getIOStatistics().counters().get("stream_read_seek_backward_operations"))
+              readStream
+                  .getIOStatistics()
+                  .counters()
+                  .get(STREAM_READ_SEEK_BACKWARD_OPERATIONS.getSymbol()))
           .isEqualTo(1);
-      assertThat(readStream.getIOStatistics().counters().get("stream_read_bytes_backwards_on_seek"))
+      assertThat(
+              readStream
+                  .getIOStatistics()
+                  .counters()
+                  .get(STREAM_READ_SEEK_BYTES_BACKWARDS.getSymbol()))
           .isEqualTo(2);
 
       // Check the statistics related to seek operations.
-      assertThat(readStream.getIOStatistics().counters().get("stream_read_seek_operations"))
+      assertThat(
+              readStream.getIOStatistics().counters().get(STREAM_READ_SEEK_OPERATIONS.getSymbol()))
           .isEqualTo(2);
-
       readStream.close();
 
-      assertThat(readStream.getIOStatistics().counters().get("stream_read_close_operations"))
+      assertThat(
+              readStream.getIOStatistics().counters().get(STREAM_READ_CLOSE_OPERATIONS.getSymbol()))
           .isEqualTo(1);
     }
   }
@@ -881,7 +886,8 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     try (FSDataOutputStream fsos = ghfs.create(hadoopPath)) {
       fsos.write("Created a file to test statistics".getBytes(UTF_8));
       fsos.close();
-      assertThat(fsos.getIOStatistics().counters().get("stream_write_bytes")).isEqualTo(33);
+      assertThat(fsos.getIOStatistics().counters().get(STREAM_WRITE_BYTES.getSymbol()))
+          .isEqualTo(33);
     }
 
     assertThat(ghfs.delete(hadoopPath)).isTrue();
