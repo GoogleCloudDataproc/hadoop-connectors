@@ -132,10 +132,7 @@ public final class MockHttpTransportHelper {
           }
         };
     HttpRequest request =
-        transport
-            .createRequestFactory()
-            .buildGetRequest(HttpTesting.SIMPLE_GENERIC_URL)
-            .setResponseReturnRawInputStream(true);
+        transport.createRequestFactory().buildGetRequest(HttpTesting.SIMPLE_GENERIC_URL);
     return request.execute();
   }
 
