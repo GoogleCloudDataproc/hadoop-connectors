@@ -75,7 +75,7 @@ public class HadoopConfigurationProperty<T> {
     return logProperty(lookupKey, getterFn.apply(lookupKey, defaultValue));
   }
 
-  public String getPassword(Configuration config) {
+  public RedactedString getPassword(Configuration config) {
     checkState(defaultValue == null || defaultValue instanceof String, "Not a string property");
     String lookupKey = getLookupKey(config, key, deprecatedKeys, (c, k) -> c.get(k) != null);
     char[] value;
@@ -84,7 +84,9 @@ public class HadoopConfigurationProperty<T> {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    return logProperty(lookupKey, value == null ? (String) defaultValue : String.valueOf(value));
+    return logProperty(
+        lookupKey,
+        RedactedString.create(value == null ? (String) defaultValue : String.valueOf(value)));
   }
 
   public Collection<String> getStringCollection(Configuration config) {
