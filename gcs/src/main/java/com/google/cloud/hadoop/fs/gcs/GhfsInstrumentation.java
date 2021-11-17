@@ -21,18 +21,20 @@ import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURE
 import com.google.common.flogger.GoogleLogger;
 import java.io.Closeable;
 import java.net.URI;
-import java.time.Duration;
 import java.util.EnumSet;
 import java.util.UUID;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.statistics.*;
 import org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding;
 import org.apache.hadoop.fs.statistics.impl.IOStatisticsStore;
 import org.apache.hadoop.fs.statistics.impl.IOStatisticsStoreBuilder;
-import org.apache.hadoop.metrics2.*;
+import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.MetricsSource;
+import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.impl.MetricsSystemImpl;
-import org.apache.hadoop.metrics2.lib.*;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
+import org.apache.hadoop.metrics2.lib.MutableMetric;
 
 /**
  * Instrumentation of GCS.
@@ -42,18 +44,15 @@ import org.apache.hadoop.metrics2.lib.*;
  * access such counters failing, the operations to increment/query metric values are designed to
  * handle lookup failures.
  */
-@InterfaceAudience.Private
-@InterfaceStability.Evolving
 class GhfsInstrumentation
     implements Closeable, MetricsSource, IOStatisticsSource, DurationTrackerFactory {
-
-  private static final GoogleLogger LOG = GoogleLogger.forEnclosingClass();
+  private static final String METRICS_SOURCE_BASENAME = "GCSMetrics";
 
   /**
    * {@value} Currently all gcs metrics are placed in a single "context". Distinct contexts may be
    * used in the future.
    */
-  public static final String CONTEXT = "gcsFilesystem";
+  public static final String CONTEXT = "GoogleHadoopFilesystem";
 
   /** {@value} The name of the gcs-specific metrics system instance used for gcs metrics. */
   public static final String METRICS_SYSTEM_NAME = "google-hadoop-file-system";
@@ -76,10 +75,9 @@ class GhfsInstrumentation
    */
   private static final Object METRICS_SYSTEM_LOCK = new Object();
 
+  private static MetricsSystem metricsSystem = null;
   private static int metricsSourceNameCounter = 0;
   private static int metricsSourceActiveCounter = 0;
-
-  private static MetricsSystem metricsSystem = null;
 
   private final MetricsRegistry registry =
       new MetricsRegistry("googleHadoopFilesystem").setContext(CONTEXT);
@@ -96,7 +94,7 @@ class GhfsInstrumentation
 
   private String metricsSourceName;
 
-  private static final String METRICS_SOURCE_BASENAME = "GCSMetrics";
+  private static final GoogleLogger LOG = GoogleLogger.forEnclosingClass();
 
   /**
    * Construct the instrumentation for a filesystem.
@@ -111,31 +109,24 @@ class GhfsInstrumentation
         fileSystemInstanceID.toString());
     registry.tag(METRIC_TAG_BUCKET, "Hostname from the FS URL", name.getHost());
     IOStatisticsStoreBuilder storeBuilder = IOStatisticsBinding.iostatisticsStore();
-    // declare all counter statistics
     EnumSet.allOf(GhfsStatistic.class).stream()
-        .filter(GhfsStatistic -> GhfsStatistic.getType() == GhfsStatisticTypeEnum.TYPE_COUNTER)
         .forEach(
             stat -> {
-              counter(stat);
-              storeBuilder.withCounters(stat.getSymbol());
-            });
-    // declare all gauge statistics
-    EnumSet.allOf(GhfsStatistic.class).stream()
-        .filter(statistic -> statistic.getType() == GhfsStatisticTypeEnum.TYPE_GAUGE)
-        .forEach(
-            stat -> {
-              gauge(stat);
-              storeBuilder.withGauges(stat.getSymbol());
+              // declare all counter statistics
+              if (stat.getType() == GhfsStatisticTypeEnum.TYPE_COUNTER) {
+                counter(stat);
+                storeBuilder.withCounters(stat.getSymbol());
+                // declare all gauge statistics
+              } else if (stat.getType() == GhfsStatisticTypeEnum.TYPE_GAUGE) {
+                gauge(stat);
+                storeBuilder.withGauges(stat.getSymbol());
+                // and durations
+              } else if (stat.getType() == GhfsStatisticTypeEnum.TYPE_DURATION) {
+                duration(stat);
+                storeBuilder.withDurationTracking(stat.getSymbol());
+              }
             });
 
-    // and durations
-    EnumSet.allOf(GhfsStatistic.class).stream()
-        .filter(statistic -> statistic.getType() == GhfsStatisticTypeEnum.TYPE_DURATION)
-        .forEach(
-            stat -> {
-              duration(stat);
-              storeBuilder.withDurationTracking(stat.getSymbol());
-            });
     // register with Hadoop metrics
     registerAsMetricsSource(name);
     // and build the IO Statistics
@@ -147,7 +138,17 @@ class GhfsInstrumentation
   }
 
   public void close() {
-    LOG.atFine().log("Close");
+    synchronized (METRICS_SYSTEM_LOCK) {
+      metricsSystem.unregisterSource(metricsSourceName);
+      metricsSourceActiveCounter--;
+      int activeSources = metricsSourceActiveCounter;
+      if (activeSources == 0) {
+        LOG.atInfo().log("Shutting down metrics publisher");
+        metricsSystem.publishMetricsNow();
+        metricsSystem.shutdown();
+        metricsSystem = null;
+      }
+    }
   }
 
   /**
@@ -168,11 +169,12 @@ class GhfsInstrumentation
    * @param count increment value
    */
   public void incrementCounter(GhfsStatistic op, long count) {
-    if (count != 0) {
-      String name = op.getSymbol();
-      incrementMutableCounter(name, count);
-      instanceIOStatistics.incrementCounter(name, count);
+    if (count == 0) {
+      return;
     }
+    String name = op.getSymbol();
+    incrementMutableCounter(name, count);
+    instanceIOStatistics.incrementCounter(name, count);
   }
 
   /**
@@ -188,8 +190,7 @@ class GhfsInstrumentation
       metricsSourceActiveCounter++;
       number = ++metricsSourceNameCounter;
     }
-    String msName = METRICS_SOURCE_BASENAME + number;
-    metricsSourceName = msName + "-" + name.getHost();
+    metricsSourceName = METRICS_SOURCE_BASENAME + number + "-" + name.getHost();
     metricsSystem.register(metricsSourceName, "", this);
   }
 
@@ -282,13 +283,9 @@ class GhfsInstrumentation
     }
     if (!(metric instanceof MutableCounterLong)) {
       throw new IllegalStateException(
-          "Metric "
-              + name
-              + " is not a MutableCounterLong: "
-              + metric
-              + " (type: "
-              + metric.getClass()
-              + ")");
+          String.format(
+              "Metric %s is not a MutableCounterLong: %s (type: %s)",
+              name, metric, metric.getClass()));
     }
     return (MutableCounterLong) metric;
   }
@@ -323,7 +320,7 @@ class GhfsInstrumentation
    * the count on start; after a failure the failures count is incremented by one.
    */
   private final class MetricUpdatingDurationTracker implements DurationTracker {
-
+    /** Name of the statistics value to be updated */
     private final String symbol;
 
     private boolean failed;
@@ -375,20 +372,6 @@ class GhfsInstrumentation
   @Override
   public DurationTracker trackDuration(final String key, final long count) {
     return durationTrackerFactory.trackDuration(key, count);
-  }
-
-  /**
-   * Add the duration as a timed statistic, deriving statistic name from the operation symbol and
-   * the outcome.
-   *
-   * @param op operation
-   * @param success was the operation a success?
-   * @param duration how long did it take
-   */
-  public void recordDuration(
-      final GhfsStatistic op, final boolean success, final Duration duration) {
-    String name = op.getSymbol() + (success ? "" : SUFFIX_FAILURES);
-    instanceIOStatistics.addTimedOperation(name, duration);
   }
 
   @Override
