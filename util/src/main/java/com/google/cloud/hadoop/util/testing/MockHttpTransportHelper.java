@@ -24,8 +24,6 @@ import static com.google.common.net.HttpHeaders.CONTENT_ENCODING;
 import static com.google.common.net.HttpHeaders.CONTENT_LENGTH;
 import static com.google.common.net.HttpHeaders.CONTENT_RANGE;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.http.HttpStatus.SC_GONE;
-import static org.apache.http.HttpStatus.SC_REQUESTED_RANGE_NOT_SATISFIABLE;
 
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.http.HttpRequest;
@@ -55,13 +53,10 @@ public final class MockHttpTransportHelper {
 
   /** HTTP JSON API error responses */
   public enum ErrorResponses {
-    GONE(SC_GONE, STATUS_CODE_SERVICE_UNAVAILABLE, "backendError", "Backend Error", GLOBAL_DOMAIN),
+    GONE(410, STATUS_CODE_SERVICE_UNAVAILABLE, "backendError", "Backend Error", GLOBAL_DOMAIN),
     NOT_FOUND(STATUS_CODE_NOT_FOUND, "notFound", "Not Found", GLOBAL_DOMAIN),
     RANGE_NOT_SATISFIABLE(
-        SC_REQUESTED_RANGE_NOT_SATISFIABLE,
-        "requestedRangeNotSatisfiable",
-        "Request range not satisfiable",
-        GLOBAL_DOMAIN),
+        416, "requestedRangeNotSatisfiable", "Request range not satisfiable", GLOBAL_DOMAIN),
     RATE_LIMITED(429, RATE_LIMITED_REASON, "The total number of changes ...", USAGE_LIMITS_DOMAIN),
     SERVER_ERROR(STATUS_CODE_SERVER_ERROR, "backendError", "Backend Error", GLOBAL_DOMAIN);
 
@@ -137,7 +132,10 @@ public final class MockHttpTransportHelper {
           }
         };
     HttpRequest request =
-        transport.createRequestFactory().buildGetRequest(HttpTesting.SIMPLE_GENERIC_URL);
+        transport
+            .createRequestFactory()
+            .buildGetRequest(HttpTesting.SIMPLE_GENERIC_URL)
+            .setResponseReturnRawInputStream(true);
     return request.execute();
   }
 

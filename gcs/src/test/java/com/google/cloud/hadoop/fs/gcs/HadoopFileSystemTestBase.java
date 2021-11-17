@@ -14,6 +14,16 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_BYTES;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_CLOSE_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_BACKWARD_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_BYTES_BACKWARDS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_BYTES_SKIPPED;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_FORWARD_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_TOTAL_BYTES;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_BYTES;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -834,6 +844,120 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     } finally {
       ghfs.delete(hadoopPath);
     }
+  }
+
+  @Test
+  public void testInputStreamReadIOStatistics() throws IOException {
+
+    // Write an object.
+    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
+    String text = "Hello World!";
+    int numBytesWritten = ghfsHelper.writeFile(hadoopPath, text, 1, /* overwrite= */ false);
+
+    try (FSDataInputStream readStream = ghfs.open(hadoopPath)) {
+
+      //  Check the statistics of method read().
+      readStream.read();
+      assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_OPERATIONS.getSymbol()))
+          .isEqualTo(1);
+
+      assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_BYTES.getSymbol()))
+          .isEqualTo(1);
+
+      // Check the statistics of method read(buf, off, len)
+      byte[] readbuffer = new byte[1];
+      readStream.read(readbuffer, 0, 1);
+      assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_OPERATIONS.getSymbol()))
+          .isEqualTo(2);
+      assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_TOTAL_BYTES.getSymbol()))
+          .isEqualTo(2);
+      assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_BYTES.getSymbol()))
+          .isEqualTo(2);
+
+      // Check the statistics of method read(pos, buf, off, len)
+      byte[] readbuffer1 = new byte[2];
+      readStream.read(2, readbuffer1, 0, 2);
+      assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_OPERATIONS.getSymbol()))
+          .isEqualTo(4);
+      assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_TOTAL_BYTES.getSymbol()))
+          .isEqualTo(6);
+      assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_BYTES.getSymbol()))
+          .isEqualTo(6);
+
+      // Check the  statistics of read Exception
+      readStream.close();
+    }
+  }
+
+  @Test
+  public void testInputStreamSeekIOStatistics() throws IOException {
+
+    // Write an object.
+    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
+    String text = "Hello World!";
+
+    int numBytesWritten = ghfsHelper.writeFile(hadoopPath, text, 1, /* overwrite= */ false);
+
+    // Check the statistics related to seek() method.
+    try (FSDataInputStream readStream = ghfs.open(hadoopPath)) {
+      // Check the statistics related to Forward seek operations.
+      readStream.seek(7);
+      assertThat(
+              readStream
+                  .getIOStatistics()
+                  .counters()
+                  .get(STREAM_READ_SEEK_FORWARD_OPERATIONS.getSymbol()))
+          .isEqualTo(1);
+      assertThat(
+              readStream
+                  .getIOStatistics()
+                  .counters()
+                  .get(STREAM_READ_SEEK_BYTES_SKIPPED.getSymbol()))
+          .isEqualTo(7);
+
+      // Check the statistics related to Forward seek operations.
+      readStream.seek(5);
+      assertThat(
+              readStream
+                  .getIOStatistics()
+                  .counters()
+                  .get(STREAM_READ_SEEK_BACKWARD_OPERATIONS.getSymbol()))
+          .isEqualTo(1);
+      assertThat(
+              readStream
+                  .getIOStatistics()
+                  .counters()
+                  .get(STREAM_READ_SEEK_BYTES_BACKWARDS.getSymbol()))
+          .isEqualTo(2);
+
+      // Check the statistics related to seek operations.
+      assertThat(
+              readStream.getIOStatistics().counters().get(STREAM_READ_SEEK_OPERATIONS.getSymbol()))
+          .isEqualTo(2);
+      readStream.close();
+
+      assertThat(
+              readStream.getIOStatistics().counters().get(STREAM_READ_CLOSE_OPERATIONS.getSymbol()))
+          .isEqualTo(1);
+    }
+  }
+
+  @Test
+  public void testOutputStreamIOStatistics() throws IOException {
+    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
+
+    // Check the IOstatistics of write operation
+    try (FSDataOutputStream fsos = ghfs.create(hadoopPath)) {
+      fsos.write("Created a file to test statistics".getBytes(UTF_8));
+      fsos.close();
+      assertThat(fsos.getIOStatistics().counters().get(STREAM_WRITE_BYTES.getSymbol()))
+          .isEqualTo(33);
+    }
+
+    assertThat(ghfs.delete(hadoopPath)).isTrue();
   }
 
   // -----------------------------------------------------------------

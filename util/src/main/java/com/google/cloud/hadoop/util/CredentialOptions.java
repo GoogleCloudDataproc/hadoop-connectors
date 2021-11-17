@@ -19,7 +19,6 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleOAuthConstants;
 import com.google.auto.value.AutoValue;
-import com.google.cloud.hadoop.util.HttpTransportFactory.HttpTransportType;
 import javax.annotation.Nullable;
 
 /** Configuration for how components should obtain Credentials. */
@@ -30,16 +29,12 @@ public abstract class CredentialOptions {
 
   static final boolean NULL_CREDENTIALS_ENABLED_DEFAULT = false;
 
-  static final HttpTransportType HTTP_TRANSPORT_TYPE_DEFAULT =
-      HttpTransportFactory.DEFAULT_TRANSPORT_TYPE;
-
   static final String TOKEN_SERVER_URL_DEFAULT = GoogleOAuthConstants.TOKEN_SERVER_URL;
 
   public static Builder builder() {
     return new AutoValue_CredentialOptions.Builder()
         .setServiceAccountEnabled(SERVICE_ACCOUNT_ENABLED_DEFAULT)
         .setNullCredentialEnabled(NULL_CREDENTIALS_ENABLED_DEFAULT)
-        .setTransportType(HTTP_TRANSPORT_TYPE_DEFAULT)
         .setTokenServerUrl(TOKEN_SERVER_URL_DEFAULT);
   }
 
@@ -70,8 +65,6 @@ public abstract class CredentialOptions {
 
   public abstract boolean isNullCredentialEnabled();
 
-  public abstract HttpTransportType getTransportType();
-
   public abstract String getTokenServerUrl();
 
   @Nullable
@@ -101,8 +94,6 @@ public abstract class CredentialOptions {
     public abstract Builder setServiceAccountJsonKeyFile(String serviceAccountJsonKeyFile);
 
     public abstract Builder setNullCredentialEnabled(boolean nullCredentialEnabled);
-
-    public abstract Builder setTransportType(HttpTransportType transportType);
 
     public abstract Builder setTokenServerUrl(String tokenServerUrl);
 

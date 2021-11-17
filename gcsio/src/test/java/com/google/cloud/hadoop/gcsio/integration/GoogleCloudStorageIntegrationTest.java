@@ -19,7 +19,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
-import com.google.cloud.hadoop.util.HttpTransportFactory;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
@@ -34,14 +33,7 @@ public class GoogleCloudStorageIntegrationTest extends GoogleCloudStorageTest {
   public static Collection<Object[]> getConstructorArguments() throws IOException {
     return Arrays.asList(
         new Object[] {getGoogleCloudStorage()},
-        new Object[] {getApacheGoogleCloudStorage()},
         new Object[] {getPerformanceCachingGoogleCloudStorage()});
-  }
-
-  private static GoogleCloudStorage getApacheGoogleCloudStorage() throws IOException {
-    return getGoogleCloudStorage(
-        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-            .setTransportType(HttpTransportFactory.HttpTransportType.APACHE));
   }
 
   private static GoogleCloudStorage getPerformanceCachingGoogleCloudStorage() throws IOException {

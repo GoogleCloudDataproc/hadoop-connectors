@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCE_BUCKET_DELETE_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID;
@@ -469,7 +470,6 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
       localTempFile.delete();
     }
   }
-
   /**
    * We override certain methods in FileSystem simply to provide debug tracing. (Search for
    * "Overridden functions for debug tracing" in GoogleHadoopFileSystemBase.java). We do not add or

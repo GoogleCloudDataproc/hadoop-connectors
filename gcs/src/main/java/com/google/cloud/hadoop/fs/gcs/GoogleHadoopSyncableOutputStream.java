@@ -37,6 +37,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.Syncable;
@@ -210,6 +211,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
       logger.atFiner().log("close(): Ignoring; stream already closed.");
       return;
     }
+    getStatistics().close();
     commitCurrentFile();
 
     // null denotes stream closed.
@@ -260,7 +262,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
       hsyncInternal(startTimeNs);
       return;
     }
-    logger.atWarning().log(
+    logger.atInfo().atMostEvery(1, TimeUnit.MINUTES).log(
         "hflush(): No-op due to rate limit (%s): readers will *not* yet see flushed data for %s",
         syncRateLimiter, finalGcsPath);
     throwIfNotOpen();
@@ -389,5 +391,10 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
   /** Increment the count of hsync() operation */
   public void incrementhsyncStatistics() {
     curDelegate.getStreamStatistics().hsyncInvoked();
+  }
+
+  /** Get the current stream statistics. For Testing */
+  public GhfsOutputStreamStatistics getStatistics() {
+    return curDelegate.getStreamStatistics();
   }
 }

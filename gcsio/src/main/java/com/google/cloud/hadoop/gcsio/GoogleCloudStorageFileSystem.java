@@ -38,6 +38,7 @@ import com.google.cloud.hadoop.util.LazyExecutorService;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
@@ -186,7 +187,8 @@ public class GoogleCloudStorageFileSystem {
     this(gcsFn.apply(options.getCloudStorageOptions()), options);
   }
 
-  private GoogleCloudStorageFileSystem(
+  @VisibleForTesting
+  public GoogleCloudStorageFileSystem(
       GoogleCloudStorage gcs, GoogleCloudStorageFileSystemOptions options) {
     checkArgument(
         gcs.getOptions() == options.getCloudStorageOptions(),
@@ -325,6 +327,25 @@ public class GoogleCloudStorageFileSystem {
   }
 
   /**
+   * Opens an object for reading using {@link FileInfo}.
+   *
+   * @param fileInfo contains metadata information about the file
+   * @param readOptions readOptions fine-grained options specifying things like retry settings,
+   *     buffering, etc.
+   * @return Seekable Byte Channel to enable file open
+   * @throws IOException IOException on IO Error
+   */
+  public SeekableByteChannel open(FileInfo fileInfo, GoogleCloudStorageReadOptions readOptions)
+      throws IOException {
+    logger.atFiner().log("open(fileInfo : %s, readOptions: %s)", fileInfo, readOptions);
+    checkNotNull(fileInfo, "fileInfo should not be null");
+    checkArgument(
+        !fileInfo.isDirectory(), "Cannot open a directory for reading: %s", fileInfo.getPath());
+
+    return gcs.open(fileInfo.getItemInfo(), readOptions);
+  }
+
+  /**
    * Deletes one or more items indicated by the given path.
    *
    * <p>If path points to a directory:
@@ -347,7 +368,7 @@ public class GoogleCloudStorageFileSystem {
    * @throws IOException
    */
   public void delete(URI path, boolean recursive) throws IOException {
-    Preconditions.checkNotNull(path, "path can not be null");
+    Preconditions.checkNotNull(path, "path should not be null");
     checkArgument(!path.equals(GCS_ROOT), "Cannot delete root path (%s)", path);
     logger.atFiner().log("delete(path: %s, recursive: %b)", path, recursive);
 
@@ -627,13 +648,11 @@ public class GoogleCloudStorageFileSystem {
       StorageResourceId srcResourceId =
           StorageResourceId.fromUriPath(src, /* allowEmptyObjectName= */ true);
       StorageResourceId dstResourceId =
-          StorageResourceId.fromUriPath(dst, /* allowEmptyObjectName= */ true);
+          StorageResourceId.fromUriPath(
+              dst, /* allowEmptyObjectName= */ true, /* generationId= */ 0L);
 
-      gcs.copy(
-          srcResourceId.getBucketName(), ImmutableList.of(srcResourceId.getObjectName()),
-          dstResourceId.getBucketName(), ImmutableList.of(dstResourceId.getObjectName()));
+      gcs.copy(ImmutableMap.of(srcResourceId, dstResourceId));
 
-      // TODO(b/110833109): populate generation ID in StorageResourceId when getting info
       gcs.deleteObjects(
           ImmutableList.of(
               new StorageResourceId(

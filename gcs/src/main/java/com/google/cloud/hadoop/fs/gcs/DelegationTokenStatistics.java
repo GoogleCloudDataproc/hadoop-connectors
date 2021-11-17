@@ -16,6 +16,10 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+/**
+ * Statistics updated by a {@link com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens} during
+ * its use.
+ */
 public interface DelegationTokenStatistics extends GhfsStatisticInterface {
 
   /** A token has been issued. */
