@@ -789,7 +789,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
-  public void GlobStatus_statistics() throws IOException {
+  public void GlobStatus_storage_statistics() throws IOException {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
     GhfsStorageStatistics StorageStats = myGhfs.getStorageStatistics();
     Path testRoot = new Path("/directory1/");
@@ -802,7 +802,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
-  public void getFileStatus_statistics() throws IOException {
+  public void getFileStatus_storage_statistics() throws IOException {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
     GhfsStorageStatistics StorageStats = myGhfs.getStorageStatistics();
     Path testRoot = new Path("/directory1/");
@@ -816,7 +816,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
-  public void createNonRecursive_statistics() throws IOException {
+  public void createNonRecursive_storage_statistics() throws IOException {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
     GhfsStorageStatistics StorageStats = myGhfs.getStorageStatistics();
     Path testRoot = new Path("/directory1/");
@@ -831,7 +831,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
-  public void getFileChecksum_statistics() throws IOException {
+  public void getFileChecksum_storage_statistics() throws IOException {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
     GhfsStorageStatistics StorageStats = myGhfs.getStorageStatistics();
     Path testRoot = new Path("/directory1/");
@@ -846,7 +846,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
-  public void rename_statistics() throws IOException {
+  public void rename_storage_statistics() throws IOException {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
     GhfsStorageStatistics StorageStats = myGhfs.getStorageStatistics();
     Path testRoot = new Path("/directory1/");
@@ -860,7 +860,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
-  public void exists_statistics() throws IOException {
+  public void exists_storage_statistics() throws IOException {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
     GhfsStorageStatistics StorageStats = myGhfs.getStorageStatistics();
     Path testRoot = new Path("/directory1/");
