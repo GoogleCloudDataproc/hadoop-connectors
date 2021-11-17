@@ -1059,7 +1059,7 @@ public class GoogleCloudStorageTest {
     InputStream intermittentProgressTimeoutStream =
         new InputStream() {
           // Return -1 value from time to time to simulate intermittent read progress
-          final int[] readData = {testData[0], testData[1], -1, testData[2], -1};
+          final int[] readData = {testData[0], testData[1], -1, testData[2], -1, -1};
           int readDataIndex = 0;
 
           @Override
@@ -1438,7 +1438,7 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorageReadChannel readChannel =
         (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
     readChannel.setReadBackOff(BackOff.ZERO_BACKOFF);
-    readChannel.setMaxRetries(1);
+
     assertThat(readChannel.isOpen()).isTrue();
     assertThat(readChannel.position()).isEqualTo(0);
 
