@@ -24,7 +24,6 @@ import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE
 import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
-import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
@@ -32,7 +31,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
-import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
@@ -550,19 +548,5 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
         localTempFile.delete();
       }
     }
-  }
-
-  @Test
-  public void testInvalidCredentialFromAccessTokenProvider() throws Exception {
-    Configuration config = new Configuration();
-    config.set("fs.gs.auth.access.token.provider.impl", TestingAccessTokenProvider.class.getName());
-    URI gsUri = new URI("gs://foobar/");
-
-    GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
-    ghfs.initialize(gsUri, config);
-
-    IOException thrown = assertThrows(IOException.class, () -> ghfs.exists(new Path("gs://")));
-
-    assertThat(thrown).hasCauseThat().hasMessageThat().contains("Invalid Credentials");
   }
 }
