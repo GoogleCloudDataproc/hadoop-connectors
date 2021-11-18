@@ -56,7 +56,7 @@ public class GoogleCloudStorageImplCreateTest {
             GoogleCloudStorageOptions.builder()
                 .setAppName("app")
                 .setGrpcEnabled(true)
-                .setDirectPathPreffered(false)
+                .setDirectPathPreferred(false)
                 .build(),
             createStorage(),
             ComputeEngineCredentials.newBuilder().build(),
