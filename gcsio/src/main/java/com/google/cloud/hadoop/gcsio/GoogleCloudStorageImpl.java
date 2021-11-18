@@ -32,7 +32,6 @@ import static java.util.Arrays.stream;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 
-import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.batch.json.JsonBatchCallback;
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
@@ -281,22 +280,19 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
    *
-   * @param credential OAuth2 credential that allows access to GCS
+   * @param options options to customize behavior
+   * @param credentials OAuth2 credential that allows access to GCS
    * @throws IOException on IO error
    */
-  public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Credential credential)
+  public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Credentials credentials)
       throws IOException {
-    this(options, credential, /* downscopedAccessTokenFn= */ null);
+    this(options, credentials, /* downscopedAccessTokenFn= */ null);
   }
 
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer)
       throws IOException {
-    this(
-        options,
-        createStorage(options, httpRequestInitializer),
-        /* credentials= */ null,
-        /* accessTokenProvider= */ null);
+    this(options, createStorage(options, httpRequestInitializer), /* accessTokenProvider= */ null);
   }
 
   public GoogleCloudStorageImpl(
@@ -304,11 +300,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       HttpRequestInitializer httpRequestInitializer,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
-    this(
-        options,
-        createStorage(options, httpRequestInitializer),
-        /* credentials= */ null,
-        downscopedAccessTokenFn);
+    this(options, createStorage(options, httpRequestInitializer), downscopedAccessTokenFn);
   }
 
   /**
@@ -317,31 +309,20 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param storage {@link Storage} to use for I/O.
    */
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage storage) {
-    this(options, storage, /* credentials= */ null, /* downscopedAccessTokenFn= */ null);
+    this(options, storage, /* downscopedAccessTokenFn= */ null);
   }
 
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
    *
-   * @param options {@link GoogleCloudStorageOptions} to use to initialize the object.
-   * @param storage {@link Storage} to use for I/O.
-   * @param credentials OAuth2 credentials that allows access to GCS
-   */
-  public GoogleCloudStorageImpl(
-      GoogleCloudStorageOptions options, Storage storage, Credentials credentials) {
-    this(options, storage, credentials, /* downscopedAccessTokenFn= */ null);
-  }
-
-  /**
-   * Constructs an instance of GoogleCloudStorageImpl.
-   *
-   * @param credential OAuth2 credential that allows access to GCS
+   * @param options options to customize behavior
+   * @param credentials OAuth2 credential that allows access to GCS
    * @param downscopedAccessTokenFn Function that generates downscoped access token.
    * @throws IOException on IO error
    */
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options,
-      Credential credential,
+      Credentials credentials,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
     logger.atFiner().log("GCS(options: %s)", options);
@@ -351,7 +332,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     HttpRequestInitializer retryHttpInitializer =
         new RetryHttpInitializer(
             new StatisticsTrackingHttpRequestInitializer(statistics),
-            credential,
+            credentials,
             options.toRetryHttpInitializerOptions());
 
     this.storage =
@@ -368,7 +349,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           Watchdog.create(Duration.ofMillis(storageOptions.getGrpcMessageTimeoutCheckInterval()));
       this.storageStubProvider =
           StorageStubProvider.newInstance(
-              this.storageOptions, this.backgroundTasksThreadPool, credential);
+              this.storageOptions, this.backgroundTasksThreadPool, credentials);
     }
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
   }
@@ -378,13 +359,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    *
    * @param options {@link GoogleCloudStorageOptions} to use to initialize the object.
    * @param storage {@link Storage} to use for I/O.
-   * @param credentials OAuth2 credentials that allows access to GCS
    * @param downscopedAccessTokenFn Function that generates downscoped access token.
    */
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options,
       Storage storage,
-      Credentials credentials,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
     logger.atFiner().log("GCS(options: %s)", options);
 
@@ -402,20 +381,14 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     if (this.storageOptions.isGrpcEnabled()) {
       this.watchdog =
           Watchdog.create(Duration.ofMillis(options.getGrpcMessageTimeoutCheckInterval()));
-      if (credentials != null) {
-        this.storageStubProvider =
-            StorageStubProvider.newInstance(
-                this.storageOptions, this.backgroundTasksThreadPool, credentials);
-      } else {
-        checkArgument(
-            httpRequestInitializer instanceof RetryHttpInitializer,
-            "request initializer must be an instance of the RetryHttpInitializer class"
-                + " when gRPC API enabled");
-        Credential credential = ((RetryHttpInitializer) httpRequestInitializer).getCredential();
-        this.storageStubProvider =
-            StorageStubProvider.newInstance(
-                this.storageOptions, this.backgroundTasksThreadPool, credential);
-      }
+      checkArgument(
+          httpRequestInitializer instanceof RetryHttpInitializer,
+          "request initializer must be an instance of the RetryHttpInitializer class"
+              + " when gRPC API enabled");
+      Credentials credentials = ((RetryHttpInitializer) httpRequestInitializer).getCredentials();
+      this.storageStubProvider =
+          StorageStubProvider.newInstance(
+              this.storageOptions, this.backgroundTasksThreadPool, credentials);
     }
 
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
@@ -981,8 +954,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                   createJsonResponseException(jsonError, responseHeaders);
               if (errorExtractor.itemNotFound(cause)) {
                 // If the item isn't found, treat it the same as if it's not found
-                // in the delete
-                // case: assume the user wanted the object gone and now it is.
+                // in the delete case: assume the user wanted the object gone, and now it is.
                 logger.atFiner().log(
                     "deleteObjects(%s): get not found:%n%s", resourceId, jsonError);
               } else {
@@ -1144,7 +1116,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       StorageResourceId dstObject = entry.getValue();
       if (storageOptions.isCopyWithRewriteEnabled()) {
         // Rewrite request has the same effect as Copy, but it can handle moving
-        // large objects that may potentially timeout a Copy request.
+        // large objects that may potentially time out a Copy request.
         rewriteInternal(
             batchHelper,
             innerExceptions,
@@ -1422,7 +1394,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     // List +1 object if prefix is not included in the result,
     // because GCS always includes prefix object
-    // in the result if it exists and we filter it out.
+    // in the result if it exists, and we filter it out.
     //
     // Example:
     //

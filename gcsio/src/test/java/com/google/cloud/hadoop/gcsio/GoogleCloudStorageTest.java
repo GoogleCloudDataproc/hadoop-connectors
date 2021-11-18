@@ -52,7 +52,6 @@ import static org.mockito.Mockito.when;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.googleapis.media.MediaHttpUploader;
-import com.google.api.client.googleapis.testing.auth.oauth2.MockGoogleCredential;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpStatusCodes;
@@ -72,7 +71,10 @@ import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
+import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
+import com.google.cloud.hadoop.util.testing.FakeCredentials;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
+import com.google.cloud.hadoop.util.testing.ThrowingInputStream;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -150,7 +152,12 @@ public class GoogleCloudStorageTest {
   public void setUp() {
     trackingRequestInitializerWithRetries =
         new TrackingHttpRequestInitializer(
-            new RetryHttpInitializer(new MockGoogleCredential.Builder().build(), "gcs-io-unt-test"),
+            new RetryHttpInitializer(
+                /* delegate= */ null,
+                new FakeCredentials(),
+                RetryHttpInitializerOptions.builder()
+                    .setDefaultUserAgent("gcs-io-unit-test")
+                    .build()),
             /* replaceRequestParams= */ false);
     trackingRequestInitializerWithoutRetries =
         new TrackingHttpRequestInitializer(/* replaceRequestParams= */ false);
@@ -854,7 +861,7 @@ public class GoogleCloudStorageTest {
             // even though we'll set maxRetries == 1.
             inputStreamResponse(CONTENT_LENGTH, 2, new ByteArrayInputStream(truncatedRetryData)),
             // Third time, we claim we'll deliver the one remaining byte, but give none. Since no
-            // progress is made, the retry counter does not get reset and we've exhausted all
+            // progress is made, the retry counter does not get reset, and we've exhausted all
             // retries.
             inputStreamResponse(CONTENT_LENGTH, 1, new ByteArrayInputStream(new byte[0])));
 
@@ -908,7 +915,7 @@ public class GoogleCloudStorageTest {
             // even though we'll set maxRetries == 1.
             inputStreamResponse(CONTENT_LENGTH, 2, new ByteArrayInputStream(secondReadData)),
             // Third time, we claim we'll deliver the one remaining byte, but give none. Since no
-            // progress is made, the retry counter does not get reset and we've exhausted all
+            // progress is made, the retry counter does not get reset, and we've exhausted all
             // retries.
             inputStreamResponse(CONTENT_LENGTH, 1, new ByteArrayInputStream(thirdReadData)));
 
@@ -3454,8 +3461,7 @@ public class GoogleCloudStorageTest {
       HttpRequestInitializer requestInitializer,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
     Storage storage = new Storage(transport, JSON_FACTORY, requestInitializer);
-    return new GoogleCloudStorageImpl(
-        gcsOptions, storage, /* credentials= */ null, downscopedAccessTokenFn);
+    return new GoogleCloudStorageImpl(gcsOptions, storage, downscopedAccessTokenFn);
   }
 
   static Bucket newBucket(String name) {

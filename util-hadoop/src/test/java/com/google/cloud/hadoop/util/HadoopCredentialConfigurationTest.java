@@ -15,29 +15,27 @@
 package com.google.cloud.hadoop.util;
 
 import static com.github.stefanbirkner.systemlambda.SystemLambda.withEnvironmentVariable;
-import static com.google.cloud.hadoop.util.CredentialFactory.CREDENTIAL_ENV_VAR;
+import static com.google.cloud.hadoop.util.CredentialsFactory.CREDENTIAL_ENV_VAR;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_NULL_CREDENTIAL_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_KEYFILE_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_PRIVATE_KEY_ID_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_PRIVATE_KEY_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.TOKEN_SERVER_URL_SUFFIX;
 import static com.google.cloud.hadoop.util.testing.HadoopConfigurationUtils.getDefaultProperties;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonDataResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.truth.Truth.assertThat;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertThrows;
 
-import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.auth.oauth2.TokenResponse;
+import com.google.api.client.http.HttpTransport;
 import com.google.api.client.testing.http.MockHttpTransport;
-import com.google.cloud.hadoop.util.CredentialFactory.GoogleCredentialWithRetry;
-import com.google.common.collect.ImmutableList;
+import com.google.auth.oauth2.ComputeEngineCredentials;
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.oauth2.ServiceAccountCredentials;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Resources;
+import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
@@ -57,16 +55,10 @@ public class HadoopCredentialConfigurationTest {
         {
           put(".auth.access.token.provider.impl", null);
           put(".auth.null.enable", false);
-          put(".auth.service.account.email", null);
-          put(".service.account.auth.email", null);
           put(".auth.service.account.enable", true);
           put(".enable.service.account.auth", true);
           put(".auth.service.account.json.keyfile", null);
-          put(".auth.service.account.keyfile", null);
-          put(".service.account.auth.keyfile", null);
-          put(".auth.service.account.private.key", null);
-          put(".auth.service.account.private.key.id", null);
-          put(".token.server.url", "https://oauth2.googleapis.com/token");
+          put(".token.server.url", null);
           put(".proxy.address", null);
           put(".proxy.password", null);
           put(".proxy.username", null);
@@ -75,8 +67,6 @@ public class HadoopCredentialConfigurationTest {
           put(".auth.impersonation.service.account.for.group.", ImmutableMap.of());
         }
       };
-
-  private static final ImmutableList<String> TEST_SCOPES = ImmutableList.of("scope1", "scope2");
 
   private Configuration configuration;
 
@@ -89,11 +79,13 @@ public class HadoopCredentialConfigurationTest {
     configuration = new Configuration();
   }
 
-  private CredentialFactory getCredentialFactory() {
-    CredentialFactory credentialFactory =
-        HadoopCredentialConfiguration.getCredentialFactory(configuration);
-    credentialFactory.setTransport(new MockHttpTransport());
-    return credentialFactory;
+  private CredentialsFactory getCredentialFactory() {
+    return getCredentialFactory(new MockHttpTransport());
+  }
+
+  private CredentialsFactory getCredentialFactory(HttpTransport transport) {
+    CredentialOptions options = HadoopCredentialConfiguration.getCredentialsOptions(configuration);
+    return new CredentialsFactory(options, Suppliers.ofInstance(transport));
   }
 
   @Test
@@ -101,22 +93,9 @@ public class HadoopCredentialConfigurationTest {
     configuration.setBoolean(getConfigKey(ENABLE_SERVICE_ACCOUNTS_SUFFIX), false);
     configuration.setBoolean(getConfigKey(ENABLE_NULL_CREDENTIAL_SUFFIX), true);
 
-    CredentialFactory credentialFactory = getCredentialFactory();
+    CredentialsFactory credentialsFactory = getCredentialFactory();
 
-    assertThat(credentialFactory.getCredential(TEST_SCOPES)).isNull();
-  }
-
-  @Test
-  public void exceptionIsThrownForNoServiceAccountEmail() {
-    // No email set, keyfile doesn't exist, but that's OK.
-    configuration.set(getConfigKey(SERVICE_ACCOUNT_KEYFILE_SUFFIX), "aFile");
-
-    IllegalArgumentException thrown =
-        assertThrows(IllegalArgumentException.class, this::getCredentialFactory);
-
-    assertThat(thrown)
-        .hasMessageThat()
-        .isEqualTo("Email must be set if using service account auth and a key file is specified.");
+    assertThat(credentialsFactory.getCredentials()).isNull();
   }
 
   @Test
@@ -131,41 +110,31 @@ public class HadoopCredentialConfigurationTest {
 
   @Test
   public void metadataServiceIsUsedByDefault() throws Exception {
-    TokenResponse token = new TokenResponse().setAccessToken("metadata-test-token");
+    TokenResponse token =
+        new TokenResponse().setAccessToken("metadata-test-token").setExpiresInSeconds(100L);
 
     MockHttpTransport transport = mockTransport(jsonDataResponse(token));
-    CredentialFactory.setStaticHttpTransport(transport);
 
-    CredentialFactory credentialFactory = getCredentialFactory();
-    Credential credential = credentialFactory.getCredential(TEST_SCOPES);
+    CredentialsFactory credentialsFactory = getCredentialFactory(transport);
+    GoogleCredentials credentials = credentialsFactory.getCredentials();
 
-    assertThat(credential.getAccessToken()).isEqualTo("metadata-test-token");
+    credentials.refreshIfExpired();
+
+    assertThat(credentials).isInstanceOf(ComputeEngineCredentials.class);
+    assertThat(credentials.getAccessToken().getTokenValue()).isEqualTo("metadata-test-token");
   }
 
   @Test
   public void applicationDefaultServiceAccountWhenConfigured() throws Exception {
-    CredentialFactory credentialFactory = getCredentialFactory();
+    CredentialsFactory credentialsFactory = getCredentialFactory();
 
-    GoogleCredentialWithRetry credential =
-        (GoogleCredentialWithRetry)
+    ServiceAccountCredentials credentials =
+        (ServiceAccountCredentials)
             withEnvironmentVariable(CREDENTIAL_ENV_VAR, getStringPath("test-credential.json"))
-                .execute(() -> credentialFactory.getCredential(TEST_SCOPES));
+                .execute(credentialsFactory::getCredentials);
 
-    assertThat(credential.getServiceAccountId()).isEqualTo("test-email@gserviceaccount.com");
-    assertThat(credential.getServiceAccountPrivateKeyId()).isEqualTo("test-key-id");
-  }
-
-  @Test
-  public void p12KeyFileUsedWhenConfigured() throws Exception {
-    configuration.set(getConfigKey(SERVICE_ACCOUNT_EMAIL_SUFFIX), "foo@example.com");
-    configuration.set(getConfigKey(SERVICE_ACCOUNT_KEYFILE_SUFFIX), getStringPath("test-key.p12"));
-
-    CredentialFactory credentialFactory = getCredentialFactory();
-
-    GoogleCredentialWithRetry credential =
-        (GoogleCredentialWithRetry) credentialFactory.getCredential(TEST_SCOPES);
-
-    assertThat(credential.getServiceAccountId()).isEqualTo("foo@example.com");
+    assertThat(credentials.getClientEmail()).isEqualTo("test-email@gserviceaccount.com");
+    assertThat(credentials.getPrivateKeyId()).isEqualTo("test-key-id");
   }
 
   @Test
@@ -173,30 +142,13 @@ public class HadoopCredentialConfigurationTest {
     configuration.set(
         getConfigKey(SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX), getStringPath("test-credential.json"));
 
-    CredentialFactory credentialFactory = getCredentialFactory();
+    CredentialsFactory credentialsFactory = getCredentialFactory();
 
-    GoogleCredentialWithRetry credential =
-        (GoogleCredentialWithRetry) credentialFactory.getCredential(TEST_SCOPES);
+    ServiceAccountCredentials credentials =
+        (ServiceAccountCredentials) credentialsFactory.getCredentials();
 
-    assertThat(credential.getServiceAccountId()).isEqualTo("test-email@gserviceaccount.com");
-    assertThat(credential.getServiceAccountPrivateKeyId()).isEqualTo("test-key-id");
-  }
-
-  @Test
-  public void configurationSAUsedWhenConfigured() throws Exception {
-    configuration.set(getConfigKey(SERVICE_ACCOUNT_EMAIL_SUFFIX), "foo@example.com");
-    configuration.set(getConfigKey(SERVICE_ACCOUNT_PRIVATE_KEY_ID_SUFFIX), "privatekey");
-    configuration.set(
-        getConfigKey(SERVICE_ACCOUNT_PRIVATE_KEY_SUFFIX),
-        Resources.toString(getPath("test-key.txt").toUri().toURL(), UTF_8));
-
-    CredentialFactory credentialFactory = getCredentialFactory();
-
-    GoogleCredentialWithRetry credential =
-        (GoogleCredentialWithRetry) credentialFactory.getCredential(TEST_SCOPES);
-
-    assertThat(credential.getServiceAccountId()).isEqualTo("foo@example.com");
-    assertThat(credential.getServiceAccountPrivateKeyId()).isEqualTo("privatekey");
+    assertThat(credentials.getClientEmail()).isEqualTo("test-email@gserviceaccount.com");
+    assertThat(credentials.getPrivateKeyId()).isEqualTo("test-key-id");
   }
 
   @Test
@@ -205,12 +157,12 @@ public class HadoopCredentialConfigurationTest {
         getConfigKey(SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX), getStringPath("test-credential.json"));
     configuration.set(getConfigKey(TOKEN_SERVER_URL_SUFFIX), "https://test.oauth.com/token");
 
-    CredentialFactory credentialFactory = getCredentialFactory();
+    CredentialsFactory credentialsFactory = getCredentialFactory();
 
-    GoogleCredentialWithRetry credential =
-        (GoogleCredentialWithRetry) credentialFactory.getCredential(TEST_SCOPES);
+    ServiceAccountCredentials credentials =
+        (ServiceAccountCredentials) credentialsFactory.getCredentials();
 
-    assertThat(credential.getTokenServerEncodedUrl()).isEqualTo("https://test.oauth.com/token");
+    assertThat(credentials.getTokenServerUri()).isEqualTo(new URI("https://test.oauth.com/token"));
   }
 
   @Test
@@ -219,11 +171,11 @@ public class HadoopCredentialConfigurationTest {
         .containsExactlyEntriesIn(expectedDefaultConfiguration);
   }
 
-  private static String getStringPath(String resource) throws Exception {
+  private static String getStringPath(String resource) {
     return getPath(resource).toString();
   }
 
-  private static Path getPath(String resource) throws Exception {
+  private static Path getPath(String resource) {
     String filePath = Resources.getResource(resource).getFile();
     return Paths.get(
         System.getProperty("os.name").toLowerCase().contains("win") && filePath.startsWith("/")

@@ -18,8 +18,8 @@ import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.g
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
-import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
+import com.google.auth.Credentials;
+import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
@@ -93,7 +93,7 @@ public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSyst
   /** Validates constructor. */
   @Test
   public void testConstructor() throws IOException {
-    GoogleCredential cred = new GoogleCredential();
+    GoogleCredentials cred = GoogleCredentials.create(/* accessToken= */ null);
     GoogleCloudStorageFileSystemOptions.Builder optionsBuilder =
         GoogleCloudStorageFileSystemOptions.builder();
 
@@ -134,7 +134,7 @@ public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSyst
         options.getCloudStorageOptions().toBuilder().setAppName("appName").build());
 
     // Verify that credential == null works - this is required for unauthenticated access.
-    new GoogleCloudStorageFileSystem((Credential) null, optionsBuilder.build());
+    new GoogleCloudStorageFileSystem((Credentials) null, optionsBuilder.build());
 
     // Verify that fake projectId/appName and empty cred does not throw.
     setDefaultValidOptions(optionsBuilder);
@@ -203,7 +203,7 @@ public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSyst
 
   /** Verify that we cannot pass invalid path to GoogleCloudStorageFileSystem. */
   @Test
-  public void testInvalidPath() throws IOException, URISyntaxException {
+  public void testInvalidPath() throws URISyntaxException {
     String[] invalidPaths = {
 
       // Path with a scheme other than gs.
@@ -372,7 +372,7 @@ public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSyst
 
   /** Verify misc cases for create/open. */
   @Test
-  public void testMiscCreateAndOpen() throws URISyntaxException, IOException {
+  public void testMiscCreateAndOpen() throws URISyntaxException {
     URI dirPath = new URI("gs://foo/bar/");
     assertThrows(IOException.class, () -> gcsfs.create(dirPath));
 

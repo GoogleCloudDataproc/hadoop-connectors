@@ -35,6 +35,16 @@
     fs.gs.cooperative.locking.max.concurrent.operations
     ```
 
+1.  Migrate authentication to `com.google.auth.Credentials` and remove obsolete
+    properties:
+
+    ```
+    fs.gs.auth.service.account.email
+    fs.gs.auth.service.account.keyfile
+    fs.gs.auth.service.account.private.key
+    fs.gs.auth.service.account.private.key.id
+    ```
+
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.
