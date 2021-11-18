@@ -187,7 +187,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
    * @param watchdog monitors read channel for Idle time
    * @param readOptions readOptions fine-grained options specifying things like retry settings,
    *     buffering, etc.
-   * @return gRPC read channel
    * @throws IOException IOException on IO Error
    */
   GoogleCloudStorageGrpcReadChannel(
@@ -392,7 +391,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
    * @param byteBuffer Buffer to be filled with data from GCS
    * @return number of bytes read into the buffer
    * @throws IOException In case of data errors or network errors
-   * @throws InterruptedException In case of thread interrupt while retrying
    */
   private int readFromGCS(ByteBuffer byteBuffer, OptionalLong bytesToRead) throws IOException {
     int read = 0;

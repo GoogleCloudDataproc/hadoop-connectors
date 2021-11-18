@@ -56,7 +56,7 @@ public class HadoopCredentialsConfigurationTest {
 
   @SuppressWarnings("DoubleBraceInitialization")
   private static final Map<String, Object> expectedDefaultConfiguration =
-      new HashMap<String, Object>() {
+      new HashMap<>() {
         {
           put(".auth.access.token.provider", null);
           put(".auth.impersonation.service.account", null);

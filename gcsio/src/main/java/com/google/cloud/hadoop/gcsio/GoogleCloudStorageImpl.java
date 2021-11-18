@@ -208,7 +208,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       CacheBuilder.newBuilder()
           .expireAfterWrite(Duration.ofHours(1))
           .build(
-              new CacheLoader<String, Boolean>() {
+              new CacheLoader<>() {
                 final List<String> iamPermissions = ImmutableList.of("storage.buckets.get");
 
                 @Override
@@ -874,7 +874,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       BatchHelper batchHelper,
       int attempt,
       long generation) {
-    return new JsonBatchCallback<Void>() {
+    return new JsonBatchCallback<>() {
       @Override
       public void onSuccess(Void obj, HttpHeaders responseHeaders) {
         logger.atFiner().log("Successfully deleted %s at generation %s", resourceId, generation);
@@ -934,7 +934,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               .setFields("generation");
       batchHelper.queue(
           getObject,
-          new JsonBatchCallback<StorageObject>() {
+          new JsonBatchCallback<>() {
             @Override
             public void onSuccess(StorageObject storageObject, HttpHeaders httpHeaders)
                 throws IOException {
@@ -1172,7 +1172,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // TODO(b/79750454) do not batch rewrite requests because they time out in batches.
     batchHelper.queue(
         rewriteObject,
-        new JsonBatchCallback<RewriteResponse>() {
+        new JsonBatchCallback<>() {
           @Override
           public void onSuccess(RewriteResponse rewriteResponse, HttpHeaders responseHeaders) {
             String srcString = StringPaths.fromComponents(srcBucketName, srcObjectName);
@@ -1238,7 +1238,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     batchHelper.queue(
         copyObject,
-        new JsonBatchCallback<StorageObject>() {
+        new JsonBatchCallback<>() {
           @Override
           public void onSuccess(StorageObject copyResponse, HttpHeaders responseHeaders) {
             String srcString = StringPaths.fromComponents(srcBucketName, srcObjectName);
@@ -1796,7 +1796,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         batchHelper.queue(
             initializeRequest(
                 storage.buckets().get(resourceId.getBucketName()), resourceId.getBucketName()),
-            new JsonBatchCallback<Bucket>() {
+            new JsonBatchCallback<>() {
               @Override
               public void onSuccess(Bucket bucket, HttpHeaders responseHeaders) {
                 logger.atFiner().log(
@@ -1830,7 +1830,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                 // Request only fields used in GoogleCloudStorageItemInfo:
                 // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
                 .setFields(OBJECT_FIELDS),
-            new JsonBatchCallback<StorageObject>() {
+            new JsonBatchCallback<>() {
               @Override
               public void onSuccess(StorageObject obj, HttpHeaders responseHeaders) {
                 logger.atFiner().log(
@@ -1928,7 +1928,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
       batchHelper.queue(
           patch,
-          new JsonBatchCallback<StorageObject>() {
+          new JsonBatchCallback<>() {
             @Override
             public void onSuccess(StorageObject obj, HttpHeaders responseHeaders) {
               logger.atFiner().log(
