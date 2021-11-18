@@ -579,7 +579,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     GoogleCloudStorageReadOptions readChannelOptions =
         getGcsFs().getOptions().getCloudStorageOptions().getReadChannelOptions();
     GoogleHadoopFSInputStream in =
-        new GoogleHadoopFSInputStream(this, gcsPath, readChannelOptions, statistics);
+        new ForwardingGoogleHadoopFSInputStream(this, gcsPath, readChannelOptions, statistics);
 
     return new FSDataInputStream(in);
   }
@@ -620,7 +620,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 result,
                 () ->
                     new FSDataInputStream(
-                        new GoogleHadoopFSInputStream(this, fileInfo, statistics))));
+                        new ForwardingGoogleHadoopFSInputStream(this, fileInfo, statistics))));
     return result;
   }
 

@@ -28,7 +28,6 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 
 /** A seekable and positionable FSInputStream that provides read access to a file. */
@@ -52,12 +51,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   // Used for single-byte reads.
   private final byte[] singleReadBuf = new byte[1];
 
-  // Statistics tracker of Input Stream
-  private final GhfsInputStreamStatistics streamStatistics;
-
-  // IO Statistics tracker from Input stream
-  private final IOStatistics iostatistics;
-
   /**
    * Constructs an instance of GoogleHadoopFSInputStream object.
    *
@@ -76,10 +69,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
         "GoogleHadoopFSInputStream(gcsPath: %s, readOptions: %s)", gcsPath, readOptions);
     this.gcsPath = gcsPath;
     this.statistics = statistics;
-    // used to track the input stream related iostatistics
-    this.streamStatistics = ghfs.getInstrumentation().newInputStreamStatistics(statistics);
-    // used to track IOstatistics in input stream
-    this.iostatistics = streamStatistics.getIOStatistics();
     this.totalBytesRead = 0;
     this.channel = ghfs.getGcsFs().open(gcsPath, readOptions);
   }
@@ -100,10 +89,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     this.statistics = statistics;
     this.totalBytesRead = 0;
     GoogleCloudStorageFileSystem gcsFs = ghfs.getGcsFs();
-    // used to track the input stream related iostatistics
-    this.streamStatistics = ghfs.getInstrumentation().newInputStreamStatistics(statistics);
-    // used to track IOstatistics in input stream
-    this.iostatistics = streamStatistics.getIOStatistics();
     this.channel =
         gcsFs.open(fileInfo, gcsFs.getOptions().getCloudStorageOptions().getReadChannelOptions());
   }
@@ -118,16 +103,11 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   public synchronized int read() throws IOException {
     // TODO(user): Wrap this in a while-loop if we ever introduce a non-blocking mode for the
     // underlying channel.
-    // update the statistics of read operation
-    streamStatistics.readOperationStarted(getPos(), 1);
     int numRead = channel.read(ByteBuffer.wrap(singleReadBuf));
     if (numRead == -1) {
       return -1;
     }
     if (numRead != 1) {
-      // update the statistics of read Exception
-      streamStatistics.readException();
-      streamStatistics.readOperationCompleted(1, numRead);
       throw new IOException(
           String.format(
               "Somehow read %d bytes using single-byte buffer for path %s ending in position %d!",
@@ -135,10 +115,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     }
     byte b = singleReadBuf[0];
     totalBytesRead++;
-    // update the statistics of number of bytes read
-    streamStatistics.bytesRead(1);
-    // update the statistics of read operation completion
-    streamStatistics.readOperationCompleted(1, numRead);
     return (b & 0xff);
   }
 
@@ -159,21 +135,13 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       throw new IndexOutOfBoundsException();
     }
 
-    // update the statistics of read operation
-    streamStatistics.readOperationStarted(getPos(), length);
     int numRead = channel.read(ByteBuffer.wrap(buf, offset, length));
 
     if (numRead > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
-      // update the statistics of number of bytes read
-      streamStatistics.bytesRead(numRead);
       totalBytesRead += numRead;
-    } else {
-      // update the statistics of read Exception
-      streamStatistics.readException();
     }
-    // update the statistics of read operation completion
-    streamStatistics.readOperationCompleted(length, numRead);
+
     return numRead;
   }
 
@@ -192,22 +160,12 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   @Override
   public synchronized int read(long position, byte[] buf, int offset, int length)
       throws IOException {
-
-    // update the statistics of read operation
-    streamStatistics.readOperationStarted(position, length);
     int result = super.read(position, buf, offset, length);
 
     if (result > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
-      // update the statistics of number of bytes read
-      streamStatistics.bytesRead(result);
       totalBytesRead += result;
-    } else {
-      // update the statistics of read Exception
-      streamStatistics.readException();
     }
-    // update the statistics of read operation completion
-    streamStatistics.readOperationCompleted(length, result);
     return result;
   }
 
@@ -233,15 +191,8 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   @Override
   public synchronized void seek(long pos) throws IOException {
     logger.atFiner().log("seek(%d)", pos);
-    long curPos = getPos();
-    long diff = pos - curPos;
     try {
       channel.position(pos);
-      if (diff > 0) {
-        streamStatistics.seekForwards(diff);
-      } else {
-        streamStatistics.seekBackwards(diff);
-      }
     } catch (IllegalArgumentException e) {
       throw new IOException(e);
     }
@@ -268,8 +219,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     if (channel != null) {
       logger.atFiner().log("Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
       channel.close();
-      // to merge the current stream statistics with the instrumentation
-      streamStatistics.close();
     }
   }
 
@@ -290,15 +239,5 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       throw new ClosedChannelException();
     }
     return super.available();
-  }
-
-  /**
-   * Get the current IOStatistics from input stream
-   *
-   * @return
-   */
-  @Override
-  public IOStatistics getIOStatistics() {
-    return iostatistics;
   }
 }
