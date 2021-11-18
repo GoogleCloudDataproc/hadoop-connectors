@@ -98,7 +98,7 @@ class InMemoryGlobberFileSystem extends FileSystem {
 
   /** @inheritDoc */
   @Override
-  public FileStatus[] listStatus(Path f) throws FileNotFoundException, IOException {
+  public FileStatus[] listStatus(Path f) throws IOException {
     Path qualifiedPath = makeQualified(f);
     List<FileStatus> fileStatuses = fileStatusesByParentPath.get(qualifiedPath);
     if (fileStatuses == null) {

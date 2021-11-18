@@ -53,7 +53,7 @@ public enum BigQueryFileFormat {
   private final String extension;
   private final String formatIdentifier;
 
-  private BigQueryFileFormat(String extension, String formatIdentifier) {
+  BigQueryFileFormat(String extension, String formatIdentifier) {
     this.extension = extension;
     this.formatIdentifier = formatIdentifier;
   }

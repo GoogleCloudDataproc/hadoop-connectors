@@ -1249,7 +1249,7 @@ public class GoogleCloudStorageTest {
             .build();
     StorageObject storageObject = newStorageObject(BUCKET_NAME, OBJECT_NAME);
     GoogleCloudStorageItemInfo itemInfo =
-        GoogleCloudStorageImpl.createItemInfoForStorageObject(RESOURCE_ID, storageObject);
+        createItemInfoForStorageObject(RESOURCE_ID, storageObject);
     GoogleCloudStorageReadChannel readChannel =
         (GoogleCloudStorageReadChannel) gcs.open(itemInfo, readOptions);
 
@@ -2938,7 +2938,7 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorageItemInfo info = gcs.getItemInfo(RESOURCE_ID);
 
     GoogleCloudStorageItemInfo expected =
-        GoogleCloudStorageImpl.createItemInfoForStorageObject(RESOURCE_ID, storageObject);
+        createItemInfoForStorageObject(RESOURCE_ID, storageObject);
 
     assertThat(info).isEqualTo(expected);
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
@@ -3016,9 +3016,8 @@ public class GoogleCloudStorageTest {
 
     assertThat(itemInfos)
         .containsExactly(
-            GoogleCloudStorageImpl.createItemInfoForStorageObject(RESOURCE_ID, storageObject),
-            GoogleCloudStorageImpl.createItemInfoForBucket(
-                new StorageResourceId(BUCKET_NAME), bucket))
+            createItemInfoForStorageObject(RESOURCE_ID, storageObject),
+            createItemInfoForBucket(new StorageResourceId(BUCKET_NAME), bucket))
         .inOrder();
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
@@ -3127,7 +3126,7 @@ public class GoogleCloudStorageTest {
 
     assertThat(composedInfo)
         .isEqualTo(
-            GoogleCloudStorageImpl.createItemInfoForStorageObject(
+            createItemInfoForStorageObject(
                 new StorageResourceId(BUCKET_NAME, destination), destinationObject));
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
@@ -3496,7 +3495,7 @@ public class GoogleCloudStorageTest {
   private static InputStream partialReadTimeoutStream(
       byte[] data, double readFraction, String timeoutMessage) {
     return new InputStream() {
-      private int position = 0;
+      private int position;
       private final int maxPos = (int) (data.length * readFraction);
 
       @Override

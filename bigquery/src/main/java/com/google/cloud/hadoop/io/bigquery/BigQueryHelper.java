@@ -52,7 +52,7 @@ public class BigQueryHelper {
   // Used for specialized handling of various API-defined exceptions.
   private ApiErrorExtractor errorExtractor = ApiErrorExtractor.INSTANCE;
 
-  private Bigquery service;
+  private final Bigquery service;
 
   public BigQueryHelper(Bigquery service) {
     this.service = service;

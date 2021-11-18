@@ -45,7 +45,7 @@ import java.util.Map;
  * close it when it's no longer needed. Otherwise, it'd cause memory leak.
  */
 class ZeroCopyMessageMarshaller<T extends MessageLite> implements PrototypeMarshaller<T> {
-  private Map<T, InputStream> unclosedStreams =
+  private final Map<T, InputStream> unclosedStreams =
       Collections.synchronizedMap(new IdentityHashMap<>());
   private final Parser<T> parser;
   private final PrototypeMarshaller<T> marshaller;

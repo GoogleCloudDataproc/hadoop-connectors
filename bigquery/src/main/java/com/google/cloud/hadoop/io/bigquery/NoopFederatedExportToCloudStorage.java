@@ -64,7 +64,7 @@ public class NoopFederatedExportToCloudStorage extends UnshardedExportToCloudSto
   }
 
   @VisibleForTesting
-  static String getCommaSeparatedGcsPathList(final Table table) {
+  static String getCommaSeparatedGcsPathList(Table table) {
     Preconditions.checkNotNull(table.getExternalDataConfiguration());
     for (String uri : table.getExternalDataConfiguration().getSourceUris()) {
       Preconditions.checkArgument(uri.startsWith("gs://"), "Invalid GCS resource: '%s'", uri);

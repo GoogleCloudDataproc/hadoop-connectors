@@ -329,7 +329,7 @@ public class BigQueryConfiguration {
   public static String getTemporaryPathRoot(Configuration conf, @Nullable JobID jobId)
       throws IOException {
     // Try using the temporary gcs path.
-    String pathRoot = conf.get(BigQueryConfiguration.TEMP_GCS_PATH.getKey());
+    String pathRoot = conf.get(TEMP_GCS_PATH.getKey());
 
     if (Strings.isNullOrEmpty(pathRoot)) {
       checkNotNull(jobId, "jobId is required if '%s' is not set", TEMP_GCS_PATH.getKey());

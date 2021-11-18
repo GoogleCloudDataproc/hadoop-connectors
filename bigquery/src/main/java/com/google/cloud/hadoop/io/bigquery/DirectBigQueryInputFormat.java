@@ -67,7 +67,7 @@ public class DirectBigQueryInputFormat extends InputFormat<NullWritable, Generic
 
   @Override
   public List<InputSplit> getSplits(JobContext context) throws IOException {
-    final Configuration configuration = context.getConfiguration();
+    Configuration configuration = context.getConfiguration();
     BigQueryStorageClient client = getClient(configuration);
     BigQueryHelper bigQueryHelper;
     try {

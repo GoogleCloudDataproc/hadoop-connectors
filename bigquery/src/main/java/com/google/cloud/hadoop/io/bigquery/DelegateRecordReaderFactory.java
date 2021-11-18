@@ -22,6 +22,6 @@ import org.apache.hadoop.mapreduce.RecordReader;
 public interface DelegateRecordReaderFactory<K, V> {
 
   /** Create a new record reader for a single input split. */
-  public RecordReader<K, V> createDelegateRecordReader(
-      InputSplit split, Configuration configuration) throws IOException, InterruptedException;
+  RecordReader<K, V> createDelegateRecordReader(InputSplit split, Configuration configuration)
+      throws IOException, InterruptedException;
 }

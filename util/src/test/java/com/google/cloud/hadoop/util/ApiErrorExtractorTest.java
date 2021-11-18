@@ -18,7 +18,6 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.googleapis.json.GoogleJsonError;
-import com.google.api.client.googleapis.json.GoogleJsonError.ErrorInfo;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpResponse;
@@ -80,7 +79,7 @@ public class ApiErrorExtractorTest {
             400, ApiErrorExtractor.RESOURCE_NOT_READY_REASON, "Resource not ready");
 
     // This works because googleJsonResponseException takes final ErrorInfo
-    ErrorInfo errorInfo = new ErrorInfo();
+    GoogleJsonError.ErrorInfo errorInfo = new GoogleJsonError.ErrorInfo();
     errorInfo.setReason(ApiErrorExtractor.RATE_LIMITED_REASON);
     notRateLimited = googleJsonResponseException(POSSIBLE_RATE_LIMIT, errorInfo, "");
     errorInfo.setDomain(ApiErrorExtractor.USAGE_LIMITS_DOMAIN);
@@ -463,14 +462,14 @@ public class ApiErrorExtractorTest {
   /** Builds a fake GoogleJsonResponseException for testing API error handling. */
   private static GoogleJsonResponseException googleJsonResponseException(
       int httpStatus, String reason, String message, String httpStatusString) throws IOException {
-    ErrorInfo errorInfo = new ErrorInfo();
+    GoogleJsonError.ErrorInfo errorInfo = new GoogleJsonError.ErrorInfo();
     errorInfo.setReason(reason);
     errorInfo.setMessage(message);
     return googleJsonResponseException(httpStatus, errorInfo, httpStatusString);
   }
 
   private static GoogleJsonResponseException googleJsonResponseException(
-      int status, ErrorInfo errorInfo, String httpStatusString) throws IOException {
+      int status, GoogleJsonError.ErrorInfo errorInfo, String httpStatusString) throws IOException {
     JsonFactory jsonFactory = JacksonFactory.getDefaultInstance();
     HttpTransport transport =
         new MockHttpTransport() {

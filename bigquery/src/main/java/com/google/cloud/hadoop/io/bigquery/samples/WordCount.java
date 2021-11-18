@@ -48,7 +48,7 @@ public class WordCount {
   public static class Map extends Mapper<LongWritable, JsonObject, Text, LongWritable> {
 
     private static final LongWritable ONE = new LongWritable(1);
-    private Text word = new Text();
+    private final Text word = new Text();
     private String wordKey;
 
     @Override

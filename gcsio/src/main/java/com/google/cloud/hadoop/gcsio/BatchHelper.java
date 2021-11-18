@@ -102,7 +102,7 @@ public class BatchHelper {
   }
 
   /** Callback that causes a single StorageRequest to be added to the {@link BatchRequest}. */
-  protected static interface QueueRequestCallback {
+  protected interface QueueRequestCallback {
     void enqueue(BatchRequest batch) throws IOException;
   }
 

@@ -113,6 +113,6 @@ public class InstrumentatedgoogleHadoopFSInputStream extends GoogleHadoopFSInput
    */
   @Override
   public IOStatistics getIOStatistics() {
-    return this.ioStatistics;
+    return ioStatistics;
   }
 }

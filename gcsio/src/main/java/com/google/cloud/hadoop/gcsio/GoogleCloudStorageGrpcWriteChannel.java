@@ -34,7 +34,6 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.util.Timestamps;
 import com.google.storage.v2.ChecksummedData;
 import com.google.storage.v2.CommonRequestParams;
-import com.google.storage.v2.CommonRequestParams.Builder;
 import com.google.storage.v2.Object;
 import com.google.storage.v2.ObjectChecksums;
 import com.google.storage.v2.QueryWriteStatusRequest;
@@ -76,7 +75,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
           Status.Code.RESOURCE_EXHAUSTED,
           Status.Code.UNAVAILABLE);
 
-  private volatile StorageStub stub;
+  private final StorageStub stub;
 
   private final StorageStubProvider stubProvider;
   private final StorageResourceId resourceId;
@@ -433,7 +432,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
         insertObjectSpecBuilder.setIfMetagenerationMatch(writeConditions.getMetaGenerationMatch());
       }
 
-      Builder commonRequestParamsBuilder = null;
+      CommonRequestParams.Builder commonRequestParamsBuilder = null;
       if (requesterPaysProject != null) {
         commonRequestParamsBuilder =
             CommonRequestParams.newBuilder().setUserProject(requesterPaysProject);

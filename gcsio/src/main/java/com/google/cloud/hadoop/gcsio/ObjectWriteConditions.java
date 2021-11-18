@@ -16,7 +16,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import com.google.api.services.storage.Storage.Objects.Insert;
+import com.google.api.services.storage.Storage;
 import com.google.auto.value.AutoValue;
 import javax.annotation.Nullable;
 
@@ -53,7 +53,7 @@ public abstract class ObjectWriteConditions {
   }
 
   /** Apply the conditions represented by this object to an Insert operation. */
-  public void apply(Insert objectToInsert) {
+  public void apply(Storage.Objects.Insert objectToInsert) {
     if (hasContentGenerationMatch()) {
       objectToInsert.setIfGenerationMatch(getContentGenerationMatch());
     }

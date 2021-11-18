@@ -81,8 +81,8 @@ public class TestDelegationTokenBindingImpl extends AbstractDelegationTokenBindi
     }
 
     @Override
-    public void setConf(Configuration configuration) {
-      this.config = configuration;
+    public void setConf(Configuration config) {
+      this.config = config;
     }
 
     @Override

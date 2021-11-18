@@ -25,7 +25,7 @@ public enum ExportFileFormat {
   private final String filePattern;
   private final String formatIdentifier;
 
-  private ExportFileFormat(String filePattern, String formatIdentifier) {
+  ExportFileFormat(String filePattern, String formatIdentifier) {
     this.filePattern = filePattern;
     this.formatIdentifier = formatIdentifier;
   }

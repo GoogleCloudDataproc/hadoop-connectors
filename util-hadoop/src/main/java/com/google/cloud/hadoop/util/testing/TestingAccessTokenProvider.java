@@ -40,6 +40,6 @@ public final class TestingAccessTokenProvider implements AccessTokenProvider {
 
   @Override
   public Configuration getConf() {
-    return this.config;
+    return config;
   }
 }

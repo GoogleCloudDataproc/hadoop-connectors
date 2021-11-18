@@ -30,7 +30,7 @@ import javax.annotation.concurrent.NotThreadSafe;
 public class RetryBoundedBackOff implements BackOff {
   private int retriesAttempted = 0;
   private final int maxRetries;
-  private BackOff backoff;
+  private final BackOff backoff;
 
   /**
    * RetryBoundedBackOff takes a {@link BackOff} and limits the retries.

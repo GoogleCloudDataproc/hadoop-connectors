@@ -35,7 +35,6 @@ import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
@@ -94,7 +93,7 @@ public class FsBenchmark extends Configured implements Tool {
 
   /** Helper to dispatch ToolRunner.run but with try/catch, progress-reporting, and statistics. */
   private int runWithInstrumentation(FileSystem fs, String cmd, Map<String, String> cmdArgs) {
-    Statistics statistics = FileSystem.getStatistics().get(fs.getScheme());
+    FileSystem.Statistics statistics = FileSystem.getStatistics().get(fs.getScheme());
 
     Optional<ScheduledExecutorService> progressReporter = Optional.empty();
     Future<?> statsFuture = immediateVoidFuture();

@@ -105,8 +105,8 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
    * @param fs owning FS.
    * @param service name of the service (i.e. bucket name) for the FS.
    */
-  public void bindToFileSystem(GoogleHadoopFileSystemBase fs, Text service) {
-    this.fileSystem = requireNonNull(fs);
+  public void bindToFileSystem(GoogleHadoopFileSystemBase fileSystem, Text service) {
+    this.fileSystem = requireNonNull(fileSystem);
     this.service = requireNonNull(service);
   }
 
@@ -118,9 +118,9 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
    * @throws IOException if one cannot be created
    */
   public Token<DelegationTokenIdentifier> createDelegationToken(
-      String renewer, DelegationTokenStatistics statistics) throws IOException {
+      String renewer, DelegationTokenStatistics stats) throws IOException {
     Text renewerText = new Text();
-    this.stats = statistics;
+    this.stats = stats;
     if (renewer != null) {
       renewerText.set(renewer);
     }
@@ -216,7 +216,7 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
 
     @Override
     public DelegationTokenIdentifier createIdentifier() {
-      return AbstractDelegationTokenBinding.this.createEmptyIdentifier();
+      return createEmptyIdentifier();
     }
   }
   /**
@@ -224,7 +224,7 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
    *
    * @param token token created
    */
-  private void noteTokenCreated(final Token<DelegationTokenIdentifier> token) {
+  private void noteTokenCreated(Token<DelegationTokenIdentifier> token) {
     stats.tokenIssued();
   }
 }

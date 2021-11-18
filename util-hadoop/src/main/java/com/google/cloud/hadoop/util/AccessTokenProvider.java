@@ -27,7 +27,7 @@ public interface AccessTokenProvider extends Configurable {
     GENERIC,
 
     /** A downscoped access token generated for each request. */
-    DOWNSCOPED;
+    DOWNSCOPED
   }
 
   /** An access token and its expiration time. */
@@ -36,9 +36,9 @@ public interface AccessTokenProvider extends Configurable {
     private final String token;
     private final Long expirationTimeMilliSeconds;
 
-    public AccessToken(String token, Long expirationTimeMillis) {
+    public AccessToken(String token, Long expirationTimeMilliSeconds) {
       this.token = token;
-      this.expirationTimeMilliSeconds = expirationTimeMillis;
+      this.expirationTimeMilliSeconds = expirationTimeMilliSeconds;
     }
 
     /** @return the Access Token string. */

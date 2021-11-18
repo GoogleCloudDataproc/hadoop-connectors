@@ -38,7 +38,7 @@ import org.apache.hadoop.util.Progressable;
  */
 public class UnshardedExportToCloudStorage extends AbstractExportToCloudStorage {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-  private InputFormat<LongWritable, Text> delegateInputFormat;
+  private final InputFormat<LongWritable, Text> delegateInputFormat;
 
   public UnshardedExportToCloudStorage(
       Configuration configuration,

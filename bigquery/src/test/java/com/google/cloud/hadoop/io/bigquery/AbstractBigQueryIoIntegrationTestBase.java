@@ -43,7 +43,6 @@ import java.security.GeneralSecurityException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -162,7 +161,7 @@ public abstract class AbstractBigQueryIoIntegrationTestBase<T> {
 
   private void setConfigForGcsFromBigquerySettings() {
     Configuration conf = getConfigForGcsFromBigquerySettings(projectIdValue);
-    for (Entry<String, String> entry : conf) {
+    for (Map.Entry<String, String> entry : conf) {
       config.set(entry.getKey(), entry.getValue());
     }
   }

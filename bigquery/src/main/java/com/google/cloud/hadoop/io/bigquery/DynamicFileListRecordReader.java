@@ -76,17 +76,17 @@ public class DynamicFileListRecordReader<K, V> extends RecordReader<K, V> {
   private long recordsRead = 0;
 
   // Factory for creating the underlying reader for iterating over records within a single file.
-  private DelegateRecordReaderFactory<K, V> delegateRecordReaderFactory;
+  private final DelegateRecordReaderFactory<K, V> delegateRecordReaderFactory;
 
   // Underlying reader for iterating over the records within a single file.
   private RecordReader<K, V> delegateReader = null;
 
   // Set of all files we've successfully listed so far. Doesn't include end-indicator empty file.
-  private Set<String> knownFileSet = new HashSet<>();
+  private final Set<String> knownFileSet = new HashSet<>();
 
   // Queue of ready-but-not-yet-processed files whose filenames are also saved in knownFileSet,
   // in the order we discovered them.
-  private Queue<FileStatus> fileQueue = new ArrayDeque<>();
+  private final Queue<FileStatus> fileQueue = new ArrayDeque<>();
 
   // Becomes positive once we've discovered the end-indicator file for the first time.
   private int endFileNumber = -1;
@@ -304,10 +304,7 @@ public class DynamicFileListRecordReader<K, V> extends RecordReader<K, V> {
    *     to read.
    */
   private boolean shouldExpectMoreFiles() {
-    if (endFileNumber == -1 || knownFileSet.size() <= endFileNumber) {
-      return true;
-    }
-    return false;
+    return endFileNumber == -1 || knownFileSet.size() <= endFileNumber;
   }
 
   /**

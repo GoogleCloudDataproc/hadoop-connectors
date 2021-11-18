@@ -512,7 +512,6 @@ public class BigQueryOutputConfiguration {
     private final Configuration config;
 
     public JobConfigurationAdapter(Configuration config) throws IOException {
-      super();
       this.config = config;
     }
 

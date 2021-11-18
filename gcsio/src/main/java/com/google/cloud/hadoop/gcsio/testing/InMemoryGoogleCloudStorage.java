@@ -31,7 +31,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStrings;
 import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import java.io.ByteArrayOutputStream;
@@ -474,7 +473,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     List<GoogleCloudStorageItemInfo> itemInfos = new ArrayList<>();
     for (UpdatableItemInfo updatableItemInfo : itemInfoList) {
       StorageResourceId resourceId = updatableItemInfo.getStorageResourceId();
-      Preconditions.checkArgument(
+      checkArgument(
           !resourceId.isRoot() && !resourceId.isBucket(),
           "Can't update item on GCS Root or bucket resources");
       if (!validateObjectName(resourceId.getObjectName())) {
@@ -487,8 +486,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
         objectEntry.patchMetadata(updatableItemInfo.getMetadata());
         itemInfos.add(getItemInfo(resourceId));
       } else {
-        throw new IOException(
-            String.format("Error getting StorageObject %s", resourceId.toString()));
+        throw new IOException(String.format("Error getting StorageObject %s", resourceId));
       }
     }
     return itemInfos;

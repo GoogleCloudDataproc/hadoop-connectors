@@ -32,7 +32,7 @@ public class HadoopToStringUtil {
     String result = "InputSplit::";
     result += " length:" + input.getLength();
     result += " locations: " + Arrays.toString(input.getLocations());
-    result += " toString(): " + input.toString();
+    result += " toString(): " + input;
     return result;
   }
 

@@ -47,7 +47,7 @@ public class BigQueryUtilsTest {
   private Progressable mockProgressable;
 
   // Sample projectId for testing.
-  private String projectId = "Test";
+  private final String projectId = "Test";
 
   private JobReference jobReference;
 

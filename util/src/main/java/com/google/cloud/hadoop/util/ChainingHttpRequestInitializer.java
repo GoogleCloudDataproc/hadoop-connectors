@@ -73,7 +73,7 @@ public class ChainingHttpRequestInitializer implements HttpRequestInitializer {
   }
 
   private HttpResponseInterceptor makeResponseInterceptor(
-      final Iterable<HttpResponseInterceptor> responseInterceptors) {
+      Iterable<HttpResponseInterceptor> responseInterceptors) {
     return new HttpResponseInterceptor() {
       @Override
       public void interceptResponse(HttpResponse response) throws IOException {
@@ -84,8 +84,7 @@ public class ChainingHttpRequestInitializer implements HttpRequestInitializer {
     };
   }
 
-  private HttpExecuteInterceptor makeInterceptor(
-      final Iterable<HttpExecuteInterceptor> interceptors) {
+  private HttpExecuteInterceptor makeInterceptor(Iterable<HttpExecuteInterceptor> interceptors) {
     return new HttpExecuteInterceptor() {
       @Override
       public void intercept(HttpRequest request) throws IOException {
@@ -97,7 +96,7 @@ public class ChainingHttpRequestInitializer implements HttpRequestInitializer {
   }
 
   private HttpUnsuccessfulResponseHandler makeUnsuccessfulResponseHandler(
-      final Iterable<HttpUnsuccessfulResponseHandler> unsuccessfulResponseHandlers) {
+      Iterable<HttpUnsuccessfulResponseHandler> unsuccessfulResponseHandlers) {
     return new HttpUnsuccessfulResponseHandler() {
       @Override
       public boolean handleResponse(
@@ -113,7 +112,7 @@ public class ChainingHttpRequestInitializer implements HttpRequestInitializer {
   }
 
   private HttpIOExceptionHandler makeIoExceptionHandler(
-      final Iterable<HttpIOExceptionHandler> ioExceptionHandlers) {
+      Iterable<HttpIOExceptionHandler> ioExceptionHandlers) {
     return new HttpIOExceptionHandler() {
       @Override
       public boolean handleIOException(HttpRequest request, boolean supportsRetry)

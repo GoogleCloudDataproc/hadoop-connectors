@@ -117,7 +117,7 @@ public abstract class AbstractBigQueryInputFormat<K, V> extends InputFormat<K, V
   public List<InputSplit> getSplits(JobContext context) throws IOException, InterruptedException {
     logger.atFine().log("getSplits(%s)", lazy(() -> HadoopToStringUtil.toString(context)));
 
-    final Configuration configuration = context.getConfiguration();
+    Configuration configuration = context.getConfiguration();
     BigQueryHelper bigQueryHelper;
     try {
       bigQueryHelper = getBigQueryHelper(configuration);

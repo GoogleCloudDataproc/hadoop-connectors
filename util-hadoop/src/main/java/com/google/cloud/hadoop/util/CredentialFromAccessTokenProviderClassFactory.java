@@ -18,7 +18,6 @@ import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.auth.oauth2.TokenResponse;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.util.Clock;
-import com.google.cloud.hadoop.util.AccessTokenProvider.AccessToken;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Collection;
@@ -47,7 +46,7 @@ public final class CredentialFromAccessTokenProviderClassFactory {
 
     static GoogleCredential fromAccessTokenProvider(
         Clock clock, AccessTokenProvider accessTokenProvider) {
-      AccessToken accessToken =
+      AccessTokenProvider.AccessToken accessToken =
           Preconditions.checkNotNull(
               accessTokenProvider.getAccessToken(), "Access Token cannot be null!");
 
@@ -60,7 +59,7 @@ public final class CredentialFromAccessTokenProviderClassFactory {
     @Override
     protected TokenResponse executeRefreshToken() throws IOException {
       accessTokenProvider.refresh();
-      AccessToken accessToken =
+      AccessTokenProvider.AccessToken accessToken =
           Preconditions.checkNotNull(
               accessTokenProvider.getAccessToken(), "Access Token cannot be null!");
 

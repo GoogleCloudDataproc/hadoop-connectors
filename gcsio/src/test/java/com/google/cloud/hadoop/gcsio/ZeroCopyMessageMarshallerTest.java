@@ -31,7 +31,7 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class ZeroCopyMessageMarshallerTest {
-  private ReadObjectRequest REQUEST =
+  private final ReadObjectRequest REQUEST =
       ReadObjectRequest.newBuilder().setBucket("b").setObject("o").build();
 
   private ZeroCopyMessageMarshaller<ReadObjectRequest> createMarshaller() {

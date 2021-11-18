@@ -30,7 +30,6 @@ import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.NanoClock;
 import com.google.api.client.util.Sleeper;
 import com.google.api.services.storage.Storage;
-import com.google.api.services.storage.Storage.Objects.Get;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
@@ -38,7 +37,6 @@ import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.flogger.GoogleLogger;
@@ -182,14 +180,14 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   /** Sets the Sleeper used for sleeping between retries. */
   @VisibleForTesting
   void setSleeper(Sleeper sleeper) {
-    Preconditions.checkArgument(sleeper != null, "sleeper must not be null!");
+    checkArgument(sleeper != null, "sleeper must not be null!");
     this.sleeper = sleeper;
   }
 
   /** Sets the clock to be used for determining when max total time has elapsed doing retries. */
   @VisibleForTesting
   void setNanoClock(NanoClock clock) {
-    Preconditions.checkArgument(clock != null, "clock must not be null!");
+    checkArgument(clock != null, "clock must not be null!");
     this.clock = clock;
   }
 
@@ -229,7 +227,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     StorageObject object;
     try {
       // Request only fields that are used for metadata initialization
-      Get getObject = createRequest().setFields("contentEncoding,generation,size");
+      Storage.Objects.Get getObject = createRequest().setFields("contentEncoding,generation,size");
       object =
           ResilientOperation.retry(
               getObject::execute,
@@ -926,7 +924,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         "contentChannelEnd should be initialized already for '%s'",
         resourceId);
 
-    Get getObject = createDataRequest(rangeHeader);
+    Storage.Objects.Get getObject = createDataRequest(rangeHeader);
     HttpResponse response;
     try {
       response = getObject.executeMedia();
@@ -1102,8 +1100,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     throw new IOException(msg, e);
   }
 
-  private Get createDataRequest(String rangeHeader) throws IOException {
-    Get getObject = createRequest();
+  private Storage.Objects.Get createDataRequest(String rangeHeader) throws IOException {
+    Storage.Objects.Get getObject = createRequest();
 
     // Set the headers on the existing request headers that may have
     // been initialized with things like user-agent already.
@@ -1115,13 +1113,14 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     return getObject;
   }
 
-  protected Get createRequest() throws IOException {
+  protected Storage.Objects.Get createRequest() throws IOException {
     checkState(
         !metadataInitialized || resourceId.hasGenerationId(),
         "Generation should always be included for resource '%s'",
         resourceId);
     // Start with unset generation and determine what to ask for based on read consistency.
-    Get getObject = gcs.objects().get(resourceId.getBucketName(), resourceId.getObjectName());
+    Storage.Objects.Get getObject =
+        gcs.objects().get(resourceId.getBucketName(), resourceId.getObjectName());
     if (resourceId.hasGenerationId()) {
       getObject.setGeneration(resourceId.getGenerationId());
     }

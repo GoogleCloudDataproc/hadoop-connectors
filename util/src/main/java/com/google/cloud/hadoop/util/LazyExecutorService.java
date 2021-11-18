@@ -77,7 +77,7 @@ public final class LazyExecutorService implements ExecutorService {
    * gc:ed. The set needs to be safe for concurrent access.
    */
   private final Set<ExecutingFuture<?>> pendingTasks =
-      Collections.newSetFromMap(new MapMaker().weakKeys().<ExecutingFuture<?>, Boolean>makeMap());
+      Collections.newSetFromMap(new MapMaker().weakKeys().makeMap());
 
   /**
    * Manages compound conditions involving changing the size of {@code pendingTasks} and the value
@@ -169,7 +169,7 @@ public final class LazyExecutorService implements ExecutorService {
   }
 
   @Override
-  public <T> Future<T> submit(final Callable<T> task) {
+  public <T> Future<T> submit(Callable<T> task) {
     checkNotNull(task, "Null task submitted.");
     tasksAndTerminationLock.lock();
     try {
@@ -234,10 +234,10 @@ public final class LazyExecutorService implements ExecutorService {
   @CanIgnoreReturnValue
   @Override
   public <T> List<Future<T>> invokeAll(
-      Collection<? extends Callable<T>> tasks, final long timeout, final TimeUnit unit)
+      Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
       throws InterruptedException {
     checkNotNull(unit);
-    final List<Future<T>> result = Lists.newLinkedList();
+    List<Future<T>> result = Lists.newLinkedList();
     try {
       for (Callable<T> task : tasks) {
         result.add(submit(task));
@@ -336,8 +336,7 @@ public final class LazyExecutorService implements ExecutorService {
    * either a lazy execution perspective or a cached result perspective.
    */
   @Override
-  public <T> T invokeAny(
-      final Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) {
+  public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) {
     throw new RejectedExecutionException("Use another ExecutorService implementation.");
   }
 
@@ -350,7 +349,7 @@ public final class LazyExecutorService implements ExecutorService {
     throw new RejectedExecutionException("Use submit instead of execute.");
   }
 
-  private static interface ExecutingFuture<T> extends Future<T> {
+  private interface ExecutingFuture<T> extends Future<T> {
     void backingServiceDied();
   }
 

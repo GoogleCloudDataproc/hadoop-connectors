@@ -41,7 +41,7 @@ public class GsonRecordReader extends RecordReader<LongWritable, JsonObject> {
   private LineRecordReader lineReader;
 
   // Current key.
-  private LongWritable currentKey = new LongWritable(0L);
+  private final LongWritable currentKey = new LongWritable(0L);
 
   // Current value.
   private JsonObject currentValue;

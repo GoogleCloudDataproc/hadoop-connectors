@@ -76,9 +76,9 @@ public class GoogleHadoopSyncableOutputStreamTest {
     Path objectPath = new Path(ghfs.getFileSystemRoot(), "dir/object.txt");
     FSDataOutputStream fout = ghfs.create(objectPath);
 
-    byte[] data1 = new byte[] {0x0f, 0x0e, 0x0e, 0x0d};
-    byte[] data2 = new byte[] {0x0b, 0x0e, 0x0e, 0x0f};
-    byte[] data3 = new byte[] {0x04, 0x02};
+    byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
+    byte[] data2 = {0x0b, 0x0e, 0x0e, 0x0f};
+    byte[] data3 = {0x04, 0x02};
     byte[] data1Read = new byte[4];
     byte[] data2Read = new byte[4];
     byte[] data3Read = new byte[2];
@@ -133,8 +133,8 @@ public class GoogleHadoopSyncableOutputStreamTest {
     when(mockExecutorService.submit(any(Callable.class)))
         .thenReturn(Futures.immediateFailedFuture(new ExecutionException(fakeIoException)));
 
-    byte[] data1 = new byte[] {0x0f, 0x0e, 0x0e, 0x0d};
-    byte[] data2 = new byte[] {0x0b, 0x0e, 0x0e, 0x0f};
+    byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
+    byte[] data2 = {0x0b, 0x0e, 0x0e, 0x0f};
 
     fout.write(data1, 0, data1.length);
     fout.sync(); // This one commits straight into destination.
@@ -243,8 +243,8 @@ public class GoogleHadoopSyncableOutputStreamTest {
             SyncableOutputStreamOptions.DEFAULT,
             mockExecutorService);
 
-    byte[] data1 = new byte[] {0x0f, 0x0e, 0x0e, 0x0d};
-    byte[] data2 = new byte[] {0x0b, 0x0d, 0x0e, 0x0e, 0x0f};
+    byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
+    byte[] data2 = {0x0b, 0x0d, 0x0e, 0x0e, 0x0f};
 
     fout.write(data1, 0, data1.length);
     fout.sync();
@@ -271,8 +271,8 @@ public class GoogleHadoopSyncableOutputStreamTest {
             SyncableOutputStreamOptions.DEFAULT,
             mockExecutorService);
 
-    byte[] data1 = new byte[] {0x0f, 0x0e, 0x0e, 0x0d};
-    byte[] data2 = new byte[] {0x0b, 0x0d, 0x0e, 0x0e, 0x0f};
+    byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
+    byte[] data2 = {0x0b, 0x0d, 0x0e, 0x0e, 0x0f};
 
     fout.write(data1, 0, data1.length);
     fout.hsync();

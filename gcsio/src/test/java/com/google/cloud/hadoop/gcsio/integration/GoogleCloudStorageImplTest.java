@@ -362,7 +362,7 @@ public class GoogleCloudStorageImplTest {
     int maxBytesRewrittenPerCall = 256 * 1024 * 1024;
     TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
         newTrackingGoogleCloudStorage(
-            GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            getStandardOptionBuilder()
                 .setCopyWithRewriteEnabled(true)
                 .setMaxBytesRewrittenPerCall(maxBytesRewrittenPerCall)
                 .build());
@@ -454,7 +454,7 @@ public class GoogleCloudStorageImplTest {
   }
 
   private static GoogleCloudStorageOptions getOptionsWithUploadChunk(int uploadChunk) {
-    return GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+    return getStandardOptionBuilder()
         .setWriteChannelOptions(
             AsyncWriteChannelOptions.builder().setUploadChunkSize(uploadChunk).build())
         .build();

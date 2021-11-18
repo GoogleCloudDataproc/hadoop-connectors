@@ -46,7 +46,6 @@ class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
 
   public GcsioTrackingHttpRequestInitializer(
       ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics) {
-    this.delegate = null;
     this.httpStatistics = httpStatistics;
   }
 
@@ -73,8 +72,8 @@ class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
    * @param key GoogleCloudStorageStatistics key for tracking http-related activity in gcsio
    */
   private void increment(GoogleCloudStorageStatistics key) {
-    this.httpStatistics.putIfAbsent(key, new AtomicLong(0));
-    this.httpStatistics.get(key).incrementAndGet();
+    httpStatistics.putIfAbsent(key, new AtomicLong(0));
+    httpStatistics.get(key).incrementAndGet();
   }
 
   /**
@@ -84,17 +83,17 @@ class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
    */
   private void sethttprequestStats(HttpRequest r) {
     if (r.getRequestMethod() == "GET") {
-      this.increment(ACTION_HTTP_GET_REQUEST);
+      increment(ACTION_HTTP_GET_REQUEST);
     } else if (r.getRequestMethod() == "HEAD") {
-      this.increment(ACTION_HTTP_HEAD_REQUEST);
+      increment(ACTION_HTTP_HEAD_REQUEST);
     } else if (r.getRequestMethod() == "PUT") {
-      this.increment(ACTION_HTTP_PUT_REQUEST);
+      increment(ACTION_HTTP_PUT_REQUEST);
     } else if (r.getRequestMethod() == "POST") {
-      this.increment(ACTION_HTTP_POST_REQUEST);
+      increment(ACTION_HTTP_POST_REQUEST);
     } else if (r.getRequestMethod() == "PATCH") {
-      this.increment(ACTION_HTTP_PATCH_REQUEST);
+      increment(ACTION_HTTP_PATCH_REQUEST);
     } else if (r.getRequestMethod() == "DELETE") {
-      this.increment(ACTION_HTTP_DELETE_REQUEST);
+      increment(ACTION_HTTP_DELETE_REQUEST);
     }
   }
 
@@ -106,17 +105,17 @@ class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
   private void setHttpRequestFailureStats(HttpResponse httpResponse) {
     if (!(httpResponse.isSuccessStatusCode())) {
       if (httpResponse.getRequest().getRequestMethod() == "GET") {
-        this.increment(ACTION_HTTP_GET_REQUEST_FAILURES);
+        increment(ACTION_HTTP_GET_REQUEST_FAILURES);
       } else if (httpResponse.getRequest().getRequestMethod() == "HEAD") {
-        this.increment(ACTION_HTTP_HEAD_REQUEST_FAILURES);
+        increment(ACTION_HTTP_HEAD_REQUEST_FAILURES);
       } else if (httpResponse.getRequest().getRequestMethod() == "PUT") {
-        this.increment(ACTION_HTTP_PUT_REQUEST_FAILURES);
+        increment(ACTION_HTTP_PUT_REQUEST_FAILURES);
       } else if (httpResponse.getRequest().getRequestMethod() == "POST") {
-        this.increment(ACTION_HTTP_POST_REQUEST_FAILURES);
+        increment(ACTION_HTTP_POST_REQUEST_FAILURES);
       } else if (httpResponse.getRequest().getRequestMethod() == "PATCH") {
-        this.increment(ACTION_HTTP_PATCH_REQUEST_FAILURES);
+        increment(ACTION_HTTP_PATCH_REQUEST_FAILURES);
       } else if (httpResponse.getRequest().getRequestMethod() == "DELETE") {
-        this.increment(ACTION_HTTP_DELETE_REQUEST_FAILURES);
+        increment(ACTION_HTTP_DELETE_REQUEST_FAILURES);
       }
     }
   }

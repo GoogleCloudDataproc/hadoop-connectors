@@ -70,8 +70,8 @@ public class GsonBigQueryInputFormatTest {
   private static final Set<Logger> configuredLoggers = new HashSet<>();
 
   // Sample text values for tests.
-  private Text value1 = new Text("{'title':'Test1','value':'test_1'}");
-  private Text value2 = new Text("{'title':'Test2','value':'test_2'}");
+  private final Text value1 = new Text("{'title':'Test1','value':'test_1'}");
+  private final Text value2 = new Text("{'title':'Test2','value':'test_2'}");
 
   // GoogleHadoopFileSystem to use.
   private InMemoryGoogleHadoopFileSystem ghfs;
@@ -81,10 +81,10 @@ public class GsonBigQueryInputFormatTest {
 
   // Sample projectIds for testing; one for owning the BigQuery jobs, another for the
   // TableReference.
-  private String jobProjectId = "google.com:foo-project";
-  private String dataProjectId = "publicdata";
-  private String intermediateDataset = "test_dataset";
-  private String intermediateTable = "test_table";
+  private final String jobProjectId = "google.com:foo-project";
+  private final String dataProjectId = "publicdata";
+  private final String intermediateDataset = "test_dataset";
+  private final String intermediateTable = "test_table";
 
   // Misc mocks for Bigquery auto-generated API objects.
   @Mock private Bigquery mockBigquery;
@@ -272,7 +272,7 @@ public class GsonBigQueryInputFormatTest {
                 .setSourceUris(ImmutableList.of("gs://foo-bucket/bar.json")));
 
     FileSplit split = new FileSplit(new Path("gs://foo-bucket/bar.json"), 0, 100, new String[0]);
-    when(mockInputFormat.getSplits(eq(jobContext))).thenReturn(ImmutableList.<InputSplit>of(split));
+    when(mockInputFormat.getSplits(eq(jobContext))).thenReturn(ImmutableList.of(split));
 
     GsonBigQueryInputFormat gsonBigQueryInputFormat = new GsonBigQueryInputFormatForTest();
     gsonBigQueryInputFormat.setDelegateInputFormat(mockInputFormat);
@@ -316,7 +316,7 @@ public class GsonBigQueryInputFormatTest {
     Path tempPath = new Path(BigQueryConfiguration.TEMP_GCS_PATH.get(config, config::get));
     FileSystem fs = tempPath.getFileSystem(config);
     fs.mkdirs(tempPath);
-    Path dataFile = new Path(tempPath.toString() + "/data-00000.json");
+    Path dataFile = new Path(tempPath + "/data-00000.json");
     fs.createNewFile(dataFile);
 
     // Check file and directory exist.
@@ -340,7 +340,7 @@ public class GsonBigQueryInputFormatTest {
     Path tempPath = new Path(BigQueryConfiguration.TEMP_GCS_PATH.get(config, config::get));
     FileSystem fs = tempPath.getFileSystem(config);
     fs.mkdirs(tempPath);
-    Path dataFile = new Path(tempPath.toString() + "/data-00000.json");
+    Path dataFile = new Path(tempPath + "/data-00000.json");
     fs.createNewFile(dataFile);
 
     // Check file and directory exist.
@@ -366,7 +366,7 @@ public class GsonBigQueryInputFormatTest {
     Path tempPath = new Path(BigQueryConfiguration.TEMP_GCS_PATH.get(config, config::get));
     FileSystem fs = tempPath.getFileSystem(config);
     fs.mkdirs(tempPath);
-    Path dataFile = new Path(tempPath.toString() + "/data-00000.json");
+    Path dataFile = new Path(tempPath + "/data-00000.json");
     fs.createNewFile(dataFile);
     assertThat(fs.exists(tempPath)).isTrue();
     assertThat(fs.exists(dataFile)).isTrue();
@@ -394,7 +394,7 @@ public class GsonBigQueryInputFormatTest {
     Path tempPath = new Path(BigQueryConfiguration.TEMP_GCS_PATH.get(config, config::get));
     FileSystem fs = tempPath.getFileSystem(config);
     fs.mkdirs(tempPath);
-    Path dataFile = new Path(tempPath.toString() + "/data-00000.json");
+    Path dataFile = new Path(tempPath + "/data-00000.json");
     fs.createNewFile(dataFile);
     assertThat(fs.exists(tempPath)).isTrue();
     assertThat(fs.exists(dataFile)).isTrue();

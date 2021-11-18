@@ -181,9 +181,10 @@ public class GcsDelegationTokens extends AbstractService {
    * @param fs owning FS.
    * @throws IOException failure.
    */
-  public void bindToFileSystem(GoogleHadoopFileSystemBase fs, Text service) throws IOException {
+  public void bindToFileSystem(GoogleHadoopFileSystemBase fileSystem, Text service)
+      throws IOException {
     this.service = requireNonNull(service);
-    this.fileSystem = requireNonNull(fs);
+    this.fileSystem = requireNonNull(fileSystem);
   }
 
   /**
@@ -256,7 +257,7 @@ public class GcsDelegationTokens extends AbstractService {
    * @throws IllegalArgumentException if the token isn't an GCP session token
    */
   public static DelegationTokenIdentifier extractIdentifier(
-      final Token<? extends DelegationTokenIdentifier> token) throws IOException {
+      Token<? extends DelegationTokenIdentifier> token) throws IOException {
     checkArgument(token != null, "null token");
     DelegationTokenIdentifier identifier;
     // harden up decode beyond what Token does itself

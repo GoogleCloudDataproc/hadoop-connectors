@@ -247,7 +247,7 @@ public class InMemoryObjectEntry {
       throw new IOException(
           String.format(
               "Cannot getReadChannel() before writes have been committed! Object = %s",
-              this.getObjectName()));
+              getObjectName()));
     }
     return new InMemoryObjectReadChannel(bucketName, objectName, completedContents, readOptions) {
       @Nullable
@@ -279,7 +279,7 @@ public class InMemoryObjectEntry {
       throw new IOException(
           String.format(
               "Cannot patchMetadata() before writes have been committed! Object = %s",
-              this.getObjectName()));
+              getObjectName()));
     }
     Map<String, byte[]> mergedMetadata = Maps.newHashMap(info.getMetadata());
 

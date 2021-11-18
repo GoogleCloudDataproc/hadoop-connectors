@@ -74,7 +74,6 @@ import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
 
 @RunWith(Parameterized.class)
 public class GoogleCloudStorageTest {
@@ -130,7 +129,7 @@ public class GoogleCloudStorageTest {
   // Test classes using JUnit4 runner must have only a single constructor. Since we
   // want to be able to pass in dependencies, we'll maintain this base class as
   // @Parameterized with @Parameters.
-  @Parameters
+  @Parameterized.Parameters
   public static Collection<Object[]> getConstructorArguments() throws IOException {
     return Arrays.asList(
         new Object[] {new InMemoryGoogleCloudStorage()},

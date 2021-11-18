@@ -33,7 +33,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
-import java.nio.charset.StandardCharsets;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -180,7 +179,7 @@ public class HadoopFileSystemIntegrationHelper
       readStream = ghfs.open(hadoopPath);
       int numBytesRead = readStream.read(readBuffer);
       while (numBytesRead > 0) {
-        returnBuffer.append(new String(readBuffer, 0, numBytesRead, StandardCharsets.UTF_8));
+        returnBuffer.append(new String(readBuffer, 0, numBytesRead, UTF_8));
         numBytesRead = readStream.read(readBuffer);
       }
     } finally {
@@ -231,7 +230,7 @@ public class HadoopFileSystemIntegrationHelper
         numBytesRead = readStream.read(readBuffer);
       }
       assertThat(numBytesRead).isEqualTo(len);
-      text = new String(readBuffer, 0, numBytesRead, StandardCharsets.UTF_8);
+      text = new String(readBuffer, 0, numBytesRead, UTF_8);
     } finally {
       if (readStream != null) {
         readStream.close();

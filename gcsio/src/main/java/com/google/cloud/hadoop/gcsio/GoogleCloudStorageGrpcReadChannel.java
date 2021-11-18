@@ -72,7 +72,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
           .build();
   private final boolean useZeroCopyMarshaller;
 
-  private volatile StorageBlockingStub stub;
+  private final StorageBlockingStub stub;
 
   private final StorageResourceId resourceId;
 
@@ -86,26 +86,26 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   private boolean channelIsOpen = true;
 
   // Current position in the object.
-  private long positionInGrpcStream = 0;
+  private long positionInGrpcStream;
 
   // If a user seeks forwards by a configurably small amount, we continue reading from where
   // we are instead of starting a new connection. The user's intended read position is
   // position + bytesToSkipBeforeReading.
-  private long bytesToSkipBeforeReading = 0;
+  private long bytesToSkipBeforeReading;
 
   // The user may have read less data than we received from the server. If that's the case, we
   // keep
   // the most recently received content and a reference to how much of it we've returned so far.
-  @Nullable private ByteString bufferedContent = null;
+  @Nullable private ByteString bufferedContent;
 
-  private int bufferedContentReadOffset = 0;
+  private int bufferedContentReadOffset;
 
   // InputStream that backs bufferedContent. This needs to be closed when bufferedContent is no
   // longer needed.
-  @Nullable private InputStream streamForBufferedContent = null;
+  @Nullable private InputStream streamForBufferedContent;
 
   // The streaming read operation. If null, there is not an in-flight read in progress.
-  @Nullable private Iterator<ReadObjectResponse> resIterator = null;
+  @Nullable private Iterator<ReadObjectResponse> resIterator;
 
   // Fine-grained options.
   private final GoogleCloudStorageReadOptions readOptions;
@@ -124,7 +124,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   // Offset in the object for the end of the range-requests
   private long contentChannelEndOffset = -1;
 
-  private long readTimeout;
+  private final long readTimeout;
 
   public static GoogleCloudStorageGrpcReadChannel open(
       StorageStubProvider stubProvider,
@@ -272,7 +272,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
     int prefetchSizeInBytes = readOptions.getMinRangeRequestSize() / 2;
     long objectSize = itemInfo.getSize();
-    long footerOffsetInBytes = Math.max(0, (objectSize - prefetchSizeInBytes));
+    long footerOffsetInBytes = max(0, (objectSize - prefetchSizeInBytes));
 
     long startTime = System.currentTimeMillis();
     ByteString footerContent =
@@ -424,7 +424,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     String msg = String.format("Error reading '%s'", resourceId);
     switch (Status.fromThrowable(error).getCode()) {
       case NOT_FOUND:
-        return GoogleCloudStorageExceptions.createFileNotFoundException(
+        return createFileNotFoundException(
             resourceId.getBucketName(), resourceId.getObjectName(), new IOException(msg, error));
       case OUT_OF_RANGE:
         return (IOException) new EOFException(msg).initCause(error);
@@ -638,7 +638,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       throw new IOException(
           String.format(
               "Message checksum (%s) didn't match expected checksum (%s) for '%s'",
-              expectedChecksum, calculatedChecksum, this.resourceId));
+              expectedChecksum, calculatedChecksum, resourceId));
     }
   }
 
@@ -652,8 +652,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     OptionalLong optionalBytesToRead = OptionalLong.empty();
     if (readStrategy == Fadvise.RANDOM) {
       long rangeRequestSize =
-          Math.max(readOptions.getInplaceSeekLimit(), readOptions.getMinRangeRequestSize());
-      optionalBytesToRead = OptionalLong.of(max((long) byteBuffer.remaining(), rangeRequestSize));
+          max(readOptions.getInplaceSeekLimit(), readOptions.getMinRangeRequestSize());
+      optionalBytesToRead = OptionalLong.of(max(byteBuffer.remaining(), rangeRequestSize));
     }
 
     if (footerContent == null) {

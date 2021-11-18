@@ -38,7 +38,7 @@ class GoogleHadoopFSInputStreamBase extends FSInputStream {
   private final SeekableByteChannel channel;
 
   // Path of the file to read.
-  private URI gcsPath;
+  private final URI gcsPath;
 
   // Number of bytes read through this channel.
   private long totalBytesRead;

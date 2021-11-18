@@ -79,7 +79,7 @@ public class BigQueryHelperTest {
   private TableSchema fakeTableSchema;
 
   // Sample projectId for testing - for owning the BigQuery jobs.
-  private String jobProjectId = "google.com:foo-project";
+  private final String jobProjectId = "google.com:foo-project";
 
   // Sample KMS key name.
   private final String kmsKeyName =
@@ -87,12 +87,12 @@ public class BigQueryHelperTest {
 
   // Sample TableReference for BigQuery.
   private TableReference tableRef;
-  private String projectId = "google.com:bar-project";
-  private String datasetId = "test_dataset";
-  private String tableId = "test_table";
+  private final String projectId = "google.com:bar-project";
+  private final String datasetId = "test_dataset";
+  private final String tableId = "test_table";
 
   // Sample jobId for JobReference for mockBigqueryJobs.
-  private String jobId = "bigquery-job-1234";
+  private final String jobId = "bigquery-job-1234";
 
   // The instance being tested.
   private BigQueryHelper helper;
@@ -170,7 +170,7 @@ public class BigQueryHelperTest {
   public void testImportBigQueryFromGcs() throws Exception {
     when(mockBigqueryTablesGet.execute()).thenReturn(fakeTable);
 
-    final ArgumentCaptor<Job> jobCaptor = ArgumentCaptor.forClass(Job.class);
+    ArgumentCaptor<Job> jobCaptor = ArgumentCaptor.forClass(Job.class);
     doAnswer(
             new Answer<Job>() {
               @Override
@@ -224,7 +224,7 @@ public class BigQueryHelperTest {
   public void testExportBigQueryToGcsSingleShardAwaitCompletion() throws Exception {
     when(mockBigqueryTablesGet.execute()).thenReturn(fakeTable);
 
-    final ArgumentCaptor<Job> jobCaptor = ArgumentCaptor.forClass(Job.class);
+    ArgumentCaptor<Job> jobCaptor = ArgumentCaptor.forClass(Job.class);
     doAnswer(
             new Answer<Job>() {
               @Override

@@ -61,7 +61,7 @@ public class AvroRecordReader extends RecordReader<LongWritable, GenericData.Rec
     FileStatus status = fs.getFileStatus(filePath);
     inputFileLength = status.getLen();
 
-    final FSDataInputStream stream = fs.open(filePath);
+    FSDataInputStream stream = fs.open(filePath);
     dataFileReader =
         DataFileReader.openReader(
             new SeekableInput() {

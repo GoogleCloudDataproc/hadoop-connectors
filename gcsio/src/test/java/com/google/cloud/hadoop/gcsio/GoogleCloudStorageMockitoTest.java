@@ -429,9 +429,9 @@ public class GoogleCloudStorageMockitoTest {
         .thenReturn(mockStorageObjectsGet);
 
     // Make the errorExtractor claim that our fake notFoundException.
-    final GoogleJsonError notFoundError = new GoogleJsonError();
+    GoogleJsonError notFoundError = new GoogleJsonError();
     notFoundError.setMessage("Fake not-found exception");
-    final GoogleJsonError unexpectedError = new GoogleJsonError();
+    GoogleJsonError unexpectedError = new GoogleJsonError();
     unexpectedError.setMessage("Other API exception");
 
     doAnswer(
@@ -522,9 +522,9 @@ public class GoogleCloudStorageMockitoTest {
     when(mockStorageObjects.copy(
             eq(BUCKET_NAME), eq(OBJECT_NAME), eq(BUCKET_NAME), eq(dstObjectName), isNull()))
         .thenReturn(mockStorageObjectsCopy);
-    final GoogleJsonError notFoundError = new GoogleJsonError();
+    GoogleJsonError notFoundError = new GoogleJsonError();
     notFoundError.setMessage("Fake not-found exception");
-    final GoogleJsonError unexpectedError = new GoogleJsonError();
+    GoogleJsonError unexpectedError = new GoogleJsonError();
     unexpectedError.setMessage("Other API exception");
     doAnswer(
             invocation -> {
@@ -589,7 +589,7 @@ public class GoogleCloudStorageMockitoTest {
     // Set up the return for the Bucket fetch.
     when(mockStorage.buckets()).thenReturn(mockStorageBuckets);
     when(mockStorageBuckets.get(eq(BUCKET_NAME))).thenReturn(mockStorageBucketsGet);
-    final GoogleJsonError unexpectedError = new GoogleJsonError();
+    GoogleJsonError unexpectedError = new GoogleJsonError();
     unexpectedError.setMessage("Unexpected API exception ");
     doAnswer(
             invocation -> {

@@ -353,8 +353,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   }
 
   private void setGcsFs(GoogleCloudStorageFileSystem gcsFs) {
-    this.gcsFsSupplier = Suppliers.ofInstance(gcsFs);
-    this.gcsFsInitialized = true;
+    gcsFsSupplier = Suppliers.ofInstance(gcsFs);
+    gcsFsInitialized = true;
   }
 
   /**
@@ -398,7 +398,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * against poor directory accounting in the PathData class of Hadoop 2's FsShell.
    */
   @Override
-  public Path makeQualified(final Path path) {
+  public Path makeQualified(Path path) {
     Path qualifiedPath = super.makeQualified(path);
 
     URI uri = qualifiedPath.toUri();
@@ -1203,7 +1203,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     }
 
     matchedStatuses.sort(
-        ((Comparator<FileStatus>) Comparator.<FileStatus>naturalOrder())
+        Comparator.<FileStatus>naturalOrder()
             // Place duplicate implicit directories after real directory
             .thenComparingInt((FileStatus f) -> isImplicitDirectory(f) ? 1 : 0));
 
@@ -1709,7 +1709,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     checkOpen();
 
     URI gcsPath = getGcsPath(hadoopPath);
-    final FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
+    FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
     if (!fileInfo.exists()) {
       throw new FileNotFoundException(
           String.format(

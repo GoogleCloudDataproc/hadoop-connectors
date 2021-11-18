@@ -54,9 +54,7 @@ public class GoogleHadoopFileSystem extends InstrumentatedGoogleHadoopFileSystem
    * Constructs an instance of GoogleHadoopFileSystem; the internal GoogleCloudStorageFileSystem
    * will be set up with config settings when initialize() is called.
    */
-  public GoogleHadoopFileSystem() {
-    super();
-  }
+  public GoogleHadoopFileSystem() {}
 
   /**
    * Constructs an instance of GoogleHadoopFileSystem using the provided
