@@ -769,7 +769,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           ? GoogleCloudStorageGrpcReadChannel.open(
               storageStubProvider, storage, errorExtractor, resourceId, readOptions)
           : GoogleCloudStorageGrpcReadChannel.open(
-              storageStubProvider, storage, errorExtractor, itemInfo, readOptions);
+              storageStubProvider, storage, itemInfo, readOptions);
     }
 
     return new GoogleCloudStorageReadChannel(

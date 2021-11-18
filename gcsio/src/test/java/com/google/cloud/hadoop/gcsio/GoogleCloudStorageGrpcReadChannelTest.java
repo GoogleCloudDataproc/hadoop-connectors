@@ -1571,7 +1571,6 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     return GoogleCloudStorageGrpcReadChannel.open(
         new FakeStubProvider(mockCredentials),
         storage,
-        errorExtractor,
         itemInfo,
         options,
         () -> BackOff.STOP_BACKOFF);
