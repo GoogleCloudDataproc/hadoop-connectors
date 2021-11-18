@@ -18,7 +18,6 @@ import com.google.api.client.http.HttpExecuteInterceptor;
 import com.google.api.client.http.HttpIOExceptionHandler;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
-import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpResponseInterceptor;
 import com.google.api.client.http.HttpUnsuccessfulResponseHandler;
 import com.google.common.collect.ImmutableList;
@@ -74,56 +73,42 @@ public class ChainingHttpRequestInitializer implements HttpRequestInitializer {
 
   private HttpResponseInterceptor makeResponseInterceptor(
       Iterable<HttpResponseInterceptor> responseInterceptors) {
-    return new HttpResponseInterceptor() {
-      @Override
-      public void interceptResponse(HttpResponse response) throws IOException {
-        for (HttpResponseInterceptor interceptor : responseInterceptors) {
-          interceptor.interceptResponse(response);
-        }
+    return response -> {
+      for (HttpResponseInterceptor interceptor : responseInterceptors) {
+        interceptor.interceptResponse(response);
       }
     };
   }
 
   private HttpExecuteInterceptor makeInterceptor(Iterable<HttpExecuteInterceptor> interceptors) {
-    return new HttpExecuteInterceptor() {
-      @Override
-      public void intercept(HttpRequest request) throws IOException {
-        for (HttpExecuteInterceptor interceptor : interceptors) {
-          interceptor.intercept(request);
-        }
+    return request -> {
+      for (HttpExecuteInterceptor interceptor : interceptors) {
+        interceptor.intercept(request);
       }
     };
   }
 
   private HttpUnsuccessfulResponseHandler makeUnsuccessfulResponseHandler(
       Iterable<HttpUnsuccessfulResponseHandler> unsuccessfulResponseHandlers) {
-    return new HttpUnsuccessfulResponseHandler() {
-      @Override
-      public boolean handleResponse(
-          HttpRequest request, HttpResponse response, boolean supportsRetry) throws IOException {
-        for (HttpUnsuccessfulResponseHandler handler : unsuccessfulResponseHandlers) {
-          if (handler.handleResponse(request, response, supportsRetry)) {
-            return true;
-          }
+    return (request, response, supportsRetry) -> {
+      for (HttpUnsuccessfulResponseHandler handler : unsuccessfulResponseHandlers) {
+        if (handler.handleResponse(request, response, supportsRetry)) {
+          return true;
         }
-        return false;
       }
+      return false;
     };
   }
 
   private HttpIOExceptionHandler makeIoExceptionHandler(
       Iterable<HttpIOExceptionHandler> ioExceptionHandlers) {
-    return new HttpIOExceptionHandler() {
-      @Override
-      public boolean handleIOException(HttpRequest request, boolean supportsRetry)
-          throws IOException {
-        for (HttpIOExceptionHandler handler : ioExceptionHandlers) {
-          if (handler.handleIOException(request, supportsRetry)) {
-            return true;
-          }
+    return (request, supportsRetry) -> {
+      for (HttpIOExceptionHandler handler : ioExceptionHandlers) {
+        if (handler.handleIOException(request, supportsRetry)) {
+          return true;
         }
-        return false;
       }
+      return false;
     };
   }
 }

@@ -17,7 +17,6 @@ import com.google.api.services.bigquery.model.Table;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.hadoop.conf.Configuration;
@@ -74,27 +73,27 @@ public class NoopFederatedExportToCloudStorage extends UnshardedExportToCloudSto
   }
 
   @Override
-  public void prepare() throws IOException {
+  public void prepare() {
     // No-op
   }
 
   @Override
-  public void beginExport() throws IOException {
+  public void beginExport() {
     // No-op
   }
 
   @Override
-  public void waitForUsableMapReduceInput() throws IOException, InterruptedException {
+  public void waitForUsableMapReduceInput() {
     // No-op
   }
 
   @Override
-  public List<String> getExportPaths() throws IOException {
+  public List<String> getExportPaths() {
     return gcsPaths;
   }
 
   @Override
-  public void cleanupExport() throws IOException {
+  public void cleanupExport() {
     // No-op
   }
 }

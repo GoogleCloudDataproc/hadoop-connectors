@@ -1099,9 +1099,9 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
 
     assertThrows(
         IOException.class,
-        () -> {
-          gcsFs.rename(bucketUri.resolve(dirObject + "/f1"), bucketUri.resolve(dirObject + "/f2"));
-        });
+        () ->
+            gcsFs.rename(
+                bucketUri.resolve(dirObject + "/f1"), bucketUri.resolve(dirObject + "/f2")));
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(

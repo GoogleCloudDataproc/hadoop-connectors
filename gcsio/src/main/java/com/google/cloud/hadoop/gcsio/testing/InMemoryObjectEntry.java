@@ -116,7 +116,7 @@ public class InMemoryObjectEntry {
     writeStream =
         new ByteArrayOutputStream() {
           @Override
-          public synchronized void close() throws IOException {
+          public synchronized void close() {
             synchronized (InMemoryObjectEntry.this) {
               completedContents = toByteArray();
               HashCode md5 = Hashing.md5().hashBytes(completedContents);

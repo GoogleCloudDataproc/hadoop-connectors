@@ -1656,11 +1656,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
 
     Exception exception =
-        assertThrows(
-            GoogleJsonResponseException.class,
-            () -> {
-              ghfs.initialize(gsUri, config);
-            });
+        assertThrows(GoogleJsonResponseException.class, () -> ghfs.initialize(gsUri, config));
     assertThat(exception).hasMessageThat().startsWith("401 Unauthorized");
   }
 
@@ -1681,11 +1677,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
 
     Exception exception =
-        assertThrows(
-            GoogleJsonResponseException.class,
-            () -> {
-              ghfs.initialize(gsUri, config);
-            });
+        assertThrows(GoogleJsonResponseException.class, () -> ghfs.initialize(gsUri, config));
     assertThat(exception).hasMessageThat().startsWith("401 Unauthorized");
   }
 
@@ -1711,11 +1703,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
 
     Exception exception =
-        assertThrows(
-            GoogleJsonResponseException.class,
-            () -> {
-              ghfs.initialize(gsUri, config);
-            });
+        assertThrows(GoogleJsonResponseException.class, () -> ghfs.initialize(gsUri, config));
     assertThat(exception).hasMessageThat().startsWith("401 Unauthorized");
   }
 
@@ -1743,11 +1731,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
 
     Exception exception =
-        assertThrows(
-            GoogleJsonResponseException.class,
-            () -> {
-              ghfs.initialize(gsUri, config);
-            });
+        assertThrows(GoogleJsonResponseException.class, () -> ghfs.initialize(gsUri, config));
     assertThat(exception).hasMessageThat().startsWith("401 Unauthorized");
   }
 

@@ -68,7 +68,7 @@ public class FederatedBigQueryOutputCommitter extends ForwardingBigQueryFileOutp
         .importFederatedFromGcs(
             jobProjectId,
             destTable,
-            destSchema.isPresent() ? destSchema.get().get() : null,
+            destSchema.map(BigQueryTableSchema::get).orElse(null),
             outputFileFormat,
             sourceUris);
   }

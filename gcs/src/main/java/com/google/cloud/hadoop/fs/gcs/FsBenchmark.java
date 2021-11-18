@@ -325,9 +325,9 @@ public class FsBenchmark extends Configured implements Tool {
                       long seekPos = random.nextLong(maxReadPositionExclusive);
 
                       long openStart = System.nanoTime();
-                      FSDataInputStream input = fs.open(testFile);
-                      openLatencyNs.accept(System.nanoTime() - openStart);
-                      try {
+                      long closeStart = -1;
+                      try (FSDataInputStream input = fs.open(testFile)) {
+                        openLatencyNs.accept(System.nanoTime() - openStart);
                         for (int k = 0; k < numReads; k++) {
                           long seekStart = System.nanoTime();
                           input.seek(seekPos);
@@ -343,10 +343,11 @@ public class FsBenchmark extends Configured implements Tool {
                                 numRead, readSize, seekPos);
                           }
                         }
+                        closeStart = System.nanoTime();
                       } finally {
-                        long closeStart = System.nanoTime();
-                        input.close();
-                        closeLatencyNs.accept(System.nanoTime() - closeStart);
+                        if (closeStart != -1) {
+                          closeLatencyNs.accept(System.nanoTime() - closeStart);
+                        }
                       }
                     } catch (Throwable e) {
                       logger.atSevere().withCause(e).log("Failed random read from '%s'", testFile);

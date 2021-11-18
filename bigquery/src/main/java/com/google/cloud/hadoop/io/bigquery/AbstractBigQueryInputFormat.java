@@ -159,8 +159,7 @@ public abstract class AbstractBigQueryInputFormat<K, V> extends InputFormat<K, V
     return createRecordReader(inputSplit, taskAttemptContext.getConfiguration());
   }
 
-  public RecordReader<K, V> createRecordReader(InputSplit inputSplit, Configuration configuration)
-      throws IOException, InterruptedException {
+  public RecordReader<K, V> createRecordReader(InputSplit inputSplit, Configuration configuration) {
     Preconditions.checkArgument(
         inputSplit instanceof UnshardedInputSplit,
         "Split should be instance of UnshardedInputSplit.");
@@ -276,7 +275,7 @@ public abstract class AbstractBigQueryInputFormat<K, V> extends InputFormat<K, V
   }
 
   @VisibleForTesting
-  void setDelegateInputFormat(InputFormat inputFormat) {
+  void setDelegateInputFormat(InputFormat<LongWritable, Text> inputFormat) {
     delegateInputFormat = inputFormat;
   }
 }

@@ -46,7 +46,7 @@ public class UnshardedExportToCloudStorageTest {
             new BigQueryHelper(null),
             "project-id",
             null, /* table */
-            new InputFormat<LongWritable, Text>() {
+            new InputFormat<>() {
               @Override
               public List<InputSplit> getSplits(JobContext jobContext) {
                 return ImmutableList.<InputSplit>builder()

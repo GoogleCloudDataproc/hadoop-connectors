@@ -288,7 +288,7 @@ public class HadoopFileSystemIntegrationHelper
     if (statusList != null) {
       for (FileStatus status : statusList) {
         if (!ghfs.delete(status.getPath(), true)) {
-          System.err.println(String.format("Failed to delete path: '%s'", status.getPath()));
+          System.err.printf("Failed to delete path: '%s'%n", status.getPath());
         }
       }
     }

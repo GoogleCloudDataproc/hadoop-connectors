@@ -135,13 +135,11 @@ public class ForwardingBigQueryFileOutputCommitter extends OutputCommitter {
   protected List<String> getOutputFileURIs() throws IOException {
     // Enumerate over all files in the output path.
     FileStatus[] outputFiles = outputFileSystem.listStatus(outputPath);
-    ArrayList<String> sourceUris = new ArrayList<String>(outputFiles.length);
+    ArrayList<String> sourceUris = new ArrayList<>(outputFiles.length);
 
-    for (int i = 0; i < outputFiles.length; i++) {
-      FileStatus fileStatus = outputFiles[i];
-
+    for (FileStatus fileStatus : outputFiles) {
       // Skip the success file and directories as they're not relevant to BigQuery.
-      if (!fileStatus.isDir()
+      if (!fileStatus.isDirectory()
           && !fileStatus.getPath().getName().equals(FileOutputCommitter.SUCCEEDED_FILE_NAME)) {
         sourceUris.add(fileStatus.getPath().toString());
       }

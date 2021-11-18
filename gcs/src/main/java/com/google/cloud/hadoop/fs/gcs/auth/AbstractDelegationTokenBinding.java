@@ -210,7 +210,7 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
     }
 
     @Override
-    public byte[] retrievePassword(DelegationTokenIdentifier identifier) throws InvalidToken {
+    public byte[] retrievePassword(DelegationTokenIdentifier identifier) {
       return pwd;
     }
 

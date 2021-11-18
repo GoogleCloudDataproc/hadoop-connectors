@@ -61,6 +61,7 @@ import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
+import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.junit.After;
 import org.junit.Before;
@@ -114,13 +115,13 @@ public abstract class AbstractBigQueryIoIntegrationTestBase<T> {
 
   // The InputFormat and OutputFormat handles with which we will invoke the underlying "connector"
   // library methods.
-  private final InputFormat inputFormat;
+  private final InputFormat<?, T> inputFormat;
   private final OutputFormat<Text, JsonObject> outputFormat;
 
   // TableId derived from testId, a unique one should be used for each test method.
   private String testTable;
 
-  public AbstractBigQueryIoIntegrationTestBase(InputFormat inputFormat) {
+  public AbstractBigQueryIoIntegrationTestBase(InputFormat<?, T> inputFormat) {
     this.inputFormat = inputFormat;
     this.outputFormat = new IndirectBigQueryOutputFormat<>();
   }
@@ -228,7 +229,7 @@ public abstract class AbstractBigQueryIoIntegrationTestBase<T> {
     String jobIdString = "jobid" + System.currentTimeMillis();
     JobID jobId = new JobID(jobIdString, jobNumber);
     TaskAttemptID taskAttemptId =
-        new TaskAttemptID(new TaskID(jobId, false, taskNumber), taskAttempt);
+        new TaskAttemptID(new TaskID(jobId, TaskType.REDUCE, taskNumber), taskAttempt);
     when(mockTaskAttemptContext.getTaskAttemptID()).thenReturn(taskAttemptId);
     when(mockJobContext.getJobID()).thenReturn(jobId);
 

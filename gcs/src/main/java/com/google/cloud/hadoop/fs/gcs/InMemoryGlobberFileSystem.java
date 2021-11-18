@@ -131,7 +131,7 @@ class InMemoryGlobberFileSystem extends FileSystem {
 
   /** @inheritDoc */
   @Override
-  public FSDataInputStream open(Path f, int bufferSize) throws IOException {
+  public FSDataInputStream open(Path f, int bufferSize) {
     throw new UnsupportedOperationException();
   }
 
@@ -144,33 +144,31 @@ class InMemoryGlobberFileSystem extends FileSystem {
       int bufferSize,
       short replication,
       long blockSize,
-      Progressable progress)
-      throws IOException {
+      Progressable progress) {
     throw new UnsupportedOperationException();
   }
 
   /** @inheritDoc */
   @Override
-  public FSDataOutputStream append(Path f, int bufferSize, Progressable progress)
-      throws IOException {
+  public FSDataOutputStream append(Path f, int bufferSize, Progressable progress) {
     throw new UnsupportedOperationException();
   }
 
   /** @inheritDoc */
   @Override
-  public boolean rename(Path src, Path dst) throws IOException {
+  public boolean rename(Path src, Path dst) {
     throw new UnsupportedOperationException();
   }
 
   /** @inheritDoc */
   @Override
-  public boolean delete(Path f) throws IOException {
+  public boolean delete(Path f) {
     throw new UnsupportedOperationException();
   }
 
   /** @inheritDoc */
   @Override
-  public boolean delete(Path f, boolean recursive) throws IOException {
+  public boolean delete(Path f, boolean recursive) {
     throw new UnsupportedOperationException();
   }
 
@@ -182,7 +180,7 @@ class InMemoryGlobberFileSystem extends FileSystem {
 
   /** @inheritDoc */
   @Override
-  public boolean mkdirs(Path f, FsPermission permission) throws IOException {
+  public boolean mkdirs(Path f, FsPermission permission) {
     throw new UnsupportedOperationException();
   }
 }

@@ -90,7 +90,7 @@ public class AvroRecordReader extends RecordReader<LongWritable, GenericData.Rec
                 stream.close();
               }
             },
-            new GenericDatumReader<GenericData.Record>());
+            new GenericDatumReader<>());
     // Sync to the first sync point after the start of the split:
     dataFileReader.sync(fileSplit.getStart());
     schema = dataFileReader.getSchema();

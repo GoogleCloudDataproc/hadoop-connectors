@@ -480,7 +480,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    *
    * @param config The filesystem configuration
    * @param path The filesystem path
-   * @throws IOException
    */
   private void initializeDelegationTokenSupport(Configuration config, URI path) throws IOException {
     logger.atFiner().log("initializeDelegationTokenSupport(config: %s, path: %s)", config, path);
@@ -526,7 +525,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     return result;
   }
 
-  public boolean hasPathCapability(Path path, String capability) throws IOException {
+  public boolean hasPathCapability(Path path, String capability) {
     switch (validatePathCapabilityArgs(path, capability)) {
         // TODO: remove string literals in favor of Constants in CommonPathCapabilities.java
         // from Hadoop 3 when Hadoop 2 is no longer supported
@@ -1550,10 +1549,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * Validates and possibly creates buckets needed by subclass.
    *
    * @param gcsFs {@link GoogleCloudStorageFileSystem} to configure buckets
-   * @throws IOException if bucket name is invalid or cannot be found.
    */
   @VisibleForTesting
-  protected abstract void configureBuckets(GoogleCloudStorageFileSystem gcsFs) throws IOException;
+  protected abstract void configureBuckets(GoogleCloudStorageFileSystem gcsFs);
 
   private void configureWorkingDirectory(Configuration config) {
     // Set initial working directory to root so that any configured value gets resolved

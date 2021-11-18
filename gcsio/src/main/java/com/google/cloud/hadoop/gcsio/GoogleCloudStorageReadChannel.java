@@ -49,6 +49,7 @@ import java.nio.channels.Channels;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -445,12 +446,12 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   }
 
   @Override
-  public SeekableByteChannel truncate(long size) throws IOException {
+  public SeekableByteChannel truncate(long size) {
     throw new UnsupportedOperationException("Cannot mutate read-only channel");
   }
 
   @Override
-  public int write(ByteBuffer src) throws IOException {
+  public int write(ByteBuffer src) {
     throw new UnsupportedOperationException("Cannot mutate read-only channel");
   }
 

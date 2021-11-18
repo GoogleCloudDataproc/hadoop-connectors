@@ -39,7 +39,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.FileNotFoundException;
@@ -66,6 +65,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 /**
@@ -140,7 +140,6 @@ public class GoogleCloudStorageFileSystem {
    * @param credential OAuth2 credential that allows access to GCS.
    * @param options Options for how this filesystem should operate and configure its underlying
    *     storage.
-   * @throws IOException
    */
   public GoogleCloudStorageFileSystem(
       Credential credential, GoogleCloudStorageFileSystemOptions options) throws IOException {
@@ -158,7 +157,6 @@ public class GoogleCloudStorageFileSystem {
    * @param downscopedAccessTokenFn Function that generates downscoped access token.
    * @param options Options for how this filesystem should operate and configure its underlying
    *     storage.
-   * @throws IOException
    */
   public GoogleCloudStorageFileSystem(
       Credential credential,
@@ -364,7 +362,6 @@ public class GoogleCloudStorageFileSystem {
    * @param path Path of the item to delete.
    * @param recursive If true, all sub-items are also deleted.
    * @throws FileNotFoundException if the given path does not exist.
-   * @throws IOException
    */
   public void delete(URI path, boolean recursive) throws IOException {
     checkNotNull(path, "path should not be null");
@@ -470,7 +467,6 @@ public class GoogleCloudStorageFileSystem {
    *
    * @param path Path of the item to check.
    * @return true if the given item exists, false otherwise.
-   * @throws IOException
    */
   public boolean exists(URI path) throws IOException {
     logger.atFiner().log("exists(path: %s)", path);
@@ -482,7 +478,6 @@ public class GoogleCloudStorageFileSystem {
    * Similar to 'mkdir -p' command.
    *
    * @param path Path of the directory to create.
-   * @throws IOException
    */
   public void mkdirs(URI path) throws IOException {
     logger.atFiner().log("mkdirs(path: %s)", path);
@@ -757,8 +752,9 @@ public class GoogleCloudStorageFileSystem {
   public void compose(List<URI> sources, URI destination, String contentType) throws IOException {
     StorageResourceId destResource = StorageResourceId.fromStringPath(destination.toString());
     List<String> sourceObjects =
-        Lists.transform(
-            sources, uri -> StorageResourceId.fromStringPath(uri.toString()).getObjectName());
+        sources.stream()
+            .map(uri -> StorageResourceId.fromStringPath(uri.toString()).getObjectName())
+            .collect(Collectors.toList());
     gcs.compose(
         destResource.getBucketName(), sourceObjects, destResource.getObjectName(), contentType);
   }

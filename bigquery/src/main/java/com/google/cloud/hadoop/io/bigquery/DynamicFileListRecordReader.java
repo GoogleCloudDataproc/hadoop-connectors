@@ -314,8 +314,8 @@ public class DynamicFileListRecordReader<K, V> extends RecordReader<K, V> {
    * @throws IndexOutOfBoundsException if the parsed value is greater than Integer.MAX_VALUE.
    */
   private int parseFileIndex(String fileName) {
-    Matcher match = null;
-    String indexString = null;
+    Matcher match;
+    String indexString;
     try {
       match = exportPattern.matcher(fileName);
       match.find();

@@ -65,7 +65,7 @@ public class GcsDelegationTokens extends AbstractService {
   }
 
   @Override
-  public void serviceInit(Configuration conf) throws Exception {
+  public void serviceInit(Configuration conf) {
     String tokenBindingImpl = DELEGATION_TOKEN_BINDING_CLASS.get(conf, conf::get);
 
     checkState(tokenBindingImpl != null, "Delegation Tokens are not configured");
@@ -179,10 +179,8 @@ public class GcsDelegationTokens extends AbstractService {
    * live for actual use and will not yet have interacted with GCS services.
    *
    * @param fs owning FS.
-   * @throws IOException failure.
    */
-  public void bindToFileSystem(GoogleHadoopFileSystemBase fileSystem, Text service)
-      throws IOException {
+  public void bindToFileSystem(GoogleHadoopFileSystemBase fileSystem, Text service) {
     this.service = requireNonNull(service);
     this.fileSystem = requireNonNull(fileSystem);
   }
@@ -233,7 +231,6 @@ public class GcsDelegationTokens extends AbstractService {
    * @return a delegation token.
    * @throws IOException if one cannot be created
    */
-  @SuppressWarnings("OptionalGetWithoutIsPresent")
   public Token<DelegationTokenIdentifier> getBoundOrNewDT(String renewer) throws IOException {
     logger.atFiner().log("Delegation token requested");
     if (isBoundToDT()) {

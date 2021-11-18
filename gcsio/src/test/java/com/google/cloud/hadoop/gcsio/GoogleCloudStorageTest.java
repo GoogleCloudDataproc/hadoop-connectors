@@ -3266,7 +3266,6 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorage gcs =
         mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithoutRetries);
 
-    StorageResourceId resourceId = RESOURCE_ID;
     CreateObjectOptions createOptions =
         CreateObjectOptions.DEFAULT_OVERWRITE
             .toBuilder()
@@ -3274,7 +3273,7 @@ public class GoogleCloudStorageTest {
             .build();
 
     IOException thrown =
-        assertThrows(IOException.class, () -> gcs.createEmptyObject(resourceId, createOptions));
+        assertThrows(IOException.class, () -> gcs.createEmptyObject(RESOURCE_ID, createOptions));
     assertThat(thrown).hasMessageThat().contains(ApiErrorExtractor.RATE_LIMITED_REASON);
 
     assertThat(trackingRequestInitializerWithoutRetries.getAllRequestStrings())

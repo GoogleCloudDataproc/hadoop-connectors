@@ -77,7 +77,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
   private final StorageStub stub;
 
-  private final StorageStubProvider stubProvider;
   private final StorageResourceId resourceId;
   private final CreateObjectOptions createOptions;
   private final ObjectWriteConditions writeConditions;
@@ -96,7 +95,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
       String requesterPaysProject,
       BackOffFactory backOffFactory) {
     super(threadPool, channelOptions);
-    this.stubProvider = stubProvider;
     this.stub = stubProvider.newAsyncStub();
     this.resourceId = resourceId;
     this.createOptions = createOptions;
@@ -167,7 +165,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
     private Hasher objectHasher;
     private String uploadId;
     private long writeOffset = 0;
-    private InsertChunkResponseObserver responseObserver;
     // Holds list of most recent number of NUMBER_OF_REQUESTS_TO_RETAIN requests, so upload can
     // be rewound and re-sent upon transient errors.
     private final TreeMap<Long, ByteString> dataChunkMap = new TreeMap<>();
@@ -203,7 +200,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
       if (writeOffset > 0) {
         writeOffset = getCommittedWriteSize(uploadId);
       }
-      responseObserver = new InsertChunkResponseObserver(uploadId, writeOffset);
+      InsertChunkResponseObserver responseObserver =
+          new InsertChunkResponseObserver(uploadId, writeOffset);
       // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
       StreamObserver<WriteObjectRequest> requestStreamObserver =
           stub.withDeadlineAfter(channelOptions.getGrpcWriteTimeout(), MILLISECONDS)

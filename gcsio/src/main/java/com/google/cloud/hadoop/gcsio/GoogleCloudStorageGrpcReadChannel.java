@@ -63,8 +63,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   protected static final String METADATA_FIELDS = "contentEncoding,generation,size";
 
   // ZeroCopy version of GetObjectMedia Method
-  private final ZeroCopyMessageMarshaller getObjectMediaResponseMarshaller =
-      new ZeroCopyMessageMarshaller(ReadObjectResponse.getDefaultInstance());
+  private final ZeroCopyMessageMarshaller<ReadObjectResponse> getObjectMediaResponseMarshaller =
+      new ZeroCopyMessageMarshaller<>(ReadObjectResponse.getDefaultInstance());
   private final MethodDescriptor<ReadObjectRequest, ReadObjectResponse> getObjectMediaMethod =
       StorageGrpc.getReadObjectMethod()
           .toBuilder()
@@ -193,7 +193,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
    * @param itemInfo contains metadata information about the file
    * @param readOptions readOptions fine-grained options specifying things like retry settings,
    *     buffering, etc.
-   * @param backOffFactory
    * @return gRPC read channel
    * @throws IOException IOException on IO Error
    */
@@ -241,7 +240,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
    * @param itemInfo contains metadata information about the file
    * @param readOptions readOptions fine-grained options specifying things like retry settings,
    *     buffering, etc.
-   * @param backOffFactory
    * @return gRPC read channel
    * @throws IOException IOException on IO Error
    */
@@ -803,7 +801,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   }
 
   @Override
-  public SeekableByteChannel truncate(long l) throws IOException {
+  public SeekableByteChannel truncate(long l) {
     throw new UnsupportedOperationException("Cannot mutate read-only channel");
   }
 

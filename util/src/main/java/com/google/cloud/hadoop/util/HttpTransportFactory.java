@@ -39,7 +39,6 @@ public class HttpTransportFactory {
   /**
    * Create an {@link HttpTransport} based on an type class.
    *
-   * @param type The type of HttpTransport to use.
    * @return The resulting HttpTransport.
    * @throws IllegalArgumentException If the proxy address is invalid.
    * @throws IOException If there is an issue connecting to Google's Certification server.
@@ -52,7 +51,6 @@ public class HttpTransportFactory {
   /**
    * Create an {@link HttpTransport} based on an type class and an optional HTTP proxy.
    *
-   * @param type The type of HttpTransport to use.
    * @param proxyAddress The HTTP proxy to use with the transport. Of the form hostname:port. If
    *     empty no proxy will be used.
    * @param proxyUsername The HTTP proxy username to use with the transport. If empty no proxy

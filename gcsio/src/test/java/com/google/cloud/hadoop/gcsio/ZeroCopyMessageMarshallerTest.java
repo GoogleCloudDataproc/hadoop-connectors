@@ -75,21 +75,13 @@ public class ZeroCopyMessageMarshallerTest {
   public void testParseBrokenMessageOnFastPath() {
     InputStream stream = createInputStream(dropLastOneByte(REQUEST.toByteArray()), true);
     ZeroCopyMessageMarshaller<ReadObjectRequest> marshaller = createMarshaller();
-    assertThrows(
-        StatusRuntimeException.class,
-        () -> {
-          marshaller.parse(stream);
-        });
+    assertThrows(StatusRuntimeException.class, () -> marshaller.parse(stream));
   }
 
   @Test
   public void testParseBrokenMessageOnSlowPath() {
     InputStream stream = createInputStream(dropLastOneByte(REQUEST.toByteArray()), false);
     ZeroCopyMessageMarshaller<ReadObjectRequest> marshaller = createMarshaller();
-    assertThrows(
-        StatusRuntimeException.class,
-        () -> {
-          marshaller.parse(stream);
-        });
+    assertThrows(StatusRuntimeException.class, () -> marshaller.parse(stream));
   }
 }

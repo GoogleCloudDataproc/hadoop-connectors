@@ -176,7 +176,7 @@ public final class LazyExecutorService implements ExecutorService {
       if (isShutdown()) {
         throw new RejectedExecutionException("ExecutorService is shutdown");
       }
-      ExecutingFuture<T> future = new ExecutingFutureImpl<T>(task);
+      ExecutingFuture<T> future = new ExecutingFutureImpl<>(task);
       pendingTasks.add(future);
       return future;
     } finally {
@@ -361,7 +361,7 @@ public final class LazyExecutorService implements ExecutorService {
     private final AtomicReference<ExecutingFuture<T>> state;
 
     ExecutingFutureImpl(Callable<T> task) {
-      state = new AtomicReference<ExecutingFuture<T>>(new Created(task));
+      state = new AtomicReference<>(new Created(task));
     }
 
     @Override
@@ -437,14 +437,11 @@ public final class LazyExecutorService implements ExecutorService {
           try {
             Future<T> backingFuture =
                 backingService.submit(
-                    new Callable<T>() {
-                      @Override
-                      public T call() throws Exception {
-                        try {
-                          return task.call();
-                        } finally {
-                          removePendingTask(ExecutingFutureImpl.this);
-                        }
+                    () -> {
+                      try {
+                        return task.call();
+                      } finally {
+                        removePendingTask(ExecutingFutureImpl.this);
                       }
                     });
             state.set(new Delegated(backingFuture));

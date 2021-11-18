@@ -74,8 +74,8 @@ public class IndirectBigQueryOutputCommitter extends ForwardingBigQueryFileOutpu
           .importFromGcs(
               jobProjectId,
               destTable,
-              destSchema.isPresent() ? destSchema.get().get() : null,
-              timePartitioning.isPresent() ? timePartitioning.get().get() : null,
+              destSchema.map(BigQueryTableSchema::get).orElse(null),
+              timePartitioning.map(BigQueryTimePartitioning::get).orElse(null),
               kmsKeyName,
               outputFileFormat,
               createDisposition,

@@ -106,7 +106,7 @@ public class NoopFederatedExportToCloudStorageTest {
             helper,
             projectId,
             table,
-            new InputFormat<LongWritable, Text>() {
+            new InputFormat<>() {
               @Override
               public List<InputSplit> getSplits(JobContext jobContext)
                   throws IOException, InterruptedException {

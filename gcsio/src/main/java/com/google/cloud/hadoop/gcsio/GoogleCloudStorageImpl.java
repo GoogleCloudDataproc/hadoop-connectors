@@ -67,7 +67,6 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.BaseEncoding;
@@ -97,6 +96,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 /**
@@ -200,11 +200,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       CacheBuilder.newBuilder()
           .expireAfterWrite(Duration.ofHours(1))
           .build(
-              new CacheLoader<String, Boolean>() {
+              new CacheLoader<>() {
                 final List<String> iamPermissions = ImmutableList.of("storage.buckets.get");
 
                 @Override
-                public Boolean load(String bucketName) throws Exception {
+                public Boolean load(String bucketName) {
                   try {
                     storage
                         .buckets()
@@ -912,7 +912,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       BatchHelper batchHelper,
       int attempt,
       long generation) {
-    return new JsonBatchCallback<Void>() {
+    return new JsonBatchCallback<>() {
       @Override
       public void onSuccess(Void obj, HttpHeaders responseHeaders) {
         logger.atFiner().log("Successfully deleted %s at generation %s", resourceId, generation);
@@ -975,7 +975,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               .setFields("generation");
       batchHelper.queue(
           getObject,
-          new JsonBatchCallback<StorageObject>() {
+          new JsonBatchCallback<>() {
             @Override
             public void onSuccess(StorageObject storageObject, HttpHeaders httpHeaders)
                 throws IOException {
@@ -1214,7 +1214,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // TODO(b/79750454) do not batch rewrite requests because they time out in batches.
     batchHelper.queue(
         rewriteObject,
-        new JsonBatchCallback<RewriteResponse>() {
+        new JsonBatchCallback<>() {
           @Override
           public void onSuccess(RewriteResponse rewriteResponse, HttpHeaders responseHeaders) {
             String srcString = StringPaths.fromComponents(srcBucketName, srcObjectName);
@@ -1280,7 +1280,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     batchHelper.queue(
         copyObject,
-        new JsonBatchCallback<StorageObject>() {
+        new JsonBatchCallback<>() {
           @Override
           public void onSuccess(StorageObject copyResponse, HttpHeaders responseHeaders) {
             String srcString = StringPaths.fromComponents(srcBucketName, srcObjectName);
@@ -1851,7 +1851,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         batchHelper.queue(
             initializeRequest(
                 storage.buckets().get(resourceId.getBucketName()), resourceId.getBucketName()),
-            new JsonBatchCallback<Bucket>() {
+            new JsonBatchCallback<>() {
               @Override
               public void onSuccess(Bucket bucket, HttpHeaders responseHeaders) {
                 logger.atFiner().log(
@@ -1885,7 +1885,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                 // Request only fields used in GoogleCloudStorageItemInfo:
                 // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
                 .setFields(OBJECT_FIELDS),
-            new JsonBatchCallback<StorageObject>() {
+            new JsonBatchCallback<>() {
               @Override
               public void onSuccess(StorageObject obj, HttpHeaders responseHeaders) {
                 logger.atFiner().log(
@@ -1983,7 +1983,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
       batchHelper.queue(
           patch,
-          new JsonBatchCallback<StorageObject>() {
+          new JsonBatchCallback<>() {
             @Override
             public void onSuccess(StorageObject obj, HttpHeaders responseHeaders) {
               logger.atFiner().log(
@@ -2247,7 +2247,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       throws IOException {
     logger.atFiner().log("compose(%s, %s, %s, %s)", bucketName, sources, destination, contentType);
     List<StorageResourceId> sourceIds =
-        Lists.transform(sources, objectName -> new StorageResourceId(bucketName, objectName));
+        sources.stream()
+            .map(objectName -> new StorageResourceId(bucketName, objectName))
+            .collect(Collectors.toList());
     StorageResourceId destinationId = new StorageResourceId(bucketName, destination);
     CreateObjectOptions options =
         CreateObjectOptions.DEFAULT_OVERWRITE
@@ -2272,9 +2274,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       }
     }
     List<ComposeRequest.SourceObjects> sourceObjects =
-        Lists.transform(
-            // TODO(user): Maybe set generationIds for source objects as well here.
-            sources, input -> new ComposeRequest.SourceObjects().setName(input.getObjectName()));
+        sources.stream()
+            .map(input -> new ComposeRequest.SourceObjects().setName(input.getObjectName()))
+            .collect(Collectors.toList());
     Storage.Objects.Compose compose =
         initializeRequest(
             storage
@@ -2313,11 +2315,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param request the storage request to be initialized before send out
    * @param bucketName the bucket name the storage request accesses
    * @return the initialized storage request.
-   * @throws IOException
    */
   @VisibleForTesting
   <RequestT extends StorageRequest<?>> RequestT initializeRequest(
-      RequestT request, String bucketName) throws IOException {
+      RequestT request, String bucketName) {
     if (downscopedAccessTokenFn != null) {
       List<AccessBoundary> accessBoundaries =
           StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);

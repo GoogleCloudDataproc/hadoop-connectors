@@ -71,7 +71,6 @@ public class BigQueryHelper {
    * @param schema the schema of the source data to populate the destination table by.
    * @param sourceFormat the file format of the source data.
    * @param gcsPaths the location of the source data in GCS.
-   * @throws IOException
    */
   public void importFederatedFromGcs(
       String projectId,
@@ -125,7 +124,6 @@ public class BigQueryHelper {
    * @param gcsPaths the location of the source data in GCS.
    * @param awaitCompletion if true, block and poll until job completes, otherwise return as soon as
    *     the job has been successfully dispatched.
-   * @throws IOException
    * @throws InterruptedException if interrupted while waiting for job completion.
    */
   public void importFromGcs(
@@ -282,7 +280,6 @@ public class BigQueryHelper {
    *
    * @param tableRef The BigQuery table reference.
    * @return The table resource, which describes the structure of this table.
-   * @throws IOException
    */
   public Table getTable(TableReference tableRef) throws IOException {
     try {

@@ -71,7 +71,6 @@ public class BigQueryOutputConfiguration {
    * @param outputGcsPath the path in GCS to stage data in. Example: 'gs://bucket/job'.
    * @param outputFileFormat the formatting of the data being written by the output format class.
    * @param outputFormatClass the file output format that will write files to GCS.
-   * @throws IOException
    */
   @SuppressWarnings("rawtypes")
   public static void configure(
@@ -111,7 +110,6 @@ public class BigQueryOutputConfiguration {
    * @param outputGcsPath the path in GCS to stage data in. Example: 'gs://bucket/job'.
    * @param outputFileFormat the formatting of the data being written by the output format class.
    * @param outputFormatClass the file output format that will write files to GCS.
-   * @throws IOException
    */
   @SuppressWarnings("rawtypes")
   private static void configure(
@@ -170,7 +168,6 @@ public class BigQueryOutputConfiguration {
    * @param outputGcsPath the path in GCS to stage data in. Example: 'gs://bucket/job'.
    * @param outputFileFormat the formatting of the data being written by the output format class.
    * @param outputFormatClass the file output format that will write files to GCS.
-   * @throws IOException
    */
   @SuppressWarnings("rawtypes")
   public static void configure(
@@ -202,7 +199,6 @@ public class BigQueryOutputConfiguration {
    * @param outputGcsPath the path in GCS to stage data in. Example: 'gs://bucket/job'.
    * @param outputFileFormat the formatting of the data being written by the output format class.
    * @param outputFormatClass the file output format that will write files to GCS.
-   * @throws IOException
    */
   @SuppressWarnings("rawtypes")
   public static void configureWithAutoSchema(
@@ -387,7 +383,7 @@ public class BigQueryOutputConfiguration {
    * @return the KMS key name of the output table, null if no KMS key name exists in the
    *     configuration.
    */
-  public static String getKmsKeyName(Configuration conf) throws IOException {
+  public static String getKmsKeyName(Configuration conf) {
     return OUTPUT_TABLE_KMS_KEY_NAME.get(conf, conf::get);
   }
 
@@ -491,7 +487,6 @@ public class BigQueryOutputConfiguration {
    *
    * @param conf the configuration to pass to FileOutputFormat.
    * @param outputPath the path to set as the output path.
-   * @throws IOException
    */
   @VisibleForTesting
   static void setFileOutputFormatOutputPath(Configuration conf, String outputPath)

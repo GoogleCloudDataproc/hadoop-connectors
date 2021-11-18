@@ -158,7 +158,7 @@ public class ResilientOperationTest {
     verifySleeper(sleeper, 3);
   }
 
-  private class CallableTester implements Callable<Integer> {
+  private static class CallableTester implements Callable<Integer> {
     int called = 0;
     ArrayList<Exception> exceptions = null;
 
@@ -179,7 +179,7 @@ public class ResilientOperationTest {
     }
   }
 
-  private class BackOffTester implements BackOff {
+  private static class BackOffTester implements BackOff {
     int counter = 1;
 
     @Override

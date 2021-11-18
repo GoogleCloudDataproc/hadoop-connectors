@@ -39,7 +39,6 @@ import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.Te
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.common.base.Equivalence;
-import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -68,6 +67,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -90,7 +90,7 @@ public class GoogleCloudStorageTest {
   private static final LoadingCache<GoogleCloudStorage, String> SHARED_BUCKETS =
       CacheBuilder.newBuilder()
           .build(
-              new CacheLoader<GoogleCloudStorage, String>() {
+              new CacheLoader<>() {
                 @Override
                 public String load(GoogleCloudStorage gcs) throws Exception {
                   return createUniqueBucket(gcs, "shared");
@@ -114,7 +114,7 @@ public class GoogleCloudStorageTest {
 
   /** An Equivalence for byte arrays. */
   public static final Equivalence<byte[]> BYTE_ARRAY_EQUIVALENCE =
-      new Equivalence<byte[]>() {
+      new Equivalence<>() {
         @Override
         protected boolean doEquivalent(byte[] bytes, byte[] bytes2) {
           return Arrays.equals(bytes, bytes2);
@@ -1080,12 +1080,14 @@ public class GoogleCloudStorageTest {
     }
 
     List<String> sourceObjects =
-        Lists.transform(
-            objectsToCopy, copyObjectData -> copyObjectData.sourceResourceId.getObjectName());
+        objectsToCopy.stream()
+            .map(copyObjectData -> copyObjectData.sourceResourceId.getObjectName())
+            .collect(toList());
 
     List<String> destinationObjects =
-        Lists.transform(
-            objectsToCopy, copyObjectData -> copyObjectData.destinationResourceId.getObjectName());
+        objectsToCopy.stream()
+            .map(copyObjectData -> copyObjectData.destinationResourceId.getObjectName())
+            .collect(toList());
 
     rawStorage.copy(bucketName, sourceObjects, bucketName, destinationObjects);
 

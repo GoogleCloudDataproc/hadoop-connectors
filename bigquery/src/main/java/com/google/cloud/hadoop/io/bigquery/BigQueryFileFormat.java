@@ -34,14 +34,13 @@ public enum BigQueryFileFormat {
   AVRO(".avro", "AVRO");
 
   /** Map used for simple deserialization of strings into BigQueryFileFormats. */
-  private static final Map<String, BigQueryFileFormat> NAMES_MAP =
-      new HashMap<String, BigQueryFileFormat>();
+  private static final Map<String, BigQueryFileFormat> NAMES_MAP = new HashMap<>();
 
   /** A formatted string of the accepted file formats. */
   private static final String ACCEPTED_FORMATS;
 
   static {
-    List<String> formats = new ArrayList<String>();
+    List<String> formats = new ArrayList<>();
     for (BigQueryFileFormat format : BigQueryFileFormat.values()) {
       NAMES_MAP.put(format.name(), format);
       formats.add(format.name());

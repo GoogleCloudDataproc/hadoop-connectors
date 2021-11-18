@@ -140,7 +140,6 @@ public class IndirectBigQueryOutputCommitterTest {
   @Mock private TaskAttemptContext mockTaskAttemptContext;
   @Mock private OutputCommitter mockCommitter;
 
-  /** Verify exceptions are being thrown. */
   /** Sets up common objects for testing before each test. */
   @Before
   public void setUp() throws IOException {

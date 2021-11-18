@@ -80,7 +80,7 @@ public class CredentialFactory {
     }
 
     @Override
-    public void initialize(HttpRequest httpRequest) throws IOException {
+    public void initialize(HttpRequest httpRequest) {
       if (credential != null) {
         httpRequest.setInterceptor(credential);
       }
@@ -209,8 +209,7 @@ public class CredentialFactory {
    * Returns shared staticHttpTransport instance; initializes staticHttpTransport if it hasn't
    * already been initialized.
    */
-  private static synchronized HttpTransport getStaticHttpTransport()
-      throws IOException, GeneralSecurityException {
+  private static synchronized HttpTransport getStaticHttpTransport() throws IOException {
     if (staticHttpTransport == null) {
       staticHttpTransport = HttpTransportFactory.createHttpTransport();
     }
@@ -235,8 +234,7 @@ public class CredentialFactory {
    * See: <a href="https://developers.google.com/compute/docs/authentication">Authenticating from
    * Google Compute Engine</a>.
    */
-  public static Credential getCredentialFromMetadataServiceAccount()
-      throws IOException, GeneralSecurityException {
+  public static Credential getCredentialFromMetadataServiceAccount() throws IOException {
     logger.atFine().log("Getting service account credentials from metadata service.");
     Credential cred =
         new ComputeCredentialWithRetry(

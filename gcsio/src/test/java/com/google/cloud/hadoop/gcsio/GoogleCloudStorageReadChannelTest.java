@@ -441,7 +441,7 @@ public class GoogleCloudStorageReadChannelTest {
     GoogleCloudStorageReadOptions options =
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
     GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options, generation);
-    assertThrows(FileNotFoundException.class, () -> readChannel.size());
+    assertThrows(FileNotFoundException.class, readChannel::size);
   }
 
   @Test

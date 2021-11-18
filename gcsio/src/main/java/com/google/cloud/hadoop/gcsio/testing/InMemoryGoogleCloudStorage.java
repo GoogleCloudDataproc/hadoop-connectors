@@ -32,7 +32,6 @@ import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
 import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -41,6 +40,7 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 /**
  * InMemoryGoogleCloudStorage overrides the public methods of GoogleCloudStorage by implementing all
@@ -242,7 +242,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
         }
 
         @Override
-        public int write(ByteBuffer src) throws IOException {
+        public int write(ByteBuffer src) {
           throw new UnsupportedOperationException("Cannot mutate read-only channel");
         }
 
@@ -353,12 +353,12 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public synchronized List<String> listBucketNames() throws IOException {
+  public synchronized List<String> listBucketNames() {
     return new ArrayList<>(bucketLookup.keySet());
   }
 
   @Override
-  public synchronized List<GoogleCloudStorageItemInfo> listBucketInfo() throws IOException {
+  public synchronized List<GoogleCloudStorageItemInfo> listBucketInfo() {
     List<GoogleCloudStorageItemInfo> bucketInfos = new ArrayList<>();
     for (InMemoryBucketEntry entry : bucketLookup.values()) {
       bucketInfos.add(entry.getInfo());
@@ -500,7 +500,9 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
       String bucketName, List<String> sources, String destination, String contentType)
       throws IOException {
     List<StorageResourceId> sourceResourcesIds =
-        Lists.transform(sources, s -> new StorageResourceId(bucketName, s));
+        sources.stream()
+            .map(s -> new StorageResourceId(bucketName, s))
+            .collect(Collectors.toList());
     StorageResourceId destinationId = new StorageResourceId(bucketName, destination);
     CreateObjectOptions options =
         CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder().setContentType(contentType).build();

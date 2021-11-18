@@ -94,7 +94,6 @@ public class FederatedBigQueryOutputFormatTest {
   @Mock private OutputCommitter mockOutputCommitter;
   @Mock private RecordWriter<Text, Text> mockRecordWriter;
 
-  /** Verify exceptions are being thrown. */
   /** Sets up common objects for testing before each test. */
   @Before
   public void setUp() throws Exception {
@@ -124,7 +123,7 @@ public class FederatedBigQueryOutputFormatTest {
         .thenReturn(mockRecordWriter);
 
     // Create and setup the output format.
-    outputFormat = new FederatedBigQueryOutputFormat<Text, Text>();
+    outputFormat = new FederatedBigQueryOutputFormat<>();
     outputFormat.setDelegate(mockFileOutputFormat);
   }
 
