@@ -17,7 +17,7 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 /**
- * Statistics updated by a {@link GoogleHadoopFSInputStream} during its use. It also contains
+ * Statistics updated by a {@link GoogleHadoopFSInputStreamBase} during its use. It also contains
  * getters for tests.
  */
 interface GhfsInputStreamStatistics extends AutoCloseable, GhfsStatisticInterface {

@@ -23,11 +23,8 @@ import java.net.URI;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 
-/**
- * A class to update the input stream statistics of {@link
- * com.google.cloud.hadoop.fs.gcs.GoogleHadoopFSInputStream}
- */
-public class ForwardingGoogleHadoopFSInputStream extends GoogleHadoopFSInputStream {
+/** A class to update the input stream statistics of {@link GoogleHadoopFSInputStreamBase} */
+public class GoogleHadoopFSInputStreamInstrumentation extends GoogleHadoopFSInputStreamBase {
 
   // Statistic tracker of the Input stream
   private final GhfsInputStreamStatistics streamStatistics;
@@ -35,7 +32,7 @@ public class ForwardingGoogleHadoopFSInputStream extends GoogleHadoopFSInputStre
   // IO Statistics of the current input stream
   private final IOStatistics ioStatistics;
 
-  ForwardingGoogleHadoopFSInputStream(
+  GoogleHadoopFSInputStreamInstrumentation(
       GoogleHadoopFileSystemBase ghfs,
       URI gcsPath,
       GoogleCloudStorageReadOptions readOptions,
@@ -46,7 +43,7 @@ public class ForwardingGoogleHadoopFSInputStream extends GoogleHadoopFSInputStre
     this.ioStatistics = streamStatistics.getIOStatistics();
   }
 
-  ForwardingGoogleHadoopFSInputStream(
+  GoogleHadoopFSInputStreamInstrumentation(
       GoogleHadoopFileSystemBase ghfs, FileInfo fileInfo, FileSystem.Statistics statistics)
       throws IOException {
     super(ghfs, fileInfo, statistics);
@@ -56,37 +53,28 @@ public class ForwardingGoogleHadoopFSInputStream extends GoogleHadoopFSInputStre
 
   @Override
   public synchronized int read() throws IOException {
-    // update the statistics of read operation
     streamStatistics.readOperationStarted(getPos(), 1);
     int response = 0;
     try {
       response = super.read();
     } catch (IOException e) {
-      // update the statistics of read Exception
       streamStatistics.readException();
-      // update the statistics of read operation completion
       streamStatistics.readOperationCompleted(1, response);
     }
-    // update the statistics of number of bytes read
     streamStatistics.bytesRead(1);
-    // update the statistics of read operation completion
     streamStatistics.readOperationCompleted(1, response);
     return response;
   }
 
   @Override
   public synchronized int read(byte[] buf, int offset, int length) throws IOException {
-    // update the statistics of read operation
     streamStatistics.readOperationStarted(getPos(), length);
     int response = super.read(buf, offset, length);
     if (response > 0) {
-      // update the statistics of number of bytes read
       streamStatistics.bytesRead(response);
     } else {
-      // update the statistics of read Exception
       streamStatistics.readException();
     }
-    // update the statistics of read operation completion
     streamStatistics.readOperationCompleted(length, response);
     return response;
   }
@@ -94,17 +82,13 @@ public class ForwardingGoogleHadoopFSInputStream extends GoogleHadoopFSInputStre
   @Override
   public synchronized int read(long position, byte[] buf, int offset, int length)
       throws IOException {
-    // update the statistics of read operation
     streamStatistics.readOperationStarted(position, length);
     int response = super.read(position, buf, offset, length);
     if (response > 0) {
-      // update the statistics of number of bytes read
       streamStatistics.bytesRead(response);
     } else {
-      // update the statistics of read Exception
       streamStatistics.readException();
     }
-    // update the statistics of read operation completion
     streamStatistics.readOperationCompleted(length, response);
     return response;
   }
@@ -116,10 +100,8 @@ public class ForwardingGoogleHadoopFSInputStream extends GoogleHadoopFSInputStre
     try {
       super.seek(pos);
       if (diff > 0) {
-        // update the statistics related to seek forward operations
         streamStatistics.seekForwards(diff);
       } else {
-        // update the statistics related to seek backward operations
         streamStatistics.seekBackwards(diff);
       }
     } catch (IOException e) {
@@ -129,7 +111,6 @@ public class ForwardingGoogleHadoopFSInputStream extends GoogleHadoopFSInputStre
 
   @Override
   public synchronized void close() throws IOException {
-    // Merge the current stream statistics with the instrumentation
     streamStatistics.close();
     super.close();
   }
