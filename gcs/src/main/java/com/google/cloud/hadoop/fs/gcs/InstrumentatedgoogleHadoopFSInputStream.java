@@ -22,9 +22,11 @@ import java.io.IOException;
 import java.net.URI;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.statistics.IOStatistics;
+import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 
 /** A class to update the input stream statistics of {@link GoogleHadoopFSInputStreamBase} */
-public class InstrumentatedgoogleHadoopFSInputStream extends GoogleHadoopFSInputStreamBase {
+public class InstrumentatedgoogleHadoopFSInputStream extends GoogleHadoopFSInputStreamBase
+    implements IOStatisticsSource {
 
   // Statistic tracker of the Input stream
   private final GhfsInputStreamStatistics streamStatistics;
@@ -102,7 +104,7 @@ public class InstrumentatedgoogleHadoopFSInputStream extends GoogleHadoopFSInput
     } else {
       streamStatistics.seekBackwards(diff);
     }
-      super.seek(pos);
+    super.seek(pos);
   }
 
   @Override

@@ -28,10 +28,9 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 
 /** A seekable and positionable FSInputStream that provides read access to a file. */
-class GoogleHadoopFSInputStreamBase extends FSInputStream implements IOStatisticsSource {
+class GoogleHadoopFSInputStreamBase extends FSInputStream {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
