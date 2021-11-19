@@ -24,7 +24,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 
 /** A class to update the input stream statistics of {@link GoogleHadoopFSInputStreamBase} */
-public class GoogleHadoopFSInputStreamInstrumentation extends GoogleHadoopFSInputStreamBase {
+public class InstrumentatedgoogleHadoopFSInputStream extends GoogleHadoopFSInputStreamBase {
 
   // Statistic tracker of the Input stream
   private final GhfsInputStreamStatistics streamStatistics;
@@ -32,7 +32,7 @@ public class GoogleHadoopFSInputStreamInstrumentation extends GoogleHadoopFSInpu
   // IO Statistics of the current input stream
   private final IOStatistics ioStatistics;
 
-  GoogleHadoopFSInputStreamInstrumentation(
+  InstrumentatedgoogleHadoopFSInputStream(
       GoogleHadoopFileSystemBase ghfs,
       URI gcsPath,
       GoogleCloudStorageReadOptions readOptions,
@@ -43,7 +43,7 @@ public class GoogleHadoopFSInputStreamInstrumentation extends GoogleHadoopFSInpu
     this.ioStatistics = streamStatistics.getIOStatistics();
   }
 
-  GoogleHadoopFSInputStreamInstrumentation(
+  InstrumentatedgoogleHadoopFSInputStream(
       GoogleHadoopFileSystemBase ghfs, FileInfo fileInfo, FileSystem.Statistics statistics)
       throws IOException {
     super(ghfs, fileInfo, statistics);
@@ -97,16 +97,12 @@ public class GoogleHadoopFSInputStreamInstrumentation extends GoogleHadoopFSInpu
   public synchronized void seek(long pos) throws IOException {
     long curPos = getPos();
     long diff = pos - curPos;
-    try {
-      super.seek(pos);
-      if (diff > 0) {
-        streamStatistics.seekForwards(diff);
-      } else {
-        streamStatistics.seekBackwards(diff);
-      }
-    } catch (IOException e) {
-      throw e;
+    if (diff > 0) {
+      streamStatistics.seekForwards(diff);
+    } else {
+      streamStatistics.seekBackwards(diff);
     }
+      super.seek(pos);
   }
 
   @Override
