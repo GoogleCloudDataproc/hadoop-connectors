@@ -211,6 +211,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
       logger.atFiner().log("close(): Ignoring; stream already closed.");
       return;
     }
+    getStatistics().close();
     commitCurrentFile();
 
     // null denotes stream closed.

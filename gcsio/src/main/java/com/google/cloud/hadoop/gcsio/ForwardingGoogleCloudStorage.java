@@ -20,6 +20,7 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 /** A class that wraps a {@link GoogleCloudStorage} object, delegating all calls to it. */
 public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
@@ -123,8 +124,8 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
    * @return
    */
   @Override
-  public long getObjectStatistics(GoogleCloudStorageStatistics key) {
-    return 0;
+  public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key) {
+    return delegate.getObjectStatistics(key);
   }
 
   @Override
