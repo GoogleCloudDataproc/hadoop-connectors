@@ -635,7 +635,6 @@ public class GhfsInstrumentation
       // stream is being closed.
       // merge in all the IOStatistics
       GhfsInstrumentation.this.getIOStatistics().aggregate(ioStatistics);
-
     }
 
     /**
