@@ -95,6 +95,7 @@ class GoogleHadoopOutputStreamBase extends OutputStream {
   public void write(int b) throws IOException {
     throwIfNotOpen();
     out.write(b);
+    statistics.incrementBytesWritten(1);
     statistics.incrementWriteOps(1);
   }
 
@@ -105,6 +106,7 @@ class GoogleHadoopOutputStreamBase extends OutputStream {
   public void write(byte[] b, int offset, int len) throws IOException {
     throwIfNotOpen();
     out.write(b, offset, len);
+    statistics.incrementBytesWritten(len);
     statistics.incrementWriteOps(1);
   }
 

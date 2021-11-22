@@ -113,7 +113,10 @@ class GoogleHadoopFSInputStreamBase extends FSInputStream {
               numRead, gcsPath, channel.position()));
     }
     byte b = singleReadBuf[0];
+
     totalBytesRead++;
+    statistics.incrementBytesRead(1);
+    statistics.incrementReadOps(1);
     return (b & 0xff);
   }
 
@@ -139,6 +142,8 @@ class GoogleHadoopFSInputStreamBase extends FSInputStream {
     if (numRead > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
       totalBytesRead += numRead;
+      statistics.incrementBytesRead(numRead);
+      statistics.incrementReadOps(1);
     }
 
     return numRead;
@@ -163,6 +168,7 @@ class GoogleHadoopFSInputStreamBase extends FSInputStream {
 
     if (result > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
+      statistics.incrementBytesRead(result);
       totalBytesRead += result;
     }
     return result;

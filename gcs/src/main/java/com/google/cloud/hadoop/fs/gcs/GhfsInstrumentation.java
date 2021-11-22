@@ -636,14 +636,6 @@ public class GhfsInstrumentation
       // merge in all the IOStatistics
       GhfsInstrumentation.this.getIOStatistics().aggregate(ioStatistics);
 
-      // increment the filesystem statistics for this thread.
-      if (filesystemStatistics != null) {
-        long t = getTotalBytesRead();
-        int readOperations = (int) getReadOperations();
-        filesystemStatistics.incrementBytesRead(t);
-        filesystemStatistics.incrementBytesReadByDistance(DISTANCE, t);
-        filesystemStatistics.incrementReadOps(readOperations);
-      }
     }
 
     /**
@@ -830,9 +822,6 @@ public class GhfsInstrumentation
       // provided the stream is closed in the worker thread, this will
       // ensure that the thread-specific worker stats are updated.
       mergeOutputStreamStatistics(this);
-      if (filesystemStatistics != null) {
-        filesystemStatistics.incrementBytesWritten(getBytesWritten());
-      }
     }
 
     /**
