@@ -29,7 +29,6 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.WritableByteChannel;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 
 /** A buffered output stream that allows writing to a GCS object. */
 class GoogleHadoopOutputStreamBase extends OutputStream {
