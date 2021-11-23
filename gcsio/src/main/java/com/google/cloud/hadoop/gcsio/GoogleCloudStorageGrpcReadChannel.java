@@ -705,9 +705,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
    * Waits until more data is available from the server, or returns false if read is done.
    *
    * @return true if more data is available with .next()
-   * @throws IOException of the appropriate type if there was an I/O error.
    */
-  private boolean moreServerContent() throws IOException {
+  private boolean moreServerContent() {
     if (resIterator == null || requestContext == null || requestContext.isCancelled()) {
       return false;
     }
@@ -719,7 +718,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       return moreDataAvailable;
     } catch (StatusRuntimeException e) {
       cancelCurrentRequest();
-      throw convertError(e, resourceId);
+      throw e;
     }
   }
 
