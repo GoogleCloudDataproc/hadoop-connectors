@@ -80,6 +80,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.grpc.enable", false);
           put("fs.gs.grpc.read.metadata.timeout.ms", 60 * 1000L);
           put("fs.gs.grpc.read.timeout.ms", 30 * 1000L);
+          put("fs.gs.grpc.read.speed.bytespersec", 50 * 1024 * 1024L);
           put("fs.gs.grpc.read.zerocopy.enable", true);
           put("fs.gs.grpc.directpath.enable", true);
           put("fs.gs.grpc.server.address", null);
