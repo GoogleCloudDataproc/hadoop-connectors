@@ -122,9 +122,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   // Offset in the object for the end of the range-requests
   private long contentChannelEndOffset = -1;
 
-  // Read throughput on a single call used to estimate the timeouts
-  private static final long ESTIMATED_OBJECT_READ_SPEED_PER_SEC = 50 * 1024 * 1024; // 50 MBps
-
   public static GoogleCloudStorageGrpcReadChannel open(
       StorageStubProvider stubProvider,
       Storage storage,
@@ -378,10 +375,9 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   }
 
   // Estimates a read time out based on read speeds
-  private static long getReadTimeoutMillis(
-      GoogleCloudStorageReadOptions readOptions, long objectSize) {
+  static long getReadTimeoutMillis(GoogleCloudStorageReadOptions readOptions, long objectSize) {
     return readOptions.getGrpcReadTimeoutMillis()
-        + ((objectSize / ESTIMATED_OBJECT_READ_SPEED_PER_SEC) * 1000);
+        + ((objectSize / readOptions.getGrpcReadSpeedBytesPerSec()) * 1000);
   }
 
   private GoogleCloudStorageGrpcReadChannel(

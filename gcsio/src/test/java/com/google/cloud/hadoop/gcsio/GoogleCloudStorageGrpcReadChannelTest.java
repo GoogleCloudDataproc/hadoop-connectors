@@ -1527,6 +1527,20 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     assertFalse(readChannel.isOpen());
   }
 
+  @Test
+  public void readTimeOutBasedOnObjectSize() {
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder()
+            .setGrpcReadTimeoutMillis(60 * 1000) // 60 sec
+            .setGrpcReadSpeedBytesPerSec(100 * 1024 * 1024) // 100 MBps
+            .build();
+    long objectSize = 500 * 1024 * 1024; // 500MB
+    long readTimeoutMillis =
+        GoogleCloudStorageGrpcReadChannel.getReadTimeoutMillis(readOptions, objectSize);
+    // 60 sec + 5 sec
+    assertEquals(65000, readTimeoutMillis);
+  }
+
   private GoogleCloudStorageGrpcReadChannel newReadChannel() throws IOException {
     return newReadChannel(GoogleCloudStorageReadOptions.DEFAULT);
   }
