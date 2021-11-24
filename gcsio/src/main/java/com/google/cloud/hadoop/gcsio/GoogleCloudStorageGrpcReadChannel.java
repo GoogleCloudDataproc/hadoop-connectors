@@ -519,6 +519,14 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     }
   }
 
+  /**
+   * Reads data from GCS over network, with retries
+   *
+   * @param byteBuffer Buffer to be filled with data from GCS
+   * @return number of bytes read into the buffer
+   * @throws IOException In case of data errors or network errors
+   * @throws InterruptedException In case of thread interrupt while retrying
+   */
   private int readFromGCS(ByteBuffer byteBuffer) throws IOException, InterruptedException {
     int read = 0;
     StatusRuntimeException statusRuntimeException;
@@ -710,16 +718,11 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     if (resIterator == null || requestContext == null || requestContext.isCancelled()) {
       return false;
     }
-    try {
-      boolean moreDataAvailable = resIterator.hasNext();
-      if (!moreDataAvailable) {
-        cancelCurrentRequest();
-      }
-      return moreDataAvailable;
-    } catch (StatusRuntimeException e) {
+    boolean moreDataAvailable = resIterator.hasNext();
+    if (!moreDataAvailable) {
       cancelCurrentRequest();
-      throw e;
     }
+    return moreDataAvailable;
   }
 
   @Override
