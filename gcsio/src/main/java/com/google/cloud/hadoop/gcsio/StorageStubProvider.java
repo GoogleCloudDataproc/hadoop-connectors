@@ -97,7 +97,7 @@ class StorageStubProvider {
   }
 
   public void shutdown() {
-    if (channel != null) channel.shutdownNow();
+    if (channel != null) channel.shutdown();
   }
 
   interface GrpcDecorator {
