@@ -375,6 +375,10 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_WRITE_TIMEOUT_MS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.write.timeout.ms", 10 * 60 * 1000L);
 
+  /** Configuration key for enabling use of directpath gRPC API for read/write. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_DIRECTPATH_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.grpc.directpath.enable", true);
+
   /**
    * Configuration key for using cooperative locking to achieve a directory mutation operations
    * isolation.
@@ -465,7 +469,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setEncryptionAlgorithm(GCS_ENCRYPTION_ALGORITHM.get(config, config::get))
         .setEncryptionKey(RedactedString.create(GCS_ENCRYPTION_KEY.getPassword(config)))
         .setEncryptionKeyHash(RedactedString.create(GCS_ENCRYPTION_KEY_HASH.getPassword(config)))
-        .setGrpcEnabled(GCS_GRPC_ENABLE.get(config, config::getBoolean));
+        .setGrpcEnabled(GCS_GRPC_ENABLE.get(config, config::getBoolean))
+        .setDirectPathPreferred(GCS_GRPC_DIRECTPATH_ENABLE.get(config, config::getBoolean));
   }
 
   private static PerformanceCachingGoogleCloudStorageOptions getPerformanceCachingOptions(
