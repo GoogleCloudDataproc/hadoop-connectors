@@ -249,7 +249,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
   public void hflush() throws IOException {
     long startTimeNs = System.nanoTime();
     // update the output stream statistics of hflush()
-    incrementhflushStatistics();
+    curDelegate.getStreamStatistics().hflushInvoked();
     if (!options.isSyncOnFlushEnabled()) {
       logger.atWarning().log(
           "hflush(): No-op: readers will *not* yet see flushed data for %s", finalGcsPath);
@@ -287,7 +287,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
     throwIfNotOpen();
 
     // update the output stream statistics of hsync()
-    incrementhsyncStatistics();
+    curDelegate.getStreamStatistics().hsyncInvoked();
     commitCurrentFile();
 
     // Use a different temporary path for each temporary component to reduce the possible avenues of
@@ -381,16 +381,6 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
     if (!isOpen()) {
       throw new ClosedChannelException();
     }
-  }
-
-  /** Increment the count of hflush() operation */
-  public void incrementhflushStatistics() {
-    curDelegate.getStreamStatistics().hflushInvoked();
-  }
-
-  /** Increment the count of hsync() operation */
-  public void incrementhsyncStatistics() {
-    curDelegate.getStreamStatistics().hsyncInvoked();
   }
 
   /** Get the current stream statistics. For Testing */

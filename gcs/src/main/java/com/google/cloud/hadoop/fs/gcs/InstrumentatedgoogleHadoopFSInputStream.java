@@ -41,7 +41,10 @@ public class InstrumentatedgoogleHadoopFSInputStream extends GoogleHadoopFSInput
       FileSystem.Statistics statistics)
       throws IOException {
     super(ghfs, gcsPath, readOptions, statistics);
-    this.streamStatistics = ghfs.getInstrumentation().newInputStreamStatistics(statistics);
+    this.streamStatistics =
+        ((InstrumentatedGoogleHadoopFileSystem) ghfs)
+            .getInstrumentation()
+            .newInputStreamStatistics(statistics);
     this.ioStatistics = streamStatistics.getIOStatistics();
   }
 
@@ -49,7 +52,10 @@ public class InstrumentatedgoogleHadoopFSInputStream extends GoogleHadoopFSInput
       GoogleHadoopFileSystemBase ghfs, FileInfo fileInfo, FileSystem.Statistics statistics)
       throws IOException {
     super(ghfs, fileInfo, statistics);
-    this.streamStatistics = ghfs.getInstrumentation().newInputStreamStatistics(statistics);
+    this.streamStatistics =
+        ((InstrumentatedGoogleHadoopFileSystem) ghfs)
+            .getInstrumentation()
+            .newInputStreamStatistics(statistics);
     this.ioStatistics = streamStatistics.getIOStatistics();
   }
 

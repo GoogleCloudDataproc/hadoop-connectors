@@ -179,7 +179,7 @@ class StorageStubProvider {
       ExecutorService backgroundTasksThreadPool,
       Credential credential) {
     boolean useDirectpath =
-        options.isDirectPathPreffered()
+        options.isDirectPathPreferred()
             && credential != null
             && java.util.Objects.equals(
                 credential.getTokenServerEncodedUrl(), ComputeCredential.TOKEN_SERVER_ENCODED_URL);
@@ -196,7 +196,7 @@ class StorageStubProvider {
       ExecutorService backgroundTasksThreadPool,
       Credentials credentials) {
     boolean useDirectpath =
-        options.isDirectPathPreffered() && credentials instanceof ComputeEngineCredentials;
+        options.isDirectPathPreferred() && credentials instanceof ComputeEngineCredentials;
     return new StorageStubProvider(
         options,
         backgroundTasksThreadPool,

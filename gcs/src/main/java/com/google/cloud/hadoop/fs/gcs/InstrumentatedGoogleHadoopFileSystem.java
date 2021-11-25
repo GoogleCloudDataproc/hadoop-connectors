@@ -268,7 +268,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
    * @throws IOException if the
    */
   public void entryPoint(GhfsStatistic operation) {
-    if (super.getIsClosed()) {
+    if (super.isClosed()) {
       return;
     }
     incrementStatistic(operation);
@@ -304,11 +304,6 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
     return instrumentation != null ? instrumentation.getIOStatistics() : null;
   }
 
-  /**
-   * Get the instance's instrumentation.
-   *
-   * @return
-   */
   public GhfsInstrumentation getInstrumentation() {
     return this.instrumentation;
   }
