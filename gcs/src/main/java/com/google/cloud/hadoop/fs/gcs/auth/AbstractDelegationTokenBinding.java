@@ -225,7 +225,6 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
    * @param token token created
    */
   private void noteTokenCreated(final Token<DelegationTokenIdentifier> token) {
-    logger.atInfo().log("Created Delegation Token");
     stats.tokenIssued();
   }
 }

@@ -20,6 +20,7 @@ import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDura
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
+import com.google.common.flogger.GoogleLogger;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
@@ -37,6 +38,8 @@ import org.apache.hadoop.util.Progressable;
 public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystemBase
     implements IOStatisticsSource {
   GhfsInstrumentation instrumentation;
+
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   InstrumentatedGoogleHadoopFileSystem() {
     super();
@@ -109,16 +112,19 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
   @Override
   public boolean delete(Path hadoopPath, boolean recursive) throws IOException {
     entryPoint(GhfsStatistic.INVOCATION_DELETE);
-
     boolean response = false;
     try {
       response = super.delete(hadoopPath, recursive);
-      incrementStatistic(
-          GhfsStatistic.OBJECT_DELETE_OBJECTS,
-          getGcsFs()
-              .getGcs()
-              .getObjectStatistics(GoogleCloudStorageStatistics.OBJECT_DELETE_OBJECTS)
-              .longValue());
+      try {
+        incrementStatistic(
+            GhfsStatistic.OBJECT_DELETE_OBJECTS,
+            getGcsFs()
+                .getGcs()
+                .getObjectStatistics(GoogleCloudStorageStatistics.OBJECT_DELETE_OBJECTS)
+                .longValue());
+      } catch (Exception e) {
+        logger.atWarning().log("Get Object Statistics threw UnsupportedOpersationException");
+      }
       instrumentation.fileDeleted(1);
     } catch (IOException e) {
       incrementStatistic(GhfsStatistic.FILES_DELETE_REJECTED);
@@ -137,13 +143,8 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
   @Override
   public boolean mkdirs(Path hadoopPath, FsPermission permission) throws IOException {
     entryPoint(GhfsStatistic.INVOCATION_MKDIRS);
-    boolean response = false;
-    try {
-      response = super.mkdirs(hadoopPath, permission);
-      instrumentation.directoryCreated();
-    } catch (IOException e) {
-      throw e;
-    }
+    boolean response = super.mkdirs(hadoopPath, permission);
+    instrumentation.directoryCreated();
     return response;
   }
 

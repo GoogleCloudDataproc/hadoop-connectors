@@ -40,12 +40,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -553,6 +548,6 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
    */
   @Override
   public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key) {
-    return new AtomicLong(0);
+    throw new UnsupportedOperationException("not implemented");
   }
 }
