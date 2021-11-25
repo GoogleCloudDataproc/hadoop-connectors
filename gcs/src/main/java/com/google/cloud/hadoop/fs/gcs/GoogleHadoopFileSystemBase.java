@@ -116,10 +116,8 @@ import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.GlobPattern;
-import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
-import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.impl.AbstractFSBuilderImpl;
 import org.apache.hadoop.fs.impl.OpenFileParameters;
@@ -1587,7 +1585,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     }
   }
 
-  private boolean isClosed() {
+  boolean isClosed() {
     return gcsFsSupplier == null || gcsFsSupplier.get() == null;
   }
 
@@ -1897,31 +1895,5 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   private byte[] getXAttrValue(byte[] value) {
     return value == null ? XATTR_NULL_VALUE : value;
-  }
-
-  /** Override superclass so as to add statistic collection. */
-  @Override
-  public boolean exists(Path f) throws IOException {
-    return super.exists(f);
-  }
-
-  /** Override superclass so as to add statistic collection. */
-  @Override
-  public RemoteIterator<LocatedFileStatus> listLocatedStatus(final Path f)
-      throws FileNotFoundException, IOException {
-    return super.listLocatedStatus(f);
-  }
-
-  /**
-   * Get the instance's instrumentation.
-   *
-   * @return
-   */
-  public GhfsInstrumentation getInstrumentation() {
-    return null;
-  };
-
-  Boolean getIsClosed() {
-    return isClosed();
   }
 }

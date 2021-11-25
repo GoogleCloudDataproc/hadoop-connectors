@@ -39,7 +39,10 @@ public class InstrumentatedGoogleHadoopOutputStream extends GoogleHadoopOutputSt
       CreateFileOptions createFileOptions)
       throws IOException {
     super(ghfs, gcsPath, statistics, createFileOptions);
-    this.streamStatistics = ghfs.getInstrumentation().newOutputStreamStatistics(statistics);
+    this.streamStatistics =
+        ((InstrumentatedGoogleHadoopFileSystem) ghfs)
+            .getInstrumentation()
+            .newOutputStreamStatistics(statistics);
     this.ioStatistics = streamStatistics.getIOStatistics();
   }
 
