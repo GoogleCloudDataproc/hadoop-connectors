@@ -67,7 +67,7 @@ public class InstrumentatedgoogleHadoopFSInputStream extends GoogleHadoopFSInput
       response = super.read();
     } catch (IOException e) {
       streamStatistics.readException();
-      streamStatistics.readOperationCompleted(1, response);
+      throw e;
     }
     streamStatistics.bytesRead(1);
     streamStatistics.readOperationCompleted(1, response);
