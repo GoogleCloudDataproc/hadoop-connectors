@@ -23,7 +23,9 @@ import java.io.Closeable;
 import java.net.URI;
 import java.util.EnumSet;
 import java.util.UUID;
-import org.apache.hadoop.fs.statistics.*;
+import org.apache.hadoop.fs.statistics.DurationTracker;
+import org.apache.hadoop.fs.statistics.DurationTrackerFactory;
+import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 import org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding;
 import org.apache.hadoop.fs.statistics.impl.IOStatisticsStore;
 import org.apache.hadoop.fs.statistics.impl.IOStatisticsStoreBuilder;
@@ -52,22 +54,22 @@ class GhfsInstrumentation
    * {@value} Currently all gcs metrics are placed in a single "context". Distinct contexts may be
    * used in the future.
    */
-  public static final String CONTEXT = "GoogleHadoopFilesystem";
+  private static final String CONTEXT = "GoogleHadoopFilesystem";
 
   /** {@value} The name of the gcs-specific metrics system instance used for gcs metrics. */
-  public static final String METRICS_SYSTEM_NAME = "google-hadoop-file-system";
+  private static final String METRICS_SYSTEM_NAME = "google-hadoop-file-system";
 
   /**
    * {@value} The name of a field added to metrics records that uniquely identifies a specific
    * FileSystem instance.
    */
-  public static final String METRIC_TAG_FILESYSTEM_ID = "gcsFilesystemId";
+  private static final String METRIC_TAG_FILESYSTEM_ID = "gcsFilesystemId";
 
   /**
    * {@value} The name of a field added to metrics records that indicates the hostname portion of
    * the FS URL.
    */
-  public static final String METRIC_TAG_BUCKET = "bucket";
+  private static final String METRIC_TAG_BUCKET = "bucket";
 
   /**
    * metricsSystemLock must be used to synchronize modifications to metricsSystem and the following
@@ -94,7 +96,7 @@ class GhfsInstrumentation
 
   private String metricsSourceName;
 
-  private static final GoogleLogger LOG = GoogleLogger.forEnclosingClass();
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   /**
    * Construct the instrumentation for a filesystem.
@@ -108,24 +110,7 @@ class GhfsInstrumentation
         "A unique identifier for the instance",
         fileSystemInstanceID.toString());
     registry.tag(METRIC_TAG_BUCKET, "Hostname from the FS URL", name.getHost());
-    IOStatisticsStoreBuilder storeBuilder = IOStatisticsBinding.iostatisticsStore();
-    EnumSet.allOf(GhfsStatistic.class).stream()
-        .forEach(
-            stat -> {
-              // declare all counter statistics
-              if (stat.getType() == GhfsStatisticTypeEnum.TYPE_COUNTER) {
-                counter(stat);
-                storeBuilder.withCounters(stat.getSymbol());
-                // declare all gauge statistics
-              } else if (stat.getType() == GhfsStatisticTypeEnum.TYPE_GAUGE) {
-                gauge(stat);
-                storeBuilder.withGauges(stat.getSymbol());
-                // and durations
-              } else if (stat.getType() == GhfsStatisticTypeEnum.TYPE_DURATION) {
-                duration(stat);
-                storeBuilder.withDurationTracking(stat.getSymbol());
-              }
-            });
+    IOStatisticsStoreBuilder storeBuilder = createStoreBuilder();
 
     // register with Hadoop metrics
     registerAsMetricsSource(name);
@@ -137,13 +122,30 @@ class GhfsInstrumentation
             instanceIOStatistics, new MetricDurationTrackerFactory());
   }
 
+  /**
+   * Register this instance as a metrics source.
+   *
+   * @param name gs:// URI for the associated FileSystem instance
+   */
+  private void registerAsMetricsSource(URI name) {
+    int number;
+    synchronized (METRICS_SYSTEM_LOCK) {
+      getMetricsSystem();
+
+      metricsSourceActiveCounter++;
+      number = ++metricsSourceNameCounter;
+    }
+    metricsSourceName = METRICS_SOURCE_BASENAME + number + "-" + name.getHost();
+    metricsSystem.register(metricsSourceName, "", this);
+  }
+
   public void close() {
     synchronized (METRICS_SYSTEM_LOCK) {
       metricsSystem.unregisterSource(metricsSourceName);
       metricsSourceActiveCounter--;
       int activeSources = metricsSourceActiveCounter;
       if (activeSources == 0) {
-        LOG.atInfo().log("Shutting down metrics publisher");
+        logger.atInfo().log("Shutting down metrics publisher");
         metricsSystem.publishMetricsNow();
         metricsSystem.shutdown();
         metricsSystem = null;
@@ -175,23 +177,6 @@ class GhfsInstrumentation
     String name = op.getSymbol();
     incrementMutableCounter(name, count);
     instanceIOStatistics.incrementCounter(name, count);
-  }
-
-  /**
-   * Register this instance as a metrics source.
-   *
-   * @param name gs:// URI for the associated FileSystem instance
-   */
-  private void registerAsMetricsSource(URI name) {
-    int number;
-    synchronized (METRICS_SYSTEM_LOCK) {
-      getMetricsSystem();
-
-      metricsSourceActiveCounter++;
-      number = ++metricsSourceNameCounter;
-    }
-    metricsSourceName = METRICS_SOURCE_BASENAME + number + "-" + name.getHost();
-    metricsSystem.register(metricsSourceName, "", this);
   }
 
   public MetricsSystem getMetricsSystem() {
@@ -376,4 +361,26 @@ class GhfsInstrumentation
 
   @Override
   public void getMetrics(MetricsCollector metricsCollector, boolean b) {}
+
+  private IOStatisticsStoreBuilder createStoreBuilder() {
+    IOStatisticsStoreBuilder storeBuilder = IOStatisticsBinding.iostatisticsStore();
+    EnumSet.allOf(GhfsStatistic.class).stream()
+        .forEach(
+            stat -> {
+              // declare all counter statistics
+              if (stat.getType() == GhfsStatisticTypeEnum.TYPE_COUNTER) {
+                counter(stat);
+                storeBuilder.withCounters(stat.getSymbol());
+                // declare all gauge statistics
+              } else if (stat.getType() == GhfsStatisticTypeEnum.TYPE_GAUGE) {
+                gauge(stat);
+                storeBuilder.withGauges(stat.getSymbol());
+                // and durations
+              } else if (stat.getType() == GhfsStatisticTypeEnum.TYPE_DURATION) {
+                duration(stat);
+                storeBuilder.withDurationTracking(stat.getSymbol());
+              }
+            });
+    return storeBuilder;
+  }
 }

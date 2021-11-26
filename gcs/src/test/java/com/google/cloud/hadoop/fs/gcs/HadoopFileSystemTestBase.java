@@ -341,14 +341,8 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
             ((GoogleHadoopFileSystem) ghfs)
                 .getIOStatistics()
                 .counters()
-                .get("action_http_get_request"))
+                .get(GhfsStatistic.ACTION_HTTP_GET_REQUEST.getSymbol()))
         .isGreaterThan(1);
-    assertThat(
-            ((GoogleHadoopFileSystem) ghfs)
-                .getIOStatistics()
-                .counters()
-                .get("action_http_get_request_failures"))
-        .isEqualTo(0);
   }
 
   /** Validates delete(). */

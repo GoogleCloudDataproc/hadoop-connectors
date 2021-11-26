@@ -42,7 +42,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
-import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpTransport;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
@@ -56,7 +55,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.ListFileOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
@@ -126,7 +124,6 @@ import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.impl.AbstractFSBuilderImpl;
 import org.apache.hadoop.fs.impl.OpenFileParameters;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -168,7 +165,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   private static final String OBJECT_FIELDS = "bucket,name,size,updated";
 
   // To track the http requests from GoogleCloudStorage
-  private static GcsioTrackingHttpRequestInitializer gcsRequestsTracker;
+  static GcsioTrackingHttpRequestInitializer gcsRequestsTracker;
 
   private static final ListFileOptions LIST_OPTIONS =
       ListFileOptions.DEFAULT.toBuilder().setFields(OBJECT_FIELDS).build();
@@ -294,9 +291,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   /** The fixed reported permission of all files. */
   private FsPermission reportedPermissions;
-
-  /** Instrumentation to get the statistics. */
-  private GhfsInstrumentation instrumentation;
 
   /**
    * GCS {@link FileChecksum} which takes constructor parameters to define the return values of the
@@ -486,15 +480,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     // Initialize the delegation token support, if it is configured
     initializeDelegationTokenSupport(config, path);
 
-    // Initialize the instrumentation
-    instrumentation = new GhfsInstrumentation(path);
-
     configure(config);
-  }
-
-  /** Get the Instrumentation of the instance to track the IOStatistics */
-  GhfsInstrumentation getInstrumentation() {
-    return this.instrumentation;
   }
 
   /**
@@ -1619,7 +1605,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     }
   }
 
-  private boolean isClosed() {
+  boolean isClosed() {
     return gcsFsSupplier == null || gcsFsSupplier.get() == null;
   }
 
@@ -1705,9 +1691,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public void close() throws IOException {
     logger.atFiner().log("close()");
-    if (!this.LazyFs) {
-      setHttpStatistics();
-    }
     super.close();
 
     // NB: We must *first* have the superclass close() before we close the underlying gcsFsSupplier
@@ -1724,33 +1707,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     backgroundTasksThreadPool.shutdown();
     backgroundTasksThreadPool = null;
-  }
-
-  /** Set the Value for http get and head request related statistics keys */
-  private void setHttpStatistics() {
-    if (!isClosed()) {
-      if (gcsFsSupplier.get() != null) {
-        long get_failures =
-            gcsFsSupplier
-                .get()
-                .getGcs()
-                .getStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES);
-        if (get_failures > 0L) {
-          instrumentation.incrementFailureStatistics(
-              GhfsStatistic.ACTION_HTTP_GET_REQUEST.getSymbol(), get_failures);
-        }
-      }
-    }
-    if (this.gcsRequestsTracker != null) {
-      ImmutableList<HttpRequest> httpRequests = this.gcsRequestsTracker.getAllRequests();
-      for (HttpRequest req : httpRequests) {
-        if (req.getRequestMethod() == "GET") {
-          instrumentation.incrementCounter(GhfsStatistic.ACTION_HTTP_GET_REQUEST, 1);
-        } else if (req.getRequestMethod() == "HEAD") {
-          instrumentation.incrementCounter(GhfsStatistic.ACTION_HTTP_HEAD_REQUEST, 1);
-        }
-      }
-    }
   }
 
   @Override
@@ -1961,14 +1917,5 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   private byte[] getXAttrValue(byte[] value) {
     return value == null ? XATTR_NULL_VALUE : value;
-  }
-
-  /**
-   * Get the instrumentation's IOStatistics.
-   *
-   * @return statistics
-   */
-  public IOStatistics getIOStatistics() {
-    return instrumentation != null ? instrumentation.getIOStatistics() : null;
   }
 }
