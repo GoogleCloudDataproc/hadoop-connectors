@@ -19,8 +19,7 @@ import com.google.auto.value.AutoValue;
 /** An access boundary used to generate a downscoped access token. */
 @AutoValue
 public abstract class AccessBoundary {
-
-  public static AccessBoundary create(String bucketName, String objectName, String action) {
+  public static AccessBoundary create(String bucketName, String objectName, Action action) {
     return new AutoValue_AccessBoundary(bucketName, objectName, action);
   }
 
@@ -28,5 +27,19 @@ public abstract class AccessBoundary {
 
   public abstract String objectName();
 
-  public abstract String action();
+  public abstract Action action();
+
+  public enum Action {
+    UNSPECIFIED_ACTION,
+    LIST_OBJECTS,
+    READ_OBJECTS,
+    WRITE_OBJECTS,
+    // EDIT_OBJECTS implies READ_OBJECTS and WRITE_OBJECTS
+    EDIT_OBJECTS,
+    DELETE_OBJECTS,
+    GET_BUCKETS,
+    CREATE_BUCKETS,
+    DELETE_BUCKETS,
+    LIST_BUCKETS
+  }
 }

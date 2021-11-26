@@ -37,6 +37,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.Syncable;
@@ -210,6 +211,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
       logger.atFiner().log("close(): Ignoring; stream already closed.");
       return;
     }
+    getStatistics().close();
     commitCurrentFile();
 
     // null denotes stream closed.
@@ -246,6 +248,8 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
   @Override
   public void hflush() throws IOException {
     long startTimeNs = System.nanoTime();
+    // update the output stream statistics of hflush()
+    curDelegate.getStreamStatistics().hflushInvoked();
     if (!options.isSyncOnFlushEnabled()) {
       logger.atWarning().log(
           "hflush(): No-op: readers will *not* yet see flushed data for %s", finalGcsPath);
@@ -258,7 +262,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
       hsyncInternal(startTimeNs);
       return;
     }
-    logger.atWarning().log(
+    logger.atInfo().atMostEvery(1, TimeUnit.MINUTES).log(
         "hflush(): No-op due to rate limit (%s): readers will *not* yet see flushed data for %s",
         syncRateLimiter, finalGcsPath);
     throwIfNotOpen();
@@ -282,6 +286,8 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
         "hsync(): Committing tail file %s to final destination %s", curGcsPath, finalGcsPath);
     throwIfNotOpen();
 
+    // update the output stream statistics of hsync()
+    curDelegate.getStreamStatistics().hsyncInvoked();
     commitCurrentFile();
 
     // Use a different temporary path for each temporary component to reduce the possible avenues of
@@ -375,5 +381,10 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
     if (!isOpen()) {
       throw new ClosedChannelException();
     }
+  }
+
+  /** Get the current stream statistics. For Testing */
+  public GhfsOutputStreamStatistics getStatistics() {
+    return curDelegate.getStreamStatistics();
   }
 }

@@ -109,6 +109,24 @@ public class GoogleCloudStorageImplTest {
   }
 
   @Test
+  public void open_withItemInfo() throws IOException {
+    int expectedSize = 5 * 1024 * 1024;
+    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+    writeObject(helperGcs, resourceId, /* partitionSize= */ expectedSize, /* partitionsCount= */ 1);
+
+    TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+
+    GoogleCloudStorageItemInfo itemInfo = helperGcs.getItemInfo(resourceId);
+
+    try (SeekableByteChannel readChannel = trackingGcs.delegate.open(itemInfo)) {
+      assertThat(readChannel.size()).isEqualTo(expectedSize);
+    }
+
+    assertThat(trackingGcs.requestsTracker.getAllRequestStrings()).isEmpty();
+  }
+
+  @Test
   public void writeLargeObject_withSmallUploadChunk() throws IOException {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
 

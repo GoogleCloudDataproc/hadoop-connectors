@@ -26,6 +26,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStrings;
 import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
@@ -39,12 +40,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * InMemoryGoogleCloudStorage overrides the public methods of GoogleCloudStorage by implementing all
@@ -197,10 +194,17 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   @Override
   public SeekableByteChannel open(
       StorageResourceId resourceId, GoogleCloudStorageReadOptions readOptions) throws IOException {
-    if (!getItemInfo(resourceId).exists()) {
+    return open(getItemInfo(resourceId), readOptions);
+  }
+
+  @Override
+  public SeekableByteChannel open(
+      GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
+      throws IOException {
+    if (!itemInfo.exists()) {
       IOException notFoundException =
           createFileNotFoundException(
-              resourceId.getBucketName(), resourceId.getObjectName(), /* cause= */ null);
+              itemInfo.getBucketName(), itemInfo.getObjectName(), /* cause= */ null);
 
       if (readOptions.getFastFailOnNotFound()) {
         throw notFoundException;
@@ -256,9 +260,9 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     }
 
     return bucketLookup
-        .get(resourceId.getBucketName())
-        .get(resourceId.getObjectName())
-        .getReadChannel(resourceId.getBucketName(), resourceId.getObjectName(), readOptions);
+        .get(itemInfo.getBucketName())
+        .get(itemInfo.getObjectName())
+        .getReadChannel(itemInfo.getBucketName(), itemInfo.getObjectName(), readOptions);
   }
 
   @Override
@@ -534,5 +538,16 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     destChannel.write(ByteBuffer.wrap(tempOutput.toByteArray()));
     destChannel.close();
     return getItemInfo(destination);
+  }
+
+  /**
+   * Get the Value of the statistics
+   *
+   * @param key name of the object related statistics key
+   * @return
+   */
+  @Override
+  public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key) {
+    throw new UnsupportedOperationException("not implemented");
   }
 }

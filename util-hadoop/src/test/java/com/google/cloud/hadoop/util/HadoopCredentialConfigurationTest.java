@@ -24,7 +24,6 @@ import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_PRIVATE_KEY_ID_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_PRIVATE_KEY_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.TOKEN_SERVER_URL_SUFFIX;
-import static com.google.cloud.hadoop.util.HttpTransportFactory.HttpTransportType.JAVA_NET;
 import static com.google.cloud.hadoop.util.testing.HadoopConfigurationUtils.getDefaultProperties;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonDataResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
@@ -68,7 +67,6 @@ public class HadoopCredentialConfigurationTest {
           put(".auth.service.account.private.key", null);
           put(".auth.service.account.private.key.id", null);
           put(".token.server.url", "https://oauth2.googleapis.com/token");
-          put(".http.transport.type", JAVA_NET);
           put(".proxy.address", null);
           put(".proxy.password", null);
           put(".proxy.username", null);

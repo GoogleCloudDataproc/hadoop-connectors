@@ -19,10 +19,8 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.services.storage.Storage;
 import com.google.auto.value.AutoValue;
-import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
 import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
-import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
@@ -39,7 +37,7 @@ public abstract class GoogleCloudStorageOptions {
   public static final boolean ENABLE_GRPC_DEFAULT = false;
 
   /** Default setting to prefer DirectPath for gRPC. */
-  public static final boolean DIRECT_PATH_PREFFERED_DEFAULT = true;
+  public static final boolean DIRECT_PATH_PREFERRED_DEFAULT = true;
 
   /** Default root URL for Cloud Storage API endpoint. */
   public static final String STORAGE_ROOT_URL_DEFAULT = Storage.DEFAULT_ROOT_URL;
@@ -83,20 +81,12 @@ public abstract class GoogleCloudStorageOptions {
   /** Default setting for GCS HTTP request headers. */
   public static final ImmutableMap<String, String> HTTP_REQUEST_HEADERS_DEFAULT = ImmutableMap.of();
 
-  /** Default setting for authorization handler. */
-  public static final Class<? extends AuthorizationHandler>
-      AUTHORIZATION_HANDLER_IMPL_CLASS_DEFAULT = null;
-
-  /** Default properties for authorization handler. */
-  public static final Map<String, String> AUTHORIZATION_HANDLER_PROPERTIES_DEFAULT =
-      ImmutableMap.of();
-
   public static final GoogleCloudStorageOptions DEFAULT = builder().build();
 
   public static Builder builder() {
     return new AutoValue_GoogleCloudStorageOptions.Builder()
         .setGrpcEnabled(ENABLE_GRPC_DEFAULT)
-        .setDirectPathPreffered(DIRECT_PATH_PREFFERED_DEFAULT)
+        .setDirectPathPreferred(DIRECT_PATH_PREFERRED_DEFAULT)
         .setStorageRootUrl(STORAGE_ROOT_URL_DEFAULT)
         .setStorageServicePath(STORAGE_SERVICE_PATH_DEFAULT)
         .setAutoRepairImplicitDirectoriesEnabled(AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT)
@@ -107,23 +97,20 @@ public abstract class GoogleCloudStorageOptions {
         .setMaxHttpRequestRetries(MAX_HTTP_REQUEST_RETRIES)
         .setHttpRequestConnectTimeout(HTTP_REQUEST_CONNECT_TIMEOUT)
         .setHttpRequestReadTimeout(HTTP_REQUEST_READ_TIMEOUT)
-        .setTransportType(HttpTransportFactory.DEFAULT_TRANSPORT_TYPE)
         .setCopyWithRewriteEnabled(COPY_WITH_REWRITE_DEFAULT)
         .setMaxBytesRewrittenPerCall(MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT)
         .setReadChannelOptions(GoogleCloudStorageReadOptions.DEFAULT)
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
         .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
         .setCooperativeLockingOptions(CooperativeLockingOptions.DEFAULT)
-        .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT)
-        .setAuthorizationHandlerImplClass(AUTHORIZATION_HANDLER_IMPL_CLASS_DEFAULT)
-        .setAuthorizationHandlerProperties(AUTHORIZATION_HANDLER_PROPERTIES_DEFAULT);
+        .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT);
   }
 
   public abstract Builder toBuilder();
 
   public abstract boolean isGrpcEnabled();
 
-  public abstract boolean isDirectPathPreffered();
+  public abstract boolean isDirectPathPreferred();
 
   public abstract String getStorageRootUrl();
 
@@ -150,8 +137,6 @@ public abstract class GoogleCloudStorageOptions {
   public abstract int getHttpRequestConnectTimeout();
 
   public abstract int getHttpRequestReadTimeout();
-
-  public abstract HttpTransportFactory.HttpTransportType getTransportType();
 
   @Nullable
   public abstract String getProxyAddress();
@@ -195,11 +180,6 @@ public abstract class GoogleCloudStorageOptions {
         .build();
   }
 
-  @Nullable
-  public abstract Class<? extends AuthorizationHandler> getAuthorizationHandlerImplClass();
-
-  public abstract Map<String, String> getAuthorizationHandlerProperties();
-
   public void throwIfNotValid() {
     checkArgument(!isNullOrEmpty(getAppName()), "appName must not be null or empty");
   }
@@ -210,7 +190,7 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setGrpcEnabled(boolean grpcEnabled);
 
-    public abstract Builder setDirectPathPreffered(boolean directPathPreffered);
+    public abstract Builder setDirectPathPreferred(boolean directPathPreffered);
 
     public abstract Builder setStorageRootUrl(String rootUrl);
 
@@ -238,8 +218,6 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setHttpRequestReadTimeout(int httpRequestReadTimeout);
 
-    public abstract Builder setTransportType(HttpTransportFactory.HttpTransportType transportType);
-
     public abstract Builder setProxyAddress(String proxyAddress);
 
     public abstract Builder setProxyUsername(RedactedString proxyUsername);
@@ -266,11 +244,6 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setEncryptionKey(RedactedString encryptionKey);
 
     public abstract Builder setEncryptionKeyHash(RedactedString encryptionKeyHash);
-
-    public abstract Builder setAuthorizationHandlerImplClass(
-        Class<? extends AuthorizationHandler> authorizationHandlerImpl);
-
-    public abstract Builder setAuthorizationHandlerProperties(Map<String, String> properties);
 
     abstract GoogleCloudStorageOptions autoBuild();
 

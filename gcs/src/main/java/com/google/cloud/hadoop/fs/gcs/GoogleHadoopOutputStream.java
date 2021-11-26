@@ -17,39 +17,11 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
-import com.google.common.flogger.GoogleLogger;
-import java.io.BufferedOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.URI;
-import java.nio.channels.Channels;
-import java.nio.channels.ClosedChannelException;
-import java.nio.channels.WritableByteChannel;
-import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileSystem;
 
-/** A buffered output stream that allows writing to a GCS object. */
-class GoogleHadoopOutputStream extends OutputStream {
-
-  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-
-  // All store IO access goes through this.
-  private WritableByteChannel channel;
-
-  // Output stream corresponding to channel.
-  private OutputStream out;
-
-  // Path of the file to write to.
-  private final URI gcsPath;
-
-  // Statistics tracker provided by the parent GoogleHadoopFileSystemBase for recording
-  // numbers of bytes written.
-  private final FileSystem.Statistics statistics;
-
-  // Statistics tracker for outputstream related statistics
-  private GhfsOutputStreamStatistics streamStatistics;
+public class GoogleHadoopOutputStream extends InstrumentatedGoogleHadoopOutputStream {
 
   /**
    * Constructs an instance of GoogleHadoopOutputStream object.
@@ -57,6 +29,7 @@ class GoogleHadoopOutputStream extends OutputStream {
    * @param ghfs Instance of GoogleHadoopFileSystemBase.
    * @param gcsPath Path of the file to write to.
    * @param statistics File system statistics object.
+   * @param createFileOptions
    * @throws IOException if an IO error occurs.
    */
   GoogleHadoopOutputStream(
@@ -65,84 +38,6 @@ class GoogleHadoopOutputStream extends OutputStream {
       FileSystem.Statistics statistics,
       CreateFileOptions createFileOptions)
       throws IOException {
-    logger.atFiner().log(
-        "GoogleHadoopOutputStream(gcsPath: %s, createFileOptions: %s)", gcsPath, createFileOptions);
-    this.gcsPath = gcsPath;
-    this.statistics = statistics;
-    GoogleCloudStorageFileSystem gcsfs = ghfs.getGcsFs();
-    this.streamStatistics = ghfs.getInstrumentation().newOutputStreamStatistics(statistics);
-    this.channel = createChannel(gcsfs, gcsPath, createFileOptions);
-    this.out = createOutputStream(this.channel, gcsfs.getOptions().getCloudStorageOptions());
-  }
-
-  private static WritableByteChannel createChannel(
-      GoogleCloudStorageFileSystem gcsfs, URI gcsPath, CreateFileOptions options)
-      throws IOException {
-    try {
-      return gcsfs.create(gcsPath, options);
-    } catch (java.nio.file.FileAlreadyExistsException e) {
-      throw (FileAlreadyExistsException)
-          new FileAlreadyExistsException(String.format("'%s' already exists", gcsPath))
-              .initCause(e);
-    }
-  }
-
-  private static OutputStream createOutputStream(
-      WritableByteChannel channel, GoogleCloudStorageOptions gcsOptions) {
-    OutputStream out = Channels.newOutputStream(channel);
-    int bufferSize = gcsOptions.getWriteChannelOptions().getBufferSize();
-    return bufferSize > 0 ? new BufferedOutputStream(out, bufferSize) : out;
-  }
-
-  /** Writes the specified byte to this output stream. */
-  @Override
-  public void write(int b) throws IOException {
-    throwIfNotOpen();
-    out.write(b);
-    statistics.incrementBytesWritten(1);
-    statistics.incrementWriteOps(1);
-    streamStatistics.writeBytes(1);
-  }
-
-  /**
-   * Writes to this output stream 'len' bytes of the specified buffer starting at the given offset.
-   */
-  @Override
-  public void write(byte[] b, int offset, int len) throws IOException {
-    throwIfNotOpen();
-    out.write(b, offset, len);
-    statistics.incrementBytesWritten(len);
-    statistics.incrementWriteOps(1);
-    streamStatistics.writeBytes(len);
-  }
-
-  /** Closes this output stream and releases any system resources associated with this stream. */
-  @Override
-  public void close() throws IOException {
-    logger.atFiner().log("close(%s)", gcsPath);
-    if (out != null) {
-      try {
-        out.close();
-        streamStatistics.close();
-      } finally {
-        out = null;
-        channel = null;
-      }
-    }
-  }
-
-  private boolean isOpen() {
-    return out != null;
-  }
-
-  private void throwIfNotOpen() throws IOException {
-    if (!isOpen()) {
-      streamStatistics.writeException();
-      throw new ClosedChannelException();
-    }
-  }
-
-  WritableByteChannel getInternalChannel() {
-    return channel;
+    super(ghfs, gcsPath, statistics, createFileOptions);
   }
 }

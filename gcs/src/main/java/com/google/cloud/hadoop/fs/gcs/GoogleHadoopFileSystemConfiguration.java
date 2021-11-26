@@ -16,7 +16,6 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.HTTP_TRANSPORT_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_ADDRESS_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_PASSWORD_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_USERNAME_SUFFIX;
@@ -31,7 +30,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
-import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
 import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
@@ -377,6 +375,10 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_WRITE_TIMEOUT_MS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.write.timeout.ms", 10 * 60 * 1000L);
 
+  /** Configuration key for enabling use of directpath gRPC API for read/write. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_DIRECTPATH_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.grpc.directpath.enable", true);
+
   /**
    * Configuration key for using cooperative locking to achieve a directory mutation operations
    * isolation.
@@ -414,17 +416,6 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<RedactedString> GCS_ENCRYPTION_KEY_HASH =
       new HadoopConfigurationProperty<>("fs.gs.encryption.key.hash");
 
-  /** Configuration for authorization handler implementation class. */
-  public static final HadoopConfigurationProperty<Class<? extends AuthorizationHandler>>
-      GCS_AUTHORIZATION_HANDLER_IMPL =
-          new HadoopConfigurationProperty<>("fs.gs.authorization.handler.impl");
-
-  /** Configuration prefix for custom authorization handler properties. */
-  public static final HadoopConfigurationProperty<Map<String, String>>
-      GCS_AUTHORIZATION_HANDLER_PROPERTIES_PREFIX =
-          new HadoopConfigurationProperty<>(
-              "fs.gs.authorization.handler.properties.", ImmutableMap.of());
-
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
   // @VisibleForTesting
@@ -452,8 +443,6 @@ public class GoogleHadoopFileSystemConfiguration {
             GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.get(config, config::getBoolean))
         .setCopyWithRewriteEnabled(GCS_COPY_WITH_REWRITE_ENABLE.get(config, config::getBoolean))
         .setMaxBytesRewrittenPerCall(GCS_REWRITE_MAX_BYTES_PER_CALL.get(config, config::getLong))
-        .setTransportType(
-            HTTP_TRANSPORT_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::getEnum))
         .setProxyAddress(
             PROXY_ADDRESS_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::get))
         .setProxyUsername(
@@ -481,11 +470,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setEncryptionKey(RedactedString.create(GCS_ENCRYPTION_KEY.getPassword(config)))
         .setEncryptionKeyHash(RedactedString.create(GCS_ENCRYPTION_KEY_HASH.getPassword(config)))
         .setGrpcEnabled(GCS_GRPC_ENABLE.get(config, config::getBoolean))
-        .setAuthorizationHandlerImplClass(
-            GCS_AUTHORIZATION_HANDLER_IMPL.get(
-                config, (k, d) -> config.getClass(k, d, AuthorizationHandler.class)))
-        .setAuthorizationHandlerProperties(
-            GCS_AUTHORIZATION_HANDLER_PROPERTIES_PREFIX.getPropsWithPrefix(config));
+        .setDirectPathPreferred(GCS_GRPC_DIRECTPATH_ENABLE.get(config, config::getBoolean));
   }
 
   private static PerformanceCachingGoogleCloudStorageOptions getPerformanceCachingOptions(

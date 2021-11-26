@@ -1149,6 +1149,15 @@ public class GoogleCloudStorageTest {
   }
 
   @Test
+  public void testOpenItemInfoNonExistentItem() throws IOException {
+    String bucketName = getSharedBucketName();
+    StorageResourceId nonExistent =
+        new StorageResourceId(bucketName, "testOpenItemInfoNonExistentItem_Object");
+    GoogleCloudStorageItemInfo itemInfo = GoogleCloudStorageItemInfo.createNotFound(nonExistent);
+    assertThrows(FileNotFoundException.class, () -> rawStorage.open(itemInfo));
+  }
+
+  @Test
   public void testOpenEmptyObject() throws IOException {
     String bucketName = getSharedBucketName();
 

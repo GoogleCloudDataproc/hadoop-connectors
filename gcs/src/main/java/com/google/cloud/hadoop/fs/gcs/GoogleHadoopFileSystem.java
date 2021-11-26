@@ -38,7 +38,7 @@ import org.apache.hadoop.fs.Path;
  * particular, it is not subject to bucket-naming constraints, and files are allowed to be placed in
  * root.
  */
-public class GoogleHadoopFileSystem extends GoogleHadoopFileSystemBase {
+public class GoogleHadoopFileSystem extends InstrumentatedGoogleHadoopFileSystem {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 

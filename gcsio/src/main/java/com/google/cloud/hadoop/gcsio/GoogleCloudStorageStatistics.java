@@ -14,17 +14,10 @@
  * limitations under the License.
  */
 
-package com.google.cloud.hadoop.fs.gcs;
+package com.google.cloud.hadoop.gcsio;
 
-/** Enum of statistic types. */
-public enum GhfsStatisticTypeEnum {
-
-  /** Counter. Counts the number of occurrences of each operation */
-  TYPE_COUNTER,
-
-  /** Duration. Duration for the execution of opertaion */
-  TYPE_DURATION,
-
-  /** Gauge. */
-  TYPE_GAUGE
+/** Statistics which are collected in GCSIO. */
+public enum GoogleCloudStorageStatistics {
+  // number of objects deleted
+  OBJECT_DELETE_OBJECTS
 }

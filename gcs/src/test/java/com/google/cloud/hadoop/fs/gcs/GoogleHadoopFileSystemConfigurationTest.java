@@ -14,11 +14,12 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_AUTHORIZATION_HANDLER_IMPL;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_ALGORITHM;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY_HASH;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_DIRECTPATH_ENABLE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_READ_METADATA_TIMEOUT_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_READ_TIMEOUT_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_UPLOAD_BUFFERED_REQUESTS;
@@ -41,8 +42,6 @@ import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamTyp
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
-import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
-import com.google.cloud.hadoop.gcsio.authorization.FakeAuthorizationHandler;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
 import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.common.collect.ImmutableList;
@@ -62,8 +61,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
       new HashMap<String, Object>() {
         {
           put("fs.gs.application.name.suffix", "");
-          put("fs.gs.authorization.handler.impl", null);
-          put("fs.gs.authorization.handler.properties.", ImmutableMap.of());
           put("fs.gs.batch.threads", 15);
           put("fs.gs.block.size", 64 * 1024 * 1024L);
           put("fs.gs.bucket.delete.enable", false);
@@ -83,6 +80,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.grpc.read.metadata.timeout.ms", 60 * 1000L);
           put("fs.gs.grpc.read.timeout.ms", 20 * 60 * 1000L);
           put("fs.gs.grpc.read.zerocopy.enable", true);
+          put("fs.gs.grpc.directpath.enable", true);
           put("fs.gs.grpc.server.address", null);
           put("fs.gs.grpc.write.buffered.requests", 20L);
           put("fs.gs.grpc.write.timeout.ms", 10 * 60 * 1000L);
@@ -302,45 +300,22 @@ public class GoogleHadoopFileSystemConfigurationTest {
   }
 
   @Test
-  public void testGetAuthorizationHandler() {
-    Configuration config = new Configuration();
-    config.setClass(
-        GCS_AUTHORIZATION_HANDLER_IMPL.getKey(),
-        FakeAuthorizationHandler.class,
-        AuthorizationHandler.class);
-
-    GoogleCloudStorageOptions options =
-        GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
-
-    Class<? extends AuthorizationHandler> handler = options.getAuthorizationHandlerImplClass();
-
-    assertThat(handler).isAssignableTo(AuthorizationHandler.class);
-    assertThat(handler).isEqualTo(FakeAuthorizationHandler.class);
-  }
-
-  @Test
-  public void testAuthorizationHandlerClassNotFound() {
-    Configuration config = new Configuration();
-    config.set(GCS_AUTHORIZATION_HANDLER_IMPL.getKey(), "test.class.not.exist");
-
-    assertThrows(
-        RuntimeException.class,
-        () -> GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build());
-  }
-
-  @Test
   public void testGrpcConfiguration() {
     Configuration config = new Configuration();
     long grpcReadTimeout = 10;
     long grpcReadMetadataTimeout = 15;
     long grpcWriteTimeout = 20;
     long grpcUploadBufferedRequests = 25;
+    boolean isDirectPathEnabled = false;
+    boolean isGrpcEnabled = true;
 
+    config.set(GCS_GRPC_ENABLE.getKey(), String.valueOf(isGrpcEnabled));
     config.set(GCS_GRPC_READ_TIMEOUT_MS.getKey(), String.valueOf(grpcReadTimeout));
     config.set(GCS_GRPC_READ_METADATA_TIMEOUT_MS.getKey(), String.valueOf(grpcReadMetadataTimeout));
     config.set(GCS_GRPC_WRITE_TIMEOUT_MS.getKey(), String.valueOf(grpcWriteTimeout));
     config.set(
         GCS_GRPC_UPLOAD_BUFFERED_REQUESTS.getKey(), String.valueOf(grpcUploadBufferedRequests));
+    config.set(GCS_GRPC_DIRECTPATH_ENABLE.getKey(), String.valueOf(isDirectPathEnabled));
 
     GoogleCloudStorageOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
@@ -352,5 +327,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
     assertThat(options.getWriteChannelOptions().getGrpcWriteTimeout()).isEqualTo(grpcWriteTimeout);
     assertThat(options.getWriteChannelOptions().getNumberOfBufferedRequests())
         .isEqualTo(grpcUploadBufferedRequests);
+    assertThat(options.isDirectPathPreferred()).isEqualTo(isDirectPathEnabled);
+    assertThat(options.isGrpcEnabled()).isEqualTo(isGrpcEnabled);
   }
 }

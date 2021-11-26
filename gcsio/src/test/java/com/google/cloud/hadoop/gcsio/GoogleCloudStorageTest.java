@@ -16,7 +16,6 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.createItemInfoForBucket;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.createItemInfoForStorageObject;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.initializeStorageRequestAuthorizer;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInferredDirectory;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.HTTP_TRANSPORT;
@@ -59,7 +58,6 @@ import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpStatusCodes;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.testing.http.MockHttpTransport;
-import com.google.api.client.util.BackOff;
 import com.google.api.client.util.DateTime;
 import com.google.api.client.util.NanoClock;
 import com.google.api.client.util.Sleeper;
@@ -69,8 +67,6 @@ import com.google.api.services.storage.model.Buckets;
 import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
-import com.google.cloud.hadoop.gcsio.authorization.FakeAuthorizationHandler;
-import com.google.cloud.hadoop.gcsio.authorization.StorageRequestAuthorizer;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
@@ -1051,73 +1047,6 @@ public class GoogleCloudStorageTest {
         .inOrder();
   }
 
-  @Test
-  public void testOpenTwoTimeoutsWithIntermittentProgress() throws Exception {
-    byte[] testData = {0x01, 0x02, 0x03, 0x05, 0x08};
-    byte[] testData2 = {0x05, 0x08};
-
-    InputStream timeoutStream =
-        new ThrowingInputStream(new SocketTimeoutException("read timeout #1"));
-
-    InputStream intermittentProgressTimeoutStream =
-        new InputStream() {
-          // Return -1 value from time to time to simulate intermittent read progress
-          final int[] readData = {testData[0], testData[1], -1, testData[2], -1};
-          int readDataIndex = 0;
-
-          @Override
-          public int available() {
-            return 1;
-          }
-
-          @Override
-          public int read() throws IOException {
-            assertThat(readDataIndex).isAtMost(readData.length);
-            // throw SocketTimeoutException after all bytes were read
-            if (readData.length == readDataIndex) {
-              readDataIndex++;
-              throw new SocketTimeoutException("read timeout #2");
-            }
-            return readData[readDataIndex++];
-          }
-        };
-
-    StorageObject storageObject = newStorageObject(BUCKET_NAME, OBJECT_NAME);
-
-    MockHttpTransport transport =
-        mockTransport(
-            jsonDataResponse(storageObject),
-            inputStreamResponse(CONTENT_LENGTH, testData.length, timeoutStream),
-            inputStreamResponse(CONTENT_LENGTH, testData.length, intermittentProgressTimeoutStream),
-            inputStreamResponse(
-                CONTENT_LENGTH, testData.length, new ByteArrayInputStream(testData2)));
-
-    GoogleCloudStorage gcs = mockedGcs(transport);
-
-    GoogleCloudStorageReadChannel readChannel =
-        (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
-    readChannel.setMaxRetries(1);
-    assertThat(readChannel.isOpen()).isTrue();
-    assertThat(readChannel.position()).isEqualTo(0);
-
-    // Should succeed even though, in total, there were more retries than maxRetries, since we
-    // made progress between errors.
-    byte[] actualData = new byte[testData.length];
-    int bytesRead = readChannel.read(ByteBuffer.wrap(actualData));
-
-    assertThat(readChannel.position()).isEqualTo(5);
-    assertThat(bytesRead).isEqualTo(testData.length);
-    assertThat(actualData).isEqualTo(testData);
-
-    assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
-            getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
-            getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
-            getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()))
-        .inOrder();
-  }
-
   /** Test successful operation of GoogleCloudStorage.open(2) with Content-Encoding: gzip files. */
   @Test
   public void testOpenGzippedObjectNormalOperation() throws IOException {
@@ -1235,6 +1164,34 @@ public class GoogleCloudStorageTest {
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(getMediaRequestString(BUCKET_NAME, OBJECT_NAME))
         .inOrder();
+  }
+
+  @Test
+  public void testOpenItemInfoNoSupportGzipEncodingAndNoFailFastOnNotFound() throws Exception {
+    byte[] testData = {0x01, 0x02, 0x03, 0x05, 0x08};
+
+    MockHttpTransport transport = mockTransport(dataResponse(testData));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder()
+            .setSupportGzipEncoding(false)
+            .setFastFailOnNotFound(false)
+            .build();
+    StorageObject storageObject = newStorageObject(BUCKET_NAME, OBJECT_NAME);
+    GoogleCloudStorageItemInfo itemInfo =
+        GoogleCloudStorageImpl.createItemInfoForStorageObject(RESOURCE_ID, storageObject);
+    GoogleCloudStorageReadChannel readChannel =
+        (GoogleCloudStorageReadChannel) gcs.open(itemInfo, readOptions);
+
+    byte[] actualData = new byte[testData.length];
+    int bytesRead = readChannel.read(ByteBuffer.wrap(actualData));
+
+    assertThat(bytesRead).isEqualTo(testData.length);
+    assertThat(actualData).isEqualTo(testData);
+    assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
+        .contains(getMediaRequestString(BUCKET_NAME, OBJECT_NAME, itemInfo.getContentGeneration()));
   }
 
   /** Test in-place forward seeks smaller than seek buffer, smaller than limit. */
@@ -1372,62 +1329,6 @@ public class GoogleCloudStorageTest {
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
             getRequestString(BUCKET_NAME, OBJECT_NAME),
-            getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
-            getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()))
-        .inOrder();
-  }
-
-  /**
-   * Test operation of GoogleCloudStorage.open(2) with Content-Encoding: gzip files when exceptions
-   * occur during reading.
-   */
-  @Test
-  public void testOpenGzippedObjectExceptionsDuringRead() throws Exception {
-    byte[] testData = new byte[1024];
-    new Random().nextBytes(testData);
-    byte[] compressedData = gzip(testData);
-
-    Map<String, Object> responseHeaders =
-        ImmutableMap.of(CONTENT_LENGTH, compressedData.length, "Content-Encoding", "gzip");
-
-    StorageObject storageObject =
-        newStorageObject(BUCKET_NAME, OBJECT_NAME)
-            .setSize(BigInteger.valueOf(compressedData.length))
-            .setContentEncoding("gzip");
-
-    MockHttpTransport transport =
-        mockTransport(
-            jsonDataResponse(storageObject),
-            inputStreamResponse(
-                responseHeaders,
-                partialReadTimeoutStream(
-                    compressedData, /* readFraction= */ 0.25, "read timeout #1")),
-            inputStreamResponse(
-                responseHeaders,
-                partialReadTimeoutStream(
-                    compressedData, /* readFraction= */ 0.75, "read timeout #2")),
-            inputStreamResponse(responseHeaders, new ByteArrayInputStream(compressedData)));
-
-    GoogleCloudStorage gcs = mockedGcs(transport);
-
-    GoogleCloudStorageReadChannel readChannel =
-        (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
-    readChannel.setReadBackOff(BackOff.ZERO_BACKOFF);
-    readChannel.setMaxRetries(1);
-    assertThat(readChannel.isOpen()).isTrue();
-    assertThat(readChannel.position()).isEqualTo(0);
-
-    byte[] actualData = new byte[testData.length];
-    int bytesRead = readChannel.read(ByteBuffer.wrap(actualData));
-
-    assertThat(readChannel.position()).isEqualTo(testData.length);
-    assertThat(bytesRead).isEqualTo(testData.length);
-    assertThat(actualData).isEqualTo(testData);
-
-    assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
-            getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()))
         .inOrder();
@@ -3375,23 +3276,6 @@ public class GoogleCloudStorageTest {
   }
 
   @Test
-  public void testInstantiateAuthorizationHandler() {
-    GoogleCloudStorageOptions options =
-        GoogleCloudStorageOptions.builder()
-            .setAppName("test-name")
-            .setProjectId("test-project")
-            .setAuthorizationHandlerImplClass(FakeAuthorizationHandler.class)
-            .setAuthorizationHandlerProperties(
-                ImmutableMap.of(
-                    FakeAuthorizationHandler.PROPERTY_KEY, FakeAuthorizationHandler.EXPECTED_VALUE))
-            .build();
-
-    StorageRequestAuthorizer authorizer = initializeStorageRequestAuthorizer(options);
-
-    assertThat(authorizer).isNotNull();
-  }
-
-  @Test
   public void initializeRequest_withAccessTokenProviderNotUsingNewTokenPerRequest()
       throws IOException {
     MockHttpTransport transport = mockTransport(jsonDataResponse(newBucket(BUCKET_NAME)));
@@ -3483,27 +3367,5 @@ public class GoogleCloudStorageTest {
       gzipOutputStream.write(testData);
     }
     return outputStream.toByteArray();
-  }
-
-  private static InputStream partialReadTimeoutStream(
-      byte[] data, double readFraction, String timeoutMessage) {
-    return new InputStream() {
-      private int position = 0;
-      private final int maxPos = (int) (data.length * readFraction);
-
-      @Override
-      public int read() throws IOException {
-        if (position == maxPos) {
-          // increment position, so read()) will return `-1` on subsequent read() calls.
-          position++;
-          throw new SocketTimeoutException(timeoutMessage);
-        }
-        if (position >= maxPos) {
-          return -1;
-        }
-        assertThat(position).isLessThan(maxPos);
-        return data[position++] & 0xff;
-      }
-    };
   }
 }
