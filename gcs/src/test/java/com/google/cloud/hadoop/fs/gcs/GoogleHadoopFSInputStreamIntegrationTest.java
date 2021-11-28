@@ -59,7 +59,7 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     String testContent = "test content";
     gcsFsIHelper.writeTextFile(path, testContent);
 
-    GoogleHadoopFSInputStream in = createGhfsInputStream(ghfs, path);
+    GoogleHadoopFSInputStreamBase in = createGhfsInputStream(ghfs, path);
 
     Throwable exception = assertThrows(EOFException.class, () -> in.seek(testContent.length()));
     assertThat(exception).hasMessageThat().contains("Invalid seek offset");
@@ -82,8 +82,8 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     GoogleCloudStorageReadOptions options =
         ghfs.getGcsFs().getOptions().getCloudStorageOptions().getReadChannelOptions();
     FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
-    try (GoogleHadoopFSInputStream in =
-        new GoogleHadoopFSInputStream(ghfs, path, options, statistics)) {
+    try (GoogleHadoopFSInputStreamBase in =
+        new GoogleHadoopFSInputStreamBase(ghfs, path, options, statistics)) {
       assertThat(in.read(value, 0, 1)).isEqualTo(1);
       assertThat(statistics.getReadOps()).isEqualTo(1);
       assertThat(in.read(1, value, 1, 1)).isEqualTo(1);
@@ -103,19 +103,19 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     String testContent = "test content";
     gcsFsIHelper.writeTextFile(path, testContent);
 
-    GoogleHadoopFSInputStream in = createGhfsInputStream(ghfs, path);
-    try (GoogleHadoopFSInputStream ignore = in) {
+    GoogleHadoopFSInputStreamBase in = createGhfsInputStream(ghfs, path);
+    try (GoogleHadoopFSInputStreamBase ignore = in) {
       assertThat(in.available()).isEqualTo(0);
     }
 
     assertThrows(ClosedChannelException.class, in::available);
   }
 
-  private static GoogleHadoopFSInputStream createGhfsInputStream(
+  private static GoogleHadoopFSInputStreamBase createGhfsInputStream(
       GoogleHadoopFileSystem ghfs, URI path) throws IOException {
     GoogleCloudStorageReadOptions options =
         ghfs.getGcsFs().getOptions().getCloudStorageOptions().getReadChannelOptions();
-    return new GoogleHadoopFSInputStream(
+    return new GoogleHadoopFSInputStreamBase(
         ghfs, path, options, new FileSystem.Statistics(ghfs.getScheme()));
   }
 }

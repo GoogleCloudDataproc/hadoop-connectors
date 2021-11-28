@@ -26,6 +26,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStrings;
 import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
@@ -39,12 +40,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * InMemoryGoogleCloudStorage overrides the public methods of GoogleCloudStorage by implementing all
@@ -541,5 +538,16 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     destChannel.write(ByteBuffer.wrap(tempOutput.toByteArray()));
     destChannel.close();
     return getItemInfo(destination);
+  }
+
+  /**
+   * Get the Value of the statistics
+   *
+   * @param key name of the object related statistics key
+   * @return
+   */
+  @Override
+  public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key) {
+    throw new UnsupportedOperationException("not implemented");
   }
 }
