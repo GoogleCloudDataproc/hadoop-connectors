@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCE_BUCKET_DELETE_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID;
@@ -446,6 +447,42 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     }
   }
 
+  @Test
+  public void CopyFromLocalFileIOStatisticsTest() throws IOException {
+    // Temporary file in GHFS.
+    URI tempFileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path tempFilePath = ghfsHelper.castAsHadoopPath(tempFileUri);
+    Path tempDirPath = tempFilePath.getParent();
+    String text = "Hello World!";
+    ghfsHelper.writeFile(tempFilePath, text, 1, /* overwrite= */ false);
+
+    // Temporary file in local FS.
+    File localTempFile = File.createTempFile("ghfs-test-", null);
+    Path localTempFilePath = new Path(localTempFile.getPath());
+
+    // Test the IOStatitsics of copyFromLocalFile(delSrc,overwrite,src,dst)
+    ghfs.copyFromLocalFile(false, true, localTempFilePath, tempDirPath);
+
+    assertThat(
+            ((GoogleHadoopFileSystem) ghfs)
+                .getIOStatistics()
+                .counters()
+                .get(INVOCATION_COPY_FROM_LOCAL_FILE.getSymbol()))
+        .isEqualTo(1);
+
+    // Test the IOStatitsics of copyFromLocalFile(delSrc,overwrite,[] srcs,dst)
+    ghfs.copyFromLocalFile(false, true, new Path[] {localTempFilePath}, tempDirPath);
+    assertThat(
+            ((GoogleHadoopFileSystem) ghfs)
+                .getIOStatistics()
+                .counters()
+                .get(INVOCATION_COPY_FROM_LOCAL_FILE.getSymbol()))
+        .isEqualTo(2);
+
+    if (localTempFile.exists()) {
+      localTempFile.delete();
+    }
+  }
   /**
    * We override certain methods in FileSystem simply to provide debug tracing. (Search for
    * "Overridden functions for debug tracing" in GoogleHadoopFileSystemBase.java). We do not add or
