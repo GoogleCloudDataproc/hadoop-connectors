@@ -671,8 +671,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
     requestContext = Context.current().withCancellation();
     Context toReattach = requestContext.attach();
-    StorageBlockingStub blockingStub =
-        stub.withDeadlineAfter(readTimeout, MILLISECONDS);
+    StorageBlockingStub blockingStub = stub.withDeadlineAfter(readTimeout, MILLISECONDS);
     try {
       if (useZeroCopyMarshaller) {
         resIterator =
