@@ -113,7 +113,7 @@ public class ResilientOperation {
    * @param currentException exception that caused the retry and sleep. For logging.
    * @throws InterruptedException if sleep is interrupted
    */
-  private static boolean nextSleep(BackOff backoff, Sleeper sleeper, Exception currentException)
+  public static boolean nextSleep(BackOff backoff, Sleeper sleeper, Exception currentException)
       throws InterruptedException {
     long backOffTime;
     try {
