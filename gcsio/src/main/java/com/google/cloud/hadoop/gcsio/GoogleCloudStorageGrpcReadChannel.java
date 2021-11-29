@@ -20,6 +20,7 @@ import static java.lang.Math.max;
 import static java.lang.Math.min;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
+import com.google.api.client.util.BackOff;
 import com.google.api.client.util.Sleeper;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.Storage.Objects.Get;
@@ -468,61 +469,89 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     if (!isOpen()) {
       throw new ClosedChannelException();
     }
+    try {
+      int bytesRead = 0;
 
-    int bytesRead = 0;
-
-    if (resIterator != null && isByteBufferBeyondCurrentRequestRange(byteBuffer)) {
-      positionInGrpcStream += bytesToSkipBeforeReading;
-      cancelCurrentRequest();
-      bufferedContent = null;
-      bufferedContentReadOffset = 0;
-      bytesToSkipBeforeReading = 0;
-    }
-
-    // The server responds in 2MB chunks, but the client can ask for less than that. We store
-    // the
-    // remainder in bufferedContent and return pieces of that on the next read call (and flush
-    // that buffer if there is a seek).
-    if (bufferedContent != null) {
-      bytesRead += readBufferedContentInto(byteBuffer);
-    }
-    if (!byteBuffer.hasRemaining()) {
-      return bytesRead;
-    }
-    if (positionInGrpcStream == objectSize) {
-      return bytesRead > 0 ? bytesRead : -1;
-    }
-
-    // read request content overlaps with cached footer data
-    long effectivePosition = positionInGrpcStream + bytesToSkipBeforeReading;
-    if ((footerContent != null) && (effectivePosition >= footerStartOffsetInBytes)) {
-      logger.atFiner().log(
-          "Read request responded with footer content at position '%s'", effectivePosition);
-      bytesRead += readFooterContentIntoBuffer(byteBuffer);
-      return bytesRead;
-    }
-
-    if (resIterator == null) {
-      OptionalLong bytesToRead = getBytesToRead(byteBuffer);
-      positionInGrpcStream += bytesToSkipBeforeReading;
-      bytesToSkipBeforeReading = 0;
-      requestObjectMedia(bytesToRead);
-      if (bytesToRead.isPresent()) {
-        contentChannelEndOffset = positionInGrpcStream + bytesToRead.getAsLong();
+      if (resIterator != null && isByteBufferBeyondCurrentRequestRange(byteBuffer)) {
+        positionInGrpcStream += bytesToSkipBeforeReading;
+        cancelCurrentRequest();
+        invalidateBufferedContent();
+        bytesToSkipBeforeReading = 0;
       }
+
+      // The server responds in 2MB chunks, but the client can ask for less than that. We
+      // store the remainder in bufferedContent and return pieces of that on the next read call (and
+      // flush that buffer if there is a seek).
+      if (bufferedContent != null) {
+        bytesRead += readBufferedContentInto(byteBuffer);
+      }
+      if (!byteBuffer.hasRemaining()) {
+        return bytesRead;
+      }
+      if (positionInGrpcStream == objectSize) {
+        return bytesRead > 0 ? bytesRead : -1;
+      }
+
+      // read request content overlaps with cached footer data
+      long effectivePosition = positionInGrpcStream + bytesToSkipBeforeReading;
+      if ((footerContent != null) && (effectivePosition >= footerStartOffsetInBytes)) {
+        logger.atFiner().log(
+            "Read request responded with footer content at position '%s'", effectivePosition);
+        bytesRead += readFooterContentIntoBuffer(byteBuffer);
+        return bytesRead;
+      }
+
+      bytesRead += readFromGCS(byteBuffer);
+
+      if (hasMoreFooterContentToRead(byteBuffer)) {
+        int bytesToWrite = min(byteBuffer.remaining(), footerContent.size());
+        int bytesToSkipInFooter = (int) (positionInGrpcStream - footerStartOffsetInBytes);
+        put(footerContent, bytesToSkipInFooter, bytesToWrite, byteBuffer);
+        positionInGrpcStream += bytesToWrite;
+        bytesRead += bytesToWrite;
+      }
+
+      return bytesRead;
+    } catch (InterruptedException e) {
+      cancelCurrentRequest();
+      throw new IOException(e);
     }
+  }
 
-    bytesRead += readObjectContentFromGCS(byteBuffer);
-
-    if (hasMoreFooterContentToRead(byteBuffer)) {
-      int bytesToWrite = min(byteBuffer.remaining(), footerContent.size());
-      int bytesToSkipInFooter = (int) (positionInGrpcStream - footerStartOffsetInBytes);
-      put(footerContent, bytesToSkipInFooter, bytesToWrite, byteBuffer);
-      positionInGrpcStream += bytesToWrite;
-      bytesRead += bytesToWrite;
-    }
-
-    return bytesRead;
+  /**
+   * Reads data from GCS over network, with retries
+   *
+   * @param byteBuffer Buffer to be filled with data from GCS
+   * @return number of bytes read into the buffer
+   * @throws IOException In case of data errors or network errors
+   * @throws InterruptedException In case of thread interrupt while retrying
+   */
+  private int readFromGCS(ByteBuffer byteBuffer) throws IOException, InterruptedException {
+    int read = 0;
+    StatusRuntimeException statusRuntimeException;
+    BackOff backoff = backOffFactory.newBackOff();
+    Sleeper sleeper = Sleeper.DEFAULT;
+    do {
+      try {
+        if (resIterator == null) {
+          OptionalLong bytesToRead = getBytesToRead(byteBuffer);
+          positionInGrpcStream += bytesToSkipBeforeReading;
+          bytesToSkipBeforeReading = 0;
+          requestObjectMedia(bytesToRead);
+          if (bytesToRead.isPresent()) {
+            contentChannelEndOffset = positionInGrpcStream + bytesToRead.getAsLong();
+          }
+        }
+        while (byteBuffer.hasRemaining() && moreServerContent()) {
+          read += readObjectContentFromGCS(byteBuffer);
+        }
+        return read;
+      } catch (StatusRuntimeException e) {
+        cancelCurrentRequest();
+        statusRuntimeException = e;
+      }
+    } while (ResilientOperation.nextSleep(backoff, sleeper, statusRuntimeException));
+    throw convertError(statusRuntimeException, resourceId);
   }
 
   private boolean isByteBufferBeyondCurrentRequestRange(ByteBuffer byteBuffer) {
@@ -536,48 +565,46 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private int readObjectContentFromGCS(ByteBuffer byteBuffer) throws IOException {
     int bytesRead = 0;
-    while (byteBuffer.hasRemaining() && moreServerContent()) {
-      ReadObjectResponse res = resIterator.next();
+    ReadObjectResponse res = resIterator.next();
 
-      // When zero-copy mashaller is used, the stream that backs GetObjectMediaResponse
-      // should be closed when the mssage is no longed needed so that all buffers in the
-      // stream can be reclaimed. If zero-copy is not used, stream will be null.
-      InputStream stream = getObjectMediaResponseMarshaller.popStream(res);
-      try {
-        ByteString content = res.getChecksummedData().getContent();
-        if (bytesToSkipBeforeReading >= 0 && bytesToSkipBeforeReading < content.size()) {
-          content = res.getChecksummedData().getContent().substring((int) bytesToSkipBeforeReading);
-          positionInGrpcStream += bytesToSkipBeforeReading;
-          bytesToSkipBeforeReading = 0;
-        } else if (bytesToSkipBeforeReading >= content.size()) {
-          positionInGrpcStream += content.size();
-          bytesToSkipBeforeReading -= content.size();
-          continue;
-        }
+    // When zero-copy marshaller is used, the stream that backs GetObjectMediaResponse
+    // should be closed when the message is no longed needed so that all buffers in the
+    // stream can be reclaimed. If zero-copy is not used, stream will be null.
+    InputStream stream = getObjectMediaResponseMarshaller.popStream(res);
+    try {
+      ByteString content = res.getChecksummedData().getContent();
+      if (bytesToSkipBeforeReading >= 0 && bytesToSkipBeforeReading < content.size()) {
+        content = content.substring((int) bytesToSkipBeforeReading);
+        positionInGrpcStream += bytesToSkipBeforeReading;
+        bytesToSkipBeforeReading = 0;
+      } else if (bytesToSkipBeforeReading >= content.size()) {
+        positionInGrpcStream += content.size();
+        bytesToSkipBeforeReading -= content.size();
+        return bytesRead;
+      }
 
-        if (readOptions.isGrpcChecksumsEnabled() && res.getChecksummedData().hasCrc32C()) {
-          validateChecksum(res);
-        }
+      if (readOptions.isGrpcChecksumsEnabled() && res.getChecksummedData().hasCrc32C()) {
+        validateChecksum(res);
+      }
 
-        boolean responseSizeLargerThanRemainingBuffer = content.size() > byteBuffer.remaining();
-        int bytesToWrite =
-            responseSizeLargerThanRemainingBuffer ? byteBuffer.remaining() : content.size();
-        put(content, 0, bytesToWrite, byteBuffer);
-        bytesRead += bytesToWrite;
-        positionInGrpcStream += bytesToWrite;
+      boolean responseSizeLargerThanRemainingBuffer = content.size() > byteBuffer.remaining();
+      int bytesToWrite =
+          responseSizeLargerThanRemainingBuffer ? byteBuffer.remaining() : content.size();
+      put(content, 0, bytesToWrite, byteBuffer);
+      bytesRead += bytesToWrite;
+      positionInGrpcStream += bytesToWrite;
 
-        if (responseSizeLargerThanRemainingBuffer) {
-          invalidateBufferedContent();
-          bufferedContent = content;
-          bufferedContentReadOffset = bytesToWrite;
-          // This is to keep the stream alive for the message backed by this.
-          streamForBufferedContent = stream;
-          stream = null;
-        }
-      } finally {
-        if (stream != null) {
-          stream.close();
-        }
+      if (responseSizeLargerThanRemainingBuffer) {
+        invalidateBufferedContent();
+        bufferedContent = content;
+        bufferedContentReadOffset = bytesToWrite;
+        // This is to keep the stream alive for the message backed by this.
+        streamForBufferedContent = stream;
+        stream = null;
+      }
+    } finally {
+      if (stream != null) {
+        stream.close();
       }
     }
     return bytesRead;
@@ -632,7 +659,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     return bytesToWrite;
   }
 
-  private void requestObjectMedia(OptionalLong bytesToRead) throws IOException {
+  private void requestObjectMedia(OptionalLong bytesToRead) throws StatusRuntimeException {
     ReadObjectRequest.Builder requestBuilder =
         ReadObjectRequest.newBuilder()
             .setBucket(GrpcChannelUtils.toV2BucketName(resourceId.getBucketName()))
@@ -641,37 +668,23 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
             .setReadOffset(positionInGrpcStream);
     bytesToRead.ifPresent(requestBuilder::setReadLimit);
     ReadObjectRequest request = requestBuilder.build();
+
+    requestContext = Context.current().withCancellation();
+    Context toReattach = requestContext.attach();
+    StorageBlockingStub blockingStub = stub.withDeadlineAfter(readTimeout, MILLISECONDS);
     try {
-      ResilientOperation.retry(
-          () -> {
-            try {
-              requestContext = Context.current().withCancellation();
-              Context toReattach = requestContext.attach();
-              StorageBlockingStub blockingStub = stub.withDeadlineAfter(readTimeout, MILLISECONDS);
-              try {
-                if (useZeroCopyMarshaller) {
-                  resIterator =
-                      io.grpc.stub.ClientCalls.blockingServerStreamingCall(
-                          blockingStub.getChannel(),
-                          getObjectMediaMethod,
-                          blockingStub.getCallOptions(),
-                          request);
-                } else {
-                  resIterator = blockingStub.readObject(request);
-                }
-              } finally {
-                requestContext.detach(toReattach);
-              }
-            } catch (StatusRuntimeException e) {
-              throw convertError(e, resourceId);
-            }
-            return null;
-          },
-          backOffFactory.newBackOff(),
-          RetryDeterminer.ALL_ERRORS,
-          IOException.class);
-    } catch (Exception e) {
-      throw new IOException(String.format("Error reading '%s'", resourceId), e);
+      if (useZeroCopyMarshaller) {
+        resIterator =
+            io.grpc.stub.ClientCalls.blockingServerStreamingCall(
+                blockingStub.getChannel(),
+                getObjectMediaMethod,
+                blockingStub.getCallOptions(),
+                request);
+      } else {
+        resIterator = blockingStub.readObject(request);
+      }
+    } finally {
+      requestContext.detach(toReattach);
     }
   }
 
@@ -698,33 +711,16 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
    * Waits until more data is available from the server, or returns false if read is done.
    *
    * @return true if more data is available with .next()
-   * @throws IOException of the appropriate type if there was an I/O error.
    */
-  private boolean moreServerContent() throws IOException {
+  private boolean moreServerContent() {
     if (resIterator == null || requestContext == null || requestContext.isCancelled()) {
       return false;
     }
-
-    try {
-      return ResilientOperation.retry(
-          () -> {
-            try {
-              boolean moreDataAvailable = resIterator.hasNext();
-              if (!moreDataAvailable) {
-                cancelCurrentRequest();
-              }
-              return moreDataAvailable;
-            } catch (StatusRuntimeException e) {
-              throw convertError(e, resourceId);
-            }
-          },
-          backOffFactory.newBackOff(),
-          RetryDeterminer.ALL_ERRORS,
-          IOException.class);
-    } catch (Exception e) {
+    boolean moreDataAvailable = resIterator.hasNext();
+    if (!moreDataAvailable) {
       cancelCurrentRequest();
-      throw new IOException(String.format("Error reading '%s'", resourceId), e);
     }
+    return moreDataAvailable;
   }
 
   @Override
