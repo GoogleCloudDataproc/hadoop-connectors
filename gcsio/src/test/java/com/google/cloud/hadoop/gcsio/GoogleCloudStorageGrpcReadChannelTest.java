@@ -726,11 +726,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
     ByteBuffer buffer = ByteBuffer.allocate(10);
     IOException thrown = assertThrows(IOException.class, () -> readChannel.read(buffer));
-    assertThat(thrown)
-        .hasCauseThat()
-        .hasCauseThat()
-        .hasMessageThat()
-        .contains("Custom error message.");
+    assertThat(thrown).hasCauseThat().hasMessageThat().contains("Custom error message.");
   }
 
   @Test
@@ -798,11 +794,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
     ByteBuffer buffer = ByteBuffer.allocate(10);
     IOException thrown = assertThrows(IOException.class, () -> readChannel.read(buffer));
-    assertThat(thrown)
-        .hasCauseThat()
-        .hasCauseThat()
-        .hasMessageThat()
-        .contains("Custom error message");
+    assertThat(thrown).hasCauseThat().hasMessageThat().contains("Custom error message");
   }
 
   @Test
