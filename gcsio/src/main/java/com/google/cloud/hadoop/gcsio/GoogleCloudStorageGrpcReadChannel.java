@@ -14,6 +14,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_GRPC_READ_SPEED_BYTES_PER_SEC;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
@@ -376,8 +377,12 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   // Estimates a read time out based on read speeds
   static long getReadTimeoutMillis(GoogleCloudStorageReadOptions readOptions, long objectSize) {
-    return readOptions.getGrpcReadTimeoutMillis()
-        + ((objectSize / readOptions.getGrpcReadSpeedBytesPerSec()) * 1000);
+    long readSpeedInBytesPerSec;
+    if (readOptions.getGrpcReadSpeedBytesPerSec() <= 0)
+      readSpeedInBytesPerSec = DEFAULT_GRPC_READ_SPEED_BYTES_PER_SEC;
+    else readSpeedInBytesPerSec = readOptions.getGrpcReadSpeedBytesPerSec();
+
+    return readOptions.getGrpcReadTimeoutMillis() + ((objectSize / readSpeedInBytesPerSec) * 1000);
   }
 
   private GoogleCloudStorageGrpcReadChannel(
