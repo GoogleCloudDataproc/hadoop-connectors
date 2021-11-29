@@ -475,8 +475,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       if (resIterator != null && isByteBufferBeyondCurrentRequestRange(byteBuffer)) {
         positionInGrpcStream += bytesToSkipBeforeReading;
         cancelCurrentRequest();
-        bufferedContent = null;
-        bufferedContentReadOffset = 0;
+        invalidateBufferedContent();
         bytesToSkipBeforeReading = 0;
       }
 
