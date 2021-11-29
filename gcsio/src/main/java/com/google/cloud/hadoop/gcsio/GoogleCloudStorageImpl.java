@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createJsonResponseException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInferredDirectory;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.OBJECT_DELETE_OBJECTS;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -57,7 +58,6 @@ import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.RewriteResponse;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.auth.Credentials;
-import com.google.cloud.hadoop.gcsio.authorization.StorageRequestAuthorizer;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
@@ -104,6 +104,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 
@@ -150,6 +151,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           "metadata");
 
   private static final String LIST_OBJECT_FIELDS_FORMAT = "items(%s),prefixes,nextPageToken";
+
+  // To track the object statistics
+  private HashMap<GoogleCloudStorageStatistics, AtomicLong> objectStatistics =
+      new HashMap<GoogleCloudStorageStatistics, AtomicLong>();
 
   // A function to encode metadata map values
   static String encodeMetadataValues(byte[] bytes) {
@@ -260,9 +265,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   // Determine if a given IOException is due to rate-limiting.
   private RetryDeterminer<IOException> rateLimitedRetryDeterminer = errorExtractor::rateLimited;
-
-  // Authorization Handler instance.
-  private final StorageRequestAuthorizer storageRequestAuthorizer;
 
   // Function that generates downscoped access token.
   private final Function<List<AccessBoundary>, String> downscopedAccessTokenFn;
@@ -385,7 +387,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       }
     }
 
-    this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
   }
 
@@ -394,25 +395,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       throws IOException {
     HttpTransport httpTransport =
         HttpTransportFactory.createHttpTransport(
-            options.getTransportType(),
-            options.getProxyAddress(),
-            options.getProxyUsername(),
-            options.getProxyPassword());
+            options.getProxyAddress(), options.getProxyUsername(), options.getProxyPassword());
     return new Storage.Builder(httpTransport, JSON_FACTORY, httpRequestInitializer)
         .setRootUrl(options.getStorageRootUrl())
         .setServicePath(options.getStorageServicePath())
         .setApplicationName(options.getAppName())
         .build();
-  }
-
-  @VisibleForTesting
-  static StorageRequestAuthorizer initializeStorageRequestAuthorizer(
-      GoogleCloudStorageOptions options) {
-    return options.getAuthorizationHandlerImplClass() == null
-        ? null
-        : new StorageRequestAuthorizer(
-            options.getAuthorizationHandlerImplClass(),
-            options.getAuthorizationHandlerProperties());
   }
 
   private ExecutorService createManualBatchingThreadPool() {
@@ -746,25 +734,48 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     Preconditions.checkArgument(
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
 
-    if (storageOptions.isGrpcEnabled()) {
-      return GoogleCloudStorageGrpcReadChannel.open(
-          storageStubProvider, storage, errorExtractor, resourceId, readOptions);
-    }
-
     // The underlying channel doesn't initially read data, which means that we won't see a
     // FileNotFoundException until read is called. As a result, in order to find out if the
-    // object
-    // exists, we'll need to do an RPC (metadata or data). A metadata check should be a less
+    // object exists, we'll need to do an RPC (metadata or data). A metadata check should be a less
     // expensive operation than a read data operation.
-    GoogleCloudStorageItemInfo info;
-    if (readOptions.getFastFailOnNotFound()) {
-      info = getItemInfo(resourceId);
-      if (!info.exists()) {
-        throw createFileNotFoundException(
-            resourceId.getBucketName(), resourceId.getObjectName(), /* cause= */ null);
-      }
-    } else {
-      info = null;
+    GoogleCloudStorageItemInfo itemInfo =
+        readOptions.getFastFailOnNotFound() ? getItemInfo(resourceId) : null;
+
+    return open(resourceId, itemInfo, readOptions);
+  }
+
+  /**
+   * See {@link GoogleCloudStorage#open(GoogleCloudStorageItemInfo)} for details about expected
+   * behavior.
+   */
+  public SeekableByteChannel open(
+      GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
+      throws IOException {
+    logger.atFiner().log("open(%s, %s)", itemInfo, readOptions);
+    checkNotNull(itemInfo, "itemInfo should not be null");
+
+    StorageResourceId resourceId = itemInfo.getResourceId();
+    Preconditions.checkArgument(
+        resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
+
+    return open(resourceId, itemInfo, readOptions);
+  }
+
+  private SeekableByteChannel open(
+      StorageResourceId resourceId,
+      GoogleCloudStorageItemInfo itemInfo,
+      GoogleCloudStorageReadOptions readOptions)
+      throws IOException {
+    if (itemInfo != null && !itemInfo.exists()) {
+      throw createFileNotFoundException(
+          resourceId.getBucketName(), resourceId.getObjectName(), /* cause= */ null);
+    }
+    if (storageOptions.isGrpcEnabled()) {
+      return itemInfo == null
+          ? GoogleCloudStorageGrpcReadChannel.open(
+              storageStubProvider, storage, errorExtractor, resourceId, readOptions)
+          : GoogleCloudStorageGrpcReadChannel.open(
+              storageStubProvider, storage, itemInfo, readOptions);
     }
 
     return new GoogleCloudStorageReadChannel(
@@ -773,7 +784,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       @Override
       @Nullable
       protected GoogleCloudStorageItemInfo getInitialMetadata() {
-        return info;
+        return itemInfo;
       }
 
       @Override
@@ -825,11 +836,17 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   public void deleteObject(StorageResourceId resourceId, long metaGeneration) throws IOException {
     String bucketName = resourceId.getBucketName();
+
     Storage.Objects.Delete deleteObject =
         initializeRequest(
                 storage.objects().delete(bucketName, resourceId.getObjectName()), bucketName)
             .setIfMetagenerationMatch(metaGeneration);
     deleteObject.execute();
+
+    //  To update the statistics of number of objects deleted
+
+    objectStatistics.putIfAbsent(OBJECT_DELETE_OBJECTS, new AtomicLong(0));
+    objectStatistics.get(OBJECT_DELETE_OBJECTS).incrementAndGet();
   }
 
   /** See {@link GoogleCloudStorage#deleteObjects(List)} for details about expected behavior. */
@@ -859,8 +876,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             fullObjectNames.size(),
             storageOptions.getBatchThreads());
 
+    // update the statistics of number of objects deleted
+    objectStatistics.putIfAbsent(OBJECT_DELETE_OBJECTS, new AtomicLong(0));
     for (StorageResourceId fullObjectName : fullObjectNames) {
       queueSingleObjectDelete(fullObjectName, innerExceptions, batchHelper, 1);
+      objectStatistics.get(OBJECT_DELETE_OBJECTS).incrementAndGet();
     }
 
     batchHelper.flush();
@@ -2292,9 +2312,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       String token = downscopedAccessTokenFn.apply(accessBoundaries);
       request.getRequestHeaders().setAuthorization("Bearer " + token);
     }
-    if (storageRequestAuthorizer != null) {
-      storageRequestAuthorizer.authorize(request);
-    }
     return configureRequest(request, bucketName);
   }
 
@@ -2388,5 +2405,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     if (userProjectField != null) {
       request.set(USER_PROJECT_FIELD_NAME, projectId);
     }
+  }
+
+  @Override
+  public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key) {
+    return objectStatistics.get(key);
   }
 }
