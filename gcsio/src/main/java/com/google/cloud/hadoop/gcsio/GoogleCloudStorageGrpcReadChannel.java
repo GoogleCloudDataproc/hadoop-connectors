@@ -123,6 +123,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   // Offset in the object for the end of the range-requests
   private long contentChannelEndOffset = -1;
 
+  private long readTimeout;
+
   public static GoogleCloudStorageGrpcReadChannel open(
       StorageStubProvider stubProvider,
       Storage storage,
@@ -377,10 +379,9 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   // Estimates a read time out based on read speeds
   static long getReadTimeoutMillis(GoogleCloudStorageReadOptions readOptions, long objectSize) {
-    long readSpeedInBytesPerSec;
-    if (readOptions.getGrpcReadSpeedBytesPerSec() <= 0)
-      readSpeedInBytesPerSec = DEFAULT_GRPC_READ_SPEED_BYTES_PER_SEC;
-    else readSpeedInBytesPerSec = readOptions.getGrpcReadSpeedBytesPerSec();
+    long readSpeedInBytesPerSec = DEFAULT_GRPC_READ_SPEED_BYTES_PER_SEC;
+    if (readOptions.getGrpcReadSpeedBytesPerSec() > 0)
+      readSpeedInBytesPerSec = readOptions.getGrpcReadSpeedBytesPerSec();
 
     return readOptions.getGrpcReadTimeoutMillis() + ((objectSize / readSpeedInBytesPerSec) * 1000);
   }
@@ -396,6 +397,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       BackOffFactory backOffFactory) {
     this.useZeroCopyMarshaller =
         ZeroCopyReadinessChecker.isReady() && readOptions.isGrpcReadZeroCopyEnabled();
+    this.readTimeout = getReadTimeoutMillis(readOptions, objectSize);
     this.stub = gcsGrpcBlockingStub;
     this.resourceId = resourceId;
     this.objectGeneration = objectGeneration;
@@ -645,9 +647,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
             try {
               requestContext = Context.current().withCancellation();
               Context toReattach = requestContext.attach();
-              StorageBlockingStub blockingStub =
-                  stub.withDeadlineAfter(
-                      getReadTimeoutMillis(readOptions, objectSize), MILLISECONDS);
+              StorageBlockingStub blockingStub = stub.withDeadlineAfter(readTimeout, MILLISECONDS);
               try {
                 if (useZeroCopyMarshaller) {
                   resIterator =
