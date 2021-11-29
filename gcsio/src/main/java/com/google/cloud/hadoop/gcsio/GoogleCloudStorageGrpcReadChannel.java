@@ -14,6 +14,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_GRPC_READ_SPEED_BYTES_PER_SEC;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
@@ -44,6 +45,7 @@ import io.grpc.MethodDescriptor;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import java.io.EOFException;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -70,8 +72,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   private final boolean useZeroCopyMarshaller;
 
   private volatile StorageBlockingStub stub;
-
-  private final StorageStubProvider stubProvider;
 
   private final StorageResourceId resourceId;
 
@@ -123,6 +123,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   // Offset in the object for the end of the range-requests
   private long contentChannelEndOffset = -1;
 
+  private long readTimeout;
+
   public static GoogleCloudStorageGrpcReadChannel open(
       StorageStubProvider stubProvider,
       Storage storage,
@@ -132,6 +134,26 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       throws IOException {
     return open(
         stubProvider, storage, errorExtractor, resourceId, readOptions, BackOffFactory.DEFAULT);
+  }
+
+  /**
+   * Used to open given file using item info
+   *
+   * @param stubProvider gRPC stub for accessing the Storage gRPC API
+   * @param storage store and retrieve data object
+   * @param itemInfo contains metadata information about the file
+   * @param readOptions readOptions fine-grained options specifying things like retry settings,
+   *     buffering, etc.
+   * @return gRPC read channel
+   * @throws IOException IOException on IO Error
+   */
+  static GoogleCloudStorageGrpcReadChannel open(
+      StorageStubProvider stubProvider,
+      Storage storage,
+      GoogleCloudStorageItemInfo itemInfo,
+      GoogleCloudStorageReadOptions readOptions)
+      throws IOException {
+    return open(stubProvider, storage, itemInfo, readOptions, BackOffFactory.DEFAULT);
   }
 
   @VisibleForTesting
@@ -160,6 +182,39 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     }
   }
 
+  /**
+   * The gRPC API's GetObjectMedia call does not provide a generation number, so to ensure
+   * consistent reads, we need to begin by checking the current generation number with a separate
+   * call.
+   *
+   * @param stubProvider gRPC stub for accessing the Storage gRPC API
+   * @param storage store and retrieve data object
+   * @param itemInfo contains metadata information about the file
+   * @param readOptions readOptions fine-grained options specifying things like retry settings,
+   *     buffering, etc.
+   * @param backOffFactory
+   * @return gRPC read channel
+   * @throws IOException IOException on IO Error
+   */
+  static GoogleCloudStorageGrpcReadChannel open(
+      StorageStubProvider stubProvider,
+      Storage storage,
+      GoogleCloudStorageItemInfo itemInfo,
+      GoogleCloudStorageReadOptions readOptions,
+      BackOffFactory backOffFactory)
+      throws IOException {
+
+    try {
+      return ResilientOperation.retry(
+          () -> openChannel(stubProvider, storage, itemInfo, readOptions, backOffFactory),
+          backOffFactory.newBackOff(),
+          RetryDeterminer.ALL_ERRORS,
+          IOException.class);
+    } catch (Exception e) {
+      throw new IOException(String.format("Error reading '%s'", itemInfo.getResourceId()), e);
+    }
+  }
+
   private static GoogleCloudStorageGrpcReadChannel openChannel(
       StorageStubProvider stubProvider,
       Storage storage,
@@ -168,16 +223,46 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       GoogleCloudStorageReadOptions readOptions,
       BackOffFactory backOffFactory)
       throws IOException {
-    StorageBlockingStub stub = stubProvider.newBlockingStub();
     // TODO(b/135138893): We can avoid this call by adding metadata to a read request.
     //      That will save about 40ms per read.
     Preconditions.checkArgument(storage != null, "GCS json client cannot be null");
     GoogleCloudStorageItemInfo itemInfo =
         getObjectMetadata(resourceId, errorExtractor, backOffFactory, storage);
     Preconditions.checkArgument(itemInfo != null, "object metadata cannot be null");
+    return openChannel(stubProvider, storage, itemInfo, readOptions, backOffFactory);
+  }
+
+  /**
+   * Overloaded implementation of openChannel with item info to reduce an object metadata call
+   *
+   * @param stubProvider gRPC stub for accessing the Storage gRPC API
+   * @param storage store and retrieve data object
+   * @param itemInfo contains metadata information about the file
+   * @param readOptions readOptions fine-grained options specifying things like retry settings,
+   *     buffering, etc.
+   * @param backOffFactory
+   * @return gRPC read channel
+   * @throws IOException IOException on IO Error
+   */
+  private static GoogleCloudStorageGrpcReadChannel openChannel(
+      StorageStubProvider stubProvider,
+      Storage storage,
+      GoogleCloudStorageItemInfo itemInfo,
+      GoogleCloudStorageReadOptions readOptions,
+      BackOffFactory backOffFactory)
+      throws IOException {
+    StorageBlockingStub stub = stubProvider.newBlockingStub();
+    Preconditions.checkArgument(storage != null, "GCS json client cannot be null");
+    Preconditions.checkArgument(itemInfo != null, "object metadata cannot be null");
     // The non-gRPC read channel has special support for gzip. This channel doesn't
     // decompress gzip-encoded objects on the fly, so best to fail fast rather than return
     // gibberish unexpectedly.
+    if (!itemInfo.exists()) {
+      throw new FileNotFoundException(
+          String.format(
+              "%s not found: %s",
+              itemInfo.isDirectory() ? "Directory" : "File", itemInfo.getResourceId()));
+    }
     String contentEncoding = itemInfo.getContentEncoding();
     if (contentEncoding != null && contentEncoding.contains("gzip")) {
       throw new IOException(
@@ -185,16 +270,18 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     }
 
     int prefetchSizeInBytes = readOptions.getMinRangeRequestSize() / 2;
-    long footerOffsetInBytes = Math.max(0, (itemInfo.getSize() - prefetchSizeInBytes));
+    long objectSize = itemInfo.getSize();
+    long footerOffsetInBytes = Math.max(0, (objectSize - prefetchSizeInBytes));
 
-    ByteString footerContent = getFooterContent(resourceId, readOptions, stub, footerOffsetInBytes);
+    ByteString footerContent =
+        getFooterContent(
+            itemInfo.getResourceId(), readOptions, stub, footerOffsetInBytes, objectSize);
 
     return new GoogleCloudStorageGrpcReadChannel(
         stub,
-        stubProvider,
-        resourceId,
+        itemInfo.getResourceId(),
         itemInfo.getContentGeneration(),
-        itemInfo.getSize(),
+        objectSize,
         footerOffsetInBytes,
         footerContent,
         readOptions,
@@ -253,11 +340,12 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       StorageResourceId resourceId,
       GoogleCloudStorageReadOptions readOptions,
       StorageBlockingStub stub,
-      long footerOffset)
+      long footerOffset,
+      long objectSize)
       throws IOException {
     try {
       Iterator<ReadObjectResponse> footerContentResponse =
-          stub.withDeadlineAfter(readOptions.getGrpcReadTimeoutMillis(), MILLISECONDS)
+          stub.withDeadlineAfter(getReadTimeoutMillis(readOptions, objectSize), MILLISECONDS)
               .readObject(
                   ReadObjectRequest.newBuilder()
                       .setReadOffset(footerOffset)
@@ -289,9 +377,17 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     }
   }
 
+  // Estimates a read time out based on read speeds
+  static long getReadTimeoutMillis(GoogleCloudStorageReadOptions readOptions, long objectSize) {
+    long readSpeedInBytesPerSec = DEFAULT_GRPC_READ_SPEED_BYTES_PER_SEC;
+    if (readOptions.getGrpcReadSpeedBytesPerSec() > 0)
+      readSpeedInBytesPerSec = readOptions.getGrpcReadSpeedBytesPerSec();
+
+    return readOptions.getGrpcReadTimeoutMillis() + ((objectSize / readSpeedInBytesPerSec) * 1000);
+  }
+
   private GoogleCloudStorageGrpcReadChannel(
       StorageBlockingStub gcsGrpcBlockingStub,
-      StorageStubProvider stubProvider,
       StorageResourceId resourceId,
       long objectGeneration,
       long objectSize,
@@ -301,8 +397,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       BackOffFactory backOffFactory) {
     this.useZeroCopyMarshaller =
         ZeroCopyReadinessChecker.isReady() && readOptions.isGrpcReadZeroCopyEnabled();
+    this.readTimeout = getReadTimeoutMillis(readOptions, objectSize);
     this.stub = gcsGrpcBlockingStub;
-    this.stubProvider = stubProvider;
     this.resourceId = resourceId;
     this.objectGeneration = objectGeneration;
     this.objectSize = objectSize;
@@ -551,8 +647,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
             try {
               requestContext = Context.current().withCancellation();
               Context toReattach = requestContext.attach();
-              StorageBlockingStub blockingStub =
-                  stub.withDeadlineAfter(readOptions.getGrpcReadTimeoutMillis(), MILLISECONDS);
+              StorageBlockingStub blockingStub = stub.withDeadlineAfter(readTimeout, MILLISECONDS);
               try {
                 if (useZeroCopyMarshaller) {
                   resIterator =
