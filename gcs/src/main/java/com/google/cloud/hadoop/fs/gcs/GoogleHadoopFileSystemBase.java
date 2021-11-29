@@ -571,7 +571,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     URI gcsPath = getGcsPath(hadoopPath);
     GoogleCloudStorageReadOptions readChannelOptions =
         getGcsFs().getOptions().getCloudStorageOptions().getReadChannelOptions();
-    GoogleHadoopFSInputStream in =
+    GoogleHadoopFSInputStreamBase in =
         new GoogleHadoopFSInputStream(this, gcsPath, readChannelOptions, statistics);
 
     return new FSDataInputStream(in);
@@ -705,7 +705,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 "Unsupported output stream type given for key '%s': '%s'",
                 GCS_OUTPUT_STREAM_TYPE.getKey(), type));
     }
-
     return new FSDataOutputStream(out, /* stats= */ null);
   }
 
@@ -720,6 +719,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       long blockSize,
       Progressable progress)
       throws IOException {
+
     URI gcsPath = getGcsPath(checkNotNull(hadoopPath, "hadoopPath must not be null"));
     URI parentGcsPath = UriPaths.getParentPath(gcsPath);
     if (!getGcsFs().getFileInfo(parentGcsPath).exists()) {
@@ -851,7 +851,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     URI srcPath = getGcsPath(src);
     URI dstPath = getGcsPath(dst);
-
     getGcsFs().rename(srcPath, dstPath);
 
     logger.atFiner().log("rename(src: %s, dst: %s): true", src, dst);
@@ -1639,7 +1638,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   @Override
   public Token<?> getDelegationToken(String renewer) throws IOException {
     Token<?> result = null;
-
     if (delegationTokens != null) {
       result = delegationTokens.getBoundOrNewDT(renewer);
     }
@@ -1785,6 +1783,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     checkNotNull(path, "path should not be null");
     checkNotNull(name, "name should not be null");
 
+    // track the duration and update the statistics of getXAttr()
     Map<String, byte[]> attributes = getGcsFs().getFileInfo(getGcsPath(path)).getAttributes();
     String xAttrKey = getXAttrKey(name);
     byte[] xAttr =
@@ -1801,6 +1800,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     checkNotNull(path, "path should not be null");
 
     FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
+
     Map<String, byte[]> xAttrs =
         fileInfo.getAttributes().entrySet().stream()
             .filter(a -> isXAttr(a.getKey()))
@@ -1808,7 +1808,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
                 HashMap::new,
                 (m, a) -> m.put(getXAttrName(a.getKey()), getXAttrValue(a.getValue())),
                 Map::putAll);
-
     logger.atFiner().log("getXAttrs(path: %s): %s", path, xAttrs);
     return xAttrs;
   }
@@ -1824,6 +1823,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       xAttrs = new HashMap<>();
     } else {
       Set<String> namesSet = new HashSet<>(names);
+
       xAttrs =
           getXAttrs(path).entrySet().stream()
               .filter(a -> namesSet.contains(a.getKey()))
@@ -1839,14 +1839,11 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   public List<String> listXAttrs(Path path) throws IOException {
     checkNotNull(path, "path should not be null");
 
-    FileInfo fileInfo = getGcsFs().getFileInfo(getGcsPath(path));
-
     List<String> xAttrs =
-        fileInfo.getAttributes().keySet().stream()
+        getGcsFs().getFileInfo(getGcsPath(path)).getAttributes().keySet().stream()
             .filter(this::isXAttr)
             .map(this::getXAttrName)
             .collect(Collectors.toCollection(ArrayList::new));
-
     logger.atFiner().log("listXAttrs(path: %s): %s", path, xAttrs);
     return xAttrs;
   }

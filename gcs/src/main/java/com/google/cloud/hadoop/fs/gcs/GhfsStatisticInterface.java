@@ -16,15 +16,11 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-/** Enum of statistic types. */
-public enum GhfsStatisticTypeEnum {
+import org.apache.hadoop.fs.statistics.DurationTrackerFactory;
+import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 
-  /** Counter. Counts the number of occurrences of each operation */
-  TYPE_COUNTER,
-
-  /** Duration. Duration for the execution of opertaion */
-  TYPE_DURATION,
-
-  /** Gauge. */
-  TYPE_GAUGE
-}
+/**
+ * Base Interface for GoogleHadoopFileSystem Statistics, as a way of managing Input Stream
+ * Statistics and Output Stream Statistics.
+ */
+public interface GhfsStatisticInterface extends IOStatisticsSource, DurationTrackerFactory {}
