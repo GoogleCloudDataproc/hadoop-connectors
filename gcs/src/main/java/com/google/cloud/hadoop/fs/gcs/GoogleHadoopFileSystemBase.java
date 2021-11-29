@@ -565,7 +565,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     URI gcsPath = getGcsPath(hadoopPath);
     GoogleCloudStorageReadOptions readChannelOptions =
         getGcsFs().getOptions().getCloudStorageOptions().getReadChannelOptions();
-    GoogleHadoopFSInputStream in =
+    GoogleHadoopFSInputStreamBase in =
         new GoogleHadoopFSInputStream(this, gcsPath, readChannelOptions, statistics);
 
     return new FSDataInputStream(in);
