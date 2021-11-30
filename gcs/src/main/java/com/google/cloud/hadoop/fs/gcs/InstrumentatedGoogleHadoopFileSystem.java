@@ -303,19 +303,6 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
   protected void incrementStatistic(GhfsStatistic statistic, long count) {
     instrumentation.incrementCounter(statistic, count);
   }
-  //
-  //  /**
-  //   * Create the storage statistics or bind to an existing one.
-  //   *
-  //   * @param ioStatistics IOStatistics to build the storage statistics from.
-  //   * @return a storage statistics instance; expected to be that of the FS.
-  //   */
-  //  protected static GhfsStorageStatistics createStorageStatistics(final IOStatistics
-  // ioStatistics) {
-  //    return (GhfsStorageStatistics)
-  //        GlobalStorageStatistics.INSTANCE.put(
-  //            GhfsStorageStatistics.NAME, () -> new GhfsStorageStatistics(ioStatistics));
-  //  }
 
   /**
    * Get the storage statistics of this filesystem.

@@ -153,7 +153,7 @@ import org.apache.hadoop.util.Progressable;
  * throw or to return false.
  */
 public abstract class GoogleHadoopFileSystemBase extends FileSystem
-    implements FileSystemDescriptor, IOStatisticsSource {
+    implements FileSystemDescriptor{
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 

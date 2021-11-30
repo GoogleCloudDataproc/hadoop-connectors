@@ -16,14 +16,10 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.impl.StorageStatisticsFromIOStatistics;
 
 /** Storage statistics for GCS, dynamically generated from the IOStatistics. */
-@InterfaceAudience.Private
-@InterfaceStability.Evolving
 public class GhfsStorageStatistics extends StorageStatisticsFromIOStatistics {
 
   public static final String NAME = "GhfsStorageStatistics";
@@ -33,7 +29,7 @@ public class GhfsStorageStatistics extends StorageStatisticsFromIOStatistics {
    *
    * @param ioStatistics
    */
-  public GhfsStorageStatistics(final IOStatistics ioStatistics) {
+  public GhfsStorageStatistics(IOStatistics ioStatistics) {
     super(NAME, "Ghfs", ioStatistics);
   }
 }
