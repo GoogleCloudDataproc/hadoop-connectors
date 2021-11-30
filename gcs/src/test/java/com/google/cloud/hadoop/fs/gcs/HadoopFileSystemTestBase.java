@@ -320,7 +320,6 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     GhfsStorageStatistics StorageStats = ((GoogleHadoopFileSystem) ghfs).getStorageStatistics();
 
     // Check the statistics related to seek() method.
-    // Check the statistics related to seek() method.
     try (FSDataInputStream readStream = ghfs.open(hadoopPath)) {
       // Check the statistics related to Forward seek operations.
       readStream.seek(7);

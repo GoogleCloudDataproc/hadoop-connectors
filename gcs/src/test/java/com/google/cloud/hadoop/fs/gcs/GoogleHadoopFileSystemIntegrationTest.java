@@ -276,13 +276,8 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     fout.writeBytes("data");
     fout.close();
     myGhfs.open(new Path("/directory1/file1"));
-    GhfsStorageStatistics ss1 = myGhfs.getStorageStatistics();
-    System.out.println("STORAGE STATS ***");
-    System.out.println(ss1.getLong("op_create"));
-    System.out.println(ss1.isTracked("op_list_located_status"));
-    System.out.println(ss1.getLong("op_list_located_status"));
-    System.out.println(ss1.isTracked("op_open"));
-    System.out.println(ss1.getLong("op_open"));
+    GhfsStorageStatistics storage_stats = myGhfs.getStorageStatistics();
+    assertThat(storage_stats.isTracked("op_open")).isTrue();
     assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
   }
 
@@ -1595,19 +1590,5 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     FileStatus[] fileStatuses = fs.listStatus(new Path(publicBucket));
 
     assertThat(fileStatuses).isNotEmpty();
-  }
-
-  private static void initializeInMemoryFileSystem(FileSystem ghfs, String initUriString)
-      throws IOException {
-    URI initUri;
-    try {
-      initUri = new URI(initUriString);
-    } catch (URISyntaxException e) {
-      throw new IllegalArgumentException(e);
-    }
-    Configuration config = new Configuration();
-    ghfs.initialize(initUri, config);
-    // Create test bucket
-    ghfs.mkdirs(new Path(initUriString));
   }
 }

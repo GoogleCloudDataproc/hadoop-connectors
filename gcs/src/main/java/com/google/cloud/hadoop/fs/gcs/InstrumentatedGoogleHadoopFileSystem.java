@@ -16,7 +16,6 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static java.util.Objects.requireNonNull;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
@@ -59,7 +58,10 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
   public void initialize(URI path, Configuration config) throws IOException {
     super.initialize(path, config);
     this.instrumentation = new GhfsInstrumentation(path);
-    this.storageStatistics = createStorageStatistics(requireNonNull((getIOStatistics())));
+    this.storageStatistics =
+        (GhfsStorageStatistics)
+            GlobalStorageStatistics.INSTANCE.put(
+                GhfsStorageStatistics.NAME, () -> new GhfsStorageStatistics(getIOStatistics()));
   }
 
   @Override
@@ -301,18 +303,19 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
   protected void incrementStatistic(GhfsStatistic statistic, long count) {
     instrumentation.incrementCounter(statistic, count);
   }
-
-  /**
-   * Create the storage statistics or bind to an existing one.
-   *
-   * @param ioStatistics IOStatistics to build the storage statistics from.
-   * @return a storage statistics instance; expected to be that of the FS.
-   */
-  protected static GhfsStorageStatistics createStorageStatistics(final IOStatistics ioStatistics) {
-    return (GhfsStorageStatistics)
-        GlobalStorageStatistics.INSTANCE.put(
-            GhfsStorageStatistics.NAME, () -> new GhfsStorageStatistics(ioStatistics));
-  }
+  //
+  //  /**
+  //   * Create the storage statistics or bind to an existing one.
+  //   *
+  //   * @param ioStatistics IOStatistics to build the storage statistics from.
+  //   * @return a storage statistics instance; expected to be that of the FS.
+  //   */
+  //  protected static GhfsStorageStatistics createStorageStatistics(final IOStatistics
+  // ioStatistics) {
+  //    return (GhfsStorageStatistics)
+  //        GlobalStorageStatistics.INSTANCE.put(
+  //            GhfsStorageStatistics.NAME, () -> new GhfsStorageStatistics(ioStatistics));
+  //  }
 
   /**
    * Get the storage statistics of this filesystem.

@@ -16,8 +16,6 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.emptyStatistics;
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.statistics.IOStatistics;
@@ -37,10 +35,5 @@ public class GhfsStorageStatistics extends StorageStatisticsFromIOStatistics {
    */
   public GhfsStorageStatistics(final IOStatistics ioStatistics) {
     super(NAME, "Ghfs", ioStatistics);
-  }
-
-  /** Create the instance of Empty storage Statistics */
-  public GhfsStorageStatistics() {
-    super(NAME, "Ghfs", emptyStatistics());
   }
 }
