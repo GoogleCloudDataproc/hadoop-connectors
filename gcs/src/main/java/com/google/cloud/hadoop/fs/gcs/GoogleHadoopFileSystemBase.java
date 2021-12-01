@@ -122,7 +122,6 @@ import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.impl.AbstractFSBuilderImpl;
 import org.apache.hadoop.fs.impl.OpenFileParameters;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -153,7 +152,7 @@ import org.apache.hadoop.util.Progressable;
  * throw or to return false.
  */
 public abstract class GoogleHadoopFileSystemBase extends FileSystem
-    implements FileSystemDescriptor{
+    implements FileSystemDescriptor {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
@@ -556,7 +555,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public FSDataInputStream open(Path hadoopPath, int bufferSize) throws IOException {
-
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
@@ -639,7 +637,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       long blockSize,
       Progressable progress)
       throws IOException {
-
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
     checkArgument(replication > 0, "replication must be a positive integer: %s", replication);
     checkArgument(blockSize > 0, "blockSize must be a positive integer: %s", blockSize);
@@ -839,7 +836,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * @throws IOException if an error occurs.
    */
   void renameInternal(Path src, Path dst) throws IOException {
-
     checkArgument(src != null, "src must not be null");
     checkArgument(dst != null, "dst must not be null");
 
@@ -863,7 +859,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public boolean delete(Path hadoopPath, boolean recursive) throws IOException {
-
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
@@ -895,7 +890,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public FileStatus[] listStatus(Path hadoopPath) throws IOException {
-
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
@@ -965,7 +959,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public boolean mkdirs(Path hadoopPath, FsPermission permission) throws IOException {
-
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
@@ -1001,7 +994,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public FileStatus getFileStatus(Path hadoopPath) throws IOException {
-
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
@@ -1125,7 +1117,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    */
   @Override
   public FileStatus[] globStatus(Path pathPattern, PathFilter filter) throws IOException {
-
     checkOpen();
 
     logger.atFiner().log("globStatus(pathPattern: %s, filter: %s)", pathPattern, filter);
@@ -1713,7 +1704,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   @Override
   public FileChecksum getFileChecksum(Path hadoopPath) throws IOException {
-
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
