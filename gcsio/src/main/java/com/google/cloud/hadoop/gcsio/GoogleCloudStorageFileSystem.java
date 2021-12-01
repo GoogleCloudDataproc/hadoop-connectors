@@ -29,7 +29,6 @@ import static java.util.Comparator.comparing;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
 import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.http.HttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationDelete;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationRename;
@@ -171,29 +170,6 @@ public class GoogleCloudStorageFileSystem {
         new GoogleCloudStorageImpl(
             checkNotNull(options, "options must not be null").getCloudStorageOptions(),
             credential,
-            downscopedAccessTokenFn),
-        options);
-    logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
-  }
-
-  /**
-   * Constructs an instance of GoogleCloudStorageFileSystem.
-   *
-   * @param options Options for how this filesystem should operate and configure its underlying
-   *     storage.
-   * @param httpRequestInitializer request initializer for requests.
-   * @param downscopedAccessTokenFn Function that generates downscoped access token.
-   * @throws IOException
-   */
-  public GoogleCloudStorageFileSystem(
-      GoogleCloudStorageFileSystemOptions options,
-      HttpRequestInitializer httpRequestInitializer,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
-      throws IOException {
-    this(
-        new GoogleCloudStorageImpl(
-            checkNotNull(options, "options must not be null").getCloudStorageOptions(),
-            httpRequestInitializer,
             downscopedAccessTokenFn),
         options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
