@@ -123,7 +123,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
             GhfsStatistic.OBJECT_DELETE_OBJECTS,
             getGcsFs()
                 .getGcs()
-                .getObjectStatistics(GoogleCloudStorageStatistics.OBJECT_DELETE_OBJECTS)
+                .getStatistics(GoogleCloudStorageStatistics.OBJECT_DELETE_OBJECTS)
                 .longValue());
       } catch (Exception e) {
         logger.atWarning().log("Get Object Statistics threw UnsupportedOpersationException");
@@ -267,9 +267,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
 
   @Override
   public void close() throws IOException {
-    if (!this.LazyFs) {
-      setHttpStatistics();
-    }
+    setHttpStatistics();
     super.close();
   }
   /**
@@ -321,27 +319,36 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
 
   /** Set the Value for http get and head request related statistics keys */
   private void setHttpStatistics() {
-    if (!isClosed()) {
+    try {
       if (getGcsFs() != null) {
-        long get_failures =
-            getGcsFs()
-                .getGcs()
-                .getStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES);
-        if (get_failures > 0L) {
-          instrumentation.incrementFailureStatistics(
-              GhfsStatistic.ACTION_HTTP_GET_REQUEST.getSymbol(), get_failures);
+        try {
+          long get_failures =
+              getGcsFs()
+                  .getGcs()
+                  .getStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES)
+                  .longValue();
+          if (get_failures > 0L) {
+            instrumentation.incrementFailureStatistics(
+                GhfsStatistic.ACTION_HTTP_GET_REQUEST.getSymbol(), get_failures);
+          }
+        } catch (Exception e) {
+          logger.atWarning().log("GetStatistics from gcsio threw Unsupported Exception");
         }
       }
-    }
-    if (this.gcsRequestsTracker != null) {
-      ImmutableList<HttpRequest> httpRequests = this.gcsRequestsTracker.getAllRequests();
-      for (HttpRequest req : httpRequests) {
-        if (req.getRequestMethod() == "GET") {
-          instrumentation.incrementCounter(GhfsStatistic.ACTION_HTTP_GET_REQUEST, 1);
-        } else if (req.getRequestMethod() == "HEAD") {
-          instrumentation.incrementCounter(GhfsStatistic.ACTION_HTTP_HEAD_REQUEST, 1);
+
+      if (getGcsFs().getGcs().getGcsRequestsTracker() != null) {
+        ImmutableList<HttpRequest> httpRequests =
+            this.getGcsFs().getGcs().getGcsRequestsTracker().getAllRequests();
+        for (HttpRequest req : httpRequests) {
+          if (req.getRequestMethod() == "GET") {
+            instrumentation.incrementCounter(GhfsStatistic.ACTION_HTTP_GET_REQUEST, 1);
+          } else if (req.getRequestMethod() == "HEAD") {
+            instrumentation.incrementCounter(GhfsStatistic.ACTION_HTTP_HEAD_REQUEST, 1);
+          }
         }
       }
+    } catch (Exception e) {
+      logger.atWarning().log("Exception in getting statistics");
     }
   }
 }

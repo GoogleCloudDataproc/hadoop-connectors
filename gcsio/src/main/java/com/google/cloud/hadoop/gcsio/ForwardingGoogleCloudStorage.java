@@ -124,8 +124,14 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
    * @return
    */
   @Override
-  public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key) {
-    return delegate.getObjectStatistics(key);
+  public AtomicLong getStatistics(GoogleCloudStorageStatistics key) {
+    return delegate.getStatistics(key);
+  }
+
+  /** To get the http requests tracker */
+  @Override
+  public GcsioTrackingHttpRequestInitializer getGcsRequestsTracker() {
+    return delegate.getGcsRequestsTracker();
   }
 
   @Override
@@ -232,11 +238,5 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
    */
   public GoogleCloudStorage getDelegate() {
     return delegate;
-  }
-
-  /** Get the IOStatistics value */
-  @Override
-  public long getStatistics(GoogleCloudStorageStatistics key) {
-    return 0L;
   }
 }

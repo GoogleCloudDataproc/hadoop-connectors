@@ -47,7 +47,6 @@ import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.FileInfo;
-import com.google.cloud.hadoop.gcsio.GcsioTrackingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
@@ -69,7 +68,6 @@ import com.google.cloud.hadoop.util.GoogleCredentialWithIamAccessToken;
 import com.google.cloud.hadoop.util.HadoopCredentialConfiguration;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.PropertyUtil;
-import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ascii;
 import com.google.common.base.Suppliers;
@@ -163,9 +161,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   // Request only object fields that are used in Hadoop FileStatus:
   // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
   private static final String OBJECT_FIELDS = "bucket,name,size,updated";
-
-  // To track the http requests from GoogleCloudStorage
-  static GcsioTrackingHttpRequestInitializer gcsRequestsTracker;
 
   private static final ListFileOptions LIST_OPTIONS =
       ListFileOptions.DEFAULT.toBuilder().setFields(OBJECT_FIELDS).build();
@@ -271,9 +266,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   private Supplier<GoogleCloudStorageFileSystem> gcsFsSupplier;
 
   private boolean gcsFsInitialized = false;
-
-  /** To identify whether the filesystem is initialized as lazyFS */
-  public boolean LazyFs = false;
 
   /**
    * Current working directory; overridden in initialize() if {@link
@@ -1504,15 +1496,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     defaultBlockSize = BLOCK_SIZE.get(config, config::getLong);
     reportedPermissions = new FsPermission(PERMISSIONS_TO_REPORT.get(config, config::get));
 
-    if (GCS_LAZY_INITIALIZATION_ENABLE.get(config, config::getBoolean)) {
-      this.LazyFs = true;
-    } else {
-      this.LazyFs = false;
-    }
-
     if (gcsFsSupplier == null) {
       if (GCS_LAZY_INITIALIZATION_ENABLE.get(config, config::getBoolean)) {
-        this.LazyFs = true;
         gcsFsSupplier =
             Suppliers.memoize(
                 () -> {
@@ -1543,7 +1528,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     GoogleCloudStorageFileSystemOptions gcsFsOptions =
         GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
 
-    GoogleCloudStorageOptions gcsOptions = gcsFsOptions.getCloudStorageOptions();
     AccessTokenProvider accessTokenProvider = getAccessTokenProvider(config);
 
     Credential credential;
@@ -1552,17 +1536,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     } catch (GeneralSecurityException e) {
       throw new RuntimeException(e);
     }
-    gcsRequestsTracker =
-        new GcsioTrackingHttpRequestInitializer(
-            new RetryHttpInitializer(credential, gcsOptions.toRetryHttpInitializerOptions()));
 
     return new GoogleCloudStorageFileSystem(
-        gcsFsOptions,
-        gcsRequestsTracker,
+        credential,
         accessTokenProvider != null
                 && accessTokenProvider.getAccessTokenType() == AccessTokenType.DOWNSCOPED
             ? accessBoundaries -> accessTokenProvider.getAccessToken(accessBoundaries).getToken()
-            : null);
+            : null,
+        gcsFsOptions);
   }
 
   /**
@@ -1728,7 +1709,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     checkOpen();
 
     URI gcsPath = getGcsPath(hadoopPath);
-    FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
+    final FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
     if (!fileInfo.exists()) {
       throw new FileNotFoundException(
           String.format(

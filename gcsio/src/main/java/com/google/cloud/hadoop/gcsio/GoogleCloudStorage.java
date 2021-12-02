@@ -419,7 +419,10 @@ public interface GoogleCloudStorage {
    *
    * @param key name of the object related statistics key
    */
-  public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key);
+  public AtomicLong getStatistics(GoogleCloudStorageStatistics key);
+
+  /** To get the http requests tracker */
+  public GcsioTrackingHttpRequestInitializer getGcsRequestsTracker();
 
   /**
    * Composes inputs into a single GCS object. This performs a GCS Compose. Objects will be composed
@@ -435,9 +438,6 @@ public interface GoogleCloudStorage {
 
   /** Releases resources used by this instance. */
   void close();
-
-  /** Get the http related statistics count from GCSio */
-  public long getStatistics(GoogleCloudStorageStatistics Key);
 
   /** Paged list request response */
   class ListPage<T> {

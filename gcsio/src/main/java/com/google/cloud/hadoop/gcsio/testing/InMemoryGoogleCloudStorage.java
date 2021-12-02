@@ -20,6 +20,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import com.google.api.client.util.Clock;
 import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
+import com.google.cloud.hadoop.gcsio.GcsioTrackingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
@@ -80,11 +81,6 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   @Override
   public GoogleCloudStorageOptions getOptions() {
     return storageOptions;
-  }
-
-  @Override
-  public long getStatistics(GoogleCloudStorageStatistics key) {
-    return 0L;
   }
 
   private boolean validateBucketName(String bucketName) {
@@ -552,7 +548,13 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
    * @return
    */
   @Override
-  public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key) {
+  public AtomicLong getStatistics(GoogleCloudStorageStatistics key) {
+    throw new UnsupportedOperationException("not implemented");
+  }
+
+  /** To get the http requests tracker */
+  @Override
+  public GcsioTrackingHttpRequestInitializer getGcsRequestsTracker() {
     throw new UnsupportedOperationException("not implemented");
   }
 }
