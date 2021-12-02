@@ -455,7 +455,8 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     Path tempDirPath = tempFilePath.getParent();
     String text = "Hello World!";
     ghfsHelper.writeFile(tempFilePath, text, 1, /* overwrite= */ false);
-    GhfsStorageStatistics StorageStats = ((GoogleHadoopFileSystem) ghfs).getStorageStatistics();
+    GhfsStorageStatistics StorageStats =
+        new GhfsStorageStatistics(((GoogleHadoopFileSystem) ghfs).getIOStatistics());
 
     // Temporary file in local FS.
     File localTempFile = File.createTempFile("ghfs-test-", null);
@@ -464,6 +465,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
     ghfs.copyFromLocalFile(false, true, localTempFilePath, tempDirPath);
 
     assertThat((StorageStats.isTracked("op_copy_from_local_file"))).isTrue();
+    assertThat((StorageStats.getLong("op_copy_from_local_file"))).isEqualTo(3);
 
     if (localTempFile.exists()) {
       localTempFile.delete();
