@@ -277,35 +277,40 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
 
   @Test
   public void testInputStreamReadStorageStatistics() throws IOException {
-
     // Write an object.
     URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
     String text = "Hello World!";
     int numBytesWritten = ghfsHelper.writeFile(hadoopPath, text, 1, /* overwrite= */ false);
-    GhfsStorageStatistics StorageStats =
-        new GhfsStorageStatistics(((GoogleHadoopFileSystem) ghfs).getIOStatistics());
-    try (FSDataInputStream readStream = ghfs.open(hadoopPath)) {
 
+    try (FSDataInputStream readStream = ghfs.open(hadoopPath)) {
+      GhfsStorageStatistics StorageStats =
+          new GhfsStorageStatistics((readStream).getIOStatistics());
       //  Check the statistics of method read().
       readStream.read();
+      readStream.close();
       assertThat(StorageStats.isTracked("stream_read_operations")).isTrue();
-      assertThat(StorageStats.getLong("stream_read_operations")).isEqualTo(2);
-
+      assertThat(StorageStats.getLong("stream_read_operations")).isEqualTo(1);
+    }
+    try (FSDataInputStream readStream = ghfs.open(hadoopPath)) {
+      GhfsStorageStatistics StorageStats =
+          new GhfsStorageStatistics((readStream).getIOStatistics());
       // Check the statistics of method read(buf, off, len)
       byte[] readbuffer = new byte[1];
       readStream.read(readbuffer, 0, 1);
-      assertThat(StorageStats.isTracked("stream_read_operations")).isTrue();
-      assertThat(StorageStats.getLong("stream_read_operations")).isEqualTo(2);
-
-      // Check the statistics of method read(pos, buf, off, len)
-      byte[] readbuffer1 = new byte[2];
-      readStream.read(2, readbuffer1, 0, 2);
-      assertThat(StorageStats.isTracked("stream_read_operations")).isTrue();
-      assertThat(StorageStats.getLong("stream_read_operations")).isEqualTo(2);
-
-      // Check the  statistics of read Exception
       readStream.close();
+      assertThat(StorageStats.isTracked("stream_read_operations")).isTrue();
+      assertThat(StorageStats.getLong("stream_read_operations")).isEqualTo(1);
+    }
+    try (FSDataInputStream readStream = ghfs.open(hadoopPath)) {
+      GhfsStorageStatistics StorageStats =
+          new GhfsStorageStatistics((readStream).getIOStatistics());
+      // Check the statistics of method read(pos, buf, off, len)
+      byte[] readbuffer = new byte[2];
+      readStream.read(2, readbuffer, 0, 2);
+      readStream.close();
+      assertThat(StorageStats.isTracked("stream_read_operations")).isTrue();
+      assertThat(StorageStats.getLong("stream_read_operations")).isEqualTo(2);
     }
   }
 
@@ -318,30 +323,22 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     String text = "Hello World!";
 
     int numBytesWritten = ghfsHelper.writeFile(hadoopPath, text, 1, /* overwrite= */ false);
-    GhfsStorageStatistics StorageStats =
-        new GhfsStorageStatistics(((GoogleHadoopFileSystem) ghfs).getIOStatistics());
 
     // Check the statistics related to seek() method.
     try (FSDataInputStream readStream = ghfs.open(hadoopPath)) {
+      GhfsStorageStatistics StorageStats = new GhfsStorageStatistics(readStream.getIOStatistics());
       // Check the statistics related to Forward seek operations.
       readStream.seek(7);
-      assertThat(StorageStats.isTracked("stream_read_seek_forward_operations")).isTrue();
-      assertThat(StorageStats.getLong("stream_read_seek_forward_operations")).isEqualTo(11);
-
-      // Check the statistics related to Forward seek operations.
       readStream.seek(5);
-      assertThat(StorageStats.isTracked("stream_read_seek_backward_operations")).isTrue();
-      assertThat(StorageStats.getLong("stream_read_seek_backward_operations")).isEqualTo(20);
-
-      // Check the statistics related to seek operations.
-      assertThat(StorageStats.isTracked("stream_read_seek_operations")).isTrue();
-      assertThat(StorageStats.getLong("stream_read_seek_operations")).isEqualTo(31);
-
       readStream.close();
-
-      // Check the statistics related to stream close operations.
+      assertThat(StorageStats.isTracked("stream_read_seek_forward_operations")).isTrue();
+      assertThat(StorageStats.getLong("stream_read_seek_forward_operations")).isEqualTo(1);
+      assertThat(StorageStats.isTracked("stream_read_seek_backward_operations")).isTrue();
+      assertThat(StorageStats.getLong("stream_read_seek_backward_operations")).isEqualTo(1);
+      assertThat(StorageStats.isTracked("stream_read_seek_operations")).isTrue();
+      assertThat(StorageStats.getLong("stream_read_seek_operations")).isEqualTo(2);
       assertThat(StorageStats.isTracked("stream_read_close_operations")).isTrue();
-      assertThat(StorageStats.getLong("stream_read_close_operations")).isEqualTo(15);
+      assertThat(StorageStats.getLong("stream_read_close_operations")).isEqualTo(1);
     }
   }
 

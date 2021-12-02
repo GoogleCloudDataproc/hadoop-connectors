@@ -74,7 +74,6 @@ import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.Service;
@@ -706,35 +705,30 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   @Test
   public void create_storage_statistics() throws IOException {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
-    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     GhfsStorageStatistics StorageStats = new GhfsStorageStatistics(myGhfs.getIOStatistics());
-
-    try (FSDataOutputStream fout = myGhfs.create(filePath, true, 1, (short) 1, 1)) {
-      fout.writeBytes("Test Content");
-      fout.close();
-    }
+    Path testRoot = new Path("/directory1/");
+    myGhfs.mkdirs(testRoot);
+    FSDataOutputStream fout = myGhfs.create(new Path("/directory1/file1"));
+    fout.writeBytes("Test Content");
+    fout.close();
     assertThat(StorageStats.isTracked("op_create")).isTrue();
     assertThat(StorageStats.getLong("op_create")).isEqualTo(1);
-    assertThat(myGhfs.delete(filePath)).isTrue();
+    assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
   }
 
   @Test
   public void listLocatedStatus_storage_statistics() throws IOException {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
-    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     GhfsStorageStatistics StorageStats = new GhfsStorageStatistics(myGhfs.getIOStatistics());
-
-    try (FSDataOutputStream fout = myGhfs.create(filePath, true, 1, (short) 1, 1)) {
-      fout.writeBytes("Test Content");
-      fout.close();
-      myGhfs.listLocatedStatus(filePath);
-      assertThat(StorageStats.isTracked("op_list_located_status")).isTrue();
-      assertThat(StorageStats.getLong("op_list_located_status")).isEqualTo(1);
-    }
-
-    assertThat(myGhfs.delete(filePath)).isTrue();
+    Path testRoot = new Path("/directory1/");
+    myGhfs.mkdirs(testRoot);
+    FSDataOutputStream fout = myGhfs.create(new Path("/directory1/file1"));
+    fout.writeBytes("Test Content");
+    fout.close();
+    myGhfs.listLocatedStatus(testRoot);
+    assertThat(StorageStats.isTracked("op_list_located_status")).isTrue();
+    assertThat(StorageStats.getLong("op_list_located_status")).isEqualTo(1);
+    assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
   }
 
   @Test
@@ -756,9 +750,11 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   public void delete_storage_statistics() throws IOException {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
     GhfsStorageStatistics StorageStats = new GhfsStorageStatistics(myGhfs.getIOStatistics());
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
-    Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
-    myGhfs.delete(filePath);
+    Path filePath = new Path("/file1");
+    FSDataOutputStream fout = myGhfs.create(filePath);
+    fout.writeBytes("Test Content");
+    fout.close();
+    assertThat(myGhfs.delete(filePath)).isTrue();
     assertThat(StorageStats.isTracked("op_delete")).isTrue();
     assertThat(StorageStats.getLong("op_delete")).isEqualTo(1);
   }
@@ -1552,16 +1548,8 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
     FileSystem fs = FileSystem.get(new URI(publicBucket), config);
 
-    StorageStatistics StorageStats = fs.getStorageStatistics();
-
     FileStatus[] fileStatuses = fs.listStatus(new Path(publicBucket));
 
-    // Storage Statistics Test for listStatus
-
-    assertThat(StorageStats.isTracked("op_list_files")).isTrue();
-    assertThat(StorageStats.getLong("op_list_files")).isEqualTo(2);
-    assertThat(StorageStats.isTracked("op_list_status")).isTrue();
-    assertThat(StorageStats.getLong("op_list_status")).isEqualTo(2);
     assertThat(
             ((GoogleHadoopFileSystem) fs)
                 .getIOStatistics()
