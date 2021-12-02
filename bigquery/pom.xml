@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright (C) 2014 Google, Inc.
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.google.cloud.bigdataoss</groupId>
+    <artifactId>bigdataoss-parent</artifactId>
+    <version>3.0.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <name>bigquery-connector</name>
+  <description>
+    MapReduce input and output formats for use with BigQuery
+  </description>
+
+  <artifactId>bigquery-connector</artifactId>
+  <version>2.0.0-SNAPSHOT</version>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.google.http-client</groupId>
+      <artifactId>google-http-client-jackson2</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.apis</groupId>
+      <artifactId>google-api-services-storage</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.apis</groupId>
+      <artifactId>google-api-services-bigquery</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-bigquerystorage</artifactId>
+      <exclusions>
+        <!-- Exclude Gson because we do not shade it and that's why should use
+             Hadoop's version pulled in as a transitive dependency -->
+        <exclusion>
+          <groupId>com.google.code.gson</groupId>
+          <artifactId>gson</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.google.protobuf</groupId>
+      <artifactId>protobuf-java</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.oauth-client</groupId>
+      <artifactId>google-oauth-client</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud.bigdataoss</groupId>
+      <artifactId>util</artifactId>
+      <version>${bigdataoss.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud.bigdataoss</groupId>
+      <artifactId>util-hadoop</artifactId>
+      <version>${bigdataoss.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.flogger</groupId>
+      <artifactId>flogger</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.flogger</groupId>
+      <artifactId>google-extensions</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.flogger</groupId>
+      <artifactId>flogger-system-backend</artifactId>
+    </dependency>
+
+    <!-- Hadoop dependencies -->
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-client-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-mapreduce-client</artifactId>
+      <type>pom</type>
+    </dependency>
+
+    <!-- Test dependencies -->
+    <dependency>
+      <groupId>com.google.cloud.bigdataoss</groupId>
+      <artifactId>gcsio</artifactId>
+      <version>${bigdataoss.version}</version>
+      <scope>test</scope>
+      <type>test-jar</type>
+      <exclusions>
+        <!-- Exclude Gson because we do not shade it and that's why should use
+             Hadoop's version pulled in as a transitive dependency -->
+        <exclusion>
+          <groupId>com.google.code.gson</groupId>
+          <artifactId>gson</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud.bigdataoss</groupId>
+      <artifactId>gcsio</artifactId>
+      <version>${bigdataoss.version}</version>
+      <scope>test</scope>
+      <exclusions>
+        <!-- Exclude Gson because we do not shade it and that's why should use
+             Hadoop's version pulled in as a transitive dependency -->
+        <exclusion>
+          <groupId>com.google.code.gson</groupId>
+          <artifactId>gson</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud.bigdataoss</groupId>
+      <artifactId>gcs-connector</artifactId>
+      <version>${bigdataoss.version}</version>
+      <scope>test</scope>
+      <exclusions>
+        <!-- Exclude Gson because we do not shade it and that's why should use
+             Hadoop's version pulled in as a transitive dependency -->
+        <exclusion>
+          <groupId>com.google.code.gson</groupId>
+          <artifactId>gson</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud.bigdataoss</groupId>
+      <artifactId>gcs-connector</artifactId>
+      <version>${bigdataoss.version}</version>
+      <classifier>tests</classifier>
+      <scope>test</scope>
+      <exclusions>
+        <!-- Exclude Gson because we do not shade it and that's why should use
+             Hadoop's version pulled in as a transitive dependency -->
+        <exclusion>
+          <groupId>com.google.code.gson</groupId>
+          <artifactId>gson</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-client-runtime</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.truth</groupId>
+      <artifactId>truth</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <artifactId>maven-shade-plugin</artifactId>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <transformers>
+                <transformer
+                    implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
+                <transformer
+                    implementation="org.apache.maven.plugins.shade.resource.ApacheNoticeResourceTransformer"/>
+                <transformer
+                    implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+              </transformers>
+              <filters>
+                <!-- minimizeJar breaks all the dynamic load hacks; add them explicitly -->
+                <filter>
+                  <artifact>com.google.auth:*</artifact>
+                  <includes>
+                    <include>**</include>
+                  </includes>
+                </filter>
+                <filter>
+                  <artifact>io.grpc:*</artifact>
+                  <includes>
+                    <include>**</include>
+                  </includes>
+                </filter>
+                <filter>
+                  <artifact>io.opencensus:*</artifact>
+                  <includes>
+                    <include>**</include>
+                  </includes>
+                </filter>
+                <filter>
+                  <artifact>io.perfmark:*</artifact>
+                  <includes>
+                    <include>**</include>
+                  </includes>
+                </filter>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>*.json</exclude>
+                    <exclude>**/*.proto</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+              <artifactSet>
+                <includes>
+                  <include>com.fasterxml.jackson.core:jackson-core</include>
+                  <include>com.google.api</include>
+                  <include>com.google.api.grpc</include>
+                  <include>com.google.api-client</include>
+                  <include>com.google.apis</include>
+                  <include>com.google.auth</include>
+                  <include>com.google.cloud</include>
+                  <include>com.google.cloud.bigdataoss:util</include>
+                  <include>com.google.cloud.bigdataoss:util-hadoop</include>
+                  <include>com.google.flogger</include>
+                  <include>com.google.guava</include>
+                  <include>com.google.http-client</include>
+                  <include>com.google.oauth-client</include>
+                  <include>com.google.protobuf</include>
+                  <include>com.google.storage.v2</include>
+                  <include>io.grpc</include>
+                  <include>io.opencensus</include>
+                  <include>io.perfmark</include>
+                  <include>org.threeten</include>
+                  <!-- needed by http client and versions conflict -->
+                  <include>commons-codec:commons-codec</include>
+                </includes>
+              </artifactSet>
+              <minimizeJar>true</minimizeJar>
+              <relocations>
+                <relocation>
+                  <pattern>com</pattern>
+                  <shadedPattern>com.google.cloud.hadoop.repackaged.bigquery.com</shadedPattern>
+                  <includes>
+                    <include>com.fasterxml.**</include>
+                    <include>com.google.api.**</include>
+                    <include>com.google.auth.**</include>
+                    <include>com.google.cloud.bigquery.**</include>
+                    <include>com.google.cloud.hadoop.util.**</include>
+                    <include>com.google.common.**</include>
+                    <include>com.google.longrunning.**</include>
+                    <include>com.google.protobuf.**</include>
+                    <include>com.google.rpc.**</include>
+                    <include>com.google.storage.**</include>
+                  </includes>
+                  <excludes>
+                    <exclude>com.google.cloud.hadoop.util.AccessTokenProvider</exclude>
+                    <exclude>com.google.cloud.hadoop.util.AccessTokenProvider$AccessToken</exclude>
+                    <exclude>com.google.cloud.hadoop.util.AccessTokenProvider$AccessTokenType</exclude>
+                    <exclude>com.google.cloud.hadoop.util.AccessBoundary</exclude>
+                    <exclude>com.google.cloud.hadoop.util.AccessBoundary$Action</exclude>
+                    <exclude>com.google.cloud.hadoop.util.AutoValue_AccessBoundary</exclude>
+                  </excludes>
+                </relocation>
+                <!-- Take special care of grpc-netty-shaded, it uses the package
+                     io.grpc.netty.shaded.io.grpc.netty, which will cause the
+                     ServicesResourceTransformer to replace both occurrences of io.grpc -->
+                <relocation>
+                  <pattern>io.grpc.netty.shaded</pattern>
+                  <shadedPattern>
+                    com.google.cloud.hadoop.repackaged.bigquery.io.grpc.netty.shaded
+                  </shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>io</pattern>
+                  <shadedPattern>com.google.cloud.hadoop.repackaged.bigquery.io</shadedPattern>
+                  <includes>
+                    <include>io.grpc.**</include>
+                    <include>io.opencensus.**</include>
+                    <include>io.perfmark.**</include>
+                  </includes>
+                </relocation>
+
+                <relocation>
+                  <pattern>org</pattern>
+                  <shadedPattern>com.google.cloud.hadoop.repackaged.bigquery.org</shadedPattern>
+                  <includes>
+                    <include>org.apache.commons.codec.**</include>
+                    <include>org.checkerframework.**</include>
+                    <include>org.codehaus.mojo.animal_sniffer.**</include>
+                    <include>org.joda.**</include>
+                    <include>org.threeten.**</include>
+                  </includes>
+                </relocation>
+                <relocation>
+                  <pattern>META-INF/native/io_grpc_netty_shaded_</pattern>
+                  <shadedPattern>
+                    META-INF/native/com_google_cloud_hadoop_repackaged_bigquery_io_grpc_netty_shaded_
+                  </shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>META-INF/native/libio_grpc_netty_shaded_</pattern>
+                  <shadedPattern>
+                    META-INF/native/libcom_google_cloud_hadoop_repackaged_bigquery_io_grpc_netty_shaded_
+                  </shadedPattern>
+                </relocation>
+              </relocations>
+              <shadedArtifactAttached>true</shadedArtifactAttached>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

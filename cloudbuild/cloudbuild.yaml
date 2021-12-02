@@ -1,0 +1,39 @@
+steps:
+  # 1. Create a Docker image containing hadoop-connectors repo
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'docker-build'
+    args: ['build', '--tag=gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit', '-f', 'cloudbuild/Dockerfile', '.']
+
+  # 2. Run unit tests
+  - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
+    id: 'unit-tests'
+    waitFor: ['docker-build']
+    entrypoint: 'bash'
+    args: ['/hadoop-connectors/cloudbuild/presubmit.sh', 'unittest']
+    env:
+      - 'CODECOV_TOKEN=$_CODECOV_TOKEN'
+      - 'VCS_BRANCH_NAME=$BRANCH_NAME'
+      - 'VCS_COMMIT_ID=$COMMIT_SHA'
+      - 'VCS_TAG=$TAG_NAME'
+      - 'CI_BUILD_ID=$BUILD_ID'
+
+  # 3. Run integration tests concurrently with unit tests
+  - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
+    id: 'integration-tests'
+    waitFor: ['docker-build']
+    entrypoint: 'bash'
+    args: ['/hadoop-connectors/cloudbuild/presubmit.sh', 'integrationtest']
+    env:
+      - 'GCS_TEST_PROJECT_ID=$PROJECT_ID'
+      - 'CODECOV_TOKEN=$_CODECOV_TOKEN'
+      - 'VCS_BRANCH_NAME=$BRANCH_NAME'
+      - 'VCS_COMMIT_ID=$COMMIT_SHA'
+      - 'VCS_TAG=$TAG_NAME'
+      - 'CI_BUILD_ID=$BUILD_ID'
+
+# Tests take on average 25 minutes to run
+timeout: 2400s
+
+options:
+  machineType: 'N1_HIGHCPU_32'
+
