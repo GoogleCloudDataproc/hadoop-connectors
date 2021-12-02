@@ -48,5 +48,4 @@ public class TestGoogleContractRootDirectory extends AbstractContractRootDirecto
   protected AbstractFSContract createContract(Configuration conf) {
     return new GoogleContract(conf, TEST_BUCKET_HELPER);
   }
-
 }
