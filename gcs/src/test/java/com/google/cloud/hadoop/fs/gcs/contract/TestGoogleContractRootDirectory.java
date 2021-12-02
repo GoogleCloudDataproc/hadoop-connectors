@@ -16,7 +16,6 @@ package com.google.cloud.hadoop.fs.gcs.contract;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
-import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractContractRootDirectoryTest;
@@ -49,7 +48,4 @@ public class TestGoogleContractRootDirectory extends AbstractContractRootDirecto
   protected AbstractFSContract createContract(Configuration conf) {
     return new GoogleContract(conf, TEST_BUCKET_HELPER);
   }
-
-  @Override
-  public void testSimpleRootListing() throws IOException {}
 }
