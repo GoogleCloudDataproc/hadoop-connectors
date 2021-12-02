@@ -341,7 +341,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
 
       // Check the statistics related to stream close operations.
       assertThat(StorageStats.isTracked("stream_read_close_operations")).isTrue();
-      assertThat(StorageStats.getLong("stream_read_close_operations")).isEqualTo(13);
+      assertThat(StorageStats.getLong("stream_read_close_operations")).isEqualTo(15);
     }
   }
 
