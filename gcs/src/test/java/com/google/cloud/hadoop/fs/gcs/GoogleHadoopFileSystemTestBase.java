@@ -448,31 +448,6 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
   }
 
   @Test
-  public void CopyFromLocalFileStorageStatisticsTest() throws IOException {
-    // Temporary file in GHFS.
-    URI tempFileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
-    Path tempFilePath = ghfsHelper.castAsHadoopPath(tempFileUri);
-    Path tempDirPath = tempFilePath.getParent();
-    String text = "Hello World!";
-    ghfsHelper.writeFile(tempFilePath, text, 1, /* overwrite= */ false);
-    GhfsStorageStatistics StorageStats =
-        new GhfsStorageStatistics(((GoogleHadoopFileSystem) ghfs).getIOStatistics());
-
-    // Temporary file in local FS.
-    File localTempFile = File.createTempFile("ghfs-test-", null);
-    Path localTempFilePath = new Path(localTempFile.getPath());
-
-    ghfs.copyFromLocalFile(false, true, localTempFilePath, tempDirPath);
-
-    assertThat((StorageStats.isTracked("op_copy_from_local_file"))).isTrue();
-    assertThat((StorageStats.getLong("op_copy_from_local_file"))).isEqualTo(3);
-
-    if (localTempFile.exists()) {
-      localTempFile.delete();
-    }
-  }
-
-  @Test
   public void CopyFromLocalFileIOStatisticsTest() throws IOException {
     // Temporary file in GHFS.
     URI tempFileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();

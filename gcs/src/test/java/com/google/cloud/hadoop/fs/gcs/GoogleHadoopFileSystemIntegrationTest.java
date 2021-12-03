@@ -57,6 +57,7 @@ import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.common.collect.ImmutableList;
 import com.google.common.hash.Hashing;
 import com.google.common.primitives.Ints;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
@@ -743,6 +744,26 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     myGhfs.open(new Path("/directory1/file1"));
     assertThat(StorageStats.isTracked("op_open")).isTrue();
     assertThat(StorageStats.getLong("op_open")).isEqualTo(1);
+    assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
+  }
+
+  @Test
+  public void copy_from_local_file_storage_statistics() throws IOException {
+    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
+    GhfsStorageStatistics StorageStats = new GhfsStorageStatistics(myGhfs.getIOStatistics());
+    Path testRoot = new Path("/directory1/");
+    myGhfs.mkdirs(testRoot);
+    FSDataOutputStream fout = myGhfs.create(new Path("/directory1/file1"));
+    fout.writeBytes("data");
+    fout.close();
+    // Temporary file in local FS.
+    File localTempFile = File.createTempFile("ghfs-test-", null);
+    Path localTempFilePath = new Path(localTempFile.getPath());
+
+    myGhfs.copyFromLocalFile(false, true, localTempFilePath, testRoot);
+
+    assertThat((StorageStats.isTracked("op_copy_from_local_file"))).isTrue();
+    assertThat((StorageStats.getLong("op_copy_from_local_file"))).isEqualTo(1);
     assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
   }
 

@@ -310,7 +310,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
       readStream.read(2, readbuffer, 0, 2);
       readStream.close();
       assertThat(StorageStats.isTracked("stream_read_operations")).isTrue();
-      assertThat(StorageStats.getLong("stream_read_operations")).isEqualTo(2);
+      assertThat(StorageStats.getLong("stream_read_operations")).isEqualTo(1);
     }
   }
 
@@ -879,11 +879,11 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
       byte[] readbuffer1 = new byte[2];
       readStream.read(2, readbuffer1, 0, 2);
       assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_OPERATIONS.getSymbol()))
-          .isEqualTo(4);
+          .isEqualTo(3);
       assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_TOTAL_BYTES.getSymbol()))
-          .isEqualTo(6);
+          .isEqualTo(4);
       assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_BYTES.getSymbol()))
-          .isEqualTo(6);
+          .isEqualTo(4);
 
       // Check the  statistics of read Exception
       readStream.close();
