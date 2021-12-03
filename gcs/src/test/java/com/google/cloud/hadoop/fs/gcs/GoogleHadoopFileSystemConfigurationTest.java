@@ -23,6 +23,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_READ_METADATA_TIMEOUT_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_READ_SPEED_BYTES_PER_SEC;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_READ_TIMEOUT_MS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_TRAFFICDIRECTOR_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_UPLOAD_BUFFERED_REQUESTS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_TIMEOUT_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_HTTP_HEADERS;
@@ -309,7 +310,8 @@ public class GoogleHadoopFileSystemConfigurationTest {
     long grpcWriteTimeout = 20;
     long grpcUploadBufferedRequests = 25;
     long grpcReadSpeedBytesPerSec = 100 * 1024 * 1024;
-    boolean isDirectPathEnabled = false;
+    boolean isDirectPathEnabled = true;
+    boolean isTrafficDirectorEnabled = true;
     boolean isGrpcEnabled = true;
 
     config.set(GCS_GRPC_ENABLE.getKey(), String.valueOf(isGrpcEnabled));
@@ -319,6 +321,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
     config.set(
         GCS_GRPC_UPLOAD_BUFFERED_REQUESTS.getKey(), String.valueOf(grpcUploadBufferedRequests));
     config.set(GCS_GRPC_DIRECTPATH_ENABLE.getKey(), String.valueOf(isDirectPathEnabled));
+    config.set(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.getKey(), String.valueOf(isTrafficDirectorEnabled));
     config.set(
         GCS_GRPC_READ_SPEED_BYTES_PER_SEC.getKey(), String.valueOf(grpcReadSpeedBytesPerSec));
 
