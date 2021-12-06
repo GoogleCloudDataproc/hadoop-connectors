@@ -2449,6 +2449,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     return gcsStatistics.get(key);
   }
 
+  
   @Override
   public GcsioTrackingHttpRequestInitializer getGcsRequestsTracker() {
     return this.gcsRequestsTracker;
