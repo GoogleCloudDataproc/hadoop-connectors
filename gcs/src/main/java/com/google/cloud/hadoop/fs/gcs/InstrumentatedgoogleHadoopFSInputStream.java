@@ -89,20 +89,6 @@ public class InstrumentatedgoogleHadoopFSInputStream extends GoogleHadoopFSInput
   }
 
   @Override
-  public synchronized int read(long position, byte[] buf, int offset, int length)
-      throws IOException {
-    streamStatistics.readOperationStarted(position, length);
-    int response = super.read(position, buf, offset, length);
-    if (response > 0) {
-      streamStatistics.bytesRead(response);
-    } else {
-      streamStatistics.readException();
-    }
-    streamStatistics.readOperationCompleted(length, response);
-    return response;
-  }
-
-  @Override
   public synchronized void seek(long pos) throws IOException {
     long curPos = getPos();
     long diff = pos - curPos;

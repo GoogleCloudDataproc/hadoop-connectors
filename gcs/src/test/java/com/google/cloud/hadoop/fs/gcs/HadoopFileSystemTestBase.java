@@ -275,6 +275,73 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     }
   }
 
+  @Test
+  public void testInputStreamReadStorageStatistics() throws IOException {
+    // Write an object.
+    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
+    String text = "Hello World!";
+    int numBytesWritten = ghfsHelper.writeFile(hadoopPath, text, 1, /* overwrite= */ false);
+
+    try (FSDataInputStream readStream = ghfs.open(hadoopPath)) {
+      GhfsStorageStatistics StorageStats =
+          new GhfsStorageStatistics((readStream).getIOStatistics());
+      //  Check the statistics of method read().
+      readStream.read();
+      readStream.close();
+      assertThat(StorageStats.isTracked("stream_read_operations")).isTrue();
+      assertThat(StorageStats.getLong("stream_read_operations")).isEqualTo(1);
+    }
+    try (FSDataInputStream readStream = ghfs.open(hadoopPath)) {
+      GhfsStorageStatistics StorageStats =
+          new GhfsStorageStatistics((readStream).getIOStatistics());
+      // Check the statistics of method read(buf, off, len)
+      byte[] readbuffer = new byte[1];
+      readStream.read(readbuffer, 0, 1);
+      readStream.close();
+      assertThat(StorageStats.isTracked("stream_read_operations")).isTrue();
+      assertThat(StorageStats.getLong("stream_read_operations")).isEqualTo(1);
+    }
+    try (FSDataInputStream readStream = ghfs.open(hadoopPath)) {
+      GhfsStorageStatistics StorageStats =
+          new GhfsStorageStatistics((readStream).getIOStatistics());
+      // Check the statistics of method read(pos, buf, off, len)
+      byte[] readbuffer = new byte[2];
+      readStream.read(2, readbuffer, 0, 2);
+      readStream.close();
+      assertThat(StorageStats.isTracked("stream_read_operations")).isTrue();
+      assertThat(StorageStats.getLong("stream_read_operations")).isEqualTo(1);
+    }
+  }
+
+  @Test
+  public void testInputStreamSeekStorageStatistics() throws IOException {
+
+    // Write an object.
+    URI path = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    Path hadoopPath = ghfsHelper.castAsHadoopPath(path);
+    String text = "Hello World!";
+
+    int numBytesWritten = ghfsHelper.writeFile(hadoopPath, text, 1, /* overwrite= */ false);
+
+    // Check the statistics related to seek() method.
+    try (FSDataInputStream readStream = ghfs.open(hadoopPath)) {
+      GhfsStorageStatistics StorageStats = new GhfsStorageStatistics(readStream.getIOStatistics());
+      // Check the statistics related to Forward seek operations.
+      readStream.seek(7);
+      readStream.seek(5);
+      readStream.close();
+      assertThat(StorageStats.isTracked("stream_read_seek_forward_operations")).isTrue();
+      assertThat(StorageStats.getLong("stream_read_seek_forward_operations")).isEqualTo(1);
+      assertThat(StorageStats.isTracked("stream_read_seek_backward_operations")).isTrue();
+      assertThat(StorageStats.getLong("stream_read_seek_backward_operations")).isEqualTo(1);
+      assertThat(StorageStats.isTracked("stream_read_seek_operations")).isTrue();
+      assertThat(StorageStats.getLong("stream_read_seek_operations")).isEqualTo(2);
+      assertThat(StorageStats.isTracked("stream_read_close_operations")).isTrue();
+      assertThat(StorageStats.getLong("stream_read_close_operations")).isEqualTo(1);
+    }
+  }
+
   // -----------------------------------------------------------------
   // Tests that test behavior at GHFS layer.
 
@@ -812,11 +879,11 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
       byte[] readbuffer1 = new byte[2];
       readStream.read(2, readbuffer1, 0, 2);
       assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_OPERATIONS.getSymbol()))
-          .isEqualTo(4);
+          .isEqualTo(3);
       assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_TOTAL_BYTES.getSymbol()))
-          .isEqualTo(6);
+          .isEqualTo(4);
       assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_BYTES.getSymbol()))
-          .isEqualTo(6);
+          .isEqualTo(4);
 
       // Check the  statistics of read Exception
       readStream.close();
