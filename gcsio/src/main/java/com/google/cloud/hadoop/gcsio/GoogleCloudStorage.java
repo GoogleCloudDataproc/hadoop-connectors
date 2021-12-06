@@ -419,10 +419,14 @@ public interface GoogleCloudStorage {
    *
    * @param key name of the object related statistics key
    */
-  public AtomicLong getStatistics(GoogleCloudStorageStatistics key);
+  public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key);
 
-  /** To get the http requests tracker */
-  public GcsioTrackingHttpRequestInitializer getGcsRequestsTracker();
+  /**
+   * To get the value object related statistics from GCS
+   *
+   * @param key name of the http related statistics key
+   */
+  public AtomicLong getHttpStatistics(GoogleCloudStorageStatistics key);
 
   /**
    * Composes inputs into a single GCS object. This performs a GCS Compose. Objects will be composed

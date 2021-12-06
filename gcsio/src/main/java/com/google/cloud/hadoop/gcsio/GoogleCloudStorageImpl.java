@@ -19,8 +19,7 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createJsonResponseException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInferredDirectory;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.OBJECT_DELETE_OBJECTS;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.*;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -35,6 +34,7 @@ import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.ByteArrayContent;
 import com.google.api.client.http.HttpHeaders;
+import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.InputStreamContent;
@@ -154,13 +154,17 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private static final String LIST_OBJECT_FIELDS_FORMAT = "items(%s),prefixes,nextPageToken";
 
   // To track the object statistics
-  private HashMap<GoogleCloudStorageStatistics, AtomicLong> gcsStatistics =
+  private HashMap<GoogleCloudStorageStatistics, AtomicLong> objectStatistics =
       new HashMap<GoogleCloudStorageStatistics, AtomicLong>();
 
   // A function to encode metadata map values
   static String encodeMetadataValues(byte[] bytes) {
     return bytes == null ? Data.NULL_STRING : BaseEncoding.base64().encode(bytes);
   }
+
+  // To track the http statistics
+  private HashMap<GoogleCloudStorageStatistics, AtomicLong> gcsStatistics =
+      new HashMap<GoogleCloudStorageStatistics, AtomicLong>();
 
   private static byte[] decodeMetadataValues(String value) {
     try {
@@ -270,7 +274,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // Function that generates downscoped access token.
   private final Function<List<AccessBoundary>, String> downscopedAccessTokenFn;
 
-  private GcsioTrackingHttpRequestInitializer gcsRequestsTracker;
+  private static GcsioTrackingHttpRequestInitializer gcsRequestsTracker;
 
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
@@ -280,10 +284,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    */
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Credential credential)
       throws IOException {
-    this(
-        options,
-        new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()),
-        /* downscopedAccessTokenFn= */ null);
+    this(options, setGcsRequestTracker(options, credential), /* downscopedAccessTokenFn= */ null);
   }
 
   /**
@@ -298,26 +299,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       Credential credential,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
-    this(
-        options,
-        new GcsioTrackingHttpRequestInitializer(
-            new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions())),
-        downscopedAccessTokenFn);
-  }
-
-  /**
-   * Constructs an instance of GoogleCloudStorageImpl.
-   *
-   * @param downscopedAccessTokenFn Function that generates downscoped access token.
-   * @throws IOException on IO error
-   */
-  public GoogleCloudStorageImpl(
-      GoogleCloudStorageOptions options,
-      GcsioTrackingHttpRequestInitializer gcsRequestsTracker,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
-      throws IOException {
-    this(options, createStorage(options, gcsRequestsTracker), null, downscopedAccessTokenFn);
-    this.gcsRequestsTracker = gcsRequestsTracker;
+    this(options, setGcsRequestTracker(options, credential), downscopedAccessTokenFn);
   }
 
   public GoogleCloudStorageImpl(
@@ -340,6 +322,14 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         createStorage(options, httpRequestInitializer),
         /* credentials= */ null,
         downscopedAccessTokenFn);
+  }
+
+  private static HttpRequestInitializer setGcsRequestTracker(
+      GoogleCloudStorageOptions options, Credential credential) {
+    gcsRequestsTracker =
+        new GcsioTrackingHttpRequestInitializer(
+            new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()));
+    return (HttpRequestInitializer) gcsRequestsTracker;
   }
 
   /**
@@ -864,8 +854,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     //  To update the statistics of number of objects deleted
 
-    gcsStatistics.putIfAbsent(OBJECT_DELETE_OBJECTS, new AtomicLong(0));
-    gcsStatistics.get(OBJECT_DELETE_OBJECTS).incrementAndGet();
+    objectStatistics.putIfAbsent(OBJECT_DELETE_OBJECTS, new AtomicLong(0));
+    objectStatistics.get(OBJECT_DELETE_OBJECTS).incrementAndGet();
   }
 
   /** See {@link GoogleCloudStorage#deleteObjects(List)} for details about expected behavior. */
@@ -896,10 +886,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             storageOptions.getBatchThreads());
 
     // update the statistics of number of objects deleted
-    gcsStatistics.putIfAbsent(OBJECT_DELETE_OBJECTS, new AtomicLong(0));
+    objectStatistics.putIfAbsent(OBJECT_DELETE_OBJECTS, new AtomicLong(0));
     for (StorageResourceId fullObjectName : fullObjectNames) {
       queueSingleObjectDelete(fullObjectName, innerExceptions, batchHelper, 1);
-      gcsStatistics.get(OBJECT_DELETE_OBJECTS).incrementAndGet();
+      objectStatistics.get(OBJECT_DELETE_OBJECTS).incrementAndGet();
     }
 
     batchHelper.flush();
@@ -2445,12 +2435,28 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   @Override
-  public AtomicLong getStatistics(GoogleCloudStorageStatistics key) {
-    return gcsStatistics.get(key);
+  public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key) {
+    return objectStatistics.get(key);
   }
 
   @Override
-  public GcsioTrackingHttpRequestInitializer getGcsRequestsTracker() {
-    return this.gcsRequestsTracker;
+  public AtomicLong getHttpStatistics(GoogleCloudStorageStatistics key) {
+    setHttpStatistics();
+    return gcsStatistics.get(key);
+  }
+
+  private void setHttpStatistics() {
+    gcsStatistics.putIfAbsent(ACTION_HTTP_GET_REQUEST, new AtomicLong(0));
+    gcsStatistics.putIfAbsent(ACTION_HTTP_GET_REQUEST, new AtomicLong(0));
+    ImmutableList<HttpRequest> httpRequests = gcsRequestsTracker.getAllRequests();
+    httpRequests.stream()
+        .forEach(
+            req -> {
+              if (req.getRequestMethod() == "GET") {
+                gcsStatistics.get(ACTION_HTTP_GET_REQUEST).incrementAndGet();
+              } else if (req.getRequestMethod() == "HEAD") {
+                gcsStatistics.get(ACTION_HTTP_HEAD_REQUEST).incrementAndGet();
+              }
+            });
   }
 }

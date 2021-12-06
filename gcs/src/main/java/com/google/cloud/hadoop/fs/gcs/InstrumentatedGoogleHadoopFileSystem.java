@@ -18,10 +18,9 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
-import com.google.api.client.http.HttpRequest;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
-import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -132,7 +131,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
             GhfsStatistic.OBJECT_DELETE_OBJECTS,
             getGcsFs()
                 .getGcs()
-                .getStatistics(GoogleCloudStorageStatistics.OBJECT_DELETE_OBJECTS)
+                .getObjectStatistics(GoogleCloudStorageStatistics.OBJECT_DELETE_OBJECTS)
                 .longValue());
       } catch (Exception e) {
         logger.atWarning().log("Get Object Statistics threw UnsupportedOpersationException");
@@ -339,33 +338,22 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
   /** Set the Value for http get and head request related statistics keys */
   private void setHttpStatistics() {
     try {
-      if (getGcsFs() != null) {
-        try {
-          long get_failures =
-              getGcsFs()
-                  .getGcs()
-                  .getStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES)
-                  .longValue();
-          if (get_failures > 0L) {
-            instrumentation.incrementFailureStatistics(
-                GhfsStatistic.ACTION_HTTP_GET_REQUEST.getSymbol(), get_failures);
-          }
-        } catch (Exception e) {
-          logger.atWarning().log("GetStatistics from gcsio threw Unsupported Exception");
-        }
-      }
+      GoogleCloudStorage gcs = getGcsFs().getGcs();
+      incrementStatistic(
+          GhfsStatistic.ACTION_HTTP_GET_REQUEST,
+          gcs.getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST).longValue());
+      incrementStatistic(
+          GhfsStatistic.ACTION_HTTP_HEAD_REQUEST,
+          gcs.getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST).longValue());
+      instrumentation.incrementFailureStatistics(
+          GhfsStatistic.ACTION_HTTP_GET_REQUEST.getSymbol(),
+          gcs.getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES)
+              .longValue());
+      instrumentation.incrementFailureStatistics(
+          GhfsStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol(),
+          gcs.getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST_FAILURES)
+              .longValue());
 
-      if (getGcsFs().getGcs().getGcsRequestsTracker() != null) {
-        ImmutableList<HttpRequest> httpRequests =
-            this.getGcsFs().getGcs().getGcsRequestsTracker().getAllRequests();
-        for (HttpRequest req : httpRequests) {
-          if (req.getRequestMethod() == "GET") {
-            instrumentation.incrementCounter(GhfsStatistic.ACTION_HTTP_GET_REQUEST, 1);
-          } else if (req.getRequestMethod() == "HEAD") {
-            instrumentation.incrementCounter(GhfsStatistic.ACTION_HTTP_HEAD_REQUEST, 1);
-          }
-        }
-      }
     } catch (Exception e) {
       logger.atWarning().log("Exception in getting statistics");
     }

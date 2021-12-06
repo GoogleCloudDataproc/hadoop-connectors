@@ -412,6 +412,8 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
 
       //  Check the statistics of method read().
       readStream.read();
+      readStream.close();
+      assertThat(readStream.getIOStatistics().counters().get(STREAM_READ_OPERATIONS)).isEqualTo(1);
     }
     ghfs.close();
     assertThat(
