@@ -647,6 +647,29 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
   }
 
   @Test
+  public void listFileInfo_directory_increased_batch_size() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorageOptions gcsOptions =
+        getStandardOptionBuilder().setMaxListItemsPerCall(5000).build();
+    GoogleCloudStorageFileSystemOptions gcsfsOptions =
+        newGcsFsOptions().setCloudStorageOptions(gcsOptions).build();
+    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsfsOptions, gcsRequestsTracker);
+
+    String bucketName = "dataproc-enhanced-list-integ-tests";
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = "listFileInfo_directory";
+
+    List<FileInfo> fileInfos = gcsFs.listFileInfo(bucketUri.resolve(dirObject));
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(bucketName, dirObject),
+            listRequestWithTrailingDelimiter(
+                bucketName, dirObject + "/", /* maxResults= */ 5000, /* pageToken= */ null));
+  }
+
+  @Test
   public void listFileInfo_directory_directoryPath() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
