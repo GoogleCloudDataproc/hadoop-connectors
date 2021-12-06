@@ -2187,7 +2187,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     try {
       return getObject.execute();
     } catch (IOException e) {
-
       if (errorExtractor.itemNotFound(e)) {
         logger.atFiner().withCause(e).log("getObject(%s): not found", resourceId);
         return null;
