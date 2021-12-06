@@ -13,7 +13,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.protobuf.util.Durations;
 import com.google.storage.v2.StorageGrpc;
 import com.google.storage.v2.StorageGrpc.StorageBlockingStub;
 import com.google.storage.v2.StorageGrpc.StorageStub;
@@ -97,7 +96,7 @@ class StorageStubProvider {
   }
 
   public void shutdown() {
-    channel.shutdownNow();
+    if (channel != null) channel.shutdown();
   }
 
   interface GrpcDecorator {
@@ -139,38 +138,11 @@ class StorageStubProvider {
     }
 
     private Map<String, Object> getGrpcServiceConfig() {
-      Map<String, Object> name = ImmutableMap.of("service", "google.storage.v1.Storage");
-
-      Map<String, Object> retryPolicy =
-          ImmutableMap.<String, Object>builder()
-              .put("maxAttempts", GRPC_MAX_RETRY_ATTEMPTS)
-              .put(
-                  "initialBackoff",
-                  Durations.toString(
-                      Durations.fromMillis(readOptions.getBackoffInitialIntervalMillis())))
-              .put(
-                  "maxBackoff",
-                  Durations.toString(
-                      Durations.fromMillis(readOptions.getBackoffMaxIntervalMillis())))
-              .put("backoffMultiplier", readOptions.getBackoffMultiplier())
-              .put("retryableStatusCodes", ImmutableList.of("UNAVAILABLE", "RESOURCE_EXHAUSTED"))
-              .build();
-
-      Map<String, Object> methodConfig =
-          ImmutableMap.of("name", ImmutableList.of(name), "retryPolicy", retryPolicy);
-
       Map<String, Object> childLbStrategy = ImmutableMap.of("round_robin", ImmutableMap.of());
-
       Map<String, Object> childPolicy =
           ImmutableMap.of("childPolicy", ImmutableList.of(childLbStrategy));
-
       Map<String, Object> grpcLbPolicy = ImmutableMap.of("grpclb", childPolicy);
-
-      return ImmutableMap.of(
-          "methodConfig",
-          ImmutableList.of(methodConfig),
-          "loadBalancingConfig",
-          ImmutableList.of(grpcLbPolicy));
+      return ImmutableMap.of("loadBalancingConfig", ImmutableList.of(grpcLbPolicy));
     }
   }
 

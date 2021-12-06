@@ -40,7 +40,12 @@ import org.apache.hadoop.util.Progressable;
 
 public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystemBase
     implements IOStatisticsSource {
-  GhfsInstrumentation instrumentation;
+
+  /** Instrumentation to track Statistics */
+  private GhfsInstrumentation instrumentation;
+
+  /** Storage Statistics Bonded to the instrumentation. */
+  private GhfsStorageStatistics storageStatistics;
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
@@ -56,6 +61,10 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
   public void initialize(URI path, Configuration config) throws IOException {
     super.initialize(path, config);
     this.instrumentation = new GhfsInstrumentation(path);
+    this.storageStatistics =
+        (GhfsStorageStatistics)
+            GlobalStorageStatistics.INSTANCE.put(
+                GhfsStorageStatistics.NAME, () -> new GhfsStorageStatistics(getIOStatistics()));
   }
 
   @Override
@@ -301,6 +310,16 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
    */
   protected void incrementStatistic(GhfsStatistic statistic, long count) {
     instrumentation.incrementCounter(statistic, count);
+  }
+
+  /**
+   * Get the storage statistics of this filesystem.
+   *
+   * @return the storage statistics
+   */
+  @Override
+  public GhfsStorageStatistics getStorageStatistics() {
+    return this.storageStatistics;
   }
 
   /**

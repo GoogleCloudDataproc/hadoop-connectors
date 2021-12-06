@@ -353,12 +353,21 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<String> GCS_GRPC_SERVER_ADDRESS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.server.address");
 
-  /** Configuration key for the connect timeout (in millisecond) for gRPC read requests to GCS. */
+  /**
+   * Configuration key for the connection timeout (in millisecond) for gRPC read requests to GCS.
+   */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_TIMEOUT_MS =
-      new HadoopConfigurationProperty<>("fs.gs.grpc.read.timeout.ms", 20 * 60 * 1000L);
+      new HadoopConfigurationProperty<>("fs.gs.grpc.read.timeout.ms", 30 * 1000L);
 
   /**
-   * Configuration key for the connect timeout (in millisecond) for gRPC metadata requests to GCS.
+   * Configuration key for the connection timeout (in millisecond) for gRPC read requests to GCS.
+   */
+  public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_SPEED_BYTES_PER_SEC =
+      new HadoopConfigurationProperty<>("fs.gs.grpc.read.speed.bytespersec", 50 * 1024 * 1024L);
+
+  /**
+   * Configuration key for the connection timeout (in millisecond) for gRPC metadata requests to
+   * GCS.
    */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_METADATA_TIMEOUT_MS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.read.metadata.timeout.ms", 60 * 1000L);
@@ -500,6 +509,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
         .setGrpcServerAddress(GCS_GRPC_SERVER_ADDRESS.get(config, config::get))
         .setGrpcReadTimeoutMillis(GCS_GRPC_READ_TIMEOUT_MS.get(config, config::getLong))
+        .setGrpcReadSpeedBytesPerSec(GCS_GRPC_READ_SPEED_BYTES_PER_SEC.get(config, config::getLong))
         .setGrpcReadMetadataTimeoutMillis(
             GCS_GRPC_READ_METADATA_TIMEOUT_MS.get(config, config::getLong))
         .setGrpcReadZeroCopyEnabled(GCS_GRPC_READ_ZEROCOPY_ENABLE.get(config, config::getBoolean))
