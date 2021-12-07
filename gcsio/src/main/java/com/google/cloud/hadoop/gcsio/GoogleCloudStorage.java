@@ -426,7 +426,9 @@ public interface GoogleCloudStorage {
    *
    * @param key name of the http related statistics key
    */
-  public AtomicLong getHttpStatistics(GoogleCloudStorageStatistics key);
+  default AtomicLong getHttpStatistics(GoogleCloudStorageStatistics key) {
+    throw new UnsupportedOperationException("Implemented in GoogleCloudStorageImpl");
+  }
 
   /**
    * Composes inputs into a single GCS object. This performs a GCS Compose. Objects will be composed

@@ -19,7 +19,10 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createJsonResponseException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInferredDirectory;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.*;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.OBJECT_DELETE_OBJECTS;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -326,9 +329,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   private static HttpRequestInitializer setGcsRequestTracker(
       GoogleCloudStorageOptions options, Credential credential) {
-    gcsRequestsTracker =
-        new GcsioTrackingHttpRequestInitializer(
-            new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()));
+    HttpRequestInitializer httpRequestInitializer =
+        new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions());
+    gcsRequestsTracker = new GcsioTrackingHttpRequestInitializer(httpRequestInitializer);
     return (HttpRequestInitializer) gcsRequestsTracker;
   }
 
@@ -1338,6 +1341,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           gcsStatistics.get(ACTION_HTTP_GET_REQUEST_FAILURES).incrementAndGet();
         }
         throw e;
+      } finally {
+        setHttpStatistics();
       }
 
       // Accumulate buckets (if any).
@@ -2130,6 +2135,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         gcsStatistics.get(ACTION_HTTP_GET_REQUEST_FAILURES).incrementAndGet();
       }
       throw new IOException("Error accessing Bucket " + bucketName, e);
+    } finally {
+      setHttpStatistics();
     }
   }
 
@@ -2185,6 +2192,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         gcsStatistics.get(ACTION_HTTP_GET_REQUEST_FAILURES).incrementAndGet();
       }
       throw new IOException("Error accessing " + resourceId, e);
+    } finally {
+      setHttpStatistics();
     }
   }
 
@@ -2441,22 +2450,23 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   @Override
   public AtomicLong getHttpStatistics(GoogleCloudStorageStatistics key) {
-    setHttpStatistics();
     return gcsStatistics.get(key);
   }
 
   private void setHttpStatistics() {
-    gcsStatistics.putIfAbsent(ACTION_HTTP_GET_REQUEST, new AtomicLong(0));
-    gcsStatistics.putIfAbsent(ACTION_HTTP_GET_REQUEST, new AtomicLong(0));
-    ImmutableList<HttpRequest> httpRequests = gcsRequestsTracker.getAllRequests();
-    httpRequests.stream()
-        .forEach(
-            req -> {
-              if (req.getRequestMethod() == "GET") {
-                gcsStatistics.get(ACTION_HTTP_GET_REQUEST).incrementAndGet();
-              } else if (req.getRequestMethod() == "HEAD") {
-                gcsStatistics.get(ACTION_HTTP_HEAD_REQUEST).incrementAndGet();
-              }
-            });
+    if (gcsRequestsTracker != null) {
+      ImmutableList<HttpRequest> httpRequests = gcsRequestsTracker.getAllRequests();
+      httpRequests.stream()
+          .forEach(
+              req -> {
+                if (req.getRequestMethod() == "GET") {
+                  gcsStatistics.putIfAbsent(ACTION_HTTP_GET_REQUEST, new AtomicLong(1));
+                  gcsStatistics.get(ACTION_HTTP_GET_REQUEST).incrementAndGet();
+                } else if (req.getRequestMethod() == "HEAD") {
+                  gcsStatistics.putIfAbsent(ACTION_HTTP_GET_REQUEST, new AtomicLong(1));
+                  gcsStatistics.get(ACTION_HTTP_HEAD_REQUEST).incrementAndGet();
+                }
+              });
+    }
   }
 }

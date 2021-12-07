@@ -72,7 +72,14 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
   @Override
   public FSDataInputStream open(Path hadoopPath, int bufferSize) throws IOException {
     entryPoint(GhfsStatistic.INVOCATION_OPEN);
-    return super.open(hadoopPath, bufferSize);
+    FSDataInputStream resp;
+    try {
+      resp = super.open(hadoopPath, bufferSize);
+    } catch (IOException e) {
+      throw e;
+    }
+    setHttpStatistics();
+    return resp;
   }
 
   @Override
@@ -95,6 +102,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
     } catch (IOException e) {
       throw e;
     }
+    setHttpStatistics();
     return response;
   }
 
@@ -275,7 +283,6 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
 
   @Override
   public void close() throws IOException {
-    setHttpStatistics();
     super.close();
   }
   /**
@@ -355,7 +362,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
               .longValue());
 
     } catch (Exception e) {
-      logger.atWarning().log("Exception in getting statistics");
+      logger.atWarning().log("Error in getting statistics from gcsio", e);
     }
   }
 }

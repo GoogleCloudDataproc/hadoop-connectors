@@ -1312,6 +1312,18 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     assertThat(myGhfs.delete(testRoot, true)).isTrue();
   }
 
+  public void http_IOstatistics() throws IOException {
+    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
+
+    FSDataOutputStream fout = myGhfs.create(new Path("/file1"));
+    fout.writeBytes("Test Content");
+    fout.close();
+
+    assertThat(myGhfs.getIOStatistics().counters().get(INVOCATION_CREATE.getSymbol())).isEqualTo(1);
+    assertThat(myGhfs.getIOStatistics().counters().get("action_http_get_request")).isEqualTo(3);
+    assertThat(myGhfs.delete(new Path("/file1"))).isTrue();
+  }
+
   @Test
   public void fileChecksum_throwsExceptionWHenHadoopPathAsNull() {
     GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
