@@ -329,9 +329,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   private static HttpRequestInitializer setGcsRequestTracker(
       GoogleCloudStorageOptions options, Credential credential) {
-    HttpRequestInitializer httpRequestInitializer =
-        new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions());
-    gcsRequestsTracker = new GcsioTrackingHttpRequestInitializer(httpRequestInitializer);
+    gcsRequestsTracker =
+        new GcsioTrackingHttpRequestInitializer(
+            new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()));
+    if (options.isGrpcEnabled()) {
+      return (HttpRequestInitializer)
+          new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions());
+    }
     return (HttpRequestInitializer) gcsRequestsTracker;
   }
 
