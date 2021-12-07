@@ -284,8 +284,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
           resourceId, (endTime - startTime));
     } else {
       logger.atFiner().log(
-          "Prefetched %d bytes footer for '%s' after %d milliseconds",
-          footerContent.size(), resourceId, (endTime - startTime));
+          "prefetched footer, resource:%s, time:%d, size:%d",
+          resourceId, (endTime - startTime), footerContent.size());
     }
 
     return new GoogleCloudStorageGrpcReadChannel(
@@ -328,8 +328,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     } finally {
       long endTime = System.currentTimeMillis();
       logger.atFinest().log(
-          "Spent %d milliseconds to fetch metadata for resource %s",
-          (endTime - startTime), resourceId);
+          "fetched metadata, resource:%s, time:%d", resourceId, (endTime - startTime));
     }
     return GoogleCloudStorageItemInfo.createObject(
         resourceId,
@@ -525,13 +524,16 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       return bytesRead;
     } catch (InterruptedException e) {
       cancelCurrentRequest();
+      long endTime = System.currentTimeMillis();
+      logger.atFinest().log(
+          "read data errored , resource:%s, time:%d, offset:%d, remaining:%d",
+          resourceId, (endTime - startTime), positionInGrpcStream, byteBuffer.remaining());
       throw new IOException(e);
     } finally {
       long endTime = System.currentTimeMillis();
       logger.atFinest().log(
-          "Read request for resource %s responded/errored after %d milliseconds,"
-              + " file at offset %d with %d remaining in the buffer",
-          (endTime - startTime), positionInGrpcStream, byteBuffer.remaining());
+          "read data , resource:%s, time:%d, offset:%d, remaining:%d",
+          resourceId, (endTime - startTime), positionInGrpcStream, byteBuffer.remaining());
     }
   }
 
