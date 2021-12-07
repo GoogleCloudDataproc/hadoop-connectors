@@ -526,13 +526,13 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       cancelCurrentRequest();
       long endTime = System.currentTimeMillis();
       logger.atFinest().log(
-          "read data errored , resource:%s, time:%d, offset:%d, remaining:%d",
+          "read data errored, resource:%s, time:%d, offset:%d, remaining:%d",
           resourceId, (endTime - startTime), positionInGrpcStream, byteBuffer.remaining());
       throw new IOException(e);
     } finally {
       long endTime = System.currentTimeMillis();
       logger.atFinest().log(
-          "read data , resource:%s, time:%d, offset:%d, remaining:%d",
+          "read data, resource:%s, time:%d, offset:%d, remaining:%d",
           resourceId, (endTime - startTime), positionInGrpcStream, byteBuffer.remaining());
     }
   }
