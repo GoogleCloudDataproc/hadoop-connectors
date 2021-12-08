@@ -80,10 +80,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
   @Override
   public FSDataInputStream open(Path hadoopPath, int bufferSize) throws IOException {
     entryPoint(GhfsStatistic.INVOCATION_OPEN);
-    FSDataInputStream resp;
-    resp = super.open(hadoopPath, bufferSize);
-    setHttpStatistics();
-    return resp;
+    return super.open(hadoopPath, bufferSize);
   }
 
   @Override
@@ -102,7 +99,6 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
         super.create(
             hadoopPath, permission, overwrite, bufferSize, replication, blockSize, progress);
     instrumentation.fileCreated();
-    setHttpStatistics();
     return response;
   }
 
@@ -281,10 +277,6 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
     return null;
   }
 
-  @Override
-  public void close() throws IOException {
-    super.close();
-  }
   /**
    * Entry point to an operation. Increments the statistic; verifies the FS is active.
    *
@@ -334,6 +326,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
    */
   @Override
   public IOStatistics getIOStatistics() {
+    setHttpStatistics();
     return instrumentation != null ? instrumentation.getIOStatistics() : null;
   }
 
@@ -351,12 +344,12 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
       incrementStatistic(
           GhfsStatistic.ACTION_HTTP_HEAD_REQUEST,
           gcs.getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST).longValue());
-      instrumentation.incrementFailureStatistics(
-          GhfsStatistic.ACTION_HTTP_GET_REQUEST.getSymbol(),
+      incrementStatistic(
+          GhfsStatistic.ACTION_HTTP_GET_REQUEST_FAILURES,
           gcs.getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES)
               .longValue());
-      instrumentation.incrementFailureStatistics(
-          GhfsStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol(),
+      incrementStatistic(
+          GhfsStatistic.ACTION_HTTP_HEAD_REQUEST_FAILURES,
           gcs.getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST_FAILURES)
               .longValue());
 

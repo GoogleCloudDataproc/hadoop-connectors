@@ -319,16 +319,6 @@ public class GhfsInstrumentation
   }
 
   /**
-   * Increments a Mutable counter for request failure
-   *
-   * @param symbol counter name.
-   * @param count increment value
-   */
-  public void incrementFailureStatistics(String symbol, Long count) {
-    incrementMutableCounter(symbol + SUFFIX_FAILURES, count);
-  }
-
-  /**
    * A duration tracker which updates a mutable counter with a metric. The metric is updated with
    * the count on start; after a failure the failures count is incremented by one.
    */

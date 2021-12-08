@@ -1320,7 +1320,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     fout.close();
 
     assertThat(myGhfs.getIOStatistics().counters().get(INVOCATION_CREATE.getSymbol())).isEqualTo(1);
-    assertThat(myGhfs.getIOStatistics().counters().get("action_http_get_request")).isEqualTo(3);
+    assertThat(myGhfs.getIOStatistics().counters().get("action_http_get_request")).isEqualTo(2);
     assertThat(myGhfs.delete(new Path("/file1"))).isTrue();
   }
 

@@ -19,9 +19,6 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createJsonResponseException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInferredDirectory;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.OBJECT_DELETE_OBJECTS;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -37,7 +34,6 @@ import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.ByteArrayContent;
 import com.google.api.client.http.HttpHeaders;
-import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.InputStreamContent;
@@ -1336,18 +1332,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         listBucket.setPageToken(pageToken);
       }
 
-      Buckets items = null;
-      try {
-        items = listBucket.execute();
-      } catch (IOException e) {
-        if (ApiErrorExtractor.INSTANCE.requestFailure(e)) {
-          gcsStatistics.putIfAbsent(ACTION_HTTP_GET_REQUEST_FAILURES, new AtomicLong(1));
-          gcsStatistics.get(ACTION_HTTP_GET_REQUEST_FAILURES).incrementAndGet();
-        }
-        throw e;
-      } finally {
-        setHttpStatistics();
-      }
+      Buckets items = listBucket.execute();
 
       // Accumulate buckets (if any).
       List<Bucket> buckets = items.getItems();
@@ -1519,9 +1504,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         logger.atFiner().withCause(e).log(
             "listStorageObjectsAndPrefixesPage(%s, %s): item not found", resource, listOptions);
         return null;
-      } else if (ApiErrorExtractor.INSTANCE.requestFailure(e)) {
-        gcsStatistics.putIfAbsent(ACTION_HTTP_GET_REQUEST_FAILURES, new AtomicLong(1));
-        gcsStatistics.get(ACTION_HTTP_GET_REQUEST_FAILURES).incrementAndGet();
       }
       throw new IOException("Error listing " + resource, e);
     }
@@ -2134,13 +2116,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       if (errorExtractor.itemNotFound(e)) {
         logger.atFiner().withCause(e).log("getBucket(%s): not found", bucketName);
         return null;
-      } else if (ApiErrorExtractor.INSTANCE.requestFailure(e)) {
-        gcsStatistics.putIfAbsent(ACTION_HTTP_GET_REQUEST_FAILURES, new AtomicLong(1));
-        gcsStatistics.get(ACTION_HTTP_GET_REQUEST_FAILURES).incrementAndGet();
       }
       throw new IOException("Error accessing Bucket " + bucketName, e);
-    } finally {
-      setHttpStatistics();
     }
   }
 
@@ -2191,13 +2168,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       if (errorExtractor.itemNotFound(e)) {
         logger.atFiner().withCause(e).log("getObject(%s): not found", resourceId);
         return null;
-      } else if (ApiErrorExtractor.INSTANCE.requestFailure(e)) {
-        gcsStatistics.putIfAbsent(ACTION_HTTP_GET_REQUEST_FAILURES, new AtomicLong(1));
-        gcsStatistics.get(ACTION_HTTP_GET_REQUEST_FAILURES).incrementAndGet();
       }
       throw new IOException("Error accessing " + resourceId, e);
-    } finally {
-      setHttpStatistics();
     }
   }
 
@@ -2454,23 +2426,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   @Override
   public AtomicLong getHttpStatistics(GoogleCloudStorageStatistics key) {
-    return gcsStatistics.get(key);
-  }
-
-  private void setHttpStatistics() {
-    if (gcsRequestsTracker != null) {
-      ImmutableList<HttpRequest> httpRequests = gcsRequestsTracker.getAllRequests();
-      httpRequests.stream()
-          .forEach(
-              req -> {
-                if (req.getRequestMethod() == "GET") {
-                  gcsStatistics.putIfAbsent(ACTION_HTTP_GET_REQUEST, new AtomicLong(1));
-                  gcsStatistics.get(ACTION_HTTP_GET_REQUEST).incrementAndGet();
-                } else if (req.getRequestMethod() == "HEAD") {
-                  gcsStatistics.putIfAbsent(ACTION_HTTP_GET_REQUEST, new AtomicLong(1));
-                  gcsStatistics.get(ACTION_HTTP_HEAD_REQUEST).incrementAndGet();
-                }
-              });
-    }
+    return gcsRequestsTracker.getHttpStatistics(key);
   }
 }

@@ -38,6 +38,10 @@ public enum GhfsStatistic {
       StoreStatisticNames.ACTION_HTTP_HEAD_REQUEST, "HEAD request.", TYPE_COUNTER),
   ACTION_HTTP_GET_REQUEST(
       StoreStatisticNames.ACTION_HTTP_GET_REQUEST, "GET request.", TYPE_COUNTER),
+  ACTION_HTTP_HEAD_REQUEST_FAILURES(
+      "action_http_head_request_failures", "HEAD request.", TYPE_COUNTER),
+  ACTION_HTTP_GET_REQUEST_FAILURES(
+      "action_http_get_request_failures", "GET request.", TYPE_COUNTER),
 
   /** FileSystem Level statistics */
   DIRECTORIES_CREATED(
