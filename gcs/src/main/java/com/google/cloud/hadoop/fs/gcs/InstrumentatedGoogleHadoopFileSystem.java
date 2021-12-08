@@ -29,8 +29,16 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.*;
+import org.apache.hadoop.fs.CreateFlag;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileChecksum;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.GlobalStorageStatistics;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
@@ -73,11 +81,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
   public FSDataInputStream open(Path hadoopPath, int bufferSize) throws IOException {
     entryPoint(GhfsStatistic.INVOCATION_OPEN);
     FSDataInputStream resp;
-    try {
-      resp = super.open(hadoopPath, bufferSize);
-    } catch (IOException e) {
-      throw e;
-    }
+    resp = super.open(hadoopPath, bufferSize);
     setHttpStatistics();
     return resp;
   }
@@ -94,14 +98,10 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
       throws IOException {
     entryPoint(GhfsStatistic.INVOCATION_CREATE);
     FSDataOutputStream response = null;
-    try {
-      response =
-          super.create(
-              hadoopPath, permission, overwrite, bufferSize, replication, blockSize, progress);
-      instrumentation.fileCreated();
-    } catch (IOException e) {
-      throw e;
-    }
+    response =
+        super.create(
+            hadoopPath, permission, overwrite, bufferSize, replication, blockSize, progress);
+    instrumentation.fileCreated();
     setHttpStatistics();
     return response;
   }
@@ -142,7 +142,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
                 .getObjectStatistics(GoogleCloudStorageStatistics.OBJECT_DELETE_OBJECTS)
                 .longValue());
       } catch (Exception e) {
-        logger.atWarning().log("Get Object Statistics threw UnsupportedOpersationException");
+        logger.atWarning().log("Get Object Statistics threw UnsupportedOperationException");
       }
       instrumentation.fileDeleted(1);
     } catch (IOException e) {
@@ -289,7 +289,6 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
    * Entry point to an operation. Increments the statistic; verifies the FS is active.
    *
    * @param operation The operation to increment
-   * @throws IOException if the
    */
   public void entryPoint(GhfsStatistic operation) {
     if (super.isClosed()) {

@@ -31,11 +31,6 @@ public class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializ
   private final List<HttpRequest> requests = Collections.synchronizedList(new ArrayList<>());
 
   public GcsioTrackingHttpRequestInitializer(HttpRequestInitializer delegate) {
-    this(delegate, /* replaceRequestParams= */ true);
-  }
-
-  public GcsioTrackingHttpRequestInitializer(
-      HttpRequestInitializer delegate, boolean replaceRequestParams) {
     this.delegate = delegate;
   }
 

@@ -415,14 +415,14 @@ public interface GoogleCloudStorage {
       throws IOException;
 
   /**
-   * To get the value object related statistics from GCS
+   * Retrieves the statistics for the given object-related key
    *
    * @param key name of the object related statistics key
    */
   public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key);
 
   /**
-   * To get the value object related statistics from GCS
+   * Retrieves the statistics for the given http-related key
    *
    * @param key name of the http related statistics key
    */
