@@ -15,10 +15,18 @@
  */
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_HTTP_DELETE_REQUEST;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_HTTP_DELETE_REQUEST_FAILURES;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST_FAILURES;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_HTTP_PATCH_REQUEST;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_HTTP_PATCH_REQUEST_FAILURES;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST_FAILURES;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST_FAILURES;
 
 import com.google.api.client.http.HttpExecuteInterceptor;
 import com.google.api.client.http.HttpRequest;
@@ -28,7 +36,6 @@ import com.google.api.client.http.HttpResponseInterceptor;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 
 /** To track and update the statistics related to http requests */
@@ -60,7 +67,6 @@ class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
             executeInterceptor.intercept(r);
           }
           if (r.getRequestMethod() == "GET") {
-            logger.atInfo().log(Objects.toString(r));
             httpStatistics.putIfAbsent(
                 GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST, new AtomicLong(0));
             httpStatistics.get(ACTION_HTTP_GET_REQUEST).incrementAndGet();
@@ -68,6 +74,22 @@ class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
             httpStatistics.putIfAbsent(
                 GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST, new AtomicLong(0));
             httpStatistics.get(ACTION_HTTP_HEAD_REQUEST).incrementAndGet();
+          } else if (r.getRequestMethod() == "PUT") {
+            httpStatistics.putIfAbsent(
+                GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST, new AtomicLong(0));
+            httpStatistics.get(ACTION_HTTP_PUT_REQUEST).incrementAndGet();
+          } else if (r.getRequestMethod() == "POST") {
+            httpStatistics.putIfAbsent(
+                GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST, new AtomicLong(0));
+            httpStatistics.get(ACTION_HTTP_POST_REQUEST).incrementAndGet();
+          } else if (r.getRequestMethod() == "PATCH") {
+            httpStatistics.putIfAbsent(
+                GoogleCloudStorageStatistics.ACTION_HTTP_PATCH_REQUEST, new AtomicLong(0));
+            httpStatistics.get(ACTION_HTTP_PATCH_REQUEST).incrementAndGet();
+          } else if (r.getRequestMethod() == "DELETE") {
+            httpStatistics.putIfAbsent(
+                GoogleCloudStorageStatistics.ACTION_HTTP_DELETE_REQUEST, new AtomicLong(0));
+            httpStatistics.get(ACTION_HTTP_DELETE_REQUEST).incrementAndGet();
           }
         });
     request.setResponseInterceptor(
@@ -76,15 +98,28 @@ class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
           public void interceptResponse(HttpResponse httpResponse) throws IOException {
             if (!(httpResponse.isSuccessStatusCode())
                 && httpResponse.getRequest().getRequestMethod() == "GET") {
-              httpStatistics.putIfAbsent(
-                  GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES, new AtomicLong(0));
+              httpStatistics.putIfAbsent(ACTION_HTTP_GET_REQUEST_FAILURES, new AtomicLong(0));
               httpStatistics.get(ACTION_HTTP_GET_REQUEST_FAILURES).incrementAndGet();
             } else if (!(httpResponse.isSuccessStatusCode())
                 && httpResponse.getRequest().getRequestMethod() == "HEAD") {
-              httpStatistics.putIfAbsent(
-                  GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST_FAILURES,
-                  new AtomicLong(0));
+              httpStatistics.putIfAbsent(ACTION_HTTP_HEAD_REQUEST_FAILURES, new AtomicLong(0));
               httpStatistics.get(ACTION_HTTP_HEAD_REQUEST_FAILURES).incrementAndGet();
+            } else if (!(httpResponse.isSuccessStatusCode())
+                && httpResponse.getRequest().getRequestMethod() == "PUT") {
+              httpStatistics.putIfAbsent(ACTION_HTTP_PUT_REQUEST_FAILURES, new AtomicLong(0));
+              httpStatistics.get(ACTION_HTTP_PUT_REQUEST_FAILURES).incrementAndGet();
+            } else if (!(httpResponse.isSuccessStatusCode())
+                && httpResponse.getRequest().getRequestMethod() == "POST") {
+              httpStatistics.putIfAbsent(ACTION_HTTP_POST_REQUEST_FAILURES, new AtomicLong(0));
+              httpStatistics.get(ACTION_HTTP_POST_REQUEST_FAILURES).incrementAndGet();
+            } else if (!(httpResponse.isSuccessStatusCode())
+                && httpResponse.getRequest().getRequestMethod() == "PATCH") {
+              httpStatistics.putIfAbsent(ACTION_HTTP_PATCH_REQUEST_FAILURES, new AtomicLong(0));
+              httpStatistics.get(ACTION_HTTP_PATCH_REQUEST_FAILURES).incrementAndGet();
+            } else if (!(httpResponse.isSuccessStatusCode())
+                && httpResponse.getRequest().getRequestMethod() == "DELETE") {
+              httpStatistics.putIfAbsent(ACTION_HTTP_DELETE_REQUEST_FAILURES, new AtomicLong(0));
+              httpStatistics.get(ACTION_HTTP_DELETE_REQUEST_FAILURES).incrementAndGet();
             }
           }
         });

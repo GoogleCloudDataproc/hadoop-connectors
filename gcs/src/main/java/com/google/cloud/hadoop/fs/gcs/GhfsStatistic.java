@@ -38,6 +38,14 @@ public enum GhfsStatistic {
       StoreStatisticNames.ACTION_HTTP_HEAD_REQUEST, "HEAD request.", TYPE_DURATION),
   ACTION_HTTP_GET_REQUEST(
       StoreStatisticNames.ACTION_HTTP_GET_REQUEST, "GET request.", TYPE_DURATION),
+  ACTION_HTTP_PUT_REQUEST(
+      StoreStatisticNames.ACTION_HTTP_PUT_REQUEST, "PUT request.", TYPE_DURATION),
+  ACTION_HTTP_PATCH_REQUEST(
+      StoreStatisticNames.ACTION_HTTP_POST_REQUEST, "PATCH request.", TYPE_DURATION),
+  ACTION_HTTP_POST_REQUEST(
+      StoreStatisticNames.ACTION_HTTP_PATCH_REQUEST, "POST request.", TYPE_DURATION),
+  ACTION_HTTP_DELETE_REQUEST(
+      StoreStatisticNames.ACTION_HTTP_DELETE_REQUEST, "DELETE request.", TYPE_DURATION),
 
   /** FileSystem Level statistics */
   DIRECTORIES_CREATED(
