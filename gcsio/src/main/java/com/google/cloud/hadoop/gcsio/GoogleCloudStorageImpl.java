@@ -2420,9 +2420,4 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key) {
     return objectStatistics.get(key);
   }
-
-  @Override
-  public AtomicLong getHttpStatistics(GoogleCloudStorageStatistics key) {
-    return new AtomicLong(0);
-  }
 }

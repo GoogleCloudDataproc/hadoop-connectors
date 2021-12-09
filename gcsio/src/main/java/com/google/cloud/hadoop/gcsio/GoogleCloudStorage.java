@@ -422,15 +422,6 @@ public interface GoogleCloudStorage {
   public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key);
 
   /**
-   * Retrieves the statistics for the given http-related key
-   *
-   * @param key name of the http related statistics key
-   */
-  default AtomicLong getHttpStatistics(GoogleCloudStorageStatistics key) {
-    throw new UnsupportedOperationException("Implemented in GoogleCloudStorageImpl");
-  }
-
-  /**
    * Composes inputs into a single GCS object. This performs a GCS Compose. Objects will be composed
    * according to the order they appear in the input. The destination object will have metadata set
    * according to {@code options}. Overwrite semantics for the destination object will follow the
