@@ -153,17 +153,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private static final String LIST_OBJECT_FIELDS_FORMAT = "items(%s),prefixes,nextPageToken";
 
   // To track the object statistics
-  private HashMap<GoogleCloudStorageStatistics, AtomicLong> objectStatistics =
+  private static final HashMap<GoogleCloudStorageStatistics, AtomicLong> objectStatistics =
       new HashMap<GoogleCloudStorageStatistics, AtomicLong>();
 
   // A function to encode metadata map values
   static String encodeMetadataValues(byte[] bytes) {
     return bytes == null ? Data.NULL_STRING : BaseEncoding.base64().encode(bytes);
   }
-
-  // To track the http statistics
-  private HashMap<GoogleCloudStorageStatistics, AtomicLong> gcsStatistics =
-      new HashMap<GoogleCloudStorageStatistics, AtomicLong>();
 
   private static byte[] decodeMetadataValues(String value) {
     try {
@@ -331,7 +327,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
     gcsRequestsTracker =
         new GcsioTrackingHttpRequestInitializer(
-            new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()));
+            new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()),
+            objectStatistics);
     return (HttpRequestInitializer) gcsRequestsTracker;
   }
 
@@ -2426,6 +2423,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   @Override
   public AtomicLong getHttpStatistics(GoogleCloudStorageStatistics key) {
-    return gcsRequestsTracker.getHttpStatistics(key);
+    return new AtomicLong(0);
   }
 }

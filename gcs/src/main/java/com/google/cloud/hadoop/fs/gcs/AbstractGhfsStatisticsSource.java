@@ -64,6 +64,16 @@ abstract class AbstractGhfsStatisticsSource implements IOStatisticsSource, Durat
   }
 
   /**
+   * set the value for a named counter.
+   *
+   * @param key counter name
+   * @param value value to set
+   */
+  public void setCounter(String key, long value) {
+    ioStatistics.setCounter(key, 0L);
+  }
+
+  /**
    * Get the value of a counter.
    *
    * @param name counter name

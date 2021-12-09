@@ -25,25 +25,27 @@ import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpResponseInterceptor;
+import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
+/** To track and update the statistics related to http requests */
+class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
 
   private final HttpRequestInitializer delegate;
 
-  private final List<HttpRequest> requests = Collections.synchronizedList(new ArrayList<>());
-
   // To track the http statistics
-  private HashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics =
-      new HashMap<GoogleCloudStorageStatistics, AtomicLong>();
+  private HashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics;
 
-  public GcsioTrackingHttpRequestInitializer(HttpRequestInitializer delegate) {
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
+  public GcsioTrackingHttpRequestInitializer(
+      HttpRequestInitializer delegate,
+      HashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics) {
     this.delegate = delegate;
+    this.httpStatistics = httpStatistics;
   }
 
   @Override
@@ -57,8 +59,8 @@ public class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializ
           if (executeInterceptor != null) {
             executeInterceptor.intercept(r);
           }
-          requests.add(r);
           if (r.getRequestMethod() == "GET") {
+            logger.atInfo().log(Objects.toString(r));
             httpStatistics.putIfAbsent(
                 GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST, new AtomicLong(0));
             httpStatistics.get(ACTION_HTTP_GET_REQUEST).incrementAndGet();
@@ -88,11 +90,8 @@ public class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializ
         });
   }
 
-  public AtomicLong getHttpStatistics(GoogleCloudStorageStatistics key) {
-    return httpStatistics.get(key);
-  }
-
+  /** clear the statistics */
   public void reset() {
-    requests.clear();
+    httpStatistics.clear();
   }
 }

@@ -336,21 +336,24 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
 
   /** Set the Value for http get and head request related statistics keys */
   private void setHttpStatistics() {
+    instrumentation.clearHttpStats();
     try {
       GoogleCloudStorage gcs = getGcsFs().getGcs();
       incrementStatistic(
           GhfsStatistic.ACTION_HTTP_GET_REQUEST,
-          gcs.getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST).longValue());
-      incrementStatistic(
-          GhfsStatistic.ACTION_HTTP_HEAD_REQUEST,
-          gcs.getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST).longValue());
-      incrementStatistic(
-          GhfsStatistic.ACTION_HTTP_GET_REQUEST_FAILURES,
-          gcs.getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES)
+          gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST)
               .longValue());
       incrementStatistic(
-          GhfsStatistic.ACTION_HTTP_HEAD_REQUEST_FAILURES,
-          gcs.getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST_FAILURES)
+          GhfsStatistic.ACTION_HTTP_HEAD_REQUEST,
+          gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST)
+              .longValue());
+      instrumentation.incrementFailureStatistics(
+          GhfsStatistic.ACTION_HTTP_GET_REQUEST,
+          gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES)
+              .longValue());
+      instrumentation.incrementFailureStatistics(
+          GhfsStatistic.ACTION_HTTP_HEAD_REQUEST,
+          gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST_FAILURES)
               .longValue());
 
     } catch (Exception e) {

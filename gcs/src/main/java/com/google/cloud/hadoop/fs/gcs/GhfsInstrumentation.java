@@ -319,6 +319,18 @@ public class GhfsInstrumentation
   }
 
   /**
+   * increment the failure statistics
+   *
+   * @param name
+   * @param count
+   */
+  public void incrementFailureStatistics(GhfsStatistic name, long count) {
+    if (count > 0) {
+      incrementMutableCounter(name.getSymbol() + SUFFIX_FAILURES, count);
+    }
+  }
+
+  /**
    * A duration tracker which updates a mutable counter with a metric. The metric is updated with
    * the count on start; after a failure the failures count is incremented by one.
    */
@@ -954,5 +966,10 @@ public class GhfsInstrumentation
               }
             });
     return storeBuilder;
+  }
+
+  public void clearHttpStats() {
+    instanceIOStatistics.setCounter(GhfsStatistic.ACTION_HTTP_GET_REQUEST.getSymbol(), 0L);
+    instanceIOStatistics.setCounter(GhfsStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol(), 0L);
   }
 }
