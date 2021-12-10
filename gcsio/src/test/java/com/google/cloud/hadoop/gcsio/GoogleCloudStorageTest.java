@@ -275,7 +275,7 @@ public class GoogleCloudStorageTest {
   }
   /** Test the Statistics of http GET request */
   @Test
-  public void testHttpPostRequestFailureStat() throws IOException {
+  public void testHttpGetRequestStat() throws IOException {
 
     MockHttpTransport transport =
         mockTransport(
