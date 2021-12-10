@@ -329,10 +329,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       return (HttpRequestInitializer)
           new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions());
     }
+    HttpRequestInitializer httpRequestInitializer =
+        new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions());
     gcsRequestsTracker =
-        new GcsioTrackingHttpRequestInitializer(
-            new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()),
-            httpStatistics);
+        new GcsioTrackingHttpRequestInitializer(httpRequestInitializer, httpStatistics);
     return (HttpRequestInitializer) gcsRequestsTracker;
   }
 

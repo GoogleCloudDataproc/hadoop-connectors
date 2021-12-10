@@ -33,10 +33,8 @@ import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpResponseInterceptor;
-import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 
 /** To track and update the statistics related to http requests */
@@ -46,8 +44,6 @@ class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
 
   // To track the http statistics
   private HashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics;
-
-  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   public GcsioTrackingHttpRequestInitializer(
       HttpRequestInitializer delegate,
@@ -89,32 +85,26 @@ class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
       httpStatistics.putIfAbsent(
           GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST, new AtomicLong(0));
       httpStatistics.get(ACTION_HTTP_GET_REQUEST).incrementAndGet();
-      logger.atInfo().log("GET Request - " + Objects.toString(r));
     } else if (r.getRequestMethod() == "HEAD") {
       httpStatistics.putIfAbsent(
           GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST, new AtomicLong(0));
       httpStatistics.get(ACTION_HTTP_HEAD_REQUEST).incrementAndGet();
-      logger.atInfo().log("HEAD Request - " + Objects.toString(r));
     } else if (r.getRequestMethod() == "PUT") {
       httpStatistics.putIfAbsent(
           GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST, new AtomicLong(0));
       httpStatistics.get(ACTION_HTTP_PUT_REQUEST).incrementAndGet();
-      logger.atInfo().log("PUT Request - " + Objects.toString(r));
     } else if (r.getRequestMethod() == "POST") {
       httpStatistics.putIfAbsent(
           GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST, new AtomicLong(0));
       httpStatistics.get(ACTION_HTTP_POST_REQUEST).incrementAndGet();
-      logger.atInfo().log("POST Request - " + Objects.toString(r));
     } else if (r.getRequestMethod() == "PATCH") {
       httpStatistics.putIfAbsent(
           GoogleCloudStorageStatistics.ACTION_HTTP_PATCH_REQUEST, new AtomicLong(0));
       httpStatistics.get(ACTION_HTTP_PATCH_REQUEST).incrementAndGet();
-      logger.atInfo().log("PATCH Request - " + Objects.toString(r));
     } else if (r.getRequestMethod() == "DELETE") {
       httpStatistics.putIfAbsent(
           GoogleCloudStorageStatistics.ACTION_HTTP_DELETE_REQUEST, new AtomicLong(0));
       httpStatistics.get(ACTION_HTTP_DELETE_REQUEST).incrementAndGet();
-      logger.atInfo().log("DELETE Request - " + Objects.toString(r));
     }
   }
 
@@ -150,6 +140,7 @@ class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
       httpStatistics.get(ACTION_HTTP_DELETE_REQUEST_FAILURES).incrementAndGet();
     }
   }
+
   /** clear the statistics */
   public void reset() {
     httpStatistics.clear();

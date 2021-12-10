@@ -35,17 +35,29 @@ import org.apache.hadoop.fs.statistics.StreamStatisticNames;
 public enum GhfsStatistic {
   /** Http Request counters */
   ACTION_HTTP_HEAD_REQUEST(
-      StoreStatisticNames.ACTION_HTTP_HEAD_REQUEST, "HEAD request.", TYPE_DURATION),
+      StoreStatisticNames.ACTION_HTTP_HEAD_REQUEST, "HEAD request.", TYPE_COUNTER),
   ACTION_HTTP_GET_REQUEST(
-      StoreStatisticNames.ACTION_HTTP_GET_REQUEST, "GET request.", TYPE_DURATION),
+      StoreStatisticNames.ACTION_HTTP_GET_REQUEST, "GET request.", TYPE_COUNTER),
   ACTION_HTTP_PUT_REQUEST(
-      StoreStatisticNames.ACTION_HTTP_PUT_REQUEST, "PUT request.", TYPE_DURATION),
+      StoreStatisticNames.ACTION_HTTP_PUT_REQUEST, "PUT request.", TYPE_COUNTER),
   ACTION_HTTP_PATCH_REQUEST(
-      StoreStatisticNames.ACTION_HTTP_POST_REQUEST, "PATCH request.", TYPE_DURATION),
+      StoreStatisticNames.ACTION_HTTP_POST_REQUEST, "PATCH request.", TYPE_COUNTER),
   ACTION_HTTP_POST_REQUEST(
-      StoreStatisticNames.ACTION_HTTP_PATCH_REQUEST, "POST request.", TYPE_DURATION),
+      StoreStatisticNames.ACTION_HTTP_PATCH_REQUEST, "POST request.", TYPE_COUNTER),
   ACTION_HTTP_DELETE_REQUEST(
-      StoreStatisticNames.ACTION_HTTP_DELETE_REQUEST, "DELETE request.", TYPE_DURATION),
+      StoreStatisticNames.ACTION_HTTP_DELETE_REQUEST, "DELETE request.", TYPE_COUNTER),
+  ACTION_HTTP_HEAD_REQUEST_FAILURES(
+      "action_http_head_request_failures", "HEAD request Failures.", TYPE_COUNTER),
+  ACTION_HTTP_GET_REQUEST_FAILURES(
+      "action_http_get_request_failures", "GET request Failures.", TYPE_COUNTER),
+  ACTION_HTTP_PUT_REQUEST_FAILURES(
+      "action_http_put_request_failures", "PUT request Failures.", TYPE_COUNTER),
+  ACTION_HTTP_PATCH_REQUEST_FAILURES(
+      "action_http_patch_request_failures", "PATCH request Failures.", TYPE_COUNTER),
+  ACTION_HTTP_POST_REQUEST_FAILURES(
+      "action_http_post_request_failures", "POST request Failures.", TYPE_COUNTER),
+  ACTION_HTTP_DELETE_REQUEST_FAILURES(
+      "action_http_delete_request_failures", "DELETE request Failures.", TYPE_COUNTER),
 
   /** FileSystem Level statistics */
   DIRECTORIES_CREATED(

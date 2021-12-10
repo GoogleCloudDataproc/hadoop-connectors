@@ -1313,34 +1313,37 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   public void http_IOstatistics() throws IOException {
-    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
-
-    FSDataOutputStream fout = myGhfs.create(new Path("/file1"));
+    FSDataOutputStream fout = ghfs.create(new Path("/file1"));
     fout.writeBytes("Test Content");
     fout.close();
 
-    assertThat(myGhfs.getIOStatistics().counters().get(INVOCATION_CREATE.getSymbol())).isEqualTo(1);
     assertThat(
-            myGhfs
+            ((GoogleHadoopFileSystem) ghfs)
+                .getIOStatistics()
+                .counters()
+                .get(INVOCATION_CREATE.getSymbol()))
+        .isEqualTo(1);
+    assertThat(
+            ((GoogleHadoopFileSystem) ghfs)
                 .getIOStatistics()
                 .counters()
                 .get(GhfsStatistic.ACTION_HTTP_GET_REQUEST.getSymbol()))
         .isEqualTo(2);
     assertThat(
-            myGhfs
+            ((GoogleHadoopFileSystem) ghfs)
                 .getIOStatistics()
                 .counters()
                 .get(GhfsStatistic.ACTION_HTTP_PUT_REQUEST.getSymbol()))
         .isEqualTo(1);
     assertThat(
-            myGhfs
+            ((GoogleHadoopFileSystem) ghfs)
                 .getIOStatistics()
                 .counters()
                 .get(GhfsStatistic.ACTION_HTTP_PATCH_REQUEST.getSymbol()))
         .isEqualTo(1);
-    assertThat(myGhfs.delete(new Path("/file1"))).isTrue();
+    assertThat(ghfs.delete(new Path("/file1"))).isTrue();
     assertThat(
-            myGhfs
+            ((GoogleHadoopFileSystem) ghfs)
                 .getIOStatistics()
                 .counters()
                 .get(GhfsStatistic.ACTION_HTTP_DELETE_REQUEST.getSymbol()))

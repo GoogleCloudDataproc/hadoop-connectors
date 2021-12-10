@@ -273,9 +273,10 @@ public class GoogleCloudStorageTest {
       assertThat(writtenData.toByteArray()).isEqualTo(testData);
     }
   }
+
   /** Test the Statistics of http GET request */
   @Test
-  public void testHttpGetRequestStat() throws IOException {
+  public void testHttpRequestStat() throws IOException {
 
     MockHttpTransport transport =
         mockTransport(
@@ -321,6 +322,45 @@ public class GoogleCloudStorageTest {
                 .get(GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST_FAILURES)
                 .longValue())
         .isEqualTo(1L);
+  }
+
+  @Test
+  public void testhttpStats() throws Exception {
+    InputStream timeoutStream = new ThrowingInputStream(new SocketTimeoutException("read timeout"));
+    InputStream sslExceptionStream = new ThrowingInputStream(new SSLException("read SSLException"));
+    InputStream ioExceptionStream = new ThrowingInputStream(new IOException("read IOException"));
+
+    byte[] testData = {0x01, 0x02, 0x03, 0x05, 0x08};
+
+    StorageObject storageObject = newStorageObject(BUCKET_NAME, OBJECT_NAME);
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(storageObject),
+            inputStreamResponse(CONTENT_LENGTH, testData.length, timeoutStream),
+            inputStreamResponse(CONTENT_LENGTH, testData.length, sslExceptionStream),
+            inputStreamResponse(CONTENT_LENGTH, testData.length, ioExceptionStream),
+            dataResponse(testData));
+
+    GoogleCloudStorage gcs = mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializer);
+
+    GoogleCloudStorageReadChannel readChannel =
+        (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
+    readChannel.setSleeper(Sleeper.DEFAULT);
+    readChannel.setMaxRetries(3);
+    assertThat(readChannel.isOpen()).isTrue();
+    assertThat(readChannel.position()).isEqualTo(0);
+
+    byte[] actualData = new byte[testData.length];
+    int bytesRead = readChannel.read(ByteBuffer.wrap(actualData));
+
+    assertThat(bytesRead).isEqualTo(testData.length);
+    assertThat(actualData).isEqualTo(testData);
+
+    assertThat(httpStatistics.get(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST).longValue())
+        .isEqualTo(5L);
+
+    httpStatistics.clear();
   }
 
   /**
