@@ -28,6 +28,7 @@ import java.net.URI;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -55,6 +56,8 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
   private GhfsStorageStatistics storageStatistics;
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
+  private static GoogleCloudStorage gcs;
 
   InstrumentatedGoogleHadoopFileSystem() {
     super();
@@ -94,8 +97,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
       Progressable progress)
       throws IOException {
     entryPoint(GhfsStatistic.INVOCATION_CREATE);
-    FSDataOutputStream response = null;
-    response =
+    FSDataOutputStream response =
         super.create(
             hadoopPath, permission, overwrite, bufferSize, replication, blockSize, progress);
     instrumentation.fileCreated();
@@ -336,92 +338,72 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
 
   /** Set the Value for http get and head request related statistics keys */
   private void setHttpStatistics() {
-    instrumentation.clearHttpStats();
+    this.gcs = getGcsFs().getGcs();
     try {
-      GoogleCloudStorage gcs = getGcsFs().getGcs();
-      if (gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST) != null) {
-        incrementStatistic(
-            GhfsStatistic.ACTION_HTTP_GET_REQUEST,
-            gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST)
-                .longValue());
-      }
-      if (gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST) != null) {
-        incrementStatistic(
-            GhfsStatistic.ACTION_HTTP_HEAD_REQUEST,
-            gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST)
-                .longValue());
-      }
-      if (gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST) != null) {
-        incrementStatistic(
-            GhfsStatistic.ACTION_HTTP_PUT_REQUEST,
-            gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST)
-                .longValue());
-      }
-      if (gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST) != null) {
-        incrementStatistic(
-            GhfsStatistic.ACTION_HTTP_POST_REQUEST,
-            gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST)
-                .longValue());
-      }
-      if (gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PATCH_REQUEST) != null) {
-        incrementStatistic(
-            GhfsStatistic.ACTION_HTTP_PATCH_REQUEST,
-            gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PATCH_REQUEST)
-                .longValue());
-      }
-      if (gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_DELETE_REQUEST)
-          != null) {
-        incrementStatistic(
-            GhfsStatistic.ACTION_HTTP_DELETE_REQUEST,
-            gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_DELETE_REQUEST)
-                .longValue());
-      }
-      if (gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES)
-          != null) {
-        instrumentation.incrementFailureStatistics(
-            GhfsStatistic.ACTION_HTTP_GET_REQUEST,
-            gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES)
-                .longValue());
-      }
-      if (gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST_FAILURES)
-          != null) {
-        instrumentation.incrementFailureStatistics(
-            GhfsStatistic.ACTION_HTTP_HEAD_REQUEST,
-            gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST_FAILURES)
-                .longValue());
-      }
-      if (gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST_FAILURES)
-          != null) {
-        instrumentation.incrementFailureStatistics(
-            GhfsStatistic.ACTION_HTTP_PUT_REQUEST,
-            gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST_FAILURES)
-                .longValue());
-      }
-      if (gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST_FAILURES)
-          != null) {
-        instrumentation.incrementFailureStatistics(
-            GhfsStatistic.ACTION_HTTP_POST_REQUEST,
-            gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST_FAILURES)
-                .longValue());
-      }
-      if (gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PATCH_REQUEST_FAILURES)
-          != null) {
-        instrumentation.incrementFailureStatistics(
-            GhfsStatistic.ACTION_HTTP_PATCH_REQUEST,
-            gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PATCH_REQUEST_FAILURES)
-                .longValue());
-      }
-      if (gcs.getObjectStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_DELETE_REQUEST_FAILURES)
-          != null) {
-        instrumentation.incrementFailureStatistics(
-            GhfsStatistic.ACTION_HTTP_DELETE_REQUEST,
-            gcs.getObjectStatistics(
-                    GoogleCloudStorageStatistics.ACTION_HTTP_DELETE_REQUEST_FAILURES)
-                .longValue());
-      }
-
+      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST);
+      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST);
+      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST);
+      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST);
+      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PATCH_REQUEST);
+      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_DELETE_REQUEST);
     } catch (Exception e) {
       logger.atWarning().log("Error in getting statistics from gcsio", e);
+    }
+  }
+
+  /** Set the IOStatistics for http requests */
+  private void setRequestStatistics(GoogleCloudStorageStatistics key) {
+    GhfsStatistic statisticsKey = getKey(key);
+    clearStats(statisticsKey.getSymbol());
+    AtomicLong successKeyValue = gcs.getHttpStatistics(key);
+    AtomicLong failureKeyValue = gcs.getHttpStatistics(getFailureKey(key));
+    if (successKeyValue != null) {
+      incrementStatistic(statisticsKey, successKeyValue.longValue());
+      if (failureKeyValue != null) {
+        instrumentation.incrementFailureStatistics(statisticsKey, failureKeyValue.longValue());
+      }
+    }
+  }
+
+  private void clearStats(String key) {
+    instrumentation.getIOStatistics().getCounterReference(key).set(0L);
+  }
+
+  private GhfsStatistic getKey(GoogleCloudStorageStatistics key) {
+    switch (key) {
+      case ACTION_HTTP_GET_REQUEST:
+        return GhfsStatistic.ACTION_HTTP_GET_REQUEST;
+      case ACTION_HTTP_HEAD_REQUEST:
+        return GhfsStatistic.ACTION_HTTP_HEAD_REQUEST;
+      case ACTION_HTTP_PUT_REQUEST:
+        return GhfsStatistic.ACTION_HTTP_PUT_REQUEST;
+      case ACTION_HTTP_POST_REQUEST:
+        return GhfsStatistic.ACTION_HTTP_POST_REQUEST;
+      case ACTION_HTTP_PATCH_REQUEST:
+        return GhfsStatistic.ACTION_HTTP_PATCH_REQUEST;
+      case ACTION_HTTP_DELETE_REQUEST:
+        return GhfsStatistic.ACTION_HTTP_DELETE_REQUEST;
+      default:
+        return null;
+    }
+  }
+
+  private GoogleCloudStorageStatistics getFailureKey(GoogleCloudStorageStatistics key) {
+    switch (key) {
+      case ACTION_HTTP_GET_REQUEST:
+        return GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES;
+      case ACTION_HTTP_HEAD_REQUEST:
+        return GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST_FAILURES;
+      case ACTION_HTTP_PUT_REQUEST:
+        return GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST_FAILURES;
+      case ACTION_HTTP_POST_REQUEST:
+        return GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST_FAILURES;
+      case ACTION_HTTP_PATCH_REQUEST:
+        return GoogleCloudStorageStatistics.ACTION_HTTP_PATCH_REQUEST_FAILURES;
+      case ACTION_HTTP_DELETE_REQUEST:
+        return GoogleCloudStorageStatistics.ACTION_HTTP_DELETE_REQUEST_FAILURES;
+      default:
+        return null;
     }
   }
 }

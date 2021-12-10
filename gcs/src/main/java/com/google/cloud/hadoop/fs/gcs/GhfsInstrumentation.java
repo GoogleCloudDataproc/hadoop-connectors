@@ -967,13 +967,4 @@ public class GhfsInstrumentation
             });
     return storeBuilder;
   }
-
-  public void clearHttpStats() {
-    instanceIOStatistics.setCounter(GhfsStatistic.ACTION_HTTP_GET_REQUEST.getSymbol(), 0L);
-    instanceIOStatistics.setCounter(GhfsStatistic.ACTION_HTTP_HEAD_REQUEST.getSymbol(), 0L);
-    instanceIOStatistics.setCounter(GhfsStatistic.ACTION_HTTP_PUT_REQUEST.getSymbol(), 0L);
-    instanceIOStatistics.setCounter(GhfsStatistic.ACTION_HTTP_POST_REQUEST.getSymbol(), 0L);
-    instanceIOStatistics.setCounter(GhfsStatistic.ACTION_HTTP_PATCH_REQUEST.getSymbol(), 0L);
-    instanceIOStatistics.setCounter(GhfsStatistic.ACTION_HTTP_DELETE_REQUEST.getSymbol(), 0L);
-  }
 }

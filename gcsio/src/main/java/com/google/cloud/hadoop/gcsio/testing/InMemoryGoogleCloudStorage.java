@@ -550,4 +550,15 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key) {
     throw new UnsupportedOperationException("not implemented");
   }
+
+  /**
+   * Get the Value of the statistics
+   *
+   * @param key name of the http related statistics key
+   * @return
+   */
+  @Override
+  public AtomicLong getHttpStatistics(GoogleCloudStorageStatistics key) {
+    throw new UnsupportedOperationException("not implemented");
+  }
 }

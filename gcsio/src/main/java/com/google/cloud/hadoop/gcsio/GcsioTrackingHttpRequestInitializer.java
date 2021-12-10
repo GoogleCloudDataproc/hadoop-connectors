@@ -36,6 +36,7 @@ import com.google.api.client.http.HttpResponseInterceptor;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 
 /** To track and update the statistics related to http requests */
@@ -66,65 +67,89 @@ class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
           if (executeInterceptor != null) {
             executeInterceptor.intercept(r);
           }
-          if (r.getRequestMethod() == "GET") {
-            httpStatistics.putIfAbsent(
-                GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST, new AtomicLong(0));
-            httpStatistics.get(ACTION_HTTP_GET_REQUEST).incrementAndGet();
-          } else if (r.getRequestMethod() == "HEAD") {
-            httpStatistics.putIfAbsent(
-                GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST, new AtomicLong(0));
-            httpStatistics.get(ACTION_HTTP_HEAD_REQUEST).incrementAndGet();
-          } else if (r.getRequestMethod() == "PUT") {
-            httpStatistics.putIfAbsent(
-                GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST, new AtomicLong(0));
-            httpStatistics.get(ACTION_HTTP_PUT_REQUEST).incrementAndGet();
-          } else if (r.getRequestMethod() == "POST") {
-            httpStatistics.putIfAbsent(
-                GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST, new AtomicLong(0));
-            httpStatistics.get(ACTION_HTTP_POST_REQUEST).incrementAndGet();
-          } else if (r.getRequestMethod() == "PATCH") {
-            httpStatistics.putIfAbsent(
-                GoogleCloudStorageStatistics.ACTION_HTTP_PATCH_REQUEST, new AtomicLong(0));
-            httpStatistics.get(ACTION_HTTP_PATCH_REQUEST).incrementAndGet();
-          } else if (r.getRequestMethod() == "DELETE") {
-            httpStatistics.putIfAbsent(
-                GoogleCloudStorageStatistics.ACTION_HTTP_DELETE_REQUEST, new AtomicLong(0));
-            httpStatistics.get(ACTION_HTTP_DELETE_REQUEST).incrementAndGet();
-          }
+          sethttprequestStats(r);
         });
     request.setResponseInterceptor(
         new HttpResponseInterceptor() {
           @Override
           public void interceptResponse(HttpResponse httpResponse) throws IOException {
-            if (!(httpResponse.isSuccessStatusCode())
-                && httpResponse.getRequest().getRequestMethod() == "GET") {
-              httpStatistics.putIfAbsent(ACTION_HTTP_GET_REQUEST_FAILURES, new AtomicLong(0));
-              httpStatistics.get(ACTION_HTTP_GET_REQUEST_FAILURES).incrementAndGet();
-            } else if (!(httpResponse.isSuccessStatusCode())
-                && httpResponse.getRequest().getRequestMethod() == "HEAD") {
-              httpStatistics.putIfAbsent(ACTION_HTTP_HEAD_REQUEST_FAILURES, new AtomicLong(0));
-              httpStatistics.get(ACTION_HTTP_HEAD_REQUEST_FAILURES).incrementAndGet();
-            } else if (!(httpResponse.isSuccessStatusCode())
-                && httpResponse.getRequest().getRequestMethod() == "PUT") {
-              httpStatistics.putIfAbsent(ACTION_HTTP_PUT_REQUEST_FAILURES, new AtomicLong(0));
-              httpStatistics.get(ACTION_HTTP_PUT_REQUEST_FAILURES).incrementAndGet();
-            } else if (!(httpResponse.isSuccessStatusCode())
-                && httpResponse.getRequest().getRequestMethod() == "POST") {
-              httpStatistics.putIfAbsent(ACTION_HTTP_POST_REQUEST_FAILURES, new AtomicLong(0));
-              httpStatistics.get(ACTION_HTTP_POST_REQUEST_FAILURES).incrementAndGet();
-            } else if (!(httpResponse.isSuccessStatusCode())
-                && httpResponse.getRequest().getRequestMethod() == "PATCH") {
-              httpStatistics.putIfAbsent(ACTION_HTTP_PATCH_REQUEST_FAILURES, new AtomicLong(0));
-              httpStatistics.get(ACTION_HTTP_PATCH_REQUEST_FAILURES).incrementAndGet();
-            } else if (!(httpResponse.isSuccessStatusCode())
-                && httpResponse.getRequest().getRequestMethod() == "DELETE") {
-              httpStatistics.putIfAbsent(ACTION_HTTP_DELETE_REQUEST_FAILURES, new AtomicLong(0));
-              httpStatistics.get(ACTION_HTTP_DELETE_REQUEST_FAILURES).incrementAndGet();
-            }
+            setHttpRequestFailureStats(httpResponse);
           }
         });
   }
 
+  /**
+   * set the stats for the http requests
+   *
+   * @param r - request
+   */
+  private void sethttprequestStats(HttpRequest r) {
+
+    if (r.getRequestMethod() == "GET") {
+      httpStatistics.putIfAbsent(
+          GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST, new AtomicLong(0));
+      httpStatistics.get(ACTION_HTTP_GET_REQUEST).incrementAndGet();
+      logger.atInfo().log("GET Request - " + Objects.toString(r));
+    } else if (r.getRequestMethod() == "HEAD") {
+      httpStatistics.putIfAbsent(
+          GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST, new AtomicLong(0));
+      httpStatistics.get(ACTION_HTTP_HEAD_REQUEST).incrementAndGet();
+      logger.atInfo().log("HEAD Request - " + Objects.toString(r));
+    } else if (r.getRequestMethod() == "PUT") {
+      httpStatistics.putIfAbsent(
+          GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST, new AtomicLong(0));
+      httpStatistics.get(ACTION_HTTP_PUT_REQUEST).incrementAndGet();
+      logger.atInfo().log("PUT Request - " + Objects.toString(r));
+    } else if (r.getRequestMethod() == "POST") {
+      httpStatistics.putIfAbsent(
+          GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST, new AtomicLong(0));
+      httpStatistics.get(ACTION_HTTP_POST_REQUEST).incrementAndGet();
+      logger.atInfo().log("POST Request - " + Objects.toString(r));
+    } else if (r.getRequestMethod() == "PATCH") {
+      httpStatistics.putIfAbsent(
+          GoogleCloudStorageStatistics.ACTION_HTTP_PATCH_REQUEST, new AtomicLong(0));
+      httpStatistics.get(ACTION_HTTP_PATCH_REQUEST).incrementAndGet();
+      logger.atInfo().log("PATCH Request - " + Objects.toString(r));
+    } else if (r.getRequestMethod() == "DELETE") {
+      httpStatistics.putIfAbsent(
+          GoogleCloudStorageStatistics.ACTION_HTTP_DELETE_REQUEST, new AtomicLong(0));
+      httpStatistics.get(ACTION_HTTP_DELETE_REQUEST).incrementAndGet();
+      logger.atInfo().log("DELETE Request - " + Objects.toString(r));
+    }
+  }
+
+  /**
+   * set the stats for http request failures
+   *
+   * @param httpResponse
+   */
+  private void setHttpRequestFailureStats(HttpResponse httpResponse) {
+    if (!(httpResponse.isSuccessStatusCode())
+        && httpResponse.getRequest().getRequestMethod() == "GET") {
+      httpStatistics.putIfAbsent(ACTION_HTTP_GET_REQUEST_FAILURES, new AtomicLong(0));
+      httpStatistics.get(ACTION_HTTP_GET_REQUEST_FAILURES).incrementAndGet();
+    } else if (!(httpResponse.isSuccessStatusCode())
+        && httpResponse.getRequest().getRequestMethod() == "HEAD") {
+      httpStatistics.putIfAbsent(ACTION_HTTP_HEAD_REQUEST_FAILURES, new AtomicLong(0));
+      httpStatistics.get(ACTION_HTTP_HEAD_REQUEST_FAILURES).incrementAndGet();
+    } else if (!(httpResponse.isSuccessStatusCode())
+        && httpResponse.getRequest().getRequestMethod() == "PUT") {
+      httpStatistics.putIfAbsent(ACTION_HTTP_PUT_REQUEST_FAILURES, new AtomicLong(0));
+      httpStatistics.get(ACTION_HTTP_PUT_REQUEST_FAILURES).incrementAndGet();
+    } else if (!(httpResponse.isSuccessStatusCode())
+        && httpResponse.getRequest().getRequestMethod() == "POST") {
+      httpStatistics.putIfAbsent(ACTION_HTTP_POST_REQUEST_FAILURES, new AtomicLong(0));
+      httpStatistics.get(ACTION_HTTP_POST_REQUEST_FAILURES).incrementAndGet();
+    } else if (!(httpResponse.isSuccessStatusCode())
+        && httpResponse.getRequest().getRequestMethod() == "PATCH") {
+      httpStatistics.putIfAbsent(ACTION_HTTP_PATCH_REQUEST_FAILURES, new AtomicLong(0));
+      httpStatistics.get(ACTION_HTTP_PATCH_REQUEST_FAILURES).incrementAndGet();
+    } else if (!(httpResponse.isSuccessStatusCode())
+        && httpResponse.getRequest().getRequestMethod() == "DELETE") {
+      httpStatistics.putIfAbsent(ACTION_HTTP_DELETE_REQUEST_FAILURES, new AtomicLong(0));
+      httpStatistics.get(ACTION_HTTP_DELETE_REQUEST_FAILURES).incrementAndGet();
+    }
+  }
   /** clear the statistics */
   public void reset() {
     httpStatistics.clear();
