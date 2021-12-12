@@ -75,36 +75,34 @@ class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
   }
 
   /**
+   * For a given key, check if it is already in the current session's list of keys. If not present,
+   * add it and increment the value
+   *
+   * @param key GoogleCloudStorageStatistics key for tracking http-related activity in gcsio
+   */
+  private void incrementAndGetStatistics(GoogleCloudStorageStatistics key) {
+    this.httpStatistics.putIfAbsent(key, new AtomicLong(0));
+    this.httpStatistics.get(key).incrementAndGet();
+  }
+
+  /**
    * set the stats for the http requests
    *
    * @param r - request
    */
   private void sethttprequestStats(HttpRequest r) {
-
     if (r.getRequestMethod() == "GET") {
-      httpStatistics.putIfAbsent(
-          GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST, new AtomicLong(0));
-      httpStatistics.get(ACTION_HTTP_GET_REQUEST).incrementAndGet();
+      this.incrementAndGetStatistics(ACTION_HTTP_GET_REQUEST);
     } else if (r.getRequestMethod() == "HEAD") {
-      httpStatistics.putIfAbsent(
-          GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST, new AtomicLong(0));
-      httpStatistics.get(ACTION_HTTP_HEAD_REQUEST).incrementAndGet();
+      this.incrementAndGetStatistics(ACTION_HTTP_HEAD_REQUEST);
     } else if (r.getRequestMethod() == "PUT") {
-      httpStatistics.putIfAbsent(
-          GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST, new AtomicLong(0));
-      httpStatistics.get(ACTION_HTTP_PUT_REQUEST).incrementAndGet();
+      this.incrementAndGetStatistics(ACTION_HTTP_PUT_REQUEST);
     } else if (r.getRequestMethod() == "POST") {
-      httpStatistics.putIfAbsent(
-          GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST, new AtomicLong(0));
-      httpStatistics.get(ACTION_HTTP_POST_REQUEST).incrementAndGet();
+      this.incrementAndGetStatistics(ACTION_HTTP_POST_REQUEST);
     } else if (r.getRequestMethod() == "PATCH") {
-      httpStatistics.putIfAbsent(
-          GoogleCloudStorageStatistics.ACTION_HTTP_PATCH_REQUEST, new AtomicLong(0));
-      httpStatistics.get(ACTION_HTTP_PATCH_REQUEST).incrementAndGet();
+      this.incrementAndGetStatistics(ACTION_HTTP_PATCH_REQUEST);
     } else if (r.getRequestMethod() == "DELETE") {
-      httpStatistics.putIfAbsent(
-          GoogleCloudStorageStatistics.ACTION_HTTP_DELETE_REQUEST, new AtomicLong(0));
-      httpStatistics.get(ACTION_HTTP_DELETE_REQUEST).incrementAndGet();
+      this.incrementAndGetStatistics(ACTION_HTTP_DELETE_REQUEST);
     }
   }
 

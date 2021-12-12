@@ -1316,13 +1316,15 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     FSDataOutputStream fout = ghfs.create(new Path("/file1"));
     fout.writeBytes("Test Content");
     fout.close();
-
+    // evaluating the iostatistics by extracting the values set for the iostatistics key after each
+    // file operation
     assertThat(
             ((GoogleHadoopFileSystem) ghfs)
                 .getIOStatistics()
                 .counters()
                 .get(INVOCATION_CREATE.getSymbol()))
         .isEqualTo(1);
+    // The create and write methods are expected to trigger requests of types GET, PUT and PATCH
     assertThat(
             ((GoogleHadoopFileSystem) ghfs)
                 .getIOStatistics()
@@ -1342,6 +1344,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
                 .get(GhfsStatistic.ACTION_HTTP_PATCH_REQUEST.getSymbol()))
         .isEqualTo(1);
     assertThat(ghfs.delete(new Path("/file1"))).isTrue();
+    // Delete operation triggers the DELETE type request
     assertThat(
             ((GoogleHadoopFileSystem) ghfs)
                 .getIOStatistics()
