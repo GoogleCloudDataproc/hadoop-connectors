@@ -112,30 +112,20 @@ class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
    * @param httpResponse
    */
   private void setHttpRequestFailureStats(HttpResponse httpResponse) {
-    if (!(httpResponse.isSuccessStatusCode())
-        && httpResponse.getRequest().getRequestMethod() == "GET") {
-      httpStatistics.putIfAbsent(ACTION_HTTP_GET_REQUEST_FAILURES, new AtomicLong(0));
-      httpStatistics.get(ACTION_HTTP_GET_REQUEST_FAILURES).incrementAndGet();
-    } else if (!(httpResponse.isSuccessStatusCode())
-        && httpResponse.getRequest().getRequestMethod() == "HEAD") {
-      httpStatistics.putIfAbsent(ACTION_HTTP_HEAD_REQUEST_FAILURES, new AtomicLong(0));
-      httpStatistics.get(ACTION_HTTP_HEAD_REQUEST_FAILURES).incrementAndGet();
-    } else if (!(httpResponse.isSuccessStatusCode())
-        && httpResponse.getRequest().getRequestMethod() == "PUT") {
-      httpStatistics.putIfAbsent(ACTION_HTTP_PUT_REQUEST_FAILURES, new AtomicLong(0));
-      httpStatistics.get(ACTION_HTTP_PUT_REQUEST_FAILURES).incrementAndGet();
-    } else if (!(httpResponse.isSuccessStatusCode())
-        && httpResponse.getRequest().getRequestMethod() == "POST") {
-      httpStatistics.putIfAbsent(ACTION_HTTP_POST_REQUEST_FAILURES, new AtomicLong(0));
-      httpStatistics.get(ACTION_HTTP_POST_REQUEST_FAILURES).incrementAndGet();
-    } else if (!(httpResponse.isSuccessStatusCode())
-        && httpResponse.getRequest().getRequestMethod() == "PATCH") {
-      httpStatistics.putIfAbsent(ACTION_HTTP_PATCH_REQUEST_FAILURES, new AtomicLong(0));
-      httpStatistics.get(ACTION_HTTP_PATCH_REQUEST_FAILURES).incrementAndGet();
-    } else if (!(httpResponse.isSuccessStatusCode())
-        && httpResponse.getRequest().getRequestMethod() == "DELETE") {
-      httpStatistics.putIfAbsent(ACTION_HTTP_DELETE_REQUEST_FAILURES, new AtomicLong(0));
-      httpStatistics.get(ACTION_HTTP_DELETE_REQUEST_FAILURES).incrementAndGet();
+    if (!(httpResponse.isSuccessStatusCode())) {
+      if (httpResponse.getRequest().getRequestMethod() == "GET") {
+        this.increment(ACTION_HTTP_GET_REQUEST_FAILURES);
+      } else if (httpResponse.getRequest().getRequestMethod() == "HEAD") {
+        this.increment(ACTION_HTTP_HEAD_REQUEST_FAILURES);
+      } else if (httpResponse.getRequest().getRequestMethod() == "PUT") {
+        this.increment(ACTION_HTTP_PUT_REQUEST_FAILURES);
+      } else if (httpResponse.getRequest().getRequestMethod() == "POST") {
+        this.increment(ACTION_HTTP_POST_REQUEST_FAILURES);
+      } else if (httpResponse.getRequest().getRequestMethod() == "PATCH") {
+        this.increment(ACTION_HTTP_PATCH_REQUEST_FAILURES);
+      } else if (httpResponse.getRequest().getRequestMethod() == "DELETE") {
+        this.increment(ACTION_HTTP_DELETE_REQUEST_FAILURES);
+      }
     }
   }
 
