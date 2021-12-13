@@ -157,17 +157,15 @@ class StorageStubProvider {
         credential != null
             && java.util.Objects.equals(
                 credential.getTokenServerEncodedUrl(), ComputeCredential.TOKEN_SERVER_ENCODED_URL);
+    GrpcDecorator decorator;
     if (options.isTrafficDirectorEnabled() && isDefaultServiceAccount) {
-      return new StorageStubProvider(
-          options, backgroundTasksThreadPool, new TrafficDirectorGrpcDecorator());
+      decorator = new TrafficDirectorGrpcDecorator();
+    } else if (options.isDirectPathPreferred() && isDefaultServiceAccount) {
+      decorator = new DirectPathGrpcDecorator(options.getReadChannelOptions());
     } else {
-      return new StorageStubProvider(
-          options,
-          backgroundTasksThreadPool,
-          options.isDirectPathPreferred() && isDefaultServiceAccount
-              ? new DirectPathGrpcDecorator(options.getReadChannelOptions())
-              : new CloudPathGrpcDecorator(new CredentialAdapter(credential)));
+      decorator = new CloudPathGrpcDecorator(new CredentialAdapter(credential));
     }
+    return new StorageStubProvider(options, backgroundTasksThreadPool, decorator);
   }
 
   public static StorageStubProvider newInstance(
@@ -175,16 +173,14 @@ class StorageStubProvider {
       ExecutorService backgroundTasksThreadPool,
       Credentials credentials) {
     boolean isDefaultServiceAccount = credentials instanceof ComputeEngineCredentials;
+    GrpcDecorator decorator;
     if (options.isTrafficDirectorEnabled() && isDefaultServiceAccount) {
-      return new StorageStubProvider(
-          options, backgroundTasksThreadPool, new TrafficDirectorGrpcDecorator());
+      decorator = new TrafficDirectorGrpcDecorator();
+    } else if (options.isDirectPathPreferred() && isDefaultServiceAccount) {
+      decorator = new DirectPathGrpcDecorator(options.getReadChannelOptions());
     } else {
-      return new StorageStubProvider(
-          options,
-          backgroundTasksThreadPool,
-          options.isDirectPathPreferred() && isDefaultServiceAccount
-              ? new DirectPathGrpcDecorator(options.getReadChannelOptions())
-              : new CloudPathGrpcDecorator(credentials));
+      decorator = new CloudPathGrpcDecorator(credentials);
     }
+    return new StorageStubProvider(options, backgroundTasksThreadPool, decorator);
   }
 }
