@@ -80,7 +80,7 @@ class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
    *
    * @param key GoogleCloudStorageStatistics key for tracking http-related activity in gcsio
    */
-  private void incrementAndGetStatistics(GoogleCloudStorageStatistics key) {
+  private void increment(GoogleCloudStorageStatistics key) {
     this.httpStatistics.putIfAbsent(key, new AtomicLong(0));
     this.httpStatistics.get(key).incrementAndGet();
   }
@@ -92,17 +92,17 @@ class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
    */
   private void sethttprequestStats(HttpRequest r) {
     if (r.getRequestMethod() == "GET") {
-      this.incrementAndGetStatistics(ACTION_HTTP_GET_REQUEST);
+      this.increment(ACTION_HTTP_GET_REQUEST);
     } else if (r.getRequestMethod() == "HEAD") {
-      this.incrementAndGetStatistics(ACTION_HTTP_HEAD_REQUEST);
+      this.increment(ACTION_HTTP_HEAD_REQUEST);
     } else if (r.getRequestMethod() == "PUT") {
-      this.incrementAndGetStatistics(ACTION_HTTP_PUT_REQUEST);
+      this.increment(ACTION_HTTP_PUT_REQUEST);
     } else if (r.getRequestMethod() == "POST") {
-      this.incrementAndGetStatistics(ACTION_HTTP_POST_REQUEST);
+      this.increment(ACTION_HTTP_POST_REQUEST);
     } else if (r.getRequestMethod() == "PATCH") {
-      this.incrementAndGetStatistics(ACTION_HTTP_PATCH_REQUEST);
+      this.increment(ACTION_HTTP_PATCH_REQUEST);
     } else if (r.getRequestMethod() == "DELETE") {
-      this.incrementAndGetStatistics(ACTION_HTTP_DELETE_REQUEST);
+      this.increment(ACTION_HTTP_DELETE_REQUEST);
     }
   }
 
