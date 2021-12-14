@@ -353,7 +353,8 @@ public class GoogleHadoopFileSystemConfiguration {
 
   /** Configuration key for the Cloud Storage gRPC server address. */
   public static final HadoopConfigurationProperty<String> GCS_GRPC_SERVER_ADDRESS =
-      new HadoopConfigurationProperty<>("fs.gs.grpc.server.address");
+      new HadoopConfigurationProperty<>(
+          "fs.gs.grpc.server.address", GoogleCloudStorageOptions.DEFAULT_GCS_GRPC_SERVER_ADDRESS);
 
   /**
    * Configuration key for the connection timeout (in millisecond) for gRPC read requests to GCS.
@@ -499,6 +500,7 @@ public class GoogleHadoopFileSystemConfiguration {
                 config, (k, d) -> config.getClass(k, d, AuthorizationHandler.class)))
         .setAuthorizationHandlerProperties(
             GCS_AUTHORIZATION_HANDLER_PROPERTIES_PREFIX.getPropsWithPrefix(config))
+        .setGrpcServerAddress(GCS_GRPC_SERVER_ADDRESS.get(config, config::get))
         .setDirectPathPreferred(GCS_GRPC_DIRECTPATH_ENABLE.get(config, config::getBoolean));
   }
 
@@ -527,7 +529,6 @@ public class GoogleHadoopFileSystemConfiguration {
         .setFadvise(GCS_INPUT_STREAM_FADVISE.get(config, config::getEnum))
         .setMinRangeRequestSize(GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getInt))
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
-        .setGrpcServerAddress(GCS_GRPC_SERVER_ADDRESS.get(config, config::get))
         .setGrpcReadTimeoutMillis(GCS_GRPC_READ_TIMEOUT_MS.get(config, config::getLong))
         .setGrpcReadSpeedBytesPerSec(GCS_GRPC_READ_SPEED_BYTES_PER_SEC.get(config, config::getLong))
         .setGrpcReadMetadataTimeoutMillis(
