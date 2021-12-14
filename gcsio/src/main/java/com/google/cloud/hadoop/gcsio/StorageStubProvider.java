@@ -1,9 +1,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Strings.isNullOrEmpty;
 
-import com.google.api.ClientProto;
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.compute.ComputeCredential;
 import com.google.auth.Credentials;
@@ -16,7 +14,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.storage.v2.StorageGrpc;
 import com.google.storage.v2.StorageGrpc.StorageBlockingStub;
 import com.google.storage.v2.StorageGrpc.StorageStub;
-import com.google.storage.v2.StorageProto;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Status;
@@ -35,14 +32,7 @@ class StorageStubProvider {
   private static final ImmutableSet<Status.Code> STUB_BROKEN_ERROR_CODES =
       ImmutableSet.of(Status.Code.DEADLINE_EXCEEDED, Status.Code.UNAVAILABLE);
 
-  // The GCS gRPC server address.
-  private static final String DEFAULT_GCS_GRPC_SERVER_ADDRESS =
-      StorageProto.getDescriptor()
-          .findServiceByName("Storage")
-          .getOptions()
-          .getExtension(ClientProto.defaultHost);
-
-  private final GoogleCloudStorageReadOptions readOptions;
+  private final GoogleCloudStorageOptions options;
   private final String userAgent;
   private final ExecutorService backgroundTasksThreadPool;
   private final GrpcDecorator grpcDecorator;
@@ -57,17 +47,14 @@ class StorageStubProvider {
       GoogleCloudStorageOptions options,
       ExecutorService backgroundTasksThreadPool,
       GrpcDecorator grpcDecorator) {
-    this.readOptions = options.getReadChannelOptions();
+    this.options = options;
     this.userAgent = options.getAppName();
     this.backgroundTasksThreadPool = backgroundTasksThreadPool;
     this.grpcDecorator = checkNotNull(grpcDecorator, "grpcDecorator cannot be null");
   }
 
   private ManagedChannel buildManagedChannel() {
-    String target =
-        isNullOrEmpty(readOptions.getGrpcServerAddress())
-            ? DEFAULT_GCS_GRPC_SERVER_ADDRESS
-            : readOptions.getGrpcServerAddress();
+    String target = options.getGrpcServerAddress();
     ManagedChannel channel =
         grpcDecorator.createChannelBuilder(target).enableRetry().userAgent(userAgent).build();
     return channel;

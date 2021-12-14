@@ -258,11 +258,11 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     // The non-gRPC read channel has special support for gzip. This channel doesn't
     // decompress gzip-encoded objects on the fly, so best to fail fast rather than return
     // gibberish unexpectedly.
+    StorageResourceId resourceId = itemInfo.getResourceId();
     if (!itemInfo.exists()) {
       throw new FileNotFoundException(
           String.format(
-              "%s not found: %s",
-              itemInfo.isDirectory() ? "Directory" : "File", itemInfo.getResourceId()));
+              "%s not found: %s", itemInfo.isDirectory() ? "Directory" : "File", resourceId));
     }
     String contentEncoding = itemInfo.getContentEncoding();
     if (contentEncoding != null && contentEncoding.contains("gzip")) {
@@ -274,13 +274,23 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     long objectSize = itemInfo.getSize();
     long footerOffsetInBytes = Math.max(0, (objectSize - prefetchSizeInBytes));
 
+    long startTime = System.currentTimeMillis();
     ByteString footerContent =
-        getFooterContent(
-            itemInfo.getResourceId(), readOptions, stub, footerOffsetInBytes, objectSize);
+        getFooterContent(resourceId, readOptions, stub, footerOffsetInBytes, objectSize);
+    long endTime = System.currentTimeMillis();
+    if (footerContent == null) {
+      logger.atFiner().log(
+          "Prefetched footer content is null for resource '%s', spent %d milliseconds",
+          resourceId, (endTime - startTime));
+    } else {
+      logger.atFiner().log(
+          "prefetched footer, resource:%s, time:%d, size:%d",
+          resourceId, (endTime - startTime), footerContent.size());
+    }
 
     return new GoogleCloudStorageGrpcReadChannel(
         stub,
-        itemInfo.getResourceId(),
+        resourceId,
         itemInfo.getContentGeneration(),
         objectSize,
         footerOffsetInBytes,
@@ -296,6 +306,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       Storage gcs)
       throws IOException {
     StorageObject object;
+    long startTime = System.currentTimeMillis();
     try {
       // TODO(b/190617054) : Migrate to gRPC requests for metadata when available
       // Request only fields that are used for metadata initialization
@@ -314,6 +325,10 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new IOException("Thread interrupt received.", e);
+    } finally {
+      long endTime = System.currentTimeMillis();
+      logger.atFinest().log(
+          "fetched metadata, resource:%s, time:%d", resourceId, (endTime - startTime));
     }
     return GoogleCloudStorageItemInfo.createObject(
         resourceId,
@@ -365,12 +380,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
             footerContent = footerContent.concat(content);
           }
         }
-      }
-      if (footerContent == null) {
-        logger.atFiner().log("Prefetched footer content is null for resource '%s'", resourceId);
-      } else {
-        logger.atFiner().log(
-            "Prefetched %s bytes footer for '%s'", footerContent.size(), resourceId);
       }
       return footerContent;
     } catch (StatusRuntimeException e) {
@@ -469,6 +478,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     if (!isOpen()) {
       throw new ClosedChannelException();
     }
+    long startTime = System.currentTimeMillis();
     try {
       int bytesRead = 0;
 
@@ -514,7 +524,16 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       return bytesRead;
     } catch (InterruptedException e) {
       cancelCurrentRequest();
+      long endTime = System.currentTimeMillis();
+      logger.atFinest().log(
+          "read data errored, resource:%s, time:%d, offset:%d, remaining:%d",
+          resourceId, (endTime - startTime), positionInGrpcStream, byteBuffer.remaining());
       throw new IOException(e);
+    } finally {
+      long endTime = System.currentTimeMillis();
+      logger.atFinest().log(
+          "read data, resource:%s, time:%d, offset:%d, remaining:%d",
+          resourceId, (endTime - startTime), positionInGrpcStream, byteBuffer.remaining());
     }
   }
 
