@@ -14,7 +14,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.storage.v2.StorageGrpc;
 import com.google.storage.v2.StorageGrpc.StorageBlockingStub;
 import com.google.storage.v2.StorageGrpc.StorageStub;
-import com.google.storage.v2.StorageProto;
 import io.grpc.Grpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;

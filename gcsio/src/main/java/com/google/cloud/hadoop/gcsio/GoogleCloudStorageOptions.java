@@ -209,7 +209,7 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setGrpcEnabled(boolean grpcEnabled);
 
     public abstract Builder setGrpcServerAddress(String rootUrl);
-    
+
     public abstract Builder setTrafficDirectorEnabled(boolean trafficDirectorEnabled);
 
     public abstract Builder setDirectPathPreferred(boolean directPathPreffered);

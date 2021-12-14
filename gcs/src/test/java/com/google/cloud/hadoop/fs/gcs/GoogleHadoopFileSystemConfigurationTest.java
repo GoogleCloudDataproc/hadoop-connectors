@@ -85,6 +85,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.grpc.read.zerocopy.enable", true);
           put("fs.gs.grpc.directpath.enable", true);
           put("fs.gs.grpc.server.address", "storage.googleapis.com");
+          put("fs.gs.grpc.trafficdirector.enable", true);
           put("fs.gs.grpc.write.buffered.requests", 20L);
           put("fs.gs.grpc.write.timeout.ms", 10 * 60 * 1000L);
           put("fs.gs.http.connect-timeout", 20_000);
@@ -310,18 +311,18 @@ public class GoogleHadoopFileSystemConfigurationTest {
     long grpcWriteTimeout = 20;
     long grpcUploadBufferedRequests = 25;
     long grpcReadSpeedBytesPerSec = 100 * 1024 * 1024;
-    boolean isDirectPathEnabled = true;
-    boolean isTrafficDirectorEnabled = true;
-    boolean isGrpcEnabled = true;
+    boolean directPathEnabled = true;
+    boolean trafficDirectorEnabled = true;
+    boolean grpcEnabled = true;
 
-    config.set(GCS_GRPC_ENABLE.getKey(), String.valueOf(isGrpcEnabled));
+    config.set(GCS_GRPC_ENABLE.getKey(), String.valueOf(grpcEnabled));
     config.set(GCS_GRPC_READ_TIMEOUT_MS.getKey(), String.valueOf(grpcReadTimeout));
     config.set(GCS_GRPC_READ_METADATA_TIMEOUT_MS.getKey(), String.valueOf(grpcReadMetadataTimeout));
     config.set(GCS_GRPC_WRITE_TIMEOUT_MS.getKey(), String.valueOf(grpcWriteTimeout));
     config.set(
         GCS_GRPC_UPLOAD_BUFFERED_REQUESTS.getKey(), String.valueOf(grpcUploadBufferedRequests));
-    config.set(GCS_GRPC_DIRECTPATH_ENABLE.getKey(), String.valueOf(isDirectPathEnabled));
-    config.set(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.getKey(), String.valueOf(isTrafficDirectorEnabled));
+    config.set(GCS_GRPC_DIRECTPATH_ENABLE.getKey(), String.valueOf(directPathEnabled));
+    config.set(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.getKey(), String.valueOf(trafficDirectorEnabled));
     config.set(
         GCS_GRPC_READ_SPEED_BYTES_PER_SEC.getKey(), String.valueOf(grpcReadSpeedBytesPerSec));
 
@@ -335,8 +336,8 @@ public class GoogleHadoopFileSystemConfigurationTest {
     assertThat(options.getWriteChannelOptions().getGrpcWriteTimeout()).isEqualTo(grpcWriteTimeout);
     assertThat(options.getWriteChannelOptions().getNumberOfBufferedRequests())
         .isEqualTo(grpcUploadBufferedRequests);
-    assertThat(options.isDirectPathPreferred()).isEqualTo(isDirectPathEnabled);
-    assertThat(options.isGrpcEnabled()).isEqualTo(isGrpcEnabled);
+    assertThat(options.isDirectPathPreferred()).isEqualTo(directPathEnabled);
+    assertThat(options.isGrpcEnabled()).isEqualTo(grpcEnabled);
     assertThat(options.getReadChannelOptions().getGrpcReadSpeedBytesPerSec())
         .isEqualTo(grpcReadSpeedBytesPerSec);
   }
