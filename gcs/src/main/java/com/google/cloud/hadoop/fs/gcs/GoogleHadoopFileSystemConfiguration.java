@@ -391,6 +391,10 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_DIRECTPATH_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.grpc.directpath.enable", true);
 
+  /** Configuration key for enabling use of traffic director gRPC API for read/write. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_TRAFFICDIRECTOR_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.grpc.trafficdirector.enable", false);
+
   /**
    * Configuration key for using cooperative locking to achieve a directory mutation operations
    * isolation.
@@ -501,7 +505,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setAuthorizationHandlerProperties(
             GCS_AUTHORIZATION_HANDLER_PROPERTIES_PREFIX.getPropsWithPrefix(config))
         .setGrpcServerAddress(GCS_GRPC_SERVER_ADDRESS.get(config, config::get))
-        .setDirectPathPreferred(GCS_GRPC_DIRECTPATH_ENABLE.get(config, config::getBoolean));
+        .setDirectPathPreferred(GCS_GRPC_DIRECTPATH_ENABLE.get(config, config::getBoolean))
+        .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean));
   }
 
   private static PerformanceCachingGoogleCloudStorageOptions getPerformanceCachingOptions(

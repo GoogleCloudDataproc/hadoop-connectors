@@ -14,10 +14,12 @@ import com.google.common.collect.ImmutableSet;
 import com.google.storage.v2.StorageGrpc;
 import com.google.storage.v2.StorageGrpc.StorageBlockingStub;
 import com.google.storage.v2.StorageGrpc.StorageStub;
+import io.grpc.Grpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Status;
 import io.grpc.alts.GoogleDefaultChannelBuilder;
+import io.grpc.alts.GoogleDefaultChannelCredentials;
 import io.grpc.auth.MoreCallCredentials;
 import io.grpc.stub.AbstractStub;
 import java.util.Map;
@@ -133,34 +135,51 @@ class StorageStubProvider {
     }
   }
 
+  static class TrafficDirectorGrpcDecorator implements GrpcDecorator {
+    TrafficDirectorGrpcDecorator() {}
+
+    public ManagedChannelBuilder<?> createChannelBuilder(String target) {
+      return Grpc.newChannelBuilder(
+          "google-c2p:///" + target, GoogleDefaultChannelCredentials.create());
+    }
+
+    public AbstractStub<?> applyCallOption(AbstractStub<?> stub) {
+      return stub;
+    }
+  }
+
   public static StorageStubProvider newInstance(
       GoogleCloudStorageOptions options,
       ExecutorService backgroundTasksThreadPool,
       Credential credential) {
-    boolean useDirectpath =
-        options.isDirectPathPreferred()
-            && credential != null
+    boolean isDefaultServiceAccount =
+        credential != null
             && java.util.Objects.equals(
                 credential.getTokenServerEncodedUrl(), ComputeCredential.TOKEN_SERVER_ENCODED_URL);
-    return new StorageStubProvider(
-        options,
-        backgroundTasksThreadPool,
-        useDirectpath
-            ? new DirectPathGrpcDecorator(options.getReadChannelOptions())
-            : new CloudPathGrpcDecorator(new CredentialAdapter(credential)));
+    GrpcDecorator decorator;
+    if (options.isTrafficDirectorEnabled() && isDefaultServiceAccount) {
+      decorator = new TrafficDirectorGrpcDecorator();
+    } else if (options.isDirectPathPreferred() && isDefaultServiceAccount) {
+      decorator = new DirectPathGrpcDecorator(options.getReadChannelOptions());
+    } else {
+      decorator = new CloudPathGrpcDecorator(new CredentialAdapter(credential));
+    }
+    return new StorageStubProvider(options, backgroundTasksThreadPool, decorator);
   }
 
   public static StorageStubProvider newInstance(
       GoogleCloudStorageOptions options,
       ExecutorService backgroundTasksThreadPool,
       Credentials credentials) {
-    boolean useDirectpath =
-        options.isDirectPathPreferred() && credentials instanceof ComputeEngineCredentials;
-    return new StorageStubProvider(
-        options,
-        backgroundTasksThreadPool,
-        useDirectpath
-            ? new DirectPathGrpcDecorator(options.getReadChannelOptions())
-            : new CloudPathGrpcDecorator(credentials));
+    boolean isDefaultServiceAccount = credentials instanceof ComputeEngineCredentials;
+    GrpcDecorator decorator;
+    if (options.isTrafficDirectorEnabled() && isDefaultServiceAccount) {
+      decorator = new TrafficDirectorGrpcDecorator();
+    } else if (options.isDirectPathPreferred() && isDefaultServiceAccount) {
+      decorator = new DirectPathGrpcDecorator(options.getReadChannelOptions());
+    } else {
+      decorator = new CloudPathGrpcDecorator(credentials);
+    }
+    return new StorageStubProvider(options, backgroundTasksThreadPool, decorator);
   }
 }
