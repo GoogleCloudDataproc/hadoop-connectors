@@ -74,4 +74,20 @@ public class GoogleCloudStorageImplCreateTest {
     assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
         .isInstanceOf(StorageStubProvider.CloudPathGrpcDecorator.class);
   }
+
+  @Test
+  public void create_grpcAndTrafficDirector_useTrafficDirector() throws IOException {
+    GoogleCloudStorageImpl gcs =
+        new GoogleCloudStorageImpl(
+            GoogleCloudStorageOptions.builder()
+                .setAppName("app")
+                .setGrpcEnabled(true)
+                .setTrafficDirectorEnabled(true)
+                .build(),
+            createStorage(),
+            ComputeEngineCredentials.newBuilder().build(),
+            null);
+    assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
+        .isInstanceOf(StorageStubProvider.TrafficDirectorGrpcDecorator.class);
+  }
 }
