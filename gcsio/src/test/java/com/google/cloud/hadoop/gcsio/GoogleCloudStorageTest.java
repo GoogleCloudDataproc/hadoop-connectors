@@ -274,58 +274,61 @@ public class GoogleCloudStorageTest {
     }
   }
 
-  /** Test the Statistics of http GET request */
   @Test
-  public void testHttpRequestStat() throws IOException {
-
-    MockHttpTransport transport =
-        mockTransport(
-            jsonDataResponse(newStorageObject(BUCKET_NAME, OBJECT_NAME)),
-            jsonErrorResponse(ErrorResponses.NOT_FOUND));
-
-    GoogleCloudStorage gcs = mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializer);
-    WritableByteChannel writeChannel = gcs.create(RESOURCE_ID);
-    assertThat(writeChannel.isOpen()).isTrue();
-    assertThat(trackingRequestInitializer).isNotNull();
-    assertThat(httpStatistics.get(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST).longValue())
-        .isEqualTo(1L);
-  }
-
-  /** Test the Failure Statistics of http GET & POST request */
-  @Test
-  public void testHttpGetRequestFailureStat() throws Exception {
-
+  public void testHttpStats() throws Exception {
     byte[] testData = new byte[MediaHttpUploader.MINIMUM_CHUNK_SIZE];
     new Random().nextBytes(testData);
-
-    RuntimeException uploadException = new RuntimeException("upload RuntimeException");
+    int uploadChunkSize = testData.length * 2;
+    int uploadCacheSize = testData.length * 2;
 
     MockHttpTransport transport =
         mockTransport(
             emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
-            uploadException);
+            jsonErrorResponse(ErrorResponses.GONE),
+            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
+            jsonDataResponse(
+                newStorageObject(BUCKET_NAME, OBJECT_NAME)
+                    .setSize(BigInteger.valueOf(testData.length))));
 
-    GoogleCloudStorage gcs = mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializer);
+    AsyncWriteChannelOptions writeOptions =
+        AsyncWriteChannelOptions.builder()
+            .setUploadChunkSize(uploadChunkSize)
+            .setUploadCacheSize(uploadCacheSize)
+            .build();
 
-    WritableByteChannel writeChannel = gcs.create(RESOURCE_ID);
-    writeChannel.write(ByteBuffer.wrap(testData));
+    GoogleCloudStorage gcs =
+        mockedGcs(
+            GCS_OPTIONS.toBuilder().setWriteChannelOptions(writeOptions).build(),
+            transport,
+            trackingRequestInitializer);
+
+    try (WritableByteChannel writeChannel = gcs.create(RESOURCE_ID)) {
+      writeChannel.write(ByteBuffer.wrap(testData));
+      writeChannel.write(ByteBuffer.wrap(testData));
+    }
     assertThat(httpStatistics.get(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST).longValue())
-        .isEqualTo(2L);
+        .isEqualTo(1L);
     assertThat(
             httpStatistics
                 .get(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES)
                 .longValue())
         .isEqualTo(1L);
+    assertThat(httpStatistics.get(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST).longValue())
+        .isEqualTo(2L);
+    assertThat(
+            httpStatistics.get(GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST).longValue())
+        .isEqualTo(2L);
     assertThat(
             httpStatistics
-                .get(GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST_FAILURES)
+                .get(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST_FAILURES)
                 .longValue())
         .isEqualTo(1L);
+    httpStatistics.clear();
   }
 
   @Test
-  public void testhttpStats() throws Exception {
+  public void testHttpStatsInOpenWithSomeExceptionsDuringRead() throws Exception {
     InputStream timeoutStream = new ThrowingInputStream(new SocketTimeoutException("read timeout"));
     InputStream sslExceptionStream = new ThrowingInputStream(new SSLException("read SSLException"));
     InputStream ioExceptionStream = new ThrowingInputStream(new IOException("read IOException"));
