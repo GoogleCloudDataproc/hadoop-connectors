@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
@@ -358,6 +359,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
   private void setRequestStatistics(GoogleCloudStorageStatistics key) {
     GoogleCloudStorage gcs = getGcsFs().getGcs();
     GhfsStatistic statisticsKey = getKey(key);
+    checkNotNull(statisticsKey, "statistics key must not be null");
     clearStats(statisticsKey.getSymbol());
     AtomicLong StatisticsValue = gcs.getHttpStatistics(key);
     if (StatisticsValue != null) {

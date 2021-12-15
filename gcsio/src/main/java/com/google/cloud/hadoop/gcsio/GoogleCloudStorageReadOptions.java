@@ -19,7 +19,6 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.google.auto.value.AutoValue;
-import javax.annotation.Nullable;
 
 /**
  * Advanced options for reading GoogleCloudStorage objects. Immutable; callers must use the inner
@@ -108,10 +107,6 @@ public abstract class GoogleCloudStorageReadOptions {
 
   /** See {@link Builder#setGrpcChecksumsEnabled}. */
   public abstract boolean isGrpcChecksumsEnabled();
-
-  /** See {@link Builder#setGrpcServerAddress}. */
-  @Nullable
-  public abstract String getGrpcServerAddress();
 
   /** See {@link Builder#setGrpcReadTimeoutMillis}. */
   public abstract long getGrpcReadTimeoutMillis();
@@ -213,9 +208,6 @@ public abstract class GoogleCloudStorageReadOptions {
      * them and we're validating them.
      */
     public abstract Builder setGrpcChecksumsEnabled(boolean grpcChecksumsEnabled);
-
-    /** Sets the property to override the default GCS gRPC server address. */
-    public abstract Builder setGrpcServerAddress(String grpcServerAddress);
 
     /** Sets the property to override the default GCS gRPC read stream timeout. */
     public abstract Builder setGrpcReadTimeoutMillis(long grpcReadTimeoutMillis);
