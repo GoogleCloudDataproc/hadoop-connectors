@@ -40,6 +40,9 @@ public abstract class GoogleCloudStorageOptions {
   /** Default setting for enabling use of GCS gRPC API. */
   public static final boolean ENABLE_GRPC_DEFAULT = false;
 
+  /** Default setting for enabling use of the Traffic Director for GCS gRPC API. */
+  public static final boolean ENABLE_TRAFFIC_DIRECTOR_DEFAULT = false;
+
   /** Default setting to prefer DirectPath for gRPC. */
   public static final boolean DIRECT_PATH_PREFERRED_DEFAULT = true;
 
@@ -105,6 +108,7 @@ public abstract class GoogleCloudStorageOptions {
   public static Builder builder() {
     return new AutoValue_GoogleCloudStorageOptions.Builder()
         .setGrpcEnabled(ENABLE_GRPC_DEFAULT)
+        .setTrafficDirectorEnabled(ENABLE_TRAFFIC_DIRECTOR_DEFAULT)
         .setDirectPathPreferred(DIRECT_PATH_PREFERRED_DEFAULT)
         .setStorageRootUrl(STORAGE_ROOT_URL_DEFAULT)
         .setStorageServicePath(STORAGE_SERVICE_PATH_DEFAULT)
@@ -134,6 +138,8 @@ public abstract class GoogleCloudStorageOptions {
   public abstract boolean isGrpcEnabled();
 
   public abstract String getGrpcServerAddress();
+
+  public abstract boolean isTrafficDirectorEnabled();
 
   public abstract boolean isDirectPathPreferred();
 
@@ -223,6 +229,8 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setGrpcEnabled(boolean grpcEnabled);
 
     public abstract Builder setGrpcServerAddress(String rootUrl);
+
+    public abstract Builder setTrafficDirectorEnabled(boolean trafficDirectorEnabled);
 
     public abstract Builder setDirectPathPreferred(boolean directPathPreffered);
 
