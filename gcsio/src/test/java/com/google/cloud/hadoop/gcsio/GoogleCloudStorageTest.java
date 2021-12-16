@@ -145,7 +145,8 @@ public class GoogleCloudStorageTest {
 
   private TrackingHttpRequestInitializer trackingRequestInitializerWithRetries;
   private TrackingHttpRequestInitializer trackingRequestInitializerWithoutRetries;
-  private GcsioTrackingHttpRequestInitializer trackingRequestInitializer;
+  private TrackingHttpRequestInitializer trackingRequestInitializer;
+  private GcsioTrackingHttpRequestInitializer gcsiotrackingRequestInitializer;
 
   // To track the http statistics
   private static final HashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics =
@@ -159,12 +160,14 @@ public class GoogleCloudStorageTest {
             /* replaceRequestParams= */ false);
     trackingRequestInitializerWithoutRetries =
         new TrackingHttpRequestInitializer(/* replaceRequestParams= */ false);
-    trackingRequestInitializer =
+    gcsiotrackingRequestInitializer =
         new GcsioTrackingHttpRequestInitializer(
             new RetryHttpInitializer(
                 new MockGoogleCredential.Builder().build(),
                 GCS_OPTIONS.toRetryHttpInitializerOptions()),
             httpStatistics);
+    trackingRequestInitializer =
+        new TrackingHttpRequestInitializer(gcsiotrackingRequestInitializer);
   }
 
   private static StorageObject getStorageObjectForEmptyObjectWithMetadata(
@@ -305,7 +308,6 @@ public class GoogleCloudStorageTest {
 
     try (WritableByteChannel writeChannel = gcs.create(RESOURCE_ID)) {
       writeChannel.write(ByteBuffer.wrap(testData));
-      writeChannel.write(ByteBuffer.wrap(testData));
     }
     assertThat(httpStatistics.get(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST).longValue())
         .isEqualTo(1L);
@@ -324,6 +326,27 @@ public class GoogleCloudStorageTest {
                 .get(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST_FAILURES)
                 .longValue())
         .isEqualTo(1L);
+
+    assertThat(trackingRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            resumableUploadRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* generationId = */ 1, /* replaceGenerationId= */ true),
+            resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 1),
+            resumableUploadRequestString(
+                BUCKET_NAME,
+                OBJECT_NAME, /* generationId= generationId_*/
+                2,
+                /* replaceGenerationId= */ true),
+            resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 2))
+        .inOrder();
+
+    HttpRequest writeRequest = trackingRequestInitializer.getAllRequests().get(4);
+    assertThat(writeRequest.getContent().getLength()).isEqualTo(testData.length);
+    try (ByteArrayOutputStream writtenData = new ByteArrayOutputStream(testData.length)) {
+      writeRequest.getContent().writeTo(writtenData);
+      assertThat(writtenData.toByteArray()).isEqualTo(testData);
+    }
     httpStatistics.clear();
   }
 
@@ -362,6 +385,15 @@ public class GoogleCloudStorageTest {
 
     assertThat(httpStatistics.get(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST).longValue())
         .isEqualTo(5L);
+
+    assertThat(trackingRequestInitializer.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
+            getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
+            getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
+            getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()))
+        .inOrder();
 
     httpStatistics.clear();
   }
@@ -3427,7 +3459,7 @@ public class GoogleCloudStorageTest {
   private GoogleCloudStorage mockedGcs(
       GoogleCloudStorageOptions gcsOptions,
       HttpTransport transport,
-      GcsioTrackingHttpRequestInitializer requestInitializer) {
+      TrackingHttpRequestInitializer requestInitializer) {
     return mockedGcs(gcsOptions, transport, requestInitializer, null);
   }
 
