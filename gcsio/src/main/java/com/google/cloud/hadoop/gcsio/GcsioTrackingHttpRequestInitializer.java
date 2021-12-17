@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Google LLC. All Rights Reserved.
+ * Copyright 2021 Google LLC. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpResponseInterceptor;
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /** To track and update the statistics related to http requests */
@@ -43,11 +43,11 @@ class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
   private final HttpRequestInitializer delegate;
 
   // To track the http statistics
-  private HashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics;
+  private ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics;
 
   public GcsioTrackingHttpRequestInitializer(
       HttpRequestInitializer delegate,
-      HashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics) {
+      ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics) {
     this.delegate = delegate;
     this.httpStatistics = httpStatistics;
   }

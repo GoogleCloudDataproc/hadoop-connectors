@@ -98,6 +98,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
@@ -149,8 +150,8 @@ public class GoogleCloudStorageTest {
   private GcsioTrackingHttpRequestInitializer gcsiotrackingRequestInitializer;
 
   // To track the http statistics
-  private static final HashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics =
-      new HashMap<GoogleCloudStorageStatistics, AtomicLong>();
+  private static final ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics =
+      new ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong>();
 
   @Before
   public void setUp() {
@@ -275,127 +276,6 @@ public class GoogleCloudStorageTest {
       chunkUploadRequest.getContent().writeTo(writtenData);
       assertThat(writtenData.toByteArray()).isEqualTo(testData);
     }
-  }
-
-  @Test
-  public void testHttpStats() throws Exception {
-    byte[] testData = new byte[MediaHttpUploader.MINIMUM_CHUNK_SIZE];
-    new Random().nextBytes(testData);
-    int uploadChunkSize = testData.length * 2;
-    int uploadCacheSize = testData.length * 2;
-
-    MockHttpTransport transport =
-        mockTransport(
-            emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
-            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
-            jsonErrorResponse(ErrorResponses.GONE),
-            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
-            jsonDataResponse(
-                newStorageObject(BUCKET_NAME, OBJECT_NAME)
-                    .setSize(BigInteger.valueOf(testData.length))));
-
-    AsyncWriteChannelOptions writeOptions =
-        AsyncWriteChannelOptions.builder()
-            .setUploadChunkSize(uploadChunkSize)
-            .setUploadCacheSize(uploadCacheSize)
-            .build();
-
-    GoogleCloudStorage gcs =
-        mockedGcs(
-            GCS_OPTIONS.toBuilder().setWriteChannelOptions(writeOptions).build(),
-            transport,
-            trackingRequestInitializer);
-
-    try (WritableByteChannel writeChannel = gcs.create(RESOURCE_ID)) {
-      writeChannel.write(ByteBuffer.wrap(testData));
-    }
-    assertThat(httpStatistics.get(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST).longValue())
-        .isEqualTo(1L);
-    assertThat(
-            httpStatistics
-                .get(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES)
-                .longValue())
-        .isEqualTo(1L);
-    assertThat(httpStatistics.get(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST).longValue())
-        .isEqualTo(2L);
-    assertThat(
-            httpStatistics.get(GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST).longValue())
-        .isEqualTo(2L);
-    assertThat(
-            httpStatistics
-                .get(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST_FAILURES)
-                .longValue())
-        .isEqualTo(1L);
-
-    assertThat(trackingRequestInitializer.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
-            resumableUploadRequestString(
-                BUCKET_NAME, OBJECT_NAME, /* generationId = */ 1, /* replaceGenerationId= */ true),
-            resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 1),
-            resumableUploadRequestString(
-                BUCKET_NAME,
-                OBJECT_NAME, /* generationId= generationId_*/
-                2,
-                /* replaceGenerationId= */ true),
-            resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 2))
-        .inOrder();
-
-    HttpRequest writeRequest = trackingRequestInitializer.getAllRequests().get(4);
-    assertThat(writeRequest.getContent().getLength()).isEqualTo(testData.length);
-    try (ByteArrayOutputStream writtenData = new ByteArrayOutputStream(testData.length)) {
-      writeRequest.getContent().writeTo(writtenData);
-      assertThat(writtenData.toByteArray()).isEqualTo(testData);
-    }
-    httpStatistics.clear();
-  }
-
-  @Test
-  public void testHttpStatsInOpenWithSomeExceptionsDuringRead() throws Exception {
-    InputStream timeoutStream = new ThrowingInputStream(new SocketTimeoutException("read timeout"));
-    InputStream sslExceptionStream = new ThrowingInputStream(new SSLException("read SSLException"));
-    InputStream ioExceptionStream = new ThrowingInputStream(new IOException("read IOException"));
-
-    byte[] testData = {0x01, 0x02, 0x03, 0x05, 0x08};
-
-    StorageObject storageObject = newStorageObject(BUCKET_NAME, OBJECT_NAME);
-
-    MockHttpTransport transport =
-        mockTransport(
-            jsonDataResponse(storageObject),
-            inputStreamResponse(CONTENT_LENGTH, testData.length, timeoutStream),
-            inputStreamResponse(CONTENT_LENGTH, testData.length, sslExceptionStream),
-            inputStreamResponse(CONTENT_LENGTH, testData.length, ioExceptionStream),
-            dataResponse(testData));
-
-    GoogleCloudStorage gcs = mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializer);
-
-    GoogleCloudStorageReadChannel readChannel =
-        (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
-    readChannel.setSleeper(Sleeper.DEFAULT);
-    readChannel.setMaxRetries(3);
-    assertThat(readChannel.isOpen()).isTrue();
-    assertThat(readChannel.position()).isEqualTo(0);
-
-    byte[] actualData = new byte[testData.length];
-    int bytesRead = readChannel.read(ByteBuffer.wrap(actualData));
-
-    assertThat(bytesRead).isEqualTo(testData.length);
-    assertThat(actualData).isEqualTo(testData);
-
-    assertThat(httpStatistics.get(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST).longValue())
-        .isEqualTo(5L);
-
-    assertThat(trackingRequestInitializer.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
-            getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
-            getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
-            getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
-            getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()))
-        .inOrder();
-
-    httpStatistics.clear();
   }
 
   /**
@@ -3476,7 +3356,11 @@ public class GoogleCloudStorageTest {
       HttpTransport transport,
       HttpRequestInitializer requestInitializer,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
-    Storage storage = new Storage(transport, JSON_FACTORY, requestInitializer);
+    Storage storage =
+        new Storage(
+            transport,
+            JSON_FACTORY,
+            new GcsioTrackingHttpRequestInitializer(requestInitializer, httpStatistics));
     return new GoogleCloudStorageImpl(
         gcsOptions, storage, /* credentials= */ null, downscopedAccessTokenFn);
   }

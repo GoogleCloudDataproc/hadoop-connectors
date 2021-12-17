@@ -157,8 +157,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       new HashMap<GoogleCloudStorageStatistics, AtomicLong>();
 
   // To track the http statistics
-  private static final HashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics =
-      new HashMap<GoogleCloudStorageStatistics, AtomicLong>();
+  private static final ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics =
+      new ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong>();
 
   // A function to encode metadata map values
   static String encodeMetadataValues(byte[] bytes) {
@@ -318,21 +318,24 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       throws IOException {
     this(
         options,
-        createStorage(options, httpRequestInitializer),
+        createStorage(
+            options,
+            new GcsioTrackingHttpRequestInitializer(httpRequestInitializer, httpStatistics)),
         /* credentials= */ null,
         downscopedAccessTokenFn);
   }
 
   private static HttpRequestInitializer setGcsRequestTracker(
       GoogleCloudStorageOptions options, Credential credential) {
-    if (options.isGrpcEnabled()) {
-      return (HttpRequestInitializer)
-          new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions());
-    }
     HttpRequestInitializer httpRequestInitializer =
         new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions());
     gcsRequestsTracker =
         new GcsioTrackingHttpRequestInitializer(httpRequestInitializer, httpStatistics);
+    if (options.isGrpcEnabled()) {
+      return (HttpRequestInitializer)
+          new RetryHttpInitializer(
+              gcsRequestsTracker, credential, options.toRetryHttpInitializerOptions());
+    }
     return (HttpRequestInitializer) gcsRequestsTracker;
   }
 
@@ -409,7 +412,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     HttpTransport httpTransport =
         HttpTransportFactory.createHttpTransport(
             options.getProxyAddress(), options.getProxyUsername(), options.getProxyPassword());
-    return new Storage.Builder(httpTransport, JSON_FACTORY, httpRequestInitializer)
+    return new Storage.Builder(
+            httpTransport,
+            JSON_FACTORY,
+            new GcsioTrackingHttpRequestInitializer(httpRequestInitializer, httpStatistics))
         .setRootUrl(options.getStorageRootUrl())
         .setServicePath(options.getStorageServicePath())
         .setApplicationName(options.getAppName())

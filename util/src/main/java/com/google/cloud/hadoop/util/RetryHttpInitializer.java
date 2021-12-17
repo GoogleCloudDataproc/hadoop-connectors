@@ -38,6 +38,7 @@ import java.util.Set;
 
 public class RetryHttpInitializer implements HttpRequestInitializer {
 
+  private HttpRequestInitializer delegate;
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   private static final int HTTP_SC_GONE = 410;
@@ -219,6 +220,12 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     this.credential = credential;
     this.options = options;
     this.sleeperOverride = null;
+  }
+
+  public RetryHttpInitializer(
+      HttpRequestInitializer delegate, Credential credential, RetryHttpInitializerOptions options) {
+    this(credential, options);
+    this.delegate = delegate;
   }
 
   @Override

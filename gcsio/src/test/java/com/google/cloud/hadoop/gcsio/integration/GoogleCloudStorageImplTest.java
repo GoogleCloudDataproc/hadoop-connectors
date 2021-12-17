@@ -141,7 +141,59 @@ public class GoogleCloudStorageImplTest {
             resourceId,
             /* partitionSize= */ 5 * 1024 * 1024,
             partitionsCount);
+    assertObjectContent(helperGcs, resourceId, partition, partitionsCount);
+    assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
+        .containsExactlyElementsIn(
+            getExpectedRequestsForCreateObject(
+                resourceId, uploadChunkSize, partitionsCount, partition))
+        .inOrder();
+  }
 
+  @Test
+  public void writeLargeObject_withSmallUploadChunk_testStatistics() throws IOException {
+    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+
+    int uploadChunkSize = 1024 * 1024;
+    TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
+        newTrackingGoogleCloudStorage(getOptionsWithUploadChunk(uploadChunkSize));
+
+    int partitionsCount = 1;
+    byte[] partition =
+        writeObject(
+            trackingGcs.delegate,
+            resourceId,
+            /* partitionSize= */ 5 * 1024 * 1024,
+            partitionsCount);
+    assertThat(
+            trackingGcs
+                .delegate
+                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST)
+                .longValue())
+        .isEqualTo(1L);
+    assertThat(
+            trackingGcs
+                .delegate
+                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES)
+                .longValue())
+        .isEqualTo(1L);
+    assertThat(
+            trackingGcs
+                .delegate
+                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST)
+                .longValue())
+        .isEqualTo(5L);
+    assertThat(
+            trackingGcs
+                .delegate
+                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST)
+                .longValue())
+        .isEqualTo(4L);
+    assertThat(
+            trackingGcs
+                .delegate
+                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST_FAILURES)
+                .longValue())
+        .isEqualTo(4L);
     assertObjectContent(helperGcs, resourceId, partition, partitionsCount);
 
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
