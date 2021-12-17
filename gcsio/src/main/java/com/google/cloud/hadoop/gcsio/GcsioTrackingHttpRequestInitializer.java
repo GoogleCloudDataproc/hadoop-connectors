@@ -43,7 +43,7 @@ class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
   private final HttpRequestInitializer delegate;
 
   // To track the http statistics
-  private ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics;
+  private final ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics;
 
   public GcsioTrackingHttpRequestInitializer(
       HttpRequestInitializer delegate,
