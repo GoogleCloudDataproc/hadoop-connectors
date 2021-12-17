@@ -165,12 +165,14 @@ public class GoogleCloudStorageImplTest {
             resourceId,
             /* partitionSize= */ 5 * 1024 * 1024,
             partitionsCount);
+    List<String> expectedRequests =
+        getExpectedRequestsForCreateObject(resourceId, uploadChunkSize, partitionsCount, partition);
     assertThat(
             trackingGcs
                 .delegate
                 .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST)
                 .longValue())
-        .isEqualTo(1L);
+        .isEqualTo(getCountFromExpectedRequests("GET", expectedRequests));
     assertThat(
             trackingGcs
                 .delegate
@@ -182,13 +184,7 @@ public class GoogleCloudStorageImplTest {
                 .delegate
                 .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST)
                 .longValue())
-        .isEqualTo(5L);
-    assertThat(
-            trackingGcs
-                .delegate
-                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST)
-                .longValue())
-        .isEqualTo(4L);
+        .isEqualTo(getCountFromExpectedRequests("PUT", expectedRequests));
     assertThat(
             trackingGcs
                 .delegate
@@ -202,6 +198,16 @@ public class GoogleCloudStorageImplTest {
             getExpectedRequestsForCreateObject(
                 resourceId, uploadChunkSize, partitionsCount, partition))
         .inOrder();
+  }
+
+  private int getCountFromExpectedRequests(String requestType, List<String> expectedRequests) {
+    int count = 0;
+    for (int ind = 0; ind < expectedRequests.size(); ind++) {
+      if (requestType != "" && expectedRequests.get(ind).startsWith(requestType)) {
+        count += 1;
+      }
+    }
+    return count;
   }
 
   @Test
