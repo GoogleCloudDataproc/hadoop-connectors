@@ -192,6 +192,36 @@ public class GoogleCloudStorageImplTest {
                 .longValue())
         .isEqualTo(4L);
     assertObjectContent(helperGcs, resourceId, partition, partitionsCount);
+    assertThat(
+            trackingGcs
+                .delegate
+                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST)
+                .longValue())
+        .isEqualTo(getCountFromExpectedRequests("GET", expectedRequests));
+    assertThat(
+            trackingGcs
+                .delegate
+                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES)
+                .longValue())
+        .isEqualTo(1L);
+    assertThat(
+            trackingGcs
+                .delegate
+                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST)
+                .longValue())
+        .isEqualTo(getCountFromExpectedRequests("PUT", expectedRequests));
+    assertThat(
+            trackingGcs
+                .delegate
+                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST_FAILURES)
+                .longValue())
+        .isEqualTo(4L);
+    assertThat(
+            trackingGcs
+                .delegate
+                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST)
+                .longValue())
+        .isEqualTo(getCountFromExpectedRequests("POST", expectedRequests));
 
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactlyElementsIn(
