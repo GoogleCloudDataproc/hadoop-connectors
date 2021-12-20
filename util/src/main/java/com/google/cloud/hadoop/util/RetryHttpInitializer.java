@@ -38,7 +38,6 @@ import java.util.Set;
 
 public class RetryHttpInitializer implements HttpRequestInitializer {
 
-  private HttpRequestInitializer delegate;
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   private static final int HTTP_SC_GONE = 410;
@@ -52,6 +51,8 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
   private static final HttpBackOffUnsuccessfulResponseHandler.BackOffRequired
       BASE_HTTP_BACKOFF_REQUIRED =
           HttpBackOffUnsuccessfulResponseHandler.BackOffRequired.ON_SERVER_ERROR;
+
+  private HttpRequestInitializer delegate;
 
   // To be used as a request interceptor for filling in the "Authorization" header field, as well
   // as a response handler for certain unsuccessful error codes wherein the Credential must refresh

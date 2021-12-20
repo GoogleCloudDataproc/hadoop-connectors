@@ -153,8 +153,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private static final String LIST_OBJECT_FIELDS_FORMAT = "items(%s),prefixes,nextPageToken";
 
   // To track the object statistics
-  private static final HashMap<GoogleCloudStorageStatistics, AtomicLong> objectStatistics =
-      new HashMap<GoogleCloudStorageStatistics, AtomicLong>();
+  private static final ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong>
+      objectStatistics = new ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong>();
 
   // To track the http statistics
   private static final ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics =
