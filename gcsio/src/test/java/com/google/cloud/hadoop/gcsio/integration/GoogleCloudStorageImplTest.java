@@ -191,7 +191,15 @@ public class GoogleCloudStorageImplTest {
                 .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST_FAILURES)
                 .longValue())
         .isEqualTo(4L);
-    assertObjectContent(helperGcs, resourceId, partition, partitionsCount);
+
+    assertObjectContent(trackingGcs.delegate, resourceId, partition, partitionsCount);
+
+    assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
+        .containsExactlyElementsIn(
+            getExpectedRequestsForCreateObject(
+                resourceId, uploadChunkSize, partitionsCount, partition))
+        .inOrder();
+
     assertThat(
             trackingGcs
                 .delegate
@@ -201,33 +209,15 @@ public class GoogleCloudStorageImplTest {
     assertThat(
             trackingGcs
                 .delegate
-                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES)
-                .longValue())
-        .isEqualTo(1L);
-    assertThat(
-            trackingGcs
-                .delegate
                 .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST)
                 .longValue())
         .isEqualTo(getCountFromExpectedRequests("PUT", expectedRequests));
     assertThat(
             trackingGcs
                 .delegate
-                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST_FAILURES)
-                .longValue())
-        .isEqualTo(4L);
-    assertThat(
-            trackingGcs
-                .delegate
                 .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST)
                 .longValue())
         .isEqualTo(getCountFromExpectedRequests("POST", expectedRequests));
-
-    assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
-        .containsExactlyElementsIn(
-            getExpectedRequestsForCreateObject(
-                resourceId, uploadChunkSize, partitionsCount, partition))
-        .inOrder();
   }
 
   private int getCountFromExpectedRequests(String requestType, List<String> expectedRequests) {
