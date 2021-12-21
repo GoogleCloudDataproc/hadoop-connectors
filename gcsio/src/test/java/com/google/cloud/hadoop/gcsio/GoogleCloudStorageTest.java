@@ -98,10 +98,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.zip.GZIPOutputStream;
 import javax.net.ssl.SSLException;
@@ -146,12 +144,6 @@ public class GoogleCloudStorageTest {
 
   private TrackingHttpRequestInitializer trackingRequestInitializerWithRetries;
   private TrackingHttpRequestInitializer trackingRequestInitializerWithoutRetries;
-  private TrackingHttpRequestInitializer trackingRequestInitializer;
-  private GcsioTrackingHttpRequestInitializer gcsiotrackingRequestInitializer;
-
-  // To track the http statistics
-  private static final ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics =
-      new ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong>();
 
   @Before
   public void setUp() {
@@ -161,14 +153,6 @@ public class GoogleCloudStorageTest {
             /* replaceRequestParams= */ false);
     trackingRequestInitializerWithoutRetries =
         new TrackingHttpRequestInitializer(/* replaceRequestParams= */ false);
-    gcsiotrackingRequestInitializer =
-        new GcsioTrackingHttpRequestInitializer(
-            new RetryHttpInitializer(
-                new MockGoogleCredential.Builder().build(),
-                GCS_OPTIONS.toRetryHttpInitializerOptions()),
-            httpStatistics);
-    trackingRequestInitializer =
-        new TrackingHttpRequestInitializer(gcsiotrackingRequestInitializer);
   }
 
   private static StorageObject getStorageObjectForEmptyObjectWithMetadata(
@@ -3339,13 +3323,6 @@ public class GoogleCloudStorageTest {
   private GoogleCloudStorage mockedGcs(
       GoogleCloudStorageOptions gcsOptions,
       HttpTransport transport,
-      TrackingHttpRequestInitializer requestInitializer) {
-    return mockedGcs(gcsOptions, transport, requestInitializer, null);
-  }
-
-  private GoogleCloudStorage mockedGcs(
-      GoogleCloudStorageOptions gcsOptions,
-      HttpTransport transport,
       HttpRequestInitializer requestInitializer) {
     return mockedGcs(
         gcsOptions, transport, requestInitializer, /* downscopedAccessTokenFn= */ null);
@@ -3356,11 +3333,7 @@ public class GoogleCloudStorageTest {
       HttpTransport transport,
       HttpRequestInitializer requestInitializer,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
-    Storage storage =
-        new Storage(
-            transport,
-            JSON_FACTORY,
-            new GcsioTrackingHttpRequestInitializer(requestInitializer, httpStatistics));
+    Storage storage = new Storage(transport, JSON_FACTORY, requestInitializer);
     return new GoogleCloudStorageImpl(
         gcsOptions, storage, /* credentials= */ null, downscopedAccessTokenFn);
   }

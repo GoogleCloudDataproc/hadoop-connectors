@@ -167,6 +167,7 @@ public class GoogleCloudStorageImplTest {
             partitionsCount);
     List<String> expectedRequests =
         getExpectedRequestsForCreateObject(resourceId, uploadChunkSize, partitionsCount, partition);
+    Long ExpectedReadChannelGetRequestCount = getCountFromExpectedRequests("GET", expectedRequests) + 2L;
     assertThat(
             trackingGcs
                 .delegate
@@ -192,32 +193,26 @@ public class GoogleCloudStorageImplTest {
                 .longValue())
         .isEqualTo(4L);
 
-    assertObjectContent(trackingGcs.delegate, resourceId, partition, partitionsCount);
-
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactlyElementsIn(
             getExpectedRequestsForCreateObject(
                 resourceId, uploadChunkSize, partitionsCount, partition))
         .inOrder();
 
+    assertObjectContent(trackingGcs.delegate, resourceId, partition, partitionsCount);
+
     assertThat(
             trackingGcs
                 .delegate
                 .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST)
                 .longValue())
-        .isEqualTo(getCountFromExpectedRequests("GET", expectedRequests));
+        .isEqualTo(ExpectedReadChannelGetRequestCount);
     assertThat(
             trackingGcs
                 .delegate
                 .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST)
                 .longValue())
         .isEqualTo(getCountFromExpectedRequests("PUT", expectedRequests));
-    assertThat(
-            trackingGcs
-                .delegate
-                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST)
-                .longValue())
-        .isEqualTo(getCountFromExpectedRequests("POST", expectedRequests));
   }
 
   private int getCountFromExpectedRequests(String requestType, List<String> expectedRequests) {
