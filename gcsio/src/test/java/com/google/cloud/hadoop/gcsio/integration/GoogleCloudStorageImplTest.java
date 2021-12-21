@@ -167,7 +167,8 @@ public class GoogleCloudStorageImplTest {
             partitionsCount);
     List<String> expectedRequests =
         getExpectedRequestsForCreateObject(resourceId, uploadChunkSize, partitionsCount, partition);
-    Long ExpectedReadChannelGetRequestCount = getCountFromExpectedRequests("GET", expectedRequests) + 2L;
+    Long ExpectedReadChannelGetRequestCount =
+        getCountFromExpectedRequests("GET", expectedRequests) + 2L;
     assertThat(
             trackingGcs
                 .delegate
