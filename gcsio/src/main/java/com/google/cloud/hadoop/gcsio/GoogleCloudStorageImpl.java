@@ -318,9 +318,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       throws IOException {
     this(
         options,
-        createStorage(
-            options,
-            new GcsioTrackingHttpRequestInitializer(httpRequestInitializer, httpStatistics)),
+        createStorage(options, httpRequestInitializer),
         /* credentials= */ null,
         downscopedAccessTokenFn);
   }
@@ -332,9 +330,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     gcsRequestsTracker =
         new GcsioTrackingHttpRequestInitializer(httpRequestInitializer, httpStatistics);
     if (options.isGrpcEnabled()) {
-      return (HttpRequestInitializer)
-          new RetryHttpInitializer(
-              gcsRequestsTracker, credential, options.toRetryHttpInitializerOptions());
+      return new RetryHttpInitializer(
+          gcsRequestsTracker, credential, options.toRetryHttpInitializerOptions());
     }
     return (HttpRequestInitializer) gcsRequestsTracker;
   }
