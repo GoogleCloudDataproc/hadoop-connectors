@@ -403,6 +403,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     HttpTransport httpTransport =
         HttpTransportFactory.createHttpTransport(
             options.getProxyAddress(), options.getProxyUsername(), options.getProxyPassword());
+    httpStatistics.clear();
     return new Storage.Builder(
             httpTransport,
             JSON_FACTORY,
