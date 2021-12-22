@@ -52,6 +52,12 @@ class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
     this.httpStatistics = httpStatistics;
   }
 
+  public GcsioTrackingHttpRequestInitializer(
+      ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics) {
+    this.delegate = null;
+    this.httpStatistics = httpStatistics;
+  }
+
   @Override
   public void initialize(HttpRequest request) throws IOException {
     if (delegate != null) {
