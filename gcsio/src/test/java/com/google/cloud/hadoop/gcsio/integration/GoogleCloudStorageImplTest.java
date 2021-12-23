@@ -155,75 +155,28 @@ public class GoogleCloudStorageImplTest {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
 
     int uploadChunkSize = 1024 * 1024;
-    TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
-        newHttpTrackingGoogleCloudStorage(getOptionsWithUploadChunk(uploadChunkSize));
+    GoogleCloudStorage trackingGcs =
+        new GoogleCloudStorageImpl(
+            getOptionsWithUploadChunk(uploadChunkSize),
+            GoogleCloudStorageTestHelper.getCredential());
 
     int partitionsCount = 1;
     byte[] partition =
-        writeObject(
-            trackingGcs.delegate,
-            resourceId,
-            /* partitionSize= */ 5 * 1024 * 1024,
-            partitionsCount);
+        writeObject(trackingGcs, resourceId, /* partitionSize= */ 5 * 1024 * 1024, partitionsCount);
     List<String> expectedRequests =
         getExpectedRequestsForCreateObject(resourceId, uploadChunkSize, partitionsCount, partition);
-    Long ExpectedReadChannelGetRequestCount =
-        getCountFromExpectedRequests("GET", expectedRequests) + 2L;
+
     assertThat(
             trackingGcs
-                .delegate
-                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST)
-                .longValue())
-        .isEqualTo(getCountFromExpectedRequests("GET", expectedRequests));
-    assertThat(
-            trackingGcs
-                .delegate
                 .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES)
                 .longValue())
         .isEqualTo(1L);
+
     assertThat(
             trackingGcs
-                .delegate
-                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST)
-                .longValue())
-        .isEqualTo(getCountFromExpectedRequests("PUT", expectedRequests));
-    assertThat(
-            trackingGcs
-                .delegate
                 .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST_FAILURES)
                 .longValue())
         .isEqualTo(4L);
-
-    assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
-        .containsExactlyElementsIn(
-            getExpectedRequestsForCreateObject(
-                resourceId, uploadChunkSize, partitionsCount, partition))
-        .inOrder();
-
-    assertObjectContent(trackingGcs.delegate, resourceId, partition, partitionsCount);
-
-    assertThat(
-            trackingGcs
-                .delegate
-                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST)
-                .longValue())
-        .isEqualTo(ExpectedReadChannelGetRequestCount);
-    assertThat(
-            trackingGcs
-                .delegate
-                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST)
-                .longValue())
-        .isEqualTo(getCountFromExpectedRequests("PUT", expectedRequests));
-  }
-
-  private int getCountFromExpectedRequests(String requestType, List<String> expectedRequests) {
-    int count = 0;
-    for (int ind = 0; ind < expectedRequests.size(); ind++) {
-      if (requestType != "" && expectedRequests.get(ind).startsWith(requestType)) {
-        count += 1;
-      }
-    }
-    return count;
   }
 
   @Test
@@ -477,15 +430,6 @@ public class GoogleCloudStorageImplTest {
     return new TrackingStorageWrapper<>(
         options,
         httpRequestInitializer -> new GoogleCloudStorageImpl(options, httpRequestInitializer));
-  }
-
-  private static TrackingStorageWrapper<GoogleCloudStorageImpl> newHttpTrackingGoogleCloudStorage(
-      GoogleCloudStorageOptions options) throws IOException {
-    return new TrackingStorageWrapper<>(
-        options,
-        httpRequestInitializer ->
-            new GoogleCloudStorageImpl(
-                options, GoogleCloudStorageImpl.setGcsRequestTracker(httpRequestInitializer)));
   }
 
   private static GoogleCloudStorageOptions getOptionsWithUploadChunk(int uploadChunk) {

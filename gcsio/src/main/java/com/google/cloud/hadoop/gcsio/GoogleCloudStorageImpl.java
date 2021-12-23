@@ -153,8 +153,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private static final String LIST_OBJECT_FIELDS_FORMAT = "items(%s),prefixes,nextPageToken";
 
   // To track the object statistics
-  private static final ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong>
-      objectStatistics = new ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong>();
+  private final ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong> objectStatistics =
+      new ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong>();
 
   // To track the http statistics
   private static final ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics =
@@ -330,12 +330,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         gcsRequestsTracker, credential, options.toRetryHttpInitializerOptions());
   }
 
-  public static HttpRequestInitializer setGcsRequestTracker(
-      HttpRequestInitializer httpRequestInitializer) {
-    httpStatistics.clear();
-    return new GcsioTrackingHttpRequestInitializer(httpRequestInitializer, httpStatistics);
-  }
-
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
    *
@@ -409,6 +403,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     HttpTransport httpTransport =
         HttpTransportFactory.createHttpTransport(
             options.getProxyAddress(), options.getProxyUsername(), options.getProxyPassword());
+    httpStatistics.clear();
     return new Storage.Builder(httpTransport, JSON_FACTORY, httpRequestInitializer)
         .setRootUrl(options.getStorageRootUrl())
         .setServicePath(options.getStorageServicePath())
