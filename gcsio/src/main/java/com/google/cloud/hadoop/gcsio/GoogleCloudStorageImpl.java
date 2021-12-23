@@ -330,6 +330,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         gcsRequestsTracker, credential, options.toRetryHttpInitializerOptions());
   }
 
+  public static HttpRequestInitializer setGcsRequestTracker(
+      HttpRequestInitializer httpRequestInitializer) {
+    httpStatistics.clear();
+    return new GcsioTrackingHttpRequestInitializer(httpRequestInitializer, httpStatistics);
+  }
+
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
    *
@@ -403,11 +409,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     HttpTransport httpTransport =
         HttpTransportFactory.createHttpTransport(
             options.getProxyAddress(), options.getProxyUsername(), options.getProxyPassword());
-    httpStatistics.clear();
-    return new Storage.Builder(
-            httpTransport,
-            JSON_FACTORY,
-            new GcsioTrackingHttpRequestInitializer(httpRequestInitializer, httpStatistics))
+    return new Storage.Builder(httpTransport, JSON_FACTORY, httpRequestInitializer)
         .setRootUrl(options.getStorageRootUrl())
         .setServicePath(options.getStorageServicePath())
         .setApplicationName(options.getAppName())

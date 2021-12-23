@@ -156,7 +156,7 @@ public class GoogleCloudStorageImplTest {
 
     int uploadChunkSize = 1024 * 1024;
     TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
-        newTrackingGoogleCloudStorage(getOptionsWithUploadChunk(uploadChunkSize));
+        newHttpTrackingGoogleCloudStorage(getOptionsWithUploadChunk(uploadChunkSize));
 
     int partitionsCount = 1;
     byte[] partition =
@@ -477,6 +477,15 @@ public class GoogleCloudStorageImplTest {
     return new TrackingStorageWrapper<>(
         options,
         httpRequestInitializer -> new GoogleCloudStorageImpl(options, httpRequestInitializer));
+  }
+
+  private static TrackingStorageWrapper<GoogleCloudStorageImpl> newHttpTrackingGoogleCloudStorage(
+      GoogleCloudStorageOptions options) throws IOException {
+    return new TrackingStorageWrapper<>(
+        options,
+        httpRequestInitializer ->
+            new GoogleCloudStorageImpl(
+                options, GoogleCloudStorageImpl.setGcsRequestTracker(httpRequestInitializer)));
   }
 
   private static GoogleCloudStorageOptions getOptionsWithUploadChunk(int uploadChunk) {
