@@ -28,7 +28,6 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST_FAILURES;
 
-import com.google.api.client.http.HttpExecuteInterceptor;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpResponse;
@@ -56,18 +55,12 @@ class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
     if (delegate != null) {
       delegate.initialize(request);
     }
-    HttpExecuteInterceptor executeInterceptor = request.getInterceptor();
-    request.setInterceptor(
-        r -> {
-          if (executeInterceptor != null) {
-            executeInterceptor.intercept(r);
-          }
-          sethttprequestStats(r);
-        });
+
     request.setResponseInterceptor(
         new HttpResponseInterceptor() {
           @Override
           public void interceptResponse(HttpResponse httpResponse) throws IOException {
+            sethttprequestStats(httpResponse.getRequest());
             setHttpRequestFailureStats(httpResponse);
           }
         });
