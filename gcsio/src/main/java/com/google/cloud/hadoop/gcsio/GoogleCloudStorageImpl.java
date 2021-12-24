@@ -157,8 +157,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       new ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong>();
 
   // To track the http statistics
-  private static final ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics =
-      new ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong>();
+  private static ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics;
 
   // A function to encode metadata map values
   static String encodeMetadataValues(byte[] bytes) {
@@ -273,8 +272,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // Function that generates downscoped access token.
   private final Function<List<AccessBoundary>, String> downscopedAccessTokenFn;
 
-  private static GcsioTrackingHttpRequestInitializer gcsRequestsTracker;
-
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
    *
@@ -283,7 +280,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    */
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Credential credential)
       throws IOException {
-    this(options, setGcsRequestTracker(options, credential), /* downscopedAccessTokenFn= */ null);
+    this(
+        options,
+        new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()),
+        /* downscopedAccessTokenFn= */ null);
   }
 
   /**
@@ -298,7 +298,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       Credential credential,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
-    this(options, setGcsRequestTracker(options, credential), downscopedAccessTokenFn);
+    this(
+        options,
+        new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()),
+        downscopedAccessTokenFn);
   }
 
   public GoogleCloudStorageImpl(
@@ -324,10 +327,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   private static HttpRequestInitializer setGcsRequestTracker(
-      GoogleCloudStorageOptions options, Credential credential) {
-    gcsRequestsTracker = new GcsioTrackingHttpRequestInitializer(httpStatistics);
-    return new RetryHttpInitializer(
-        gcsRequestsTracker, credential, options.toRetryHttpInitializerOptions());
+      GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer) {
+    httpStatistics = new ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong>();
+    if (options.isGrpcEnabled()) {
+      return httpRequestInitializer;
+    }
+    return new GcsioTrackingHttpRequestInitializer(httpRequestInitializer, httpStatistics);
   }
 
   /**
@@ -403,8 +408,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     HttpTransport httpTransport =
         HttpTransportFactory.createHttpTransport(
             options.getProxyAddress(), options.getProxyUsername(), options.getProxyPassword());
-    httpStatistics.clear();
-    return new Storage.Builder(httpTransport, JSON_FACTORY, httpRequestInitializer)
+    return new Storage.Builder(
+            httpTransport, JSON_FACTORY, setGcsRequestTracker(options, httpRequestInitializer))
         .setRootUrl(options.getStorageRootUrl())
         .setServicePath(options.getStorageServicePath())
         .setApplicationName(options.getAppName())

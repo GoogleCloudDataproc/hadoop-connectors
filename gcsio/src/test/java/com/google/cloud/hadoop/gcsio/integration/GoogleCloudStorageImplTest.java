@@ -155,7 +155,7 @@ public class GoogleCloudStorageImplTest {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
 
     int uploadChunkSize = 1024 * 1024;
-    GoogleCloudStorage trackingGcs =
+    GoogleCloudStorageImpl trackingGcs =
         new GoogleCloudStorageImpl(
             getOptionsWithUploadChunk(uploadChunkSize),
             GoogleCloudStorageTestHelper.getCredential());
@@ -165,6 +165,19 @@ public class GoogleCloudStorageImplTest {
         writeObject(trackingGcs, resourceId, /* partitionSize= */ 5 * 1024 * 1024, partitionsCount);
     List<String> expectedRequests =
         getExpectedRequestsForCreateObject(resourceId, uploadChunkSize, partitionsCount, partition);
+    long expectedGetRequestsCountRead = getCountFromExpectedRequests("GET", expectedRequests) + 2L;
+
+    assertThat(
+            trackingGcs
+                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST)
+                .longValue())
+        .isEqualTo(getCountFromExpectedRequests("GET", expectedRequests));
+
+    assertThat(
+            trackingGcs
+                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST)
+                .longValue())
+        .isEqualTo(getCountFromExpectedRequests("PUT", expectedRequests));
 
     assertThat(
             trackingGcs
@@ -177,6 +190,14 @@ public class GoogleCloudStorageImplTest {
                 .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST_FAILURES)
                 .longValue())
         .isEqualTo(4L);
+
+    assertObjectContent(trackingGcs, resourceId, partition, partitionsCount);
+
+    assertThat(
+            trackingGcs
+                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST)
+                .longValue())
+        .isEqualTo(expectedGetRequestsCountRead);
   }
 
   @Test
@@ -462,5 +483,15 @@ public class GoogleCloudStorageImplTest {
                             /* uploadId= */ i))
                 .collect(toList()))
         .build();
+  }
+
+  private int getCountFromExpectedRequests(String requestType, List<String> expectedRequests) {
+    int count = 0;
+    for (int ind = 0; ind < expectedRequests.size(); ind++) {
+      if (requestType != "" && expectedRequests.get(ind).startsWith(requestType)) {
+        count += 1;
+      }
+    }
+    return count;
   }
 }
