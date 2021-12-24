@@ -2436,9 +2436,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   @Override
   public AtomicLong getHttpStatistics(GoogleCloudStorageStatistics key) {
-    if (httpStatistics.get(key) != null) {
-      return httpStatistics.get(key);
+    if (httpStatistics == null) {
+      throw new UnsupportedOperationException("Http Statistics is null");
     }
-    return new AtomicLong(0);
+    return httpStatistics.get(key);
   }
 }
