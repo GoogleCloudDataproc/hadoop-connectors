@@ -343,7 +343,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     this.storageOptions = checkNotNull(options, "options must not be null");
     this.storageOptions.throwIfNotValid();
     this.httpStatistics = new ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong>();
-    RetryHttpInitializer retryHttpInitializer =
+    HttpRequestInitializer retryHttpInitializer =
         new RetryHttpInitializer(
             new GcsioTrackingHttpRequestInitializer(this.httpStatistics),
             credential,
@@ -2436,6 +2436,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   @Override
   public AtomicLong getHttpStatistics(GoogleCloudStorageStatistics key) {
+    checkNotNull(httpStatistics.get(key));
     return httpStatistics.get(key);
   }
 }

@@ -234,6 +234,10 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     // Credential must be the interceptor to fill in accessToken fields.
     request.setInterceptor(credential);
 
+    if (delegate != null) {
+      delegate.initialize(request);
+    }
+
     // Request will be retried if server errors (5XX) or I/O errors are encountered.
     request.setNumberOfRetries(options.getMaxRequestRetries());
 
@@ -270,10 +274,6 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     }
 
     request.getHeaders().putAll(options.getHttpHeaders());
-
-    if (delegate != null) {
-      delegate.initialize(request);
-    }
   }
 
   public Credential getCredential() {
