@@ -231,10 +231,6 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
   @Override
   public void initialize(HttpRequest request) throws IOException {
-    if (delegate != null) {
-      delegate.initialize(request);
-    }
-
     // Credential must be the interceptor to fill in accessToken fields.
     request.setInterceptor(credential);
 
@@ -274,6 +270,10 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     }
 
     request.getHeaders().putAll(options.getHttpHeaders());
+
+    if (delegate != null) {
+      delegate.initialize(request);
+    }
   }
 
   public Credential getCredential() {

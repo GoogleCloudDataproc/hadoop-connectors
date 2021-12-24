@@ -157,7 +157,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       new ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong>();
 
   // To track the http statistics
-  private static ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics;
+  private ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics;
 
   // A function to encode metadata map values
   static String encodeMetadataValues(byte[] bytes) {
@@ -280,28 +280,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    */
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Credential credential)
       throws IOException {
-    this(
-        options,
-        new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()),
-        /* downscopedAccessTokenFn= */ null);
-  }
-
-  /**
-   * Constructs an instance of GoogleCloudStorageImpl.
-   *
-   * @param credential OAuth2 credential that allows access to GCS
-   * @param downscopedAccessTokenFn Function that generates downscoped access token.
-   * @throws IOException on IO error
-   */
-  public GoogleCloudStorageImpl(
-      GoogleCloudStorageOptions options,
-      Credential credential,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
-      throws IOException {
-    this(
-        options,
-        new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()),
-        downscopedAccessTokenFn);
+    this(options, credential, /* downscopedAccessTokenFn= */ null);
   }
 
   public GoogleCloudStorageImpl(
@@ -326,15 +305,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         downscopedAccessTokenFn);
   }
 
-  private static HttpRequestInitializer setGcsRequestTracker(
-      GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer) {
-    httpStatistics = new ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong>();
-    if (options.isGrpcEnabled()) {
-      return httpRequestInitializer;
-    }
-    return new GcsioTrackingHttpRequestInitializer(httpRequestInitializer, httpStatistics);
-  }
-
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
    *
@@ -354,6 +324,46 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options, Storage storage, Credentials credentials) {
     this(options, storage, credentials, /* downscopedAccessTokenFn= */ null);
+  }
+
+  /**
+   * Constructs an instance of GoogleCloudStorageImpl.
+   *
+   * @param credential OAuth2 credential that allows access to GCS
+   * @param downscopedAccessTokenFn Function that generates downscoped access token.
+   * @throws IOException on IO error
+   */
+  public GoogleCloudStorageImpl(
+      GoogleCloudStorageOptions options,
+      Credential credential,
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
+      throws IOException {
+    logger.atFiner().log("GCS(options: %s)", options);
+
+    this.storageOptions = checkNotNull(options, "options must not be null");
+    this.storageOptions.throwIfNotValid();
+    this.httpStatistics = new ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong>();
+    RetryHttpInitializer retryHttpInitializer =
+        new RetryHttpInitializer(
+            new GcsioTrackingHttpRequestInitializer(this.httpStatistics),
+            credential,
+            options.toRetryHttpInitializerOptions());
+
+    this.storage =
+        checkNotNull(createStorage(options, retryHttpInitializer), "storage must not be null");
+
+    this.httpRequestInitializer =
+        this.storage.getRequestFactory() == null
+            ? null
+            : this.storage.getRequestFactory().getInitializer();
+
+    // Create the gRPC stub if necessary;
+    if (this.storageOptions.isGrpcEnabled()) {
+      this.storageStubProvider =
+          StorageStubProvider.newInstance(
+              this.storageOptions, this.backgroundTasksThreadPool, credential);
+    }
+    this.downscopedAccessTokenFn = downscopedAccessTokenFn;
   }
 
   /**
@@ -408,8 +418,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     HttpTransport httpTransport =
         HttpTransportFactory.createHttpTransport(
             options.getProxyAddress(), options.getProxyUsername(), options.getProxyPassword());
-    return new Storage.Builder(
-            httpTransport, JSON_FACTORY, setGcsRequestTracker(options, httpRequestInitializer))
+    return new Storage.Builder(httpTransport, JSON_FACTORY, httpRequestInitializer)
         .setRootUrl(options.getStorageRootUrl())
         .setServicePath(options.getStorageServicePath())
         .setApplicationName(options.getAppName())
