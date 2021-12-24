@@ -415,11 +415,18 @@ public interface GoogleCloudStorage {
       throws IOException;
 
   /**
-   * To get the value object related statistics from GCS
+   * Retrieves the statistics for the given object-related key
    *
    * @param key name of the object related statistics key
    */
   public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key);
+
+  /**
+   * Retrieves the statistics for the given http request-related key
+   *
+   * @param key name of the http related statistics key
+   */
+  public AtomicLong getHttpStatistics(GoogleCloudStorageStatistics key);
 
   /**
    * Composes inputs into a single GCS object. This performs a GCS Compose. Objects will be composed

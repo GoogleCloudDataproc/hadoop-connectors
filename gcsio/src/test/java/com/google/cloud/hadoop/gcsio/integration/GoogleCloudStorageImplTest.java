@@ -34,6 +34,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TrackingStorageWrapper;
@@ -141,14 +142,62 @@ public class GoogleCloudStorageImplTest {
             resourceId,
             /* partitionSize= */ 5 * 1024 * 1024,
             partitionsCount);
-
     assertObjectContent(helperGcs, resourceId, partition, partitionsCount);
-
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactlyElementsIn(
             getExpectedRequestsForCreateObject(
                 resourceId, uploadChunkSize, partitionsCount, partition))
         .inOrder();
+  }
+
+  @Test
+  public void writeLargeObject_withSmallUploadChunk_testStatistics() throws IOException {
+    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+
+    int uploadChunkSize = 1024 * 1024;
+    GoogleCloudStorageImpl trackingGcs =
+        new GoogleCloudStorageImpl(
+            getOptionsWithUploadChunk(uploadChunkSize),
+            GoogleCloudStorageTestHelper.getCredential());
+
+    int partitionsCount = 1;
+    byte[] partition =
+        writeObject(trackingGcs, resourceId, /* partitionSize= */ 5 * 1024 * 1024, partitionsCount);
+    List<String> expectedRequests =
+        getExpectedRequestsForCreateObject(resourceId, uploadChunkSize, partitionsCount, partition);
+    long expectedGetRequestsCountRead = getCountFromExpectedRequests("GET", expectedRequests) + 2L;
+
+    assertThat(
+            trackingGcs
+                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST)
+                .longValue())
+        .isEqualTo(getCountFromExpectedRequests("GET", expectedRequests));
+
+    assertThat(
+            trackingGcs
+                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST)
+                .longValue())
+        .isEqualTo(getCountFromExpectedRequests("PUT", expectedRequests));
+
+    assertThat(
+            trackingGcs
+                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES)
+                .longValue())
+        .isEqualTo(1L);
+
+    assertThat(
+            trackingGcs
+                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST_FAILURES)
+                .longValue())
+        .isEqualTo(4L);
+
+    assertObjectContent(trackingGcs, resourceId, partition, partitionsCount);
+
+    assertThat(
+            trackingGcs
+                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST)
+                .longValue())
+        .isEqualTo(expectedGetRequestsCountRead);
   }
 
   @Test
@@ -434,5 +483,15 @@ public class GoogleCloudStorageImplTest {
                             /* uploadId= */ i))
                 .collect(toList()))
         .build();
+  }
+
+  private int getCountFromExpectedRequests(String requestType, List<String> expectedRequests) {
+    int count = 0;
+    for (int ind = 0; ind < expectedRequests.size(); ind++) {
+      if (requestType != "" && expectedRequests.get(ind).startsWith(requestType)) {
+        count += 1;
+      }
+    }
+    return count;
   }
 }

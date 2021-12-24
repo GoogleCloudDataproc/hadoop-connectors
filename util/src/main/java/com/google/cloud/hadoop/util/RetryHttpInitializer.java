@@ -52,6 +52,8 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
       BASE_HTTP_BACKOFF_REQUIRED =
           HttpBackOffUnsuccessfulResponseHandler.BackOffRequired.ON_SERVER_ERROR;
 
+  private HttpRequestInitializer delegate;
+
   // To be used as a request interceptor for filling in the "Authorization" header field, as well
   // as a response handler for certain unsuccessful error codes wherein the Credential must refresh
   // its token for a retry.
@@ -221,8 +223,18 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     this.sleeperOverride = null;
   }
 
+  public RetryHttpInitializer(
+      HttpRequestInitializer delegate, Credential credential, RetryHttpInitializerOptions options) {
+    this(credential, options);
+    this.delegate = delegate;
+  }
+
   @Override
-  public void initialize(HttpRequest request) {
+  public void initialize(HttpRequest request) throws IOException {
+    if (delegate != null) {
+      delegate.initialize(request);
+    }
+
     // Credential must be the interceptor to fill in accessToken fields.
     request.setInterceptor(credential);
 

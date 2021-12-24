@@ -128,6 +128,17 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
     return delegate.getObjectStatistics(key);
   }
 
+  /**
+   * get the value of the statistics
+   *
+   * @param key name of the http related statistics key
+   * @return
+   */
+  @Override
+  public AtomicLong getHttpStatistics(GoogleCloudStorageStatistics key) {
+    return delegate.getHttpStatistics(key);
+  }
+
   @Override
   public void copy(
       String srcBucketName,

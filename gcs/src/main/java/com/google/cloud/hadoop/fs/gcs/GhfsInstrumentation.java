@@ -346,6 +346,7 @@ public class GhfsInstrumentation
       }
     }
   }
+
   /**
    * Get the duration tracker factory.
    *

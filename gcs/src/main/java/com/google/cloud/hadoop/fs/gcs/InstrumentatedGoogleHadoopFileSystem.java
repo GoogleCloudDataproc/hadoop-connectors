@@ -16,8 +16,10 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.common.flogger.GoogleLogger;
@@ -27,8 +29,18 @@ import java.net.URI;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.*;
+import org.apache.hadoop.fs.CreateFlag;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileChecksum;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.GlobalStorageStatistics;
+import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
@@ -84,15 +96,10 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
       Progressable progress)
       throws IOException {
     entryPoint(GhfsStatistic.INVOCATION_CREATE);
-    FSDataOutputStream response = null;
-    try {
-      response =
-          super.create(
-              hadoopPath, permission, overwrite, bufferSize, replication, blockSize, progress);
-      instrumentation.fileCreated();
-    } catch (IOException e) {
-      throw e;
-    }
+    FSDataOutputStream response =
+        super.create(
+            hadoopPath, permission, overwrite, bufferSize, replication, blockSize, progress);
+    instrumentation.fileCreated();
     return response;
   }
 
@@ -132,7 +139,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
                 .getObjectStatistics(GoogleCloudStorageStatistics.OBJECT_DELETE_OBJECTS)
                 .longValue());
       } catch (Exception e) {
-        logger.atWarning().log("Get Object Statistics threw UnsupportedOpersationException");
+        logger.atWarning().log("Get Object Statistics threw UnsupportedOperationException");
       }
       instrumentation.fileDeleted(1);
     } catch (IOException e) {
@@ -275,7 +282,6 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
    * Entry point to an operation. Increments the statistic; verifies the FS is active.
    *
    * @param operation The operation to increment
-   * @throws IOException if the
    */
   public void entryPoint(GhfsStatistic operation) {
     if (super.isClosed()) {
@@ -321,10 +327,78 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
    */
   @Override
   public IOStatistics getIOStatistics() {
+    setHttpStatistics();
     return instrumentation != null ? instrumentation.getIOStatistics() : null;
   }
 
   public GhfsInstrumentation getInstrumentation() {
     return this.instrumentation;
+  }
+
+  /** Set the Value for http get and head request related statistics keys */
+  private void setHttpStatistics() {
+    try {
+      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST);
+      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST);
+      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST);
+      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST);
+      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PATCH_REQUEST);
+      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_DELETE_REQUEST);
+      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES);
+      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST_FAILURES);
+      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST_FAILURES);
+      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST_FAILURES);
+      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PATCH_REQUEST_FAILURES);
+      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_DELETE_REQUEST_FAILURES);
+    } catch (Exception e) {
+      logger.atWarning().log("Error in getting statistics from gcsio", e);
+    }
+  }
+
+  /** Set the IOStatistics for http requests */
+  private void setRequestStatistics(GoogleCloudStorageStatistics key) {
+    GoogleCloudStorage gcs = getGcsFs().getGcs();
+    GhfsStatistic statisticsKey = getKey(key);
+    checkNotNull(statisticsKey, "statistics key must not be null");
+    clearStats(statisticsKey.getSymbol());
+    AtomicLong StatisticsValue = gcs.getHttpStatistics(key);
+    if (StatisticsValue != null) {
+      incrementStatistic(statisticsKey, StatisticsValue.longValue());
+    }
+  }
+
+  private void clearStats(String key) {
+    instrumentation.getIOStatistics().getCounterReference(key).set(0L);
+  }
+
+  private GhfsStatistic getKey(GoogleCloudStorageStatistics key) {
+    switch (key) {
+      case ACTION_HTTP_GET_REQUEST:
+        return GhfsStatistic.ACTION_HTTP_GET_REQUEST;
+      case ACTION_HTTP_HEAD_REQUEST:
+        return GhfsStatistic.ACTION_HTTP_HEAD_REQUEST;
+      case ACTION_HTTP_PUT_REQUEST:
+        return GhfsStatistic.ACTION_HTTP_PUT_REQUEST;
+      case ACTION_HTTP_POST_REQUEST:
+        return GhfsStatistic.ACTION_HTTP_POST_REQUEST;
+      case ACTION_HTTP_PATCH_REQUEST:
+        return GhfsStatistic.ACTION_HTTP_PATCH_REQUEST;
+      case ACTION_HTTP_DELETE_REQUEST:
+        return GhfsStatistic.ACTION_HTTP_DELETE_REQUEST;
+      case ACTION_HTTP_GET_REQUEST_FAILURES:
+        return GhfsStatistic.ACTION_HTTP_GET_REQUEST_FAILURES;
+      case ACTION_HTTP_HEAD_REQUEST_FAILURES:
+        return GhfsStatistic.ACTION_HTTP_HEAD_REQUEST_FAILURES;
+      case ACTION_HTTP_PUT_REQUEST_FAILURES:
+        return GhfsStatistic.ACTION_HTTP_PUT_REQUEST_FAILURES;
+      case ACTION_HTTP_POST_REQUEST_FAILURES:
+        return GhfsStatistic.ACTION_HTTP_POST_REQUEST_FAILURES;
+      case ACTION_HTTP_PATCH_REQUEST_FAILURES:
+        return GhfsStatistic.ACTION_HTTP_PATCH_REQUEST_FAILURES;
+      case ACTION_HTTP_DELETE_REQUEST_FAILURES:
+        return GhfsStatistic.ACTION_HTTP_DELETE_REQUEST_FAILURES;
+      default:
+        return null;
+    }
   }
 }
