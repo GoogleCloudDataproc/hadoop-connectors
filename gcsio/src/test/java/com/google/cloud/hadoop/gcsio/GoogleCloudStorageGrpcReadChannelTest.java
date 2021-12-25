@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.util.BackOff;
+import com.google.api.core.CurrentMillisClock;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.Storage.Objects;
 import com.google.api.services.storage.Storage.Objects.Get;
@@ -55,8 +56,10 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executors;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -99,6 +102,11 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   private ApiErrorExtractor errorExtractor;
   private Get get;
   private StorageObject storageObject;
+  private static final Watchdog watchdog =
+      Watchdog.create(
+          CurrentMillisClock.getDefaultClock(),
+          Duration.ofMillis(100),
+          Executors.newSingleThreadScheduledExecutor());
 
   @Before
   public void setUp() throws Exception {
@@ -1559,6 +1567,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         storage,
         errorExtractor,
         new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+        watchdog,
         options,
         () -> BackOff.STOP_BACKOFF);
   }
@@ -1570,6 +1579,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         storage,
         errorExtractor,
         new StorageResourceId(V1_BUCKET_NAME, OBJECT_NAME),
+        watchdog,
         options,
         () -> BackOff.STOP_BACKOFF);
   }
@@ -1582,6 +1592,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         storage,
         errorExtractor,
         storageResourceId,
+        watchdog,
         options,
         () -> BackOff.STOP_BACKOFF);
   }
@@ -1593,6 +1604,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         new FakeStubProvider(mockCredentials),
         storage,
         itemInfo,
+        watchdog,
         options,
         () -> BackOff.STOP_BACKOFF);
   }

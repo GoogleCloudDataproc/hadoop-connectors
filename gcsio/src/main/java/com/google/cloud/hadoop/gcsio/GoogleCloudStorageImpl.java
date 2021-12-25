@@ -47,6 +47,7 @@ import com.google.api.client.util.BackOff;
 import com.google.api.client.util.Data;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.Sleeper;
+import com.google.api.core.CurrentMillisClock;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.StorageRequest;
 import com.google.api.services.storage.model.Bucket;
@@ -797,12 +798,17 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       throw createFileNotFoundException(
           resourceId.getBucketName(), resourceId.getObjectName(), /* cause= */ null);
     }
+    Watchdog watchdog =
+        Watchdog.create(
+            CurrentMillisClock.getDefaultClock(),
+            Duration.ofMillis(100),
+            Executors.newSingleThreadScheduledExecutor());
     if (storageOptions.isGrpcEnabled()) {
       return itemInfo == null
           ? GoogleCloudStorageGrpcReadChannel.open(
-              storageStubProvider, storage, errorExtractor, resourceId, readOptions)
+              storageStubProvider, storage, errorExtractor, resourceId, watchdog, readOptions)
           : GoogleCloudStorageGrpcReadChannel.open(
-              storageStubProvider, storage, itemInfo, readOptions);
+              storageStubProvider, storage, itemInfo, watchdog, readOptions);
     }
 
     return new GoogleCloudStorageReadChannel(
