@@ -126,9 +126,9 @@ public final class Watchdog implements Runnable {
    * @param <T> Type reference for the RPC response
    * @return {@link StreamObserver}
    */
-  public <R, T> StreamObserver<T> watch(
+  public <R, T> StreamObserver<R> watch(
       ClientCall<R, T> clientCall,
-      StreamObserver<T> streamObserver,
+      StreamObserver<R> streamObserver,
       @Nonnull Duration idleTimeout) {
     Preconditions.checkNotNull(streamObserver, "streamObserver can't be null");
     Preconditions.checkNotNull(idleTimeout, "idleTimeout can't be null");
@@ -250,13 +250,13 @@ public final class Watchdog implements Runnable {
     }
   }
 
-  class ClientStreamingRPCWatchdogStream<R, T> implements StreamObserver<T>, WatchdogStream {
+  class ClientStreamingRPCWatchdogStream<R, T> implements StreamObserver<R>, WatchdogStream {
 
     private final Object lock = new Object();
 
     private final Duration waitTimeout;
 
-    private final StreamObserver<T> innerStreamObserver;
+    private final StreamObserver<R> innerStreamObserver;
 
     private final ClientCall<R, T> clientCall;
 
@@ -267,7 +267,7 @@ public final class Watchdog implements Runnable {
     private State state = State.IDLE;
 
     public ClientStreamingRPCWatchdogStream(
-        ClientCall<R, T> clientCall, StreamObserver<T> innerStreamObserver, Duration waitTimeout) {
+        ClientCall<R, T> clientCall, StreamObserver<R> innerStreamObserver, Duration waitTimeout) {
       this.clientCall = clientCall;
       this.innerStreamObserver = innerStreamObserver;
       this.waitTimeout = waitTimeout;
@@ -295,7 +295,7 @@ public final class Watchdog implements Runnable {
     }
 
     @Override
-    public void onNext(T value) {
+    public void onNext(R value) {
       synchronized (lock) {
         lastActivityAt = clock.millisTime();
       }

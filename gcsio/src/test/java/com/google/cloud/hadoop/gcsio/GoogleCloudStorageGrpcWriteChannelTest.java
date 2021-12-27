@@ -13,6 +13,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.google.api.client.util.BackOff;
+import com.google.api.core.CurrentMillisClock;
 import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.BackOffFactory;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
@@ -44,6 +45,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
+import java.time.Duration;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -78,6 +80,11 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
           .build();
   private static final QueryWriteStatusRequest WRITE_STATUS_REQUEST =
       QueryWriteStatusRequest.newBuilder().setUploadId(UPLOAD_ID).build();
+  private static final Watchdog watchdog =
+      Watchdog.create(
+          CurrentMillisClock.getDefaultClock(),
+          Duration.ofMillis(100),
+          Executors.newSingleThreadScheduledExecutor());
 
   private StorageStub stub;
   private FakeService fakeService;
@@ -570,6 +577,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
         options,
         new StorageResourceId(V1_BUCKET_NAME, OBJECT_NAME),
         CreateObjectOptions.DEFAULT_NO_OVERWRITE.toBuilder().setContentType(CONTENT_TYPE).build(),
+        watchdog,
         writeConditions,
         requesterPaysProject,
         backOffFactory);
