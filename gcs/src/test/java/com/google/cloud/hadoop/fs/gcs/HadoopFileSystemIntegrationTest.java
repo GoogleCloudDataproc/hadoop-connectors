@@ -14,7 +14,8 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import com.google.common.base.Strings;
+import static com.google.common.base.Strings.isNullOrEmpty;
+
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -67,7 +68,7 @@ public class HadoopFileSystemIntegrationTest extends HadoopFileSystemTestBase {
           // Get info about the HDFS instance against which we run tests.
           hdfsRoot = System.getenv(HDFS_ROOT);
 
-          if (Strings.isNullOrEmpty(hdfsRoot)) {
+          if (isNullOrEmpty(hdfsRoot)) {
             hdfsRoot = "file://" + folder.newFolder("hdfs_root").getAbsolutePath();
           }
 

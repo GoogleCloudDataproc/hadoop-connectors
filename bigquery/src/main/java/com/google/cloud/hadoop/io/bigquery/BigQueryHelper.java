@@ -14,6 +14,7 @@
 package com.google.cloud.hadoop.io.bigquery;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.flogger.LazyArgs.lazy;
 
 import com.google.api.services.bigquery.Bigquery;
@@ -32,7 +33,6 @@ import com.google.api.services.bigquery.model.TimePartitioning;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.List;
@@ -156,7 +156,7 @@ public class BigQueryHelper {
     loadConfig.setTimePartitioning(timePartitioning);
     loadConfig.setCreateDisposition(createDisposition);
     loadConfig.setWriteDisposition(writeDisposition);
-    if (!Strings.isNullOrEmpty(kmsKeyName)) {
+    if (!isNullOrEmpty(kmsKeyName)) {
       loadConfig.setDestinationEncryptionConfiguration(
           new EncryptionConfiguration().setKmsKeyName(kmsKeyName));
     }

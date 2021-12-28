@@ -15,6 +15,7 @@ package com.google.cloud.hadoop.io.bigquery;
 
 import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.DYNAMIC_FILE_LIST_RECORD_READER_POLL_INTERVAL_MS;
 import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.DYNAMIC_FILE_LIST_RECORD_READER_POLL_MAX_ATTEMPTS;
+import static java.lang.Math.min;
 
 import com.google.api.client.util.Sleeper;
 import com.google.cloud.hadoop.util.HadoopToStringUtil;
@@ -249,7 +250,7 @@ public class DynamicFileListRecordReader<K, V> extends RecordReader<K, V> {
    */
   @Override
   public float getProgress() {
-    return Math.min(1.0f, recordsRead / (float) estimatedNumRecords);
+    return min(1.0f, recordsRead / (float) estimatedNumRecords);
   }
 
   /**

@@ -20,6 +20,7 @@ import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao.LOCK_DIR
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
+import static java.lang.Math.min;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
@@ -343,7 +344,7 @@ public class CoopLockOperationDao {
       String operationId, URI operationLockPath, Class<T> clazz, BiConsumer<T, Instant> renewFn) {
     long lockRenewalPeriodMilli = options.getLockExpirationTimeoutMilli() / 2;
     long lockRenewTimeoutMilli =
-        Math.min(options.getLockExpirationTimeoutMilli() / 4, MAX_LOCK_RENEW_TIMEOUT_MILLIS);
+        min(options.getLockExpirationTimeoutMilli() / 4, MAX_LOCK_RENEW_TIMEOUT_MILLIS);
     return scheduledThreadPool.scheduleAtFixedRate(
         () ->
             renewLockOrExit(

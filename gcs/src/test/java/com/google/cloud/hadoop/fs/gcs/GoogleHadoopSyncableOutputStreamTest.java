@@ -18,6 +18,7 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HFLUSH;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_TYPE;
 import static com.google.common.truth.Truth.assertThat;
+import static java.lang.Math.toIntExact;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
@@ -286,8 +287,7 @@ public class GoogleHadoopSyncableOutputStreamTest {
 
   private byte[] readFile(Path objectPath) throws IOException {
     FileStatus status = ghfs.getFileStatus(objectPath);
-    ByteArrayOutputStream allReadBytes =
-        new ByteArrayOutputStream(Math.toIntExact(status.getLen()));
+    ByteArrayOutputStream allReadBytes = new ByteArrayOutputStream(toIntExact(status.getLen()));
     byte[] readBuffer = new byte[1024 * 1024];
     try (FSDataInputStream in = ghfs.open(objectPath)) {
       int readBytes;

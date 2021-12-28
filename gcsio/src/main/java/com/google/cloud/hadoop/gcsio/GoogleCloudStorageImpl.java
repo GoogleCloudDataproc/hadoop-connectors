@@ -26,6 +26,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.emptyToNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.Sets.newConcurrentHashSet;
+import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
 
 import com.google.api.client.auth.oauth2.Credential;
@@ -1521,7 +1522,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       long maxRemainingResults =
           getMaxRemainingResults(listOptions.getMaxResults(), prefixes, listedObjects);
       // Do not cast 'maxRemainingResults' to int here, it could overflow
-      long maxPrefixes = Math.min(maxRemainingResults, pagePrefixes.size());
+      long maxPrefixes = min(maxRemainingResults, pagePrefixes.size());
       prefixes.addAll(pagePrefixes.subList(0, (int) maxPrefixes));
     }
 

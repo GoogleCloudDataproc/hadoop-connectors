@@ -21,6 +21,8 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.nullToEmpty;
+import static java.lang.Math.min;
+import static java.lang.Math.toIntExact;
 
 import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpResponse;
@@ -583,7 +585,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     }
     while (seekDistance > 0 && contentChannel != null) {
       try {
-        int bufferSize = Math.toIntExact(Math.min(skipBuffer.length, seekDistance));
+        int bufferSize = toIntExact(min(skipBuffer.length, seekDistance));
         int bytesRead = contentChannel.read(ByteBuffer.wrap(skipBuffer, 0, bufferSize));
         if (bytesRead < 0) {
           // Shouldn't happen since we called validatePosition prior to this loop.
@@ -802,7 +804,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
   private void cacheFooter(HttpResponse response) throws IOException {
     checkState(size > 0, "size should be greater than 0 for '%s'", resourceId);
-    int footerSize = Math.toIntExact(response.getHeaders().getContentLength());
+    int footerSize = toIntExact(response.getHeaders().getContentLength());
     footerContent = new byte[footerSize];
     try (InputStream footerStream = response.getContent()) {
       int totalBytesRead = 0;
@@ -836,7 +838,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
    */
   private InputStream openFooterStream() {
     contentChannelPosition = currentPosition;
-    int offset = Math.toIntExact(currentPosition - (size - footerContent.length));
+    int offset = toIntExact(currentPosition - (size - footerContent.length));
     int length = footerContent.length - offset;
     logger.atFiner().log(
         "Opened stream (prefetched footer) from %s position for '%s'", currentPosition, resourceId);
@@ -893,13 +895,13 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       if (randomAccess) {
         long randomRangeSize = Math.max(bytesToRead, readOptions.getMinRangeRequestSize());
         // Limit rangeSize to the randomRangeSize.
-        rangeSize = Math.min(randomRangeSize, rangeSize);
+        rangeSize = min(randomRangeSize, rangeSize);
       }
 
       contentChannelEnd = contentChannelPosition + rangeSize;
       // Do not read footer again, if it was already pre-fetched.
       if (footerContent != null) {
-        contentChannelEnd = Math.min(contentChannelEnd, size - footerContent.length);
+        contentChannelEnd = min(contentChannelEnd, size - footerContent.length);
       }
 
       checkState(

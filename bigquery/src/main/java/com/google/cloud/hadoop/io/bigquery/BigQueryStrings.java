@@ -13,10 +13,11 @@
  */
 package com.google.cloud.hadoop.io.bigquery;
 
+import static com.google.common.base.Strings.isNullOrEmpty;
+
 import com.google.api.services.bigquery.model.TableReference;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
-import com.google.common.base.Strings;
 import java.util.List;
 
 /**
@@ -38,11 +39,10 @@ public class BigQueryStrings {
    */
   public static String toString(TableReference tableRef) {
     Preconditions.checkArgument(
-        !Strings.isNullOrEmpty(tableRef.getDatasetId()),
-        "tableRef must contain non-empty DatasetId.");
+        !isNullOrEmpty(tableRef.getDatasetId()), "tableRef must contain non-empty DatasetId.");
     Preconditions.checkArgument(
-        !Strings.isNullOrEmpty(tableRef.getTableId()), "tableRef must contain non-empty TableId.");
-    if (Strings.isNullOrEmpty(tableRef.getProjectId())) {
+        !isNullOrEmpty(tableRef.getTableId()), "tableRef must contain non-empty TableId.");
+    if (isNullOrEmpty(tableRef.getProjectId())) {
       return String.format("%s.%s", tableRef.getDatasetId(), tableRef.getTableId());
     } else {
       return String.format(

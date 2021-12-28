@@ -15,12 +15,12 @@
 package com.google.cloud.hadoop.util;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.client.googleapis.GoogleUtils;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Strings;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.net.Authenticator;
@@ -139,7 +139,7 @@ public class HttpTransportFactory {
    */
   @VisibleForTesting
   static URI parseProxyAddress(@Nullable String proxyAddress) {
-    if (Strings.isNullOrEmpty(proxyAddress)) {
+    if (isNullOrEmpty(proxyAddress)) {
       return null;
     }
     String uriString = (proxyAddress.contains("//") ? "" : "//") + proxyAddress;
@@ -149,11 +149,11 @@ public class HttpTransportFactory {
       String host = uri.getHost();
       int port = uri.getPort();
       checkArgument(
-          Strings.isNullOrEmpty(scheme) || scheme.matches("https?"),
+          isNullOrEmpty(scheme) || scheme.matches("https?"),
           "HTTP proxy address '%s' has invalid scheme '%s'.",
           proxyAddress,
           scheme);
-      checkArgument(!Strings.isNullOrEmpty(host), "Proxy address '%s' has no host.", proxyAddress);
+      checkArgument(!isNullOrEmpty(host), "Proxy address '%s' has no host.", proxyAddress);
       checkArgument(port != -1, "Proxy address '%s' has no port.", proxyAddress);
       checkArgument(
           uri.equals(new URI(scheme, null, host, port, null, null, null)),

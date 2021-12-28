@@ -16,8 +16,9 @@
 
 package com.google.cloud.hadoop.util;
 
+import static com.google.common.base.Strings.isNullOrEmpty;
+
 import com.google.common.base.Joiner;
-import com.google.common.base.Strings;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,7 +33,7 @@ public class ConfigurationUtil {
   public static <T extends HadoopConfigurationProperty<?>> String getMandatoryConfig(
       Configuration config, T property) throws IOException {
     String value = config.get(property.getKey());
-    if (Strings.isNullOrEmpty(value)) {
+    if (isNullOrEmpty(value)) {
       throw new IOException("Must supply a value for configuration setting: " + property.getKey());
     }
     return value;
@@ -45,7 +46,7 @@ public class ConfigurationUtil {
     Map<String, String> values = new HashMap<>();
     for (HadoopConfigurationProperty<?> property : properties) {
       String value = config.get(property.getKey());
-      if (Strings.isNullOrEmpty(value)) {
+      if (isNullOrEmpty(value)) {
         missingKeys.add(property.getKey());
       } else {
         values.put(property.getKey(), value);

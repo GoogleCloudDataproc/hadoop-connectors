@@ -22,6 +22,7 @@ import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.SELECTED
 import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.SKEW_LIMIT;
 import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.SQL_FILTER;
 import static com.google.cloud.hadoop.util.ConfigurationUtil.getMandatoryConfig;
+import static java.lang.Math.round;
 
 import com.google.api.services.bigquery.model.Table;
 import com.google.api.services.bigquery.model.TableReference;
@@ -83,7 +84,7 @@ public class DirectBigQueryInputFormat extends InputFormat<NullWritable, Generic
     Table table = getTable(configuration, bigQueryHelper);
     ReadSession session = startSession(configuration, table, client);
     long numRows = table.getNumRows().longValue();
-    long limit = Math.round(skewLimit * numRows / session.getStreamsCount());
+    long limit = round(skewLimit * numRows / session.getStreamsCount());
 
     return session.getStreamsList().stream()
         .map(

@@ -16,6 +16,7 @@ package com.google.cloud.hadoop.gcsio.testing;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.client.util.Clock;
 import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
@@ -31,7 +32,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStrings;
 import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
-import com.google.common.base.Strings;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -83,7 +83,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
   private boolean validateBucketName(String bucketName) {
     // Validation as per https://developers.google.com/storage/docs/bucketnaming
-    if (Strings.isNullOrEmpty(bucketName)) {
+    if (isNullOrEmpty(bucketName)) {
       return false;
     }
 
