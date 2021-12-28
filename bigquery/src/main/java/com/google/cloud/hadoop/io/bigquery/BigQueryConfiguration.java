@@ -14,11 +14,12 @@
 package com.google.cloud.hadoop.io.bigquery;
 
 import static com.google.cloud.hadoop.util.ConfigurationUtil.getMandatoryConfig;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.services.bigquery.model.TableReference;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
@@ -208,8 +209,8 @@ public class BigQueryConfiguration {
   public static void configureBigQueryInput(
       Configuration config, String projectId, String datasetId, String tableId) throws IOException {
     // Check preconditions.
-    Preconditions.checkArgument(!isNullOrEmpty(datasetId), "datasetId must not be null or empty.");
-    Preconditions.checkArgument(!isNullOrEmpty(tableId), "tableId must not be null or empty.");
+    checkArgument(!isNullOrEmpty(datasetId), "datasetId must not be null or empty.");
+    checkArgument(!isNullOrEmpty(tableId), "tableId must not be null or empty.");
 
     // Project is optional, if not set use default project.
     if (!isNullOrEmpty(projectId)) {
@@ -262,10 +263,9 @@ public class BigQueryConfiguration {
       Configuration config, String projectId, String datasetId, String tableId, String tableSchema)
       throws IOException {
     // Check preconditions.
-    Preconditions.checkArgument(!isNullOrEmpty(datasetId), "datasetId must not be null or empty.");
-    Preconditions.checkArgument(!isNullOrEmpty(tableId), "tableId must not be null or empty.");
-    Preconditions.checkArgument(
-        !isNullOrEmpty(tableSchema), "tableSchema must not be null or empty.");
+    checkArgument(!isNullOrEmpty(datasetId), "datasetId must not be null or empty.");
+    checkArgument(!isNullOrEmpty(tableId), "tableId must not be null or empty.");
+    checkArgument(!isNullOrEmpty(tableSchema), "tableSchema must not be null or empty.");
 
     // Project is optional, if not set use default project.
     if (!isNullOrEmpty(projectId)) {
@@ -346,7 +346,7 @@ public class BigQueryConfiguration {
     Path workingPath = new Path(pathRoot);
 
     FileSystem fs = workingPath.getFileSystem(conf);
-    Preconditions.checkState("gs".equals(fs.getScheme()), "Export FS must be GCS ('gs' scheme).");
+    checkState("gs".equals(fs.getScheme()), "Export FS must be GCS ('gs' scheme).");
     return pathRoot;
   }
 }

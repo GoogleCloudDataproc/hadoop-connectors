@@ -13,7 +13,8 @@
  */
 package com.google.cloud.hadoop.io.bigquery;
 
-import com.google.common.base.Preconditions;
+import static com.google.common.base.Preconditions.checkState;
+
 import org.apache.avro.generic.GenericData;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.LongWritable;
@@ -27,7 +28,7 @@ public class AvroBigQueryInputFormat
   @Override
   public RecordReader<LongWritable, GenericData.Record> createDelegateRecordReader(
       InputSplit split, Configuration configuration) {
-    Preconditions.checkState(
+    checkState(
         split instanceof FileSplit, "AvroBigQueryInputFormat requires FileSplit input splits");
     return new AvroRecordReader();
   }

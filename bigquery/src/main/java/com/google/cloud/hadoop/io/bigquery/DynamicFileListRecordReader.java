@@ -15,12 +15,13 @@ package com.google.cloud.hadoop.io.bigquery;
 
 import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.DYNAMIC_FILE_LIST_RECORD_READER_POLL_INTERVAL_MS;
 import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.DYNAMIC_FILE_LIST_RECORD_READER_POLL_MAX_ATTEMPTS;
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Math.min;
 
 import com.google.api.client.util.Sleeper;
 import com.google.cloud.hadoop.util.HadoopToStringUtil;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.ArrayDeque;
@@ -110,7 +111,7 @@ public class DynamicFileListRecordReader<K, V> extends RecordReader<K, V> {
     logger.atInfo().log(
         "Initializing DynamicFileListRecordReader with split '%s', task context '%s'",
         HadoopToStringUtil.toString(genericSplit), HadoopToStringUtil.toString(context));
-    Preconditions.checkArgument(
+    checkArgument(
         genericSplit instanceof ShardedInputSplit,
         "InputSplit genericSplit should be an instance of ShardedInputSplit.");
 
@@ -211,7 +212,7 @@ public class DynamicFileListRecordReader<K, V> extends RecordReader<K, V> {
       }
     }
 
-    Preconditions.checkState(
+    checkState(
         !shouldExpectMoreFiles(),
         "Should not have exited the refresh loop shouldExpectMoreFiles = true "
             + "and no files ready to read.");
@@ -345,7 +346,7 @@ public class DynamicFileListRecordReader<K, V> extends RecordReader<K, V> {
       // Sanity-check known filenames against the endFileNumber.
       for (String knownFile : knownFileSet) {
         int knownFileIndex = parseFileIndex(knownFile);
-        Preconditions.checkState(
+        checkState(
             knownFileIndex <= endFileNumber,
             "Found known file '%s' with index %s, which isn't less than or "
                 + "equal to than endFileNumber %s!",
@@ -355,7 +356,7 @@ public class DynamicFileListRecordReader<K, V> extends RecordReader<K, V> {
       }
     } else {
       // If we found it before, make sure the file we're looking at has the same index.
-      Preconditions.checkState(
+      checkState(
           fileIndex == endFileNumber,
           "Found new end-marker file '%s' with index %s but already have endFileNumber %s!",
           fileName,
@@ -376,7 +377,7 @@ public class DynamicFileListRecordReader<K, V> extends RecordReader<K, V> {
         if (endFileNumber != -1) {
           // Sanity check against endFileNumber.
           int newFileIndex = parseFileIndex(fileName);
-          Preconditions.checkState(
+          checkState(
               newFileIndex < endFileNumber,
               "Found new file '%s' with index %s, which isn't less than endFileNumber %s!",
               fileName,

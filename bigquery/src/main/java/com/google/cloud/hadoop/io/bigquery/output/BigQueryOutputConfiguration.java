@@ -26,6 +26,8 @@ import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.OUTPUT_T
 import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.OUTPUT_TABLE_WRITE_DISPOSITION;
 import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.PROJECT_ID;
 import static com.google.cloud.hadoop.util.ConfigurationUtil.getMandatoryConfig;
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.services.bigquery.model.TableReference;
@@ -36,7 +38,6 @@ import com.google.cloud.hadoop.io.bigquery.BigQueryFileFormat;
 import com.google.cloud.hadoop.io.bigquery.BigQueryStrings;
 import com.google.cloud.hadoop.io.bigquery.HadoopConfigurationProperty;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.List;
@@ -81,7 +82,7 @@ public class BigQueryOutputConfiguration {
       BigQueryFileFormat outputFileFormat,
       Class<? extends FileOutputFormat> outputFormatClass)
       throws IOException {
-    Preconditions.checkArgument(
+    checkArgument(
         !isNullOrEmpty(outputTableSchemaJson), "outputTableSchemaJson must not be null or empty.");
     TableReference outputTable = BigQueryStrings.parseTableReference(qualifiedOutputTableId);
     configure(
@@ -127,16 +128,12 @@ public class BigQueryOutputConfiguration {
       outputProjectId = PROJECT_ID.get(conf, conf::get);
     }
 
-    Preconditions.checkArgument(
-        !isNullOrEmpty(outputProjectId), "outputProjectId must not be null or empty.");
-    Preconditions.checkArgument(
-        !isNullOrEmpty(outputDatasetId), "outputDatasetId must not be null or empty.");
-    Preconditions.checkArgument(
-        !isNullOrEmpty(outputTableId), "outputTableId must not be null or empty.");
-    Preconditions.checkArgument(
-        !isNullOrEmpty(outputGcsPath), "outputGcsPath must not be null or empty.");
-    Preconditions.checkNotNull(outputFileFormat, "outputFileFormat must not be null.");
-    Preconditions.checkNotNull(outputFormatClass, "outputFormatClass must not be null.");
+    checkArgument(!isNullOrEmpty(outputProjectId), "outputProjectId must not be null or empty.");
+    checkArgument(!isNullOrEmpty(outputDatasetId), "outputDatasetId must not be null or empty.");
+    checkArgument(!isNullOrEmpty(outputTableId), "outputTableId must not be null or empty.");
+    checkArgument(!isNullOrEmpty(outputGcsPath), "outputGcsPath must not be null or empty.");
+    checkNotNull(outputFileFormat, "outputFileFormat must not be null.");
+    checkNotNull(outputFormatClass, "outputFormatClass must not be null.");
 
     conf.set(OUTPUT_PROJECT_ID.getKey(), outputProjectId);
     conf.set(OUTPUT_DATASET_ID.getKey(), outputDatasetId);
@@ -220,8 +217,7 @@ public class BigQueryOutputConfiguration {
   }
 
   public static void setKmsKeyName(Configuration conf, String kmsKeyName) {
-    Preconditions.checkArgument(
-        !isNullOrEmpty(kmsKeyName), "kmsKeyName must not be null or empty.");
+    checkArgument(!isNullOrEmpty(kmsKeyName), "kmsKeyName must not be null or empty.");
     conf.set(OUTPUT_TABLE_KMS_KEY_NAME.getKey(), kmsKeyName);
   }
 

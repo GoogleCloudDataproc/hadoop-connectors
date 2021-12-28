@@ -13,10 +13,10 @@
  */
 package com.google.cloud.hadoop.io.bigquery.output;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static java.util.stream.Collectors.toList;
 
 import com.google.api.services.bigquery.model.TableFieldSchema;
-import com.google.common.base.Preconditions;
 import java.util.List;
 
 /**
@@ -35,7 +35,7 @@ public class BigQueryTableFieldSchema {
   }
 
   BigQueryTableFieldSchema(TableFieldSchema fieldSchema) {
-    Preconditions.checkNotNull(fieldSchema);
+    checkNotNull(fieldSchema);
     this.fieldSchema = fieldSchema;
   }
 

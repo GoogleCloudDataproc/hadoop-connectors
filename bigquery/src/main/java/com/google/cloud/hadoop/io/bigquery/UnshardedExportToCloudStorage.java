@@ -13,10 +13,10 @@
  */
 package com.google.cloud.hadoop.io.bigquery;
 
+import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNullElseGet;
 
 import com.google.api.services.bigquery.model.Table;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
@@ -82,7 +82,7 @@ public class UnshardedExportToCloudStorage extends AbstractExportToCloudStorage 
 
   @Override
   public void waitForUsableMapReduceInput() throws IOException, InterruptedException {
-    Preconditions.checkState(
+    checkState(
         exportJobReference != null,
         "beginExport() must be called before waitForUsableMapReduceInput()");
 

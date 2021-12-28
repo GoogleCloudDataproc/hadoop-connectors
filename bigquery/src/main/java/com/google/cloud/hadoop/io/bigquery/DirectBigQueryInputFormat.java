@@ -22,6 +22,7 @@ import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.SELECTED
 import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.SKEW_LIMIT;
 import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.SQL_FILTER;
 import static com.google.cloud.hadoop.util.ConfigurationUtil.getMandatoryConfig;
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.lang.Math.round;
 
 import com.google.api.services.bigquery.model.Table;
@@ -33,7 +34,6 @@ import com.google.cloud.bigquery.storage.v1beta1.Storage.CreateReadSessionReques
 import com.google.cloud.bigquery.storage.v1beta1.Storage.DataFormat;
 import com.google.cloud.bigquery.storage.v1beta1.Storage.ReadSession;
 import com.google.cloud.bigquery.storage.v1beta1.TableReferenceProto;
-import com.google.common.base.Preconditions;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
@@ -77,7 +77,7 @@ public class DirectBigQueryInputFormat extends InputFormat<NullWritable, Generic
       throw new IOException("Failed to create BigQuery client", gse);
     }
     double skewLimit = SKEW_LIMIT.get(configuration, configuration::getDouble);
-    Preconditions.checkArgument(
+    checkArgument(
         skewLimit >= 1.0,
         "%s is less than 1; not all records would be read. Exiting",
         SKEW_LIMIT.getKey());

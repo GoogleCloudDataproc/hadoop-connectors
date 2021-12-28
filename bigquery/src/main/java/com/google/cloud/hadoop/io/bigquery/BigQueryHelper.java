@@ -14,6 +14,7 @@
 package com.google.cloud.hadoop.io.bigquery;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.flogger.LazyArgs.lazy;
 
@@ -32,7 +33,6 @@ import com.google.api.services.bigquery.model.TableSchema;
 import com.google.api.services.bigquery.model.TimePartitioning;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.List;
@@ -321,7 +321,7 @@ public class BigQueryHelper {
    * between {@code expected} and {@code actual}, using Preconditions.checkState.
    */
   public void checkJobIdEquality(Job expected, Job actual) {
-    Preconditions.checkState(
+    checkState(
         actual.getJobReference() != null
             && actual.getJobReference().getJobId() != null
             && expected.getJobReference() != null

@@ -16,10 +16,11 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
-import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.net.URI;
@@ -132,7 +133,7 @@ class GoogleHadoopFSInputStreamBase extends FSInputStream {
    */
   @Override
   public synchronized int read(byte[] buf, int offset, int length) throws IOException {
-    Preconditions.checkNotNull(buf, "buf must not be null");
+    checkNotNull(buf, "buf must not be null");
     if (offset < 0 || length < 0 || length > buf.length - offset) {
       throw new IndexOutOfBoundsException();
     }

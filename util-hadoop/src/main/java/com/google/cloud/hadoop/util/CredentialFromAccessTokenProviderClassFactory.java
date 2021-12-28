@@ -14,11 +14,13 @@
 
 package com.google.cloud.hadoop.util;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.auth.oauth2.TokenResponse;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.util.Clock;
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
@@ -47,8 +49,7 @@ public final class CredentialFromAccessTokenProviderClassFactory {
     static GoogleCredential fromAccessTokenProvider(
         Clock clock, AccessTokenProvider accessTokenProvider) {
       AccessTokenProvider.AccessToken accessToken =
-          Preconditions.checkNotNull(
-              accessTokenProvider.getAccessToken(), "Access Token cannot be null!");
+          checkNotNull(accessTokenProvider.getAccessToken(), "Access Token cannot be null!");
 
       // TODO: This should be setting the refresh token as well.
       return new GoogleCredentialWithAccessTokenProvider(clock, accessTokenProvider)
@@ -60,11 +61,9 @@ public final class CredentialFromAccessTokenProviderClassFactory {
     protected TokenResponse executeRefreshToken() throws IOException {
       accessTokenProvider.refresh();
       AccessTokenProvider.AccessToken accessToken =
-          Preconditions.checkNotNull(
-              accessTokenProvider.getAccessToken(), "Access Token cannot be null!");
+          checkNotNull(accessTokenProvider.getAccessToken(), "Access Token cannot be null!");
 
-      String token =
-          Preconditions.checkNotNull(accessToken.getToken(), "Access Token cannot be null!");
+      String token = checkNotNull(accessToken.getToken(), "Access Token cannot be null!");
       Long expirationTimeMilliSeconds = accessToken.getExpirationTimeMilliSeconds();
       return new TokenResponse()
           .setAccessToken(token)
@@ -101,8 +100,7 @@ public final class CredentialFromAccessTokenProviderClassFactory {
   /** Creates a {@link Credential} based on information from the access token provider. */
   private static Credential getCredentialFromAccessTokenProvider(
       AccessTokenProvider accessTokenProvider, Collection<String> scopes) {
-    Preconditions.checkArgument(
-        accessTokenProvider.getAccessToken() != null, "Access Token cannot be null!");
+    checkArgument(accessTokenProvider.getAccessToken() != null, "Access Token cannot be null!");
     GoogleCredential credential =
         GoogleCredentialWithAccessTokenProvider.fromAccessTokenProvider(
             Clock.SYSTEM, accessTokenProvider);

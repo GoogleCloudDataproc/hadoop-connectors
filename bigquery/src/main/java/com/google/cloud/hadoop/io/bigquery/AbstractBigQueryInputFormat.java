@@ -20,6 +20,8 @@ import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.MANDATOR
 import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.PROJECT_ID;
 import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.TEMP_GCS_PATH;
 import static com.google.cloud.hadoop.util.ConfigurationUtil.getMandatoryConfig;
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.flogger.LazyArgs.lazy;
 
 import com.google.api.services.bigquery.Bigquery;
@@ -27,7 +29,6 @@ import com.google.api.services.bigquery.model.Table;
 import com.google.api.services.bigquery.model.TableReference;
 import com.google.cloud.hadoop.util.HadoopToStringUtil;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -97,7 +98,7 @@ public abstract class AbstractBigQueryInputFormat<K, V> extends InputFormat<K, V
     Class<? extends AbstractBigQueryInputFormat<?, ?>> clazz =
         (Class<? extends AbstractBigQueryInputFormat<?, ?>>)
             INPUT_FORMAT_CLASS.get(configuration, configuration::getClass);
-    Preconditions.checkState(
+    checkState(
         AbstractBigQueryInputFormat.class.isAssignableFrom(clazz),
         "Expected input format to derive from AbstractBigQueryInputFormat");
     return getExportFileFormat(clazz);
@@ -154,13 +155,12 @@ public abstract class AbstractBigQueryInputFormat<K, V> extends InputFormat<K, V
 
   @Override
   public RecordReader<K, V> createRecordReader(
-      InputSplit inputSplit, TaskAttemptContext taskAttemptContext)
-      throws IOException, InterruptedException {
+      InputSplit inputSplit, TaskAttemptContext taskAttemptContext) {
     return createRecordReader(inputSplit, taskAttemptContext.getConfiguration());
   }
 
   public RecordReader<K, V> createRecordReader(InputSplit inputSplit, Configuration configuration) {
-    Preconditions.checkArgument(
+    checkArgument(
         inputSplit instanceof UnshardedInputSplit,
         "Split should be instance of UnshardedInputSplit.");
     logger.atFine().log("createRecordReader -> createDelegateRecordReader()");
