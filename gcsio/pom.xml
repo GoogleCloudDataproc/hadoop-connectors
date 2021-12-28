@@ -171,8 +171,6 @@
     <dependency>
       <groupId>com.google.api</groupId>
       <artifactId>api-common</artifactId>
-      <version>1.10.3</version>
-      <scope>compile</scope>
     </dependency>
   </dependencies>
   <build>
