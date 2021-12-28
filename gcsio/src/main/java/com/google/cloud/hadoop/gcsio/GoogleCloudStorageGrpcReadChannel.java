@@ -724,10 +724,10 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
                 getObjectMediaMethod,
                 blockingStub.getCallOptions(),
                 request);
-        resIterator = watchdog.watch(requestContext, responseIterator, Duration.ofMinutes(1));
+        resIterator = watchdog.watch(requestContext, responseIterator, Duration.ofSeconds(1));
       } else {
         resIterator =
-            watchdog.watch(requestContext, blockingStub.readObject(request), Duration.ofMinutes(1));
+            watchdog.watch(requestContext, blockingStub.readObject(request), Duration.ofSeconds(1));
       }
     } finally {
       requestContext.detach(toReattach);

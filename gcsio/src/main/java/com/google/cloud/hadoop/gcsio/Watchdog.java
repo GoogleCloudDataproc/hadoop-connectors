@@ -31,6 +31,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import com.google.api.core.ApiClock;
 import com.google.common.base.Preconditions;
+import com.google.common.flogger.GoogleLogger;
 import io.grpc.ClientCall;
 import io.grpc.Context.CancellableContext;
 import io.grpc.stub.StreamObserver;
@@ -41,8 +42,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.annotation.Nonnull;
 import javax.annotation.concurrent.GuardedBy;
 
@@ -60,7 +59,7 @@ import javax.annotation.concurrent.GuardedBy;
  * </ul>
  */
 public final class Watchdog implements Runnable {
-  private static final Logger LOG = Logger.getLogger(Watchdog.class.getName());
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Dummy value to convert the ConcurrentHashMap into a Set
   private static final Object PRESENT = new Object();
@@ -148,8 +147,13 @@ public final class Watchdog implements Runnable {
     try {
       runUnsafe();
     } catch (RuntimeException t) {
-      LOG.log(Level.SEVERE, "Caught throwable in periodic Watchdog run. Continuing.", t);
+      logger.atSevere().log("Caught throwable in periodic Watchdog run. Continuing.", t);
     }
+  }
+
+  // package-private method to test the state of watchdog
+  ConcurrentHashMap<WatchdogStream, Object> getOpenStreams() {
+    return openStreams;
   }
 
   private void runUnsafe() {
