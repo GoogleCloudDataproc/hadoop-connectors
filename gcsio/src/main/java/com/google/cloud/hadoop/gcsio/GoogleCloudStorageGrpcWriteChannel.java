@@ -216,7 +216,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
       StreamObserver<WriteObjectRequest> writeObjectRequestStreamObserver =
           ClientCalls.asyncClientStreamingCall(call, responseObserver);
       StreamObserver<WriteObjectRequest> requestStreamObserver =
-          watchdog.watch(call, writeObjectRequestStreamObserver, Duration.ofSeconds(1));
+          watchdog.watch(
+              call,
+              writeObjectRequestStreamObserver,
+              Duration.ofSeconds(channelOptions.getGrpcWriteMessageTimeoutMillis()));
 
       // Wait for streaming RPC to become ready for upload.
       try {
