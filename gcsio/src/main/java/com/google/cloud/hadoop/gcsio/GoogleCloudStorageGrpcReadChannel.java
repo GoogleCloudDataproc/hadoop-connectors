@@ -132,6 +132,20 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private final long gRPCMessageTimeout;
 
+  /**
+   * Used to open given file using item info
+   *
+   * @param stubProvider gRPC stub for accessing the Storage gRPC API
+   * @param storage store and retrieve data object
+   * @param errorExtractor ApiErrorExtractor instance to convert downstream error into appropriate
+   *     fs exception
+   * @param resourceId Identifier for the file to be opened
+   * @param watchdog Watchdog instance to monitor open streams
+   * @param readOptions readOptions fine-grained options specifying things like retry settings,
+   *     buffering, etc.
+   * @return gRPC read channel
+   * @throws IOException IO Error
+   */
   public static GoogleCloudStorageGrpcReadChannel open(
       StorageStubProvider stubProvider,
       Storage storage,
