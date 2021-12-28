@@ -53,7 +53,7 @@ public class HadoopCredentialConfigurationTest {
 
   @SuppressWarnings("DoubleBraceInitialization")
   private static final Map<String, Object> expectedDefaultConfiguration =
-      new HashMap<>() {
+      new HashMap<String, Object>() {
         {
           put(".auth.access.token.provider.impl", null);
           put(".auth.null.enable", false);

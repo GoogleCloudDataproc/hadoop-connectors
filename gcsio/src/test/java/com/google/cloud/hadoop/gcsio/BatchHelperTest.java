@@ -237,7 +237,7 @@ public class BatchHelperTest {
   }
 
   private JsonBatchCallback<StorageObject> assertCallback(StorageObject expectedObject) {
-    return new JsonBatchCallback<>() {
+    return new JsonBatchCallback<StorageObject>() {
       @Override
       public void onSuccess(StorageObject storageObject, HttpHeaders responseHeaders) {
         assertThat(storageObject).isEqualTo(expectedObject);

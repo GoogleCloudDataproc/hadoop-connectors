@@ -74,7 +74,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
   }
 
   @Override
-  protected void configureBuckets(GoogleCloudStorageFileSystem gcsFs) throws IOException {}
+  protected void configureBuckets(GoogleCloudStorageFileSystem gcsFs) {}
 
   @Override
   public FSDataInputStream open(Path hadoopPath, int bufferSize) throws IOException {

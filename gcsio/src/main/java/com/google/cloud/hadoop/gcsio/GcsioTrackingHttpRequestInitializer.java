@@ -31,15 +31,12 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.ACTION_
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpResponse;
-import com.google.api.client.http.HttpResponseInterceptor;
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /** To track and update the statistics related to http requests */
 class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
-
-  private final HttpRequestInitializer delegate;
 
   // To track the http statistics
   private final ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics;
@@ -51,17 +48,10 @@ class GcsioTrackingHttpRequestInitializer implements HttpRequestInitializer {
 
   @Override
   public void initialize(HttpRequest request) throws IOException {
-    if (delegate != null) {
-      delegate.initialize(request);
-    }
-
     request.setResponseInterceptor(
-        new HttpResponseInterceptor() {
-          @Override
-          public void interceptResponse(HttpResponse httpResponse) throws IOException {
-            sethttprequestStats(httpResponse.getRequest());
-            setHttpRequestFailureStats(httpResponse);
-          }
+        httpResponse -> {
+          sethttprequestStats(httpResponse.getRequest());
+          setHttpRequestFailureStats(httpResponse);
         });
   }
 

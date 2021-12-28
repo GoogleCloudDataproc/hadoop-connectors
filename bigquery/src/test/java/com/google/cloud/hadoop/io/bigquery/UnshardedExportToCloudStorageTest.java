@@ -45,8 +45,8 @@ public class UnshardedExportToCloudStorageTest {
             ExportFileFormat.AVRO,
             new BigQueryHelper(null),
             "project-id",
-            null, /* table */
-            new InputFormat<>() {
+            /* tableToExport= */ null,
+            new InputFormat<LongWritable, Text>() {
               @Override
               public List<InputSplit> getSplits(JobContext jobContext) {
                 return ImmutableList.<InputSplit>builder()

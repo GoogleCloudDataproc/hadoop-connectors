@@ -59,14 +59,14 @@ public class NoopFederatedExportToCloudStorageTest {
   }
 
   @Test
-  public void testGetCommaSeparatedGcsPathList() throws Exception {
+  public void testGetCommaSeparatedGcsPathList() {
     String result = NoopFederatedExportToCloudStorage.getCommaSeparatedGcsPathList(table);
     assertThat(result)
         .isEqualTo("gs://foo-bucket/bar-dir/glob-*.avro,gs://foo-bucket/bar-dir/file.avro");
   }
 
   @Test
-  public void testValidateGcsPaths() throws Exception {
+  public void testValidateGcsPaths() {
     table
         .getExternalDataConfiguration()
         .setSourceUris(ImmutableList.of("https://drive.google.com/open?id=1234"));
@@ -81,7 +81,7 @@ public class NoopFederatedExportToCloudStorageTest {
   }
 
   @Test
-  public void testFormatMismatch() throws Exception {
+  public void testFormatMismatch() {
     table.getExternalDataConfiguration().setSourceFormat("CSV");
     IllegalArgumentException thrown =
         assertThrows(
@@ -106,10 +106,9 @@ public class NoopFederatedExportToCloudStorageTest {
             helper,
             projectId,
             table,
-            new InputFormat<>() {
+            new InputFormat<LongWritable, Text>() {
               @Override
-              public List<InputSplit> getSplits(JobContext jobContext)
-                  throws IOException, InterruptedException {
+              public List<InputSplit> getSplits(JobContext jobContext) {
                 return ImmutableList.<InputSplit>builder()
                     .add(
                         new FileSplit(
@@ -125,8 +124,7 @@ public class NoopFederatedExportToCloudStorageTest {
 
               @Override
               public RecordReader<LongWritable, Text> createRecordReader(
-                  InputSplit inputSplit, TaskAttemptContext taskAttemptContext)
-                  throws IOException, InterruptedException {
+                  InputSplit inputSplit, TaskAttemptContext taskAttemptContext) {
                 throw new UnsupportedOperationException("Not implemented.");
               }
             });

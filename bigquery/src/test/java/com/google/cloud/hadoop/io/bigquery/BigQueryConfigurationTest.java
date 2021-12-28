@@ -38,7 +38,7 @@ public class BigQueryConfigurationTest {
 
   @SuppressWarnings("DoubleBraceInitialization")
   private static final Map<String, Object> expectedDefaultConfiguration =
-      new HashMap<>() {
+      new HashMap<String, Object>() {
         {
           put("mapred.bq.bigquery.root.url", "https://bigquery.googleapis.com/");
           put("mapred.bq.dynamic.file.list.record.reader.poll.interval", 10000);
@@ -116,7 +116,6 @@ public class BigQueryConfigurationTest {
     // Generate a sample configuration to properly handle gs:// paths.
     Configuration config = InMemoryGoogleHadoopFileSystem.getSampleConfiguration();
     conf = new JobConf(config);
-    new BigQueryConfiguration();
   }
 
   /**

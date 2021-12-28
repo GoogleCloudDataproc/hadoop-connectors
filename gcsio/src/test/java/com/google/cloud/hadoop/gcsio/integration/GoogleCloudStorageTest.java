@@ -90,7 +90,7 @@ public class GoogleCloudStorageTest {
   private static final LoadingCache<GoogleCloudStorage, String> SHARED_BUCKETS =
       CacheBuilder.newBuilder()
           .build(
-              new CacheLoader<>() {
+              new CacheLoader<GoogleCloudStorage, String>() {
                 @Override
                 public String load(GoogleCloudStorage gcs) throws Exception {
                   return createUniqueBucket(gcs, "shared");
@@ -114,7 +114,7 @@ public class GoogleCloudStorageTest {
 
   /** An Equivalence for byte arrays. */
   public static final Equivalence<byte[]> BYTE_ARRAY_EQUIVALENCE =
-      new Equivalence<>() {
+      new Equivalence<byte[]>() {
         @Override
         protected boolean doEquivalent(byte[] bytes, byte[] bytes2) {
           return Arrays.equals(bytes, bytes2);
