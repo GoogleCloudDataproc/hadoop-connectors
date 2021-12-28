@@ -128,7 +128,9 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private final long readTimeout;
 
-  private Watchdog watchdog;
+  private final Watchdog watchdog;
+
+  private final long gRPCMessageTimeout;
 
   public static GoogleCloudStorageGrpcReadChannel open(
       StorageStubProvider stubProvider,
@@ -442,6 +444,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     this.readStrategy = readOptions.getFadvise();
     this.footerStartOffsetInBytes = footerStartOffsetInBytes;
     this.footerContent = footerContent;
+    this.gRPCMessageTimeout = readOptions.getGrpcReadMessageTimeoutMillis();
   }
 
   private static IOException convertError(
@@ -724,10 +727,15 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
                 getObjectMediaMethod,
                 blockingStub.getCallOptions(),
                 request);
-        resIterator = watchdog.watch(requestContext, responseIterator, Duration.ofSeconds(1));
+        resIterator =
+            watchdog.watch(
+                requestContext, responseIterator, Duration.ofMillis(this.gRPCMessageTimeout));
       } else {
         resIterator =
-            watchdog.watch(requestContext, blockingStub.readObject(request), Duration.ofSeconds(1));
+            watchdog.watch(
+                requestContext,
+                blockingStub.readObject(request),
+                Duration.ofMillis(this.gRPCMessageTimeout));
       }
     } finally {
       requestContext.detach(toReattach);

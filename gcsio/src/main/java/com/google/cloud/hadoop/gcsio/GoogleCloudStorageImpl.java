@@ -285,6 +285,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // Function that generates downscoped access token.
   private final Function<List<AccessBoundary>, String> downscopedAccessTokenFn;
 
+  // Watchdog to monitor gRPC streams
+  private final Watchdog watchdog;
+
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
    *
@@ -369,6 +372,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             ? null
             : this.storage.getRequestFactory().getInitializer();
 
+    this.watchdog =
+        Watchdog.create(
+            CurrentMillisClock.getDefaultClock(),
+            Duration.ofMillis(storageOptions.getGrpcMessageTimeoutCheckInterval()),
+            Executors.newSingleThreadScheduledExecutor());
+
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
       this.storageStubProvider =
@@ -402,6 +411,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         this.storage.getRequestFactory() == null
             ? null
             : this.storage.getRequestFactory().getInitializer();
+
+    this.watchdog =
+        Watchdog.create(
+            CurrentMillisClock.getDefaultClock(),
+            Duration.ofMillis(100),
+            Executors.newSingleThreadScheduledExecutor());
 
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
@@ -532,11 +547,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         ObjectWriteConditions.builder()
             .setContentGenerationMatch(writeGeneration.orElse(null))
             .build();
-    Watchdog watchdog =
-        Watchdog.create(
-            CurrentMillisClock.getDefaultClock(),
-            Duration.ofMillis(100),
-            Executors.newSingleThreadScheduledExecutor());
 
     BaseAbstractGoogleAsyncWriteChannel<?> channel;
     if (storageOptions.isGrpcEnabled()) {
@@ -816,11 +826,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       throw createFileNotFoundException(
           resourceId.getBucketName(), resourceId.getObjectName(), /* cause= */ null);
     }
-    Watchdog watchdog =
-        Watchdog.create(
-            CurrentMillisClock.getDefaultClock(),
-            Duration.ofMillis(100),
-            Executors.newSingleThreadScheduledExecutor());
     if (storageOptions.isGrpcEnabled()) {
       return itemInfo == null
           ? GoogleCloudStorageGrpcReadChannel.open(
