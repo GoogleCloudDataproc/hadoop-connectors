@@ -22,6 +22,10 @@
     fs.gs.http.transport.type
     ```
 
+1.  Support GCS fine-grained action in AuthorizationHandlers.
+
+1.  Decrease log level for `hflush` rate limit log message.
+
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.
