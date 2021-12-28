@@ -178,7 +178,7 @@ public class GcsDelegationTokens extends AbstractService {
    * <p><b>Important:</b> This binding will happen during FileSystem.initialize(); the FS is not
    * live for actual use and will not yet have interacted with GCS services.
    *
-   * @param fs owning FS.
+   * @param fileSystem owning FS.
    */
   public void bindToFileSystem(GoogleHadoopFileSystemBase fileSystem, Text service) {
     this.service = requireNonNull(service);

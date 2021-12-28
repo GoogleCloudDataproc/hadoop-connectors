@@ -36,7 +36,7 @@ abstract class AbstractGhfsStatisticsSource implements IOStatisticsSource, Durat
   /**
    * Set the IOStatistics with the iostatistics returned from the subclass.
    *
-   * @param statistics statistics to set
+   * @param ioStatistics statistics to set
    */
   protected void setIOStatistics(IOStatisticsStore ioStatistics) {
     this.ioStatistics = ioStatistics;
