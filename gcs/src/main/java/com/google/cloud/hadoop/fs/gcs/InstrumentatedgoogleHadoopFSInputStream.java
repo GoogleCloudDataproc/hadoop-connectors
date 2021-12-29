@@ -62,7 +62,7 @@ public class InstrumentatedgoogleHadoopFSInputStream extends GoogleHadoopFSInput
   @Override
   public synchronized int read() throws IOException {
     streamStatistics.readOperationStarted(getPos(), 1);
-    int response = 0;
+    int response;
     try {
       response = super.read();
     } catch (IOException e) {

@@ -125,7 +125,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
   @Override
   public boolean delete(Path hadoopPath, boolean recursive) throws IOException {
     entryPoint(GhfsStatistic.INVOCATION_DELETE);
-    boolean response = false;
+    boolean response;
     try {
       response = super.delete(hadoopPath, recursive);
       try {
@@ -316,11 +316,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
     return storageStatistics;
   }
 
-  /**
-   * Get the instrumentation's IOStatistics.
-   *
-   * @return
-   */
+  /** Get the instrumentation's IOStatistics. */
   @Override
   public IOStatistics getIOStatistics() {
     setHttpStatistics();

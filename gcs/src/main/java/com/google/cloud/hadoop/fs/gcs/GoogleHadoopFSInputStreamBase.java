@@ -210,7 +210,7 @@ class GoogleHadoopFSInputStreamBase extends FSInputStream {
    * @return true if a new source is found, false otherwise.
    */
   @Override
-  public synchronized boolean seekToNewSource(long targetPos) throws IOException {
+  public synchronized boolean seekToNewSource(long targetPos) {
     return false;
   }
 

@@ -78,11 +78,7 @@ public class InstrumentatedGoogleHadoopOutputStream extends GoogleHadoopOutputSt
     return streamStatistics;
   }
 
-  /**
-   * Get the current IOStatistics from output stream
-   *
-   * @return
-   */
+  /** Get the current IOStatistics from output stream */
   @Override
   public IOStatistics getIOStatistics() {
     return ioStatistics;

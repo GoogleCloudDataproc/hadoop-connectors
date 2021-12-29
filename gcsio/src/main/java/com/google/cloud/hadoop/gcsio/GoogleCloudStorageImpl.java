@@ -146,7 +146,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   // To track the object statistics
   private final ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong> objectStatistics =
-      new ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong>();
+      new ConcurrentHashMap<>();
 
   // To track the http statistics
   private ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics;
@@ -334,7 +334,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     this.storageOptions = checkNotNull(options, "options must not be null");
     this.storageOptions.throwIfNotValid();
-    this.httpStatistics = new ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong>();
+    this.httpStatistics = new ConcurrentHashMap<>();
     HttpRequestInitializer retryHttpInitializer =
         new RetryHttpInitializer(
             new GcsioTrackingHttpRequestInitializer(httpStatistics),

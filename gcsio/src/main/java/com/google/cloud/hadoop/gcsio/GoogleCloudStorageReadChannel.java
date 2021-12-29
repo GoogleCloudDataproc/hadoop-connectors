@@ -39,18 +39,20 @@ import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.flogger.GoogleLogger;
 import java.io.ByteArrayInputStream;
 import java.io.EOFException;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channel;
 import java.nio.channels.Channels;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -471,12 +473,11 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
    *
    * <p>Catches and ignores all exceptions as there is not a lot the user can do to fix errors here
    * and a new connection will be needed. Especially SSLExceptions since the there's a high
-   * probability that SSL connections would be broken in a way that causes {@link
-   * java.nio.channels.Channel#close()} itself to throw an exception, even though underlying sockets
-   * have already been cleaned up; close() on an SSLSocketImpl requires a shutdown handshake in
-   * order to shutdown cleanly, and if the connection has been broken already, then this is not
-   * possible, and the SSLSocketImpl was already responsible for performing local cleanup at the
-   * time the exception was raised.
+   * probability that SSL connections would be broken in a way that causes {@link Channel#close()}
+   * itself to throw an exception, even though underlying sockets have already been cleaned up;
+   * close() on an SSLSocketImpl requires a shutdown handshake in order to shutdown cleanly, and if
+   * the connection has been broken already, then this is not possible, and the SSLSocketImpl was
+   * already responsible for performing local cleanup at the time the exception was raised.
    */
   protected void closeContentChannel() {
     if (contentChannel != null) {
@@ -531,7 +532,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
    *
    * @param newPosition the new position, counting the number of bytes from the beginning.
    * @return this channel instance
-   * @throws java.io.FileNotFoundException if the underlying object does not exist.
+   * @throws FileNotFoundException if the underlying object does not exist.
    * @throws IOException on IO error
    */
   @Override
@@ -674,7 +675,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
    * <p>Note: Seek could be an expensive operation if a new stream is opened.
    *
    * @param bytesToRead number of bytes to read, used only if new stream is opened.
-   * @throws java.io.FileNotFoundException if the underlying object does not exist.
+   * @throws FileNotFoundException if the underlying object does not exist.
    * @throws IOException on IO error
    */
   @VisibleForTesting

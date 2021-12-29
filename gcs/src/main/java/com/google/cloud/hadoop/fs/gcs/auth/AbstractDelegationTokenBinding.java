@@ -126,21 +126,14 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
     }
     DelegationTokenIdentifier tokenIdentifier =
         requireNonNull(createTokenIdentifier(renewerText), "Token identifier");
-    Token<DelegationTokenIdentifier> token = null;
-    try {
-      token =
-          trackDuration(
-              this.stats,
-              GhfsStatistic.DELEGATION_TOKENS_ISSUED.getSymbol(),
-              () -> new Token<>(tokenIdentifier, secretManager));
-      token.setKind(getKind());
-      token.setService(service);
-      if (token != null) {
-        noteTokenCreated(token);
-      }
-    } catch (IOException e) {
-      throw e;
-    }
+    Token<DelegationTokenIdentifier> token =
+        trackDuration(
+            this.stats,
+            GhfsStatistic.DELEGATION_TOKENS_ISSUED.getSymbol(),
+            () -> new Token<>(tokenIdentifier, secretManager));
+    token.setKind(getKind());
+    token.setService(service);
+    noteTokenCreated(token);
 
     logger.atFine().log("Created token %s with token identifier %s", token, tokenIdentifier);
     return token;

@@ -14,8 +14,6 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.common.base.Preconditions.checkArgument;
-
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.net.URI;
@@ -61,7 +59,6 @@ public class GoogleHadoopFS extends AbstractFileSystem {
     // true == GoogleHadoopFS requires authorities in URIs.
     // 0 == the fake port passed to AbstractFileSystem.
     super(uri, ghfs.getScheme(), true, 0);
-    checkArgument(ghfs != null, "ghfs must not be null");
     this.ghfs = ghfs;
     ghfs.initialize(uri, conf);
   }

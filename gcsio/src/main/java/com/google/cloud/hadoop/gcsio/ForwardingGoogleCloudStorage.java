@@ -122,7 +122,6 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
    * get the value of the statistics
    *
    * @param key name of the object related statistics key
-   * @return
    */
   @Override
   public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key) {
@@ -133,7 +132,6 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
    * get the value of the statistics
    *
    * @param key name of the http related statistics key
-   * @return
    */
   @Override
   public AtomicLong getHttpStatistics(GoogleCloudStorageStatistics key) {

@@ -27,9 +27,6 @@ import java.util.concurrent.ExecutorService;
 /** Provides gRPC stubs for accessing the Storage gRPC API. */
 class StorageStubProvider {
 
-  // The maximum number of times to automatically retry gRPC requests.
-  private static final double GRPC_MAX_RETRY_ATTEMPTS = 10;
-
   private static final ImmutableSet<Status.Code> STUB_BROKEN_ERROR_CODES =
       ImmutableSet.of(Status.Code.DEADLINE_EXCEEDED, Status.Code.UNAVAILABLE);
 

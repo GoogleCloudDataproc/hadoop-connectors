@@ -63,7 +63,7 @@ class StorageRequestToAccessBoundaryConverter {
     } else if (request instanceof Storage.Buckets.Delete) {
       return translateBucketDeleteRequest((Storage.Buckets.Delete) request);
     } else if (request instanceof Storage.Buckets.List) {
-      return translateBucketListRequest((Storage.Buckets.List) request);
+      return translateBucketListRequest();
     }
 
     // We enumerated all object and bucket operations used by the GCS connector already. If still
@@ -159,7 +159,7 @@ class StorageRequestToAccessBoundaryConverter {
         AccessBoundary.create(request.getBucket(), "/", Action.DELETE_BUCKETS));
   }
 
-  private static List<AccessBoundary> translateBucketListRequest(Storage.Buckets.List request) {
+  private static List<AccessBoundary> translateBucketListRequest() {
     return Collections.singletonList(AccessBoundary.create("", "", Action.LIST_BUCKETS));
   }
 
