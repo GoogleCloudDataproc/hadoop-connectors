@@ -13,18 +13,19 @@
  */
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+
 import com.google.api.core.ApiClock;
-import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
 import io.grpc.ClientCall;
 import io.grpc.Context.CancellableContext;
 import io.grpc.stub.StreamObserver;
 import java.time.Duration;
 import java.util.Iterator;
-import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nonnull;
 import javax.annotation.concurrent.GuardedBy;
@@ -46,8 +47,7 @@ public final class Watchdog implements Runnable {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Dummy value to convert the ConcurrentHashMap into a Set
-  private static final Object PRESENT = new Object();
-  private final ConcurrentHashMap<WatchdogStream, Object> openStreams = new ConcurrentHashMap<>();
+  private final KeySetView<WatchdogStream, Boolean> openStreams = ConcurrentHashMap.newKeySet();
 
   private final ApiClock clock;
   private final Duration scheduleInterval;
@@ -62,14 +62,14 @@ public final class Watchdog implements Runnable {
   }
 
   private Watchdog(ApiClock clock, Duration scheduleInterval, ScheduledExecutorService executor) {
-    this.clock = Preconditions.checkNotNull(clock, "clock can't be null");
+    this.clock = checkNotNull(clock, "clock can't be null");
     this.scheduleInterval = scheduleInterval;
     this.executor = executor;
   }
 
   private void start() {
     executor.scheduleAtFixedRate(
-        this, scheduleInterval.toMillis(), scheduleInterval.toMillis(), TimeUnit.MILLISECONDS);
+        this, scheduleInterval.toMillis(), scheduleInterval.toMillis(), MILLISECONDS);
   }
 
   /**
@@ -86,8 +86,8 @@ public final class Watchdog implements Runnable {
       CancellableContext requestContext,
       Iterator<T> responseIterator,
       @Nonnull Duration idleTimeout) {
-    Preconditions.checkNotNull(responseIterator, "responseIterator can't be null");
-    Preconditions.checkNotNull(idleTimeout, "idleTimeout can't be null");
+    checkNotNull(responseIterator, "responseIterator can't be null");
+    checkNotNull(idleTimeout, "idleTimeout can't be null");
 
     if (idleTimeout.isZero()) {
       return responseIterator;
@@ -95,7 +95,7 @@ public final class Watchdog implements Runnable {
 
     ServerStreamingRPCWatchdogStream<T> stream =
         new ServerStreamingRPCWatchdogStream<>(requestContext, responseIterator, idleTimeout);
-    openStreams.put(stream, PRESENT);
+    openStreams.add(stream);
     return stream;
   }
 
@@ -113,8 +113,8 @@ public final class Watchdog implements Runnable {
       ClientCall<R, T> clientCall,
       StreamObserver<R> streamObserver,
       @Nonnull Duration idleTimeout) {
-    Preconditions.checkNotNull(streamObserver, "streamObserver can't be null");
-    Preconditions.checkNotNull(idleTimeout, "idleTimeout can't be null");
+    checkNotNull(streamObserver, "streamObserver can't be null");
+    checkNotNull(idleTimeout, "idleTimeout can't be null");
 
     if (idleTimeout.isZero()) {
       return streamObserver;
@@ -122,7 +122,7 @@ public final class Watchdog implements Runnable {
 
     ClientStreamingRPCWatchdogStream<R, T> stream =
         new ClientStreamingRPCWatchdogStream<>(clientCall, streamObserver, idleTimeout);
-    openStreams.put(stream, PRESENT);
+    openStreams.add(stream);
     return stream;
   }
 
@@ -136,19 +136,12 @@ public final class Watchdog implements Runnable {
   }
 
   // package-private method to test the state of watchdog
-  ConcurrentHashMap<WatchdogStream, Object> getOpenStreams() {
+  KeySetView<WatchdogStream, Boolean> getOpenStreams() {
     return openStreams;
   }
 
   private void runUnsafe() {
-    Iterator<Entry<WatchdogStream, Object>> it = openStreams.entrySet().iterator();
-
-    while (it.hasNext()) {
-      WatchdogStream stream = it.next().getKey();
-      if (stream.cancelIfStale()) {
-        it.remove();
-      }
-    }
+    openStreams.removeIf(WatchdogStream::cancelIfStale);
   }
 
   enum State {
