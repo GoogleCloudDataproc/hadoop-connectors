@@ -21,7 +21,6 @@ import com.google.api.client.googleapis.media.MediaHttpUploader.UploadState;
 import com.google.api.client.googleapis.media.MediaHttpUploaderProgressListener;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
-import java.io.IOException;
 
 /**
  * Logs the status of uploads. At the beginning, during, and at the end of the upload, emits
@@ -54,7 +53,7 @@ public class LoggingMediaHttpUploaderProgressListener implements MediaHttpUpload
   }
 
   @Override
-  public void progressChanged(MediaHttpUploader uploader) throws IOException {
+  public void progressChanged(MediaHttpUploader uploader) {
     progressChanged(
         uploader.getUploadState(), uploader.getNumBytesUploaded(), System.currentTimeMillis());
   }

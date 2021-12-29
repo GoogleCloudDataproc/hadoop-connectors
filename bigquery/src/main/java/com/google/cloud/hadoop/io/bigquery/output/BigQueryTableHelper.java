@@ -40,7 +40,6 @@ class BigQueryTableHelper {
    *
    * @param fieldsJson JSON fields to convert to {@link TableSchema}
    * @return {@link TableSchema}
-   * @throws IOException
    */
   static TableSchema createTableSchemaFromFields(String fieldsJson) throws IOException {
     List<TableFieldSchema> fields = new ArrayList<>();
@@ -55,7 +54,6 @@ class BigQueryTableHelper {
    *
    * @param tableSchema {@link TableSchema} to convert to JSON
    * @return the JSON of the table schema.
-   * @throws IOException
    */
   static String getTableSchemaJson(TableSchema tableSchema) throws IOException {
     return JacksonFactory.getDefaultInstance().toString(tableSchema);
@@ -66,7 +64,6 @@ class BigQueryTableHelper {
    *
    * @param tableSchema {@link TableSchema} to get JSON fields from
    * @return the JSON of the fields.
-   * @throws IOException
    */
   static String getTableFieldsJson(TableSchema tableSchema) throws IOException {
     return JacksonFactory.getDefaultInstance().toString(tableSchema.getFields());

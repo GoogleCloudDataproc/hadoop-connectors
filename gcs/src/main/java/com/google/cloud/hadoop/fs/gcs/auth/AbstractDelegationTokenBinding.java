@@ -102,11 +102,11 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
    * <p><b>Important:</b> This binding will happen during FileSystem.initialize(); the FS is not
    * live for actual use and will not yet have interacted with GCS services.
    *
-   * @param fs owning FS.
+   * @param fileSystem owning FS.
    * @param service name of the service (i.e. bucket name) for the FS.
    */
-  public void bindToFileSystem(GoogleHadoopFileSystemBase fs, Text service) {
-    this.fileSystem = requireNonNull(fs);
+  public void bindToFileSystem(GoogleHadoopFileSystemBase fileSystem, Text service) {
+    this.fileSystem = requireNonNull(fileSystem);
     this.service = requireNonNull(service);
   }
 
@@ -118,29 +118,22 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
    * @throws IOException if one cannot be created
    */
   public Token<DelegationTokenIdentifier> createDelegationToken(
-      String renewer, DelegationTokenStatistics statistics) throws IOException {
+      String renewer, DelegationTokenStatistics stats) throws IOException {
     Text renewerText = new Text();
-    this.stats = statistics;
+    this.stats = stats;
     if (renewer != null) {
       renewerText.set(renewer);
     }
     DelegationTokenIdentifier tokenIdentifier =
         requireNonNull(createTokenIdentifier(renewerText), "Token identifier");
-    Token<DelegationTokenIdentifier> token = null;
-    try {
-      token =
-          trackDuration(
-              this.stats,
-              GhfsStatistic.DELEGATION_TOKENS_ISSUED.getSymbol(),
-              () -> new Token<>(tokenIdentifier, secretManager));
-      token.setKind(getKind());
-      token.setService(service);
-      if (token != null) {
-        noteTokenCreated(token);
-      }
-    } catch (IOException e) {
-      throw e;
-    }
+    Token<DelegationTokenIdentifier> token =
+        trackDuration(
+            this.stats,
+            GhfsStatistic.DELEGATION_TOKENS_ISSUED.getSymbol(),
+            () -> new Token<>(tokenIdentifier, secretManager));
+    token.setKind(getKind());
+    token.setService(service);
+    noteTokenCreated(token);
 
     logger.atFine().log("Created token %s with token identifier %s", token, tokenIdentifier);
     return token;
@@ -210,13 +203,13 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
     }
 
     @Override
-    public byte[] retrievePassword(DelegationTokenIdentifier identifier) throws InvalidToken {
+    public byte[] retrievePassword(DelegationTokenIdentifier identifier) {
       return pwd;
     }
 
     @Override
     public DelegationTokenIdentifier createIdentifier() {
-      return AbstractDelegationTokenBinding.this.createEmptyIdentifier();
+      return createEmptyIdentifier();
     }
   }
   /**
@@ -224,7 +217,7 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
    *
    * @param token token created
    */
-  private void noteTokenCreated(final Token<DelegationTokenIdentifier> token) {
+  private void noteTokenCreated(Token<DelegationTokenIdentifier> token) {
     stats.tokenIssued();
   }
 }

@@ -40,12 +40,12 @@ import org.mockito.Mockito;
 @RunWith(JUnit4.class)
 public class GsonRecordReaderTest {
   // Sample key values for tests.
-  private LongWritable key1 = new LongWritable(0);
-  private LongWritable key2 = new LongWritable(35);
+  private final LongWritable key1 = new LongWritable(0);
+  private final LongWritable key2 = new LongWritable(35);
 
   // Sample text values for tests.
-  private Text value1 = new Text("{'title':'Test1','value':'test_1'}");
-  private Text value2 = new Text("{'title':'Test2','value':'test_2'}");
+  private final Text value1 = new Text("{'title':'Test1','value':'test_1'}");
+  private final Text value2 = new Text("{'title':'Test2','value':'test_2'}");
 
   // GoogleHadoopFileSystem to use.
   private FileSystem ghfs;
@@ -53,7 +53,7 @@ public class GsonRecordReaderTest {
   // Hadoop job configuration.
   private Configuration config;
 
-  private TaskAttemptID testTaskAttemptId =
+  private final TaskAttemptID testTaskAttemptId =
       new TaskAttemptID(new TaskID(new JobID("", 1), true /* isMap */, 1), 1);
 
   /** Create an in-memory GHFS. */

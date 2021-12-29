@@ -42,7 +42,7 @@ public class DirectBigQueryRecordReader extends RecordReader<NullWritable, Gener
 
   private Schema schema;
   private Stream stream;
-  private Parser parser = new Parser();
+  private final Parser parser = new Parser();
   private GenericRecord current;
   private boolean finalized;
   private long limit;

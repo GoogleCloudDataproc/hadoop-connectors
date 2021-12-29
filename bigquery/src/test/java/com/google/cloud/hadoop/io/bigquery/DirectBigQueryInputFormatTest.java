@@ -63,10 +63,10 @@ public class DirectBigQueryInputFormatTest {
 
   // Sample projectIds for testing; one for owning the BigQuery jobs, another for the
   // TableReference.
-  private String jobProjectId = "foo-project";
-  private String dataProjectId = "publicdata";
-  private String datasetId = "test_dataset";
-  private String tableId = "test_table";
+  private final String jobProjectId = "foo-project";
+  private final String dataProjectId = "publicdata";
+  private final String datasetId = "test_dataset";
+  private final String tableId = "test_table";
 
   @Before
   public void setUp() throws Exception {

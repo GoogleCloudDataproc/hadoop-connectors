@@ -21,6 +21,8 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.nullToEmpty;
+import static java.lang.Math.min;
+import static java.lang.Math.toIntExact;
 
 import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpResponse;
@@ -30,7 +32,6 @@ import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.NanoClock;
 import com.google.api.client.util.Sleeper;
 import com.google.api.services.storage.Storage;
-import com.google.api.services.storage.Storage.Objects.Get;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
@@ -38,19 +39,20 @@ import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.flogger.GoogleLogger;
 import java.io.ByteArrayInputStream;
 import java.io.EOFException;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channel;
 import java.nio.channels.Channels;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -182,14 +184,14 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   /** Sets the Sleeper used for sleeping between retries. */
   @VisibleForTesting
   void setSleeper(Sleeper sleeper) {
-    Preconditions.checkArgument(sleeper != null, "sleeper must not be null!");
+    checkArgument(sleeper != null, "sleeper must not be null!");
     this.sleeper = sleeper;
   }
 
   /** Sets the clock to be used for determining when max total time has elapsed doing retries. */
   @VisibleForTesting
   void setNanoClock(NanoClock clock) {
-    Preconditions.checkArgument(clock != null, "clock must not be null!");
+    checkArgument(clock != null, "clock must not be null!");
     this.clock = clock;
   }
 
@@ -229,7 +231,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     StorageObject object;
     try {
       // Request only fields that are used for metadata initialization
-      Get getObject = createRequest().setFields("contentEncoding,generation,size");
+      Storage.Objects.Get getObject = createRequest().setFields("contentEncoding,generation,size");
       object =
           ResilientOperation.retry(
               getObject::execute,
@@ -447,12 +449,12 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   }
 
   @Override
-  public SeekableByteChannel truncate(long size) throws IOException {
+  public SeekableByteChannel truncate(long size) {
     throw new UnsupportedOperationException("Cannot mutate read-only channel");
   }
 
   @Override
-  public int write(ByteBuffer src) throws IOException {
+  public int write(ByteBuffer src) {
     throw new UnsupportedOperationException("Cannot mutate read-only channel");
   }
 
@@ -471,12 +473,11 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
    *
    * <p>Catches and ignores all exceptions as there is not a lot the user can do to fix errors here
    * and a new connection will be needed. Especially SSLExceptions since the there's a high
-   * probability that SSL connections would be broken in a way that causes {@link
-   * java.nio.channels.Channel#close()} itself to throw an exception, even though underlying sockets
-   * have already been cleaned up; close() on an SSLSocketImpl requires a shutdown handshake in
-   * order to shutdown cleanly, and if the connection has been broken already, then this is not
-   * possible, and the SSLSocketImpl was already responsible for performing local cleanup at the
-   * time the exception was raised.
+   * probability that SSL connections would be broken in a way that causes {@link Channel#close()}
+   * itself to throw an exception, even though underlying sockets have already been cleaned up;
+   * close() on an SSLSocketImpl requires a shutdown handshake in order to shutdown cleanly, and if
+   * the connection has been broken already, then this is not possible, and the SSLSocketImpl was
+   * already responsible for performing local cleanup at the time the exception was raised.
    */
   protected void closeContentChannel() {
     if (contentChannel != null) {
@@ -531,7 +532,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
    *
    * @param newPosition the new position, counting the number of bytes from the beginning.
    * @return this channel instance
-   * @throws java.io.FileNotFoundException if the underlying object does not exist.
+   * @throws FileNotFoundException if the underlying object does not exist.
    * @throws IOException on IO error
    */
   @Override
@@ -584,7 +585,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     }
     while (seekDistance > 0 && contentChannel != null) {
       try {
-        int bufferSize = Math.toIntExact(Math.min(skipBuffer.length, seekDistance));
+        int bufferSize = toIntExact(min(skipBuffer.length, seekDistance));
         int bytesRead = contentChannel.read(ByteBuffer.wrap(skipBuffer, 0, bufferSize));
         if (bytesRead < 0) {
           // Shouldn't happen since we called validatePosition prior to this loop.
@@ -674,7 +675,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
    * <p>Note: Seek could be an expensive operation if a new stream is opened.
    *
    * @param bytesToRead number of bytes to read, used only if new stream is opened.
-   * @throws java.io.FileNotFoundException if the underlying object does not exist.
+   * @throws FileNotFoundException if the underlying object does not exist.
    * @throws IOException on IO error
    */
   @VisibleForTesting
@@ -803,7 +804,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
   private void cacheFooter(HttpResponse response) throws IOException {
     checkState(size > 0, "size should be greater than 0 for '%s'", resourceId);
-    int footerSize = Math.toIntExact(response.getHeaders().getContentLength());
+    int footerSize = toIntExact(response.getHeaders().getContentLength());
     footerContent = new byte[footerSize];
     try (InputStream footerStream = response.getContent()) {
       int totalBytesRead = 0;
@@ -837,7 +838,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
    */
   private InputStream openFooterStream() {
     contentChannelPosition = currentPosition;
-    int offset = Math.toIntExact(currentPosition - (size - footerContent.length));
+    int offset = toIntExact(currentPosition - (size - footerContent.length));
     int length = footerContent.length - offset;
     logger.atFiner().log(
         "Opened stream (prefetched footer) from %s position for '%s'", currentPosition, resourceId);
@@ -894,13 +895,13 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       if (randomAccess) {
         long randomRangeSize = Math.max(bytesToRead, readOptions.getMinRangeRequestSize());
         // Limit rangeSize to the randomRangeSize.
-        rangeSize = Math.min(randomRangeSize, rangeSize);
+        rangeSize = min(randomRangeSize, rangeSize);
       }
 
       contentChannelEnd = contentChannelPosition + rangeSize;
       // Do not read footer again, if it was already pre-fetched.
       if (footerContent != null) {
-        contentChannelEnd = Math.min(contentChannelEnd, size - footerContent.length);
+        contentChannelEnd = min(contentChannelEnd, size - footerContent.length);
       }
 
       checkState(
@@ -926,7 +927,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         "contentChannelEnd should be initialized already for '%s'",
         resourceId);
 
-    Get getObject = createDataRequest(rangeHeader);
+    Storage.Objects.Get getObject = createDataRequest(rangeHeader);
     HttpResponse response;
     try {
       response = getObject.executeMedia();
@@ -1102,8 +1103,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     throw new IOException(msg, e);
   }
 
-  private Get createDataRequest(String rangeHeader) throws IOException {
-    Get getObject = createRequest();
+  private Storage.Objects.Get createDataRequest(String rangeHeader) throws IOException {
+    Storage.Objects.Get getObject = createRequest();
 
     // Set the headers on the existing request headers that may have
     // been initialized with things like user-agent already.
@@ -1115,13 +1116,14 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     return getObject;
   }
 
-  protected Get createRequest() throws IOException {
+  protected Storage.Objects.Get createRequest() throws IOException {
     checkState(
         !metadataInitialized || resourceId.hasGenerationId(),
         "Generation should always be included for resource '%s'",
         resourceId);
     // Start with unset generation and determine what to ask for based on read consistency.
-    Get getObject = gcs.objects().get(resourceId.getBucketName(), resourceId.getObjectName());
+    Storage.Objects.Get getObject =
+        gcs.objects().get(resourceId.getBucketName(), resourceId.getObjectName());
     if (resourceId.hasGenerationId()) {
       getObject.setGeneration(resourceId.getGenerationId());
     }

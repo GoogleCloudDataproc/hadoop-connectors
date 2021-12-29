@@ -1266,7 +1266,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
 
     byte[] readContent = new byte[7];
-    final GoogleCloudStorageReadOptions readOptions =
+    GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder().setSupportGzipEncoding(true).build();
     try (SeekableByteChannel channel = gcs.open(testFile, readOptions)) {
       channel.read(ByteBuffer.wrap(readContent));
@@ -1298,7 +1298,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
 
     byte[] readContent = new byte[7];
-    final GoogleCloudStorageReadOptions readOptions =
+    GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder().setSupportGzipEncoding(true).build();
     try (SeekableByteChannel channel = gcs.open(itemInfo, readOptions)) {
       channel.read(ByteBuffer.wrap(readContent));

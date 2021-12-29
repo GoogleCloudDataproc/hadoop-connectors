@@ -199,7 +199,7 @@ public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSyst
     assertThat(pathUrisNaturalSorted.toArray()).isEqualTo(expectedUrisNaturalSorted.toArray());
 
     // Sort the paths with the GCSFS-supplied PATH_COMPARATOR and verify.
-    Collections.sort(pathUris, GoogleCloudStorageFileSystem.PATH_COMPARATOR);
+    pathUris.sort(GoogleCloudStorageFileSystem.PATH_COMPARATOR);
     assertThat(pathUris.toArray()).isEqualTo(expectedUris.toArray());
   }
 

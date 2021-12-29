@@ -20,7 +20,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.channels.SeekableByteChannel;
@@ -63,7 +62,7 @@ public class GoogleCloudStorageFileSystemIntegrationHelper
 
   public GoogleCloudStorageFileSystemIntegrationHelper(GoogleCloudStorageFileSystem gcsfs) {
     super(gcsfs.getGcs());
-    this.gcsfs = Preconditions.checkNotNull(gcsfs);
+    this.gcsfs = checkNotNull(gcsfs);
   }
 
   /** Opens the given object for reading. */

@@ -24,6 +24,7 @@ import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHe
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getStandardOptionBuilder;
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.writeObject;
 import static com.google.common.truth.Truth.assertThat;
+import static java.lang.Math.ceil;
 import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
@@ -362,7 +363,7 @@ public class GoogleCloudStorageImplTest {
     int maxBytesRewrittenPerCall = 256 * 1024 * 1024;
     TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
         newTrackingGoogleCloudStorage(
-            GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            getStandardOptionBuilder()
                 .setCopyWithRewriteEnabled(true)
                 .setMaxBytesRewrittenPerCall(maxBytesRewrittenPerCall)
                 .build());
@@ -454,7 +455,7 @@ public class GoogleCloudStorageImplTest {
   }
 
   private static GoogleCloudStorageOptions getOptionsWithUploadChunk(int uploadChunk) {
-    return GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+    return getStandardOptionBuilder()
         .setWriteChannelOptions(
             AsyncWriteChannelOptions.builder().setUploadChunkSize(uploadChunk).build())
         .build();
@@ -472,8 +473,7 @@ public class GoogleCloudStorageImplTest {
                 /* replaceGenerationId= */ true))
         .addAll(
             IntStream.rangeClosed(
-                    1,
-                    (int) Math.ceil((double) partition.length * partitionsCount / uploadChunkSize))
+                    1, (int) ceil((double) partition.length * partitionsCount / uploadChunkSize))
                 .mapToObj(
                     i ->
                         resumableUploadChunkRequestString(

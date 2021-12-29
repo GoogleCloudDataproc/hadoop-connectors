@@ -32,7 +32,6 @@ public class FederatedBigQueryOutputFormat<K, V> extends ForwardingBigQueryFileO
   public OutputCommitter createCommitter(TaskAttemptContext context) throws IOException {
     Configuration conf = context.getConfiguration();
     OutputCommitter delegateCommitter = getDelegate(conf).getOutputCommitter(context);
-    OutputCommitter committer = new FederatedBigQueryOutputCommitter(context, delegateCommitter);
-    return committer;
+    return new FederatedBigQueryOutputCommitter(context, delegateCommitter);
   }
 }

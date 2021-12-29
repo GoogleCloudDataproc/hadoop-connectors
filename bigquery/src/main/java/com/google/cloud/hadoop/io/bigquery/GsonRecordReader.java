@@ -13,8 +13,9 @@
  */
 package com.google.cloud.hadoop.io.bigquery;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 import com.google.cloud.hadoop.util.HadoopToStringUtil;
-import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -41,7 +42,7 @@ public class GsonRecordReader extends RecordReader<LongWritable, JsonObject> {
   private LineRecordReader lineReader;
 
   // Current key.
-  private LongWritable currentKey = new LongWritable(0L);
+  private final LongWritable currentKey = new LongWritable(0L);
 
   // Current value.
   private JsonObject currentValue;
@@ -64,7 +65,7 @@ public class GsonRecordReader extends RecordReader<LongWritable, JsonObject> {
           "initialize('%s', '%s')",
           HadoopToStringUtil.toString(genericSplit), HadoopToStringUtil.toString(context));
     }
-    Preconditions.checkArgument(
+    checkArgument(
         genericSplit instanceof FileSplit,
         "InputSplit genericSplit should be an instance of FileSplit.");
     // Get FileSplit.

@@ -81,7 +81,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
 
   private StorageStub stub;
   private FakeService fakeService;
-  private ExecutorService executor = Executors.newCachedThreadPool();
+  private final ExecutorService executor = Executors.newCachedThreadPool();
   @Mock private Credentials mockCredentials;
 
   @Before
@@ -686,8 +686,8 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     }
 
     public void setObject(Object object) {
-      this.insertRequestObserver.object = object;
-      this.insertRequestObserver.writeObjectResponse =
+      insertRequestObserver.object = object;
+      insertRequestObserver.writeObjectResponse =
           WriteObjectResponse.newBuilder().setResource(object).build();
     }
 

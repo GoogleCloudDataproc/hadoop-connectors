@@ -13,11 +13,12 @@
  */
 package com.google.cloud.hadoop.io.bigquery;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.google.api.services.bigquery.model.Table;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.hadoop.conf.Configuration;
@@ -51,10 +52,10 @@ public class NoopFederatedExportToCloudStorage extends UnshardedExportToCloudSto
         projectId,
         table,
         delegateInputFormat);
-    Preconditions.checkNotNull(table.getExternalDataConfiguration());
+    checkNotNull(table.getExternalDataConfiguration());
     String inputType = fileFormat.getFormatIdentifier();
     String tableType = table.getExternalDataConfiguration().getSourceFormat();
-    Preconditions.checkArgument(
+    checkArgument(
         inputType.equals(tableType),
         "MapReduce fileFormat '%s' does not match BigQuery sourceFormat '%s'. Use the "
             + "appropriate InputFormat.",
@@ -64,37 +65,37 @@ public class NoopFederatedExportToCloudStorage extends UnshardedExportToCloudSto
   }
 
   @VisibleForTesting
-  static String getCommaSeparatedGcsPathList(final Table table) {
-    Preconditions.checkNotNull(table.getExternalDataConfiguration());
+  static String getCommaSeparatedGcsPathList(Table table) {
+    checkNotNull(table.getExternalDataConfiguration());
     for (String uri : table.getExternalDataConfiguration().getSourceUris()) {
-      Preconditions.checkArgument(uri.startsWith("gs://"), "Invalid GCS resource: '%s'", uri);
+      checkArgument(uri.startsWith("gs://"), "Invalid GCS resource: '%s'", uri);
     }
     // FileInputFormat accepts a comma separated list of potentially globbed paths.
     return Joiner.on(",").join(table.getExternalDataConfiguration().getSourceUris());
   }
 
   @Override
-  public void prepare() throws IOException {
+  public void prepare() {
     // No-op
   }
 
   @Override
-  public void beginExport() throws IOException {
+  public void beginExport() {
     // No-op
   }
 
   @Override
-  public void waitForUsableMapReduceInput() throws IOException, InterruptedException {
+  public void waitForUsableMapReduceInput() {
     // No-op
   }
 
   @Override
-  public List<String> getExportPaths() throws IOException {
+  public List<String> getExportPaths() {
     return gcsPaths;
   }
 
   @Override
-  public void cleanupExport() throws IOException {
+  public void cleanupExport() {
     // No-op
   }
 }

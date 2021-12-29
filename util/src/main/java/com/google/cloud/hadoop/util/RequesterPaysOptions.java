@@ -23,7 +23,7 @@ import javax.annotation.Nullable;
 public abstract class RequesterPaysOptions {
 
   /** Operational modes of GCS Requester Pays feature. */
-  public static enum RequesterPaysMode {
+  public enum RequesterPaysMode {
     AUTO,
     CUSTOM,
     DISABLED,

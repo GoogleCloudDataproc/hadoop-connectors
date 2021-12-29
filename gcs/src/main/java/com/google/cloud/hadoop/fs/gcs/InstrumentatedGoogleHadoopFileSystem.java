@@ -23,7 +23,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.common.flogger.GoogleLogger;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.EnumSet;
@@ -58,9 +57,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  InstrumentatedGoogleHadoopFileSystem() {
-    super();
-  }
+  InstrumentatedGoogleHadoopFileSystem() {}
 
   InstrumentatedGoogleHadoopFileSystem(GoogleCloudStorageFileSystem gcsfs) {
     super(gcsfs);
@@ -69,15 +66,15 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
   @Override
   public void initialize(URI path, Configuration config) throws IOException {
     super.initialize(path, config);
-    this.instrumentation = new GhfsInstrumentation(path);
-    this.storageStatistics =
+    instrumentation = new GhfsInstrumentation(path);
+    storageStatistics =
         (GhfsStorageStatistics)
             GlobalStorageStatistics.INSTANCE.put(
                 GhfsStorageStatistics.NAME, () -> new GhfsStorageStatistics(getIOStatistics()));
   }
 
   @Override
-  protected void configureBuckets(GoogleCloudStorageFileSystem gcsFs) throws IOException {}
+  protected void configureBuckets(GoogleCloudStorageFileSystem gcsFs) {}
 
   @Override
   public FSDataInputStream open(Path hadoopPath, int bufferSize) throws IOException {
@@ -128,7 +125,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
   @Override
   public boolean delete(Path hadoopPath, boolean recursive) throws IOException {
     entryPoint(GhfsStatistic.INVOCATION_DELETE);
-    boolean response = false;
+    boolean response;
     try {
       response = super.delete(hadoopPath, recursive);
       try {
@@ -209,8 +206,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
   }
 
   @Override
-  public RemoteIterator<LocatedFileStatus> listLocatedStatus(final Path f)
-      throws FileNotFoundException, IOException {
+  public RemoteIterator<LocatedFileStatus> listLocatedStatus(Path f) throws IOException {
     entryPoint(GhfsStatistic.INVOCATION_LIST_LOCATED_STATUS);
     return super.listLocatedStatus(f);
   }
@@ -284,7 +280,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
    * @param operation The operation to increment
    */
   public void entryPoint(GhfsStatistic operation) {
-    if (super.isClosed()) {
+    if (isClosed()) {
       return;
     }
     incrementStatistic(operation);
@@ -317,14 +313,10 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
    */
   @Override
   public GhfsStorageStatistics getStorageStatistics() {
-    return this.storageStatistics;
+    return storageStatistics;
   }
 
-  /**
-   * Get the instrumentation's IOStatistics.
-   *
-   * @return
-   */
+  /** Get the instrumentation's IOStatistics. */
   @Override
   public IOStatistics getIOStatistics() {
     setHttpStatistics();
@@ -332,7 +324,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
   }
 
   public GhfsInstrumentation getInstrumentation() {
-    return this.instrumentation;
+    return instrumentation;
   }
 
   /** Set the Value for http get and head request related statistics keys */

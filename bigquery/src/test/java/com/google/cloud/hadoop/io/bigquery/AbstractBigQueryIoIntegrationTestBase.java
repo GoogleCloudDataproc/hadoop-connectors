@@ -19,6 +19,7 @@ import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_KEYFILE_SUFFIX;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.when;
 
@@ -33,7 +34,6 @@ import com.google.cloud.hadoop.io.bigquery.output.BigQueryOutputConfiguration;
 import com.google.cloud.hadoop.io.bigquery.output.BigQueryTableFieldSchema;
 import com.google.cloud.hadoop.io.bigquery.output.BigQueryTableSchema;
 import com.google.cloud.hadoop.io.bigquery.output.IndirectBigQueryOutputFormat;
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import com.google.common.flogger.GoogleLogger;
@@ -43,7 +43,6 @@ import java.security.GeneralSecurityException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -62,6 +61,7 @@ import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
+import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.junit.After;
 import org.junit.Before;
@@ -115,13 +115,13 @@ public abstract class AbstractBigQueryIoIntegrationTestBase<T> {
 
   // The InputFormat and OutputFormat handles with which we will invoke the underlying "connector"
   // library methods.
-  private final InputFormat inputFormat;
+  private final InputFormat<?, T> inputFormat;
   private final OutputFormat<Text, JsonObject> outputFormat;
 
   // TableId derived from testId, a unique one should be used for each test method.
   private String testTable;
 
-  public AbstractBigQueryIoIntegrationTestBase(InputFormat inputFormat) {
+  public AbstractBigQueryIoIntegrationTestBase(InputFormat<?, T> inputFormat) {
     this.inputFormat = inputFormat;
     this.outputFormat = new IndirectBigQueryOutputFormat<>();
   }
@@ -137,11 +137,11 @@ public abstract class AbstractBigQueryIoIntegrationTestBase<T> {
   public static Configuration getConfigForGcsFromBigquerySettings(String projectIdValue) {
     TestConfiguration testConf = TestConfiguration.getInstance();
     String serviceAccount = testConf.getServiceAccount();
-    if (Strings.isNullOrEmpty(serviceAccount)) {
+    if (isNullOrEmpty(serviceAccount)) {
       serviceAccount = System.getenv(BigQueryFactory.BIGQUERY_SERVICE_ACCOUNT);
     }
     String privateKeyFile = testConf.getPrivateKeyFile();
-    if (Strings.isNullOrEmpty(privateKeyFile)) {
+    if (isNullOrEmpty(privateKeyFile)) {
       privateKeyFile = System.getenv(BigQueryFactory.BIGQUERY_PRIVATE_KEY_FILE);
     }
 
@@ -162,7 +162,7 @@ public abstract class AbstractBigQueryIoIntegrationTestBase<T> {
 
   private void setConfigForGcsFromBigquerySettings() {
     Configuration conf = getConfigForGcsFromBigquerySettings(projectIdValue);
-    for (Entry<String, String> entry : conf) {
+    for (Map.Entry<String, String> entry : conf) {
       config.set(entry.getKey(), entry.getValue());
     }
   }
@@ -181,12 +181,12 @@ public abstract class AbstractBigQueryIoIntegrationTestBase<T> {
     String testId = bucketHelper.getUniqueBucketPrefix();
 
     projectIdValue = TestConfiguration.getInstance().getProjectId();
-    if (Strings.isNullOrEmpty(projectIdValue)) {
+    if (isNullOrEmpty(projectIdValue)) {
       projectIdValue = System.getenv(BIGQUERY_PROJECT_ID_ENVVARNAME);
     }
 
     checkArgument(
-        !Strings.isNullOrEmpty(projectIdValue), "Must provide %s", BIGQUERY_PROJECT_ID_ENVVARNAME);
+        !isNullOrEmpty(projectIdValue), "Must provide %s", BIGQUERY_PROJECT_ID_ENVVARNAME);
     testDataset = testId + "_dataset";
     testBucket = testId + "_bucket";
 
@@ -229,7 +229,7 @@ public abstract class AbstractBigQueryIoIntegrationTestBase<T> {
     String jobIdString = "jobid" + System.currentTimeMillis();
     JobID jobId = new JobID(jobIdString, jobNumber);
     TaskAttemptID taskAttemptId =
-        new TaskAttemptID(new TaskID(jobId, false, taskNumber), taskAttempt);
+        new TaskAttemptID(new TaskID(jobId, TaskType.REDUCE, taskNumber), taskAttempt);
     when(mockTaskAttemptContext.getTaskAttemptID()).thenReturn(taskAttemptId);
     when(mockJobContext.getJobID()).thenReturn(jobId);
 

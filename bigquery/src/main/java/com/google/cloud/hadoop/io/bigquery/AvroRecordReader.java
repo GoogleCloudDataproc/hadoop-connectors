@@ -13,7 +13,8 @@
  */
 package com.google.cloud.hadoop.io.bigquery;
 
-import com.google.common.base.Preconditions;
+import static com.google.common.base.Preconditions.checkState;
+
 import java.io.IOException;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileReader;
@@ -50,7 +51,7 @@ public class AvroRecordReader extends RecordReader<LongWritable, GenericData.Rec
   }
 
   protected void initializeInternal(InputSplit inputSplit, Configuration conf) throws IOException {
-    Preconditions.checkState(
+    checkState(
         inputSplit instanceof FileSplit, "AvroRecordReader requires FileSplit input splits.");
     FileSplit fileSplit = (FileSplit) inputSplit;
     splitStart = fileSplit.getStart();
@@ -61,7 +62,7 @@ public class AvroRecordReader extends RecordReader<LongWritable, GenericData.Rec
     FileStatus status = fs.getFileStatus(filePath);
     inputFileLength = status.getLen();
 
-    final FSDataInputStream stream = fs.open(filePath);
+    FSDataInputStream stream = fs.open(filePath);
     dataFileReader =
         DataFileReader.openReader(
             new SeekableInput() {
@@ -90,7 +91,7 @@ public class AvroRecordReader extends RecordReader<LongWritable, GenericData.Rec
                 stream.close();
               }
             },
-            new GenericDatumReader<GenericData.Record>());
+            new GenericDatumReader<>());
     // Sync to the first sync point after the start of the split:
     dataFileReader.sync(fileSplit.getStart());
     schema = dataFileReader.getSchema();
@@ -99,7 +100,7 @@ public class AvroRecordReader extends RecordReader<LongWritable, GenericData.Rec
 
   @Override
   public boolean nextKeyValue() throws IOException {
-    Preconditions.checkState(currentRecord != null);
+    checkState(currentRecord != null);
     // Stop reading as soon as we hit a sync point out of our split:
     if (dataFileReader.hasNext() && !dataFileReader.pastSync(splitStart + splitLength)) {
       currentKey.set(currentKey.get() + 1);
@@ -122,7 +123,7 @@ public class AvroRecordReader extends RecordReader<LongWritable, GenericData.Rec
 
   @Override
   public float getProgress() throws IOException {
-    Preconditions.checkState(dataFileReader != null);
+    checkState(dataFileReader != null);
     if (splitLength == 0) {
       return 1.0f;
     }
@@ -132,7 +133,7 @@ public class AvroRecordReader extends RecordReader<LongWritable, GenericData.Rec
 
   @Override
   public void close() throws IOException {
-    Preconditions.checkState(dataFileReader != null);
+    checkState(dataFileReader != null);
     dataFileReader.close();
   }
 }

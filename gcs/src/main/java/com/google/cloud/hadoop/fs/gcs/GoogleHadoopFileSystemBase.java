@@ -353,8 +353,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   }
 
   private void setGcsFs(GoogleCloudStorageFileSystem gcsFs) {
-    this.gcsFsSupplier = Suppliers.ofInstance(gcsFs);
-    this.gcsFsInitialized = true;
+    gcsFsSupplier = Suppliers.ofInstance(gcsFs);
+    gcsFsInitialized = true;
   }
 
   /**
@@ -398,7 +398,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * against poor directory accounting in the PathData class of Hadoop 2's FsShell.
    */
   @Override
-  public Path makeQualified(final Path path) {
+  public Path makeQualified(Path path) {
     Path qualifiedPath = super.makeQualified(path);
 
     URI uri = qualifiedPath.toUri();
@@ -480,7 +480,6 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    *
    * @param config The filesystem configuration
    * @param path The filesystem path
-   * @throws IOException
    */
   private void initializeDelegationTokenSupport(Configuration config, URI path) throws IOException {
     logger.atFiner().log("initializeDelegationTokenSupport(config: %s, path: %s)", config, path);
@@ -526,7 +525,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     return result;
   }
 
-  public boolean hasPathCapability(Path path, String capability) throws IOException {
+  public boolean hasPathCapability(Path path, String capability) {
     switch (validatePathCapabilityArgs(path, capability)) {
         // TODO: remove string literals in favor of Constants in CommonPathCapabilities.java
         // from Hadoop 3 when Hadoop 2 is no longer supported
@@ -1203,7 +1202,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     }
 
     matchedStatuses.sort(
-        ((Comparator<FileStatus>) Comparator.<FileStatus>naturalOrder())
+        Comparator.<FileStatus>naturalOrder()
             // Place duplicate implicit directories after real directory
             .thenComparingInt((FileStatus f) -> isImplicitDirectory(f) ? 1 : 0));
 
@@ -1223,7 +1222,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   private static boolean isImplicitDirectory(FileStatus curr) {
     // Modification time of 0 indicates implicit directory.
-    return curr.isDir() && curr.getModificationTime() == 0;
+    return curr.isDirectory() && curr.getModificationTime() == 0;
   }
 
   /** Helper method that converts {@link FileInfo} collection to {@link FileStatus} collection. */
@@ -1292,7 +1291,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     return String.format(
         "path: %s, isDir: %s, len: %d, owner: %s",
-        stat.getPath().toString(), stat.isDir(), stat.getLen(), stat.getOwner());
+        stat.getPath().toString(), stat.isDirectory(), stat.getLen(), stat.getOwner());
   }
 
   /**
@@ -1550,10 +1549,9 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * Validates and possibly creates buckets needed by subclass.
    *
    * @param gcsFs {@link GoogleCloudStorageFileSystem} to configure buckets
-   * @throws IOException if bucket name is invalid or cannot be found.
    */
   @VisibleForTesting
-  protected abstract void configureBuckets(GoogleCloudStorageFileSystem gcsFs) throws IOException;
+  protected abstract void configureBuckets(GoogleCloudStorageFileSystem gcsFs);
 
   private void configureWorkingDirectory(Configuration config) {
     // Set initial working directory to root so that any configured value gets resolved
@@ -1709,7 +1707,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     checkOpen();
 
     URI gcsPath = getGcsPath(hadoopPath);
-    final FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
+    FileInfo fileInfo = getGcsFs().getFileInfo(gcsPath);
     if (!fileInfo.exists()) {
       throw new FileNotFoundException(
           String.format(

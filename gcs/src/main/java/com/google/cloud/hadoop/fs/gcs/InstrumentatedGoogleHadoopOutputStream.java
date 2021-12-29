@@ -27,7 +27,7 @@ public class InstrumentatedGoogleHadoopOutputStream extends GoogleHadoopOutputSt
     implements IOStatisticsSource {
 
   // Statistics tracker for outputstream related statistics
-  private GhfsOutputStreamStatistics streamStatistics;
+  private final GhfsOutputStreamStatistics streamStatistics;
 
   // IO Statistics tracker from Output Stream
   private final IOStatistics ioStatistics;
@@ -75,16 +75,12 @@ public class InstrumentatedGoogleHadoopOutputStream extends GoogleHadoopOutputSt
   }
 
   public GhfsOutputStreamStatistics getStreamStatistics() {
-    return this.streamStatistics;
+    return streamStatistics;
   }
 
-  /**
-   * Get the current IOStatistics from output stream
-   *
-   * @return
-   */
+  /** Get the current IOStatistics from output stream */
   @Override
   public IOStatistics getIOStatistics() {
-    return this.ioStatistics;
+    return ioStatistics;
   }
 }

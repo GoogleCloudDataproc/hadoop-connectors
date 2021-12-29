@@ -39,7 +39,6 @@ import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.Te
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.common.base.Equivalence;
-import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -68,13 +67,13 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
 
 @RunWith(Parameterized.class)
 public class GoogleCloudStorageTest {
@@ -130,7 +129,7 @@ public class GoogleCloudStorageTest {
   // Test classes using JUnit4 runner must have only a single constructor. Since we
   // want to be able to pass in dependencies, we'll maintain this base class as
   // @Parameterized with @Parameters.
-  @Parameters
+  @Parameterized.Parameters
   public static Collection<Object[]> getConstructorArguments() throws IOException {
     return Arrays.asList(
         new Object[] {new InMemoryGoogleCloudStorage()},
@@ -1081,12 +1080,14 @@ public class GoogleCloudStorageTest {
     }
 
     List<String> sourceObjects =
-        Lists.transform(
-            objectsToCopy, copyObjectData -> copyObjectData.sourceResourceId.getObjectName());
+        objectsToCopy.stream()
+            .map(copyObjectData -> copyObjectData.sourceResourceId.getObjectName())
+            .collect(toList());
 
     List<String> destinationObjects =
-        Lists.transform(
-            objectsToCopy, copyObjectData -> copyObjectData.destinationResourceId.getObjectName());
+        objectsToCopy.stream()
+            .map(copyObjectData -> copyObjectData.destinationResourceId.getObjectName())
+            .collect(toList());
 
     rawStorage.copy(bucketName, sourceObjects, bucketName, destinationObjects);
 

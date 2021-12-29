@@ -56,7 +56,7 @@ public class ShardedInputSplit extends InputSplit implements Writable {
   }
 
   @Override
-  public String[] getLocations() throws IOException {
+  public String[] getLocations() {
     return new String[0];
   }
 

@@ -336,7 +336,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
 
   public static String resumableUploadChunkRequestString(
       String bucketName, String object, Integer generationId, Integer uploadId) {
-    final String generationIdParameter =
+    String generationIdParameter =
         generationId == null ? "" : "ifGenerationMatch=generationId_" + generationId + "&";
     return String.format(
         RESUMABLE_UPLOAD_CHUNK_REQUEST_FORMAT, bucketName, generationIdParameter, object, uploadId);
