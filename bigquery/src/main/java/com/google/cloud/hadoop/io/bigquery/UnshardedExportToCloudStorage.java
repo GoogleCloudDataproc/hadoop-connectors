@@ -13,8 +13,9 @@
  */
 package com.google.cloud.hadoop.io.bigquery;
 
+import static com.google.common.base.Preconditions.checkState;
+
 import com.google.api.services.bigquery.model.Table;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
@@ -30,7 +31,6 @@ import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
-import org.apache.hadoop.util.Progressable;
 
 /**
  * An Export to GCS that provides a single directory for BigQuery to export to and requires all
@@ -38,7 +38,7 @@ import org.apache.hadoop.util.Progressable;
  */
 public class UnshardedExportToCloudStorage extends AbstractExportToCloudStorage {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-  private InputFormat<LongWritable, Text> delegateInputFormat;
+  private final InputFormat<LongWritable, Text> delegateInputFormat;
 
   public UnshardedExportToCloudStorage(
       Configuration configuration,
@@ -49,11 +49,8 @@ public class UnshardedExportToCloudStorage extends AbstractExportToCloudStorage 
       Table tableToExport,
       @Nullable InputFormat<LongWritable, Text> delegateInputFormat) {
     super(configuration, gcsPath, fileFormat, bigQueryHelper, projectId, tableToExport);
-    if (delegateInputFormat == null) {
-      this.delegateInputFormat = new TextInputFormat();
-    } else {
-      this.delegateInputFormat = delegateInputFormat;
-    }
+    this.delegateInputFormat =
+        delegateInputFormat == null ? new TextInputFormat() : delegateInputFormat;
   }
 
   @Override
@@ -77,7 +74,7 @@ public class UnshardedExportToCloudStorage extends AbstractExportToCloudStorage 
   }
 
   @Override
-  public List<String> getExportPaths() throws IOException {
+  public List<String> getExportPaths() {
     logger.atFine().log("Using unsharded splits");
     String exportPattern = gcsPath + "/" + fileFormat.getFilePattern();
     return ImmutableList.of(exportPattern);
@@ -85,17 +82,11 @@ public class UnshardedExportToCloudStorage extends AbstractExportToCloudStorage 
 
   @Override
   public void waitForUsableMapReduceInput() throws IOException, InterruptedException {
-    Preconditions.checkState(
+    checkState(
         exportJobReference != null,
         "beginExport() must be called before waitForUsableMapReduceInput()");
 
     BigQueryUtils.waitForJobCompletion(
-        bigQueryHelper.getRawBigquery(),
-        projectId,
-        exportJobReference,
-        new Progressable() {
-          @Override
-          public void progress() {}
-        });
+        bigQueryHelper.getRawBigquery(), projectId, exportJobReference, () -> {});
   }
 }

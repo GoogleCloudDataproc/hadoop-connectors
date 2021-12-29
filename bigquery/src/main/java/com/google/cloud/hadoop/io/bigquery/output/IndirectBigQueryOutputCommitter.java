@@ -21,7 +21,7 @@ import java.util.Optional;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.JobContext;
-import org.apache.hadoop.mapreduce.JobStatus.State;
+import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.OutputCommitter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
@@ -74,8 +74,8 @@ public class IndirectBigQueryOutputCommitter extends ForwardingBigQueryFileOutpu
           .importFromGcs(
               jobProjectId,
               destTable,
-              destSchema.isPresent() ? destSchema.get().get() : null,
-              timePartitioning.isPresent() ? timePartitioning.get().get() : null,
+              destSchema.map(BigQueryTableSchema::get).orElse(null),
+              timePartitioning.map(BigQueryTimePartitioning::get).orElse(null),
               kmsKeyName,
               outputFileFormat,
               createDisposition,
@@ -95,7 +95,7 @@ public class IndirectBigQueryOutputCommitter extends ForwardingBigQueryFileOutpu
    * OutputCommitter.
    */
   @Override
-  public void abortJob(JobContext context, State state) throws IOException {
+  public void abortJob(JobContext context, JobStatus.State state) throws IOException {
     super.abortJob(context, state);
     cleanup(context);
   }

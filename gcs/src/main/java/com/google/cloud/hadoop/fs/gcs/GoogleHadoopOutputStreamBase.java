@@ -138,11 +138,7 @@ class GoogleHadoopOutputStreamBase extends OutputStream {
     return channel;
   }
 
-  /**
-   * Get the current output stream statistics
-   *
-   * @return
-   */
+  /** Get the current output stream statistics */
   public GhfsOutputStreamStatistics getStreamStatistics() {
     return null;
   }

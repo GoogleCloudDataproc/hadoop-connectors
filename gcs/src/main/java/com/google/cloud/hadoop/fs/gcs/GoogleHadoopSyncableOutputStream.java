@@ -328,7 +328,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
     if (!finalGcsPath.equals(curGcsPath)) {
       StorageResourceId destResourceId =
           StorageResourceId.fromStringPath(finalGcsPath.toString(), curDestGenerationId);
-      final StorageResourceId tempResourceId =
+      StorageResourceId tempResourceId =
           StorageResourceId.fromStringPath(curGcsPath.toString(), generationId);
       if (!destResourceId.getBucketName().equals(tempResourceId.getBucketName())) {
         throw new IllegalStateException(
@@ -366,10 +366,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
             baseDir,
             String.format(
                 "%s%s.%d.%s",
-                TEMPFILE_PREFIX,
-                basePath.getName(),
-                curComponentIndex,
-                UUID.randomUUID().toString()));
+                TEMPFILE_PREFIX, basePath.getName(), curComponentIndex, UUID.randomUUID()));
     return ghfs.getGcsPath(tempPath);
   }
 

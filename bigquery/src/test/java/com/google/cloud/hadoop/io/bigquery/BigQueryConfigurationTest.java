@@ -116,7 +116,6 @@ public class BigQueryConfigurationTest {
     // Generate a sample configuration to properly handle gs:// paths.
     Configuration config = InMemoryGoogleHadoopFileSystem.getSampleConfiguration();
     conf = new JobConf(config);
-    new BigQueryConfiguration();
   }
 
   /**

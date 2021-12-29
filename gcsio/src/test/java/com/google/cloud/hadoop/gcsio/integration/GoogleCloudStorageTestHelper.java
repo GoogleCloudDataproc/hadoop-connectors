@@ -19,6 +19,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertWithMessage;
+import static java.lang.Math.min;
 import static org.junit.Assert.fail;
 
 import com.google.api.client.auth.oauth2.Credential;
@@ -144,7 +145,7 @@ public class GoogleCloudStorageTestHelper {
 
     int expectedBytesLength = expectedBytes.length;
     long expectedBytesTotalLength = (long) expectedBytesLength * expectedBytesCount;
-    ByteBuffer buffer = ByteBuffer.allocate(Math.min(BUFFER_SIZE_MAX_BYTES, expectedBytesLength));
+    ByteBuffer buffer = ByteBuffer.allocate(min(BUFFER_SIZE_MAX_BYTES, expectedBytesLength));
     long totalRead = 0;
     try (SeekableByteChannel channel = gcs.open(id, readOptions)) {
       if (offset > 0) {
@@ -258,7 +259,7 @@ public class GoogleCloudStorageTestHelper {
 
     private static String makeBucketName(String prefix) {
       String username = System.getProperty("user.name", "unknown").replaceAll("[-.]", "");
-      username = username.substring(0, Math.min(username.length(), 10));
+      username = username.substring(0, min(username.length(), 10));
       String uuidSuffix = UUID.randomUUID().toString().substring(0, 8);
       return prefix + DELIMITER + username + DELIMITER + uuidSuffix;
     }

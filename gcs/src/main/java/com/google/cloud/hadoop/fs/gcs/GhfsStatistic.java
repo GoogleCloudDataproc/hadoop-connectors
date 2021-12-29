@@ -181,8 +181,7 @@ public enum GhfsStatistic {
       TYPE_DURATION);
 
   /** A map used to support the {@link #fromSymbol(String)} call. */
-  private static final Map<String, GhfsStatistic> SYMBOL_MAP =
-      new HashMap<>(GhfsStatistic.values().length);
+  private static final Map<String, GhfsStatistic> SYMBOL_MAP = new HashMap<>(values().length);
 
   static {
     for (GhfsStatistic stat : values()) {

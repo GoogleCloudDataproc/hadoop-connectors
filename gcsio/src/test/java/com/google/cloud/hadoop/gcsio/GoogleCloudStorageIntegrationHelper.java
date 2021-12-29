@@ -24,7 +24,6 @@ import com.google.api.client.http.MultipartContent;
 import com.google.api.client.http.json.JsonHttpContent;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
-import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -33,7 +32,6 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -233,7 +231,7 @@ public abstract class GoogleCloudStorageIntegrationHelper {
     }
 
     readBuffer.flip();
-    return StandardCharsets.UTF_8.decode(readBuffer).toString();
+    return UTF_8.decode(readBuffer).toString();
   }
 
   /** Helper that reads text from a given SeekableByteChannel. */
@@ -250,7 +248,7 @@ public abstract class GoogleCloudStorageIntegrationHelper {
     assertWithMessage("readText: read size mismatch").that(numBytesRead).isEqualTo(len);
 
     readBuffer.flip();
-    return StandardCharsets.UTF_8.decode(readBuffer).toString();
+    return UTF_8.decode(readBuffer).toString();
   }
 
   /** Opens the given object for reading. */
@@ -312,8 +310,7 @@ public abstract class GoogleCloudStorageIntegrationHelper {
       throws UnsupportedEncodingException {
     // Determine the expected size.
     if (expectedToExist) {
-      if (Strings.isNullOrEmpty(objectName)
-          || objectName.endsWith(GoogleCloudStorage.PATH_DELIMITER)) {
+      if (isNullOrEmpty(objectName) || objectName.endsWith(GoogleCloudStorage.PATH_DELIMITER)) {
         return 0;
       }
       return objectName.getBytes(UTF_8).length;
@@ -379,11 +376,11 @@ public abstract class GoogleCloudStorageIntegrationHelper {
 
   /** Creates objects with the given names in the given bucket. */
   public void createObjects(String bucketName, String... objectNames) throws Exception {
-    final ExecutorService threadPool = Executors.newCachedThreadPool();
-    final CountDownLatch counter = new CountDownLatch(objectNames.length);
+    ExecutorService threadPool = Executors.newCachedThreadPool();
+    CountDownLatch counter = new CountDownLatch(objectNames.length);
     List<Future<?>> futures = new ArrayList<>();
     // Do each creation asynchronously.
-    for (final String objectName : objectNames) {
+    for (String objectName : objectNames) {
       Future<?> future =
           threadPool.submit(
               () -> {

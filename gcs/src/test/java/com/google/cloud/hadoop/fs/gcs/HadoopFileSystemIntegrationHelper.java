@@ -33,7 +33,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
-import java.nio.charset.StandardCharsets;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -145,7 +144,7 @@ public class HadoopFileSystemIntegrationHelper
     Path hadoopPath = castAsHadoopPath(path);
     try {
       FileStatus status = ghfs.getFileStatus(hadoopPath);
-      return status.isDir();
+      return status.isDirectory();
     } catch (FileNotFoundException e) {
       return false;
     }
@@ -180,7 +179,7 @@ public class HadoopFileSystemIntegrationHelper
       readStream = ghfs.open(hadoopPath);
       int numBytesRead = readStream.read(readBuffer);
       while (numBytesRead > 0) {
-        returnBuffer.append(new String(readBuffer, 0, numBytesRead, StandardCharsets.UTF_8));
+        returnBuffer.append(new String(readBuffer, 0, numBytesRead, UTF_8));
         numBytesRead = readStream.read(readBuffer);
       }
     } finally {
@@ -231,7 +230,7 @@ public class HadoopFileSystemIntegrationHelper
         numBytesRead = readStream.read(readBuffer);
       }
       assertThat(numBytesRead).isEqualTo(len);
-      text = new String(readBuffer, 0, numBytesRead, StandardCharsets.UTF_8);
+      text = new String(readBuffer, 0, numBytesRead, UTF_8);
     } finally {
       if (readStream != null) {
         readStream.close();
@@ -289,7 +288,7 @@ public class HadoopFileSystemIntegrationHelper
     if (statusList != null) {
       for (FileStatus status : statusList) {
         if (!ghfs.delete(status.getPath(), true)) {
-          System.err.println(String.format("Failed to delete path: '%s'", status.getPath()));
+          System.err.printf("Failed to delete path: '%s'%n", status.getPath());
         }
       }
     }

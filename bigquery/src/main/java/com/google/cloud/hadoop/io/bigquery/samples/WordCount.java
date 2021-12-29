@@ -48,12 +48,11 @@ public class WordCount {
   public static class Map extends Mapper<LongWritable, JsonObject, Text, LongWritable> {
 
     private static final LongWritable ONE = new LongWritable(1);
-    private Text word = new Text();
+    private final Text word = new Text();
     private String wordKey;
 
     @Override
-    public void setup(Mapper<LongWritable, JsonObject, Text, LongWritable>.Context context)
-        throws IOException, InterruptedException {
+    public void setup(Mapper<LongWritable, JsonObject, Text, LongWritable>.Context context) {
       // Find the runtime-configured key for the field name we're looking for in the map task.
       Configuration conf = context.getConfiguration();
       wordKey = WORDCOUNT_WORD_FIELDNAME.get(conf, conf::get);

@@ -34,7 +34,6 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
 
 @RunWith(Parameterized.class)
 public class GoogleHadoopOutputStreamIntegrationTest {
@@ -52,7 +51,7 @@ public class GoogleHadoopOutputStreamIntegrationTest {
     gcsFsIHelper.afterAllTests();
   }
 
-  @Parameters
+  @Parameterized.Parameters
   public static Collection<Object[]> getConstructorArguments() {
     return Arrays.asList(
         new Object[] {OutputStreamType.BASIC, PipeType.IO_STREAM_PIPE},

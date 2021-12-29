@@ -14,11 +14,12 @@
 package com.google.cloud.hadoop.io.bigquery;
 
 import static com.google.cloud.hadoop.util.ConfigurationUtil.getMandatoryConfig;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.services.bigquery.model.TableReference;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
@@ -208,20 +209,18 @@ public class BigQueryConfiguration {
   public static void configureBigQueryInput(
       Configuration config, String projectId, String datasetId, String tableId) throws IOException {
     // Check preconditions.
-    Preconditions.checkArgument(
-        !Strings.isNullOrEmpty(datasetId), "datasetId must not be null or empty.");
-    Preconditions.checkArgument(
-        !Strings.isNullOrEmpty(tableId), "tableId must not be null or empty.");
+    checkArgument(!isNullOrEmpty(datasetId), "datasetId must not be null or empty.");
+    checkArgument(!isNullOrEmpty(tableId), "tableId must not be null or empty.");
 
     // Project is optional, if not set use default project.
-    if (!Strings.isNullOrEmpty(projectId)) {
+    if (!isNullOrEmpty(projectId)) {
       logger.atInfo().log("Using specified project-id '%s' for input", projectId);
       config.set(INPUT_PROJECT_ID.getKey(), projectId);
 
       // For user-friendliness, we'll helpfully backfill the input-specific projectId into the
       // "global" projectId for now.
       // TODO(user): Maybe don't try to be user-friendly here.
-      if (Strings.isNullOrEmpty(PROJECT_ID.get(config, config::get))) {
+      if (isNullOrEmpty(PROJECT_ID.get(config, config::get))) {
         logger.atWarning().log(
             "No job-level projectId specified in '%s', using '%s' for it.",
             PROJECT_ID.getKey(), projectId);
@@ -264,22 +263,19 @@ public class BigQueryConfiguration {
       Configuration config, String projectId, String datasetId, String tableId, String tableSchema)
       throws IOException {
     // Check preconditions.
-    Preconditions.checkArgument(
-        !Strings.isNullOrEmpty(datasetId), "datasetId must not be null or empty.");
-    Preconditions.checkArgument(
-        !Strings.isNullOrEmpty(tableId), "tableId must not be null or empty.");
-    Preconditions.checkArgument(
-        !Strings.isNullOrEmpty(tableSchema), "tableSchema must not be null or empty.");
+    checkArgument(!isNullOrEmpty(datasetId), "datasetId must not be null or empty.");
+    checkArgument(!isNullOrEmpty(tableId), "tableId must not be null or empty.");
+    checkArgument(!isNullOrEmpty(tableSchema), "tableSchema must not be null or empty.");
 
     // Project is optional, if not set use default project.
-    if (!Strings.isNullOrEmpty(projectId)) {
+    if (!isNullOrEmpty(projectId)) {
       logger.atInfo().log("Using specified project-id '%s' for output", projectId);
       config.set(OUTPUT_PROJECT_ID.getKey(), projectId);
 
       // For user-friendliness, we'll helpfully backfill the input-specific projectId into the
       // "global" projectId for now.
       // TODO(user): Maybe don't try to be user-friendly here.
-      if (Strings.isNullOrEmpty(PROJECT_ID.get(config, config::get))) {
+      if (isNullOrEmpty(PROJECT_ID.get(config, config::get))) {
         logger.atWarning().log(
             "No job-level projectId specified in '%s', using '%s' for it.",
             PROJECT_ID.getKey(), projectId);
@@ -329,16 +325,16 @@ public class BigQueryConfiguration {
   public static String getTemporaryPathRoot(Configuration conf, @Nullable JobID jobId)
       throws IOException {
     // Try using the temporary gcs path.
-    String pathRoot = conf.get(BigQueryConfiguration.TEMP_GCS_PATH.getKey());
+    String pathRoot = conf.get(TEMP_GCS_PATH.getKey());
 
-    if (Strings.isNullOrEmpty(pathRoot)) {
+    if (isNullOrEmpty(pathRoot)) {
       checkNotNull(jobId, "jobId is required if '%s' is not set", TEMP_GCS_PATH.getKey());
       logger.atInfo().log(
           "Fetching key '%s' since '%s' isn't set explicitly.",
           GCS_BUCKET.getKey(), TEMP_GCS_PATH.getKey());
 
       String gcsBucket = conf.get(GCS_BUCKET.getKey());
-      if (Strings.isNullOrEmpty(gcsBucket)) {
+      if (isNullOrEmpty(gcsBucket)) {
         throw new IOException(
             "Must supply a value for configuration setting: " + GCS_BUCKET.getKey());
       }
@@ -350,7 +346,7 @@ public class BigQueryConfiguration {
     Path workingPath = new Path(pathRoot);
 
     FileSystem fs = workingPath.getFileSystem(conf);
-    Preconditions.checkState("gs".equals(fs.getScheme()), "Export FS must be GCS ('gs' scheme).");
+    checkState("gs".equals(fs.getScheme()), "Export FS must be GCS ('gs' scheme).");
     return pathRoot;
   }
 }

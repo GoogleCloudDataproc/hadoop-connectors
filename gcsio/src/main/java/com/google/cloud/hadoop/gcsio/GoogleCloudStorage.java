@@ -24,7 +24,6 @@ import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -253,7 +252,7 @@ public interface GoogleCloudStorage {
     List<String> srcObjectNames = new ArrayList<>(sourceToDestinationObjectsMap.size());
     List<String> dstObjectNames = new ArrayList<>(sourceToDestinationObjectsMap.size());
 
-    Optional<Entry<StorageResourceId, StorageResourceId>> first =
+    Optional<Map.Entry<StorageResourceId, StorageResourceId>> first =
         sourceToDestinationObjectsMap.entrySet().stream().findFirst();
     String srcBucketName = first.get().getKey().getBucketName();
     String dstBucketName = first.get().getValue().getBucketName();
@@ -419,14 +418,14 @@ public interface GoogleCloudStorage {
    *
    * @param key name of the object related statistics key
    */
-  public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key);
+  AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key);
 
   /**
    * Retrieves the statistics for the given http request-related key
    *
    * @param key name of the http related statistics key
    */
-  public AtomicLong getHttpStatistics(GoogleCloudStorageStatistics key);
+  AtomicLong getHttpStatistics(GoogleCloudStorageStatistics key);
 
   /**
    * Composes inputs into a single GCS object. This performs a GCS Compose. Objects will be composed

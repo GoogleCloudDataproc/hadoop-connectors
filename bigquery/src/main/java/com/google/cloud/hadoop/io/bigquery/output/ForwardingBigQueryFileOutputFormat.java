@@ -22,7 +22,6 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapred.FileAlreadyExistsException;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.OutputCommitter;
 import org.apache.hadoop.mapreduce.OutputFormat;
@@ -56,7 +55,7 @@ public class ForwardingBigQueryFileOutputFormat<K, V> extends OutputFormat<K, V>
    * a connection to BigQuery can be established.
    */
   @Override
-  public void checkOutputSpecs(JobContext job) throws FileAlreadyExistsException, IOException {
+  public void checkOutputSpecs(JobContext job) throws IOException {
     Configuration conf = job.getConfiguration();
 
     // Validate the output configuration.

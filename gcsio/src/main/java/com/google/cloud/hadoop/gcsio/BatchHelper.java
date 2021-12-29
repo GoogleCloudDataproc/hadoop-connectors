@@ -19,6 +19,9 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem.getFrom
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static java.lang.Math.ceil;
+import static java.lang.Math.min;
+import static java.lang.Math.toIntExact;
 
 import com.google.api.client.googleapis.batch.BatchRequest;
 import com.google.api.client.googleapis.batch.json.JsonBatchCallback;
@@ -91,18 +94,18 @@ public class BatchHelper {
       }
       // If maxRequestsPerBatch is too high to fill up all parallel batches (maxThreads)
       // then reduce it to evenly distribute requests across the batches
-      long requestsPerBatch = (long) Math.ceil((double) totalRequests / maxThreads);
-      requestsPerBatch = Math.min(requestsPerBatch, maxRequestsPerBatch);
+      long requestsPerBatch = (long) ceil((double) totalRequests / maxThreads);
+      requestsPerBatch = min(requestsPerBatch, maxRequestsPerBatch);
       // If maxThreads is too high to execute all requests (totalRequests)
       // in batches (requestsPerBatch) then reduce it to minimum required number of threads
-      int numThreads = Math.toIntExact((long) Math.ceil((double) totalRequests / requestsPerBatch));
-      numThreads = Math.min(numThreads, maxThreads);
+      int numThreads = toIntExact((long) ceil((double) totalRequests / requestsPerBatch));
+      numThreads = min(numThreads, maxThreads);
       return new BatchHelper(requestInitializer, gcs, requestsPerBatch, numThreads);
     }
   }
 
   /** Callback that causes a single StorageRequest to be added to the {@link BatchRequest}. */
-  protected static interface QueueRequestCallback {
+  protected interface QueueRequestCallback {
     void enqueue(BatchRequest batch) throws IOException;
   }
 

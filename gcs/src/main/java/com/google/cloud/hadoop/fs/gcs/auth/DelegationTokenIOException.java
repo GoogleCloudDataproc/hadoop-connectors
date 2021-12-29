@@ -54,7 +54,7 @@ public class DelegationTokenIOException extends IOException {
     super(message);
   }
 
-  public DelegationTokenIOException(String message, final Throwable cause) {
+  public DelegationTokenIOException(String message, Throwable cause) {
     super(message, cause);
   }
 }

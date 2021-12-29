@@ -36,7 +36,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.mockito.ArgumentMatchers;
 import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnit4.class)
@@ -266,10 +265,7 @@ public class PerformanceCachingGoogleCloudStorageTest {
 
     // Verify the delegate call.
     verify(gcsDelegate)
-        .listObjectInfo(
-            eq(BUCKET_B),
-            ArgumentMatchers.eq(null),
-            ArgumentMatchers.eq(ListObjectOptions.DEFAULT_FLAT_LIST));
+        .listObjectInfo(eq(BUCKET_B), eq(null), eq(ListObjectOptions.DEFAULT_FLAT_LIST));
     // Verify the result.
     assertThat(result).containsExactlyElementsIn(expected);
     // Verify the state of the cache.
@@ -290,10 +286,7 @@ public class PerformanceCachingGoogleCloudStorageTest {
 
     // Verify the delegate call once.
     verify(gcsDelegate, times(2))
-        .listObjectInfo(
-            eq(BUCKET_A),
-            ArgumentMatchers.eq(null),
-            ArgumentMatchers.eq(ListObjectOptions.DEFAULT_FLAT_LIST));
+        .listObjectInfo(eq(BUCKET_A), eq(null), eq(ListObjectOptions.DEFAULT_FLAT_LIST));
     // Verify the result.
     assertThat(result).containsExactlyElementsIn(expected);
     // Verify the state of the cache.

@@ -38,7 +38,6 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -1365,13 +1364,13 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     // -------------------------------------------------------
     // Call rename() for each path and verify the expected behavior.
-    final ExecutorService threadPool = Executors.newCachedThreadPool();
+    ExecutorService threadPool = Executors.newCachedThreadPool();
 
     try {
       // First do a run-through to check existence of starting files.
-      final List<Throwable> errorList = new ArrayList<>();
-      final CountDownLatch checkStartCounter = new CountDownLatch(renameData.size());
-      for (final RenameData rd : renameData) {
+      List<Throwable> errorList = new ArrayList<>();
+      CountDownLatch checkStartCounter = new CountDownLatch(renameData.size());
+      for (RenameData rd : renameData) {
         @SuppressWarnings("unused") // go/futurereturn-lsc
         Future<?> possiblyIgnoredError =
             threadPool.submit(
@@ -1401,8 +1400,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
       }
 
       // Do a loop to do all the renames.
-      final CountDownLatch renameCounter = new CountDownLatch(renameData.size());
-      for (final RenameData rd : renameData) {
+      CountDownLatch renameCounter = new CountDownLatch(renameData.size());
+      for (RenameData rd : renameData) {
         @SuppressWarnings("unused") // go/futurereturn-lsc
         Future<?> possiblyIgnoredError =
             threadPool.submit(
@@ -1460,8 +1459,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
       }
 
       // Finally, check the existence of final destination files.
-      final CountDownLatch checkDestCounter = new CountDownLatch(renameData.size());
-      for (final RenameData rd : renameData) {
+      CountDownLatch checkDestCounter = new CountDownLatch(renameData.size());
+      for (RenameData rd : renameData) {
         @SuppressWarnings("unused") // go/futurereturn-lsc
         Future<?> possiblyIgnoredError =
             threadPool.submit(
@@ -1598,7 +1597,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   public void testFileCreationSetsAttributes() throws IOException {
     CreateFileOptions createFileOptions =
         CreateFileOptions.builder()
-            .setAttributes(ImmutableMap.of("key1", "value1".getBytes(StandardCharsets.UTF_8)))
+            .setAttributes(ImmutableMap.of("key1", "value1".getBytes(UTF_8)))
             .build();
 
     URI testFilePath = gcsiHelper.getPath(sharedBucketName1, "test-file-creation-attributes.txt");
@@ -1610,8 +1609,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     assertThat(info.getAttributes()).hasSize(1);
     assertThat(info.getAttributes()).containsKey("key1");
-    assertThat(info.getAttributes().get("key1"))
-        .isEqualTo("value1".getBytes(StandardCharsets.UTF_8));
+    assertThat(info.getAttributes().get("key1")).isEqualTo("value1".getBytes(UTF_8));
   }
 
   @Test

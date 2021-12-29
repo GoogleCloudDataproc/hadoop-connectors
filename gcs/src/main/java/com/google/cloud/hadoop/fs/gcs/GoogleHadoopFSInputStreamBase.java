@@ -16,10 +16,11 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
-import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.net.URI;
@@ -38,7 +39,7 @@ class GoogleHadoopFSInputStreamBase extends FSInputStream {
   private final SeekableByteChannel channel;
 
   // Path of the file to read.
-  private URI gcsPath;
+  private final URI gcsPath;
 
   // Number of bytes read through this channel.
   private long totalBytesRead;
@@ -76,7 +77,7 @@ class GoogleHadoopFSInputStreamBase extends FSInputStream {
    * Constructs an instance of GoogleHadoopFSInputStream object with item info
    *
    * @param ghfs Instance of GoogleHadoopFileSystemBase.
-   * @param itemInfo Item info or the metadata of the file to read from.
+   * @param fileInfo File info or the metadata of the file to read from.
    * @param statistics File system statistics object.
    * @throws IOException if an IO error occurs.
    */
@@ -132,7 +133,7 @@ class GoogleHadoopFSInputStreamBase extends FSInputStream {
    */
   @Override
   public synchronized int read(byte[] buf, int offset, int length) throws IOException {
-    Preconditions.checkNotNull(buf, "buf must not be null");
+    checkNotNull(buf, "buf must not be null");
     if (offset < 0 || length < 0 || length > buf.length - offset) {
       throw new IndexOutOfBoundsException();
     }
@@ -209,7 +210,7 @@ class GoogleHadoopFSInputStreamBase extends FSInputStream {
    * @return true if a new source is found, false otherwise.
    */
   @Override
-  public synchronized boolean seekToNewSource(long targetPos) throws IOException {
+  public synchronized boolean seekToNewSource(long targetPos) {
     return false;
   }
 

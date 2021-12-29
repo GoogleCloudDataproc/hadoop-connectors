@@ -37,7 +37,7 @@ public interface Export {
   List<InputSplit> getSplits(JobContext context) throws IOException, InterruptedException;
 
   /** Get a list of export paths to provide to BigQuery */
-  List<String> getExportPaths() throws IOException;
+  List<String> getExportPaths();
 
   /** Delete any temp tables or temporary data locations. */
   void cleanupExport() throws IOException;

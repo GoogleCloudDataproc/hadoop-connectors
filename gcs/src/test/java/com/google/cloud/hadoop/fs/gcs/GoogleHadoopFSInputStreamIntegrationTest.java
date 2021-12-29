@@ -50,7 +50,7 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
 
   @Test
   public void seek_illegalArgument() throws Exception {
-    URI path = gcsFsIHelper.getUniqueObjectUri(this.getClass(), "seek_illegalArgument");
+    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "seek_illegalArgument");
 
     GoogleHadoopFileSystem ghfs =
         GoogleHadoopFileSystemIntegrationHelper.createGhfs(
@@ -67,7 +67,7 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
 
   @Test
   public void read_singleBytes() throws Exception {
-    URI path = gcsFsIHelper.getUniqueObjectUri(this.getClass(), "read_singleBytes");
+    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "read_singleBytes");
 
     GoogleHadoopFileSystem ghfs =
         GoogleHadoopFileSystemIntegrationHelper.createGhfs(
@@ -95,7 +95,7 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
 
   @Test
   public void testAvailable() throws Exception {
-    URI path = gcsFsIHelper.getUniqueObjectUri(this.getClass(), "testAvailable");
+    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "testAvailable");
     GoogleHadoopFileSystem ghfs =
         GoogleHadoopFileSystemIntegrationHelper.createGhfs(
             path, GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
