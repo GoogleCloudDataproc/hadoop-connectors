@@ -1222,7 +1222,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   private static boolean isImplicitDirectory(FileStatus curr) {
     // Modification time of 0 indicates implicit directory.
-    return curr.isDir() && curr.getModificationTime() == 0;
+    return curr.isDirectory() && curr.getModificationTime() == 0;
   }
 
   /** Helper method that converts {@link FileInfo} collection to {@link FileStatus} collection. */
@@ -1291,7 +1291,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     return String.format(
         "path: %s, isDir: %s, len: %d, owner: %s",
-        stat.getPath().toString(), stat.isDir(), stat.getLen(), stat.getOwner());
+        stat.getPath().toString(), stat.isDirectory(), stat.getLen(), stat.getOwner());
   }
 
   /**

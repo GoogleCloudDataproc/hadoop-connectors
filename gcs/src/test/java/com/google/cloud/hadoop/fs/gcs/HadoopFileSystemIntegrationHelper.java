@@ -144,7 +144,7 @@ public class HadoopFileSystemIntegrationHelper
     Path hadoopPath = castAsHadoopPath(path);
     try {
       FileStatus status = ghfs.getFileStatus(hadoopPath);
-      return status.isDir();
+      return status.isDirectory();
     } catch (FileNotFoundException e) {
       return false;
     }

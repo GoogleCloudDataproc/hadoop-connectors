@@ -135,7 +135,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
       boolean expectedToBeDir =
           isNullOrEmpty(objectName) || StringPaths.isDirectoryPath(objectName);
       assertWithMessage("%s", fileStatus.getPath())
-          .that(fileStatus.isDir())
+          .that(fileStatus.isDirectory())
           .isEqualTo(expectedToBeDir);
 
       Instant currentTime = Instant.now();
@@ -256,7 +256,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
       Set<Path> actualPaths = new HashSet<>();
       for (FileStatus status : fileStatus) {
         Path actualPath = status.getPath();
-        if (status.isDir()) {
+        if (status.isDirectory()) {
           assertThat(status.getPath().getName()).isNotEmpty();
         }
         actualPaths.add(actualPath);

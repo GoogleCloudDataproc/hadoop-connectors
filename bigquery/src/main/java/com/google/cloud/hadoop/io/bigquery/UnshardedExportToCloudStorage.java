@@ -14,7 +14,6 @@
 package com.google.cloud.hadoop.io.bigquery;
 
 import static com.google.common.base.Preconditions.checkState;
-import static java.util.Objects.requireNonNullElseGet;
 
 import com.google.api.services.bigquery.model.Table;
 import com.google.common.collect.ImmutableList;
@@ -50,7 +49,8 @@ public class UnshardedExportToCloudStorage extends AbstractExportToCloudStorage 
       Table tableToExport,
       @Nullable InputFormat<LongWritable, Text> delegateInputFormat) {
     super(configuration, gcsPath, fileFormat, bigQueryHelper, projectId, tableToExport);
-    this.delegateInputFormat = requireNonNullElseGet(delegateInputFormat, TextInputFormat::new);
+    this.delegateInputFormat =
+        delegateInputFormat == null ? new TextInputFormat() : delegateInputFormat;
   }
 
   @Override

@@ -244,7 +244,7 @@ public class GsonBigQueryInputFormatTest {
     // The base export path should've gotten created.
     Path baseExportPath = new Path(BigQueryConfiguration.TEMP_GCS_PATH.get(config, config::get));
     FileStatus baseStatus = baseExportPath.getFileSystem(config).getFileStatus(baseExportPath);
-    assertThat(baseStatus.isDir()).isTrue();
+    assertThat(baseStatus.isDirectory()).isTrue();
 
     assertThat(((FileSplit) splits.get(0)).getPath().getName()).isEqualTo("file1");
     assertThat(config.get("mapreduce.input.fileinputformat.inputdir"))

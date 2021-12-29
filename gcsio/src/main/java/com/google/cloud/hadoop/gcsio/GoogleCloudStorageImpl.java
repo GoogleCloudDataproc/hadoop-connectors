@@ -2276,6 +2276,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
     List<ComposeRequest.SourceObjects> sourceObjects =
         sources.stream()
+            // TODO(user): Maybe set generationIds for source objects as well here.
             .map(input -> new ComposeRequest.SourceObjects().setName(input.getObjectName()))
             .collect(Collectors.toList());
     Storage.Objects.Compose compose =
