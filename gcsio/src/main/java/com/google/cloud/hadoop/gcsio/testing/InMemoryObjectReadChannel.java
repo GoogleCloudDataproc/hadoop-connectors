@@ -75,7 +75,10 @@ public class InMemoryObjectReadChannel extends GoogleCloudStorageReadChannel {
       validatePosition(currentPosition);
     }
     InputStream inputStream = new ByteArrayInputStream(content);
-    inputStream.skip(currentPosition);
+    long bytesToSkip = currentPosition;
+    while (bytesToSkip > 0) {
+      bytesToSkip -= inputStream.skip(bytesToSkip);
+    }
     contentChannelPosition = currentPosition;
     return inputStream;
   }

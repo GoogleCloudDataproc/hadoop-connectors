@@ -11,7 +11,6 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.client.util.Clock;
 import com.google.api.services.iamcredentials.v1.IAMCredentials;
-import com.google.api.services.iamcredentials.v1.IAMCredentials.Projects.ServiceAccounts.GenerateAccessToken;
 import com.google.api.services.iamcredentials.v1.model.GenerateAccessTokenRequest;
 import com.google.api.services.iamcredentials.v1.model.GenerateAccessTokenResponse;
 import com.google.common.annotations.VisibleForTesting;
@@ -88,7 +87,7 @@ public class GoogleCredentialWithIamAccessToken extends GoogleCredential {
         new GenerateAccessTokenRequest()
             .setScope(scopes)
             .setLifetime(DEFAULT_ACCESS_TOKEN_LIFETIME);
-    GenerateAccessToken request =
+    IAMCredentials.Projects.ServiceAccounts.GenerateAccessToken request =
         new IAMCredentials(transport, JSON_FACTORY, initializer)
             .projects()
             .serviceAccounts()

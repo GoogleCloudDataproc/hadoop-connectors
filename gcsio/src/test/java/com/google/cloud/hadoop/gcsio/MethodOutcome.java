@@ -25,14 +25,14 @@ public class MethodOutcome {
    * no need to worry about whether some boolean is necessarily "true" or "false" in the case of an
    * exception being thrown, since there will be no return value in such a case.
    */
-  public static enum Type {
+  public enum Type {
     RETURNS_TRUE,
     RETURNS_FALSE,
     THROWS_EXCEPTION
   }
 
-  private Type expectedOutcome;
-  private Class<? extends Exception> expectedExceptionClass;
+  private final Type expectedOutcome;
+  private final Class<? extends Exception> expectedExceptionClass;
 
   public MethodOutcome(Type expectedOutcome) {
     this.expectedOutcome = expectedOutcome;

@@ -76,20 +76,7 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
    *
    * @param response The API response object.
    */
-  public void handleResponse(T response) throws IOException {}
-
-  /**
-   * Derived classes may optionally intercept an IOException thrown from the execute() method of a
-   * prepared request that came from {@link #createRequest}, and return a reconstituted "response"
-   * object if the IOException can be handled as a success; for example, if the caller already has
-   * an identifier for an object, and the response is used solely for obtaining the same identifier,
-   * and the IOException is a handled "409 Already Exists" type of exception, then the derived class
-   * may override this method to return the expected "identifier" response. Return null to let the
-   * exception propagate through correctly.
-   */
-  public T createResponseFromException(IOException e) {
-    return null;
-  }
+  public void handleResponse(T response) {}
 
   /** Returns true if direct media uploads are enabled. */
   public boolean isDirectUploadEnabled() {

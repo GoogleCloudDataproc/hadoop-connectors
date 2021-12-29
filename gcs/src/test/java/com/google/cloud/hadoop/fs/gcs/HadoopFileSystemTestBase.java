@@ -24,6 +24,7 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_FORW
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_TOTAL_BYTES;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_BYTES;
+import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -32,7 +33,6 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest;
 import com.google.cloud.hadoop.gcsio.StringPaths;
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -133,9 +133,9 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
       }
 
       boolean expectedToBeDir =
-          Strings.isNullOrEmpty(objectName) || StringPaths.isDirectoryPath(objectName);
+          isNullOrEmpty(objectName) || StringPaths.isDirectoryPath(objectName);
       assertWithMessage("%s", fileStatus.getPath())
-          .that(fileStatus.isDir())
+          .that(fileStatus.isDirectory())
           .isEqualTo(expectedToBeDir);
 
       Instant currentTime = Instant.now();
@@ -256,7 +256,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
       Set<Path> actualPaths = new HashSet<>();
       for (FileStatus status : fileStatus) {
         Path actualPath = status.getPath();
-        if (status.isDir()) {
+        if (status.isDirectory()) {
           assertThat(status.getPath().getName()).isNotEmpty();
         }
         actualPaths.add(actualPath);

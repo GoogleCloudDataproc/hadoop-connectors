@@ -36,11 +36,9 @@ import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.CheckedFunction;
 import com.google.cloud.hadoop.util.LazyExecutorService;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.FileNotFoundException;
@@ -67,6 +65,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 /**
@@ -141,7 +140,6 @@ public class GoogleCloudStorageFileSystem {
    * @param credential OAuth2 credential that allows access to GCS.
    * @param options Options for how this filesystem should operate and configure its underlying
    *     storage.
-   * @throws IOException
    */
   public GoogleCloudStorageFileSystem(
       Credential credential, GoogleCloudStorageFileSystemOptions options) throws IOException {
@@ -159,7 +157,6 @@ public class GoogleCloudStorageFileSystem {
    * @param downscopedAccessTokenFn Function that generates downscoped access token.
    * @param options Options for how this filesystem should operate and configure its underlying
    *     storage.
-   * @throws IOException
    */
   public GoogleCloudStorageFileSystem(
       Credential credential,
@@ -248,7 +245,7 @@ public class GoogleCloudStorageFileSystem {
    */
   public WritableByteChannel create(URI path, CreateFileOptions createOptions) throws IOException {
     logger.atFiner().log("create(path: %s, createOptions: %s)", path, createOptions);
-    Preconditions.checkNotNull(path, "path could not be null");
+    checkNotNull(path, "path could not be null");
     StorageResourceId resourceId =
         StorageResourceId.fromUriPath(path, /* allowEmptyObjectName=*/ true);
 
@@ -318,7 +315,7 @@ public class GoogleCloudStorageFileSystem {
   public SeekableByteChannel open(URI path, GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     logger.atFiner().log("open(path: %s, readOptions: %s)", path, readOptions);
-    Preconditions.checkNotNull(path, "path should not be null");
+    checkNotNull(path, "path should not be null");
     StorageResourceId resourceId =
         StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ false);
     checkArgument(!resourceId.isDirectory(), "Cannot open a directory for reading: %s", path);
@@ -365,10 +362,9 @@ public class GoogleCloudStorageFileSystem {
    * @param path Path of the item to delete.
    * @param recursive If true, all sub-items are also deleted.
    * @throws FileNotFoundException if the given path does not exist.
-   * @throws IOException
    */
   public void delete(URI path, boolean recursive) throws IOException {
-    Preconditions.checkNotNull(path, "path should not be null");
+    checkNotNull(path, "path should not be null");
     checkArgument(!path.equals(GCS_ROOT), "Cannot delete root path (%s)", path);
     logger.atFiner().log("delete(path: %s, recursive: %b)", path, recursive);
 
@@ -471,7 +467,6 @@ public class GoogleCloudStorageFileSystem {
    *
    * @param path Path of the item to check.
    * @return true if the given item exists, false otherwise.
-   * @throws IOException
    */
   public boolean exists(URI path) throws IOException {
     logger.atFiner().log("exists(path: %s)", path);
@@ -483,11 +478,10 @@ public class GoogleCloudStorageFileSystem {
    * Similar to 'mkdir -p' command.
    *
    * @param path Path of the directory to create.
-   * @throws IOException
    */
   public void mkdirs(URI path) throws IOException {
     logger.atFiner().log("mkdirs(path: %s)", path);
-    Preconditions.checkNotNull(path, "path should not be null");
+    checkNotNull(path, "path should not be null");
 
     mkdirsInternal(StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true));
   }
@@ -567,8 +561,8 @@ public class GoogleCloudStorageFileSystem {
    */
   public void rename(URI src, URI dst) throws IOException {
     logger.atFiner().log("rename(src: %s, dst: %s)", src, dst);
-    Preconditions.checkNotNull(src);
-    Preconditions.checkNotNull(dst);
+    checkNotNull(src);
+    checkNotNull(dst);
     checkArgument(!src.equals(GCS_ROOT), "Root path cannot be renamed.");
 
     // Parent of the destination path.
@@ -758,8 +752,9 @@ public class GoogleCloudStorageFileSystem {
   public void compose(List<URI> sources, URI destination, String contentType) throws IOException {
     StorageResourceId destResource = StorageResourceId.fromStringPath(destination.toString());
     List<String> sourceObjects =
-        Lists.transform(
-            sources, uri -> StorageResourceId.fromStringPath(uri.toString()).getObjectName());
+        sources.stream()
+            .map(uri -> StorageResourceId.fromStringPath(uri.toString()).getObjectName())
+            .collect(Collectors.toList());
     gcs.compose(
         destResource.getBucketName(), sourceObjects, destResource.getObjectName(), contentType);
   }
@@ -991,11 +986,10 @@ public class GoogleCloudStorageFileSystem {
   }
 
   private StorageResourceId getPrefixId(URI prefix) {
-    Preconditions.checkNotNull(prefix, "prefix could not be null");
+    checkNotNull(prefix, "prefix could not be null");
 
     StorageResourceId prefixId = StorageResourceId.fromUriPath(prefix, true);
-    Preconditions.checkArgument(
-        !prefixId.isRoot(), "prefix must not be global root, got '%s'", prefix);
+    checkArgument(!prefixId.isRoot(), "prefix must not be global root, got '%s'", prefix);
 
     return prefixId;
   }
@@ -1021,7 +1015,7 @@ public class GoogleCloudStorageFileSystem {
    * @throws FileNotFoundException if the given path does not exist.
    */
   public List<FileInfo> listFileInfo(URI path, ListFileOptions listOptions) throws IOException {
-    Preconditions.checkNotNull(path, "path can not be null");
+    checkNotNull(path, "path can not be null");
     logger.atFiner().log("listFileInfo(path: %s)", path);
 
     StorageResourceId pathId =
@@ -1205,7 +1199,7 @@ public class GoogleCloudStorageFileSystem {
    */
   @VisibleForTesting
   public void mkdir(URI path) throws IOException {
-    Preconditions.checkNotNull(path);
+    checkNotNull(path);
     logger.atFiner().log("mkdir(path: %s)", path);
     checkArgument(!path.equals(GCS_ROOT), "Cannot create root directory.");
 
@@ -1278,7 +1272,7 @@ public class GoogleCloudStorageFileSystem {
 
   /** Gets the leaf item of the given path. */
   String getItemName(URI path) {
-    Preconditions.checkNotNull(path, "path can not be null");
+    checkNotNull(path, "path can not be null");
 
     // There is no leaf item for the root path.
     if (path.equals(GCS_ROOT)) {

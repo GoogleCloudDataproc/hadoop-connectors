@@ -20,7 +20,6 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.encodeMetadat
 
 import com.google.api.client.http.InputStreamContent;
 import com.google.api.services.storage.Storage;
-import com.google.api.services.storage.Storage.Objects.Insert;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.util.AbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
@@ -31,7 +30,7 @@ import java.util.concurrent.ExecutorService;
 
 /** Implements WritableByteChannel to provide write access to GCS. */
 public class GoogleCloudStorageWriteChannel
-    extends AbstractGoogleAsyncWriteChannel<Insert, StorageObject>
+    extends AbstractGoogleAsyncWriteChannel<Storage.Objects.Insert, StorageObject>
     implements GoogleCloudStorageItemInfo.Provider {
 
   private static final long MIN_LOGGING_INTERVAL_MS = 60000L;
@@ -70,7 +69,7 @@ public class GoogleCloudStorageWriteChannel
   }
 
   @Override
-  public Insert createRequest(InputStreamContent inputStream) throws IOException {
+  public Storage.Objects.Insert createRequest(InputStreamContent inputStream) throws IOException {
     // Create object with the given name and metadata.
     StorageObject object =
         new StorageObject()
@@ -78,7 +77,7 @@ public class GoogleCloudStorageWriteChannel
             .setMetadata(encodeMetadata(createOptions.getMetadata()))
             .setName(resourceId.getObjectName());
 
-    Insert insert =
+    Storage.Objects.Insert insert =
         gcs.objects()
             .insert(resourceId.getBucketName(), object, inputStream)
             .setName(resourceId.getObjectName())
@@ -97,8 +96,7 @@ public class GoogleCloudStorageWriteChannel
 
   @Override
   public void handleResponse(StorageObject response) {
-    this.completedItemInfo =
-        GoogleCloudStorageImpl.createItemInfoForStorageObject(resourceId, response);
+    completedItemInfo = GoogleCloudStorageImpl.createItemInfoForStorageObject(resourceId, response);
   }
 
   @Override

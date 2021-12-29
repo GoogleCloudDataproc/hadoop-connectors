@@ -38,7 +38,7 @@ import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.JobStatus.State;
+import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.OutputCommitter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
@@ -140,7 +140,6 @@ public class IndirectBigQueryOutputCommitterTest {
   @Mock private TaskAttemptContext mockTaskAttemptContext;
   @Mock private OutputCommitter mockCommitter;
 
-  /** Verify exceptions are being thrown. */
   /** Sets up common objects for testing before each test. */
   @Before
   public void setUp() throws IOException {
@@ -287,12 +286,12 @@ public class IndirectBigQueryOutputCommitterTest {
     // Setup the sample directory.
     generateSampleFiles();
 
-    committer.abortJob(mockTaskAttemptContext, State.KILLED);
+    committer.abortJob(mockTaskAttemptContext, JobStatus.State.KILLED);
 
     // Ensure files are deleted by cleanup.
     assertThat(!ghfs.exists(outputPath)).isTrue();
     assertThat(!ghfs.exists(outputSampleFilePath)).isTrue();
 
-    verify(mockCommitter).abortJob(eq(mockTaskAttemptContext), eq(State.KILLED));
+    verify(mockCommitter).abortJob(eq(mockTaskAttemptContext), eq(JobStatus.State.KILLED));
   }
 }

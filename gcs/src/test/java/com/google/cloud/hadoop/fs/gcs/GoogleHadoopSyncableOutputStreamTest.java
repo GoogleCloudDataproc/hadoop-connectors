@@ -18,6 +18,7 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HFLUSH;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_TYPE;
 import static com.google.common.truth.Truth.assertThat;
+import static java.lang.Math.toIntExact;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
@@ -76,9 +77,9 @@ public class GoogleHadoopSyncableOutputStreamTest {
     Path objectPath = new Path(ghfs.getFileSystemRoot(), "dir/object.txt");
     FSDataOutputStream fout = ghfs.create(objectPath);
 
-    byte[] data1 = new byte[] {0x0f, 0x0e, 0x0e, 0x0d};
-    byte[] data2 = new byte[] {0x0b, 0x0e, 0x0e, 0x0f};
-    byte[] data3 = new byte[] {0x04, 0x02};
+    byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
+    byte[] data2 = {0x0b, 0x0e, 0x0e, 0x0f};
+    byte[] data3 = {0x04, 0x02};
     byte[] data1Read = new byte[4];
     byte[] data2Read = new byte[4];
     byte[] data3Read = new byte[2];
@@ -133,8 +134,8 @@ public class GoogleHadoopSyncableOutputStreamTest {
     when(mockExecutorService.submit(any(Callable.class)))
         .thenReturn(Futures.immediateFailedFuture(new ExecutionException(fakeIoException)));
 
-    byte[] data1 = new byte[] {0x0f, 0x0e, 0x0e, 0x0d};
-    byte[] data2 = new byte[] {0x0b, 0x0e, 0x0e, 0x0f};
+    byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
+    byte[] data2 = {0x0b, 0x0e, 0x0e, 0x0f};
 
     fout.write(data1, 0, data1.length);
     fout.sync(); // This one commits straight into destination.
@@ -243,8 +244,8 @@ public class GoogleHadoopSyncableOutputStreamTest {
             SyncableOutputStreamOptions.DEFAULT,
             mockExecutorService);
 
-    byte[] data1 = new byte[] {0x0f, 0x0e, 0x0e, 0x0d};
-    byte[] data2 = new byte[] {0x0b, 0x0d, 0x0e, 0x0e, 0x0f};
+    byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
+    byte[] data2 = {0x0b, 0x0d, 0x0e, 0x0e, 0x0f};
 
     fout.write(data1, 0, data1.length);
     fout.sync();
@@ -271,8 +272,8 @@ public class GoogleHadoopSyncableOutputStreamTest {
             SyncableOutputStreamOptions.DEFAULT,
             mockExecutorService);
 
-    byte[] data1 = new byte[] {0x0f, 0x0e, 0x0e, 0x0d};
-    byte[] data2 = new byte[] {0x0b, 0x0d, 0x0e, 0x0e, 0x0f};
+    byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
+    byte[] data2 = {0x0b, 0x0d, 0x0e, 0x0e, 0x0f};
 
     fout.write(data1, 0, data1.length);
     fout.hsync();
@@ -286,8 +287,7 @@ public class GoogleHadoopSyncableOutputStreamTest {
 
   private byte[] readFile(Path objectPath) throws IOException {
     FileStatus status = ghfs.getFileStatus(objectPath);
-    ByteArrayOutputStream allReadBytes =
-        new ByteArrayOutputStream(Math.toIntExact(status.getLen()));
+    ByteArrayOutputStream allReadBytes = new ByteArrayOutputStream(toIntExact(status.getLen()));
     byte[] readBuffer = new byte[1024 * 1024];
     try (FSDataInputStream in = ghfs.open(objectPath)) {
       int readBytes;

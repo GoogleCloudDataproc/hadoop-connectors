@@ -30,16 +30,7 @@ class GoogleHadoopFileStatus extends FileStatus {
 
   private final FileInfo fileInfo;
 
-  /**
-   * Constructs an instance GoogleHadoopFileStatus
-   *
-   * @param fileInfo
-   * @param filePath
-   * @param blockReplication
-   * @param defaultBlockSize
-   * @param reportedPermissions
-   * @param userName
-   */
+  /** Constructs an instance GoogleHadoopFileStatus */
   GoogleHadoopFileStatus(
       FileInfo fileInfo,
       Path filePath,

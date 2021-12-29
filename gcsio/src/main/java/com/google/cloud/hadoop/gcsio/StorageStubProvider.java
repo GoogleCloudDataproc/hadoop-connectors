@@ -22,20 +22,15 @@ import io.grpc.alts.GoogleDefaultChannelBuilder;
 import io.grpc.alts.GoogleDefaultChannelCredentials;
 import io.grpc.auth.MoreCallCredentials;
 import io.grpc.stub.AbstractStub;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 
 /** Provides gRPC stubs for accessing the Storage gRPC API. */
 class StorageStubProvider {
 
-  // The maximum number of times to automatically retry gRPC requests.
-  private static final double GRPC_MAX_RETRY_ATTEMPTS = 10;
-
   private static final ImmutableSet<Status.Code> STUB_BROKEN_ERROR_CODES =
       ImmutableSet.of(Status.Code.DEADLINE_EXCEEDED, Status.Code.UNAVAILABLE);
 
   private final GoogleCloudStorageOptions options;
-  private final String userAgent;
   private final ExecutorService backgroundTasksThreadPool;
   private final GrpcDecorator grpcDecorator;
   private ManagedChannel channel;
@@ -50,16 +45,17 @@ class StorageStubProvider {
       ExecutorService backgroundTasksThreadPool,
       GrpcDecorator grpcDecorator) {
     this.options = options;
-    this.userAgent = options.getAppName();
     this.backgroundTasksThreadPool = backgroundTasksThreadPool;
     this.grpcDecorator = checkNotNull(grpcDecorator, "grpcDecorator cannot be null");
   }
 
   private ManagedChannel buildManagedChannel() {
     String target = options.getGrpcServerAddress();
-    ManagedChannel channel =
-        grpcDecorator.createChannelBuilder(target).enableRetry().userAgent(userAgent).build();
-    return channel;
+    return grpcDecorator
+        .createChannelBuilder(target)
+        .enableRetry()
+        .userAgent(options.getAppName())
+        .build();
   }
 
   public static boolean isStubBroken(Status.Code statusCode) {
@@ -111,27 +107,24 @@ class StorageStubProvider {
   }
 
   static class DirectPathGrpcDecorator implements GrpcDecorator {
-    private final GoogleCloudStorageReadOptions readOptions;
 
-    DirectPathGrpcDecorator(GoogleCloudStorageReadOptions readOptions) {
-      this.readOptions = readOptions;
-    }
+    private static final ImmutableMap<String, Object> GRPC_SERVICE_CONFIG =
+        ImmutableMap.of(
+            "loadBalancingConfig",
+            ImmutableList.of(
+                ImmutableMap.of(
+                    "grpclb",
+                    ImmutableMap.of(
+                        "childPolicy",
+                        ImmutableList.of(ImmutableMap.of("round_robin", ImmutableMap.of()))))));
 
     public ManagedChannelBuilder<?> createChannelBuilder(String target) {
       return GoogleDefaultChannelBuilder.forTarget(target)
-          .defaultServiceConfig(getGrpcServiceConfig());
+          .defaultServiceConfig(GRPC_SERVICE_CONFIG);
     }
 
     public AbstractStub<?> applyCallOption(AbstractStub<?> stub) {
       return stub;
-    }
-
-    private Map<String, Object> getGrpcServiceConfig() {
-      Map<String, Object> childLbStrategy = ImmutableMap.of("round_robin", ImmutableMap.of());
-      Map<String, Object> childPolicy =
-          ImmutableMap.of("childPolicy", ImmutableList.of(childLbStrategy));
-      Map<String, Object> grpcLbPolicy = ImmutableMap.of("grpclb", childPolicy);
-      return ImmutableMap.of("loadBalancingConfig", ImmutableList.of(grpcLbPolicy));
     }
   }
 
@@ -152,34 +145,39 @@ class StorageStubProvider {
       GoogleCloudStorageOptions options,
       ExecutorService backgroundTasksThreadPool,
       Credential credential) {
-    boolean isDefaultServiceAccount =
+    boolean defaultServiceAccount =
         credential != null
             && java.util.Objects.equals(
                 credential.getTokenServerEncodedUrl(), ComputeCredential.TOKEN_SERVER_ENCODED_URL);
-    GrpcDecorator decorator;
-    if (options.isTrafficDirectorEnabled() && isDefaultServiceAccount) {
-      decorator = new TrafficDirectorGrpcDecorator();
-    } else if (options.isDirectPathPreferred() && isDefaultServiceAccount) {
-      decorator = new DirectPathGrpcDecorator(options.getReadChannelOptions());
-    } else {
-      decorator = new CloudPathGrpcDecorator(new CredentialAdapter(credential));
-    }
-    return new StorageStubProvider(options, backgroundTasksThreadPool, decorator);
+    GrpcDecorator grpcDecorator =
+        getGrpcDecorator(
+            options,
+            defaultServiceAccount,
+            new CloudPathGrpcDecorator(new CredentialAdapter(credential)));
+    return new StorageStubProvider(options, backgroundTasksThreadPool, grpcDecorator);
   }
 
   public static StorageStubProvider newInstance(
       GoogleCloudStorageOptions options,
       ExecutorService backgroundTasksThreadPool,
       Credentials credentials) {
-    boolean isDefaultServiceAccount = credentials instanceof ComputeEngineCredentials;
-    GrpcDecorator decorator;
-    if (options.isTrafficDirectorEnabled() && isDefaultServiceAccount) {
-      decorator = new TrafficDirectorGrpcDecorator();
-    } else if (options.isDirectPathPreferred() && isDefaultServiceAccount) {
-      decorator = new DirectPathGrpcDecorator(options.getReadChannelOptions());
-    } else {
-      decorator = new CloudPathGrpcDecorator(credentials);
+    boolean defaultServiceAccount = credentials instanceof ComputeEngineCredentials;
+    return new StorageStubProvider(
+        options,
+        backgroundTasksThreadPool,
+        getGrpcDecorator(options, defaultServiceAccount, new CloudPathGrpcDecorator(credentials)));
+  }
+
+  private static GrpcDecorator getGrpcDecorator(
+      GoogleCloudStorageOptions options,
+      boolean defaultServiceAccount,
+      CloudPathGrpcDecorator credential) {
+    if (options.isTrafficDirectorEnabled() && defaultServiceAccount) {
+      return new TrafficDirectorGrpcDecorator();
     }
-    return new StorageStubProvider(options, backgroundTasksThreadPool, decorator);
+    if (options.isDirectPathPreferred() && defaultServiceAccount) {
+      return new DirectPathGrpcDecorator();
+    }
+    return credential;
   }
 }

@@ -16,6 +16,7 @@
 package com.google.cloud.hadoop.util;
 
 import static com.google.common.base.Strings.isNullOrEmpty;
+import static java.lang.Math.toIntExact;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import com.google.api.client.auth.oauth2.Credential;
@@ -242,8 +243,8 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     request.setNumberOfRetries(options.getMaxRequestRetries());
 
     // Set the timeout configurations.
-    request.setConnectTimeout(Math.toIntExact(options.getConnectTimeout().toMillis()));
-    request.setReadTimeout(Math.toIntExact(options.getReadTimeout().toMillis()));
+    request.setConnectTimeout(toIntExact(options.getConnectTimeout().toMillis()));
+    request.setReadTimeout(toIntExact(options.getReadTimeout().toMillis()));
 
     // IOExceptions such as "socket timed out" of "insufficient bytes written" will follow a
     // straightforward backoff.

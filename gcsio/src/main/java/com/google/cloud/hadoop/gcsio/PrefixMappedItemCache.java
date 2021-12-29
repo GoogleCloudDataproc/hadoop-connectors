@@ -119,17 +119,6 @@ public class PrefixMappedItemCache {
   }
 
   /**
-   * Checks whether any items with specified prefix are in the cache.
-   *
-   * @param id the prefix resource id of the cached items to check.
-   * @return true if items with provided prefix are cached, false otherwise.
-   */
-  public synchronized boolean isPrefixCached(StorageResourceId id) {
-    PrefixKey key = new PrefixKey(id.getBucketName(), id.getObjectName());
-    return !getPrefixSubMap(itemMap, key).isEmpty();
-  }
-
-  /**
    * Invalidates all cached items and lists associated with the given bucket.
    *
    * @param bucket the bucket to invalidate. This must not be null.
@@ -274,14 +263,6 @@ public class PrefixMappedItemCache {
     @Override
     public String toString() {
       return "PrefixKey [bucket=" + bucket + ", objectName=" + objectName + "]";
-    }
-
-    /**
-     * Checks if the given {@link PrefixKey} is a parent of this. A parent exists in the same bucket
-     * and its object name is a prefix to this one.
-     */
-    public boolean isParent(PrefixKey other) {
-      return bucket.equals(other.bucket) && objectName.startsWith(other.objectName);
     }
 
     /**

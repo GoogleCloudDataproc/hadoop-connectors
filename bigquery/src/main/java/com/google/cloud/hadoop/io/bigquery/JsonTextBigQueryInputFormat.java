@@ -14,7 +14,6 @@
 package com.google.cloud.hadoop.io.bigquery;
 
 import com.google.common.flogger.GoogleLogger;
-import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
@@ -31,7 +30,7 @@ public class JsonTextBigQueryInputFormat extends AbstractBigQueryInputFormat<Lon
 
   @Override
   public RecordReader<LongWritable, Text> createDelegateRecordReader(
-      InputSplit split, Configuration configuration) throws IOException, InterruptedException {
+      InputSplit split, Configuration configuration) {
     logger.atFine().log("createDelegateRecordReader -> new LineRecordReader");
     return new LineRecordReader();
   }

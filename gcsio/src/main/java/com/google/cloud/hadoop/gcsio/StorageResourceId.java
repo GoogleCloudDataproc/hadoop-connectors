@@ -20,7 +20,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
-import com.google.common.base.Strings;
 import com.google.common.flogger.GoogleLogger;
 import java.net.URI;
 import java.util.Objects;
@@ -88,7 +87,7 @@ public class StorageResourceId {
    * @param bucketName The bucket name of the resource. Must be non-empty and non-null.
    */
   public StorageResourceId(String bucketName) {
-    checkArgument(!Strings.isNullOrEmpty(bucketName), "bucketName must not be null or empty");
+    checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
 
     this.bucketName = bucketName;
     this.objectName = null;
@@ -104,8 +103,8 @@ public class StorageResourceId {
    * @param objectName The object name of the resource. Must be non-empty and non-null.
    */
   public StorageResourceId(String bucketName, String objectName) {
-    checkArgument(!Strings.isNullOrEmpty(bucketName), "bucketName must not be null or empty");
-    checkArgument(!Strings.isNullOrEmpty(objectName), "objectName must not be null or empty");
+    checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
+    checkArgument(!isNullOrEmpty(objectName), "objectName must not be null or empty");
 
     this.bucketName = bucketName;
     this.objectName = objectName;
@@ -123,8 +122,8 @@ public class StorageResourceId {
    *     StorageResourceId as an identifier for mutation requests.
    */
   public StorageResourceId(String bucketName, String objectName, long generationId) {
-    checkArgument(!Strings.isNullOrEmpty(bucketName), "bucketName must not be null or empty");
-    checkArgument(!Strings.isNullOrEmpty(objectName), "objectName must not be null or empty");
+    checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
+    checkArgument(!isNullOrEmpty(objectName), "objectName must not be null or empty");
 
     this.bucketName = bucketName;
     this.objectName = objectName;
@@ -141,7 +140,7 @@ public class StorageResourceId {
    *     StorageResourceId as an identifier for mutation requests.
    */
   public StorageResourceId(String bucketName, long generationId) {
-    checkArgument(!Strings.isNullOrEmpty(bucketName), "bucketName must not be null or empty");
+    checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
     this.bucketName = bucketName;
     this.objectName = null;
     this.stringPath = StringPaths.fromComponents(bucketName, objectName);
@@ -301,7 +300,7 @@ public class StorageResourceId {
     }
 
     if (path.equals(GoogleCloudStorageFileSystem.GCS_ROOT)) {
-      return StorageResourceId.ROOT;
+      return ROOT;
     }
 
     String bucketName = StringPaths.validateBucketName(path.getAuthority());

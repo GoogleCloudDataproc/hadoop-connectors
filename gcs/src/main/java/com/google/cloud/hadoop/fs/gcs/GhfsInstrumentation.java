@@ -107,10 +107,10 @@ public class GhfsInstrumentation
    * with the rest of the Ghfsinstrumentation. Most inner statistics implementation classes only
    * update this store when it is pushed back, such as as in close().
    */
-  private IOStatisticsStore instanceIOStatistics;
+  private final IOStatisticsStore instanceIOStatistics;
 
   /** Duration Tracker Factory for the Instrumentation */
-  private DurationTrackerFactory durationTrackerFactory;
+  private final DurationTrackerFactory durationTrackerFactory;
 
   private String metricsSourceName;
 
@@ -309,7 +309,7 @@ public class GhfsInstrumentation
    * @param name counter name.
    * @param count increment value
    */
-  private void incrementMutableCounter(final String name, final long count) {
+  private void incrementMutableCounter(String name, long count) {
     if (count > 0) {
       MutableCounterLong counter = lookupCounter(name);
       if (counter != null) {
@@ -328,7 +328,7 @@ public class GhfsInstrumentation
 
     private boolean failed;
 
-    private MetricUpdatingDurationTracker(final String symbol, final long count) {
+    private MetricUpdatingDurationTracker(String symbol, long count) {
       this.symbol = symbol;
       incrementMutableCounter(symbol, count);
     }
@@ -367,7 +367,7 @@ public class GhfsInstrumentation
      * @return a duration tracker.
      */
     @Override
-    public DurationTracker trackDuration(final String key, final long count) {
+    public DurationTracker trackDuration(String key, long count) {
       return new MetricUpdatingDurationTracker(key, count);
     }
   }
@@ -381,7 +381,7 @@ public class GhfsInstrumentation
    * @return a duration tracker.
    */
   @Override
-  public DurationTracker trackDuration(final String key, final long count) {
+  public DurationTracker trackDuration(String key, long count) {
     return durationTrackerFactory.trackDuration(key, count);
   }
 
@@ -418,7 +418,7 @@ public class GhfsInstrumentation
    * @param filesystemStatistics FS Statistics to update in close().
    */
   public GhfsInputStreamStatistics newInputStreamStatistics(
-      @Nullable final FileSystem.Statistics filesystemStatistics) {
+      @Nullable FileSystem.Statistics filesystemStatistics) {
     return new InputStreamStatistics(filesystemStatistics);
   }
 
@@ -543,7 +543,7 @@ public class GhfsInstrumentation
      * @return the Input Stream's statistics.
      */
     private IOStatisticsStore localIOStatistics() {
-      return InputStreamStatistics.super.getIOStatistics();
+      return super.getIOStatistics();
     }
 
     /**
@@ -562,7 +562,7 @@ public class GhfsInstrumentation
      * skipped in seek, where appropriate.
      */
     @Override
-    public void seekForwards(final long skipped) {
+    public void seekForwards(long skipped) {
       if (skipped > 0) {
         bytesSkippedOnSeek.addAndGet(skipped);
       }
@@ -801,7 +801,7 @@ public class GhfsInstrumentation
      * @return the Input Stream's statistics.
      */
     private IOStatisticsStore localIOStatistics() {
-      return OutputStreamStatistics.super.getIOStatistics();
+      return super.getIOStatistics();
     }
 
     @Override
@@ -867,10 +867,10 @@ public class GhfsInstrumentation
   private void mergeOutputStreamStatistics(OutputStreamStatistics source) {
 
     incrementCounter(
-        GhfsStatistic.STREAM_WRITE_EXCEPTIONS,
+        STREAM_WRITE_EXCEPTIONS,
         source.lookupCounterValue(StreamStatisticNames.STREAM_WRITE_EXCEPTIONS));
     // merge in all the IOStatistics
-    this.getIOStatistics().aggregate(source.getIOStatistics());
+    getIOStatistics().aggregate(source.getIOStatistics());
   }
 
   /**
@@ -902,7 +902,7 @@ public class GhfsInstrumentation
      * @return the Input Stream's statistics.
      */
     private IOStatisticsStore localIOStatistics() {
-      return DelegationTokenStatisticsImpl.super.getIOStatistics();
+      return super.getIOStatistics();
     }
 
     /**
@@ -913,7 +913,7 @@ public class GhfsInstrumentation
     private void mergeDelegationTokenStatistics(DelegationTokenStatistics source) {
 
       // merge in all the IOStatistics
-      this.getIOStatistics().aggregate(source.getIOStatistics());
+      getIOStatistics().aggregate(source.getIOStatistics());
     }
 
     /** A token has been issued. */
@@ -929,13 +929,13 @@ public class GhfsInstrumentation
      * @return a duration tracker.
      */
     @Override
-    public DurationTracker trackDuration(final String key, final long count) {
+    public DurationTracker trackDuration(String key, long count) {
       return getDurationTrackerFactory().trackDuration(key, count);
     }
   }
 
   private IOStatisticsStoreBuilder createStoreBuilder() {
-    IOStatisticsStoreBuilder storeBuilder = IOStatisticsBinding.iostatisticsStore();
+    IOStatisticsStoreBuilder storeBuilder = iostatisticsStore();
     EnumSet.allOf(GhfsStatistic.class).stream()
         .forEach(
             stat -> {

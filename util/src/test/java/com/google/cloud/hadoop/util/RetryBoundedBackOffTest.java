@@ -69,7 +69,7 @@ public class RetryBoundedBackOffTest {
   }
 
   /** A simple {@link BackOff} to help with testing. */
-  public class BackOffTester implements BackOff {
+  public static class BackOffTester implements BackOff {
     public int counter = 0;
 
     @Override

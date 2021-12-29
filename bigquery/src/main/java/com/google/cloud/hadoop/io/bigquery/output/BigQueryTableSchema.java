@@ -13,9 +13,11 @@
  */
 package com.google.cloud.hadoop.io.bigquery.output;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.google.api.services.bigquery.model.TableFieldSchema;
 import com.google.api.services.bigquery.model.TableSchema;
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,13 +37,13 @@ public class BigQueryTableSchema {
   }
 
   BigQueryTableSchema(TableSchema tableSchema) {
-    Preconditions.checkNotNull(tableSchema, "tableSchema is null.");
+    checkNotNull(tableSchema, "tableSchema is null.");
     this.tableSchema = tableSchema;
   }
 
   /** @see TableSchema#setFields(List) */
   public BigQueryTableSchema setFields(List<BigQueryTableFieldSchema> bigQueryTableFields) {
-    Preconditions.checkArgument(!bigQueryTableFields.isEmpty(), "Empty fields.");
+    checkArgument(!bigQueryTableFields.isEmpty(), "Empty fields.");
     List<TableFieldSchema> fields = new ArrayList<>(bigQueryTableFields.size());
     for (BigQueryTableFieldSchema bigQueryTableField : bigQueryTableFields) {
       fields.add(bigQueryTableField.get());

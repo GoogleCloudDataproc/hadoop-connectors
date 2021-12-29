@@ -26,6 +26,9 @@ import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.OUTPUT_T
 import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.OUTPUT_TABLE_WRITE_DISPOSITION;
 import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.PROJECT_ID;
 import static com.google.cloud.hadoop.util.ConfigurationUtil.getMandatoryConfig;
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.services.bigquery.model.TableReference;
 import com.google.api.services.bigquery.model.TableSchema;
@@ -35,8 +38,6 @@ import com.google.cloud.hadoop.io.bigquery.BigQueryFileFormat;
 import com.google.cloud.hadoop.io.bigquery.BigQueryStrings;
 import com.google.cloud.hadoop.io.bigquery.HadoopConfigurationProperty;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.List;
@@ -71,7 +72,6 @@ public class BigQueryOutputConfiguration {
    * @param outputGcsPath the path in GCS to stage data in. Example: 'gs://bucket/job'.
    * @param outputFileFormat the formatting of the data being written by the output format class.
    * @param outputFormatClass the file output format that will write files to GCS.
-   * @throws IOException
    */
   @SuppressWarnings("rawtypes")
   public static void configure(
@@ -82,9 +82,8 @@ public class BigQueryOutputConfiguration {
       BigQueryFileFormat outputFileFormat,
       Class<? extends FileOutputFormat> outputFormatClass)
       throws IOException {
-    Preconditions.checkArgument(
-        !Strings.isNullOrEmpty(outputTableSchemaJson),
-        "outputTableSchemaJson must not be null or empty.");
+    checkArgument(
+        !isNullOrEmpty(outputTableSchemaJson), "outputTableSchemaJson must not be null or empty.");
     TableReference outputTable = BigQueryStrings.parseTableReference(qualifiedOutputTableId);
     configure(
         conf,
@@ -111,7 +110,6 @@ public class BigQueryOutputConfiguration {
    * @param outputGcsPath the path in GCS to stage data in. Example: 'gs://bucket/job'.
    * @param outputFileFormat the formatting of the data being written by the output format class.
    * @param outputFormatClass the file output format that will write files to GCS.
-   * @throws IOException
    */
   @SuppressWarnings("rawtypes")
   private static void configure(
@@ -126,20 +124,16 @@ public class BigQueryOutputConfiguration {
       throws IOException {
 
     // Use the default project ID as a backup.
-    if (Strings.isNullOrEmpty(outputProjectId)) {
+    if (isNullOrEmpty(outputProjectId)) {
       outputProjectId = PROJECT_ID.get(conf, conf::get);
     }
 
-    Preconditions.checkArgument(
-        !Strings.isNullOrEmpty(outputProjectId), "outputProjectId must not be null or empty.");
-    Preconditions.checkArgument(
-        !Strings.isNullOrEmpty(outputDatasetId), "outputDatasetId must not be null or empty.");
-    Preconditions.checkArgument(
-        !Strings.isNullOrEmpty(outputTableId), "outputTableId must not be null or empty.");
-    Preconditions.checkArgument(
-        !Strings.isNullOrEmpty(outputGcsPath), "outputGcsPath must not be null or empty.");
-    Preconditions.checkNotNull(outputFileFormat, "outputFileFormat must not be null.");
-    Preconditions.checkNotNull(outputFormatClass, "outputFormatClass must not be null.");
+    checkArgument(!isNullOrEmpty(outputProjectId), "outputProjectId must not be null or empty.");
+    checkArgument(!isNullOrEmpty(outputDatasetId), "outputDatasetId must not be null or empty.");
+    checkArgument(!isNullOrEmpty(outputTableId), "outputTableId must not be null or empty.");
+    checkArgument(!isNullOrEmpty(outputGcsPath), "outputGcsPath must not be null or empty.");
+    checkNotNull(outputFileFormat, "outputFileFormat must not be null.");
+    checkNotNull(outputFormatClass, "outputFormatClass must not be null.");
 
     conf.set(OUTPUT_PROJECT_ID.getKey(), outputProjectId);
     conf.set(OUTPUT_DATASET_ID.getKey(), outputDatasetId);
@@ -170,7 +164,6 @@ public class BigQueryOutputConfiguration {
    * @param outputGcsPath the path in GCS to stage data in. Example: 'gs://bucket/job'.
    * @param outputFileFormat the formatting of the data being written by the output format class.
    * @param outputFormatClass the file output format that will write files to GCS.
-   * @throws IOException
    */
   @SuppressWarnings("rawtypes")
   public static void configure(
@@ -202,7 +195,6 @@ public class BigQueryOutputConfiguration {
    * @param outputGcsPath the path in GCS to stage data in. Example: 'gs://bucket/job'.
    * @param outputFileFormat the formatting of the data being written by the output format class.
    * @param outputFormatClass the file output format that will write files to GCS.
-   * @throws IOException
    */
   @SuppressWarnings("rawtypes")
   public static void configureWithAutoSchema(
@@ -225,8 +217,7 @@ public class BigQueryOutputConfiguration {
   }
 
   public static void setKmsKeyName(Configuration conf, String kmsKeyName) {
-    Preconditions.checkArgument(
-        !Strings.isNullOrEmpty(kmsKeyName), "kmsKeyName must not be null or empty.");
+    checkArgument(!isNullOrEmpty(kmsKeyName), "kmsKeyName must not be null or empty.");
     conf.set(OUTPUT_TABLE_KMS_KEY_NAME.getKey(), kmsKeyName);
   }
 
@@ -280,10 +271,10 @@ public class BigQueryOutputConfiguration {
   public static String getProjectId(Configuration conf) throws IOException {
     // Reference the default project ID as a backup.
     String projectId = OUTPUT_PROJECT_ID.get(conf, conf::get);
-    if (Strings.isNullOrEmpty(projectId)) {
+    if (isNullOrEmpty(projectId)) {
       projectId = PROJECT_ID.get(conf, conf::get);
     }
-    if (Strings.isNullOrEmpty(projectId)) {
+    if (isNullOrEmpty(projectId)) {
       throw new IOException(
           "Must supply a value for configuration setting: " + OUTPUT_PROJECT_ID.getKey());
     }
@@ -308,10 +299,10 @@ public class BigQueryOutputConfiguration {
   public static String getJobProjectId(Configuration conf) throws IOException {
     // Reference the default project ID as a backup.
     String projectId = PROJECT_ID.get(conf, conf::get);
-    if (Strings.isNullOrEmpty(projectId)) {
+    if (isNullOrEmpty(projectId)) {
       projectId = OUTPUT_PROJECT_ID.get(conf, conf::get);
     }
-    if (Strings.isNullOrEmpty(projectId)) {
+    if (isNullOrEmpty(projectId)) {
       throw new IOException(
           "Must supply a value for configuration setting: " + PROJECT_ID.getKey());
     }
@@ -345,7 +336,7 @@ public class BigQueryOutputConfiguration {
    */
   static Optional<BigQueryTableSchema> getTableSchema(Configuration conf) throws IOException {
     String fieldsJson = OUTPUT_TABLE_SCHEMA.get(conf, conf::get);
-    if (!Strings.isNullOrEmpty(fieldsJson)) {
+    if (!isNullOrEmpty(fieldsJson)) {
       try {
         TableSchema tableSchema = BigQueryTableHelper.createTableSchemaFromFields(fieldsJson);
         return Optional.of(BigQueryTableSchema.wrap(tableSchema));
@@ -368,7 +359,7 @@ public class BigQueryOutputConfiguration {
   static Optional<BigQueryTimePartitioning> getTablePartitioning(Configuration conf)
       throws IOException {
     String fieldsJson = OUTPUT_TABLE_PARTITIONING.get(conf, conf::get);
-    if (!Strings.isNullOrEmpty(fieldsJson)) {
+    if (!isNullOrEmpty(fieldsJson)) {
       try {
         TimePartitioning tablePartitioning = BigQueryTimePartitioning.getFromJson(fieldsJson);
         return Optional.of(BigQueryTimePartitioning.wrap(tablePartitioning));
@@ -387,7 +378,7 @@ public class BigQueryOutputConfiguration {
    * @return the KMS key name of the output table, null if no KMS key name exists in the
    *     configuration.
    */
-  public static String getKmsKeyName(Configuration conf) throws IOException {
+  public static String getKmsKeyName(Configuration conf) {
     return OUTPUT_TABLE_KMS_KEY_NAME.get(conf, conf::get);
   }
 
@@ -491,7 +482,6 @@ public class BigQueryOutputConfiguration {
    *
    * @param conf the configuration to pass to FileOutputFormat.
    * @param outputPath the path to set as the output path.
-   * @throws IOException
    */
   @VisibleForTesting
   static void setFileOutputFormatOutputPath(Configuration conf, String outputPath)
@@ -512,7 +502,6 @@ public class BigQueryOutputConfiguration {
     private final Configuration config;
 
     public JobConfigurationAdapter(Configuration config) throws IOException {
-      super();
       this.config = config;
     }
 

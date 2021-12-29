@@ -14,6 +14,8 @@
 package com.google.cloud.hadoop.io.bigquery;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.flogger.LazyArgs.lazy;
 
 import com.google.api.services.bigquery.Bigquery;
@@ -31,8 +33,6 @@ import com.google.api.services.bigquery.model.TableSchema;
 import com.google.api.services.bigquery.model.TimePartitioning;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.List;
@@ -52,7 +52,7 @@ public class BigQueryHelper {
   // Used for specialized handling of various API-defined exceptions.
   private ApiErrorExtractor errorExtractor = ApiErrorExtractor.INSTANCE;
 
-  private Bigquery service;
+  private final Bigquery service;
 
   public BigQueryHelper(Bigquery service) {
     this.service = service;
@@ -71,7 +71,6 @@ public class BigQueryHelper {
    * @param schema the schema of the source data to populate the destination table by.
    * @param sourceFormat the file format of the source data.
    * @param gcsPaths the location of the source data in GCS.
-   * @throws IOException
    */
   public void importFederatedFromGcs(
       String projectId,
@@ -125,7 +124,6 @@ public class BigQueryHelper {
    * @param gcsPaths the location of the source data in GCS.
    * @param awaitCompletion if true, block and poll until job completes, otherwise return as soon as
    *     the job has been successfully dispatched.
-   * @throws IOException
    * @throws InterruptedException if interrupted while waiting for job completion.
    */
   public void importFromGcs(
@@ -158,7 +156,7 @@ public class BigQueryHelper {
     loadConfig.setTimePartitioning(timePartitioning);
     loadConfig.setCreateDisposition(createDisposition);
     loadConfig.setWriteDisposition(writeDisposition);
-    if (!Strings.isNullOrEmpty(kmsKeyName)) {
+    if (!isNullOrEmpty(kmsKeyName)) {
       loadConfig.setDestinationEncryptionConfiguration(
           new EncryptionConfiguration().setKmsKeyName(kmsKeyName));
     }
@@ -282,7 +280,6 @@ public class BigQueryHelper {
    *
    * @param tableRef The BigQuery table reference.
    * @return The table resource, which describes the structure of this table.
-   * @throws IOException
    */
   public Table getTable(TableReference tableRef) throws IOException {
     try {
@@ -324,7 +321,7 @@ public class BigQueryHelper {
    * between {@code expected} and {@code actual}, using Preconditions.checkState.
    */
   public void checkJobIdEquality(Job expected, Job actual) {
-    Preconditions.checkState(
+    checkState(
         actual.getJobReference() != null
             && actual.getJobReference().getJobId() != null
             && expected.getJobReference() != null

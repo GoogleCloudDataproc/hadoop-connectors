@@ -32,7 +32,6 @@ public class IndirectBigQueryOutputFormat<K, V> extends ForwardingBigQueryFileOu
   public OutputCommitter createCommitter(TaskAttemptContext context) throws IOException {
     Configuration conf = context.getConfiguration();
     OutputCommitter delegateCommitter = getDelegate(conf).getOutputCommitter(context);
-    OutputCommitter committer = new IndirectBigQueryOutputCommitter(context, delegateCommitter);
-    return committer;
+    return new IndirectBigQueryOutputCommitter(context, delegateCommitter);
   }
 }

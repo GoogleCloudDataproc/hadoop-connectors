@@ -68,7 +68,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -920,13 +919,13 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   @Override
   public void testConfigureBucketsWithNeitherRootBucketNorSystemBucket() throws IOException {
     URI initUri = new Path("gs://").toUri();
-    final GoogleCloudStorageFileSystem fakeGcsFs =
+    GoogleCloudStorageFileSystem fakeGcsFs =
         new GoogleCloudStorageFileSystem(
             InMemoryGoogleCloudStorage::new,
             GoogleCloudStorageFileSystemOptions.builder()
                 .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
                 .build());
-    final GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem(fakeGcsFs);
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem(fakeGcsFs);
     fs.initUri = initUri;
 
     IllegalArgumentException thrown =
@@ -1033,7 +1032,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     ghfs.mkdirs(new Path("/directory1/subdirectory1"));
     ghfs.mkdirs(new Path("/directory1/subdirectory2"));
 
-    byte[] data = "data".getBytes(StandardCharsets.UTF_8);
+    byte[] data = "data".getBytes(UTF_8);
 
     createFile(new Path("/directory1/subdirectory1/file1"), data);
     createFile(new Path("/directory1/subdirectory1/file2"), data);
@@ -1240,7 +1239,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     Path directory =
         new Path(String.format("gs://%s/testConcat_exception/", myGhfs.getRootBucketName()));
     Path target = new Path(directory, "target");
-    Path[] srcsWithTarget = new Path[] {target};
+    Path[] srcsWithTarget = {target};
     IllegalArgumentException exception =
         assertThrows(IllegalArgumentException.class, () -> myGhfs.concat(target, srcsWithTarget));
     assertThat(exception).hasMessageThat().contains("target must not be contained in sources");
@@ -1444,8 +1443,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     Path testRoot = new Path("/directory1/");
     ghfs.mkdirs(testRoot);
     ghfs.mkdirs(new Path("/directory1/subdirectory1"));
-    createFile(
-        new Path("/directory1/subdirectory1/file1"), "data".getBytes(StandardCharsets.UTF_8));
+    createFile(new Path("/directory1/subdirectory1/file1"), "data".getBytes(UTF_8));
 
     FileStatus[] rootDirStatuses = ghfs.globStatus(new Path("/d*"));
     List<String> rootDirs =
@@ -1658,11 +1656,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
 
     Exception exception =
-        assertThrows(
-            GoogleJsonResponseException.class,
-            () -> {
-              ghfs.initialize(gsUri, config);
-            });
+        assertThrows(GoogleJsonResponseException.class, () -> ghfs.initialize(gsUri, config));
     assertThat(exception).hasMessageThat().startsWith("401 Unauthorized");
   }
 
@@ -1683,11 +1677,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
 
     Exception exception =
-        assertThrows(
-            GoogleJsonResponseException.class,
-            () -> {
-              ghfs.initialize(gsUri, config);
-            });
+        assertThrows(GoogleJsonResponseException.class, () -> ghfs.initialize(gsUri, config));
     assertThat(exception).hasMessageThat().startsWith("401 Unauthorized");
   }
 
@@ -1713,11 +1703,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
 
     Exception exception =
-        assertThrows(
-            GoogleJsonResponseException.class,
-            () -> {
-              ghfs.initialize(gsUri, config);
-            });
+        assertThrows(GoogleJsonResponseException.class, () -> ghfs.initialize(gsUri, config));
     assertThat(exception).hasMessageThat().startsWith("401 Unauthorized");
   }
 
@@ -1745,11 +1731,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
 
     Exception exception =
-        assertThrows(
-            GoogleJsonResponseException.class,
-            () -> {
-              ghfs.initialize(gsUri, config);
-            });
+        assertThrows(GoogleJsonResponseException.class, () -> ghfs.initialize(gsUri, config));
     assertThat(exception).hasMessageThat().startsWith("401 Unauthorized");
   }
 

@@ -77,7 +77,7 @@ public class BigQueryUtils {
 
     // Get starting time.
     long startTime = System.currentTimeMillis();
-    long elapsedTime = 0;
+    long elapsedTime;
     boolean notDone = true;
 
     // While job is incomplete continue to poll.
