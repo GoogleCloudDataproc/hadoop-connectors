@@ -19,16 +19,13 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.net.URI;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -128,16 +125,6 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
     boolean response;
     try {
       response = super.delete(hadoopPath, recursive);
-      try {
-        incrementStatistic(
-            GhfsStatistic.OBJECT_DELETE_OBJECTS,
-            getGcsFs()
-                .getGcs()
-                .getObjectStatistics(GoogleCloudStorageStatistics.OBJECT_DELETE_OBJECTS)
-                .longValue());
-      } catch (Exception e) {
-        logger.atWarning().log("Get Object Statistics threw UnsupportedOperationException");
-      }
       instrumentation.fileDeleted(1);
     } catch (IOException e) {
       incrementStatistic(GhfsStatistic.FILES_DELETE_REJECTED);
@@ -319,78 +306,36 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
   /** Get the instrumentation's IOStatistics. */
   @Override
   public IOStatistics getIOStatistics() {
+    if (instrumentation == null) {
+      return null;
+    }
     setHttpStatistics();
-    return instrumentation != null ? instrumentation.getIOStatistics() : null;
+    return instrumentation.getIOStatistics();
   }
 
   public GhfsInstrumentation getInstrumentation() {
     return instrumentation;
   }
 
-  /** Set the Value for http get and head request related statistics keys */
+  /** Set the GCS statistic keys */
   private void setHttpStatistics() {
     try {
-      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST);
-      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST);
-      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST);
-      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST);
-      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PATCH_REQUEST);
-      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_DELETE_REQUEST);
-      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES);
-      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_HEAD_REQUEST_FAILURES);
-      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST_FAILURES);
-      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_POST_REQUEST_FAILURES);
-      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PATCH_REQUEST_FAILURES);
-      setRequestStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_DELETE_REQUEST_FAILURES);
+      getGcsFs()
+          .getGcs()
+          .getStatistics()
+          .forEach(
+              (k, v) -> {
+                GhfsStatistic statisticKey = GhfsStatistic.fromSymbol("ACTION_" + k);
+                checkNotNull(statisticKey, "statistic key for %s must not be null", k);
+                clearStats(statisticKey.getSymbol());
+                incrementStatistic(statisticKey, v);
+              });
     } catch (Exception e) {
-      logger.atWarning().log("Error in getting statistics from gcsio", e);
-    }
-  }
-
-  /** Set the IOStatistics for http requests */
-  private void setRequestStatistics(GoogleCloudStorageStatistics key) {
-    GoogleCloudStorage gcs = getGcsFs().getGcs();
-    GhfsStatistic statisticsKey = getKey(key);
-    checkNotNull(statisticsKey, "statistics key must not be null");
-    clearStats(statisticsKey.getSymbol());
-    AtomicLong StatisticsValue = gcs.getHttpStatistics(key);
-    if (StatisticsValue != null) {
-      incrementStatistic(statisticsKey, StatisticsValue.longValue());
+      logger.atWarning().withCause(e).log("Error while getting GCS statistics");
     }
   }
 
   private void clearStats(String key) {
     instrumentation.getIOStatistics().getCounterReference(key).set(0L);
-  }
-
-  private GhfsStatistic getKey(GoogleCloudStorageStatistics key) {
-    switch (key) {
-      case ACTION_HTTP_GET_REQUEST:
-        return GhfsStatistic.ACTION_HTTP_GET_REQUEST;
-      case ACTION_HTTP_HEAD_REQUEST:
-        return GhfsStatistic.ACTION_HTTP_HEAD_REQUEST;
-      case ACTION_HTTP_PUT_REQUEST:
-        return GhfsStatistic.ACTION_HTTP_PUT_REQUEST;
-      case ACTION_HTTP_POST_REQUEST:
-        return GhfsStatistic.ACTION_HTTP_POST_REQUEST;
-      case ACTION_HTTP_PATCH_REQUEST:
-        return GhfsStatistic.ACTION_HTTP_PATCH_REQUEST;
-      case ACTION_HTTP_DELETE_REQUEST:
-        return GhfsStatistic.ACTION_HTTP_DELETE_REQUEST;
-      case ACTION_HTTP_GET_REQUEST_FAILURES:
-        return GhfsStatistic.ACTION_HTTP_GET_REQUEST_FAILURES;
-      case ACTION_HTTP_HEAD_REQUEST_FAILURES:
-        return GhfsStatistic.ACTION_HTTP_HEAD_REQUEST_FAILURES;
-      case ACTION_HTTP_PUT_REQUEST_FAILURES:
-        return GhfsStatistic.ACTION_HTTP_PUT_REQUEST_FAILURES;
-      case ACTION_HTTP_POST_REQUEST_FAILURES:
-        return GhfsStatistic.ACTION_HTTP_POST_REQUEST_FAILURES;
-      case ACTION_HTTP_PATCH_REQUEST_FAILURES:
-        return GhfsStatistic.ACTION_HTTP_PATCH_REQUEST_FAILURES;
-      case ACTION_HTTP_DELETE_REQUEST_FAILURES:
-        return GhfsStatistic.ACTION_HTTP_DELETE_REQUEST_FAILURES;
-      default:
-        return null;
-    }
   }
 }

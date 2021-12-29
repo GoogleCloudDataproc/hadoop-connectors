@@ -35,7 +35,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TrackingStorageWrapper;
@@ -143,6 +142,7 @@ public class GoogleCloudStorageImplTest {
             resourceId,
             /* partitionSize= */ 5 * 1024 * 1024,
             partitionsCount);
+
     assertObjectContent(helperGcs, resourceId, partition, partitionsCount);
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactlyElementsIn(
@@ -152,53 +152,71 @@ public class GoogleCloudStorageImplTest {
   }
 
   @Test
-  public void writeLargeObject_withSmallUploadChunk_testStatistics() throws IOException {
+  public void getStatistics_writeReadDeleteLargeObject() throws IOException {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
 
     int uploadChunkSize = 1024 * 1024;
-    GoogleCloudStorageImpl trackingGcs =
+    GoogleCloudStorageImpl gcs =
         new GoogleCloudStorageImpl(
             getOptionsWithUploadChunk(uploadChunkSize),
             GoogleCloudStorageTestHelper.getCredential());
 
-    int partitionsCount = 1;
-    byte[] partition =
-        writeObject(trackingGcs, resourceId, /* partitionSize= */ 5 * 1024 * 1024, partitionsCount);
-    List<String> expectedRequests =
-        getExpectedRequestsForCreateObject(resourceId, uploadChunkSize, partitionsCount, partition);
-    long expectedGetRequestsCountRead = getCountFromExpectedRequests("GET", expectedRequests) + 2L;
+    byte[] partition = writeObject(gcs, resourceId, /* objectSize= */ 5 * uploadChunkSize);
 
-    assertThat(
-            trackingGcs
-                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST)
-                .longValue())
-        .isEqualTo(getCountFromExpectedRequests("GET", expectedRequests));
+    assertThat(gcs.getStatistics())
+        .containsExactlyEntriesIn(
+            ImmutableMap.<String, Long>builder()
+                .put("HTTP_DELETE_REQUEST", 0L)
+                .put("HTTP_DELETE_REQUEST_FAILURE", 0L)
+                .put("HTTP_GET_REQUEST", 1L)
+                .put("HTTP_GET_REQUEST_FAILURE", 1L)
+                .put("HTTP_HEAD_REQUEST", 0L)
+                .put("HTTP_HEAD_REQUEST_FAILURE", 0L)
+                .put("HTTP_PATCH_REQUEST", 0L)
+                .put("HTTP_PATCH_REQUEST_FAILURE", 0L)
+                .put("HTTP_POST_REQUEST", 1L)
+                .put("HTTP_POST_REQUEST_FAILURE", 0L)
+                .put("HTTP_PUT_REQUEST", 5L)
+                .put("HTTP_PUT_REQUEST_FAILURE", 4L)
+                .build());
 
-    assertThat(
-            trackingGcs
-                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST)
-                .longValue())
-        .isEqualTo(getCountFromExpectedRequests("PUT", expectedRequests));
+    assertObjectContent(gcs, resourceId, partition);
 
-    assertThat(
-            trackingGcs
-                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES)
-                .longValue())
-        .isEqualTo(1L);
+    assertThat(gcs.getStatistics())
+        .containsExactlyEntriesIn(
+            ImmutableMap.<String, Long>builder()
+                .put("HTTP_DELETE_REQUEST", 0L)
+                .put("HTTP_DELETE_REQUEST_FAILURE", 0L)
+                .put("HTTP_GET_REQUEST", 3L)
+                .put("HTTP_GET_REQUEST_FAILURE", 1L)
+                .put("HTTP_HEAD_REQUEST", 0L)
+                .put("HTTP_HEAD_REQUEST_FAILURE", 0L)
+                .put("HTTP_PATCH_REQUEST", 0L)
+                .put("HTTP_PATCH_REQUEST_FAILURE", 0L)
+                .put("HTTP_POST_REQUEST", 1L)
+                .put("HTTP_POST_REQUEST_FAILURE", 0L)
+                .put("HTTP_PUT_REQUEST", 5L)
+                .put("HTTP_PUT_REQUEST_FAILURE", 4L)
+                .build());
 
-    assertThat(
-            trackingGcs
-                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST_FAILURES)
-                .longValue())
-        .isEqualTo(4L);
+    gcs.deleteObjects(ImmutableList.of(resourceId));
 
-    assertObjectContent(trackingGcs, resourceId, partition, partitionsCount);
-
-    assertThat(
-            trackingGcs
-                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST)
-                .longValue())
-        .isEqualTo(expectedGetRequestsCountRead);
+    assertThat(gcs.getStatistics())
+        .containsExactlyEntriesIn(
+            ImmutableMap.<String, Long>builder()
+                .put("HTTP_DELETE_REQUEST", 1L)
+                .put("HTTP_DELETE_REQUEST_FAILURE", 0L)
+                .put("HTTP_GET_REQUEST", 3L)
+                .put("HTTP_GET_REQUEST_FAILURE", 1L)
+                .put("HTTP_HEAD_REQUEST", 0L)
+                .put("HTTP_HEAD_REQUEST_FAILURE", 0L)
+                .put("HTTP_PATCH_REQUEST", 0L)
+                .put("HTTP_PATCH_REQUEST_FAILURE", 0L)
+                .put("HTTP_POST_REQUEST", 1L)
+                .put("HTTP_POST_REQUEST_FAILURE", 0L)
+                .put("HTTP_PUT_REQUEST", 5L)
+                .put("HTTP_PUT_REQUEST_FAILURE", 4L)
+                .build());
   }
 
   @Test
@@ -483,15 +501,5 @@ public class GoogleCloudStorageImplTest {
                             /* uploadId= */ i))
                 .collect(toList()))
         .build();
-  }
-
-  private int getCountFromExpectedRequests(String requestType, List<String> expectedRequests) {
-    int count = 0;
-    for (int ind = 0; ind < expectedRequests.size(); ind++) {
-      if (requestType != "" && expectedRequests.get(ind).startsWith(requestType)) {
-        count += 1;
-      }
-    }
-    return count;
   }
 }

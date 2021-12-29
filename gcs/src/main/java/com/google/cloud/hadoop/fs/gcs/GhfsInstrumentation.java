@@ -278,8 +278,7 @@ public class GhfsInstrumentation
    * @return the metric or null
    */
   public MutableMetric lookupMetric(String name) {
-    MutableMetric metric = getRegistry().get(name);
-    return metric;
+    return getRegistry().get(name);
   }
 
   /**
