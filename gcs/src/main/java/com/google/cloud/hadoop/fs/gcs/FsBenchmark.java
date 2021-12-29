@@ -328,7 +328,6 @@ public class FsBenchmark extends Configured implements Tool {
                       FSDataInputStream input = fs.open(testFile);
                       openLatencyNs.accept(System.nanoTime() - openStart);
                       try {
-                        openLatencyNs.accept(System.nanoTime() - openStart);
                         for (int k = 0; k < numReads; k++) {
                           long seekStart = System.nanoTime();
                           input.seek(seekPos);
