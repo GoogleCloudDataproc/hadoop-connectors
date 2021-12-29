@@ -27,6 +27,9 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
+import static java.util.Arrays.stream;
+import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.toMap;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.batch.json.JsonBatchCallback;
@@ -66,6 +69,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.flogger.GoogleLogger;
@@ -81,6 +85,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -119,7 +124,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private static final String USER_PROJECT_FIELD_NAME = "userProject";
 
   private static final CreateObjectOptions EMPTY_OBJECT_CREATE_OPTIONS =
-      CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
+      CreateObjectOptions.DEFAULT_OVERWRITE
+          .toBuilder()
           .setEnsureEmptyObjectsMetadataMatch(false)
           .build();
 
@@ -141,13 +147,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           "metadata");
 
   private static final String LIST_OBJECT_FIELDS_FORMAT = "items(%s),prefixes,nextPageToken";
-
-  // To track the object statistics
-  private final ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong> objectStatistics =
-      new ConcurrentHashMap<>();
-
-  // To track the http statistics
-  private ConcurrentHashMap<GoogleCloudStorageStatistics, AtomicLong> httpStatistics;
 
   // A function to encode metadata map values
   static String encodeMetadataValues(byte[] bytes) {
@@ -194,6 +193,20 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     BackOff newBackOff();
   }
+
+  private final ImmutableMap<GoogleCloudStorageStatistics, AtomicLong> statistics =
+      ImmutableMap.copyOf(
+          stream(GoogleCloudStorageStatistics.values())
+              .collect(
+                  toMap(
+                      identity(),
+                      k -> new AtomicLong(0),
+                      (u, v) -> {
+                        throw new IllegalStateException(
+                            String.format(
+                                "Duplicate key (attempted merging values %s and %s)", u, u));
+                      },
+                      () -> new EnumMap<>(GoogleCloudStorageStatistics.class))));
 
   private final LoadingCache<String, Boolean> autoBuckets =
       CacheBuilder.newBuilder()
@@ -332,10 +345,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     this.storageOptions = checkNotNull(options, "options must not be null");
     this.storageOptions.throwIfNotValid();
-    this.httpStatistics = new ConcurrentHashMap<>();
     HttpRequestInitializer retryHttpInitializer =
         new RetryHttpInitializer(
-            new GcsioTrackingHttpRequestInitializer(httpStatistics),
+            new StatisticsTrackingHttpRequestInitializer(statistics),
             credential,
             options.toRetryHttpInitializerOptions());
 
@@ -2227,7 +2239,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             .collect(Collectors.toList());
     StorageResourceId destinationId = new StorageResourceId(bucketName, destination);
     CreateObjectOptions options =
-        CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
+        CreateObjectOptions.DEFAULT_OVERWRITE
+            .toBuilder()
             .setContentType(contentType)
             .setEnsureEmptyObjectsMetadataMatch(false)
             .build();
@@ -2396,15 +2409,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   @Override
-  public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key) {
-    return objectStatistics.get(key);
-  }
-
-  @Override
-  public AtomicLong getHttpStatistics(GoogleCloudStorageStatistics key) {
-    if (httpStatistics == null) {
-      throw new UnsupportedOperationException("Http Statistics is null");
-    }
-    return httpStatistics.get(key);
+  public Map<GoogleCloudStorageStatistics, AtomicLong> getStatistics() {
+    return statistics;
   }
 }

@@ -413,19 +413,8 @@ public interface GoogleCloudStorage {
   void compose(String bucketName, List<String> sources, String destination, String contentType)
       throws IOException;
 
-  /**
-   * Retrieves the statistics for the given object-related key
-   *
-   * @param key name of the object related statistics key
-   */
-  AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key);
-
-  /**
-   * Retrieves the statistics for the given http request-related key
-   *
-   * @param key name of the http related statistics key
-   */
-  AtomicLong getHttpStatistics(GoogleCloudStorageStatistics key);
+  /** Retrieves the statistics associated with the {@link GoogleCloudStorage} instance. */
+  Map<GoogleCloudStorageStatistics, AtomicLong> getStatistics();
 
   /**
    * Composes inputs into a single GCS object. This performs a GCS Compose. Objects will be composed

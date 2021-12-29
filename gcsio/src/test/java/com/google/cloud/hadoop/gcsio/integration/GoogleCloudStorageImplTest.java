@@ -170,25 +170,29 @@ public class GoogleCloudStorageImplTest {
 
     assertThat(
             trackingGcs
-                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST)
+                .getStatistics()
+                .get(GoogleCloudStorageStatistics.HTTP_GET_REQUEST)
                 .longValue())
         .isEqualTo(getCountFromExpectedRequests("GET", expectedRequests));
 
     assertThat(
             trackingGcs
-                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST)
+                .getStatistics()
+                .get(GoogleCloudStorageStatistics.HTTP_PUT_REQUEST)
                 .longValue())
         .isEqualTo(getCountFromExpectedRequests("PUT", expectedRequests));
 
     assertThat(
             trackingGcs
-                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST_FAILURES)
+                .getStatistics()
+                .get(GoogleCloudStorageStatistics.HTTP_GET_REQUEST_FAILURE)
                 .longValue())
         .isEqualTo(1L);
 
     assertThat(
             trackingGcs
-                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_PUT_REQUEST_FAILURES)
+                .getStatistics()
+                .get(GoogleCloudStorageStatistics.HTTP_PUT_REQUEST_FAILURE)
                 .longValue())
         .isEqualTo(4L);
 
@@ -196,7 +200,8 @@ public class GoogleCloudStorageImplTest {
 
     assertThat(
             trackingGcs
-                .getHttpStatistics(GoogleCloudStorageStatistics.ACTION_HTTP_GET_REQUEST)
+                .getStatistics()
+                .get(GoogleCloudStorageStatistics.HTTP_GET_REQUEST)
                 .longValue())
         .isEqualTo(expectedGetRequestsCountRead);
   }

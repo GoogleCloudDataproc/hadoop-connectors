@@ -118,24 +118,9 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
     delegate.deleteObjects(fullObjectNames);
   }
 
-  /**
-   * get the value of the statistics
-   *
-   * @param key name of the object related statistics key
-   */
   @Override
-  public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key) {
-    return delegate.getObjectStatistics(key);
-  }
-
-  /**
-   * get the value of the statistics
-   *
-   * @param key name of the http related statistics key
-   */
-  @Override
-  public AtomicLong getHttpStatistics(GoogleCloudStorageStatistics key) {
-    return delegate.getHttpStatistics(key);
+  public Map<GoogleCloudStorageStatistics, AtomicLong> getStatistics() {
+    return delegate.getStatistics();
   }
 
   @Override
