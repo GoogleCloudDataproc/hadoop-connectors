@@ -130,7 +130,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private final Watchdog watchdog;
 
-  private final long gRPCMessageTimeout;
+  private final long gRPCReadMessageTimeout;
 
   /**
    * Used to open given file using item info
@@ -458,7 +458,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     this.readStrategy = readOptions.getFadvise();
     this.footerStartOffsetInBytes = footerStartOffsetInBytes;
     this.footerContent = footerContent;
-    this.gRPCMessageTimeout = readOptions.getGrpcReadMessageTimeoutMillis();
+    this.gRPCReadMessageTimeout = readOptions.getGrpcReadMessageTimeoutMillis();
   }
 
   private static IOException convertError(
@@ -743,13 +743,13 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
                 request);
         resIterator =
             watchdog.watch(
-                requestContext, responseIterator, Duration.ofMillis(this.gRPCMessageTimeout));
+                requestContext, responseIterator, Duration.ofMillis(this.gRPCReadMessageTimeout));
       } else {
         resIterator =
             watchdog.watch(
                 requestContext,
                 blockingStub.readObject(request),
-                Duration.ofMillis(this.gRPCMessageTimeout));
+                Duration.ofMillis(this.gRPCReadMessageTimeout));
       }
     } finally {
       requestContext.detach(toReattach);
