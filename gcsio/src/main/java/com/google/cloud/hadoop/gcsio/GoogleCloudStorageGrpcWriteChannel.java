@@ -208,7 +208,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
       StorageStub storageStub =
           stub.withDeadlineAfter(channelOptions.getGrpcWriteTimeout(), MILLISECONDS);
-      responseObserver = new InsertChunkResponseObserver(uploadId, writeOffset);
+      InsertChunkResponseObserver responseObserver =
+          new InsertChunkResponseObserver(uploadId, writeOffset);
       ClientCall<WriteObjectRequest, WriteObjectResponse> call =
           storageStub
               .getChannel()
