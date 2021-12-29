@@ -19,7 +19,6 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createJsonResponseException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInferredDirectory;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.OBJECT_DELETE_OBJECTS;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -120,8 +119,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private static final String USER_PROJECT_FIELD_NAME = "userProject";
 
   private static final CreateObjectOptions EMPTY_OBJECT_CREATE_OPTIONS =
-      CreateObjectOptions.DEFAULT_OVERWRITE
-          .toBuilder()
+      CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
           .setEnsureEmptyObjectsMetadataMatch(false)
           .build();
 
@@ -857,11 +855,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                 storage.objects().delete(bucketName, resourceId.getObjectName()), bucketName)
             .setIfMetagenerationMatch(metaGeneration);
     deleteObject.execute();
-
-    //  To update the statistics of number of objects deleted
-
-    objectStatistics.putIfAbsent(OBJECT_DELETE_OBJECTS, new AtomicLong(0));
-    objectStatistics.get(OBJECT_DELETE_OBJECTS).incrementAndGet();
   }
 
   /** See {@link GoogleCloudStorage#deleteObjects(List)} for details about expected behavior. */
@@ -892,11 +885,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             fullObjectNames.size(),
             storageOptions.getBatchThreads());
 
-    // update the statistics of number of objects deleted
-    objectStatistics.putIfAbsent(OBJECT_DELETE_OBJECTS, new AtomicLong(0));
     for (StorageResourceId fullObjectName : fullObjectNames) {
       queueSingleObjectDelete(fullObjectName, innerExceptions, batchHelper, 1);
-      objectStatistics.get(OBJECT_DELETE_OBJECTS).incrementAndGet();
     }
 
     batchHelper.flush();
@@ -925,12 +915,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         GoogleJsonResponseException cause = createJsonResponseException(jsonError, responseHeaders);
         if (errorExtractor.itemNotFound(cause)) {
           // Ignore item-not-found errors. We do not have to delete what we cannot find.
-          // This
-          // error typically shows up when we make a request to delete something and the
-          // server
-          // receives the request but we get a retry-able error before we get a response.
-          // During a retry, we no longer find the item because the server had deleted
-          // it already.
+          // This error typically shows up when we make a request to delete something and the
+          // server receives the request, but we get a retry-able error before we get a response.
+          // During a retry, we no longer find the item because the server had deleted it already.
           logger.atFiner().log("Delete object '%s' not found:%n%s", resourceId, jsonError);
         } else if (errorExtractor.preconditionNotMet(cause)
             && attempt <= MAXIMUM_PRECONDITION_FAILURES_IN_DELETE) {
@@ -1417,8 +1404,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param bucketName bucket name
    * @param objectNamePrefix object name prefix or null if all objects in the bucket are desired
    * @param listOptions options to use when listing objects
-   * @param includeTrailingDelimiter whether to include prefix objects into the {@code
-   *     listedObjects}
    * @param listedObjects output parameter into which retrieved StorageObjects will be added
    * @param listedPrefixes output parameter into which retrieved prefixes will be added
    */
@@ -1426,13 +1411,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       String bucketName,
       String objectNamePrefix,
       ListObjectOptions listOptions,
-      boolean includeTrailingDelimiter,
       List<StorageObject> listedObjects,
       List<String> listedPrefixes)
       throws IOException {
     logger.atFiner().log(
-        "listStorageObjectsAndPrefixes(%s, %s, %s, %s)",
-        bucketName, objectNamePrefix, listOptions, includeTrailingDelimiter);
+        "listStorageObjectsAndPrefixes(%s, %s, %s)", bucketName, objectNamePrefix, listOptions);
 
     checkArgument(
         listedObjects != null && listedObjects.isEmpty(),
@@ -1454,7 +1437,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     //
     // In response to `gs://bucket/a/` list request with max results set to `1` GCS will return
     // only
-    // `gs://bucket/a/` object. But this object will be filterred out from response if
+    // `gs://bucket/a/` object. But this object will be filtered out from response if
     // `isIncludePrefix` is set to `false`.
     //
     // To prevent this situation we increment max results by 1, which will allow to list
@@ -1470,7 +1453,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             objectNamePrefix,
             listOptions.getFields(),
             listOptions.getDelimiter(),
-            includeTrailingDelimiter,
             maxResults);
 
     String pageToken = null;
@@ -1580,12 +1562,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       String objectNamePrefix,
       String objectFields,
       String delimiter,
-      boolean includeTrailingDelimiter,
       long maxResults)
       throws IOException {
     logger.atFiner().log(
         "createListRequest(%s, %s, %s, %s, %d)",
-        bucketName, objectNamePrefix, delimiter, includeTrailingDelimiter, maxResults);
+        bucketName, objectNamePrefix, delimiter, maxResults);
     checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
 
     Storage.Objects.List listObject =
@@ -1595,8 +1576,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     // Set delimiter if supplied.
     if (delimiter != null) {
-      listObject.setDelimiter(delimiter);
-      listObject.setIncludeTrailingDelimiter(includeTrailingDelimiter);
+      listObject.setDelimiter(delimiter).setIncludeTrailingDelimiter(true);
     }
 
     // Set number of items to retrieve per call.
@@ -1634,12 +1614,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     List<StorageObject> listedObjects = new ArrayList<>();
     List<String> listedPrefixes = new ArrayList<>();
     listStorageObjectsAndPrefixes(
-        bucketName,
-        objectNamePrefix,
-        listOptions,
-        /* includeTrailingDelimiter= */ true,
-        listedObjects,
-        listedPrefixes);
+        bucketName, objectNamePrefix, listOptions, listedObjects, listedPrefixes);
 
     return getGoogleCloudStorageItemInfos(
         bucketName, objectNamePrefix, listOptions, listedPrefixes, listedObjects);
@@ -1664,7 +1639,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             objectNamePrefix,
             listOptions.getFields(),
             listOptions.getDelimiter(),
-            /* includeTrailingDelimiter= */ true,
             listOptions.getMaxResults());
     if (pageToken != null) {
       logger.atFiner().log("listObjectInfoPage: next page %s", pageToken);
@@ -2253,8 +2227,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             .collect(Collectors.toList());
     StorageResourceId destinationId = new StorageResourceId(bucketName, destination);
     CreateObjectOptions options =
-        CreateObjectOptions.DEFAULT_OVERWRITE
-            .toBuilder()
+        CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
             .setContentType(contentType)
             .setEnsureEmptyObjectsMetadataMatch(false)
             .build();

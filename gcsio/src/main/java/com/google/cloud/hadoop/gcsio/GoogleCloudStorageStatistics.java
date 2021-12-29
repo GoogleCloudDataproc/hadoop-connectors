@@ -18,8 +18,6 @@ package com.google.cloud.hadoop.gcsio;
 
 /** Statistics which are collected in GCSIO. */
 public enum GoogleCloudStorageStatistics {
-  // number of objects deleted
-  OBJECT_DELETE_OBJECTS,
 
   ACTION_HTTP_GET_REQUEST,
 
