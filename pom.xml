@@ -83,32 +83,32 @@
     <bigdataoss.version>3.0.0-SNAPSHOT</bigdataoss.version>
     <bigquery-connector.version>2.0.0-SNAPSHOT</bigquery-connector.version>
 
-    <google.api.grpc.proto-google-iam-v1.version>1.1.7</google.api.grpc.proto-google-iam-v1.version>
+    <google.api.grpc.proto-google-iam-v1.version>1.2.0</google.api.grpc.proto-google-iam-v1.version>
     <google.api-client.version>1.32.2</google.api-client.version>
     <google.api-client-libraries.version>1.32.1</google.api-client-libraries.version>
-    <google.api-bigquery.version>v2-rev20210617-${google.api-client-libraries.version}</google.api-bigquery.version>
-    <google.api-iamcredentials.version>v1-rev20210326-${google.api-client-libraries.version}</google.api-iamcredentials.version>
-    <google.api-storage.version>v1-rev20211018-${google.api-client-libraries.version}</google.api-storage.version>
-    <google.auth.version>1.2.1</google.auth.version>
-    <google.auto-value.version>1.8.2</google.auto-value.version>
-    <google.cloud-bigquerystorage.version>1.22.5</google.cloud-bigquerystorage.version>
-    <google.cloud-storage.grpc.version>2.0.1-alpha</google.cloud-storage.grpc.version>
-    <google.flogger.version>0.7.1</google.flogger.version>
+    <google.api-bigquery.version>v2-rev20211129-${google.api-client-libraries.version}</google.api-bigquery.version>
+    <google.api-iamcredentials.version>v1-rev20210813-${google.api-client-libraries.version}</google.api-iamcredentials.version>
+    <google.api-storage.version>v1-rev20211201-${google.api-client-libraries.version}</google.api-storage.version>
+    <google.auth.version>1.3.0</google.auth.version>
+    <google.auto-value.version>1.9</google.auto-value.version>
+    <google.cloud-bigquerystorage.version>2.7.0</google.cloud-bigquerystorage.version>
+    <google.cloud-storage.grpc.version>2.2.2-alpha</google.cloud-storage.grpc.version>
+    <google.flogger.version>0.7.4</google.flogger.version>
     <google.gson.version>2.8.9</google.gson.version>
     <google.guava.version>31.0.1-jre</google.guava.version>
     <google.http-client.version>1.40.1</google.http-client.version>
     <google.oauth-client.version>1.32.1</google.oauth-client.version>
-    <google.protobuf.version>3.18.1</google.protobuf.version>
-    <grpc.version>1.41.1</grpc.version>
+    <google.protobuf.version>3.19.1</google.protobuf.version>
+    <grpc.version>1.43.1</grpc.version>
     <hadoop.version>3.3.1</hadoop.version>
 
     <!-- Test dependencies -->
     <google.truth.version>1.1.3</google.truth.version>
     <junit.version>4.13.2</junit.version>
-    <mockito.version>3.11.2</mockito.version>
-    <system-lambda.version>1.2.0</system-lambda.version>
+    <mockito.version>4.2.0</mockito.version>
+    <system-lambda.version>1.2.1</system-lambda.version>
     <!-- TODO: remove AssertJ dependency when Hadoop will fix transitive test dependencies -->
-    <assertj.version>3.12.2</assertj.version>
+    <assertj.version>3.14.0</assertj.version>
   </properties>
 
   <modules>
@@ -330,54 +330,10 @@
       </dependency>
       <dependency>
         <groupId>io.grpc</groupId>
-        <artifactId>grpc-alts</artifactId>
+        <artifactId>grpc-bom</artifactId>
         <version>${grpc.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.grpc</groupId>
-        <artifactId>grpc-api</artifactId>
-        <version>${grpc.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.grpc</groupId>
-        <artifactId>grpc-auth</artifactId>
-        <version>${grpc.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.grpc</groupId>
-        <artifactId>grpc-context</artifactId>
-        <version>${grpc.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.grpc</groupId>
-        <artifactId>grpc-core</artifactId>
-        <version>${grpc.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.grpc</groupId>
-        <artifactId>grpc-grpclb</artifactId>
-        <version>${grpc.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.grpc</groupId>
-        <artifactId>grpc-netty-shaded</artifactId>
-        <version>${grpc.version}</version>
-        <scope>runtime</scope>
-      </dependency>
-      <dependency>
-        <groupId>io.grpc</groupId>
-        <artifactId>grpc-protobuf</artifactId>
-        <version>${grpc.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.grpc</groupId>
-        <artifactId>grpc-protobuf-lite</artifactId>
-        <version>${grpc.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.grpc</groupId>
-        <artifactId>grpc-stub</artifactId>
-        <version>${grpc.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>com.google.api.grpc</groupId>
@@ -526,7 +482,7 @@
         </plugin>
         <plugin>
           <artifactId>maven-javadoc-plugin</artifactId>
-          <version>3.3.0</version>
+          <version>3.3.1</version>
         </plugin>
         <plugin>
           <artifactId>maven-jar-plugin</artifactId>
@@ -548,7 +504,7 @@
         </plugin>
         <plugin>
           <artifactId>maven-enforcer-plugin</artifactId>
-          <version>3.0.0-M3</version>
+          <version>3.0.0</version>
         </plugin>
         <plugin>
           <artifactId>maven-failsafe-plugin</artifactId>
@@ -561,6 +517,11 @@
         <plugin>
           <artifactId>maven-shade-plugin</artifactId>
           <version>3.2.4</version>
+        </plugin>
+        <plugin>
+          <groupId>com.diffplug.spotless</groupId>
+          <artifactId>spotless-maven-plugin</artifactId>
+          <version>2.18.0</version>
         </plugin>
         <plugin>
           <groupId>org.jacoco</groupId>
@@ -631,7 +592,7 @@
             <path>
               <groupId>com.google.auto.service</groupId>
               <artifactId>auto-service</artifactId>
-              <version>1.0-rc7</version>
+              <version>1.0.1</version>
             </path>
           </annotationProcessorPaths>
         </configuration>
@@ -639,7 +600,6 @@
       <plugin>
         <groupId>com.diffplug.spotless</groupId>
         <artifactId>spotless-maven-plugin</artifactId>
-        <version>2.12.2</version>
         <configuration>
           <formats>
             <format>
