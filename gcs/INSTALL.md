@@ -145,13 +145,14 @@ the installation.
 *   To troubleshoot other issues run `hadoop fs` command with debug logs:
 
     ```
-    $ cat <<EOF >"/tmp/google-logging.properties"
+    $ cat <<EOF >"/tmp/gcs-connector-logging.properties"
     handlers = java.util.logging.ConsoleHandler
-    java.util.logging.ConsoleHandler.level = CONFIG
-    com.google.level = CONFIG
+    java.util.logging.ConsoleHandler.level = ALL
+    com.google.level = FINE
+    sun.net.www.protocol.http.HttpURLConnection.level = ALL
     EOF
 
-    $ export HADOOP_CLIENT_OPTS="-Djava.util.logging.config.file=/tmp/google-logging.properties"
+    $ export HADOOP_CLIENT_OPTS="-Djava.util.logging.config.file=/tmp/gcs-connector-logging.properties"
 
     $ hadoop --loglevel debug fs -ls gs://<some-bucket>
     ```
