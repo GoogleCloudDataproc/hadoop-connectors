@@ -199,12 +199,12 @@ public class GoogleCloudStorageImplTest {
                 .put("HTTP_PUT_REQUEST_FAILURE", 4L)
                 .build());
 
-    gcs.deleteObject(resourceId, StorageResourceId.UNKNOWN_GENERATION_ID);
+    gcs.deleteObjects(ImmutableList.of(resourceId));
 
     assertThat(gcs.getStatistics())
         .containsExactlyEntriesIn(
             ImmutableMap.<String, Long>builder()
-                .put("HTTP_DELETE_REQUEST", 0L)
+                .put("HTTP_DELETE_REQUEST", 1L)
                 .put("HTTP_DELETE_REQUEST_FAILURE", 0L)
                 .put("HTTP_GET_REQUEST", 3L)
                 .put("HTTP_GET_REQUEST_FAILURE", 1L)
