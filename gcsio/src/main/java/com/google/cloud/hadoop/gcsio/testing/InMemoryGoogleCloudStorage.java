@@ -43,7 +43,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 /**
@@ -545,7 +544,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public Map<String, AtomicLong> getStatistics() {
+  public Map<String, Long> getStatistics() {
     throw new UnsupportedOperationException("not implemented");
   }
 }

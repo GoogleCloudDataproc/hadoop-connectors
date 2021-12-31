@@ -328,7 +328,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
                 GhfsStatistic statisticKey = GhfsStatistic.fromSymbol("ACTION_" + k);
                 checkNotNull(statisticKey, "statistic key for %s must not be null", k);
                 clearStats(statisticKey.getSymbol());
-                incrementStatistic(statisticKey, v.longValue());
+                incrementStatistic(statisticKey, v);
               });
     } catch (Exception e) {
       logger.atWarning().withCause(e).log("Error while getting GCS statistics");

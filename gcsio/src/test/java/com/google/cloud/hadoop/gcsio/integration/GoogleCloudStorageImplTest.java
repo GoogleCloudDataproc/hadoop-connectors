@@ -48,7 +48,6 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -143,6 +142,7 @@ public class GoogleCloudStorageImplTest {
             resourceId,
             /* partitionSize= */ 5 * 1024 * 1024,
             partitionsCount);
+
     assertObjectContent(helperGcs, resourceId, partition, partitionsCount);
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactlyElementsIn(
@@ -152,51 +152,70 @@ public class GoogleCloudStorageImplTest {
   }
 
   @Test
-  public void writeLargeObject_withSmallUploadChunk_testStatistics() throws IOException {
+  public void getStatistics_writeReadDeleteLargeObject() throws IOException {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
 
     int uploadChunkSize = 1024 * 1024;
-    GoogleCloudStorageImpl trackingGcs =
+    GoogleCloudStorageImpl gcs =
         new GoogleCloudStorageImpl(
             getOptionsWithUploadChunk(uploadChunkSize),
             GoogleCloudStorageTestHelper.getCredential());
 
-    byte[] partition = writeObject(trackingGcs, resourceId, /* objectSize= */ 5 * uploadChunkSize);
+    byte[] partition = writeObject(gcs, resourceId, /* objectSize= */ 5 * uploadChunkSize);
 
-    assertThat(trackingGcs.getStatistics())
+    assertThat(gcs.getStatistics())
         .containsExactlyEntriesIn(
-            ImmutableMap.<String, AtomicLong>builder()
-                .put("HTTP_DELETE_REQUEST", new AtomicLong(0))
-                .put("HTTP_DELETE_REQUEST_FAILURE", new AtomicLong(0))
-                .put("HTTP_GET_REQUEST", new AtomicLong(0))
-                .put("HTTP_GET_REQUEST_FAILURE", new AtomicLong(0))
-                .put("HTTP_HEAD_REQUEST", new AtomicLong(0))
-                .put("HTTP_HEAD_REQUEST_FAILURE", new AtomicLong(0))
-                .put("HTTP_PATCH_REQUEST", new AtomicLong(0))
-                .put("HTTP_PATCH_REQUEST_FAILURE", new AtomicLong(0))
-                .put("HTTP_POST_REQUEST", new AtomicLong(0))
-                .put("HTTP_POST_REQUEST_FAILURE", new AtomicLong(0))
-                .put("HTTP_PUT_REQUEST", new AtomicLong(0))
-                .put("HTTP_PUT_REQUEST_FAILURE", new AtomicLong(0))
+            ImmutableMap.<String, Long>builder()
+                .put("HTTP_DELETE_REQUEST", 0L)
+                .put("HTTP_DELETE_REQUEST_FAILURE", 0L)
+                .put("HTTP_GET_REQUEST", 1L)
+                .put("HTTP_GET_REQUEST_FAILURE", 1L)
+                .put("HTTP_HEAD_REQUEST", 0L)
+                .put("HTTP_HEAD_REQUEST_FAILURE", 0L)
+                .put("HTTP_PATCH_REQUEST", 0L)
+                .put("HTTP_PATCH_REQUEST_FAILURE", 0L)
+                .put("HTTP_POST_REQUEST", 1L)
+                .put("HTTP_POST_REQUEST_FAILURE", 0L)
+                .put("HTTP_PUT_REQUEST", 5L)
+                .put("HTTP_PUT_REQUEST_FAILURE", 4L)
                 .build());
 
-    assertObjectContent(trackingGcs, resourceId, partition);
+    assertObjectContent(gcs, resourceId, partition);
 
-    assertThat(trackingGcs.getStatistics())
+    assertThat(gcs.getStatistics())
         .containsExactlyEntriesIn(
-            ImmutableMap.<String, AtomicLong>builder()
-                .put("HTTP_DELETE_REQUEST", new AtomicLong(0))
-                .put("HTTP_DELETE_REQUEST_FAILURE", new AtomicLong(0))
-                .put("HTTP_GET_REQUEST", new AtomicLong(0))
-                .put("HTTP_GET_REQUEST_FAILURE", new AtomicLong(0))
-                .put("HTTP_HEAD_REQUEST", new AtomicLong(0))
-                .put("HTTP_HEAD_REQUEST_FAILURE", new AtomicLong(0))
-                .put("HTTP_PATCH_REQUEST", new AtomicLong(0))
-                .put("HTTP_PATCH_REQUEST_FAILURE", new AtomicLong(0))
-                .put("HTTP_POST_REQUEST", new AtomicLong(0))
-                .put("HTTP_POST_REQUEST_FAILURE", new AtomicLong(0))
-                .put("HTTP_PUT_REQUEST", new AtomicLong(0))
-                .put("HTTP_PUT_REQUEST_FAILURE", new AtomicLong(0))
+            ImmutableMap.<String, Long>builder()
+                .put("HTTP_DELETE_REQUEST", 0L)
+                .put("HTTP_DELETE_REQUEST_FAILURE", 0L)
+                .put("HTTP_GET_REQUEST", 3L)
+                .put("HTTP_GET_REQUEST_FAILURE", 1L)
+                .put("HTTP_HEAD_REQUEST", 0L)
+                .put("HTTP_HEAD_REQUEST_FAILURE", 0L)
+                .put("HTTP_PATCH_REQUEST", 0L)
+                .put("HTTP_PATCH_REQUEST_FAILURE", 0L)
+                .put("HTTP_POST_REQUEST", 1L)
+                .put("HTTP_POST_REQUEST_FAILURE", 0L)
+                .put("HTTP_PUT_REQUEST", 5L)
+                .put("HTTP_PUT_REQUEST_FAILURE", 4L)
+                .build());
+
+    gcs.deleteObject(resourceId, StorageResourceId.UNKNOWN_GENERATION_ID);
+
+    assertThat(gcs.getStatistics())
+        .containsExactlyEntriesIn(
+            ImmutableMap.<String, Long>builder()
+                .put("HTTP_DELETE_REQUEST", 0L)
+                .put("HTTP_DELETE_REQUEST_FAILURE", 0L)
+                .put("HTTP_GET_REQUEST", 3L)
+                .put("HTTP_GET_REQUEST_FAILURE", 1L)
+                .put("HTTP_HEAD_REQUEST", 0L)
+                .put("HTTP_HEAD_REQUEST_FAILURE", 0L)
+                .put("HTTP_PATCH_REQUEST", 0L)
+                .put("HTTP_PATCH_REQUEST_FAILURE", 0L)
+                .put("HTTP_POST_REQUEST", 1L)
+                .put("HTTP_POST_REQUEST_FAILURE", 0L)
+                .put("HTTP_PUT_REQUEST", 5L)
+                .put("HTTP_PUT_REQUEST_FAILURE", 4L)
                 .build());
   }
 

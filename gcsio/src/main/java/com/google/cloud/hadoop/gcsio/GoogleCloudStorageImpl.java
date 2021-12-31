@@ -2410,8 +2410,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   @Override
-  public Map<String, AtomicLong> getStatistics() {
+  public Map<String, Long> getStatistics() {
     return statistics.entrySet().stream()
-        .collect(toImmutableMap(e -> e.getKey().name(), Map.Entry::getValue));
+        .collect(toImmutableMap(e -> e.getKey().name(), e -> e.getValue().get()));
   }
 }

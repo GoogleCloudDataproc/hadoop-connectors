@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Interface for exposing the Google Cloud Storage API behavior in a way more amenable to writing
@@ -413,9 +412,6 @@ public interface GoogleCloudStorage {
   void compose(String bucketName, List<String> sources, String destination, String contentType)
       throws IOException;
 
-  /** Retrieves the statistics associated with the {@link GoogleCloudStorage} instance. */
-  Map<String, AtomicLong> getStatistics();
-
   /**
    * Composes inputs into a single GCS object. This performs a GCS Compose. Objects will be composed
    * according to the order they appear in the input. The destination object will have metadata set
@@ -427,6 +423,9 @@ public interface GoogleCloudStorage {
   GoogleCloudStorageItemInfo composeObjects(
       List<StorageResourceId> sources, StorageResourceId destination, CreateObjectOptions options)
       throws IOException;
+
+  /** Retrieves the statistics associated with the {@link GoogleCloudStorage} instance. */
+  Map<String, Long> getStatistics();
 
   /** Releases resources used by this instance. */
   void close();
