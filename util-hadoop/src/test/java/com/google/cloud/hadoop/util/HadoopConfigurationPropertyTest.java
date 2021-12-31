@@ -19,7 +19,9 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.common.collect.ImmutableList;
 import java.util.Collection;
+import java.util.logging.Level;
 import org.apache.hadoop.conf.Configuration;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -27,8 +29,14 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class HadoopConfigurationPropertyTest {
 
+  @Rule
+  public final ExpectedLogMessages logged =
+      ExpectedLogMessages.forLogger(HadoopConfigurationProperty.class);
+
   @Test
-  public void testPropertyCreation_withNullDeprecationKey() {
+  public void propertyCreation_withNullDeprecationKey() {
+    logged.setMinimumLevel(Level.FINE);
+
     HadoopConfigurationProperty<Integer> newKeyWithoutDeprecatedKey =
         new HadoopConfigurationProperty<>("actual.key", 0, (String[]) null);
 
@@ -36,17 +44,60 @@ public class HadoopConfigurationPropertyTest {
   }
 
   @Test
-  public void getStringCollection_throwsExceptionOnNonCollectionProperty() {
+  public void getStringCollection_withCollectionProperty() {
+    logged.setMinimumLevel(Level.FINE);
+
     Configuration config = new Configuration();
+
+    HadoopConfigurationProperty<Collection<String>> configKey =
+        new HadoopConfigurationProperty<>("collection.key", ImmutableList.of("key1", "key2"));
+
+    assertThat(configKey.getStringCollection(config)).containsExactly("key1", "key2").inOrder();
+
+    logged.expect("collection.key = \\[key1, key2\\]");
+  }
+
+  @Test
+  public void getStringCollection_withNonCollectionProperties() {
+    logged.setMinimumLevel(Level.FINE);
+
+    Configuration config = new Configuration();
+
     HadoopConfigurationProperty<String> stringKey =
         new HadoopConfigurationProperty<>("actual.key", "default-string");
     HadoopConfigurationProperty<Integer> integerKey =
         new HadoopConfigurationProperty<>("actual.key", 1);
-    HadoopConfigurationProperty<Collection<String>> collectionKey =
-        new HadoopConfigurationProperty<>("collection.key", ImmutableList.of("key1", "key2"));
 
     assertThrows(IllegalStateException.class, () -> stringKey.getStringCollection(config));
     assertThrows(IllegalStateException.class, () -> integerKey.getStringCollection(config));
-    assertThat(collectionKey.getStringCollection(config)).containsExactly("key1", "key2").inOrder();
+  }
+
+  @Test
+  public void getPassword_defaultValue() {
+    logged.setMinimumLevel(Level.FINE);
+
+    Configuration config = new Configuration();
+
+    HadoopConfigurationProperty<String> configKey =
+        new HadoopConfigurationProperty<>("secret.key", "default-secret");
+
+    assertThat(configKey.getPassword(config).value()).isEqualTo("default-secret");
+
+    logged.expect("secret.key = <redacted>");
+  }
+
+  @Test
+  public void getPassword_customValue() {
+    logged.setMinimumLevel(Level.FINE);
+
+    Configuration config = new Configuration();
+    config.set("secret.key", "custom-secret");
+
+    HadoopConfigurationProperty<String> configKey =
+        new HadoopConfigurationProperty<>("secret.key", "default-secret");
+
+    assertThat(configKey.getPassword(config).value()).isEqualTo("custom-secret");
+
+    logged.expect("secret.key = <redacted>");
   }
 }
