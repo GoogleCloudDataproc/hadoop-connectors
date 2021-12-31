@@ -12,7 +12,7 @@
  * limitations under the License.
  */
 
-package com.google.cloud.hadoop.util;
+package com.google.cloud.hadoop.util.testing.logging;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 

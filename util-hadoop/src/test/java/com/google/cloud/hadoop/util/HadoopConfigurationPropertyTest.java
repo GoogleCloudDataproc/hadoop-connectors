@@ -17,6 +17,7 @@ package com.google.cloud.hadoop.util;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
+import com.google.cloud.hadoop.util.testing.logging.ExpectedLogMessages;
 import com.google.common.collect.ImmutableList;
 import java.util.Collection;
 import java.util.logging.Level;
