@@ -45,6 +45,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
+import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -203,8 +204,8 @@ public class GoogleHadoopFileSystemConfigurationTest {
     config.set("fs.gs.proxy.deprecated.pass", gcsProxyPassword.getDefault());
 
     // Verify that we can read password from config when used key is deprecated.
-    String userPass = gcsProxyPassword.getPassword(config);
-    assertThat(userPass).isEqualTo("proxy-pass");
+    RedactedString userPass = gcsProxyPassword.getPassword(config);
+    assertThat(userPass.value()).isEqualTo("proxy-pass");
 
     GoogleCloudStorageOptions.Builder optionsBuilder =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config);
