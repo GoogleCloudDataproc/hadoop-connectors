@@ -35,7 +35,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TrackingStorageWrapper;
@@ -49,6 +48,7 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -161,49 +161,43 @@ public class GoogleCloudStorageImplTest {
             getOptionsWithUploadChunk(uploadChunkSize),
             GoogleCloudStorageTestHelper.getCredential());
 
-    int partitionsCount = 1;
-    byte[] partition =
-        writeObject(trackingGcs, resourceId, /* partitionSize= */ 5 * 1024 * 1024, partitionsCount);
-    List<String> expectedRequests =
-        getExpectedRequestsForCreateObject(resourceId, uploadChunkSize, partitionsCount, partition);
-    long expectedGetRequestsCountRead = getCountFromExpectedRequests("GET", expectedRequests) + 2L;
+    byte[] partition = writeObject(trackingGcs, resourceId, /* objectSize= */ 5 * uploadChunkSize);
 
-    assertThat(
-            trackingGcs
-                .getStatistics()
-                .get(GoogleCloudStorageStatistics.HTTP_GET_REQUEST)
-                .longValue())
-        .isEqualTo(getCountFromExpectedRequests("GET", expectedRequests));
+    assertThat(trackingGcs.getStatistics())
+        .containsExactlyEntriesIn(
+            ImmutableMap.<String, AtomicLong>builder()
+                .put("HTTP_DELETE_REQUEST", new AtomicLong(0))
+                .put("HTTP_DELETE_REQUEST_FAILURE", new AtomicLong(0))
+                .put("HTTP_GET_REQUEST", new AtomicLong(0))
+                .put("HTTP_GET_REQUEST_FAILURE", new AtomicLong(0))
+                .put("HTTP_HEAD_REQUEST", new AtomicLong(0))
+                .put("HTTP_HEAD_REQUEST_FAILURE", new AtomicLong(0))
+                .put("HTTP_PATCH_REQUEST", new AtomicLong(0))
+                .put("HTTP_PATCH_REQUEST_FAILURE", new AtomicLong(0))
+                .put("HTTP_POST_REQUEST", new AtomicLong(0))
+                .put("HTTP_POST_REQUEST_FAILURE", new AtomicLong(0))
+                .put("HTTP_PUT_REQUEST", new AtomicLong(0))
+                .put("HTTP_PUT_REQUEST_FAILURE", new AtomicLong(0))
+                .build());
 
-    assertThat(
-            trackingGcs
-                .getStatistics()
-                .get(GoogleCloudStorageStatistics.HTTP_PUT_REQUEST)
-                .longValue())
-        .isEqualTo(getCountFromExpectedRequests("PUT", expectedRequests));
+    assertObjectContent(trackingGcs, resourceId, partition);
 
-    assertThat(
-            trackingGcs
-                .getStatistics()
-                .get(GoogleCloudStorageStatistics.HTTP_GET_REQUEST_FAILURE)
-                .longValue())
-        .isEqualTo(1L);
-
-    assertThat(
-            trackingGcs
-                .getStatistics()
-                .get(GoogleCloudStorageStatistics.HTTP_PUT_REQUEST_FAILURE)
-                .longValue())
-        .isEqualTo(4L);
-
-    assertObjectContent(trackingGcs, resourceId, partition, partitionsCount);
-
-    assertThat(
-            trackingGcs
-                .getStatistics()
-                .get(GoogleCloudStorageStatistics.HTTP_GET_REQUEST)
-                .longValue())
-        .isEqualTo(expectedGetRequestsCountRead);
+    assertThat(trackingGcs.getStatistics())
+        .containsExactlyEntriesIn(
+            ImmutableMap.<String, AtomicLong>builder()
+                .put("HTTP_DELETE_REQUEST", new AtomicLong(0))
+                .put("HTTP_DELETE_REQUEST_FAILURE", new AtomicLong(0))
+                .put("HTTP_GET_REQUEST", new AtomicLong(0))
+                .put("HTTP_GET_REQUEST_FAILURE", new AtomicLong(0))
+                .put("HTTP_HEAD_REQUEST", new AtomicLong(0))
+                .put("HTTP_HEAD_REQUEST_FAILURE", new AtomicLong(0))
+                .put("HTTP_PATCH_REQUEST", new AtomicLong(0))
+                .put("HTTP_PATCH_REQUEST_FAILURE", new AtomicLong(0))
+                .put("HTTP_POST_REQUEST", new AtomicLong(0))
+                .put("HTTP_POST_REQUEST_FAILURE", new AtomicLong(0))
+                .put("HTTP_PUT_REQUEST", new AtomicLong(0))
+                .put("HTTP_PUT_REQUEST_FAILURE", new AtomicLong(0))
+                .build());
   }
 
   @Test
@@ -488,15 +482,5 @@ public class GoogleCloudStorageImplTest {
                             /* uploadId= */ i))
                 .collect(toList()))
         .build();
-  }
-
-  private int getCountFromExpectedRequests(String requestType, List<String> expectedRequests) {
-    int count = 0;
-    for (int ind = 0; ind < expectedRequests.size(); ind++) {
-      if (requestType != "" && expectedRequests.get(ind).startsWith(requestType)) {
-        count += 1;
-      }
-    }
-    return count;
   }
 }

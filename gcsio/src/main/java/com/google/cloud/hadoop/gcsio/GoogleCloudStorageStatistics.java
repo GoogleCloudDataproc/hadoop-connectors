@@ -17,7 +17,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 /** Statistics which are collected in {@link GoogleCloudStorage}. */
-public enum GoogleCloudStorageStatistics {
+enum GoogleCloudStorageStatistics {
   HTTP_DELETE_REQUEST,
   HTTP_DELETE_REQUEST_FAILURE,
   HTTP_GET_REQUEST,

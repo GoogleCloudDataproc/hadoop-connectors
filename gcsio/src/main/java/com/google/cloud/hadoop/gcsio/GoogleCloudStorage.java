@@ -414,7 +414,7 @@ public interface GoogleCloudStorage {
       throws IOException;
 
   /** Retrieves the statistics associated with the {@link GoogleCloudStorage} instance. */
-  Map<GoogleCloudStorageStatistics, AtomicLong> getStatistics();
+  Map<String, AtomicLong> getStatistics();
 
   /**
    * Composes inputs into a single GCS object. This performs a GCS Compose. Objects will be composed

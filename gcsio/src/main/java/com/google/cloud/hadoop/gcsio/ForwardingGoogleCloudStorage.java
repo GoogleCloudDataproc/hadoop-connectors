@@ -119,7 +119,7 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public Map<GoogleCloudStorageStatistics, AtomicLong> getStatistics() {
+  public Map<String, AtomicLong> getStatistics() {
     return delegate.getStatistics();
   }
 

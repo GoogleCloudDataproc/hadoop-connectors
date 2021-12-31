@@ -27,7 +27,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStrings;
 import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
@@ -546,7 +545,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public Map<GoogleCloudStorageStatistics, AtomicLong> getStatistics() {
+  public Map<String, AtomicLong> getStatistics() {
     throw new UnsupportedOperationException("not implemented");
   }
 }

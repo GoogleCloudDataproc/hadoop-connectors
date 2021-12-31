@@ -24,6 +24,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.emptyToNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
@@ -2409,7 +2410,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   @Override
-  public Map<GoogleCloudStorageStatistics, AtomicLong> getStatistics() {
-    return statistics;
+  public Map<String, AtomicLong> getStatistics() {
+    return statistics.entrySet().stream()
+        .collect(toImmutableMap(e -> e.getKey().name(), Map.Entry::getValue));
   }
 }

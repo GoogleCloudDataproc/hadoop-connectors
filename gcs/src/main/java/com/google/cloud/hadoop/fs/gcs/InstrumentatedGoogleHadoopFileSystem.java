@@ -325,7 +325,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
           .getStatistics()
           .forEach(
               (k, v) -> {
-                GhfsStatistic statisticKey = GhfsStatistic.fromSymbol("ACTION_" + k.name());
+                GhfsStatistic statisticKey = GhfsStatistic.fromSymbol("ACTION_" + k);
                 checkNotNull(statisticKey, "statistic key for %s must not be null", k);
                 clearStats(statisticKey.getSymbol());
                 incrementStatistic(statisticKey, v.longValue());
