@@ -30,7 +30,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
-import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
 import com.google.cloud.hadoop.util.RedactedString;
@@ -393,27 +392,6 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_TRAFFICDIRECTOR_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.grpc.trafficdirector.enable", false);
 
-  /**
-   * Configuration key for using cooperative locking to achieve a directory mutation operations
-   * isolation.
-   */
-  public static final HadoopConfigurationProperty<Boolean> GCS_COOPERATIVE_LOCKING_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.cooperative.locking.enable", false);
-
-  /** Configuration key for lock expiration when using cooperative locking. */
-  public static final HadoopConfigurationProperty<Long>
-      GCS_COOPERATIVE_LOCKING_EXPIRATION_TIMEOUT_MS =
-          new HadoopConfigurationProperty<>(
-              "fs.gs.cooperative.locking.expiration.timeout.ms",
-              CooperativeLockingOptions.LOCK_EXPIRATION_TIMEOUT_MS_DEFAULT);
-
-  /** Configuration key for maximum allowed concurrent operations when using cooperative locking. */
-  public static final HadoopConfigurationProperty<Integer>
-      GCS_COOPERATIVE_LOCKING_MAX_CONCURRENT_OPERATIONS =
-          new HadoopConfigurationProperty<>(
-              "fs.gs.cooperative.locking.max.concurrent.operations",
-              CooperativeLockingOptions.MAX_CONCURRENT_OPERATIONS_DEFAULT);
-
   /** Configuration key for the headers for HTTP request to GCS. */
   public static final HadoopConfigurationProperty<Map<String, String>> GCS_HTTP_HEADERS =
       new HadoopConfigurationProperty<>("fs.gs.storage.http.headers.", ImmutableMap.of());
@@ -437,8 +415,6 @@ public class GoogleHadoopFileSystemConfiguration {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setCloudStorageOptions(getGcsOptionsBuilder(config).build())
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))
-        .setCooperativeLockingEnabled(
-            GCS_COOPERATIVE_LOCKING_ENABLE.get(config, config::getBoolean))
         .setEnsureNoConflictingItems(
             GCS_CREATE_ITEMS_CONFLICT_CHECK_ENABLE.get(config, config::getBoolean))
         .setMarkerFilePattern(GCS_MARKER_FILE_PATTERN.get(config, config::get))
@@ -476,7 +452,6 @@ public class GoogleHadoopFileSystemConfiguration {
         .setReadChannelOptions(getReadChannelOptions(config))
         .setWriteChannelOptions(getWriteChannelOptions(config))
         .setRequesterPaysOptions(getRequesterPaysOptions(config, projectId))
-        .setCooperativeLockingOptions(getCooperativeLockingOptions(config))
         .setHttpRequestHeaders(GCS_HTTP_HEADERS.getPropsWithPrefix(config))
         .setEncryptionAlgorithm(GCS_ENCRYPTION_ALGORITHM.get(config, config::get))
         .setEncryptionKey(GCS_ENCRYPTION_KEY.getPassword(config))
@@ -542,15 +517,6 @@ public class GoogleHadoopFileSystemConfiguration {
         .setMode(GCS_REQUESTER_PAYS_MODE.get(config, config::getEnum))
         .setProjectId(requesterPaysProjectId == null ? projectId : requesterPaysProjectId)
         .setBuckets(GCS_REQUESTER_PAYS_BUCKETS.getStringCollection(config))
-        .build();
-  }
-
-  private static CooperativeLockingOptions getCooperativeLockingOptions(Configuration config) {
-    return CooperativeLockingOptions.builder()
-        .setLockExpirationTimeoutMilli(
-            GCS_COOPERATIVE_LOCKING_EXPIRATION_TIMEOUT_MS.get(config, config::getLong))
-        .setMaxConcurrentOperations(
-            GCS_COOPERATIVE_LOCKING_MAX_CONCURRENT_OPERATIONS.get(config, config::getInt))
         .build();
   }
 }

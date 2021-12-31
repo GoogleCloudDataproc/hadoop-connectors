@@ -20,7 +20,6 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import com.google.api.ClientProto;
 import com.google.api.services.storage.Storage;
 import com.google.auto.value.AutoValue;
-import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
@@ -116,7 +115,6 @@ public abstract class GoogleCloudStorageOptions {
         .setReadChannelOptions(GoogleCloudStorageReadOptions.DEFAULT)
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
         .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
-        .setCooperativeLockingOptions(CooperativeLockingOptions.DEFAULT)
         .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT);
   }
 
@@ -174,8 +172,6 @@ public abstract class GoogleCloudStorageOptions {
   public abstract AsyncWriteChannelOptions getWriteChannelOptions();
 
   public abstract RequesterPaysOptions getRequesterPaysOptions();
-
-  public abstract CooperativeLockingOptions getCooperativeLockingOptions();
 
   public abstract ImmutableMap<String, String> getHttpRequestHeaders();
 
@@ -255,9 +251,6 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setWriteChannelOptions(AsyncWriteChannelOptions writeChannelOptions);
 
     public abstract Builder setRequesterPaysOptions(RequesterPaysOptions requesterPaysOptions);
-
-    public abstract Builder setCooperativeLockingOptions(
-        CooperativeLockingOptions cooperativeLockingOptions);
 
     public abstract Builder setHttpRequestHeaders(Map<String, String> httpRequestHeaders);
 

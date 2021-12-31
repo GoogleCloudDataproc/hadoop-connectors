@@ -473,20 +473,3 @@ over default service account impersonation.
     Comma-separated list of Google Cloud Storage Buckets for which GCS Requester
     Pays feature should be activated if `fs.gs.requester.pays.mode` property
     value is set to `CUSTOM`.
-
-### Cooperative Locking feature configuration
-
-*   `fs.gs.cooperative.locking.enable` (default: `false`)
-
-    Enables cooperative locking to achieve isolation of directory mutation
-    operations.
-
-*   `fs.gs.cooperative.locking.expiration.timeout.ms` (default: `120000`)
-
-    Lock expiration timeout used by cooperative locking feature to lock
-    directories.
-
-*   `fs.gs.cooperative.locking.max.concurrent.operations` (default: `20`)
-
-    Maximum number of concurrent directory modification operations per bucket
-    guarded by cooperative locking feature.
