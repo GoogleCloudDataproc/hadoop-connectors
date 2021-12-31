@@ -297,8 +297,8 @@ public final class ExpectedLogMessages implements TestRule {
    * <p>You are strongly advised to use narrow regular expressions, particularly if calling this
    * method multiple times with different {@code regex} params -- you should make sure that no
    * string can match more than one of the {@code regex}es, as this may lead to confusing behavior,
-   * depending on the order that the logs are printed. It may even even lead to flaky tests, if the
-   * order of the logging of the messages is not deterministic.
+   * depending on the order that the logs are printed. It may even lead to flaky tests, if the order
+   * of the logging of the messages is not deterministic.
    */
   public ExpectedLogMessages expect(String regex) {
     expectedRegexs.add(checkNotNull(regex));

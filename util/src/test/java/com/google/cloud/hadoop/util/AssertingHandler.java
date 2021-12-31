@@ -14,9 +14,10 @@
 
 package com.google.cloud.hadoop.util;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
+
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
 import com.google.errorprone.annotations.FormatMethod;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -34,6 +35,7 @@ import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.Assert;
 
 /**
  * A log handler that records messages and lets callers perform assertions against them.
@@ -47,7 +49,7 @@ import java.util.regex.Pattern;
  * (log level): (message) \n(stack trace up to the first stack frame).
  * </pre>
  *
- * <p>After each successful assertion, {@code AssertingHandler} clears its list of logged mesages.
+ * <p>After each successful assertion, {@code AssertingHandler} clears its list of logged messages.
  * Subsequent method calls operate against only the messages that were logged after that assertion.
  * The assertion methods are:
  *
@@ -99,15 +101,14 @@ public class AssertingHandler extends Handler {
   /**
    * A configuration map of loggers to the levels they should be handled at by the AssertingHandler
    */
-  private final Map<Logger, Level> configMaps = new HashMap<Logger, Level>();
+  private final Map<Logger, Level> configMaps = new HashMap<>();
 
   /**
    * The asserting handler associated with this thread, if any. Messages from unrelated threads are
    * ignored.
    */
   @SuppressWarnings("ThreadLocalUsage")
-  private final ThreadLocal<AssertingHandler> handlerForThread =
-      new InheritableThreadLocal<AssertingHandler>();
+  private final ThreadLocal<AssertingHandler> handlerForThread = new InheritableThreadLocal<>();
 
   private boolean captureAllThreads;
 
@@ -126,13 +127,13 @@ public class AssertingHandler extends Handler {
 
     // Handlers hang off loggers, which are shared between threads, so data structures
     // that are updated by logging must be concurrent or synchronized for consistency.
-    logRecords = new ConcurrentLinkedQueue<LogRecord>();
-    logExceptionMap = new ConcurrentHashMap<LogRecord, AutomaticallyGeneratedThrowable>();
+    logRecords = new ConcurrentLinkedQueue<>();
+    logExceptionMap = new ConcurrentHashMap<>();
 
     // In practice, only the test thread should update or query these data structures,
     // so they don't need to be synchronized.
-    ignoredMessages = new HashSet<String>();
-    ignoredPatterns = new HashSet<Pattern>();
+    ignoredMessages = new HashSet<>();
+    ignoredPatterns = new HashSet<>();
 
     // setup configurations if configs is specified
     if (configs.length > 0) {
@@ -194,7 +195,7 @@ public class AssertingHandler extends Handler {
    * formatted consistently with {@link #assertEqual}.
    */
   public ImmutableList<String> getFormattedLogRecords() {
-    return ImmutableList.copyOf(Iterables.transform(logRecords, this::logRecordToString));
+    return logRecords.stream().map(this::logRecordToString).collect(toImmutableList());
   }
 
   /**
@@ -220,7 +221,7 @@ public class AssertingHandler extends Handler {
    */
   private String logRecordToString(LogRecord logRecord) {
     StringBuilder sb = new StringBuilder();
-    formatRecordMesssage(sb, logRecord);
+    formatRecordMessage(sb, logRecord);
 
     Throwable thrown = logRecord.getThrown();
     if (thrown != null) {
@@ -238,7 +239,7 @@ public class AssertingHandler extends Handler {
    */
   private String logRecordToStringWithStackTrace(LogRecord logRecord) {
     StringBuilder sb = new StringBuilder();
-    formatRecordMesssage(sb, logRecord);
+    formatRecordMessage(sb, logRecord);
 
     Throwable thrown = logRecord.getThrown();
     if (thrown == null) {
@@ -249,7 +250,7 @@ public class AssertingHandler extends Handler {
     return sb.toString().trim();
   }
 
-  private void formatRecordMesssage(StringBuilder builder, LogRecord logRecord) {
+  private void formatRecordMessage(StringBuilder builder, LogRecord logRecord) {
     String message = new SimpleFormatter().formatMessage(logRecord);
     builder.append(logRecord.getLevel()).append(": ").append(message).append("\n");
   }
@@ -321,7 +322,7 @@ public class AssertingHandler extends Handler {
   /**
    * Does an assertion on the expected messages with actual logged messages, showing the first
    * mismatch and fail if any. The expected messages should be in the format of "Level: message"
-   * without the stack trace. The messages are expectd to appear in-order in the log.
+   * without the stack trace. The messages are expected to appear in-order in the log.
    *
    * @param mc the class that does the comparison
    * @param expected the expected log messages
@@ -333,8 +334,7 @@ public class AssertingHandler extends Handler {
     int expectInd = 0;
     int seenInd = 0;
 
-    // match the expected regex and the log messages, return the first mismatch
-    // if any.
+    // match the expected regex and the log messages, return the first mismatch if any.
     while (expectInd < expected.length && iter.hasNext()) {
       LogRecord logRecord = iter.next();
 
@@ -346,8 +346,7 @@ public class AssertingHandler extends Handler {
         seenInd++; // logged message is ignorable
       } else {
 
-        // logs the full stack trace message for reference on where the
-        // assertion failed
+        // logs the full stack trace message for reference on where the assertion failed
         logger.warning(logRecordToStringWithStackTrace(logRecord));
 
         // this assertion should fail, we use it to get IDE string diff.
@@ -373,7 +372,7 @@ public class AssertingHandler extends Handler {
     }
 
     // check for extra expected messages
-    if (expectInd < expected.length && !iter.hasNext()) {
+    if (expectInd < expected.length) {
       fail("Expected message #%s unseen: %s", expectInd, expected[expectInd]);
     } else {
 
@@ -410,7 +409,7 @@ public class AssertingHandler extends Handler {
   @SuppressWarnings("AssertionFailureIgnored")
   private void assertEquals(String message, String expected, String actual) {
     try {
-      junit.framework.Assert.assertEquals(message, expected, actual);
+      Assert.assertEquals(message, expected, actual);
     } catch (AssertionError t) {
       throw (AssertionError) t.initCause(constructionTrace);
     }
@@ -420,7 +419,7 @@ public class AssertingHandler extends Handler {
   @FormatMethod
   private void fail(String message, Object... args) {
     try {
-      junit.framework.Assert.fail(String.format(message, args));
+      Assert.fail(String.format(message, args));
     } catch (AssertionError t) {
       throw (AssertionError) t.initCause(constructionTrace);
     }
@@ -473,37 +472,33 @@ public class AssertingHandler extends Handler {
 
   /** The filter for filtering messages from different loggers at different specified level. */
   private final Filter filter =
-      new Filter() {
-
-        @Override
-        public boolean isLoggable(LogRecord record) {
-          if (record.getLoggerName() == null) {
-            // The JDK spec explicitly allows a null logger name but doesn't say what that means.
-            // But logging to a null logger seems unlikely, so return false.
-            return false;
-          }
-
-          // get the level from the record
-          Level messageLevel = record.getLevel();
-
-          // Iterate through the logger and its registered parents in LogManager to
-          // find a match.
-          for (Logger logger = Logger.getLogger(record.getLoggerName());
-              logger != null;
-              logger = logger.getParent()) {
-
-            // get the cutoff level from configuration map if there's a match
-            Level cutoffLevel = configMaps.get(logger);
-            if (cutoffLevel != null) {
-
-              // return whether the message level is higher or equal to cutoff level
-              return messageLevel.intValue() >= cutoffLevel.intValue();
-            }
-          }
-
-          // if no configurations set for the logger, use default level
-          return messageLevel.intValue() >= DEFAULT_LEVEL.intValue();
+      record -> {
+        if (record.getLoggerName() == null) {
+          // The JDK spec explicitly allows a null logger name but doesn't say what that means.
+          // But logging to a null logger seems unlikely, so return false.
+          return false;
         }
+
+        // get the level from the record
+        Level messageLevel = record.getLevel();
+
+        // Iterate through the logger and its registered parents in LogManager to
+        // find a match.
+        for (Logger logger = Logger.getLogger(record.getLoggerName());
+            logger != null;
+            logger = logger.getParent()) {
+
+          // get the cutoff level from configuration map if there's a match
+          Level cutoffLevel = configMaps.get(logger);
+          if (cutoffLevel != null) {
+
+            // return whether the message level is higher or equal to cutoff level
+            return messageLevel.intValue() >= cutoffLevel.intValue();
+          }
+        }
+
+        // if no configurations set for the logger, use default level
+        return messageLevel.intValue() >= DEFAULT_LEVEL.intValue();
       };
 
   /** Do check on the input config string and parse them into loggers and assigned levels. */
@@ -523,7 +518,7 @@ public class AssertingHandler extends Handler {
     if (matcher.group(1) != null) {
       configMaps.put(Logger.getLogger(matcher.group(1)), level);
     } else {
-      // if group(1) = null, input is ".level" which we want to setup root
+      // if group(1) = null, input is ".level" which we want to set up root
       // logger.
       configMaps.put(Logger.getLogger(""), level);
     }
