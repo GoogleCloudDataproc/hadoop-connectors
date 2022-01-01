@@ -647,25 +647,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     createEmptyObject(resourceId, EMPTY_OBJECT_CREATE_OPTIONS);
   }
 
-  public void updateMetadata(GoogleCloudStorageItemInfo itemInfo, Map<String, byte[]> metadata)
-      throws IOException {
-    StorageResourceId resourceId = itemInfo.getResourceId();
-    checkArgument(
-        resourceId.isStorageObject(), "Expected full StorageObject ID, got %s", resourceId);
-
-    StorageObject storageObject = new StorageObject().setMetadata(encodeMetadata(metadata));
-
-    Storage.Objects.Patch patchObject =
-        initializeRequest(
-                storage
-                    .objects()
-                    .patch(resourceId.getBucketName(), resourceId.getObjectName(), storageObject),
-                resourceId.getBucketName())
-            .setIfMetagenerationMatch(itemInfo.getMetaGeneration());
-
-    patchObject.execute();
-  }
-
   @Override
   public void createEmptyObjects(List<StorageResourceId> resourceIds, CreateObjectOptions options)
       throws IOException {
@@ -858,16 +839,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     if (!innerExceptions.isEmpty()) {
       throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
     }
-  }
-
-  public void deleteObject(StorageResourceId resourceId, long metaGeneration) throws IOException {
-    String bucketName = resourceId.getBucketName();
-
-    Storage.Objects.Delete deleteObject =
-        initializeRequest(
-                storage.objects().delete(bucketName, resourceId.getObjectName()), bucketName)
-            .setIfMetagenerationMatch(metaGeneration);
-    deleteObject.execute();
   }
 
   /** See {@link GoogleCloudStorage#deleteObjects(List)} for details about expected behavior. */
