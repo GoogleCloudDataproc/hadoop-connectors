@@ -8,6 +8,7 @@ import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonE
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.truth.Truth.assertThat;
 import static java.lang.Math.min;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -25,7 +26,6 @@ import static org.mockito.Mockito.when;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.util.BackOff;
-import com.google.api.core.CurrentMillisClock;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.Storage.Objects;
 import com.google.api.services.storage.Storage.Objects.Get;
@@ -59,7 +59,6 @@ import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Executors;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -103,10 +102,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   private Get get;
   private StorageObject storageObject;
   private static final Watchdog watchdog =
-      Watchdog.create(
-          CurrentMillisClock.getDefaultClock(),
-          Duration.ofMillis(100),
-          Executors.newSingleThreadScheduledExecutor());
+      Watchdog.create(Duration.ofMillis(100), newSingleThreadScheduledExecutor());
 
   @Before
   public void setUp() throws Exception {

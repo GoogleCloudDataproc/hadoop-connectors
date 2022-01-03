@@ -1,6 +1,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.truth.Truth.assertThat;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
@@ -13,7 +14,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.google.api.client.util.BackOff;
-import com.google.api.core.CurrentMillisClock;
 import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.BackOffFactory;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
@@ -81,10 +81,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   private static final QueryWriteStatusRequest WRITE_STATUS_REQUEST =
       QueryWriteStatusRequest.newBuilder().setUploadId(UPLOAD_ID).build();
   private static final Watchdog watchdog =
-      Watchdog.create(
-          CurrentMillisClock.getDefaultClock(),
-          Duration.ofMillis(100),
-          Executors.newSingleThreadScheduledExecutor());
+      Watchdog.create(Duration.ofMillis(100), newSingleThreadScheduledExecutor());
 
   private StorageStub stub;
   private FakeService fakeService;

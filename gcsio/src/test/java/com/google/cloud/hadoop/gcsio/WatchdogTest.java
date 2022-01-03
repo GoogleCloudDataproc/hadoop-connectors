@@ -1,6 +1,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.truth.Truth.assertThat;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.Mockito.mock;
@@ -8,8 +9,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.api.core.ApiClock;
-import com.google.api.core.CurrentMillisClock;
 import com.google.common.flogger.GoogleLogger;
 import com.google.storage.v2.ReadObjectResponse;
 import com.google.storage.v2.WriteObjectRequest;
@@ -20,7 +19,6 @@ import io.grpc.Context.CancellableContext;
 import io.grpc.stub.StreamObserver;
 import java.time.Duration;
 import java.util.Iterator;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeoutException;
 import org.junit.Before;
@@ -40,9 +38,8 @@ public class WatchdogTest {
   @Before
   public void setUp() throws Exception {
     Duration checkInterval = Duration.ofSeconds(2);
-    ApiClock clock = CurrentMillisClock.getDefaultClock();
-    ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
-    watchdog = Watchdog.create(clock, checkInterval, executor);
+    ScheduledExecutorService executor = newSingleThreadScheduledExecutor();
+    watchdog = Watchdog.create(checkInterval, executor);
   }
 
   @Test

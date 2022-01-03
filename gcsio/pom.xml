@@ -168,10 +168,6 @@
       <groupId>io.grpc</groupId>
       <artifactId>grpc-testing</artifactId>
     </dependency>
-    <dependency>
-      <groupId>com.google.api</groupId>
-      <artifactId>api-common</artifactId>
-    </dependency>
   </dependencies>
   <build>
     <plugins>

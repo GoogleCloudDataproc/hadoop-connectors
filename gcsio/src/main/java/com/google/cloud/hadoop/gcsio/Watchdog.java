@@ -16,11 +16,11 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
-import com.google.api.core.ApiClock;
 import com.google.common.flogger.GoogleLogger;
 import io.grpc.ClientCall;
 import io.grpc.Context.CancellableContext;
 import io.grpc.stub.StreamObserver;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
@@ -43,26 +43,25 @@ import javax.annotation.concurrent.GuardedBy;
  *       had no outstanding demand. Duration.ZERO disables the timeout.
  * </ul>
  */
-public final class Watchdog implements Runnable {
+final class Watchdog implements Runnable {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Dummy value to convert the ConcurrentHashMap into a Set
   private final KeySetView<WatchdogStream, Boolean> openStreams = ConcurrentHashMap.newKeySet();
 
-  private final ApiClock clock;
+  private final Clock clock;
   private final Duration scheduleInterval;
   private final ScheduledExecutorService executor;
 
   /** returns a Watchdog which is scheduled at the provided interval. */
-  public static Watchdog create(
-      ApiClock clock, Duration scheduleInterval, ScheduledExecutorService executor) {
-    Watchdog watchdog = new Watchdog(clock, scheduleInterval, executor);
+  public static Watchdog create(Duration scheduleInterval, ScheduledExecutorService executor) {
+    Watchdog watchdog = new Watchdog(scheduleInterval, executor);
     watchdog.start();
     return watchdog;
   }
 
-  private Watchdog(ApiClock clock, Duration scheduleInterval, ScheduledExecutorService executor) {
-    this.clock = checkNotNull(clock, "clock can't be null");
+  private Watchdog(Duration scheduleInterval, ScheduledExecutorService executor) {
+    this.clock = Clock.systemUTC();
     this.scheduleInterval = scheduleInterval;
     this.executor = executor;
   }
@@ -174,7 +173,7 @@ public final class Watchdog implements Runnable {
     private final CancellableContext requestContext;
 
     @GuardedBy("lock")
-    private long lastActivityAt = clock.millisTime();
+    private long lastActivityAt = clock.millis();
 
     @GuardedBy("lock")
     private State state = State.IDLE;
@@ -189,7 +188,7 @@ public final class Watchdog implements Runnable {
     @Override
     public T next() {
       synchronized (lock) {
-        lastActivityAt = clock.millisTime();
+        lastActivityAt = clock.millis();
       }
       T next = innerIterator.next();
       this.state = State.DELIVERING;
@@ -204,7 +203,7 @@ public final class Watchdog implements Runnable {
 
       Throwable throwable = null;
       synchronized (lock) {
-        long waitTime = clock.millisTime() - lastActivityAt;
+        long waitTime = clock.millis() - lastActivityAt;
         if (this.state == State.WAITING
             && (!waitTimeout.isZero() && waitTime >= waitTimeout.toMillis())) {
           throwable = new TimeoutException("Canceled due to timeout waiting for next response");
@@ -242,7 +241,7 @@ public final class Watchdog implements Runnable {
     private final ClientCall<R, T> clientCall;
 
     @GuardedBy("lock")
-    private long lastActivityAt = clock.millisTime();
+    private long lastActivityAt = clock.millis();
 
     @GuardedBy("lock")
     private State state = State.IDLE;
@@ -262,7 +261,7 @@ public final class Watchdog implements Runnable {
 
       Throwable throwable = null;
       synchronized (lock) {
-        long waitTime = clock.millisTime() - lastActivityAt;
+        long waitTime = clock.millis() - lastActivityAt;
         if (this.state == State.WAITING
             && (!waitTimeout.isZero() && waitTime >= waitTimeout.toMillis())) {
           throwable = new TimeoutException("Canceled due to timeout waiting for next response");
@@ -278,7 +277,7 @@ public final class Watchdog implements Runnable {
     @Override
     public void onNext(R value) {
       synchronized (lock) {
-        lastActivityAt = clock.millisTime();
+        lastActivityAt = clock.millis();
       }
       this.state = State.WAITING;
       innerStreamObserver.onNext(value);

@@ -28,6 +28,7 @@ import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.Arrays.stream;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
@@ -47,7 +48,6 @@ import com.google.api.client.util.BackOff;
 import com.google.api.client.util.Data;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.Sleeper;
-import com.google.api.core.CurrentMillisClock;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.StorageRequest;
 import com.google.api.services.storage.model.Bucket;
@@ -366,9 +366,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     this.watchdog =
         Watchdog.create(
-            CurrentMillisClock.getDefaultClock(),
             Duration.ofMillis(storageOptions.getGrpcMessageTimeoutCheckInterval()),
-            Executors.newSingleThreadScheduledExecutor());
+            newSingleThreadScheduledExecutor());
 
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
@@ -406,9 +405,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     this.watchdog =
         Watchdog.create(
-            CurrentMillisClock.getDefaultClock(),
             Duration.ofMillis(options.getGrpcMessageTimeoutCheckInterval()),
-            Executors.newSingleThreadScheduledExecutor());
+            newSingleThreadScheduledExecutor());
 
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
