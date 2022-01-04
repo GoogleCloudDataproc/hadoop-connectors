@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Interface for exposing the Google Cloud Storage API behavior in a way more amenable to writing
@@ -414,20 +413,6 @@ public interface GoogleCloudStorage {
       throws IOException;
 
   /**
-   * Retrieves the statistics for the given object-related key
-   *
-   * @param key name of the object related statistics key
-   */
-  AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key);
-
-  /**
-   * Retrieves the statistics for the given http request-related key
-   *
-   * @param key name of the http related statistics key
-   */
-  AtomicLong getHttpStatistics(GoogleCloudStorageStatistics key);
-
-  /**
    * Composes inputs into a single GCS object. This performs a GCS Compose. Objects will be composed
    * according to the order they appear in the input. The destination object will have metadata set
    * according to {@code options}. Overwrite semantics for the destination object will follow the
@@ -438,6 +423,9 @@ public interface GoogleCloudStorage {
   GoogleCloudStorageItemInfo composeObjects(
       List<StorageResourceId> sources, StorageResourceId destination, CreateObjectOptions options)
       throws IOException;
+
+  /** Retrieves the statistics associated with the {@link GoogleCloudStorage} instance. */
+  Map<String, Long> getStatistics();
 
   /** Releases resources used by this instance. */
   void close();
