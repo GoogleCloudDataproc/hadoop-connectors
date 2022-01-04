@@ -206,7 +206,7 @@ public class GoogleCloudStorageImplTest {
             ImmutableMap.<String, Long>builder()
                 .put("HTTP_DELETE_REQUEST", 1L)
                 .put("HTTP_DELETE_REQUEST_FAILURE", 0L)
-                .put("HTTP_GET_REQUEST", 3L)
+                .put("HTTP_GET_REQUEST", 4L)
                 .put("HTTP_GET_REQUEST_FAILURE", 1L)
                 .put("HTTP_HEAD_REQUEST", 0L)
                 .put("HTTP_HEAD_REQUEST_FAILURE", 0L)
