@@ -1437,8 +1437,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param bucketName bucket name
    * @param objectNamePrefix object name prefix or null if all objects in the bucket are desired
    * @param listOptions options to use when listing objects
-   * @param includeTrailingDelimiter whether to include prefix objects into the {@code
-   *     listedObjects}
    * @param listedObjects output parameter into which retrieved StorageObjects will be added
    * @param listedPrefixes output parameter into which retrieved prefixes will be added
    */
@@ -1446,13 +1444,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       String bucketName,
       String objectNamePrefix,
       ListObjectOptions listOptions,
-      boolean includeTrailingDelimiter,
       List<StorageObject> listedObjects,
       List<String> listedPrefixes)
       throws IOException {
     logger.atFiner().log(
-        "listStorageObjectsAndPrefixes(%s, %s, %s, %s)",
-        bucketName, objectNamePrefix, listOptions, includeTrailingDelimiter);
+        "listStorageObjectsAndPrefixes(%s, %s, %s)", bucketName, objectNamePrefix, listOptions);
 
     checkArgument(
         listedObjects != null && listedObjects.isEmpty(),
@@ -1490,7 +1486,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             objectNamePrefix,
             listOptions.getFields(),
             listOptions.getDelimiter(),
-            includeTrailingDelimiter,
             maxResults);
 
     String pageToken = null;
@@ -1600,12 +1595,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       String objectNamePrefix,
       String objectFields,
       String delimiter,
-      boolean includeTrailingDelimiter,
       long maxResults)
       throws IOException {
     logger.atFiner().log(
         "createListRequest(%s, %s, %s, %s, %d)",
-        bucketName, objectNamePrefix, delimiter, includeTrailingDelimiter, maxResults);
+        bucketName, objectNamePrefix, delimiter, maxResults);
     checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
 
     Storage.Objects.List listObject =
@@ -1615,8 +1609,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     // Set delimiter if supplied.
     if (delimiter != null) {
-      listObject.setDelimiter(delimiter);
-      listObject.setIncludeTrailingDelimiter(includeTrailingDelimiter);
+      listObject.setDelimiter(delimiter).setIncludeTrailingDelimiter(true);
     }
 
     // Set number of items to retrieve per call.
@@ -1654,12 +1647,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     List<StorageObject> listedObjects = new ArrayList<>();
     List<String> listedPrefixes = new ArrayList<>();
     listStorageObjectsAndPrefixes(
-        bucketName,
-        objectNamePrefix,
-        listOptions,
-        /* includeTrailingDelimiter= */ true,
-        listedObjects,
-        listedPrefixes);
+        bucketName, objectNamePrefix, listOptions, listedObjects, listedPrefixes);
 
     return getGoogleCloudStorageItemInfos(
         bucketName, objectNamePrefix, listOptions, listedPrefixes, listedObjects);
@@ -1684,7 +1672,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             objectNamePrefix,
             listOptions.getFields(),
             listOptions.getDelimiter(),
-            /* includeTrailingDelimiter= */ true,
             listOptions.getMaxResults());
     if (pageToken != null) {
       logger.atFiner().log("listObjectInfoPage: next page %s", pageToken);
