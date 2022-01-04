@@ -43,13 +43,12 @@ public class WatchdogTest {
   }
 
   @Test
-  public void testPassThroughClientStreamingRPC() {
+  public void watchPassThroughClientStreamingRPC() {
     ClientCall<WriteObjectRequest, WriteObjectResponse> clientCall = new NoopClientCall<>();
     StreamObserverStub<WriteObjectRequest> streamObserver = new StreamObserverStub<>();
     StreamObserver<WriteObjectRequest> watch = watchdog.watch(clientCall, streamObserver, waitTime);
     assertThat(watchdog).isNotNull();
-    assertThat(watchdog.getOpenStreams()).isNotNull();
-    assertThat(watchdog.getOpenStreams().size()).isEqualTo(1);
+    assertThat(watchdog.getOpenStreams()).hasSize(1);
     WriteObjectRequest value = WriteObjectRequest.newBuilder().build();
     watch.onNext(value);
     assertThat(streamObserver.getObjects()).containsExactly(value);
@@ -58,12 +57,11 @@ public class WatchdogTest {
     assertThat(streamObserver.getErrors()).containsExactly(t);
     watch.onCompleted();
     assertThat(streamObserver.isCompleted()).isTrue();
-    assertThat(watchdog.getOpenStreams()).isNotNull();
-    assertThat(watchdog.getOpenStreams().size()).isEqualTo(0);
+    assertThat(watchdog.getOpenStreams().isEmpty()).isTrue();
   }
 
   @Test
-  public void testPassThroughServerStreamingRPC() {
+  public void watchPassThroughServerStreamingRPC() {
     CancellableContext requestContext = Context.current().withCancellation();
     ReadObjectResponse defaultInstance = ReadObjectResponse.getDefaultInstance();
     Response<ReadObjectResponse> validResponse = new Response<>(defaultInstance);
@@ -77,15 +75,13 @@ public class WatchdogTest {
     ReadObjectResponse next = watch.next();
     assertThat(next).isEqualTo(validResponse.object);
     assertThat(watchdog).isNotNull();
-    assertThat(watchdog.getOpenStreams()).isNotNull();
-    assertThat(watchdog.getOpenStreams().size()).isEqualTo(1);
+    assertThat(watchdog.getOpenStreams()).hasSize(1);
     assertThrows(RuntimeException.class, watch::hasNext);
-    assertThat(watchdog.getOpenStreams()).isNotNull();
-    assertThat(watchdog.getOpenStreams().size()).isEqualTo(0);
+    assertThat(watchdog.getOpenStreams().isEmpty()).isTrue();
   }
 
   @Test
-  public void testClientStreamingRPCTimeout() {
+  public void watchOnClientStreamingRPCTimeout() {
     NoopClientCallStub<WriteObjectRequest, WriteObjectResponse> clientCall =
         new NoopClientCallStub<>();
     StreamObserver<WriteObjectRequest> timeoutStreamObserver =
@@ -110,12 +106,12 @@ public class WatchdogTest {
         watchdog.watch(clientCall, timeoutStreamObserver, waitTime);
     WriteObjectRequest value = WriteObjectRequest.newBuilder().build();
     watch.onNext(value);
-    assertThat(clientCall.isCancelled).isTrue();
+    assertThat(clientCall.cancelled).isTrue();
     assertThat(clientCall.cause).isInstanceOf(TimeoutException.class);
   }
 
   @Test
-  public void testServerStreamingRPCTimeout() {
+  public void watchOnServerStreamingRPCTimeout() {
     CancellableContext requestContext = Context.current().withCancellation();
     Iterator<ReadObjectResponse> responseIterator =
         new Iterator<ReadObjectResponse>() {
@@ -141,7 +137,7 @@ public class WatchdogTest {
   }
 
   @Test
-  public void testMultipleWatches() {
+  public void watchMultipleStreams() {
     NoopClientCallStub<WriteObjectRequest, WriteObjectResponse> clientCall =
         new NoopClientCallStub<>();
     StreamObserver<WriteObjectRequest> timeoutStreamObserver =
@@ -187,22 +183,20 @@ public class WatchdogTest {
     StreamObserver<WriteObjectRequest> serverStreamingRPCWatch =
         watchdog.watch(clientCall, timeoutStreamObserver, waitTime);
     assertThat(watchdog).isNotNull();
-    assertThat(watchdog.getOpenStreams()).isNotNull();
-    assertThat(watchdog.getOpenStreams().size()).isEqualTo(2);
-
+    assertThat(watchdog.getOpenStreams()).hasSize(2);
     boolean actual = clientStreamingRPCWatch.hasNext();
     WriteObjectRequest value = WriteObjectRequest.newBuilder().build();
     serverStreamingRPCWatch.onNext(value);
 
     assertThat(actual).isTrue();
     assertThat(requestContext.isCancelled()).isTrue();
-    assertThat(clientCall.isCancelled).isTrue();
+    assertThat(clientCall.cancelled).isTrue();
     assertThat(clientCall.cause).isInstanceOf(TimeoutException.class);
-    assertThat(watchdog.getOpenStreams().size()).isEqualTo(0);
+    assertThat(watchdog.getOpenStreams().isEmpty()).isTrue();
   }
 
   @Test
-  public void testClientStreamingRPCWithoutTimeout() {
+  public void watchOnClientStreamingRPCWithoutTimeout() {
     NoopClientCallStub<WriteObjectRequest, WriteObjectResponse> clientCall =
         new NoopClientCallStub<>();
     StreamObserver<WriteObjectRequest> timeoutStreamObserver =
@@ -227,12 +221,12 @@ public class WatchdogTest {
         watchdog.watch(clientCall, timeoutStreamObserver, zeroWaitTime);
     WriteObjectRequest value = WriteObjectRequest.newBuilder().build();
     watch.onNext(value);
-    assertThat(clientCall.isCancelled).isFalse();
+    assertThat(clientCall.cancelled).isFalse();
     assertThat(clientCall.cause).isNull();
   }
 
   @Test
-  public void testServerStreamingRPCWithoutTimeout() {
+  public void watchOnServerStreamingRPCWithoutTimeout() {
     CancellableContext requestContext = Context.current().withCancellation();
     Iterator<ReadObjectResponse> responseIterator =
         new Iterator<ReadObjectResponse>() {
@@ -305,7 +299,9 @@ public class WatchdogTest {
       boolean hasNext = objects.hasNext();
       if (hasNext) {
         Response<T> next = objects.next();
-        if (next.throwable != null) throw next.throwable;
+        if (next.throwable != null) {
+          throw next.throwable;
+        }
       }
       return hasNext;
     }
@@ -317,25 +313,27 @@ public class WatchdogTest {
   }
 
   static final class Response<T> {
-    private T object;
-    private RuntimeException throwable;
+    private final T object;
+    private final RuntimeException throwable;
 
     public Response(T object) {
       this.object = object;
+      this.throwable = null;
     }
 
     public Response(RuntimeException throwable) {
       this.throwable = throwable;
+      this.object = null;
     }
   }
 
   static final class NoopClientCallStub<ReqT, ResT> extends NoopClientCall<ReqT, ResT> {
-    boolean isCancelled;
+    boolean cancelled;
     Throwable cause;
 
     @Override
     public void cancel(String message, Throwable cause) {
-      isCancelled = true;
+      cancelled = true;
       this.cause = cause;
     }
   }

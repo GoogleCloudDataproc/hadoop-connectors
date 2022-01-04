@@ -28,8 +28,8 @@ import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
-import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.Arrays.stream;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 

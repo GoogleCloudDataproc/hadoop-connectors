@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Google Inc. All Rights Reserved.
+ * Copyright 2022 Google Inc. All Rights Reserved.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -16,6 +16,7 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import io.grpc.ClientCall;
 import io.grpc.Context.CancellableContext;
@@ -46,7 +47,6 @@ import javax.annotation.concurrent.GuardedBy;
 final class Watchdog implements Runnable {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  // Dummy value to convert the ConcurrentHashMap into a Set
   private final KeySetView<WatchdogStream, Boolean> openStreams = ConcurrentHashMap.newKeySet();
 
   private final Clock clock;
@@ -130,11 +130,11 @@ final class Watchdog implements Runnable {
     try {
       runUnsafe();
     } catch (RuntimeException t) {
-      logger.atSevere().log("Caught throwable in periodic Watchdog run. Continuing.", t);
+      logger.atSevere().withCause(t).log("Caught throwable in periodic Watchdog run. Continuing.");
     }
   }
 
-  // package-private method to test the state of watchdog
+  @VisibleForTesting
   KeySetView<WatchdogStream, Boolean> getOpenStreams() {
     return openStreams;
   }
