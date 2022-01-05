@@ -20,6 +20,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.net.URI;
@@ -43,7 +44,8 @@ import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
 
-public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystemBase
+@VisibleForTesting
+public class InstrumentedGoogleHadoopFileSystem extends GoogleHadoopFileSystemBase
     implements IOStatisticsSource {
 
   /** Instrumentation to track Statistics */
@@ -54,9 +56,9 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  InstrumentatedGoogleHadoopFileSystem() {}
+  InstrumentedGoogleHadoopFileSystem() {}
 
-  InstrumentatedGoogleHadoopFileSystem(GoogleCloudStorageFileSystem gcsfs) {
+  InstrumentedGoogleHadoopFileSystem(GoogleCloudStorageFileSystem gcsfs) {
     super(gcsfs);
   }
 

@@ -23,7 +23,7 @@ import static java.util.Objects.requireNonNull;
 
 import com.google.cloud.hadoop.fs.gcs.DelegationTokenStatistics;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase;
-import com.google.cloud.hadoop.fs.gcs.InstrumentatedGoogleHadoopFileSystem;
+import com.google.cloud.hadoop.fs.gcs.InstrumentedGoogleHadoopFileSystem;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
@@ -311,7 +311,7 @@ public class GcsDelegationTokens extends AbstractService {
 
   /** Get the IOStatistics of GoogleHadoopFileSystem to update the Delegation token Statistics */
   private DelegationTokenStatistics getStats() {
-    return ((InstrumentatedGoogleHadoopFileSystem) fileSystem)
+    return ((InstrumentedGoogleHadoopFileSystem) fileSystem)
         .getInstrumentation()
         .newDelegationTokenStatistics();
   }
