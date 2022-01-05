@@ -26,6 +26,7 @@ import static com.google.common.base.Strings.emptyToNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static java.lang.Math.toIntExact;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.batch.json.JsonBatchCallback;
@@ -44,7 +45,6 @@ import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.Sleeper;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.Storage.Objects.Copy;
-import com.google.api.services.storage.Storage.Objects.Insert;
 import com.google.api.services.storage.StorageRequest;
 import com.google.api.services.storage.model.Bucket;
 import com.google.api.services.storage.model.Bucket.Lifecycle;
@@ -267,6 +267,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // Function that generates downscoped access token.
   private final Function<List<AccessBoundary>, String> downscopedAccessTokenFn;
 
+  // Watchdog to monitor gRPC streams
+  private final Watchdog watchdog;
+
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
    *
@@ -366,6 +369,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         this.storage.getRequestFactory() == null
             ? null
             : this.storage.getRequestFactory().getInitializer();
+
+    this.watchdog =
+        Watchdog.create(
+            Duration.ofMillis(options.getGrpcMessageTimeoutCheckInterval()),
+            newSingleThreadScheduledExecutor());
 
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
@@ -511,34 +519,41 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             .setContentGenerationMatch(writeGeneration.orElse(null))
             .build();
 
-    BaseAbstractGoogleAsyncWriteChannel<?> channel =
-        storageOptions.isGrpcEnabled()
-            ? new GoogleCloudStorageGrpcWriteChannel(
-                storageStubProvider,
-                backgroundTasksThreadPool,
-                storageOptions.getWriteChannelOptions(),
-                resourceId,
-                options,
-                writeConditions,
-                requesterShouldPay(resourceId.getBucketName())
-                    ? storageOptions.getRequesterPaysOptions().getProjectId()
-                    : null,
-                BackOffFactory.DEFAULT)
-            : new GoogleCloudStorageWriteChannel(
-                storage,
-                clientRequestHelper,
-                backgroundTasksThreadPool,
-                storageOptions.getWriteChannelOptions(),
-                resourceId,
-                options,
-                writeConditions) {
-
-              @Override
-              public Insert createRequest(InputStreamContent inputStream) throws IOException {
-                return initializeRequest(
-                    super.createRequest(inputStream), resourceId.getBucketName());
-              }
-            };
+    BaseAbstractGoogleAsyncWriteChannel<?> channel;
+    if (storageOptions.isGrpcEnabled()) {
+      String requesterPaysProjectId = null;
+      if (requesterShouldPay(resourceId.getBucketName())) {
+        requesterPaysProjectId = storageOptions.getRequesterPaysOptions().getProjectId();
+      }
+      channel =
+          new GoogleCloudStorageGrpcWriteChannel(
+              storageStubProvider,
+              backgroundTasksThreadPool,
+              storageOptions.getWriteChannelOptions(),
+              resourceId,
+              options,
+              watchdog,
+              writeConditions,
+              requesterPaysProjectId,
+              BackOffFactory.DEFAULT);
+    } else {
+      channel =
+          new GoogleCloudStorageWriteChannel(
+              storage,
+              clientRequestHelper,
+              backgroundTasksThreadPool,
+              storageOptions.getWriteChannelOptions(),
+              resourceId,
+              options,
+              writeConditions) {
+            @Override
+            public Storage.Objects.Insert createRequest(InputStreamContent inputStream)
+                throws IOException {
+              return initializeRequest(
+                  super.createRequest(inputStream), resourceId.getBucketName());
+            }
+          };
+    }
     channel.initialize();
     return channel;
   }
@@ -748,7 +763,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     if (storageOptions.isGrpcEnabled()) {
       return GoogleCloudStorageGrpcReadChannel.open(
-          storageStubProvider, storage, errorExtractor, resourceId, readOptions);
+          storageStubProvider, storage, errorExtractor, resourceId, watchdog, readOptions);
     }
 
     // The underlying channel doesn't initially read data, which means that we won't see a
