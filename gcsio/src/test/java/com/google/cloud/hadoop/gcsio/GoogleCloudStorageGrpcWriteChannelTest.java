@@ -1,6 +1,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.truth.Truth.assertThat;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
@@ -44,6 +45,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
+import java.time.Duration;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -78,10 +80,12 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
           .build();
   private static final QueryWriteStatusRequest WRITE_STATUS_REQUEST =
       QueryWriteStatusRequest.newBuilder().setUploadId(UPLOAD_ID).build();
+  private static final Watchdog watchdog =
+      Watchdog.create(Duration.ofMillis(100), newSingleThreadScheduledExecutor());
 
   private StorageStub stub;
   private FakeService fakeService;
-  private ExecutorService executor = Executors.newCachedThreadPool();
+  private final ExecutorService executor = Executors.newCachedThreadPool();
   @Mock private Credentials mockCredentials;
 
   @Before
@@ -107,8 +111,8 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
         newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
-                QueryWriteStatusResponse.newBuilder().setCommittedSize(0).build(),
-                QueryWriteStatusResponse.newBuilder().setCommittedSize(0).build())
+                QueryWriteStatusResponse.newBuilder().setPersistedSize(0).build(),
+                QueryWriteStatusResponse.newBuilder().setPersistedSize(0).build())
             .iterator());
 
     ByteString data = ByteString.copyFromUtf8("test data");
@@ -161,10 +165,10 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
                 QueryWriteStatusResponse.newBuilder()
-                    .setCommittedSize(GCS_MINIMUM_CHUNK_SIZE)
+                    .setPersistedSize(GCS_MINIMUM_CHUNK_SIZE)
                     .build(),
                 QueryWriteStatusResponse.newBuilder()
-                    .setCommittedSize(2 * GCS_MINIMUM_CHUNK_SIZE)
+                    .setPersistedSize(2 * GCS_MINIMUM_CHUNK_SIZE)
                     .build())
             .iterator());
 
@@ -191,10 +195,10 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
                 QueryWriteStatusResponse.newBuilder()
-                    .setCommittedSize(GCS_MINIMUM_CHUNK_SIZE)
+                    .setPersistedSize(GCS_MINIMUM_CHUNK_SIZE)
                     .build(),
                 QueryWriteStatusResponse.newBuilder()
-                    .setCommittedSize(2 * GCS_MINIMUM_CHUNK_SIZE)
+                    .setPersistedSize(2 * GCS_MINIMUM_CHUNK_SIZE)
                     .build())
             .iterator());
 
@@ -217,7 +221,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
                 QueryWriteStatusResponse.newBuilder()
-                    .setCommittedSize(GCS_MINIMUM_CHUNK_SIZE * 3 / 4)
+                    .setPersistedSize(GCS_MINIMUM_CHUNK_SIZE * 3 / 4)
                     .build())
             .iterator());
 
@@ -328,7 +332,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
                 QueryWriteStatusResponse.newBuilder()
-                    .setCommittedSize(GCS_MINIMUM_CHUNK_SIZE * 3 / 4)
+                    .setPersistedSize(GCS_MINIMUM_CHUNK_SIZE * 3 / 4)
                     .build())
             .iterator());
 
@@ -346,7 +350,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
                 QueryWriteStatusResponse.newBuilder()
-                    .setCommittedSize(GCS_MINIMUM_CHUNK_SIZE)
+                    .setPersistedSize(GCS_MINIMUM_CHUNK_SIZE)
                     .build())
             .iterator());
 
@@ -368,7 +372,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     fakeService.setInsertObjectExceptions(
         ImmutableList.of(new StatusException(Status.DEADLINE_EXCEEDED)));
     fakeService.setQueryWriteStatusResponses(
-        ImmutableList.of(QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build())
+        ImmutableList.of(QueryWriteStatusResponse.newBuilder().setPersistedSize(1).build())
             .iterator());
     ByteString chunk = createTestData(GCS_MINIMUM_CHUNK_SIZE);
     ArgumentCaptor<WriteObjectRequest> requestCaptor =
@@ -396,7 +400,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     fakeService.setInsertObjectExceptions(
         ImmutableList.of(new StatusException(Status.DEADLINE_EXCEEDED)));
     fakeService.setQueryWriteStatusResponses(
-        ImmutableList.of(QueryWriteStatusResponse.newBuilder().setCommittedSize(-1).build())
+        ImmutableList.of(QueryWriteStatusResponse.newBuilder().setPersistedSize(-1).build())
             .iterator());
     ByteString chunk = createTestData(GCS_MINIMUM_CHUNK_SIZE);
 
@@ -421,10 +425,10 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
             new StatusException(Status.DEADLINE_EXCEEDED)));
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(
-                QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build(),
-                QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build(),
-                QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build(),
-                QueryWriteStatusResponse.newBuilder().setCommittedSize(1).build())
+                QueryWriteStatusResponse.newBuilder().setPersistedSize(1).build(),
+                QueryWriteStatusResponse.newBuilder().setPersistedSize(1).build(),
+                QueryWriteStatusResponse.newBuilder().setPersistedSize(1).build(),
+                QueryWriteStatusResponse.newBuilder().setPersistedSize(1).build())
             .iterator());
     ByteString chunk = createTestData(GCS_MINIMUM_CHUNK_SIZE);
 
@@ -570,6 +574,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
         options,
         new StorageResourceId(V1_BUCKET_NAME, OBJECT_NAME),
         CreateObjectOptions.DEFAULT_NO_OVERWRITE.toBuilder().setContentType(CONTENT_TYPE).build(),
+        watchdog,
         writeConditions,
         requesterPaysProject,
         backOffFactory);
@@ -686,8 +691,8 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     }
 
     public void setObject(Object object) {
-      this.insertRequestObserver.object = object;
-      this.insertRequestObserver.writeObjectResponse =
+      insertRequestObserver.object = object;
+      insertRequestObserver.writeObjectResponse =
           WriteObjectResponse.newBuilder().setResource(object).build();
     }
 

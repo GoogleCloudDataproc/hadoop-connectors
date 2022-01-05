@@ -48,7 +48,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
-import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 /** Unit tests for BigQueryHelper. */
@@ -57,7 +56,6 @@ public class BigQueryHelperTest {
 
   private static final Set<Logger> configuredLoggers = new HashSet<>();
 
-  /** Verify exceptions are being thrown. */
   // Mocks for Bigquery API objects.
   @Mock private Bigquery mockBigquery;
 
@@ -79,7 +77,7 @@ public class BigQueryHelperTest {
   private TableSchema fakeTableSchema;
 
   // Sample projectId for testing - for owning the BigQuery jobs.
-  private String jobProjectId = "google.com:foo-project";
+  private final String jobProjectId = "google.com:foo-project";
 
   // Sample KMS key name.
   private final String kmsKeyName =
@@ -87,12 +85,12 @@ public class BigQueryHelperTest {
 
   // Sample TableReference for BigQuery.
   private TableReference tableRef;
-  private String projectId = "google.com:bar-project";
-  private String datasetId = "test_dataset";
-  private String tableId = "test_table";
+  private final String projectId = "google.com:bar-project";
+  private final String datasetId = "test_dataset";
+  private final String tableId = "test_table";
 
   // Sample jobId for JobReference for mockBigqueryJobs.
-  private String jobId = "bigquery-job-1234";
+  private final String jobId = "bigquery-job-1234";
 
   // The instance being tested.
   private BigQueryHelper helper;
@@ -170,15 +168,13 @@ public class BigQueryHelperTest {
   public void testImportBigQueryFromGcs() throws Exception {
     when(mockBigqueryTablesGet.execute()).thenReturn(fakeTable);
 
-    final ArgumentCaptor<Job> jobCaptor = ArgumentCaptor.forClass(Job.class);
+    ArgumentCaptor<Job> jobCaptor = ArgumentCaptor.forClass(Job.class);
     doAnswer(
-            new Answer<Job>() {
-              @Override
-              public Job answer(InvocationOnMock invocationOnMock) throws Throwable {
-                verify(mockBigqueryJobs, times(1)).insert(eq(jobProjectId), jobCaptor.capture());
-                return jobCaptor.getValue();
-              }
-            })
+            (Answer<Job>)
+                invocationOnMock -> {
+                  verify(mockBigqueryJobs, times(1)).insert(eq(jobProjectId), jobCaptor.capture());
+                  return jobCaptor.getValue();
+                })
         .when(mockBigqueryJobsInsert)
         .execute();
     when(mockBigqueryJobsGet.execute()).thenReturn(jobHandle);
@@ -224,15 +220,13 @@ public class BigQueryHelperTest {
   public void testExportBigQueryToGcsSingleShardAwaitCompletion() throws Exception {
     when(mockBigqueryTablesGet.execute()).thenReturn(fakeTable);
 
-    final ArgumentCaptor<Job> jobCaptor = ArgumentCaptor.forClass(Job.class);
+    ArgumentCaptor<Job> jobCaptor = ArgumentCaptor.forClass(Job.class);
     doAnswer(
-            new Answer<Job>() {
-              @Override
-              public Job answer(InvocationOnMock invocationOnMock) throws Throwable {
-                verify(mockBigqueryJobs, times(1)).insert(eq(jobProjectId), jobCaptor.capture());
-                return jobCaptor.getValue();
-              }
-            })
+            (Answer<Job>)
+                invocationOnMock -> {
+                  verify(mockBigqueryJobs, times(1)).insert(eq(jobProjectId), jobCaptor.capture());
+                  return jobCaptor.getValue();
+                })
         .when(mockBigqueryJobsInsert)
         .execute();
     when(mockBigqueryJobsGet.execute()).thenReturn(jobHandle);
@@ -266,11 +260,7 @@ public class BigQueryHelperTest {
     verify(mockBigqueryTablesGet).execute();
   }
 
-  /**
-   * Tests getTable method of BigQueryHelper.
-   *
-   * @throws IOException
-   */
+  /** Tests getTable method of BigQueryHelper. */
   @Test
   public void testGetTable() throws IOException {
     when(mockBigqueryTablesGet.execute()).thenReturn(fakeTable);

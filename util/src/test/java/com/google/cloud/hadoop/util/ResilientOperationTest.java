@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.util;
 
 import static com.google.common.truth.Truth.assertThat;
+import static java.lang.Math.pow;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.testing.util.MockSleeper;
@@ -116,7 +117,7 @@ public class ResilientOperationTest {
     if (retry == 0) {
       return;
     }
-    assertThat((long) Math.pow(2, retry)).isEqualTo(sleeper.getLastMillis());
+    assertThat((long) pow(2, retry)).isEqualTo(sleeper.getLastMillis());
   }
 
   @Test
@@ -158,7 +159,7 @@ public class ResilientOperationTest {
     verifySleeper(sleeper, 3);
   }
 
-  private class CallableTester implements Callable<Integer> {
+  private static class CallableTester implements Callable<Integer> {
     int called = 0;
     ArrayList<Exception> exceptions = null;
 
@@ -179,7 +180,7 @@ public class ResilientOperationTest {
     }
   }
 
-  private class BackOffTester implements BackOff {
+  private static class BackOffTester implements BackOff {
     int counter = 1;
 
     @Override

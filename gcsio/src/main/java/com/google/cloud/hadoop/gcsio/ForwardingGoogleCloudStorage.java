@@ -13,14 +13,14 @@
  */
 package com.google.cloud.hadoop.gcsio;
 
-import com.google.common.base.Preconditions;
+import static com.google.common.base.Preconditions.checkArgument;
+
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
 
 /** A class that wraps a {@link GoogleCloudStorage} object, delegating all calls to it. */
 public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
@@ -39,7 +39,7 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
    * @param delegate the {@link GoogleCloudStorage} to delegate calls to.
    */
   public ForwardingGoogleCloudStorage(GoogleCloudStorage delegate) {
-    Preconditions.checkArgument(delegate != null, "delegate must not be null.");
+    checkArgument(delegate != null, "delegate must not be null.");
 
     this.delegate = delegate;
     delegateClassName = delegate.getClass().getSimpleName();
@@ -117,15 +117,9 @@ public class ForwardingGoogleCloudStorage implements GoogleCloudStorage {
     delegate.deleteObjects(fullObjectNames);
   }
 
-  /**
-   * get the value of the statistics
-   *
-   * @param key name of the object related statistics key
-   * @return
-   */
   @Override
-  public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key) {
-    return delegate.getObjectStatistics(key);
+  public Map<String, Long> getStatistics() {
+    return delegate.getStatistics();
   }
 
   @Override

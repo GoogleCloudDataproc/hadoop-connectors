@@ -24,9 +24,7 @@ import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Interface for exposing the Google Cloud Storage API behavior in a way more amenable to writing
@@ -253,7 +251,7 @@ public interface GoogleCloudStorage {
     List<String> srcObjectNames = new ArrayList<>(sourceToDestinationObjectsMap.size());
     List<String> dstObjectNames = new ArrayList<>(sourceToDestinationObjectsMap.size());
 
-    Optional<Entry<StorageResourceId, StorageResourceId>> first =
+    Optional<Map.Entry<StorageResourceId, StorageResourceId>> first =
         sourceToDestinationObjectsMap.entrySet().stream().findFirst();
     String srcBucketName = first.get().getKey().getBucketName();
     String dstBucketName = first.get().getValue().getBucketName();
@@ -415,13 +413,6 @@ public interface GoogleCloudStorage {
       throws IOException;
 
   /**
-   * To get the value object related statistics from GCS
-   *
-   * @param key name of the object related statistics key
-   */
-  public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key);
-
-  /**
    * Composes inputs into a single GCS object. This performs a GCS Compose. Objects will be composed
    * according to the order they appear in the input. The destination object will have metadata set
    * according to {@code options}. Overwrite semantics for the destination object will follow the
@@ -432,6 +423,9 @@ public interface GoogleCloudStorage {
   GoogleCloudStorageItemInfo composeObjects(
       List<StorageResourceId> sources, StorageResourceId destination, CreateObjectOptions options)
       throws IOException;
+
+  /** Retrieves the statistics associated with the {@link GoogleCloudStorage} instance. */
+  Map<String, Long> getStatistics();
 
   /** Releases resources used by this instance. */
   void close();

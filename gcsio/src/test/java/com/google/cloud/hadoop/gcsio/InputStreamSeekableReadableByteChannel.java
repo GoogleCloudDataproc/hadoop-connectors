@@ -14,7 +14,8 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import com.google.common.base.Preconditions;
+import static com.google.common.base.Preconditions.checkArgument;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -52,14 +53,14 @@ public class InputStreamSeekableReadableByteChannel implements SeekableByteChann
    * @param maxBytesToRead The total number of bytes this channel can read out of the InputStream.
    */
   public InputStreamSeekableReadableByteChannel(InputStream readStream, int maxBytesToRead) {
-    Preconditions.checkArgument(readStream != null);
-    Preconditions.checkArgument(maxBytesToRead >= 0);
+    checkArgument(readStream != null);
+    checkArgument(maxBytesToRead >= 0);
 
     // We require markSupported() in order to implement seeking; InputStream.mark() allows
     // returning to a position in the stream using reset(). If this is not supported by the
     // InputStream, the user can only obtain a non-seekable ReadableByteChannel through the
     // standard Channels library.
-    Preconditions.checkArgument(readStream.markSupported());
+    checkArgument(readStream.markSupported());
 
     this.readStream = readStream;
     this.maxBytesToRead = maxBytesToRead;

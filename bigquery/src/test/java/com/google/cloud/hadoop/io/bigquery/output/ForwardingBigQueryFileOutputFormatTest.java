@@ -97,7 +97,6 @@ public class ForwardingBigQueryFileOutputFormatTest {
   @Mock private OutputCommitter mockOutputCommitter;
   @Mock private RecordWriter<Text, Text> mockRecordWriter;
 
-  /** Verify exceptions are being thrown. */
   /** Sets up common objects for testing before each test. */
   @Before
   public void setUp() throws Exception {
@@ -128,7 +127,7 @@ public class ForwardingBigQueryFileOutputFormatTest {
         .thenReturn(mockRecordWriter);
 
     // Create and setup the output format.
-    outputFormat = new ForwardingBigQueryFileOutputFormat<Text, Text>();
+    outputFormat = new ForwardingBigQueryFileOutputFormat<>();
     outputFormat.setDelegate(mockFileOutputFormat);
   }
 

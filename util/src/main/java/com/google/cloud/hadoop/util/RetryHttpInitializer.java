@@ -16,6 +16,7 @@
 package com.google.cloud.hadoop.util;
 
 import static com.google.common.base.Strings.isNullOrEmpty;
+import static java.lang.Math.toIntExact;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import com.google.api.client.auth.oauth2.Credential;
@@ -51,6 +52,8 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
   private static final HttpBackOffUnsuccessfulResponseHandler.BackOffRequired
       BASE_HTTP_BACKOFF_REQUIRED =
           HttpBackOffUnsuccessfulResponseHandler.BackOffRequired.ON_SERVER_ERROR;
+
+  private HttpRequestInitializer delegate;
 
   // To be used as a request interceptor for filling in the "Authorization" header field, as well
   // as a response handler for certain unsuccessful error codes wherein the Credential must refresh
@@ -221,8 +224,18 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     this.sleeperOverride = null;
   }
 
+  public RetryHttpInitializer(
+      HttpRequestInitializer delegate, Credential credential, RetryHttpInitializerOptions options) {
+    this(credential, options);
+    this.delegate = delegate;
+  }
+
   @Override
-  public void initialize(HttpRequest request) {
+  public void initialize(HttpRequest request) throws IOException {
+    if (delegate != null) {
+      delegate.initialize(request);
+    }
+
     // Credential must be the interceptor to fill in accessToken fields.
     request.setInterceptor(credential);
 
@@ -230,8 +243,8 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     request.setNumberOfRetries(options.getMaxRequestRetries());
 
     // Set the timeout configurations.
-    request.setConnectTimeout(Math.toIntExact(options.getConnectTimeout().toMillis()));
-    request.setReadTimeout(Math.toIntExact(options.getReadTimeout().toMillis()));
+    request.setConnectTimeout(toIntExact(options.getConnectTimeout().toMillis()));
+    request.setReadTimeout(toIntExact(options.getReadTimeout().toMillis()));
 
     // IOExceptions such as "socket timed out" of "insufficient bytes written" will follow a
     // straightforward backoff.

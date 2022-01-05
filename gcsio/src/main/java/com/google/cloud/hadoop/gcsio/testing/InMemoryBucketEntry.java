@@ -31,11 +31,11 @@ public class InMemoryBucketEntry {
   // Mapping from objectName to InMemoryObjectEntries which hold byte contents, metadata, and
   // write
   // channels.
-  private Map<String, InMemoryObjectEntry> objectLookup = new TreeMap<>();
+  private final Map<String, InMemoryObjectEntry> objectLookup = new TreeMap<>();
 
   // The metadata associated with this InMemoryBucketEntry compatible with GoogleCloudStorage; its
   // objectName is always null and size is zero.
-  private GoogleCloudStorageItemInfo info;
+  private final GoogleCloudStorageItemInfo info;
 
   /**
    * @param bucketName The name representing the bucketName portion of a GCS path, e.g. {@code

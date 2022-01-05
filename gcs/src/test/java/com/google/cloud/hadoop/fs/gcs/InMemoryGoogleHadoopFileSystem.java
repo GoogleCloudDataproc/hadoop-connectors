@@ -27,7 +27,7 @@ import org.apache.hadoop.conf.Configuration;
 /** Helper class to create an in-memory GHFS from an in-memory GcsFs instance for testing only. */
 public class InMemoryGoogleHadoopFileSystem extends GoogleHadoopFileSystem {
   // The in-memory GcsFs instance to be used.
-  private static GoogleCloudStorageFileSystem inMemoryGcsFs = createUnderlyingStorage();
+  private static final GoogleCloudStorageFileSystem inMemoryGcsFs = createUnderlyingStorage();
 
   /**
    * Default constructor. Should only be called after createUnderlyingStorage has been called.
@@ -82,9 +82,9 @@ public class InMemoryGoogleHadoopFileSystem extends GoogleHadoopFileSystem {
     try {
       initUri = new URI("gs://test_bucket/");
     } catch (URISyntaxException e) {
-      this.close();
+      close();
       throw new IllegalArgumentException(e);
     }
-    this.initialize(initUri, getSampleConfiguration());
+    initialize(initUri, getSampleConfiguration());
   }
 }

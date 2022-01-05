@@ -30,17 +30,13 @@ import static java.util.concurrent.Executors.newFixedThreadPool;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
-import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationDelete;
-import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationRename;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.CheckedFunction;
 import com.google.cloud.hadoop.util.LazyExecutorService;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.FileNotFoundException;
@@ -56,7 +52,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -67,6 +62,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 /**
@@ -141,7 +137,6 @@ public class GoogleCloudStorageFileSystem {
    * @param credential OAuth2 credential that allows access to GCS.
    * @param options Options for how this filesystem should operate and configure its underlying
    *     storage.
-   * @throws IOException
    */
   public GoogleCloudStorageFileSystem(
       Credential credential, GoogleCloudStorageFileSystemOptions options) throws IOException {
@@ -159,7 +154,6 @@ public class GoogleCloudStorageFileSystem {
    * @param downscopedAccessTokenFn Function that generates downscoped access token.
    * @param options Options for how this filesystem should operate and configure its underlying
    *     storage.
-   * @throws IOException
    */
   public GoogleCloudStorageFileSystem(
       Credential credential,
@@ -248,7 +242,7 @@ public class GoogleCloudStorageFileSystem {
    */
   public WritableByteChannel create(URI path, CreateFileOptions createOptions) throws IOException {
     logger.atFiner().log("create(path: %s, createOptions: %s)", path, createOptions);
-    Preconditions.checkNotNull(path, "path could not be null");
+    checkNotNull(path, "path could not be null");
     StorageResourceId resourceId =
         StorageResourceId.fromUriPath(path, /* allowEmptyObjectName=*/ true);
 
@@ -318,7 +312,7 @@ public class GoogleCloudStorageFileSystem {
   public SeekableByteChannel open(URI path, GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     logger.atFiner().log("open(path: %s, readOptions: %s)", path, readOptions);
-    Preconditions.checkNotNull(path, "path should not be null");
+    checkNotNull(path, "path should not be null");
     StorageResourceId resourceId =
         StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ false);
     checkArgument(!resourceId.isDirectory(), "Cannot open a directory for reading: %s", path);
@@ -365,10 +359,9 @@ public class GoogleCloudStorageFileSystem {
    * @param path Path of the item to delete.
    * @param recursive If true, all sub-items are also deleted.
    * @throws FileNotFoundException if the given path does not exist.
-   * @throws IOException
    */
   public void delete(URI path, boolean recursive) throws IOException {
-    Preconditions.checkNotNull(path, "path should not be null");
+    checkNotNull(path, "path should not be null");
     checkArgument(!path.equals(GCS_ROOT), "Cannot delete root path (%s)", path);
     logger.atFiner().log("delete(path: %s, recursive: %b)", path, recursive);
 
@@ -385,12 +378,6 @@ public class GoogleCloudStorageFileSystem {
           cachedExecutor.submit(
               () -> getFileInfoInternal(parentId, /* inferImplicitDirectories= */ false));
     }
-
-    Optional<CoopLockOperationDelete> coopLockOp =
-        options.isCooperativeLockingEnabled() && fileInfo.isDirectory()
-            ? Optional.of(CoopLockOperationDelete.create(gcs, fileInfo.getPath()))
-            : Optional.empty();
-    coopLockOp.ifPresent(CoopLockOperationDelete::lock);
 
     List<FileInfo> itemsToDelete;
     // Delete sub-items if it is a directory.
@@ -413,14 +400,7 @@ public class GoogleCloudStorageFileSystem {
     List<FileInfo> bucketsToDelete = new ArrayList<>();
     (fileInfo.getItemInfo().isBucket() ? bucketsToDelete : itemsToDelete).add(fileInfo);
 
-    coopLockOp.ifPresent(o -> o.persistAndScheduleRenewal(itemsToDelete, bucketsToDelete));
-    try {
-      deleteInternal(itemsToDelete, bucketsToDelete);
-
-      coopLockOp.ifPresent(CoopLockOperationDelete::unlock);
-    } finally {
-      coopLockOp.ifPresent(CoopLockOperationDelete::cancelRenewal);
-    }
+    deleteInternal(itemsToDelete, bucketsToDelete);
 
     repairImplicitDirectory(parentInfoFuture);
   }
@@ -471,7 +451,6 @@ public class GoogleCloudStorageFileSystem {
    *
    * @param path Path of the item to check.
    * @return true if the given item exists, false otherwise.
-   * @throws IOException
    */
   public boolean exists(URI path) throws IOException {
     logger.atFiner().log("exists(path: %s)", path);
@@ -483,11 +462,10 @@ public class GoogleCloudStorageFileSystem {
    * Similar to 'mkdir -p' command.
    *
    * @param path Path of the directory to create.
-   * @throws IOException
    */
   public void mkdirs(URI path) throws IOException {
     logger.atFiner().log("mkdirs(path: %s)", path);
-    Preconditions.checkNotNull(path, "path should not be null");
+    checkNotNull(path, "path should not be null");
 
     mkdirsInternal(StorageResourceId.fromUriPath(path, /* allowEmptyObjectName= */ true));
   }
@@ -567,8 +545,8 @@ public class GoogleCloudStorageFileSystem {
    */
   public void rename(URI src, URI dst) throws IOException {
     logger.atFiner().log("rename(src: %s, dst: %s)", src, dst);
-    Preconditions.checkNotNull(src);
-    Preconditions.checkNotNull(dst);
+    checkNotNull(src);
+    checkNotNull(dst);
     checkArgument(!src.equals(GCS_ROOT), "Root path cannot be renamed.");
 
     // Parent of the destination path.
@@ -595,38 +573,15 @@ public class GoogleCloudStorageFileSystem {
       throw new FileNotFoundException("Item not found: " + src);
     }
 
-    Optional<CoopLockOperationRename> coopLockOp =
-        options.isCooperativeLockingEnabled()
-                && src.getAuthority().equals(dst.getAuthority())
-                && srcInfo.isDirectory()
-            ? Optional.of(CoopLockOperationRename.create(gcs, src, dst))
-            : Optional.empty();
-    coopLockOp.ifPresent(CoopLockOperationRename::lock);
-    if (coopLockOp.isPresent()) {
-      fileInfos = getFileInfos(paths);
-      srcInfo = fileInfos.get(0);
-      dstInfo = fileInfos.get(1);
-      if (!srcInfo.exists()) {
-        coopLockOp.ifPresent(CoopLockOperationRename::unlock);
-        throw new FileNotFoundException("Item not found: " + src);
-      }
-      if (!srcInfo.isDirectory()) {
-        coopLockOp.ifPresent(CoopLockOperationRename::unlock);
-        coopLockOp = Optional.empty();
-      }
-    }
-
     FileInfo dstParentInfo = dstParent == null ? null : fileInfos.get(2);
     try {
       dst = getDstUri(srcInfo, dstInfo, dstParentInfo);
     } catch (IOException e) {
-      coopLockOp.ifPresent(CoopLockOperationRename::unlock);
       throw e;
     }
 
     // if src and dst are equal then do nothing
     if (src.equals(dst)) {
-      coopLockOp.ifPresent(CoopLockOperationRename::unlock);
       return;
     }
 
@@ -641,10 +596,8 @@ public class GoogleCloudStorageFileSystem {
     }
 
     if (srcInfo.isDirectory()) {
-      renameDirectoryInternal(srcInfo, dst, coopLockOp);
+      renameDirectoryInternal(srcInfo, dst);
     } else {
-      coopLockOp.ifPresent(CoopLockOperationRename::unlock);
-
       StorageResourceId srcResourceId =
           StorageResourceId.fromUriPath(src, /* allowEmptyObjectName= */ true);
       StorageResourceId dstResourceId =
@@ -758,8 +711,9 @@ public class GoogleCloudStorageFileSystem {
   public void compose(List<URI> sources, URI destination, String contentType) throws IOException {
     StorageResourceId destResource = StorageResourceId.fromStringPath(destination.toString());
     List<String> sourceObjects =
-        Lists.transform(
-            sources, uri -> StorageResourceId.fromStringPath(uri.toString()).getObjectName());
+        sources.stream()
+            .map(uri -> StorageResourceId.fromStringPath(uri.toString()).getObjectName())
+            .collect(Collectors.toList());
     gcs.compose(
         destResource.getBucketName(), sourceObjects, destResource.getObjectName(), contentType);
   }
@@ -771,8 +725,7 @@ public class GoogleCloudStorageFileSystem {
    * metadata to destination and then deleting source metadata. Note that only the metadata is
    * copied and not the content of any file.
    */
-  private void renameDirectoryInternal(
-      FileInfo srcInfo, URI dst, Optional<CoopLockOperationRename> coopLockOp) throws IOException {
+  private void renameDirectoryInternal(FileInfo srcInfo, URI dst) throws IOException {
     checkArgument(srcInfo.isDirectory(), "'%s' should be a directory", srcInfo);
     checkArgument(dst.toString().endsWith(PATH_DELIMITER), "'%s' should be a directory", dst);
 
@@ -801,46 +754,26 @@ public class GoogleCloudStorageFileSystem {
       }
     }
 
-    coopLockOp.ifPresent(
-        o -> o.persistAndScheduleRenewal(srcToDstItemNames, srcToDstMarkerItemNames));
-    try {
-      // Create the destination directory in case Cooperative Locking
-      // is enabled - this is necessary because it uses parent directory
-      // as a marker during recovery of failed rename operations.
-      // It is not necessary to crete this directory explicitly in other cases,
-      // because parent destination directory will be automatically inferred
-      // when child objects will be renamed.
-      if (coopLockOp.isPresent()) {
-        mkdir(dst);
-      }
+    // First, copy all items except marker items
+    copyInternal(srcToDstItemNames);
+    // Finally, copy marker items (if any) to mark rename operation success
+    copyInternal(srcToDstMarkerItemNames);
 
-      // First, copy all items except marker items
-      copyInternal(srcToDstItemNames);
-      // Finally, copy marker items (if any) to mark rename operation success
-      copyInternal(srcToDstMarkerItemNames);
-
-      coopLockOp.ifPresent(CoopLockOperationRename::checkpoint);
-
-      List<FileInfo> bucketsToDelete = new ArrayList<>(1);
-      List<FileInfo> srcItemsToDelete = new ArrayList<>(srcToDstItemNames.size() + 1);
-      srcItemsToDelete.addAll(srcToDstItemNames.keySet());
-      if (srcInfo.getItemInfo().isBucket()) {
-        bucketsToDelete.add(srcInfo);
-      } else {
-        // If src is a directory then srcItemInfos does not contain its own name,
-        // therefore add it to the list before we delete items in the list.
-        srcItemsToDelete.add(srcInfo);
-      }
-
-      // First delete marker files from the src
-      deleteInternal(new ArrayList<>(srcToDstMarkerItemNames.keySet()), new ArrayList<>());
-      // Then delete rest of the items that we successfully copied.
-      deleteInternal(srcItemsToDelete, bucketsToDelete);
-
-      coopLockOp.ifPresent(CoopLockOperationRename::unlock);
-    } finally {
-      coopLockOp.ifPresent(CoopLockOperationRename::cancelRenewal);
+    List<FileInfo> bucketsToDelete = new ArrayList<>(1);
+    List<FileInfo> srcItemsToDelete = new ArrayList<>(srcToDstItemNames.size() + 1);
+    srcItemsToDelete.addAll(srcToDstItemNames.keySet());
+    if (srcInfo.getItemInfo().isBucket()) {
+      bucketsToDelete.add(srcInfo);
+    } else {
+      // If src is a directory then srcItemInfos does not contain its own name,
+      // therefore add it to the list before we delete items in the list.
+      srcItemsToDelete.add(srcInfo);
     }
+
+    // First delete marker files from the src
+    deleteInternal(new ArrayList<>(srcToDstMarkerItemNames.keySet()), new ArrayList<>());
+    // Then delete rest of the items that we successfully copied.
+    deleteInternal(srcItemsToDelete, bucketsToDelete);
   }
 
   /** Copies items in given map that maps source items to destination items. */
@@ -991,11 +924,10 @@ public class GoogleCloudStorageFileSystem {
   }
 
   private StorageResourceId getPrefixId(URI prefix) {
-    Preconditions.checkNotNull(prefix, "prefix could not be null");
+    checkNotNull(prefix, "prefix could not be null");
 
     StorageResourceId prefixId = StorageResourceId.fromUriPath(prefix, true);
-    Preconditions.checkArgument(
-        !prefixId.isRoot(), "prefix must not be global root, got '%s'", prefix);
+    checkArgument(!prefixId.isRoot(), "prefix must not be global root, got '%s'", prefix);
 
     return prefixId;
   }
@@ -1021,7 +953,7 @@ public class GoogleCloudStorageFileSystem {
    * @throws FileNotFoundException if the given path does not exist.
    */
   public List<FileInfo> listFileInfo(URI path, ListFileOptions listOptions) throws IOException {
-    Preconditions.checkNotNull(path, "path can not be null");
+    checkNotNull(path, "path can not be null");
     logger.atFiner().log("listFileInfo(path: %s)", path);
 
     StorageResourceId pathId =
@@ -1205,7 +1137,7 @@ public class GoogleCloudStorageFileSystem {
    */
   @VisibleForTesting
   public void mkdir(URI path) throws IOException {
-    Preconditions.checkNotNull(path);
+    checkNotNull(path);
     logger.atFiner().log("mkdir(path: %s)", path);
     checkArgument(!path.equals(GCS_ROOT), "Cannot create root directory.");
 
@@ -1278,7 +1210,7 @@ public class GoogleCloudStorageFileSystem {
 
   /** Gets the leaf item of the given path. */
   String getItemName(URI path) {
-    Preconditions.checkNotNull(path, "path can not be null");
+    checkNotNull(path, "path can not be null");
 
     // There is no leaf item for the root path.
     if (path.equals(GCS_ROOT)) {

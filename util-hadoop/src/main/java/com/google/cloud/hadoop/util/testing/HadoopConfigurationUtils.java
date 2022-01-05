@@ -40,7 +40,7 @@ public class HadoopConfigurationUtils {
 
   private static HadoopConfigurationProperty<?> getDefaultProperty(Field field) {
     try {
-      return (HadoopConfigurationProperty) field.get(null);
+      return (HadoopConfigurationProperty<?>) field.get(null);
     } catch (IllegalAccessException e) {
       throw new RuntimeException(
           String.format("Failed to get '%s' field value", field.getName()), e);

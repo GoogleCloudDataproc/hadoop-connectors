@@ -155,6 +155,8 @@ public class HadoopCredentialConfiguration {
   public static CredentialFactory getCredentialFactory(
       Configuration config, String... keyPrefixesVararg) {
     List<String> keyPrefixes = getConfigKeyPrefixes(keyPrefixesVararg);
+    RedactedString saEmailSuffix =
+        SERVICE_ACCOUNT_EMAIL_SUFFIX.withPrefixes(keyPrefixes).getPassword(config);
     CredentialOptions credentialOptions =
         CredentialOptions.builder()
             .setServiceAccountEnabled(
@@ -162,17 +164,10 @@ public class HadoopCredentialConfiguration {
                     .withPrefixes(keyPrefixes)
                     .get(config, config::getBoolean))
             .setServiceAccountPrivateKeyId(
-                RedactedString.create(
-                    SERVICE_ACCOUNT_PRIVATE_KEY_ID_SUFFIX
-                        .withPrefixes(keyPrefixes)
-                        .getPassword(config)))
+                SERVICE_ACCOUNT_PRIVATE_KEY_ID_SUFFIX.withPrefixes(keyPrefixes).getPassword(config))
             .setServiceAccountPrivateKey(
-                RedactedString.create(
-                    SERVICE_ACCOUNT_PRIVATE_KEY_SUFFIX
-                        .withPrefixes(keyPrefixes)
-                        .getPassword(config)))
-            .setServiceAccountEmail(
-                SERVICE_ACCOUNT_EMAIL_SUFFIX.withPrefixes(keyPrefixes).getPassword(config))
+                SERVICE_ACCOUNT_PRIVATE_KEY_SUFFIX.withPrefixes(keyPrefixes).getPassword(config))
+            .setServiceAccountEmail(saEmailSuffix == null ? null : saEmailSuffix.value())
             .setServiceAccountKeyFile(
                 SERVICE_ACCOUNT_KEYFILE_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
             .setServiceAccountJsonKeyFile(
@@ -187,12 +182,8 @@ public class HadoopCredentialConfiguration {
                 TOKEN_SERVER_URL_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
             .setProxyAddress(
                 PROXY_ADDRESS_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
-            .setProxyUsername(
-                RedactedString.create(
-                    PROXY_USERNAME_SUFFIX.withPrefixes(keyPrefixes).getPassword(config)))
-            .setProxyPassword(
-                RedactedString.create(
-                    PROXY_PASSWORD_SUFFIX.withPrefixes(keyPrefixes).getPassword(config)))
+            .setProxyUsername(PROXY_USERNAME_SUFFIX.withPrefixes(keyPrefixes).getPassword(config))
+            .setProxyPassword(PROXY_PASSWORD_SUFFIX.withPrefixes(keyPrefixes).getPassword(config))
             .build();
     return new CredentialFactory(credentialOptions);
   }

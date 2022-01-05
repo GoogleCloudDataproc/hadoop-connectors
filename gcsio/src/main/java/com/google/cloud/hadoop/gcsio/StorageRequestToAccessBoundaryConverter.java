@@ -14,6 +14,8 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.common.base.Strings.isNullOrEmpty;
+
 import com.google.api.client.http.json.JsonHttpContent;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.StorageRequest;
@@ -22,7 +24,6 @@ import com.google.api.services.storage.model.ComposeRequest;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.AccessBoundary.Action;
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.security.InvalidParameterException;
 import java.util.Collections;
@@ -62,7 +63,7 @@ class StorageRequestToAccessBoundaryConverter {
     } else if (request instanceof Storage.Buckets.Delete) {
       return translateBucketDeleteRequest((Storage.Buckets.Delete) request);
     } else if (request instanceof Storage.Buckets.List) {
-      return translateBucketListRequest((Storage.Buckets.List) request);
+      return translateBucketListRequest();
     }
 
     // We enumerated all object and bucket operations used by the GCS connector already. If still
@@ -73,7 +74,7 @@ class StorageRequestToAccessBoundaryConverter {
 
   private static List<AccessBoundary> translateObjectListRequest(Storage.Objects.List request) {
     String prefix = request.getPrefix();
-    if (Strings.isNullOrEmpty(prefix)) {
+    if (isNullOrEmpty(prefix)) {
       prefix = "/";
     }
 
@@ -158,7 +159,7 @@ class StorageRequestToAccessBoundaryConverter {
         AccessBoundary.create(request.getBucket(), "/", Action.DELETE_BUCKETS));
   }
 
-  private static List<AccessBoundary> translateBucketListRequest(Storage.Buckets.List request) {
+  private static List<AccessBoundary> translateBucketListRequest() {
     return Collections.singletonList(AccessBoundary.create("", "", Action.LIST_BUCKETS));
   }
 

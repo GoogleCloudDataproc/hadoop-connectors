@@ -16,19 +16,27 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.common.flogger.GoogleLogger;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.*;
+import org.apache.hadoop.fs.CreateFlag;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileChecksum;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.GlobalStorageStatistics;
+import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
@@ -46,9 +54,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  InstrumentatedGoogleHadoopFileSystem() {
-    super();
-  }
+  InstrumentatedGoogleHadoopFileSystem() {}
 
   InstrumentatedGoogleHadoopFileSystem(GoogleCloudStorageFileSystem gcsfs) {
     super(gcsfs);
@@ -57,15 +63,15 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
   @Override
   public void initialize(URI path, Configuration config) throws IOException {
     super.initialize(path, config);
-    this.instrumentation = new GhfsInstrumentation(path);
-    this.storageStatistics =
+    instrumentation = new GhfsInstrumentation(path);
+    storageStatistics =
         (GhfsStorageStatistics)
             GlobalStorageStatistics.INSTANCE.put(
                 GhfsStorageStatistics.NAME, () -> new GhfsStorageStatistics(getIOStatistics()));
   }
 
   @Override
-  protected void configureBuckets(GoogleCloudStorageFileSystem gcsFs) throws IOException {}
+  protected void configureBuckets(GoogleCloudStorageFileSystem gcsFs) {}
 
   @Override
   public FSDataInputStream open(Path hadoopPath, int bufferSize) throws IOException {
@@ -84,15 +90,10 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
       Progressable progress)
       throws IOException {
     entryPoint(GhfsStatistic.INVOCATION_CREATE);
-    FSDataOutputStream response = null;
-    try {
-      response =
-          super.create(
-              hadoopPath, permission, overwrite, bufferSize, replication, blockSize, progress);
-      instrumentation.fileCreated();
-    } catch (IOException e) {
-      throw e;
-    }
+    FSDataOutputStream response =
+        super.create(
+            hadoopPath, permission, overwrite, bufferSize, replication, blockSize, progress);
+    instrumentation.fileCreated();
     return response;
   }
 
@@ -121,19 +122,9 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
   @Override
   public boolean delete(Path hadoopPath, boolean recursive) throws IOException {
     entryPoint(GhfsStatistic.INVOCATION_DELETE);
-    boolean response = false;
+    boolean response;
     try {
       response = super.delete(hadoopPath, recursive);
-      try {
-        incrementStatistic(
-            GhfsStatistic.OBJECT_DELETE_OBJECTS,
-            getGcsFs()
-                .getGcs()
-                .getObjectStatistics(GoogleCloudStorageStatistics.OBJECT_DELETE_OBJECTS)
-                .longValue());
-      } catch (Exception e) {
-        logger.atWarning().log("Get Object Statistics threw UnsupportedOpersationException");
-      }
       instrumentation.fileDeleted(1);
     } catch (IOException e) {
       incrementStatistic(GhfsStatistic.FILES_DELETE_REJECTED);
@@ -202,8 +193,7 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
   }
 
   @Override
-  public RemoteIterator<LocatedFileStatus> listLocatedStatus(final Path f)
-      throws FileNotFoundException, IOException {
+  public RemoteIterator<LocatedFileStatus> listLocatedStatus(Path f) throws IOException {
     entryPoint(GhfsStatistic.INVOCATION_LIST_LOCATED_STATUS);
     return super.listLocatedStatus(f);
   }
@@ -275,10 +265,9 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
    * Entry point to an operation. Increments the statistic; verifies the FS is active.
    *
    * @param operation The operation to increment
-   * @throws IOException if the
    */
   public void entryPoint(GhfsStatistic operation) {
-    if (super.isClosed()) {
+    if (isClosed()) {
       return;
     }
     incrementStatistic(operation);
@@ -311,20 +300,42 @@ public class InstrumentatedGoogleHadoopFileSystem extends GoogleHadoopFileSystem
    */
   @Override
   public GhfsStorageStatistics getStorageStatistics() {
-    return this.storageStatistics;
+    return storageStatistics;
   }
 
-  /**
-   * Get the instrumentation's IOStatistics.
-   *
-   * @return
-   */
+  /** Get the instrumentation's IOStatistics. */
   @Override
   public IOStatistics getIOStatistics() {
-    return instrumentation != null ? instrumentation.getIOStatistics() : null;
+    if (instrumentation == null) {
+      return null;
+    }
+    setHttpStatistics();
+    return instrumentation.getIOStatistics();
   }
 
   public GhfsInstrumentation getInstrumentation() {
-    return this.instrumentation;
+    return instrumentation;
+  }
+
+  /** Set the GCS statistic keys */
+  private void setHttpStatistics() {
+    try {
+      getGcsFs()
+          .getGcs()
+          .getStatistics()
+          .forEach(
+              (k, v) -> {
+                GhfsStatistic statisticKey = GhfsStatistic.fromSymbol("ACTION_" + k);
+                checkNotNull(statisticKey, "statistic key for %s must not be null", k);
+                clearStats(statisticKey.getSymbol());
+                incrementStatistic(statisticKey, v);
+              });
+    } catch (Exception e) {
+      logger.atWarning().withCause(e).log("Error while getting GCS statistics");
+    }
+  }
+
+  private void clearStats(String key) {
+    instrumentation.getIOStatistics().getCounterReference(key).set(0L);
   }
 }

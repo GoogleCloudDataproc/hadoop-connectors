@@ -22,6 +22,19 @@
     fs.gs.http.transport.type
     ```
 
+1.  Support GCS fine-grained action in AuthorizationHandlers.
+
+1.  Decrease log level for `hflush` rate limit log message.
+
+1.  Remove Cooperative Locking support for directory operations and related
+    properties:
+
+    ```
+    fs.gs.cooperative.locking.enable
+    fs.gs.cooperative.locking.expiration.timeout.ms
+    fs.gs.cooperative.locking.max.concurrent.operations
+    ```
+
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.

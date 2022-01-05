@@ -31,7 +31,7 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class ZeroCopyMessageMarshallerTest {
-  private ReadObjectRequest REQUEST =
+  private final ReadObjectRequest REQUEST =
       ReadObjectRequest.newBuilder().setBucket("b").setObject("o").build();
 
   private ZeroCopyMessageMarshaller<ReadObjectRequest> createMarshaller() {
@@ -75,21 +75,13 @@ public class ZeroCopyMessageMarshallerTest {
   public void testParseBrokenMessageOnFastPath() {
     InputStream stream = createInputStream(dropLastOneByte(REQUEST.toByteArray()), true);
     ZeroCopyMessageMarshaller<ReadObjectRequest> marshaller = createMarshaller();
-    assertThrows(
-        StatusRuntimeException.class,
-        () -> {
-          marshaller.parse(stream);
-        });
+    assertThrows(StatusRuntimeException.class, () -> marshaller.parse(stream));
   }
 
   @Test
   public void testParseBrokenMessageOnSlowPath() {
     InputStream stream = createInputStream(dropLastOneByte(REQUEST.toByteArray()), false);
     ZeroCopyMessageMarshaller<ReadObjectRequest> marshaller = createMarshaller();
-    assertThrows(
-        StatusRuntimeException.class,
-        () -> {
-          marshaller.parse(stream);
-        });
+    assertThrows(StatusRuntimeException.class, () -> marshaller.parse(stream));
   }
 }

@@ -20,7 +20,6 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import com.google.api.ClientProto;
 import com.google.api.services.storage.Storage;
 import com.google.auto.value.AutoValue;
-import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
@@ -90,6 +89,9 @@ public abstract class GoogleCloudStorageOptions {
   /** Default setting for max number of bytes rewritten per rewrite request/call. */
   public static final int MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT = 0;
 
+  /** Default setting for grpc message timeout check interval (in milliseconds) */
+  public static final long GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL = 1000;
+
   /** Default setting for GCS HTTP request headers. */
   public static final ImmutableMap<String, String> HTTP_REQUEST_HEADERS_DEFAULT = ImmutableMap.of();
 
@@ -116,8 +118,8 @@ public abstract class GoogleCloudStorageOptions {
         .setReadChannelOptions(GoogleCloudStorageReadOptions.DEFAULT)
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
         .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
-        .setCooperativeLockingOptions(CooperativeLockingOptions.DEFAULT)
-        .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT);
+        .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT)
+        .setGrpcMessageTimeoutCheckInterval(GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL);
   }
 
   public abstract Builder toBuilder();
@@ -175,8 +177,6 @@ public abstract class GoogleCloudStorageOptions {
 
   public abstract RequesterPaysOptions getRequesterPaysOptions();
 
-  public abstract CooperativeLockingOptions getCooperativeLockingOptions();
-
   public abstract ImmutableMap<String, String> getHttpRequestHeaders();
 
   @Nullable
@@ -187,6 +187,8 @@ public abstract class GoogleCloudStorageOptions {
 
   @Nullable
   public abstract RedactedString getEncryptionKeyHash();
+
+  public abstract long getGrpcMessageTimeoutCheckInterval();
 
   public RetryHttpInitializerOptions toRetryHttpInitializerOptions() {
     return RetryHttpInitializerOptions.builder()
@@ -256,9 +258,6 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setRequesterPaysOptions(RequesterPaysOptions requesterPaysOptions);
 
-    public abstract Builder setCooperativeLockingOptions(
-        CooperativeLockingOptions cooperativeLockingOptions);
-
     public abstract Builder setHttpRequestHeaders(Map<String, String> httpRequestHeaders);
 
     public abstract Builder setEncryptionAlgorithm(String encryptionAlgorithm);
@@ -266,6 +265,9 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setEncryptionKey(RedactedString encryptionKey);
 
     public abstract Builder setEncryptionKeyHash(RedactedString encryptionKeyHash);
+
+    public abstract Builder setGrpcMessageTimeoutCheckInterval(
+        long grpcMessageTimeoutInMillisCheckInterval);
 
     abstract GoogleCloudStorageOptions autoBuild();
 

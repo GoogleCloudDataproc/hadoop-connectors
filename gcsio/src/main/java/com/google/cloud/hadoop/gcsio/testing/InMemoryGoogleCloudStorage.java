@@ -16,6 +16,7 @@ package com.google.cloud.hadoop.gcsio.testing;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.client.util.Clock;
 import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
@@ -26,22 +27,23 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStrings;
 import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 /**
  * InMemoryGoogleCloudStorage overrides the public methods of GoogleCloudStorage by implementing all
@@ -84,7 +86,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
   private boolean validateBucketName(String bucketName) {
     // Validation as per https://developers.google.com/storage/docs/bucketnaming
-    if (Strings.isNullOrEmpty(bucketName)) {
+    if (isNullOrEmpty(bucketName)) {
       return false;
     }
 
@@ -243,7 +245,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
         }
 
         @Override
-        public int write(ByteBuffer src) throws IOException {
+        public int write(ByteBuffer src) {
           throw new UnsupportedOperationException("Cannot mutate read-only channel");
         }
 
@@ -354,12 +356,12 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
   }
 
   @Override
-  public synchronized List<String> listBucketNames() throws IOException {
+  public synchronized List<String> listBucketNames() {
     return new ArrayList<>(bucketLookup.keySet());
   }
 
   @Override
-  public synchronized List<GoogleCloudStorageItemInfo> listBucketInfo() throws IOException {
+  public synchronized List<GoogleCloudStorageItemInfo> listBucketInfo() {
     List<GoogleCloudStorageItemInfo> bucketInfos = new ArrayList<>();
     for (InMemoryBucketEntry entry : bucketLookup.values()) {
       bucketInfos.add(entry.getInfo());
@@ -474,7 +476,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     List<GoogleCloudStorageItemInfo> itemInfos = new ArrayList<>();
     for (UpdatableItemInfo updatableItemInfo : itemInfoList) {
       StorageResourceId resourceId = updatableItemInfo.getStorageResourceId();
-      Preconditions.checkArgument(
+      checkArgument(
           !resourceId.isRoot() && !resourceId.isBucket(),
           "Can't update item on GCS Root or bucket resources");
       if (!validateObjectName(resourceId.getObjectName())) {
@@ -487,8 +489,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
         objectEntry.patchMetadata(updatableItemInfo.getMetadata());
         itemInfos.add(getItemInfo(resourceId));
       } else {
-        throw new IOException(
-            String.format("Error getting StorageObject %s", resourceId.toString()));
+        throw new IOException(String.format("Error getting StorageObject %s", resourceId));
       }
     }
     return itemInfos;
@@ -502,7 +503,9 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
       String bucketName, List<String> sources, String destination, String contentType)
       throws IOException {
     List<StorageResourceId> sourceResourcesIds =
-        Lists.transform(sources, s -> new StorageResourceId(bucketName, s));
+        sources.stream()
+            .map(s -> new StorageResourceId(bucketName, s))
+            .collect(Collectors.toList());
     StorageResourceId destinationId = new StorageResourceId(bucketName, destination);
     CreateObjectOptions options =
         CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder().setContentType(contentType).build();
@@ -540,14 +543,8 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
     return getItemInfo(destination);
   }
 
-  /**
-   * Get the Value of the statistics
-   *
-   * @param key name of the object related statistics key
-   * @return
-   */
   @Override
-  public AtomicLong getObjectStatistics(GoogleCloudStorageStatistics key) {
+  public Map<String, Long> getStatistics() {
     throw new UnsupportedOperationException("not implemented");
   }
 }

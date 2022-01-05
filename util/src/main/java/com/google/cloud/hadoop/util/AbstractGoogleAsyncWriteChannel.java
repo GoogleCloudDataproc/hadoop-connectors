@@ -42,6 +42,19 @@ public abstract class AbstractGoogleAsyncWriteChannel<T extends AbstractGoogleCl
    */
   public abstract T createRequest(InputStreamContent inputStream) throws IOException;
 
+  /**
+   * Derived classes may optionally intercept an IOException thrown from the {@code execute()}
+   * method of a prepared request that came from {@link #createRequest}, and return a reconstituted
+   * "response" object if the IOException can be handled as a success; for example, if the caller
+   * already has an identifier for an object, and the response is used solely for obtaining the same
+   * identifier, and the IOException is a handled "409 Already Exists" type of exception, then the
+   * derived class may override this method to return the expected "identifier" response. Return
+   * null to let the exception propagate through correctly.
+   */
+  public S createResponseFromException(IOException e) {
+    return null;
+  }
+
   @Override
   public void startUpload(InputStream pipeSource) throws IOException {
     // Connect pipe-source to the stream used by uploader.

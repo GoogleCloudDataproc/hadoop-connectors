@@ -36,10 +36,10 @@ abstract class AbstractGhfsStatisticsSource implements IOStatisticsSource, Durat
   /**
    * Set the IOStatistics with the iostatistics returned from the subclass.
    *
-   * @param statistics statistics to set
+   * @param ioStatistics statistics to set
    */
-  protected void setIOStatistics(IOStatisticsStore statistics) {
-    this.ioStatistics = statistics;
+  protected void setIOStatistics(IOStatisticsStore ioStatistics) {
+    this.ioStatistics = ioStatistics;
   }
 
   /**
@@ -69,7 +69,7 @@ abstract class AbstractGhfsStatisticsSource implements IOStatisticsSource, Durat
    * @param name counter name
    * @return the value or null if no matching counter was found.
    */
-  public Long lookupCounterValue(final String name) {
+  public Long lookupCounterValue(String name) {
     return ioStatistics.counters().get(name);
   }
 
@@ -79,7 +79,7 @@ abstract class AbstractGhfsStatisticsSource implements IOStatisticsSource, Durat
    * @param name gauge name
    * @return the value or null if no matching gauge was found.
    */
-  public Long lookupGaugeValue(final String name) {
+  public Long lookupGaugeValue(String name) {
     return ioStatistics.gauges().get(name);
   }
 
@@ -106,7 +106,7 @@ abstract class AbstractGhfsStatisticsSource implements IOStatisticsSource, Durat
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this.getClass().getSimpleName())
+    return MoreObjects.toStringHelper(getClass().getSimpleName())
         .add("IOStatistics ", ioStatistics)
         .toString();
   }
@@ -120,7 +120,7 @@ abstract class AbstractGhfsStatisticsSource implements IOStatisticsSource, Durat
    * @return a duration tracker.
    */
   @Override
-  public DurationTracker trackDuration(final String key, final long count) {
+  public DurationTracker trackDuration(String key, long count) {
     return ioStatistics.trackDuration(key, count);
   }
 

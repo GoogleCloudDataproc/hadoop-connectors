@@ -105,8 +105,8 @@ public class RetryHttpInitializerTest {
 
   @Test
   public void testBasicOperation() throws IOException {
-    final String authHeaderValue = "Bearer a1b2c3d4";
-    final HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
+    String authHeaderValue = "Bearer a1b2c3d4";
+    HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
     assertThat(req.getHeaders().getUserAgent()).isEqualTo("foo-user-agent");
     assertThat(req.getHeaders().get("header-key")).isEqualTo("header=value");
     assertThat(req.getInterceptor()).isEqualTo(mockCredential);
@@ -136,8 +136,8 @@ public class RetryHttpInitializerTest {
 
   @Test
   public void testErrorCodeForbidden() throws IOException {
-    final String authHeaderValue = "Bearer a1b2c3d4";
-    final HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
+    String authHeaderValue = "Bearer a1b2c3d4";
+    HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
     assertThat(req.getHeaders().getUserAgent()).isEqualTo("foo-user-agent");
     assertThat(req.getInterceptor()).isEqualTo(mockCredential);
 
@@ -184,8 +184,8 @@ public class RetryHttpInitializerTest {
 
   /** Helper for test cases wanting to test retries kicking in for particular error codes. */
   private void testRetriesForErrorCode(int code) throws Exception {
-    final String authHeaderValue = "Bearer a1b2c3d4";
-    final HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
+    String authHeaderValue = "Bearer a1b2c3d4";
+    HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
     assertThat(req.getHeaders().getUserAgent()).isEqualTo("foo-user-agent");
     assertThat(req.getInterceptor()).isEqualTo(mockCredential);
 
@@ -223,8 +223,8 @@ public class RetryHttpInitializerTest {
 
   @Test
   public void testThrowIOException() throws Exception {
-    final String authHeaderValue = "Bearer a1b2c3d4";
-    final HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
+    String authHeaderValue = "Bearer a1b2c3d4";
+    HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
     assertThat(req.getHeaders().getUserAgent()).isEqualTo("foo-user-agent");
     assertThat(req.getInterceptor()).isEqualTo(mockCredential);
 

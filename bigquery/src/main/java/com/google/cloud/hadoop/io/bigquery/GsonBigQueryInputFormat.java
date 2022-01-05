@@ -15,7 +15,6 @@ package com.google.cloud.hadoop.io.bigquery;
 
 import com.google.common.flogger.GoogleLogger;
 import com.google.gson.JsonObject;
-import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.mapreduce.InputSplit;
@@ -30,7 +29,7 @@ public class GsonBigQueryInputFormat extends AbstractBigQueryInputFormat<LongWri
 
   @Override
   public RecordReader<LongWritable, JsonObject> createDelegateRecordReader(
-      InputSplit split, Configuration configuration) throws IOException, InterruptedException {
+      InputSplit split, Configuration configuration) {
     logger.atFine().log("createDelegateRecordReader -> new GsonRecordReader");
     return new GsonRecordReader();
   }

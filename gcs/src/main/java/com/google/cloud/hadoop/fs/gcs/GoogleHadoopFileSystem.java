@@ -23,7 +23,6 @@ import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UriPaths;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
-import java.io.IOException;
 import java.net.URI;
 import org.apache.hadoop.fs.Path;
 
@@ -54,9 +53,7 @@ public class GoogleHadoopFileSystem extends InstrumentatedGoogleHadoopFileSystem
    * Constructs an instance of GoogleHadoopFileSystem; the internal GoogleCloudStorageFileSystem
    * will be set up with config settings when initialize() is called.
    */
-  public GoogleHadoopFileSystem() {
-    super();
-  }
+  public GoogleHadoopFileSystem() {}
 
   /**
    * Constructs an instance of GoogleHadoopFileSystem using the provided
@@ -70,7 +67,7 @@ public class GoogleHadoopFileSystem extends InstrumentatedGoogleHadoopFileSystem
   /** Sets and validates the root bucket. */
   @Override
   @VisibleForTesting
-  protected void configureBuckets(GoogleCloudStorageFileSystem gcsFs) throws IOException {
+  protected void configureBuckets(GoogleCloudStorageFileSystem gcsFs) {
     rootBucket = initUri.getAuthority();
     checkArgument(rootBucket != null, "No bucket specified in GCS URI: %s", initUri);
     // Validate root bucket name

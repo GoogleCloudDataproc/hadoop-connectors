@@ -24,6 +24,7 @@ import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHe
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getStandardOptionBuilder;
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.writeObject;
 import static com.google.common.truth.Truth.assertThat;
+import static java.lang.Math.ceil;
 import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
@@ -143,12 +144,79 @@ public class GoogleCloudStorageImplTest {
             partitionsCount);
 
     assertObjectContent(helperGcs, resourceId, partition, partitionsCount);
-
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactlyElementsIn(
             getExpectedRequestsForCreateObject(
                 resourceId, uploadChunkSize, partitionsCount, partition))
         .inOrder();
+  }
+
+  @Test
+  public void getStatistics_writeReadDeleteLargeObject() throws IOException {
+    StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+
+    int uploadChunkSize = 1024 * 1024;
+    GoogleCloudStorageImpl gcs =
+        new GoogleCloudStorageImpl(
+            getOptionsWithUploadChunk(uploadChunkSize),
+            GoogleCloudStorageTestHelper.getCredential());
+
+    byte[] partition = writeObject(gcs, resourceId, /* objectSize= */ 5 * uploadChunkSize);
+
+    assertThat(gcs.getStatistics())
+        .containsExactlyEntriesIn(
+            ImmutableMap.<String, Long>builder()
+                .put("HTTP_DELETE_REQUEST", 0L)
+                .put("HTTP_DELETE_REQUEST_FAILURE", 0L)
+                .put("HTTP_GET_REQUEST", 1L)
+                .put("HTTP_GET_REQUEST_FAILURE", 1L)
+                .put("HTTP_HEAD_REQUEST", 0L)
+                .put("HTTP_HEAD_REQUEST_FAILURE", 0L)
+                .put("HTTP_PATCH_REQUEST", 0L)
+                .put("HTTP_PATCH_REQUEST_FAILURE", 0L)
+                .put("HTTP_POST_REQUEST", 1L)
+                .put("HTTP_POST_REQUEST_FAILURE", 0L)
+                .put("HTTP_PUT_REQUEST", 5L)
+                .put("HTTP_PUT_REQUEST_FAILURE", 4L)
+                .build());
+
+    assertObjectContent(gcs, resourceId, partition);
+
+    assertThat(gcs.getStatistics())
+        .containsExactlyEntriesIn(
+            ImmutableMap.<String, Long>builder()
+                .put("HTTP_DELETE_REQUEST", 0L)
+                .put("HTTP_DELETE_REQUEST_FAILURE", 0L)
+                .put("HTTP_GET_REQUEST", 3L)
+                .put("HTTP_GET_REQUEST_FAILURE", 1L)
+                .put("HTTP_HEAD_REQUEST", 0L)
+                .put("HTTP_HEAD_REQUEST_FAILURE", 0L)
+                .put("HTTP_PATCH_REQUEST", 0L)
+                .put("HTTP_PATCH_REQUEST_FAILURE", 0L)
+                .put("HTTP_POST_REQUEST", 1L)
+                .put("HTTP_POST_REQUEST_FAILURE", 0L)
+                .put("HTTP_PUT_REQUEST", 5L)
+                .put("HTTP_PUT_REQUEST_FAILURE", 4L)
+                .build());
+
+    gcs.deleteObjects(ImmutableList.of(resourceId));
+
+    assertThat(gcs.getStatistics())
+        .containsExactlyEntriesIn(
+            ImmutableMap.<String, Long>builder()
+                .put("HTTP_DELETE_REQUEST", 1L)
+                .put("HTTP_DELETE_REQUEST_FAILURE", 0L)
+                .put("HTTP_GET_REQUEST", 4L)
+                .put("HTTP_GET_REQUEST_FAILURE", 1L)
+                .put("HTTP_HEAD_REQUEST", 0L)
+                .put("HTTP_HEAD_REQUEST_FAILURE", 0L)
+                .put("HTTP_PATCH_REQUEST", 0L)
+                .put("HTTP_PATCH_REQUEST_FAILURE", 0L)
+                .put("HTTP_POST_REQUEST", 1L)
+                .put("HTTP_POST_REQUEST_FAILURE", 0L)
+                .put("HTTP_PUT_REQUEST", 5L)
+                .put("HTTP_PUT_REQUEST_FAILURE", 4L)
+                .build());
   }
 
   @Test
@@ -313,7 +381,7 @@ public class GoogleCloudStorageImplTest {
     int maxBytesRewrittenPerCall = 256 * 1024 * 1024;
     TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
         newTrackingGoogleCloudStorage(
-            GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            getStandardOptionBuilder()
                 .setCopyWithRewriteEnabled(true)
                 .setMaxBytesRewrittenPerCall(maxBytesRewrittenPerCall)
                 .build());
@@ -405,7 +473,7 @@ public class GoogleCloudStorageImplTest {
   }
 
   private static GoogleCloudStorageOptions getOptionsWithUploadChunk(int uploadChunk) {
-    return GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+    return getStandardOptionBuilder()
         .setWriteChannelOptions(
             AsyncWriteChannelOptions.builder().setUploadChunkSize(uploadChunk).build())
         .build();
@@ -423,8 +491,7 @@ public class GoogleCloudStorageImplTest {
                 /* replaceGenerationId= */ true))
         .addAll(
             IntStream.rangeClosed(
-                    1,
-                    (int) Math.ceil((double) partition.length * partitionsCount / uploadChunkSize))
+                    1, (int) ceil((double) partition.length * partitionsCount / uploadChunkSize))
                 .mapToObj(
                     i ->
                         resumableUploadChunkRequestString(

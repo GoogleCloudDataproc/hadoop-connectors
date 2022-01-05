@@ -20,7 +20,6 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorage.PATH_DELIMITER;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.common.base.CharMatcher;
-import com.google.common.base.Strings;
 import com.google.common.flogger.GoogleLogger;
 
 /** Utility methods for String GCS paths */
@@ -52,7 +51,7 @@ public final class StringPaths {
     // If the name ends with '/', remove it.
     bucketName = toFilePath(bucketName);
 
-    if (Strings.isNullOrEmpty(bucketName)) {
+    if (isNullOrEmpty(bucketName)) {
       throw new IllegalArgumentException("GCS bucket name cannot be empty.");
     }
 
@@ -137,7 +136,7 @@ public final class StringPaths {
    * @return Whether the given object name looks like a directory path.
    */
   public static boolean isDirectoryPath(String path) {
-    return !Strings.isNullOrEmpty(path) && path.endsWith(GoogleCloudStorage.PATH_DELIMITER);
+    return !isNullOrEmpty(path) && path.endsWith(PATH_DELIMITER);
   }
 
   /**
@@ -150,7 +149,7 @@ public final class StringPaths {
    * @return File path for the given path.
    */
   public static String toFilePath(String path) {
-    return !Strings.isNullOrEmpty(path) && StringPaths.isDirectoryPath(path)
+    return !isNullOrEmpty(path) && isDirectoryPath(path)
         ? path.substring(0, path.length() - 1)
         : path;
   }
@@ -165,8 +164,6 @@ public final class StringPaths {
    * @return Directory path for the given path.
    */
   static String toDirectoryPath(String path) {
-    return Strings.isNullOrEmpty(path) || isDirectoryPath(path)
-        ? path
-        : path + GoogleCloudStorage.PATH_DELIMITER;
+    return isNullOrEmpty(path) || isDirectoryPath(path) ? path : path + PATH_DELIMITER;
   }
 }
