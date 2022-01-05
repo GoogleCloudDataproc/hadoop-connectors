@@ -41,12 +41,15 @@ import com.google.storage.v2.QueryWriteStatusRequest;
 import com.google.storage.v2.QueryWriteStatusResponse;
 import com.google.storage.v2.StartResumableWriteRequest;
 import com.google.storage.v2.StartResumableWriteResponse;
+import com.google.storage.v2.StorageGrpc;
 import com.google.storage.v2.StorageGrpc.StorageStub;
 import com.google.storage.v2.WriteObjectRequest;
 import com.google.storage.v2.WriteObjectResponse;
 import com.google.storage.v2.WriteObjectSpec;
+import io.grpc.ClientCall;
 import io.grpc.Status;
 import io.grpc.stub.ClientCallStreamObserver;
+import io.grpc.stub.ClientCalls;
 import io.grpc.stub.ClientResponseObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.BufferedInputStream;
@@ -84,6 +87,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
   private final ObjectWriteConditions writeConditions;
   private final String requesterPaysProject;
   private final BackOffFactory backOffFactory;
+  private final Watchdog watchdog;
 
   private GoogleCloudStorageItemInfo completedItemInfo = null;
 
@@ -93,6 +97,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       AsyncWriteChannelOptions channelOptions,
       StorageResourceId resourceId,
       CreateObjectOptions createOptions,
+      Watchdog watchdog,
       ObjectWriteConditions writeConditions,
       String requesterPaysProject,
       BackOffFactory backOffFactory) {
@@ -104,6 +109,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     this.writeConditions = writeConditions;
     this.requesterPaysProject = requesterPaysProject;
     this.backOffFactory = backOffFactory;
+    this.watchdog = watchdog;
   }
 
   @Override
@@ -204,11 +210,21 @@ public final class GoogleCloudStorageGrpcWriteChannel
       if (writeOffset > 0) {
         writeOffset = getCommittedWriteSize(uploadId);
       }
-      responseObserver = new InsertChunkResponseObserver(uploadId, writeOffset);
-      // TODO(b/151184800): Implement per-message timeout, in addition to stream timeout.
+      StorageStub storageStub =
+          stub.withDeadlineAfter(channelOptions.getGrpcWriteTimeout(), MILLISECONDS);
+      InsertChunkResponseObserver responseObserver =
+          new InsertChunkResponseObserver(uploadId, writeOffset);
+      ClientCall<WriteObjectRequest, WriteObjectResponse> call =
+          storageStub
+              .getChannel()
+              .newCall(StorageGrpc.getWriteObjectMethod(), stub.getCallOptions());
+      StreamObserver<WriteObjectRequest> writeObjectRequestStreamObserver =
+          ClientCalls.asyncClientStreamingCall(call, responseObserver);
       StreamObserver<WriteObjectRequest> requestStreamObserver =
-          stub.withDeadlineAfter(channelOptions.getGrpcWriteTimeout(), MILLISECONDS)
-              .writeObject(responseObserver);
+          watchdog.watch(
+              call,
+              writeObjectRequestStreamObserver,
+              Duration.ofSeconds(channelOptions.getGrpcWriteMessageTimeoutMillis()));
 
       // Wait for streaming RPC to become ready for upload.
       try {

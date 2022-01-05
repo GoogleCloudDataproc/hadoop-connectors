@@ -7,6 +7,7 @@ import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonD
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonErrorResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.truth.Truth.assertThat;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -54,6 +55,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.Before;
@@ -98,6 +100,8 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   private ApiErrorExtractor errorExtractor;
   private Get get;
   private StorageObject storageObject;
+  private static final Watchdog watchdog =
+      Watchdog.create(Duration.ofMillis(100), newSingleThreadScheduledExecutor());
 
   @Before
   public void setUp() throws Exception {
@@ -1558,6 +1562,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         storage,
         errorExtractor,
         new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+        watchdog,
         options,
         () -> BackOff.STOP_BACKOFF);
   }
@@ -1569,6 +1574,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         storage,
         errorExtractor,
         new StorageResourceId(V1_BUCKET_NAME, OBJECT_NAME),
+        watchdog,
         options,
         () -> BackOff.STOP_BACKOFF);
   }
@@ -1581,6 +1587,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         storage,
         errorExtractor,
         storageResourceId,
+        watchdog,
         options,
         () -> BackOff.STOP_BACKOFF);
   }
@@ -1592,6 +1599,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         new FakeStubProvider(mockCredentials),
         storage,
         itemInfo,
+        watchdog,
         options,
         () -> BackOff.STOP_BACKOFF);
   }
