@@ -89,6 +89,9 @@ public abstract class GoogleCloudStorageOptions {
   /** Default setting for max number of bytes rewritten per rewrite request/call. */
   public static final int MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT = 0;
 
+  /** Default setting for grpc message timeout check interval (in milliseconds) */
+  public static final long GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL = 1000;
+
   /** Default setting for GCS HTTP request headers. */
   public static final ImmutableMap<String, String> HTTP_REQUEST_HEADERS_DEFAULT = ImmutableMap.of();
 
@@ -115,7 +118,8 @@ public abstract class GoogleCloudStorageOptions {
         .setReadChannelOptions(GoogleCloudStorageReadOptions.DEFAULT)
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
         .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
-        .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT);
+        .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT)
+        .setGrpcMessageTimeoutCheckInterval(GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL);
   }
 
   public abstract Builder toBuilder();
@@ -183,6 +187,8 @@ public abstract class GoogleCloudStorageOptions {
 
   @Nullable
   public abstract RedactedString getEncryptionKeyHash();
+
+  public abstract long getGrpcMessageTimeoutCheckInterval();
 
   public RetryHttpInitializerOptions toRetryHttpInitializerOptions() {
     return RetryHttpInitializerOptions.builder()
@@ -259,6 +265,9 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setEncryptionKey(RedactedString encryptionKey);
 
     public abstract Builder setEncryptionKeyHash(RedactedString encryptionKeyHash);
+
+    public abstract Builder setGrpcMessageTimeoutCheckInterval(
+        long grpcMessageTimeoutInMillisCheckInterval);
 
     abstract GoogleCloudStorageOptions autoBuild();
 
