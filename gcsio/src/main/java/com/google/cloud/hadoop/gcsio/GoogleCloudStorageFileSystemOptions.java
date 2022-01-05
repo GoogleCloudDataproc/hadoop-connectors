@@ -28,7 +28,6 @@ public abstract class GoogleCloudStorageFileSystemOptions {
     return new AutoValue_GoogleCloudStorageFileSystemOptions.Builder()
         .setBucketDeleteEnabled(false)
         .setCloudStorageOptions(GoogleCloudStorageOptions.DEFAULT)
-        .setCooperativeLockingEnabled(false)
         .setEnsureNoConflictingItems(true)
         .setMarkerFilePattern((String) null)
         .setPerformanceCacheEnabled(false)
@@ -50,8 +49,6 @@ public abstract class GoogleCloudStorageFileSystemOptions {
   public abstract Pattern getMarkerFilePattern();
 
   public abstract boolean isStatusParallelEnabled();
-
-  public abstract boolean isCooperativeLockingEnabled();
 
   public abstract boolean isEnsureNoConflictingItems();
 
@@ -84,8 +81,6 @@ public abstract class GoogleCloudStorageFileSystemOptions {
      * methods to reduce latency.
      */
     public abstract Builder setStatusParallelEnabled(boolean statusParallelEnabled);
-
-    public abstract Builder setCooperativeLockingEnabled(boolean cooperativeLockingEnabled);
 
     public abstract Builder setEnsureNoConflictingItems(boolean ensureNoConflictingItems);
 
