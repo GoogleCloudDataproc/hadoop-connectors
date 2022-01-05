@@ -354,11 +354,19 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>(
           "fs.gs.grpc.server.address", GoogleCloudStorageOptions.DEFAULT_GCS_GRPC_SERVER_ADDRESS);
 
+  /** Configuration key for check interval (in millisecond) for gRPC request timeout to GCS. */
+  public static final HadoopConfigurationProperty<Long> GCS_GRPC_CHECK_INTERVAL_TIMEOUT_MS =
+      new HadoopConfigurationProperty<>("fs.gs.grpc.checkinterval.timeout.ms", 1_000L);
+
   /**
    * Configuration key for the connection timeout (in millisecond) for gRPC read requests to GCS.
    */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_TIMEOUT_MS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.read.timeout.ms", 30 * 1000L);
+
+  /** Configuration key for the message timeout (in millisecond) for gRPC read requests to GCS. */
+  public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_MESSAGE_TIMEOUT_MS =
+      new HadoopConfigurationProperty<>("fs.gs.grpc.read.message.timeout.ms", 5 * 1_000L);
 
   /**
    * Configuration key for the connection timeout (in millisecond) for gRPC read requests to GCS.
@@ -384,6 +392,10 @@ public class GoogleHadoopFileSystemConfiguration {
   /** Configuration key for the connect timeout (in millisecond) for gRPC write requests to GCS. */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_WRITE_TIMEOUT_MS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.write.timeout.ms", 10 * 60 * 1000L);
+
+  /** Configuration key for the message timeout (in millisecond) for gRPC write requests to GCS. */
+  public static final HadoopConfigurationProperty<Long> GCS_GRPC_WRITE_MESSAGE_TIMEOUT_MS =
+      new HadoopConfigurationProperty<>("fs.gs.grpc.write.message.timeout.ms", 5 * 1_000L);
 
   /** Configuration key for enabling use of directpath gRPC API for read/write. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_DIRECTPATH_ENABLE =
@@ -483,6 +495,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setEncryptionKeyHash(GCS_ENCRYPTION_KEY_HASH.getPassword(config))
         .setGrpcEnabled(GCS_GRPC_ENABLE.get(config, config::getBoolean))
         .setGrpcServerAddress(GCS_GRPC_SERVER_ADDRESS.get(config, config::get))
+        .setGrpcMessageTimeoutCheckInterval(
+            GCS_GRPC_CHECK_INTERVAL_TIMEOUT_MS.get(config, config::getLong))
         .setDirectPathPreferred(GCS_GRPC_DIRECTPATH_ENABLE.get(config, config::getBoolean))
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean));
   }
@@ -514,6 +528,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
         .setGrpcReadTimeoutMillis(GCS_GRPC_READ_TIMEOUT_MS.get(config, config::getLong))
         .setGrpcReadSpeedBytesPerSec(GCS_GRPC_READ_SPEED_BYTES_PER_SEC.get(config, config::getLong))
+        .setGrpcReadMessageTimeoutMillis(
+            GCS_GRPC_READ_MESSAGE_TIMEOUT_MS.get(config, config::getLong))
         .setGrpcReadMetadataTimeoutMillis(
             GCS_GRPC_READ_METADATA_TIMEOUT_MS.get(config, config::getLong))
         .setGrpcReadZeroCopyEnabled(GCS_GRPC_READ_ZEROCOPY_ENABLE.get(config, config::getBoolean))
@@ -531,6 +547,8 @@ public class GoogleHadoopFileSystemConfiguration {
             GCS_OUTPUT_STREAM_DIRECT_UPLOAD_ENABLE.get(config, config::getBoolean))
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
         .setGrpcWriteTimeout(GCS_GRPC_WRITE_TIMEOUT_MS.get(config, config::getLong))
+        .setGrpcWriteMessageTimeoutMillis(
+            GCS_GRPC_WRITE_MESSAGE_TIMEOUT_MS.get(config, config::getLong))
         .setNumberOfBufferedRequests(GCS_GRPC_UPLOAD_BUFFERED_REQUESTS.get(config, config::getLong))
         .build();
   }

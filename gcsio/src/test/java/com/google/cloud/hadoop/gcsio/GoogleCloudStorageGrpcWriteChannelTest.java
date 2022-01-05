@@ -1,6 +1,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.truth.Truth.assertThat;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
@@ -44,6 +45,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
+import java.time.Duration;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -78,6 +80,8 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
           .build();
   private static final QueryWriteStatusRequest WRITE_STATUS_REQUEST =
       QueryWriteStatusRequest.newBuilder().setUploadId(UPLOAD_ID).build();
+  private static final Watchdog watchdog =
+      Watchdog.create(Duration.ofMillis(100), newSingleThreadScheduledExecutor());
 
   private StorageStub stub;
   private FakeService fakeService;
@@ -570,6 +574,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
         options,
         new StorageResourceId(V1_BUCKET_NAME, OBJECT_NAME),
         CreateObjectOptions.DEFAULT_NO_OVERWRITE.toBuilder().setContentType(CONTENT_TYPE).build(),
+        watchdog,
         writeConditions,
         requesterPaysProject,
         backOffFactory);
