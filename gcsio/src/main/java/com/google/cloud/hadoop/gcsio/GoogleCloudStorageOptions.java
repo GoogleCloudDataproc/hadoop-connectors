@@ -159,6 +159,18 @@ public abstract class GoogleCloudStorageOptions {
   public abstract int getHttpRequestReadTimeout();
 
   @Nullable
+  public abstract String getTokenEndpoint();
+
+  @Nullable
+  public abstract RedactedString getRefreshToken();
+
+  @Nullable
+  public abstract String getClientId();
+
+  @Nullable
+  public abstract RedactedString getClientSecret();
+
+  @Nullable
   public abstract String getProxyAddress();
 
   @Nullable
@@ -241,6 +253,14 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setHttpRequestConnectTimeout(int httpRequestConnectTimeout);
 
     public abstract Builder setHttpRequestReadTimeout(int httpRequestReadTimeout);
+
+    public abstract Builder setTokenEndpoint(String tokenEndpoint);
+
+    public abstract Builder setRefreshToken(RedactedString refreshToken);
+
+    public abstract Builder setClientId(String clientId);
+
+    public abstract Builder setClientSecret(RedactedString clientSecret);
 
     public abstract Builder setProxyAddress(String proxyAddress);
 

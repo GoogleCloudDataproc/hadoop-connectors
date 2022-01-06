@@ -68,6 +68,18 @@ public abstract class CredentialOptions {
   public abstract String getTokenServerUrl();
 
   @Nullable
+  public abstract String getTokenEndpoint();
+
+  @Nullable
+  public abstract RedactedString getRefreshToken();
+
+  @Nullable
+  public abstract String getClientId();
+
+  @Nullable
+  public abstract RedactedString getClientSecret();
+
+  @Nullable
   public abstract String getProxyAddress();
 
   @Nullable
@@ -96,6 +108,14 @@ public abstract class CredentialOptions {
     public abstract Builder setNullCredentialEnabled(boolean nullCredentialEnabled);
 
     public abstract Builder setTokenServerUrl(String tokenServerUrl);
+
+    public abstract Builder setTokenEndpoint(String tokenEndpoint);
+
+    public abstract Builder setRefreshToken(RedactedString refreshToken);
+
+    public abstract Builder setClientId(String clientId);
+
+    public abstract Builder setClientSecret(RedactedString clientSecret);
 
     public abstract Builder setProxyAddress(String proxyAddress);
 

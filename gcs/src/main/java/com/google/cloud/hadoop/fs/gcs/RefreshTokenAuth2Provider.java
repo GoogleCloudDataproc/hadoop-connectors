@@ -1,8 +1,11 @@
-package com.google.cloud.hadoop.util;
+package com.google.cloud.hadoop.fs.gcs;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.util.AccessTokenProvider;
+import com.google.cloud.hadoop.util.RedactedString;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.BaseEncoding;
 import java.io.BufferedReader;
@@ -28,13 +31,6 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
   private static final int CONNECT_TIMEOUT = 30 * 1000;
   private static final int READ_TIMEOUT = 30 * 1000;
 
-  public static final String CONFIG_REFRESH_TOKEN = "fs.gs.auth.refresh.token";
-  public static final String CONFIG_TOKEN_ENDPOINT = "fs.gs.auth.token.endpoint";
-  public static final String CONFIG_CLIENT_ID = "fs.gs.auth.client.id";
-  public static final String CONFIG_CLIENT_SECRET = "fs.gs.auth.client.secret";
-  public static final String CONFIG_PROXY_ADDRESS = "fs.gs.proxy.address";
-  public static final String CONFIG_PROXY_USERNAME = "fs.gs.proxy.username";
-  public static final String CONFIG_PROXY_PASSWORD = "fs.gs.proxy.password";
   private static final AccessToken EXPIRED_TOKEN = new AccessToken("", -1L);
 
   private Configuration config;
@@ -54,13 +50,17 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
             + dateFormat.format(Instant.now())
             + "'");
     logger.atFine().log("Refreshing access-token based token");
-    String tokenEndpoint = this.config.get(CONFIG_TOKEN_ENDPOINT);
-    String refreshToken = this.config.get(CONFIG_REFRESH_TOKEN);
-    String clientId = this.config.get(CONFIG_CLIENT_ID);
-    String clientSecret = this.config.get(CONFIG_CLIENT_SECRET);
-    String proxyAddress = this.config.get(CONFIG_PROXY_ADDRESS);
-    String proxyUsername = this.config.get(CONFIG_PROXY_USERNAME);
-    String proxyPassword = this.config.get(CONFIG_PROXY_PASSWORD);
+
+    GoogleCloudStorageOptions gcsOptions =
+        GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(this.config).build();
+    String tokenEndpoint = gcsOptions.getTokenEndpoint();
+    RedactedString refreshToken = gcsOptions.getRefreshToken();
+    String clientId = gcsOptions.getClientId();
+    RedactedString clientSecret = gcsOptions.getClientSecret();
+    String proxyAddress = gcsOptions.getProxyAddress();
+    RedactedString proxyUsername = gcsOptions.getProxyUsername();
+    RedactedString proxyPassword = gcsOptions.getProxyPassword();
+
     logger.atFine().log(
         "Refresh token calling endpoint '" + tokenEndpoint + "' with client id '" + clientId + "'");
     logger.atFine().log(
@@ -89,11 +89,11 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
   public AccessTokenProvider.AccessToken getAccessToken(
       String tokenEndpoint,
       String clientId,
-      String clientSecret,
-      String refreshToken,
+      RedactedString clientSecret,
+      RedactedString refreshToken,
       String proxyAddress,
-      String proxyUsername,
-      String proxyPassword)
+      RedactedString proxyUsername,
+      RedactedString proxyPassword)
       throws IOException {
 
     AccessToken token = null;
@@ -107,23 +107,24 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
       conn.setConnectTimeout(CONNECT_TIMEOUT);
       conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
       conn.setRequestProperty("Accept", "application/json");
-      if (proxyUsername != null) {
+      if (proxyUsername != null && proxyUsername.value() != null) {
         logger.atFine().log("Setup the request with the proxy auth");
         conn.setRequestProperty(
             HttpHeaders.PROXY_AUTHORIZATION,
             "Basic "
                 + BaseEncoding.base64()
                     .encode(
-                        (proxyUsername + ":" + proxyPassword).getBytes(StandardCharsets.UTF_8)));
+                        (proxyUsername.value() + ":" + proxyPassword.value())
+                            .getBytes(StandardCharsets.UTF_8)));
       }
       conn.setDoOutput(true);
       String payload =
           "grant_type=refresh_token&refresh_token="
-              + refreshToken
+              + refreshToken.value()
               + "&client_id="
               + clientId
               + "&client_secret="
-              + clientSecret;
+              + clientSecret.value();
       conn.getOutputStream().write(payload.getBytes("UTF-8"));
 
       int httpResponseCode = conn.getResponseCode();

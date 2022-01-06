@@ -148,6 +148,14 @@
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
     </dependency>
+    <dependency>
+      <groupId>net.jadler</groupId>
+      <artifactId>jadler-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>net.jadler</groupId>
+      <artifactId>jadler-jdk</artifactId>
+    </dependency>
   </dependencies>
   <build>
     <plugins>

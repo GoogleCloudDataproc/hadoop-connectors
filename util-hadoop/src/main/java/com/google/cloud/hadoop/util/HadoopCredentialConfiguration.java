@@ -128,6 +128,34 @@ public class HadoopCredentialConfiguration {
           new HadoopConfigurationProperty<>(".auth.access.token.provider.impl");
 
   /**
+   * Configuration key for defining the OAuth2 refresh token. Required when the provider is
+   * RefreshTokenAuth2Provider
+   */
+  public static final HadoopConfigurationProperty<String> AUTH_REFRESH_TOKEN_SUFFIX =
+      new HadoopConfigurationProperty<>(".auth.refresh.token");
+
+  /**
+   * Configuration key for defining the OAUth2 token endpoint. Required when the provider is
+   * RefreshTokenAuth2Provider
+   */
+  public static final HadoopConfigurationProperty<String> AUTH_TOKEN_ENDPOINT_SUFFIX =
+      new HadoopConfigurationProperty<>(".auth.token.endpoint");
+
+  /**
+   * Configuration key for defining the OAUth2 client ID. Required when the provider is
+   * RefreshTokenAuth2Provider
+   */
+  public static final HadoopConfigurationProperty<String> AUTH_CLIENT_ID_SUFFIX =
+      new HadoopConfigurationProperty<>(".auth.client.id");
+
+  /**
+   * Configuration key for defining the OAUth2 client secret. Required when the provider is
+   * RefreshTokenAuth2Provider
+   */
+  public static final HadoopConfigurationProperty<String> AUTH_CLIENT_SECRET_SUFFIX =
+      new HadoopConfigurationProperty<>(".auth.client.secret");
+
+  /**
    * Key suffix specifying the impersonating service account with which to call GCS API to get
    * access token.
    */

@@ -1,10 +1,9 @@
-package com.google.cloud.hadoop.util;
+package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.common.truth.Truth.assertThat;
-import static net.jadler.Jadler.initJadlerUsing;
-import static net.jadler.Jadler.onRequest;
-import static net.jadler.Jadler.port;
 
+import com.google.cloud.hadoop.util.AccessTokenProvider;
+import com.google.cloud.hadoop.util.RedactedString;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.BaseEncoding;
 import java.io.IOException;
@@ -25,7 +24,7 @@ public class RefreshTokenAuth2ProviderTest extends TestCase {
 
   @Before
   public void before() {
-    initJadlerUsing(new JdkStubHttpServer());
+    Jadler.initJadlerUsing(new JdkStubHttpServer());
   }
 
   @After
@@ -38,15 +37,15 @@ public class RefreshTokenAuth2ProviderTest extends TestCase {
     // GIVEN
     RefreshTokenAuth2Provider refreshTokenAuth2Provider = new RefreshTokenAuth2Provider();
 
-    String baseURL = "http://localhost:" + port();
+    String baseURL = "http://localhost:" + Jadler.port();
 
     String tokenEndpoint = baseURL + "/token";
-    String refreshToken = "REFRESH_TOKEN";
+    RedactedString refreshToken = RedactedString.create("REFRESH_TOKEN");
     String clientId = "FAKE_CLIENT_ID";
-    String clientSecret = "FAKE_CLIENT_SECRET";
+    RedactedString clientSecret = RedactedString.create("FAKE_CLIENT_SECRET");
     String proxyAddress = null;
-    String proxyUsername = null;
-    String proxyPassword = null;
+    RedactedString proxyUsername = RedactedString.create(null);
+    RedactedString proxyPassword = RedactedString.create(null);
 
     int expireInSec = 300;
     String accessTokenAsString = "SlAV32hkKG";
@@ -55,7 +54,7 @@ public class RefreshTokenAuth2ProviderTest extends TestCase {
     tokenResponse.put("token_type", "Bearer");
     tokenResponse.put("expires_in", 300);
 
-    onRequest()
+    Jadler.onRequest()
         .havingMethodEqualTo("POST")
         .havingPathEqualTo("/token")
         .havingHeaderEqualTo("Content-Type", "application/x-www-form-urlencoded")
@@ -63,10 +62,14 @@ public class RefreshTokenAuth2ProviderTest extends TestCase {
             new BodyFormMatcher(
                 ImmutableMap.of(
                     // credentials are in the body of the POST request
-                    "client_id", clientId,
-                    "client_secret", clientSecret,
-                    "refresh_token", refreshToken,
-                    "grant_type", "refresh_token")))
+                    "client_id",
+                    clientId,
+                    "client_secret",
+                    clientSecret.value(),
+                    "refresh_token",
+                    refreshToken.value(),
+                    "grant_type",
+                    "refresh_token")))
         .respond()
         .withStatus(200)
         .withHeader("Content-Type", "application/json")
@@ -100,12 +103,12 @@ public class RefreshTokenAuth2ProviderTest extends TestCase {
     RefreshTokenAuth2Provider refreshTokenAuth2Provider = new RefreshTokenAuth2Provider();
 
     String tokenEndpoint = "http://myawesomeIAM.com/token";
-    String refreshToken = "REFRESH_TOKEN";
+    RedactedString refreshToken = RedactedString.create("REFRESH_TOKEN");
     String clientId = "FAKE_CLIENT_ID";
-    String clientSecret = "FAKE_CLIENT_SECRET";
-    String proxyAddress = "localhost:" + port();
-    String proxyUsername = "admin";
-    String proxyPassword = "changeit";
+    RedactedString clientSecret = RedactedString.create("FAKE_CLIENT_SECRET");
+    String proxyAddress = "localhost:" + Jadler.port();
+    RedactedString proxyUsername = RedactedString.create("admin");
+    RedactedString proxyPassword = RedactedString.create("changeit");
 
     int expireInSec = 300;
     String accessTokenAsString = "SlAV32hkKG";
@@ -114,7 +117,7 @@ public class RefreshTokenAuth2ProviderTest extends TestCase {
     tokenResponse.put("token_type", "Bearer");
     tokenResponse.put("expires_in", expireInSec);
 
-    onRequest()
+    Jadler.onRequest()
         .havingMethodEqualTo("POST")
         .havingPathEqualTo("/token")
         .havingHeaderEqualTo("Content-Type", "application/x-www-form-urlencoded")
@@ -122,15 +125,19 @@ public class RefreshTokenAuth2ProviderTest extends TestCase {
             HttpHeaders.PROXY_AUTHORIZATION,
             "Basic "
                 + BaseEncoding.base64()
-                    .encode((proxyUsername + ":" + proxyPassword).getBytes(StandardCharsets.UTF_8)))
+                    .encode((proxyUsername.value() + ":" + proxyPassword.value()).getBytes(StandardCharsets.UTF_8)))
         .havingBody(
             new BodyFormMatcher(
                 ImmutableMap.of(
                     // credentials are in the body of the POST request
-                    "client_id", clientId,
-                    "client_secret", clientSecret,
-                    "refresh_token", refreshToken,
-                    "grant_type", "refresh_token")))
+                    "client_id",
+                    clientId,
+                    "client_secret",
+                    clientSecret.value(),
+                    "refresh_token",
+                    refreshToken.value(),
+                    "grant_type",
+                    "refresh_token")))
         .respond()
         .withStatus(200)
         .withHeader("Content-Type", "application/json")

@@ -1,4 +1,4 @@
-package com.google.cloud.hadoop.util;
+package com.google.cloud.hadoop.fs.gcs;
 
 import java.util.Arrays;
 import java.util.Map;

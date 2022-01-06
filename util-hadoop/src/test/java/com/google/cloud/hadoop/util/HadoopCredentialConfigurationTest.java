@@ -67,6 +67,10 @@ public class HadoopCredentialConfigurationTest {
           put(".auth.service.account.private.key", null);
           put(".auth.service.account.private.key.id", null);
           put(".token.server.url", "https://oauth2.googleapis.com/token");
+          put(".auth.token.endpoint", null);
+          put(".auth.refresh.token", null);
+          put(".auth.client.secret", null);
+          put(".auth.client.id", null);
           put(".proxy.address", null);
           put(".proxy.password", null);
           put(".proxy.username", null);
