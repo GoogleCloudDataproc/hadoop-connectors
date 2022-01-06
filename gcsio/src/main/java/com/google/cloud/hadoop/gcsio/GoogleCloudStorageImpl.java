@@ -144,6 +144,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   private static final String LIST_OBJECT_FIELDS_FORMAT = "items(%s),prefixes,nextPageToken";
 
+  private final MetricsPublisher metricsPublisher;
+
   // A function to encode metadata map values
   static String encodeMetadataValues(byte[] bytes) {
     return bytes == null ? Data.NULL_STRING : BaseEncoding.base64().encode(bytes);
@@ -339,6 +341,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             ? null
             : this.storage.getRequestFactory().getInitializer();
 
+    if (this.storageOptions.isMetricsEnabled()) {
+      this.metricsPublisher =
+          CloudMonitoringMetricsPublisher.create(options.getProjectId(), credentials);
+    } else {
+      this.metricsPublisher = new NoOpMetricsPublisher();
+    }
+
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
       this.watchdog =
@@ -372,6 +381,18 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         this.storage.getRequestFactory() == null
             ? null
             : this.storage.getRequestFactory().getInitializer();
+
+    if (this.storageOptions.isMetricsEnabled()) {
+      checkArgument(
+          httpRequestInitializer instanceof RetryHttpInitializer,
+          "request initializer must be an instance of the RetryHttpInitializer class"
+              + " when gRPC API enabled");
+      Credentials credentials = ((RetryHttpInitializer) httpRequestInitializer).getCredentials();
+      this.metricsPublisher =
+          CloudMonitoringMetricsPublisher.create(options.getProjectId(), credentials);
+    } else {
+      this.metricsPublisher = new NoOpMetricsPublisher();
+    }
 
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
@@ -767,10 +788,16 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               storage,
               resourceId,
               watchdog,
+              metricsPublisher,
               readOptions,
               BackOffFactory.DEFAULT)
           : new GoogleCloudStorageGrpcReadChannel(
-              storageStubProvider, itemInfo, watchdog, readOptions, BackOffFactory.DEFAULT);
+              storageStubProvider,
+              itemInfo,
+              watchdog,
+              metricsPublisher,
+              readOptions,
+              BackOffFactory.DEFAULT);
     }
 
     return new GoogleCloudStorageReadChannel(

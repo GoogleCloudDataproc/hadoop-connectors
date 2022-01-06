@@ -1,0 +1,244 @@
+/*
+ * Copyright 2022 Google LLC. All Rights Reserved.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software distributed under the
+ * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.google.cloud.hadoop.gcsio;
+
+import static io.opencensus.common.Duration.fromMillis;
+
+import com.google.auth.Credentials;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
+import com.google.common.flogger.GoogleLogger;
+import io.opencensus.common.Scope;
+import io.opencensus.contrib.grpc.metrics.RpcViews;
+import io.opencensus.exporter.stats.stackdriver.StackdriverStatsConfiguration;
+import io.opencensus.exporter.stats.stackdriver.StackdriverStatsExporter;
+import io.opencensus.stats.Aggregation;
+import io.opencensus.stats.Aggregation.Distribution;
+import io.opencensus.stats.BucketBoundaries;
+import io.opencensus.stats.Measure.MeasureLong;
+import io.opencensus.stats.Stats;
+import io.opencensus.stats.StatsRecorder;
+import io.opencensus.stats.View;
+import io.opencensus.stats.View.Name;
+import io.opencensus.stats.ViewManager;
+import io.opencensus.tags.TagContext;
+import io.opencensus.tags.TagContextBuilder;
+import io.opencensus.tags.TagKey;
+import io.opencensus.tags.TagMetadata;
+import io.opencensus.tags.TagMetadata.TagTtl;
+import io.opencensus.tags.TagValue;
+import io.opencensus.tags.Tagger;
+import io.opencensus.tags.Tags;
+import java.io.IOException;
+import java.util.List;
+import javax.annotation.concurrent.GuardedBy;
+
+/** Interface for exposing utility methods to publish metrics via open-census api-spec. */
+interface MetricsPublisher {
+
+  /**
+   * Publishes metric for specified open-census measurement
+   *
+   * @param key represents filterable attribute
+   * @param value for the TagKey
+   * @param ml - Measurement to be recorded
+   * @param n - Value of the measurement recorded
+   */
+  void recordTaggedStat(TagKey key, String value, MeasureLong ml, Long n);
+
+  /**
+   * Publishes metric for specified open-census measurement
+   *
+   * @param keys - List of TagKeys attributes used for filtration
+   * @param values - corresponding values for list of TagKeys
+   * @param ml - Measurement to be recorded
+   * @param n - Value of the measurement recorded
+   */
+  void recordLong(TagKey[] keys, String[] values, MeasureLong ml, Long n);
+}
+
+/** Publishes open-census measurements to StackDriver */
+class CloudMonitoringMetricsPublisher implements MetricsPublisher {
+
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
+  @VisibleForTesting static final Object monitor = new Object();
+
+  private static final int EXPORT_INTERVAL = 5000;
+
+  @GuardedBy("monitor")
+  private static boolean initialized = false;
+
+  private static final TagMetadata TAG_METADATA_NO_PROPAGATION =
+      TagMetadata.create(TagTtl.NO_PROPAGATION);
+
+  static final String MS = "ms";
+  static final String BY = "By";
+
+  static final MeasureLong LATENCY_MS =
+      MeasureLong.create("gcsio/latency", "The latency in milliseconds ", MS);
+
+  static final MeasureLong MESSAGE_LATENCY_MS =
+      MeasureLong.create(
+          "gcsio/message/latency", "The latency in milliseconds per gcs message loop", MS);
+
+  static final MeasureLong REQUESTS =
+      MeasureLong.create("gcsio/requests", "The distribution of retry attempts for gcs calls", BY);
+
+  static final MeasureLong REQUEST_RETRIES =
+      MeasureLong.create("gcsio/retries", "The distribution of retry attempts for gcs calls", BY);
+
+  static final TagKey METHOD = TagKey.create("method");
+  static final TagKey STATUS = TagKey.create("status");
+  static final TagKey ERROR = TagKey.create("error");
+  static final TagKey THREAD = TagKey.create("thread");
+  static final TagKey PROTOCOL = TagKey.create("protocol");
+
+  static final List<TagKey> TAG_KEYS = ImmutableList.of(METHOD, STATUS, ERROR, THREAD, PROTOCOL);
+
+  static final List<Double> RPC_MILLIS_BUCKET_BOUNDARIES =
+      ImmutableList.of(
+          0.0, 0.01, 0.05, 0.1, 0.3, 0.6, 0.8, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 13.0, 16.0,
+          20.0, 25.0, 30.0, 40.0, 50.0, 65.0, 80.0, 100.0, 130.0, 160.0, 200.0, 250.0, 300.0, 400.0,
+          500.0, 650.0, 800.0, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0, 50000.0, 100000.0);
+
+  static final Aggregation AGGREGATION_WITH_MILLIS_HISTOGRAM =
+      Distribution.create(BucketBoundaries.create(RPC_MILLIS_BUCKET_BOUNDARIES));
+
+  static final List<Double> RPC_COUNT_BUCKET_BOUNDARIES =
+      ImmutableList.of(
+          0.0, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0, 512.0, 1024.0, 2048.0, 4096.0,
+          8192.0, 16384.0, 32768.0, 65536.0);
+
+  static final Aggregation AGGREGATION_WITH_COUNT_HISTOGRAM =
+      Distribution.create(BucketBoundaries.create(RPC_COUNT_BUCKET_BOUNDARIES));
+
+  private static final Tagger tagger = Tags.getTagger();
+  private static final StatsRecorder statsRecorder = Stats.getStatsRecorder();
+
+  public static MetricsPublisher create(String projectId, Credentials credentials) {
+    try {
+      registerAllViews();
+      setupCloudMonitoringExporter(projectId, credentials);
+    } catch (Exception e) {
+      logger.atWarning().withCause(e).log("Exception while registering metrics publisher");
+      return new NoOpMetricsPublisher();
+    }
+    return new CloudMonitoringMetricsPublisher();
+  }
+
+  private static void setupCloudMonitoringExporter(String projectId, Credentials credentials)
+      throws IOException {
+    synchronized (monitor) {
+      if (!initialized) {
+        StackdriverStatsExporter.createAndRegister(
+            StackdriverStatsConfiguration.builder()
+                .setCredentials(credentials)
+                .setProjectId(projectId)
+                .setExportInterval(fromMillis(EXPORT_INTERVAL))
+                .build());
+        Runtime.getRuntime().addShutdownHook(new Thread(StackdriverStatsExporter::unregister));
+        initialized = true;
+      }
+    }
+  }
+
+  private static void registerAllViews() {
+    // Define the views
+    View[] views =
+        new View[] {
+          View.create(
+              Name.create("gcsio/latency"),
+              "The distribution of latencies for a  method",
+              LATENCY_MS,
+              AGGREGATION_WITH_MILLIS_HISTOGRAM,
+              TAG_KEYS),
+          View.create(
+              Name.create("gcsio/message/latency"),
+              "The distribution of latencies at a message level in a streaming context",
+              MESSAGE_LATENCY_MS,
+              AGGREGATION_WITH_MILLIS_HISTOGRAM,
+              TAG_KEYS),
+          View.create(
+              Name.create("gcsio/retries"),
+              "The distribution of retry attempts for a method",
+              REQUEST_RETRIES,
+              AGGREGATION_WITH_COUNT_HISTOGRAM,
+              TAG_KEYS),
+          View.create(
+              Name.create("gcsio/requests"),
+              "The distribution of request counts for a method",
+              REQUESTS,
+              AGGREGATION_WITH_COUNT_HISTOGRAM,
+              TAG_KEYS),
+        };
+
+    ViewManager viewManager = Stats.getViewManager();
+
+    for (View view : views) {
+      viewManager.registerView(view);
+    }
+
+    // register views for native grpc client metrics
+    RpcViews.registerAllGrpcViews();
+    RpcViews.registerRealTimeMetricsViews();
+  }
+
+  @Override
+  public void recordTaggedStat(TagKey key, String value, MeasureLong ml, Long n) {
+    TagContext tagContext =
+        tagger
+            .emptyBuilder()
+            .put(
+                THREAD,
+                TagValue.create(String.valueOf(Thread.currentThread().getId())),
+                TAG_METADATA_NO_PROPAGATION)
+            .put(key, TagValue.create(value), TAG_METADATA_NO_PROPAGATION)
+            .build();
+    try (Scope ignored = tagger.withTagContext(tagContext)) {
+      statsRecorder.newMeasureMap().put(ml, n).record();
+    }
+  }
+
+  @Override
+  public void recordLong(TagKey[] keys, String[] values, MeasureLong ml, Long n) {
+    TagContextBuilder builder = tagger.emptyBuilder();
+    for (int i = 0; i < keys.length; i++) {
+      builder.put(keys[i], TagValue.create(values[i]), TAG_METADATA_NO_PROPAGATION);
+    }
+    builder.put(
+        THREAD,
+        TagValue.create(String.valueOf(Thread.currentThread().getId())),
+        TAG_METADATA_NO_PROPAGATION);
+    TagContext tagContext = builder.build();
+
+    try (Scope ignored = tagger.withTagContext(tagContext)) {
+      statsRecorder.newMeasureMap().put(ml, n).record();
+    }
+  }
+}
+
+/** No-Op metrics publisher */
+class NoOpMetricsPublisher implements MetricsPublisher {
+
+  @Override
+  public void recordTaggedStat(TagKey key, String value, MeasureLong ml, Long n) {
+    // No-op
+  }
+
+  @Override
+  public void recordLong(TagKey[] keys, String[] values, MeasureLong ml, Long n) {
+    // No-op
+  }
+}

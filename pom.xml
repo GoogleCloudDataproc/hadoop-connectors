@@ -92,6 +92,7 @@
     <google.auth.version>1.3.0</google.auth.version>
     <google.auto-value.version>1.9</google.auto-value.version>
     <google.cloud-bigquerystorage.version>2.7.0</google.cloud-bigquerystorage.version>
+    <google.cloud-core.verion>2.5.4</google.cloud-core.verion>
     <google.cloud-storage.grpc.version>2.2.2-alpha</google.cloud-storage.grpc.version>
     <google.error-prone.version>2.10.0</google.error-prone.version>
     <google.flogger.version>0.7.4</google.flogger.version>
@@ -102,6 +103,7 @@
     <google.protobuf.version>3.19.2</google.protobuf.version>
     <grpc.version>1.43.1</grpc.version>
     <hadoop.version>3.3.1</hadoop.version>
+    <opencensus.version>0.31.0</opencensus.version>
 
     <!-- Test dependencies -->
     <google.truth.version>1.1.3</google.truth.version>
@@ -390,6 +392,32 @@
         <version>${hadoop.version}</version>
         <scope>provided</scope>
         <type>pom</type>
+      </dependency>
+      <dependency>
+        <groupId>io.opencensus</groupId>
+        <artifactId>opencensus-impl</artifactId>
+        <version>${opencensus.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.opencensus</groupId>
+        <artifactId>opencensus-exporter-stats-stackdriver</artifactId>
+        <version>${opencensus.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>com.google.cloud</groupId>
+            <artifactId>google-cloud-core</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>io.opencensus</groupId>
+        <artifactId>opencensus-contrib-grpc-metrics</artifactId>
+        <version>${opencensus.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.cloud</groupId>
+        <artifactId>google-cloud-core</artifactId>
+        <version>${google.cloud-core.verion}</version>
       </dependency>
 
       <!-- Test dependencies -->

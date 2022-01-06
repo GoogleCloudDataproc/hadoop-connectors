@@ -105,6 +105,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.marker.file.pattern", null);
           put("fs.gs.max.requests.per.batch", 15L);
           put("fs.gs.max.wait.for.empty.object.creation.ms", 3_000);
+          put("fs.gs.metrics.enable", false);
           put("fs.gs.outputstream.buffer.size", 8 * 1024 * 1024);
           put("fs.gs.outputstream.direct.upload.enable", false);
           put("fs.gs.outputstream.pipe.buffer.size", 1024 * 1024);

@@ -126,6 +126,17 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   }
 
   @Test
+  public void testOpenWithMetricsEnabled() throws IOException {
+    GoogleCloudStorage rawStorage =
+        new GoogleCloudStorageImpl(
+            GoogleCloudStorageTestHelper.getStandardOptionBuilder().setMetricsEnabled(true).build(),
+            GoogleCloudStorageTestHelper.getCredentials());
+    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME, "testOpen_Object");
+    byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
+    assertObjectContent(rawStorage, objectToCreate, objectBytes);
+  }
+
+  @Test
   public void testOpenNonExistentItem() throws IOException {
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId resourceId =

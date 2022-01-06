@@ -414,6 +414,10 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<RedactedString> GCS_ENCRYPTION_KEY_HASH =
       new HadoopConfigurationProperty<>("fs.gs.encryption.key.hash");
 
+  /** Configuration key to enable publishing metrics to Google cloud monitoring. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_METRICS_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.metrics.enable", false);
+
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
   // @VisibleForTesting
@@ -467,7 +471,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setGrpcMessageTimeoutCheckInterval(
             GCS_GRPC_CHECK_INTERVAL_TIMEOUT_MS.get(config, config::getLong))
         .setDirectPathPreferred(GCS_GRPC_DIRECTPATH_ENABLE.get(config, config::getBoolean))
-        .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean));
+        .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
+        .setMetricsEnabled(GCS_METRICS_ENABLE.get(config, config::getBoolean));
   }
 
   private static PerformanceCachingGoogleCloudStorageOptions getPerformanceCachingOptions(
