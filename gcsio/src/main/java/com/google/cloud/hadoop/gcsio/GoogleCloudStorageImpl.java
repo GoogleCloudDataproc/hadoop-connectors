@@ -99,6 +99,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -246,6 +247,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               .setDaemon(true)
               .build());
 
+  // Thread-pool used for background watchdog
+  private final ScheduledExecutorService scheduledExecutorService =
+      newSingleThreadScheduledExecutor();
+
   // Thread-pool for manual matching of metadata tasks.
   // TODO(user): Wire out GoogleCloudStorageOptions for these.
   private ExecutorService manualBatchingThreadPool = createManualBatchingThreadPool();
@@ -367,7 +372,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     this.watchdog =
         Watchdog.create(
             Duration.ofMillis(storageOptions.getGrpcMessageTimeoutCheckInterval()),
-            newSingleThreadScheduledExecutor());
+            scheduledExecutorService);
 
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
@@ -406,7 +411,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     this.watchdog =
         Watchdog.create(
             Duration.ofMillis(options.getGrpcMessageTimeoutCheckInterval()),
-            newSingleThreadScheduledExecutor());
+            scheduledExecutorService);
 
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
@@ -2071,6 +2076,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       } finally {
         backgroundTasksThreadPool.shutdown();
         manualBatchingThreadPool.shutdown();
+        scheduledExecutorService.shutdown();
       }
     } finally {
       backgroundTasksThreadPool = null;
