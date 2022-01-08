@@ -249,7 +249,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   // Thread-pool used for background watchdog
   private final ScheduledExecutorService scheduledExecutorService =
-      newSingleThreadScheduledExecutor();
+      newSingleThreadScheduledExecutor(
+          new ThreadFactoryBuilder()
+              .setNameFormat("gcs-background-watchdog-pool-%d")
+              .setDaemon(true)
+              .build());
 
   // Thread-pool for manual matching of metadata tasks.
   // TODO(user): Wire out GoogleCloudStorageOptions for these.
