@@ -118,10 +118,11 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
     this.previousRefreshToken =
         Optional.ofNullable(RedactedString.create(tokenResponse.getRefreshToken()));
 
-    Long expirationTimeMilliSeconds = tokenResponse.getExpiresInSeconds() == null
+    Long expirationTimeMilliSeconds =
+        tokenResponse.getExpiresInSeconds() == null
             ? null
             : System.currentTimeMillis() + (tokenResponse.getExpiresInSeconds() * 1000L);
-    return new AccessToken(tokenResponse.getAccessToken(),expirationTimeMilliSeconds);
+    return new AccessToken(tokenResponse.getAccessToken(), expirationTimeMilliSeconds);
   }
 
   @Override
