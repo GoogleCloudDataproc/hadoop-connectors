@@ -34,7 +34,7 @@
     fs.gs.cooperative.locking.expiration.timeout.ms
     fs.gs.cooperative.locking.max.concurrent.operations
     ```
-    
+
 1.  Add support for refresh token grant flow.
 
 ### 2.2.2 - 2021-06-25

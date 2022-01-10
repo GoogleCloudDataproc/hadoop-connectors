@@ -12,11 +12,13 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.RedactedString;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Optional;
 import org.apache.hadoop.conf.Configuration;
 
 public class RefreshTokenAuth2Provider implements AccessTokenProvider {
@@ -28,6 +30,8 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.systemDefault());
   private Configuration config;
   private AccessToken accessToken = EXPIRED_TOKEN;
+  private HttpTransport httpTransport;
+  private Optional<RedactedString> previousRefreshToken = Optional.empty();
 
   @Override
   public AccessToken getAccessToken() {
@@ -36,13 +40,20 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
 
   @Override
   public void refresh() {
-    logger.atFine().log(
-        "Our token is set to expire at '"
-            + dateFormat.format(Instant.ofEpochMilli(accessToken.getExpirationTimeMilliSeconds()))
-            + "' and it is now '"
-            + dateFormat.format(Instant.now())
-            + "'");
-    logger.atFine().log("Refreshing access-token based token");
+    if (logger.atFine().isEnabled()) {
+      String expireAt =
+          accessToken.getExpirationTimeMilliSeconds() == null
+              ? "NEVER_EXPIRE"
+              : dateFormat.format(
+                  Instant.ofEpochMilli(accessToken.getExpirationTimeMilliSeconds()));
+      logger.atFine().log(
+          "Our token is set to expire at '"
+              + expireAt
+              + "' and it is now '"
+              + dateFormat.format(Instant.now())
+              + "'");
+      logger.atFine().log("Refreshing access-token based token");
+    }
 
     GoogleCloudStorageOptions gcsOptions =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(this.config).build();
@@ -50,9 +61,8 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
     RedactedString refreshToken = gcsOptions.getRefreshToken();
     String clientId = gcsOptions.getClientId();
     RedactedString clientSecret = gcsOptions.getClientSecret();
-    String proxyAddress = gcsOptions.getProxyAddress();
-    RedactedString proxyUsername = gcsOptions.getProxyUsername();
-    RedactedString proxyPassword = gcsOptions.getProxyPassword();
+    assert refreshToken != null;
+    assert clientSecret != null;
 
     logger.atFine().log(
         "Refresh token calling endpoint '"
@@ -60,24 +70,28 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
             + "' with client id '"
             + clientId
             + "'");
-    logger.atFine().log(
-        "Proxy setup: '" + proxyAddress + "' with username = '" + proxyUsername + "'");
 
     try {
+      HttpTransport httpTransport = getTransport();
       this.accessToken =
           getAccessToken(
               tokenServerUrl,
               clientId,
               clientSecret,
-              refreshToken,
-              proxyAddress,
-              proxyUsername,
-              proxyPassword);
-      logger.atFine().log(
-          "New token expires at '"
-              + dateFormat.format(
-                  Instant.ofEpochMilli(this.accessToken.getExpirationTimeMilliSeconds()))
-              + "'");
+              previousRefreshToken.orElse(refreshToken),
+              httpTransport);
+
+      if (logger.atFine().isEnabled()) {
+        if (this.accessToken.getExpirationTimeMilliSeconds() != null) {
+          logger.atFine().log(
+              "New access token expires at '"
+                  + dateFormat.format(
+                      Instant.ofEpochMilli(this.accessToken.getExpirationTimeMilliSeconds()))
+                  + "'");
+        } else {
+          logger.atFine().log("New access token never expires.");
+        }
+      }
     } catch (IOException e) {
       logger.atSevere().log("Couldn't refresh token", e);
     }
@@ -88,24 +102,26 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
       String clientId,
       RedactedString clientSecret,
       RedactedString refreshToken,
-      String proxyAddress,
-      RedactedString proxyUsername,
-      RedactedString proxyPassword)
+      HttpTransport httpTransport)
       throws IOException {
 
     logger.atFine().log("Get a new access token using the refresh token grant flow");
-    HttpTransport httpTransport =
-        HttpTransportFactory.createHttpTransport(proxyAddress, proxyUsername, proxyPassword);
+
     TokenRequest request =
         new RefreshTokenRequest(
                 httpTransport, JSON_FACTORY, new GenericUrl(tokenServerUrl), refreshToken.value())
             .setClientAuthentication(
                 new ClientParametersAuthentication(clientId, clientSecret.value()));
 
-    TokenResponse execute = request.execute();
+    TokenResponse tokenResponse = request.execute();
+    this.previousRefreshToken =
+        Optional.ofNullable(RedactedString.create(tokenResponse.getRefreshToken()));
+
     return new AccessToken(
-        execute.getAccessToken(),
-        System.currentTimeMillis() + (execute.getExpiresInSeconds() * 1000L));
+        tokenResponse.getAccessToken(),
+        tokenResponse.getExpiresInSeconds() == null
+            ? null
+            : System.currentTimeMillis() + (tokenResponse.getExpiresInSeconds() * 1000L));
   }
 
   @Override
@@ -116,5 +132,30 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
   @Override
   public void setConf(Configuration config) {
     this.config = config;
+  }
+
+  private HttpTransport getTransport() throws IOException {
+    if (httpTransport == null) {
+      GoogleCloudStorageOptions gcsOptions =
+          GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(this.config).build();
+      String proxyAddress = gcsOptions.getProxyAddress();
+      RedactedString proxyUsername = gcsOptions.getProxyUsername();
+      RedactedString proxyPassword = gcsOptions.getProxyPassword();
+      logger.atFine().log(
+          "Proxy setup: '" + proxyAddress + "' with username = '" + proxyUsername + "'");
+      httpTransport =
+          HttpTransportFactory.createHttpTransport(proxyAddress, proxyUsername, proxyPassword);
+    }
+    return httpTransport;
+  }
+
+  @VisibleForTesting
+  void setTransport(HttpTransport httpTransport) {
+    this.httpTransport = httpTransport;
+  }
+
+  @VisibleForTesting
+  Optional<RedactedString> getPreviousRefreshToken() {
+    return this.previousRefreshToken;
   }
 }

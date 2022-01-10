@@ -1,18 +1,17 @@
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonDataResponse;
+import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.truth.Truth.assertThat;
 
+import com.google.api.client.auth.oauth2.TokenResponse;
+import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.RedactedString;
-import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.util.Optional;
 import junit.framework.TestCase;
-import net.jadler.Jadler;
-import net.jadler.stubbing.server.jdk.JdkStubHttpServer;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.shaded.net.minidev.json.JSONObject;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -20,22 +19,10 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class RefreshTokenAuth2ProviderTest extends TestCase {
 
-  @Before
-  public void before() {
-    Jadler.initJadlerUsing(new JdkStubHttpServer());
-  }
-
-  @After
-  public void after() {
-    Jadler.closeJadler();
-  }
-
   @Test
-  public void testGetAccessToken() throws IOException {
+  public void testGetAccessTokenWithNoNewRefreshToken() throws IOException {
     // GIVEN
-    String baseURL = "http://localhost:" + Jadler.port();
-
-    String tokenServerUrl = baseURL + "/token";
+    String tokenServerUrl = "http://localhost/token";
     RedactedString refreshToken = RedactedString.create("REFRESH_TOKEN");
     String clientId = "FAKE_CLIENT_ID";
     RedactedString clientSecret = RedactedString.create("FAKE_CLIENT_SECRET");
@@ -48,38 +35,69 @@ public class RefreshTokenAuth2ProviderTest extends TestCase {
 
     RefreshTokenAuth2Provider refreshTokenAuth2Provider = new RefreshTokenAuth2Provider();
 
-    int expireInSec = 300;
+    long expireInSec = 300L;
     String accessTokenAsString = "SlAV32hkKG";
-    JSONObject tokenResponse = new JSONObject();
-    tokenResponse.put("access_token", accessTokenAsString);
-    tokenResponse.put("token_type", "Bearer");
-    tokenResponse.put("expires_in", 300);
 
-    Jadler.onRequest()
-        .havingMethodEqualTo("POST")
-        .havingPathEqualTo("/token")
-        .havingHeaderEqualTo("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
-        .havingBody(
-            new BodyFormMatcher(
-                ImmutableMap.of(
-                    // credentials are in the body of the POST request
-                    "client_id",
-                    clientId,
-                    "client_secret",
-                    clientSecret.value(),
-                    "refresh_token",
-                    refreshToken.value(),
-                    "grant_type",
-                    "refresh_token")))
-        .respond()
-        .withStatus(200)
-        .withHeader("Content-Type", "application/json")
-        .withBody(tokenResponse.toString());
+    TokenResponse tokenResponse =
+        new TokenResponse().setAccessToken(accessTokenAsString).setExpiresInSeconds(expireInSec);
+
+    MockHttpTransport transport = mockTransport(jsonDataResponse(tokenResponse));
 
     // WHEN
     refreshTokenAuth2Provider.setConf(config);
+    refreshTokenAuth2Provider.setTransport(transport);
     refreshTokenAuth2Provider.refresh();
     AccessTokenProvider.AccessToken accessToken = refreshTokenAuth2Provider.getAccessToken();
+    Optional<RedactedString> previousRefreshToken =
+        refreshTokenAuth2Provider.getPreviousRefreshToken();
+
+    // THEN
+    assertThat(accessToken).isNotNull();
+    long now = System.currentTimeMillis();
+    // To avoid any timebase issue, we test a time range instead
+    assertThat(accessToken.getExpirationTimeMilliSeconds())
+        .isGreaterThan(now + ((expireInSec - 10) * 1000L));
+    assertThat(accessToken.getExpirationTimeMilliSeconds())
+        .isLessThan(now + ((expireInSec + 10) * 1000L));
+    assertThat(previousRefreshToken.isPresent()).isFalse();
+  }
+
+  @Test
+  public void testGetAccessTokenWithNewRefreshToken() throws IOException {
+    // GIVEN
+    String tokenServerUrl = "http://localhost/token";
+    RedactedString refreshToken = RedactedString.create("REFRESH_TOKEN");
+    String clientId = "FAKE_CLIENT_ID";
+    RedactedString clientSecret = RedactedString.create("FAKE_CLIENT_SECRET");
+
+    Configuration config = new Configuration();
+    config.set("fs.gs.token.server.url", tokenServerUrl);
+    config.set("fs.gs.auth.refresh.token", refreshToken.value());
+    config.set("fs.gs.auth.client.id", clientId);
+    config.set("fs.gs.auth.client.secret", clientSecret.value());
+
+    RefreshTokenAuth2Provider refreshTokenAuth2Provider = new RefreshTokenAuth2Provider();
+
+    long expireInSec = 300L;
+    String accessTokenAsString = "SlAV32hkKG";
+    String newRefreshToken = "NEW_REFRESH_TOKEN";
+
+    TokenResponse tokenResponse =
+        new TokenResponse()
+            .setTokenType("bearer")
+            .setAccessToken(accessTokenAsString)
+            .setExpiresInSeconds(expireInSec)
+            .setRefreshToken(newRefreshToken);
+
+    MockHttpTransport transport = mockTransport(jsonDataResponse(tokenResponse));
+
+    // WHEN
+    refreshTokenAuth2Provider.setConf(config);
+    refreshTokenAuth2Provider.setTransport(transport);
+    refreshTokenAuth2Provider.refresh();
+    AccessTokenProvider.AccessToken accessToken = refreshTokenAuth2Provider.getAccessToken();
+    Optional<RedactedString> previousRefreshToken =
+        refreshTokenAuth2Provider.getPreviousRefreshToken();
 
     // THEN
     assertThat(accessToken).isNotNull();
@@ -90,5 +108,45 @@ public class RefreshTokenAuth2ProviderTest extends TestCase {
         .isGreaterThan(now + ((expireInSec - 10) * 1000L));
     assertThat(accessToken.getExpirationTimeMilliSeconds())
         .isLessThan(now + ((expireInSec + 10) * 1000L));
+    assertThat(previousRefreshToken.isPresent()).isTrue();
+    assertThat(previousRefreshToken.get()).isEqualTo(RedactedString.create(newRefreshToken));
+  }
+
+  @Test
+  public void testGetAccessTokenWithNoExpiration() throws IOException {
+    // GIVEN
+    String tokenServerUrl = "http://localhost/token";
+    RedactedString refreshToken = RedactedString.create("REFRESH_TOKEN");
+    String clientId = "FAKE_CLIENT_ID";
+    RedactedString clientSecret = RedactedString.create("FAKE_CLIENT_SECRET");
+
+    Configuration config = new Configuration();
+    config.set("fs.gs.token.server.url", tokenServerUrl);
+    config.set("fs.gs.auth.refresh.token", refreshToken.value());
+    config.set("fs.gs.auth.client.id", clientId);
+    config.set("fs.gs.auth.client.secret", clientSecret.value());
+
+    RefreshTokenAuth2Provider refreshTokenAuth2Provider = new RefreshTokenAuth2Provider();
+
+    String accessTokenAsString = "SlAV32hkKG";
+
+    TokenResponse tokenResponse =
+        new TokenResponse().setTokenType("bearer").setAccessToken(accessTokenAsString);
+
+    MockHttpTransport transport = mockTransport(jsonDataResponse(tokenResponse));
+
+    // WHEN
+    refreshTokenAuth2Provider.setConf(config);
+    refreshTokenAuth2Provider.setTransport(transport);
+    refreshTokenAuth2Provider.refresh();
+    AccessTokenProvider.AccessToken accessToken = refreshTokenAuth2Provider.getAccessToken();
+    Optional<RedactedString> previousRefreshToken =
+        refreshTokenAuth2Provider.getPreviousRefreshToken();
+
+    // THEN
+    assertThat(accessToken).isNotNull();
+    assertThat(accessToken.getToken()).isEqualTo(accessTokenAsString);
+    assertThat(accessToken.getExpirationTimeMilliSeconds()).isNull();
+    assertThat(previousRefreshToken.isPresent()).isFalse();
   }
 }
