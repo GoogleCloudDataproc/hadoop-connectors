@@ -8,7 +8,6 @@ import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonE
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.truth.Truth.assertThat;
 import static java.lang.Math.min;
-import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -101,8 +100,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   private ApiErrorExtractor errorExtractor;
   private Get get;
   private StorageObject storageObject;
-  private static final Watchdog watchdog =
-      Watchdog.create(Duration.ofMillis(100), newSingleThreadScheduledExecutor());
+  private static final Watchdog watchdog = Watchdog.create(Duration.ofMillis(100));
 
   @Before
   public void setUp() throws Exception {

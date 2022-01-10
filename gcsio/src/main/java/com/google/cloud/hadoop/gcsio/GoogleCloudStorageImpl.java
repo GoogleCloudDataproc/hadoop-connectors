@@ -29,7 +29,6 @@ import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
 import static java.util.Arrays.stream;
-import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 
@@ -99,7 +98,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -247,14 +245,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               .setDaemon(true)
               .build());
 
-  // Thread-pool used for background watchdog
-  private final ScheduledExecutorService scheduledExecutorService =
-      newSingleThreadScheduledExecutor(
-          new ThreadFactoryBuilder()
-              .setNameFormat("gcs-background-watchdog-pool-%d")
-              .setDaemon(true)
-              .build());
-
   // Thread-pool for manual matching of metadata tasks.
   // TODO(user): Wire out GoogleCloudStorageOptions for these.
   private ExecutorService manualBatchingThreadPool = createManualBatchingThreadPool();
@@ -374,9 +364,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             : this.storage.getRequestFactory().getInitializer();
 
     this.watchdog =
-        Watchdog.create(
-            Duration.ofMillis(storageOptions.getGrpcMessageTimeoutCheckInterval()),
-            scheduledExecutorService);
+        Watchdog.create(Duration.ofMillis(storageOptions.getGrpcMessageTimeoutCheckInterval()));
 
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
@@ -413,9 +401,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             : this.storage.getRequestFactory().getInitializer();
 
     this.watchdog =
-        Watchdog.create(
-            Duration.ofMillis(options.getGrpcMessageTimeoutCheckInterval()),
-            scheduledExecutorService);
+        Watchdog.create(Duration.ofMillis(options.getGrpcMessageTimeoutCheckInterval()));
 
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
@@ -2080,7 +2066,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       } finally {
         backgroundTasksThreadPool.shutdown();
         manualBatchingThreadPool.shutdown();
-        scheduledExecutorService.shutdown();
+        watchdog.shutdown();
       }
     } finally {
       backgroundTasksThreadPool = null;
