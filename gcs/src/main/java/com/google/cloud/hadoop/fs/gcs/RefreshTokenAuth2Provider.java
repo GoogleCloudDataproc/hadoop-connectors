@@ -1,5 +1,7 @@
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.api.client.util.Preconditions.checkNotNull;
+
 import com.google.api.client.auth.oauth2.ClientParametersAuthentication;
 import com.google.api.client.auth.oauth2.RefreshTokenRequest;
 import com.google.api.client.auth.oauth2.TokenRequest;
@@ -61,8 +63,8 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
     RedactedString refreshToken = gcsOptions.getRefreshToken();
     String clientId = gcsOptions.getClientId();
     RedactedString clientSecret = gcsOptions.getClientSecret();
-    assert refreshToken != null;
-    assert clientSecret != null;
+    checkNotNull(refreshToken, "Must provide a refresh token");
+    checkNotNull(clientSecret, "Must provide a client secret");
 
     logger.atFine().log(
         "Refresh token calling endpoint '"
@@ -81,19 +83,18 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
               previousRefreshToken.orElse(refreshToken),
               httpTransport);
 
-      if (logger.atFine().isEnabled()) {
-        if (this.accessToken.getExpirationTimeMilliSeconds() != null) {
-          logger.atFine().log(
-              "New access token expires at '"
-                  + dateFormat.format(
-                      Instant.ofEpochMilli(this.accessToken.getExpirationTimeMilliSeconds()))
-                  + "'");
-        } else {
-          logger.atFine().log("New access token never expires.");
-        }
+      if (this.accessToken.getExpirationTimeMilliSeconds() != null) {
+        logger.atFine().log(
+            "New access token expires at '"
+                + dateFormat.format(
+                    Instant.ofEpochMilli(this.accessToken.getExpirationTimeMilliSeconds()))
+                + "'");
+      } else {
+        logger.atFine().log("New access token never expires.");
       }
+
     } catch (IOException e) {
-      logger.atSevere().log("Couldn't refresh token", e);
+      logger.atSevere().withCause(e).log("Couldn't refresh token");
     }
   }
 
@@ -117,11 +118,10 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
     this.previousRefreshToken =
         Optional.ofNullable(RedactedString.create(tokenResponse.getRefreshToken()));
 
-    return new AccessToken(
-        tokenResponse.getAccessToken(),
-        tokenResponse.getExpiresInSeconds() == null
+    Long expirationTimeMilliSeconds = tokenResponse.getExpiresInSeconds() == null
             ? null
-            : System.currentTimeMillis() + (tokenResponse.getExpiresInSeconds() * 1000L));
+            : System.currentTimeMillis() + (tokenResponse.getExpiresInSeconds() * 1000L);
+    return new AccessToken(tokenResponse.getAccessToken(),expirationTimeMilliSeconds);
   }
 
   @Override

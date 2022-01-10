@@ -15,6 +15,7 @@
 package com.google.cloud.hadoop.util;
 
 import static com.github.stefanbirkner.systemlambda.SystemLambda.withEnvironmentVariable;
+import static com.google.api.client.googleapis.auth.oauth2.GoogleOAuthConstants.TOKEN_SERVER_URL;
 import static com.google.cloud.hadoop.util.CredentialFactory.CREDENTIAL_ENV_VAR;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_NULL_CREDENTIAL_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
@@ -67,7 +68,7 @@ public class HadoopCredentialConfigurationTest {
           put(".service.account.auth.keyfile", null);
           put(".auth.service.account.private.key", null);
           put(".auth.service.account.private.key.id", null);
-          put(".token.server.url", GoogleOAuthConstants.TOKEN_SERVER_URL);
+          put(".token.server.url", TOKEN_SERVER_URL);
           put(".auth.refresh.token", null);
           put(".auth.client.secret", null);
           put(".auth.client.id", null);
