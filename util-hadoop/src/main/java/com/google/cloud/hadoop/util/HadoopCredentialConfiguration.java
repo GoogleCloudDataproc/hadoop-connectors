@@ -132,8 +132,7 @@ public class HadoopCredentialConfiguration {
    * RefreshTokenAuth2Provider
    */
   public static final HadoopConfigurationProperty<String> AUTH_REFRESH_TOKEN_SUFFIX =
-      new HadoopConfigurationProperty<>(
-          ".auth.refresh.token", CredentialOptions.TOKEN_SERVER_URL_DEFAULT);
+      new HadoopConfigurationProperty<>(".auth.refresh.token");
 
   /**
    * Configuration key for defining the OAUth2 client ID. Required when the provider is
