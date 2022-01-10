@@ -162,6 +162,33 @@ provider.
     with some level of GCS access in it's service account scope, and use that
     service account.
 
+#### Refresh token provider
+
+The GCS connector has an `AccessTokenProvider` implementation to retrieve an access token using the refresh token grant flow.
+This is particularly useful when you want to access GCS on behalf of a user using OAuth2. In order to use this provider,
+you will need to retrieve a refresh token using the authorization code grant flow and pass it to the connector.
+Configure the refresh token grant flow using the following properties:
+
+*   `fs.gs.auth.access.token.provider.impl=com.google.cloud.hadoop.fs.gcs.RefreshTokenAuth2Provider`
+
+    Use the Refresh Token Provider.
+
+*   `fs.gs.token.server.url` (default: `https://oauth2.googleapis.com/token`)
+
+    Google Token Server root URL.
+
+*   `fs.gs.auth.refresh.token` (not set by default)
+
+    The refresh token.
+
+*   `fs.gs.auth.client.id` (not set by default)
+
+    The OAuth2 client ID.
+
+*   `fs.gs.auth.client.secret` (not set by default)
+
+    The OAuth2 client secret.
+
 #### Service account authentication
 
 The following properties are required only when running not on a GCE VM and

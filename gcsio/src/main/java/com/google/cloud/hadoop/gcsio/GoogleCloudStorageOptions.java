@@ -18,6 +18,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.ClientProto;
+import com.google.api.client.googleapis.auth.oauth2.GoogleOAuthConstants;
 import com.google.api.services.storage.Storage;
 import com.google.auto.value.AutoValue;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
@@ -113,6 +114,7 @@ public abstract class GoogleCloudStorageOptions {
         .setMaxHttpRequestRetries(MAX_HTTP_REQUEST_RETRIES)
         .setHttpRequestConnectTimeout(HTTP_REQUEST_CONNECT_TIMEOUT)
         .setHttpRequestReadTimeout(HTTP_REQUEST_READ_TIMEOUT)
+        .setTokenServerUrl(GoogleOAuthConstants.TOKEN_SERVER_URL)
         .setCopyWithRewriteEnabled(COPY_WITH_REWRITE_DEFAULT)
         .setMaxBytesRewrittenPerCall(MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT)
         .setReadChannelOptions(GoogleCloudStorageReadOptions.DEFAULT)
@@ -158,8 +160,7 @@ public abstract class GoogleCloudStorageOptions {
 
   public abstract int getHttpRequestReadTimeout();
 
-  @Nullable
-  public abstract String getTokenEndpoint();
+  public abstract String getTokenServerUrl();
 
   @Nullable
   public abstract RedactedString getRefreshToken();
@@ -254,7 +255,7 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setHttpRequestReadTimeout(int httpRequestReadTimeout);
 
-    public abstract Builder setTokenEndpoint(String tokenEndpoint);
+    public abstract Builder setTokenServerUrl(String tokenServerUrl);
 
     public abstract Builder setRefreshToken(RedactedString refreshToken);
 
