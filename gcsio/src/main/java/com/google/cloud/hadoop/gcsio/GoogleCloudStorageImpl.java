@@ -363,11 +363,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             ? null
             : this.storage.getRequestFactory().getInitializer();
 
-    this.watchdog =
-        Watchdog.create(Duration.ofMillis(storageOptions.getGrpcMessageTimeoutCheckInterval()));
-
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
+      this.watchdog =
+          Watchdog.create(Duration.ofMillis(storageOptions.getGrpcMessageTimeoutCheckInterval()));
       this.storageStubProvider =
           StorageStubProvider.newInstance(
               this.storageOptions, this.backgroundTasksThreadPool, credential);
@@ -400,11 +399,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             ? null
             : this.storage.getRequestFactory().getInitializer();
 
-    this.watchdog =
-        Watchdog.create(Duration.ofMillis(options.getGrpcMessageTimeoutCheckInterval()));
-
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
+      this.watchdog =
+          Watchdog.create(Duration.ofMillis(options.getGrpcMessageTimeoutCheckInterval()));
       if (credentials != null) {
         this.storageStubProvider =
             StorageStubProvider.newInstance(
