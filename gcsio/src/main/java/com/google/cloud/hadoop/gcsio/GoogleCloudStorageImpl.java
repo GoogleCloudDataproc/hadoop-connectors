@@ -277,7 +277,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private final Function<List<AccessBoundary>, String> downscopedAccessTokenFn;
 
   // Watchdog to monitor gRPC streams
-  private final Watchdog watchdog;
+  private Watchdog watchdog;
 
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
@@ -2061,15 +2061,18 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         if (storageStubProvider != null) {
           storageStubProvider.shutdown();
         }
+        if (watchdog != null) {
+          watchdog.shutdown();
+        }
       } finally {
         backgroundTasksThreadPool.shutdown();
         manualBatchingThreadPool.shutdown();
-        watchdog.shutdown();
       }
     } finally {
       backgroundTasksThreadPool = null;
       manualBatchingThreadPool = null;
       storageStubProvider = null;
+      watchdog = null;
     }
   }
 
