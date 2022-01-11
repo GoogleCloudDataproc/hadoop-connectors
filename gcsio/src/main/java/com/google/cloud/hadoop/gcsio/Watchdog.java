@@ -213,6 +213,12 @@ final class Watchdog implements Runnable {
         return false;
       }
 
+      // No need to monitor the stream, If the request is cancelled outside of watchdog
+      if (requestContext.isCancelled()) {
+        openStreams.remove(this);
+        return false;
+      }
+
       Throwable throwable = null;
       synchronized (lock) {
         long waitTime = clock.millis() - lastActivityAt;
