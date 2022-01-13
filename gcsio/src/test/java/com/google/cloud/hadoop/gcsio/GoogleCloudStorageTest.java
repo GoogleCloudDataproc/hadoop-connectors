@@ -473,7 +473,10 @@ public class GoogleCloudStorageTest {
     writeChannel.write(ByteBuffer.wrap(testData));
 
     IOException thrown = assertThrows(IOException.class, writeChannel::close);
-    assertThat(thrown).hasCauseThat().hasMessageThat().contains(String.valueOf(HttpStatusCodes.STATUS_CODE_FORBIDDEN));
+    assertThat(thrown)
+        .hasCauseThat()
+        .hasMessageThat()
+        .contains(String.valueOf(HttpStatusCodes.STATUS_CODE_FORBIDDEN));
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
