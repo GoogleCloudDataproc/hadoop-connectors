@@ -123,6 +123,7 @@ public class GoogleCloudStorageTest {
       new StorageResourceId(BUCKET_NAME, OBJECT_NAME);
 
   private static final int STATUS_CODE_RESUME_INCOMPLETE = 308;
+  private static final int STATUS_CODE_REQUEST_TIMEOUT = 408;
 
   private static final ImmutableList<String[]> ILLEGAL_OBJECTS =
       ImmutableList.copyOf(
@@ -412,6 +413,67 @@ public class GoogleCloudStorageTest {
     IOException thrown = assertThrows(IOException.class, writeChannel::close);
 
     assertThat(thrown).hasCauseThat().isSameInstanceAs(uploadException);
+
+    assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            resumableUploadRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
+            resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 1))
+        .inOrder();
+  }
+
+  @Test
+  public void upload_retry_requestTimeout() throws Exception {
+    byte[] testData = new byte[MediaHttpUploader.MINIMUM_CHUNK_SIZE];
+    new Random().nextBytes(testData);
+
+    MockHttpTransport transport =
+        mockTransport(
+            emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
+            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
+            emptyResponse(STATUS_CODE_REQUEST_TIMEOUT),
+            jsonDataResponse(
+                newStorageObject(BUCKET_NAME, OBJECT_NAME)
+                    .setSize(BigInteger.valueOf(testData.length))));
+
+    GoogleCloudStorage gcs = mockedGcs(GCS_OPTIONS, transport);
+
+    try (WritableByteChannel writeChannel = gcs.create(RESOURCE_ID)) {
+      writeChannel.write(ByteBuffer.wrap(testData));
+    }
+
+    assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            resumableUploadRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* generationId= */ 0, /* replaceGenerationId= */ false),
+            resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 1),
+            resumableUploadChunkRequestString(BUCKET_NAME, OBJECT_NAME, /* uploadId= */ 2))
+        .inOrder();
+  }
+
+  @Test
+  public void upload_does_not_retry_forbidden() throws Exception {
+    byte[] testData = new byte[MediaHttpUploader.MINIMUM_CHUNK_SIZE];
+    new Random().nextBytes(testData);
+
+    MockHttpTransport transport =
+        mockTransport(
+            emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
+            resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
+            emptyResponse(HttpStatusCodes.STATUS_CODE_FORBIDDEN),
+            jsonDataResponse(
+                newStorageObject(BUCKET_NAME, OBJECT_NAME)
+                    .setSize(BigInteger.valueOf(testData.length))));
+
+    GoogleCloudStorage gcs = mockedGcs(GCS_OPTIONS, transport);
+
+    WritableByteChannel writeChannel = gcs.create(RESOURCE_ID);
+    writeChannel.write(ByteBuffer.wrap(testData));
+
+    IOException thrown = assertThrows(IOException.class, writeChannel::close);
+    assertThat(thrown).hasCauseThat().hasMessageThat().contains(String.valueOf(HttpStatusCodes.STATUS_CODE_FORBIDDEN));
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
