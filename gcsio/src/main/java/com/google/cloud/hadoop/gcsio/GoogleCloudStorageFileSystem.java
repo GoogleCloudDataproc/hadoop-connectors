@@ -912,15 +912,16 @@ public class GoogleCloudStorageFileSystem {
     logger.atFiner().log(
         "listAllFileInfoForPrefixPage(prefix: %s, pageToken:%s)", prefix, pageToken);
     StorageResourceId prefixId = getPrefixId(prefix);
+    ListObjectOptions listObjectOptions = listOptions.getRecursive() ? ListObjectOptions.DEFAULT_FLAT_LIST : ListObjectOptions.DEFAULT;
     ListPage<GoogleCloudStorageItemInfo> itemInfosPage =
         gcs.listObjectInfoPage(
             prefixId.getBucketName(),
             prefixId.getObjectName(),
-            updateListObjectOptions(ListObjectOptions.DEFAULT_FLAT_LIST, listOptions),
+            updateListObjectOptions(listObjectOptions, listOptions),
             pageToken);
-    List<FileInfo> fileInfosPage = FileInfo.fromItemInfos(itemInfosPage.getItems());
-    fileInfosPage.sort(FILE_INFO_PATH_COMPARATOR);
-    return new ListPage<>(fileInfosPage, itemInfosPage.getNextPageToken());
+    List<FileInfo> filesInfoPage = FileInfo.fromItemInfos(itemInfosPage.getItems());
+    filesInfoPage.sort(FILE_INFO_PATH_COMPARATOR);
+    return new ListPage<>(filesInfoPage, itemInfosPage.getNextPageToken());
   }
 
   private StorageResourceId getPrefixId(URI prefix) {
