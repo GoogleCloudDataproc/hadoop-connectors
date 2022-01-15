@@ -191,8 +191,6 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   // -----------------------------------------------------------------
   // Inherited tests that we suppress because their behavior differs
   // from the base class.
-  // TODO(user): Add tests for subtleties of how global-rooted
-  // initialization differs from bucket-rooted initialization.
   // -----------------------------------------------------------------
   @Override
   public void testInitializeSuccess() {}

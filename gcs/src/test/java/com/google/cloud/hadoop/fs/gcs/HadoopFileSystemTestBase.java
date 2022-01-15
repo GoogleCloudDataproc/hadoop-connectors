@@ -113,7 +113,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   // -----------------------------------------------------------------
 
   /**
-   * Actual logic for validating the GoogleHadoopFileSystemBase-specific FileStatus returned by
+   * Actual logic for validating the GoogleHadoopFileSystem-specific FileStatus returned by
    * getFileStatus() or listStatus().
    */
   private void validateFileStatusInternal(

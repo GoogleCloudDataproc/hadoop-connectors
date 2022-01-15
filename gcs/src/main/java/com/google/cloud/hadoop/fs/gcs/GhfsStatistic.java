@@ -30,7 +30,7 @@ import org.apache.hadoop.fs.statistics.StreamStatisticNames;
 
 /**
  * Statistics which are collected in GCS. Counter and duration statistics are published in {@link
- * GoogleHadoopFileSystemBase} and as metrics in {@link GhfsInstrumentation}.
+ * GoogleHadoopFileSystem} and as metrics in {@link GhfsInstrumentation}.
  *
  * <p>Where possible, stream names come from {@link StreamStatisticNames} and {@link
  * StoreStatisticNames}

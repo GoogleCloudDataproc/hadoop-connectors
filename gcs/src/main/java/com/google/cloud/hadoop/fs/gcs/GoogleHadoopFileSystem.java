@@ -158,7 +158,7 @@ public class GoogleHadoopFileSystem extends FileSystem
   public static final String UNKNOWN_VERSION = "0.0.0";
   /** Current version. */
   public static final String VERSION;
-  /** Identifies this version of the GoogleHadoopFileSystemBase library. */
+  /** Identifies this version of the {@link GoogleHadoopFileSystem} library. */
   public static final String GHFS_ID;
 
   static final String SCHEME = GoogleCloudStorageFileSystem.SCHEME;
@@ -200,7 +200,7 @@ public class GoogleHadoopFileSystem extends FileSystem
   // The bucket the file system is rooted in used for default values of:
   // -- working directory
   // -- user home directories (only for Hadoop purposes).
-  private String rootBucket;
+  private Path fsRoot;
   /** Instrumentation to track Statistics */
   private GhfsInstrumentation instrumentation;
   /** Storage Statistics Bonded to the instrumentation. */
@@ -234,7 +234,136 @@ public class GoogleHadoopFileSystem extends FileSystem
   @VisibleForTesting
   GoogleHadoopFileSystem(GoogleCloudStorageFileSystem gcsfs) {
     checkNotNull(gcsfs, "gcsFs must not be null");
-    GoogleHadoopFileSystem.this.setGcsFs(gcsfs);
+    initializeGcsFs(gcsfs);
+  }
+
+  @Override
+  public void initialize(URI path, Configuration config) throws IOException {
+    logger.atFiner().log("initialize(path: %s, config: %s)", path, config);
+
+    checkArgument(path != null, "path must not be null");
+    checkArgument(config != null, "config must not be null");
+    checkArgument(path.getScheme() != null, "scheme of path must not be null");
+    checkArgument(path.getScheme().equals(getScheme()), "URI scheme not supported: %s", path);
+
+    super.initialize(path, config);
+
+    initUri = path;
+
+    // Set this configuration as the default config for this instance; configure()
+    // will perform some file-system-specific adjustments, but the original should
+    // be sufficient (and is required) for the delegation token binding initialization.
+    setConf(config);
+
+    globAlgorithm = GCS_GLOB_ALGORITHM.get(config, config::getEnum);
+    checksumType = GCS_FILE_CHECKSUM_TYPE.get(config, config::getEnum);
+    defaultBlockSize = BLOCK_SIZE.get(config, config::getLong);
+    reportedPermissions = new FsPermission(PERMISSIONS_TO_REPORT.get(config, config::get));
+
+    instrumentation = new GhfsInstrumentation(initUri);
+    storageStatistics =
+        (GhfsStorageStatistics)
+            GlobalStorageStatistics.INSTANCE.put(
+                GhfsStorageStatistics.NAME, () -> new GhfsStorageStatistics(getIOStatistics()));
+
+    initializeFsRoot();
+    initializeWorkingDirectory(config);
+    initializeDelegationTokenSupport(config);
+    initializeGcsFs(config);
+  }
+
+  private void initializeFsRoot() {
+    String rootBucket =
+        checkNotNull(initUri.getAuthority(), "No bucket specified in GCS URI: %s", initUri);
+    // Validate root bucket name
+    UriPaths.fromStringPathComponents(
+        rootBucket, /* objectName= */ null, /* allowEmptyObjectName= */ true);
+    fsRoot = new Path(getScheme(), /* authority= */ rootBucket, /* path= */ "/");
+    logger.atFiner().log("Configured FS root: '%s'", fsRoot);
+  }
+
+  private void initializeWorkingDirectory(Configuration config) {
+    String configWorkingDirectory = GCS_WORKING_DIRECTORY.get(config, config::get);
+    if (isNullOrEmpty(configWorkingDirectory)) {
+      logger.atWarning().log(
+          "No working directory configured, using default: '%s'", workingDirectory);
+    }
+    // Use the public method to ensure proper behavior of normalizing and resolving the new
+    // working directory relative to the initial filesystem-root directory.
+    setWorkingDirectory(
+        isNullOrEmpty(configWorkingDirectory)
+            ? getFileSystemRoot()
+            : new Path(configWorkingDirectory));
+    logger.atFiner().log(
+        "Configured working directory: %s = %s",
+        GCS_WORKING_DIRECTORY.getKey(), getWorkingDirectory());
+  }
+
+  private void initializeDelegationTokenSupport(Configuration config) throws IOException {
+    logger.atFiner().log("initializeDelegationTokenSupport(config: %s)", config);
+    // Load delegation token binding, if support is configured
+    if (isNullOrEmpty(DELEGATION_TOKEN_BINDING_CLASS.get(config, config::get))) {
+      return;
+    }
+
+    GcsDelegationTokens dts = new GcsDelegationTokens();
+    Text service = new Text(getFileSystemRoot().toString());
+    dts.bindToFileSystem(this, service);
+    dts.init(config);
+    dts.start();
+    delegationTokens = dts;
+    if (delegationTokens.isBoundToDT()) {
+      logger.atFine().log(
+          "initializeDelegationTokenSupport(config: %s): using existing delegation token", config);
+    }
+  }
+
+  private synchronized void initializeGcsFs(Configuration config) throws IOException {
+    if (gcsFsSupplier == null) {
+      if (GCS_LAZY_INITIALIZATION_ENABLE.get(config, config::getBoolean)) {
+        gcsFsSupplier =
+            Suppliers.memoize(
+                () -> {
+                  try {
+                    GoogleCloudStorageFileSystem gcsFs = createGcsFs(config);
+                    gcsFsInitialized = true;
+                    return gcsFs;
+                  } catch (IOException e) {
+                    throw new RuntimeException("Failed to create GCS FS", e);
+                  }
+                });
+      } else {
+        initializeGcsFs(createGcsFs(config));
+      }
+    }
+  }
+
+  private void initializeGcsFs(GoogleCloudStorageFileSystem gcsFs) {
+    gcsFsSupplier = Suppliers.ofInstance(gcsFs);
+    gcsFsInitialized = true;
+  }
+
+  private GoogleCloudStorageFileSystem createGcsFs(Configuration config) throws IOException {
+    GoogleCloudStorageFileSystemOptions gcsFsOptions =
+        GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
+
+    AccessTokenProvider accessTokenProvider = getAccessTokenProvider(config);
+
+    Credential credential;
+    try {
+      credential = getCredential(config, gcsFsOptions, accessTokenProvider);
+    } catch (GeneralSecurityException e) {
+      throw new RuntimeException(e);
+    }
+
+    return new GoogleCloudStorageFileSystem(
+        credential,
+        accessTokenProvider != null
+                && accessTokenProvider.getAccessTokenType()
+                    == AccessTokenProvider.AccessTokenType.DOWNSCOPED
+            ? accessBoundaries -> accessTokenProvider.getAccessToken(accessBoundaries).getToken()
+            : null,
+        gcsFsOptions);
   }
 
   private static String validatePathCapabilityArgs(Path path, String capability) {
@@ -248,7 +377,7 @@ public class GoogleHadoopFileSystem extends FileSystem
     return curr.isDirectory() && curr.getModificationTime() == 0;
   }
 
-  /** Helper method to get the UGI short user name */
+  /** Helper method to get the UGI short username */
   private static String getUgiUserName() throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     return ugi.getShortUserName();
@@ -257,15 +386,14 @@ public class GoogleHadoopFileSystem extends FileSystem
   /**
    * Converts the given FileStatus to its string representation.
    *
-   * @param stat FileStatus to convert.
+   * @param fileStatus FileStatus to convert.
    * @return String representation of the given FileStatus.
    */
-  private static String fileStatusToString(FileStatus stat) {
-    assert stat != null;
-
+  private static String fileStatusToString(FileStatus fileStatus) {
+    checkNotNull(fileStatus, "fileStatus should not be null");
     return String.format(
         "path: %s, isDir: %s, len: %d, owner: %s",
-        stat.getPath().toString(), stat.isDirectory(), stat.getLen(), stat.getOwner());
+        fileStatus.getPath(), fileStatus.isDirectory(), fileStatus.getLen(), fileStatus.getOwner());
   }
 
   /**
@@ -354,57 +482,35 @@ public class GoogleHadoopFileSystem extends FileSystem
     throw new IOException("Unrecognized GcsFileChecksumType: " + type);
   }
 
-  /** Sets and validates the root bucket. */
-  @VisibleForTesting
-  protected void configureBuckets() {
-    rootBucket = initUri.getAuthority();
-    checkArgument(rootBucket != null, "No bucket specified in GCS URI: %s", initUri);
-    // Validate root bucket name
-    UriPaths.fromStringPathComponents(
-        rootBucket, /* objectName= */ null, /* allowEmptyObjectName= */ true);
-    logger.atFiner().log(
-        "configureBuckets: GoogleHadoopFileSystem root bucket is '%s'", rootBucket);
-  }
-
   @Override
   protected void checkPath(Path path) {
     logger.atFiner().log("checkPath(path: %s)", path);
     // Validate scheme
-    URI uri1 = path.toUri();
-    String scheme = uri1.getScheme();
-    // Only check that the scheme matches. The authority and path will be
-    // validated later.
-    if (scheme != null && !scheme.equalsIgnoreCase(getScheme())) {
-      String msg =
-          String.format(
-              "Wrong FS scheme: %s, in path: %s, expected scheme: %s", scheme, path, getScheme());
-      throw new IllegalArgumentException(msg);
-    }
     URI uri = path.toUri();
+
+    String scheme = uri.getScheme();
+    if (scheme != null && !scheme.equalsIgnoreCase(getScheme())) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Wrong scheme: %s, in path: %s, expected scheme: %s", scheme, path, getScheme()));
+    }
+
     String bucket = uri.getAuthority();
-    // Bucketless URIs will be qualified later
+    String rootBucket = fsRoot.toUri().getAuthority();
+
+    // Bucket-less URIs will be qualified later
     if (bucket == null || bucket.equals(rootBucket)) {
       return;
     }
+
     throw new IllegalArgumentException(
         String.format(
             "Wrong bucket: %s, in path: %s, expected bucket: %s", bucket, path, rootBucket));
   }
 
-  /** Get the name of the bucket in which file system is rooted. */
-  @VisibleForTesting
-  String getRootBucketName() {
-    return rootBucket;
-  }
-
-  /** Override to allow a homedir subpath which sits directly on our FileSystem root. */
-  protected String getHomeDirectorySubpath() {
-    return "user/" + System.getProperty("user.name");
-  }
-
   /**
-   * Validates GCS Path belongs to this file system. The bucket must match the root bucket provided
-   * at initialization time.
+   * Validates that GCS path belongs to this file system. The bucket must match the root bucket
+   * provided at initialization time.
    */
   public Path getHadoopPath(URI gcsPath) {
     logger.atFiner().log("getHadoopPath(gcsPath: %s)", gcsPath);
@@ -416,15 +522,15 @@ public class GoogleHadoopFileSystem extends FileSystem
 
     StorageResourceId resourceId = StorageResourceId.fromUriPath(gcsPath, true);
 
-    // Unlike the global-rooted GHFS, gs:// has no meaning in the bucket-rooted world.
     checkArgument(!resourceId.isRoot(), "Missing authority in gcsPath '%s'", gcsPath);
+    String rootBucket = fsRoot.toUri().getAuthority();
     checkArgument(
         resourceId.getBucketName().equals(rootBucket),
         "Authority of URI '%s' doesn't match root bucket '%s'",
         resourceId.getBucketName(),
         rootBucket);
 
-    Path hadoopPath = new Path(getScheme() + "://" + rootBucket + '/' + resourceId.getObjectName());
+    Path hadoopPath = new Path(getWorkingDirectory(), resourceId.getObjectName());
     logger.atFiner().log("getHadoopPath(gcsPath: %s): %s", gcsPath, hadoopPath);
     return hadoopPath;
   }
@@ -436,7 +542,7 @@ public class GoogleHadoopFileSystem extends FileSystem
   public URI getGcsPath(Path hadoopPath) {
     logger.atFiner().log("getGcsPath(hadoopPath: %s)", hadoopPath);
 
-    // Convert to fully qualified absolute path; the Path object will callback to get our current
+    // Convert to fully qualified absolute path; the Path object will call back to get our current
     // workingDirectory as part of fully resolving the path.
     Path resolvedPath = makeQualified(hadoopPath);
 
@@ -447,17 +553,14 @@ public class GoogleHadoopFileSystem extends FileSystem
       objectName = objectName.substring(1);
     }
 
-    // Construct GCS path uri.
+    // Construct GCS path URI
+    String rootBucket = fsRoot.toUri().getAuthority();
     URI gcsPath =
         UriPaths.fromStringPathComponents(rootBucket, objectName, /* allowEmptyObjectName= */ true);
     logger.atFiner().log("getGcsPath(hadoopPath: %s): %s", hadoopPath, gcsPath);
     return gcsPath;
   }
 
-  /**
-   * As the global-rooted FileSystem, our hadoop-path "scheme" is exactly equal to the general GCS
-   * scheme.
-   */
   @Override
   public String getScheme() {
     return GoogleCloudStorageFileSystem.SCHEME;
@@ -465,46 +568,12 @@ public class GoogleHadoopFileSystem extends FileSystem
 
   @Override
   public Path getFileSystemRoot() {
-    return new Path(getScheme() + "://" + rootBucket + '/');
-  }
-
-  /** Gets the default value of working directory. */
-  public Path getDefaultWorkingDirectory() {
-    return getFileSystemRoot();
-  }
-
-  @Override
-  public void initialize(URI path, Configuration config) throws IOException {
-    logger.atFiner().log("initialize(path: %s, config: %s)", path, config);
-
-    checkArgument(path != null, "path must not be null");
-    checkArgument(config != null, "config must not be null");
-    checkArgument(path.getScheme() != null, "scheme of path must not be null");
-    checkArgument(path.getScheme().equals(getScheme()), "URI scheme not supported: %s", path);
-
-    super.initialize(path, config);
-
-    initUri = path;
-
-    // Set this configuration as the default config for this instance; configure()
-    // will perform some file-system-specific adjustments, but the original should
-    // be sufficient (and is required) for the delegation token binding initialization.
-    setConf(config);
-
-    // Initialize the delegation token support, if it is configured
-    initializeDelegationTokenSupport(config, path);
-
-    configure(config);
-    instrumentation = new GhfsInstrumentation(path);
-    storageStatistics =
-        (GhfsStorageStatistics)
-            GlobalStorageStatistics.INSTANCE.put(
-                GhfsStorageStatistics.NAME, () -> new GhfsStorageStatistics(getIOStatistics()));
+    return fsRoot;
   }
 
   @Override
   public FSDataInputStream open(Path hadoopPath, int bufferSize) throws IOException {
-    entryPoint(GhfsStatistic.INVOCATION_OPEN);
+    incrementStatistic(GhfsStatistic.INVOCATION_OPEN);
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
@@ -529,7 +598,7 @@ public class GoogleHadoopFileSystem extends FileSystem
       long blockSize,
       Progressable progress)
       throws IOException {
-    entryPoint(GhfsStatistic.INVOCATION_CREATE);
+    incrementStatistic(GhfsStatistic.INVOCATION_CREATE);
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
     checkArgument(replication > 0, "replication must be a positive integer: %s", replication);
     checkArgument(blockSize > 0, "blockSize must be a positive integer: %s", blockSize);
@@ -606,7 +675,7 @@ public class GoogleHadoopFileSystem extends FileSystem
       Progressable progress)
       throws IOException {
 
-    entryPoint(GhfsStatistic.INVOCATION_CREATE_NON_RECURSIVE);
+    incrementStatistic(GhfsStatistic.INVOCATION_CREATE_NON_RECURSIVE);
 
     URI gcsPath = getGcsPath(checkNotNull(hadoopPath, "hadoopPath must not be null"));
     URI parentGcsPath = UriPaths.getParentPath(gcsPath);
@@ -628,14 +697,14 @@ public class GoogleHadoopFileSystem extends FileSystem
 
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
-    entryPoint(GhfsStatistic.INVOCATION_RENAME);
+    incrementStatistic(GhfsStatistic.INVOCATION_RENAME);
     checkArgument(src != null, "src must not be null");
     checkArgument(dst != null, "dst must not be null");
 
     // Even though the underlying GCSFS will also throw an IAE if src is root, since our filesystem
     // root happens to equal the global root, we want to explicitly check it here since derived
     // classes may not have filesystem roots equal to the global root.
-    if (src.makeQualified(this).equals(getFileSystemRoot())) {
+    if (this.makeQualified(src).equals(getFileSystemRoot())) {
       logger.atFiner().log("rename(src: %s, dst: %s): false [src is a root]", src, dst);
       return false;
     }
@@ -653,7 +722,7 @@ public class GoogleHadoopFileSystem extends FileSystem
 
   @Override
   public boolean delete(Path hadoopPath, boolean recursive) throws IOException {
-    entryPoint(GhfsStatistic.INVOCATION_DELETE);
+    incrementStatistic(GhfsStatistic.INVOCATION_DELETE);
     boolean response;
     try {
       boolean result = true;
@@ -688,8 +757,8 @@ public class GoogleHadoopFileSystem extends FileSystem
 
   @Override
   public FileStatus[] listStatus(Path hadoopPath) throws IOException {
-    entryPoint(GhfsStatistic.INVOCATION_LIST_STATUS);
-    entryPoint(GhfsStatistic.INVOCATION_LIST_FILES);
+    incrementStatistic(GhfsStatistic.INVOCATION_LIST_STATUS);
+    incrementStatistic(GhfsStatistic.INVOCATION_LIST_FILES);
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
@@ -718,7 +787,7 @@ public class GoogleHadoopFileSystem extends FileSystem
 
   @Override
   public boolean mkdirs(Path hadoopPath, FsPermission permission) throws IOException {
-    entryPoint(GhfsStatistic.INVOCATION_MKDIRS);
+    incrementStatistic(GhfsStatistic.INVOCATION_MKDIRS);
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
@@ -742,7 +811,7 @@ public class GoogleHadoopFileSystem extends FileSystem
 
   @Override
   public FileStatus getFileStatus(Path hadoopPath) throws IOException {
-    entryPoint(GhfsStatistic.INVOCATION_GET_FILE_STATUS);
+    incrementStatistic(GhfsStatistic.INVOCATION_GET_FILE_STATUS);
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     checkOpen();
@@ -760,7 +829,7 @@ public class GoogleHadoopFileSystem extends FileSystem
 
   @Override
   public FileStatus[] globStatus(Path pathPattern, PathFilter filter) throws IOException {
-    entryPoint(GhfsStatistic.INVOCATION_GLOB_STATUS);
+    incrementStatistic(GhfsStatistic.INVOCATION_GLOB_STATUS);
     checkOpen();
 
     logger.atFiner().log("globStatus(pathPattern: %s, filter: %s)", pathPattern, filter);
@@ -788,7 +857,7 @@ public class GoogleHadoopFileSystem extends FileSystem
 
   @Override
   public Token<?> getDelegationToken(String renewer) throws IOException {
-    entryPoint(GhfsStatistic.INVOCATION_GET_DELEGATION_TOKEN);
+    incrementStatistic(GhfsStatistic.INVOCATION_GET_DELEGATION_TOKEN);
     Token<?> result = null;
     if (delegationTokens != null) {
       result = delegationTokens.getBoundOrNewDT(renewer);
@@ -801,7 +870,7 @@ public class GoogleHadoopFileSystem extends FileSystem
   @Override
   public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path[] srcs, Path dst)
       throws IOException {
-    entryPoint(GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
+    incrementStatistic(GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
     logger.atFiner().log(
         "copyFromLocalFile(delSrc: %b, overwrite: %b, %d srcs, dst: %s)",
         delSrc, overwrite, srcs.length, dst);
@@ -811,7 +880,7 @@ public class GoogleHadoopFileSystem extends FileSystem
   @Override
   public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path src, Path dst)
       throws IOException {
-    entryPoint(GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
+    incrementStatistic(GhfsStatistic.INVOCATION_COPY_FROM_LOCAL_FILE);
     logger.atFiner().log(
         "copyFromLocalFile(delSrc: %b, overwrite: %b, src: %s, dst: %s)",
         delSrc, overwrite, src, dst);
@@ -820,7 +889,7 @@ public class GoogleHadoopFileSystem extends FileSystem
 
   @Override
   public FileChecksum getFileChecksum(Path hadoopPath) throws IOException {
-    entryPoint(GhfsStatistic.INVOCATION_GET_FILE_CHECKSUM);
+    incrementStatistic(GhfsStatistic.INVOCATION_GET_FILE_CHECKSUM);
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
     this.checkOpen();
@@ -840,19 +909,18 @@ public class GoogleHadoopFileSystem extends FileSystem
 
   @Override
   public boolean exists(Path f) throws IOException {
-    entryPoint(GhfsStatistic.INVOCATION_EXISTS);
+    incrementStatistic(GhfsStatistic.INVOCATION_EXISTS);
     return super.exists(f);
   }
 
   @Override
   public RemoteIterator<LocatedFileStatus> listLocatedStatus(Path f) throws IOException {
-    entryPoint(GhfsStatistic.INVOCATION_LIST_LOCATED_STATUS);
+    incrementStatistic(GhfsStatistic.INVOCATION_LIST_LOCATED_STATUS);
     return super.listLocatedStatus(f);
   }
 
   @Override
   public byte[] getXAttr(Path path, String name) throws IOException {
-
     return trackDuration(
         instrumentation,
         GhfsStatistic.INVOCATION_XATTR_GET_NAMED.getSymbol(),
@@ -940,34 +1008,24 @@ public class GoogleHadoopFileSystem extends FileSystem
   }
 
   /**
-   * Entry point to an operation. Increments the statistic; verifies the FS is active.
+   * Increment a statistic by 1.
    *
-   * @param operation The operation to increment
+   * @param statistic The operation statistic to increment
    */
-  public void entryPoint(GhfsStatistic operation) {
-    if (isClosed()) {
-      return;
-    }
-    incrementStatistic(operation);
-  }
-
-  /**
-   * Increment a statistic by 1. This increments both the and storage statistics.
-   *
-   * @param statistic The operation to increment
-   */
-  protected void incrementStatistic(GhfsStatistic statistic) {
+  private void incrementStatistic(GhfsStatistic statistic) {
     incrementStatistic(statistic, 1);
   }
 
   /**
-   * Increment a statistic by a specific value. This increments both the instrumentation and storage
-   * statistics.
+   * Increment a statistic by a specific value.
    *
-   * @param statistic The operation to increment
+   * @param statistic The operation statistic to increment
    * @param count the count to increment
    */
-  protected void incrementStatistic(GhfsStatistic statistic, long count) {
+  private void incrementStatistic(GhfsStatistic statistic, long count) {
+    if (isClosed()) {
+      return;
+    }
     instrumentation.incrementCounter(statistic, count);
   }
 
@@ -1017,11 +1075,6 @@ public class GoogleHadoopFileSystem extends FileSystem
     instrumentation.getIOStatistics().getCounterReference(key).set(0L);
   }
 
-  private void setGcsFs(GoogleCloudStorageFileSystem gcsFs) {
-    gcsFsSupplier = Suppliers.ofInstance(gcsFs);
-    gcsFsInitialized = true;
-  }
-
   /**
    * Overridden to make root its own parent. This is POSIX compliant, but more importantly guards
    * against poor directory accounting in the PathData class of Hadoop 2's FsShell.
@@ -1056,42 +1109,6 @@ public class GoogleHadoopFileSystem extends FileSystem
     return result;
   }
 
-  /**
-   * Initialize the delegation token support for this filesystem.
-   *
-   * @param config The filesystem configuration
-   * @param path The filesystem path
-   */
-  private void initializeDelegationTokenSupport(Configuration config, URI path) throws IOException {
-    logger.atFiner().log("initializeDelegationTokenSupport(config: %s, path: %s)", config, path);
-    // Load delegation token binding, if support is configured
-    if (isNullOrEmpty(DELEGATION_TOKEN_BINDING_CLASS.get(config, config::get))) {
-      return;
-    }
-
-    GcsDelegationTokens dts = new GcsDelegationTokens();
-    Text service = new Text(getScheme() + "://" + path.getAuthority());
-    dts.bindToFileSystem(this, service);
-    dts.init(config);
-    dts.start();
-    delegationTokens = dts;
-    if (delegationTokens.isBoundToDT()) {
-      logger.atFine().log(
-          "initializeDelegationTokenSupport(config: %s, path: %s): using existing delegation token",
-          config, path);
-    }
-  }
-
-  private void stopDelegationTokens() {
-    if (delegationTokens != null) {
-      try {
-        delegationTokens.close();
-      } catch (IOException e) {
-        logger.atSevere().withCause(e).log("Failed to stop delegation tokens support");
-      }
-    }
-  }
-
   /** Returns a URI of the root of this FileSystem. */
   @Override
   public URI getUri() {
@@ -1106,6 +1123,7 @@ public class GoogleHadoopFileSystem extends FileSystem
     return result;
   }
 
+  @Override
   public boolean hasPathCapability(Path path, String capability) {
     switch (validatePathCapabilityArgs(path, capability)) {
         // TODO: remove string literals in favor of Constants in CommonPathCapabilities.java
@@ -1241,27 +1259,6 @@ public class GoogleHadoopFileSystem extends FileSystem
     getGcsFs().rename(srcPath, dstPath);
 
     logger.atFiner().log("rename(src: %s, dst: %s): true", src, dst);
-  }
-
-  /**
-   * Sets the current working directory to the given path.
-   *
-   * @param hadoopPath New working directory.
-   */
-  @Override
-  public void setWorkingDirectory(Path hadoopPath) {
-    checkArgument(hadoopPath != null, "hadoopPath must not be null");
-
-    URI gcsPath = UriPaths.toDirectory(getGcsPath(hadoopPath));
-    Path newPath = getHadoopPath(gcsPath);
-
-    // Ideally we should check (as we did earlier) if the given path really points to an existing
-    // directory. However, it takes considerable amount of time for that check which hurts perf.
-    // Given that HDFS code does not do such checks either, we choose to not do them in favor of
-    // better performance.
-
-    workingDirectory = newPath;
-    logger.atFiner().log("setWorkingDirectory(hadoopPath: %s): %s", hadoopPath, workingDirectory);
   }
 
   /**
@@ -1498,7 +1495,7 @@ public class GoogleHadoopFileSystem extends FileSystem
    */
   @Override
   public Path getHomeDirectory() {
-    Path result = new Path(getFileSystemRoot(), getHomeDirectorySubpath());
+    Path result = new Path(getFileSystemRoot(), "user/" + System.getProperty("user.name"));
     logger.atFiner().log("getHomeDirectory(): %s", result);
     return result;
   }
@@ -1619,96 +1616,6 @@ public class GoogleHadoopFileSystem extends FileSystem
     return getImpersonatedCredential(config, gcsFsOptions, credential).orElse(credential);
   }
 
-  /**
-   * Configures GHFS using the supplied configuration.
-   *
-   * @param config Hadoop configuration object.
-   */
-  private synchronized void configure(Configuration config) throws IOException {
-    logger.atFiner().log("GHFS_ID=%s: configure(config: %s)", GHFS_ID, config);
-
-    // Set this configuration as the default config for this instance.
-    setConf(config);
-
-    globAlgorithm = GCS_GLOB_ALGORITHM.get(config, config::getEnum);
-    checksumType = GCS_FILE_CHECKSUM_TYPE.get(config, config::getEnum);
-    defaultBlockSize = BLOCK_SIZE.get(config, config::getLong);
-    reportedPermissions = new FsPermission(PERMISSIONS_TO_REPORT.get(config, config::get));
-
-    if (gcsFsSupplier == null) {
-      if (GCS_LAZY_INITIALIZATION_ENABLE.get(config, config::getBoolean)) {
-        gcsFsSupplier =
-            Suppliers.memoize(
-                () -> {
-                  try {
-                    GoogleCloudStorageFileSystem gcsFs = createGcsFs(config);
-
-                    configureBuckets();
-                    configureWorkingDirectory(config);
-                    gcsFsInitialized = true;
-
-                    return gcsFs;
-                  } catch (IOException e) {
-                    throw new RuntimeException("Failed to create GCS FS", e);
-                  }
-                });
-      } else {
-        setGcsFs(createGcsFs(config));
-        configureBuckets();
-        configureWorkingDirectory(config);
-      }
-    } else {
-      configureBuckets();
-      configureWorkingDirectory(config);
-    }
-  }
-
-  private GoogleCloudStorageFileSystem createGcsFs(Configuration config) throws IOException {
-    GoogleCloudStorageFileSystemOptions gcsFsOptions =
-        GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
-
-    AccessTokenProvider accessTokenProvider = getAccessTokenProvider(config);
-
-    Credential credential;
-    try {
-      credential = getCredential(config, gcsFsOptions, accessTokenProvider);
-    } catch (GeneralSecurityException e) {
-      throw new RuntimeException(e);
-    }
-
-    return new GoogleCloudStorageFileSystem(
-        credential,
-        accessTokenProvider != null
-                && accessTokenProvider.getAccessTokenType()
-                    == AccessTokenProvider.AccessTokenType.DOWNSCOPED
-            ? accessBoundaries -> accessTokenProvider.getAccessToken(accessBoundaries).getToken()
-            : null,
-        gcsFsOptions);
-  }
-
-  private void configureWorkingDirectory(Configuration config) {
-    // Set initial working directory to root so that any configured value gets resolved
-    // against file system root.
-    workingDirectory = getFileSystemRoot();
-
-    Path newWorkingDirectory;
-    String configWorkingDirectory = GCS_WORKING_DIRECTORY.get(config, config::get);
-    if (isNullOrEmpty(configWorkingDirectory)) {
-      newWorkingDirectory = getDefaultWorkingDirectory();
-      logger.atWarning().log(
-          "No working directory configured, using default: '%s'", newWorkingDirectory);
-    } else {
-      newWorkingDirectory = new Path(configWorkingDirectory);
-    }
-
-    // Use the public method to ensure proper behavior of normalizing and resolving the new
-    // working directory relative to the initial filesystem-root directory.
-    setWorkingDirectory(newWorkingDirectory);
-    logger.atFiner().log(
-        "Configured working directory: %s = %s",
-        GCS_WORKING_DIRECTORY.getKey(), getWorkingDirectory());
-  }
-
   /** Assert that the FileSystem has been initialized and not close()d. */
   private void checkOpen() throws IOException {
     if (isClosed()) {
@@ -1778,7 +1685,13 @@ public class GoogleHadoopFileSystem extends FileSystem
       gcsFsSupplier = null;
     }
 
-    stopDelegationTokens();
+    if (delegationTokens != null) {
+      try {
+        delegationTokens.close();
+      } catch (IOException e) {
+        logger.atSevere().withCause(e).log("Failed to stop delegation tokens support");
+      }
+    }
 
     backgroundTasksThreadPool.shutdown();
     backgroundTasksThreadPool = null;
@@ -1793,9 +1706,16 @@ public class GoogleHadoopFileSystem extends FileSystem
 
   @Override
   public long getDefaultBlockSize() {
-    long result = defaultBlockSize;
-    logger.atFiner().log("getDefaultBlockSize(): %d", result);
-    return result;
+    logger.atFiner().log("getDefaultBlockSize(): %d", defaultBlockSize);
+    return defaultBlockSize;
+  }
+
+  @Override
+  public void setWorkingDirectory(Path hadoopPath) {
+    checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    URI gcsPath = UriPaths.toDirectory(getGcsPath(hadoopPath));
+    workingDirectory = getHadoopPath(gcsPath);
+    logger.atFiner().log("setWorkingDirectory(hadoopPath: %s): %s", hadoopPath, workingDirectory);
   }
 
   @Override

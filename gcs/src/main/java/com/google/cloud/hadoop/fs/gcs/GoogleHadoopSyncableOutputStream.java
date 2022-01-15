@@ -97,13 +97,12 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
               .setDaemon(true)
               .build());
 
-  // Instance of GoogleHadoopFileSystemBase.
   private final GoogleHadoopFileSystem ghfs;
 
   // The final destination path for this stream.
   private final URI finalGcsPath;
 
-  // Statistics tracker provided by the parent GoogleHadoopFileSystemBase for recording
+  // Statistics tracker provided by the parent GoogleHadoopFileSystem for recording
   // numbers of bytes written.
   private final FileSystem.Statistics statistics;
 

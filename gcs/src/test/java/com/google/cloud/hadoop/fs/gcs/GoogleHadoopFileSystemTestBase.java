@@ -483,7 +483,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
   }
   /**
    * We override certain methods in FileSystem simply to provide debug tracing. (Search for
-   * "Overridden functions for debug tracing" in GoogleHadoopFileSystemBase.java). We do not add or
+   * "Overridden functions for debug tracing" in GoogleHadoopFileSystem.java). We do not add or
    * update any functionality for such methods. The following tests simply exercise that path to
    * ensure coverage. Consequently, they do not really test any functionality.
    *

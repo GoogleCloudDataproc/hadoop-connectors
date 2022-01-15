@@ -44,14 +44,14 @@ class GoogleHadoopOutputStreamBase extends OutputStream {
   // Path of the file to write to.
   private final URI gcsPath;
 
-  // Statistics tracker provided by the parent GoogleHadoopFileSystemBase for recording
+  // Statistics tracker provided by the parent GoogleHadoopFileSystem for recording
   // numbers of bytes written.
   private final FileSystem.Statistics statistics;
 
   /**
    * Constructs an instance of GoogleHadoopOutputStream object.
    *
-   * @param ghfs Instance of GoogleHadoopFileSystemBase.
+   * @param ghfs Instance of {@link GoogleHadoopFileSystem}.
    * @param gcsPath Path of the file to write to.
    * @param statistics File system statistics object.
    * @throws IOException if an IO error occurs.
