@@ -26,7 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType;
+import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.common.util.concurrent.Futures;
 import java.io.ByteArrayOutputStream;
@@ -55,7 +55,7 @@ import org.mockito.MockitoAnnotations;
 public class GoogleHadoopSyncableOutputStreamTest {
   @Mock private ExecutorService mockExecutorService;
 
-  private GoogleHadoopFileSystemBase ghfs;
+  private GoogleHadoopFileSystem ghfs;
 
   @Before
   public void setUp() throws IOException {

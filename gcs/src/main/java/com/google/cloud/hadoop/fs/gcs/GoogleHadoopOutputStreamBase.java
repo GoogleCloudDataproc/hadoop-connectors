@@ -57,7 +57,7 @@ class GoogleHadoopOutputStreamBase extends OutputStream {
    * @throws IOException if an IO error occurs.
    */
   GoogleHadoopOutputStreamBase(
-      GoogleHadoopFileSystemBase ghfs,
+      GoogleHadoopFileSystem ghfs,
       URI gcsPath,
       FileSystem.Statistics statistics,
       CreateFileOptions createFileOptions)

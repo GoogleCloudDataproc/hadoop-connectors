@@ -103,7 +103,7 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
     }
 
     GoogleCloudStorageItemInfo itemInfo =
-        ((GoogleHadoopFileSystemBase) ghfsIHelper.ghfs).getGcsFs().getGcs().getItemInfo(fileId);
+        ((GoogleHadoopFileSystem) ghfsIHelper.ghfs).getGcsFs().getGcs().getItemInfo(fileId);
 
     CompletableFuture<FSDataInputStream> isFuture = ghfs.openFile(filePath).build();
 
@@ -141,7 +141,7 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
 
     FileStatus fileStatus = ghfsIHelper.ghfs.getFileStatus(filePath);
     GoogleCloudStorageItemInfo itemInfo =
-        ((GoogleHadoopFileSystemBase) ghfsIHelper.ghfs).getGcsFs().getGcs().getItemInfo(fileId);
+        ((GoogleHadoopFileSystem) ghfsIHelper.ghfs).getGcsFs().getGcs().getItemInfo(fileId);
 
     CompletableFuture<FSDataInputStream> isFuture =
         ghfs.openFile(filePath).withFileStatus(fileStatus).build();

@@ -49,8 +49,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksumType;
-import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GlobAlgorithm;
+import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GcsFileChecksumType;
+import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest;
@@ -672,7 +672,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
     GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem(fakeGcsFs);
     fs.initUri = initUri;
-    fs.configureBuckets(fakeGcsFs);
+    fs.configureBuckets();
 
     // Verify that config settings were set correctly.
     assertThat(fs.initUri).isEqualTo(initUri);
@@ -680,7 +680,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     initUri = new Path("gs://" + ghfsHelper.sharedBucketName1 + "/foo").toUri();
     fs = new GoogleHadoopFileSystem(fakeGcsFs);
     fs.initUri = initUri;
-    fs.configureBuckets(fakeGcsFs);
+    fs.configureBuckets();
 
     // Verify that config settings were set correctly.
     assertThat(fs.initUri).isEqualTo(initUri);
@@ -702,7 +702,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
                 .build());
     GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem(fakeGcsFs);
     fs.initUri = initUri;
-    fs.configureBuckets(fakeGcsFs);
+    fs.configureBuckets();
 
     // Verify that config settings were set correctly.
     assertThat(fs.initUri).isEqualTo(initUri);
@@ -929,7 +929,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     fs.initUri = initUri;
 
     IllegalArgumentException thrown =
-        assertThrows(IllegalArgumentException.class, () -> fs.configureBuckets(fakeGcsFs));
+        assertThrows(IllegalArgumentException.class, fs::configureBuckets);
 
     assertThat(thrown).hasMessageThat().isEqualTo("No bucket specified in GCS URI: gs:/");
   }

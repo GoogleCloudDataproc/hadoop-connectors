@@ -419,7 +419,7 @@ public class HadoopFileSystemIntegrationHelper
             FsPermission.getDefault(),
             overwrite,
             GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE.getDefault(),
-            GoogleHadoopFileSystemBase.REPLICATION_FACTOR_DEFAULT,
+            GoogleHadoopFileSystem.REPLICATION_FACTOR_DEFAULT,
             GoogleHadoopFileSystemConfiguration.BLOCK_SIZE.getDefault(),
             /* progress= */ null)) {
       for (int i = 0; i < numWrites; i++) {

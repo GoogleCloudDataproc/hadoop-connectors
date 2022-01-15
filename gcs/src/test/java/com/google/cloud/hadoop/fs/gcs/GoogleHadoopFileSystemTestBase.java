@@ -124,7 +124,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
   /** Tests getGcsPath(). */
   @Test
   public void testGetGcsPath() throws URISyntaxException {
-    GoogleHadoopFileSystemBase myghfs = (GoogleHadoopFileSystemBase) ghfs;
+    GoogleHadoopFileSystem myghfs = (GoogleHadoopFileSystem) ghfs;
 
     URI gcsPath = new URI("gs://" + myghfs.getUri().getAuthority() + "/dir/obj");
     assertThat(myghfs.getGcsPath(new Path(gcsPath))).isEqualTo(gcsPath);
@@ -136,7 +136,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
   /** Verifies that test config can be accessed through the FS instance. */
   @Test
   public void testConfig() {
-    GoogleHadoopFileSystemBase myghfs = (GoogleHadoopFileSystemBase) ghfs;
+    GoogleHadoopFileSystem myghfs = (GoogleHadoopFileSystem) ghfs;
     GoogleCloudStorageOptions cloudStorageOptions =
         myghfs.getGcsFs().getOptions().getCloudStorageOptions();
 
@@ -157,7 +157,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
   @Test
   public void testImplicitDirectory() throws IOException {
     String bucketName = sharedBucketName1;
-    GoogleHadoopFileSystemBase myghfs = (GoogleHadoopFileSystemBase) ghfs;
+    GoogleHadoopFileSystem myghfs = (GoogleHadoopFileSystem) ghfs;
     GoogleCloudStorageFileSystem gcsfs = myghfs.getGcsFs();
     URI seedUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path parentPath = ghfsHelper.castAsHadoopPath(seedUri);
@@ -181,7 +181,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
 
   @Test
   public void testRepairDirectory_afterFileDelete() throws IOException {
-    GoogleHadoopFileSystemBase myghfs = (GoogleHadoopFileSystemBase) ghfs;
+    GoogleHadoopFileSystem myghfs = (GoogleHadoopFileSystem) ghfs;
     GoogleCloudStorageFileSystem gcsfs = myghfs.getGcsFs();
     GoogleCloudStorage gcs = gcsfs.getGcs();
     URI seedUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
@@ -210,7 +210,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
 
   @Test
   public void testRepairDirectory_afterSubdirectoryDelete() throws IOException {
-    GoogleHadoopFileSystemBase myghfs = (GoogleHadoopFileSystemBase) ghfs;
+    GoogleHadoopFileSystem myghfs = (GoogleHadoopFileSystem) ghfs;
     GoogleCloudStorageFileSystem gcsfs = myghfs.getGcsFs();
     GoogleCloudStorage gcs = gcsfs.getGcs();
 
@@ -243,7 +243,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
 
   @Test
   public void testRepairDirectory_afterFileRename() throws IOException {
-    GoogleHadoopFileSystemBase myghfs = (GoogleHadoopFileSystemBase) ghfs;
+    GoogleHadoopFileSystem myghfs = (GoogleHadoopFileSystem) ghfs;
     GoogleCloudStorageFileSystem gcsfs = myghfs.getGcsFs();
     GoogleCloudStorage gcs = gcsfs.getGcs();
 
@@ -274,7 +274,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
   @Test
   public void testRepairDirectory_afterSubdirectoryRename() throws IOException {
     String bucketName = sharedBucketName1;
-    GoogleHadoopFileSystemBase myghfs = (GoogleHadoopFileSystemBase) ghfs;
+    GoogleHadoopFileSystem myghfs = (GoogleHadoopFileSystem) ghfs;
     GoogleCloudStorageFileSystem gcsfs = myghfs.getGcsFs();
     GoogleCloudStorage gcs = gcsfs.getGcs();
 
@@ -324,7 +324,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
   /** Validates makeQualified() when working directory is not root. */
   @Test
   public void testMakeQualifiedNotRoot() {
-    GoogleHadoopFileSystemBase myGhfs = (GoogleHadoopFileSystemBase) ghfs;
+    GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) ghfs;
     Path fsRootPath = myGhfs.getFileSystemRoot();
     URI fsRootUri = fsRootPath.toUri();
     String fsRoot = fsRootPath.toString();
@@ -387,7 +387,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
   /** Validates makeQualified() when working directory is root. */
   @Test
   public void testMakeQualifiedRoot() {
-    GoogleHadoopFileSystemBase myGhfs = (GoogleHadoopFileSystemBase) ghfs;
+    GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) ghfs;
     myGhfs.setWorkingDirectory(myGhfs.getFileSystemRoot());
     Path fsRootPath = myGhfs.getFileSystemRoot();
     URI fsRootUri = fsRootPath.toUri();

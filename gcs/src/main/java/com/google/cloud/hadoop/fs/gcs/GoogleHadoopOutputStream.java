@@ -33,7 +33,7 @@ public class GoogleHadoopOutputStream extends InstrumentatedGoogleHadoopOutputSt
    * @throws IOException if an IO error occurs.
    */
   GoogleHadoopOutputStream(
-      GoogleHadoopFileSystemBase ghfs,
+      GoogleHadoopFileSystem ghfs,
       URI gcsPath,
       FileSystem.Statistics statistics,
       CreateFileOptions createFileOptions)

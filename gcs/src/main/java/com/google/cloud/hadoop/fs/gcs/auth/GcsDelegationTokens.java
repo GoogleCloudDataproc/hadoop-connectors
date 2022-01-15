@@ -22,8 +22,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
 import com.google.cloud.hadoop.fs.gcs.DelegationTokenStatistics;
-import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase;
-import com.google.cloud.hadoop.fs.gcs.InstrumentedGoogleHadoopFileSystem;
+import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
@@ -41,7 +40,7 @@ public class GcsDelegationTokens extends AbstractService {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  private GoogleHadoopFileSystemBase fileSystem;
+  private GoogleHadoopFileSystem fileSystem;
 
   /**
    * User who owns this FS; fixed at instantiation time, so that in calls to getDelegationToken()
@@ -180,7 +179,7 @@ public class GcsDelegationTokens extends AbstractService {
    *
    * @param fileSystem owning FS.
    */
-  public void bindToFileSystem(GoogleHadoopFileSystemBase fileSystem, Text service) {
+  public void bindToFileSystem(GoogleHadoopFileSystem fileSystem, Text service) {
     this.service = requireNonNull(service);
     this.fileSystem = requireNonNull(fileSystem);
   }
@@ -311,7 +310,7 @@ public class GcsDelegationTokens extends AbstractService {
 
   /** Get the IOStatistics of GoogleHadoopFileSystem to update the Delegation token Statistics */
   private DelegationTokenStatistics getStats() {
-    return ((InstrumentedGoogleHadoopFileSystem) fileSystem)
+    return ((GoogleHadoopFileSystem) fileSystem)
         .getInstrumentation()
         .newDelegationTokenStatistics();
   }

@@ -64,9 +64,8 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
 
   @Test
   public void testVersionString() {
-    assertThat(GoogleHadoopFileSystemBase.VERSION).isNotNull();
-    assertThat(
-            GoogleHadoopFileSystemBase.UNKNOWN_VERSION.equals(GoogleHadoopFileSystemBase.VERSION))
+    assertThat(GoogleHadoopFileSystem.VERSION).isNotNull();
+    assertThat(GoogleHadoopFileSystem.UNKNOWN_VERSION.equals(GoogleHadoopFileSystem.VERSION))
         .isFalse();
   }
 

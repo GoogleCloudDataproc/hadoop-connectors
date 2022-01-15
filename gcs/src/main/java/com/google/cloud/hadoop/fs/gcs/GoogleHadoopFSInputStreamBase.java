@@ -60,7 +60,7 @@ class GoogleHadoopFSInputStreamBase extends FSInputStream {
    * @throws IOException if an IO error occurs.
    */
   GoogleHadoopFSInputStreamBase(
-      GoogleHadoopFileSystemBase ghfs,
+      GoogleHadoopFileSystem ghfs,
       URI gcsPath,
       GoogleCloudStorageReadOptions readOptions,
       FileSystem.Statistics statistics)
@@ -82,7 +82,7 @@ class GoogleHadoopFSInputStreamBase extends FSInputStream {
    * @throws IOException if an IO error occurs.
    */
   GoogleHadoopFSInputStreamBase(
-      GoogleHadoopFileSystemBase ghfs, FileInfo fileInfo, FileSystem.Statistics statistics)
+      GoogleHadoopFileSystem ghfs, FileInfo fileInfo, FileSystem.Statistics statistics)
       throws IOException {
     logger.atFiner().log("GoogleHadoopFSInputStream(fileInfo: %s)", fileInfo);
     this.gcsPath = fileInfo.getPath();
