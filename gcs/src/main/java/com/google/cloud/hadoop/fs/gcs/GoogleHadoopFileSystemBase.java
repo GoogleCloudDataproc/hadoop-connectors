@@ -43,7 +43,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.http.HttpTransport;
-import com.google.api.client.util.Preconditions;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
@@ -1288,7 +1287,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * @return String representation of the given FileStatus.
    */
   private static String fileStatusToString(FileStatus stat) {
-    Preconditions.checkNotNull(stat, "Must provide a file status");
+    checkNotNull(stat, "Must provide a file status");
 
     return String.format(
         "path: %s, isDir: %s, len: %d, owner: %s",

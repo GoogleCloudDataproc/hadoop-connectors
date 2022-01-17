@@ -1,6 +1,22 @@
+/*
+ * Copyright 2022 Google Inc. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.api.client.util.Preconditions.checkNotNull;
+import static com.google.common.flogger.LazyArgs.lazy;
 
 import com.google.api.client.auth.oauth2.ClientParametersAuthentication;
 import com.google.api.client.auth.oauth2.RefreshTokenRequest;
@@ -23,42 +39,44 @@ import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 import org.apache.hadoop.conf.Configuration;
 
+/**
+ * Retrieve an access token using the OAuth2 refresh token grant flow. See <a
+ * href="https://datatracker.ietf.org/doc/html/rfc6749#section-1.5">RFC 6749</a>.
+ */
 public class RefreshTokenAuth2Provider implements AccessTokenProvider {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
 
-  private static final AccessToken EXPIRED_TOKEN = new AccessToken("", -1L);
-  private static DateTimeFormatter dateFormat =
+  private static final DateTimeFormatter dateFormat =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.systemDefault());
+  private static final AccessToken EXPIRED_TOKEN = new AccessToken("", -1L);
+
   private Configuration config;
-  private AccessToken accessToken = EXPIRED_TOKEN;
+  private Optional<AccessToken> accessToken = Optional.empty();
   private HttpTransport httpTransport;
   private Optional<RedactedString> previousRefreshToken = Optional.empty();
 
   @Override
   public AccessToken getAccessToken() {
-    return this.accessToken;
+    if (!accessToken.isPresent()) {
+      refresh();
+    }
+    return accessToken.get();
   }
 
   @Override
   public void refresh() {
-    if (logger.atFine().isEnabled()) {
-      String expireAt =
-          accessToken.getExpirationTimeMilliSeconds() == null
-              ? "NEVER_EXPIRE"
-              : dateFormat.format(
-                  Instant.ofEpochMilli(accessToken.getExpirationTimeMilliSeconds()));
-      logger.atFine().log(
-          "Our token is set to expire at '"
-              + expireAt
-              + "' and it is now '"
-              + dateFormat.format(Instant.now())
-              + "'");
-      logger.atFine().log("Refreshing access-token based token");
-    }
+    logger.atFine().log(
+        "Refreshing access-token based token. Our token is set to expire at '%s' and it is now '%s'",
+        lazy(
+            () ->
+                dateFormat.format(
+                    Instant.ofEpochMilli(
+                        accessToken.orElse(EXPIRED_TOKEN).getExpirationTimeMilliSeconds()))),
+        lazy(() -> dateFormat.format(Instant.now())));
 
     GoogleCloudStorageOptions gcsOptions =
-        GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(this.config).build();
+        GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
     String tokenServerUrl = gcsOptions.getTokenServerUrl();
     RedactedString refreshToken = gcsOptions.getRefreshToken();
     String clientId = gcsOptions.getClientId();
@@ -67,31 +85,25 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
     checkNotNull(clientSecret, "Must provide a client secret");
 
     logger.atFine().log(
-        "Refresh token calling endpoint '"
-            + tokenServerUrl
-            + "' with client id '"
-            + clientId
-            + "'");
+        "Refresh token calling endpoint '%s' with client id '%s'", tokenServerUrl, clientId);
 
     try {
       HttpTransport httpTransport = getTransport();
-      this.accessToken =
-          getAccessToken(
-              tokenServerUrl,
-              clientId,
-              clientSecret,
-              previousRefreshToken.orElse(refreshToken),
-              httpTransport);
+      accessToken =
+          Optional.of(
+              getAccessToken(
+                  tokenServerUrl,
+                  clientId,
+                  clientSecret,
+                  previousRefreshToken.orElse(refreshToken),
+                  httpTransport));
 
-      if (this.accessToken.getExpirationTimeMilliSeconds() != null) {
-        logger.atFine().log(
-            "New access token expires at '"
-                + dateFormat.format(
-                    Instant.ofEpochMilli(this.accessToken.getExpirationTimeMilliSeconds()))
-                + "'");
-      } else {
-        logger.atFine().log("New access token never expires.");
-      }
+      logger.atFine().log(
+          "New access token expires at '%s'",
+          lazy(
+              () ->
+                  dateFormat.format(
+                      Instant.ofEpochMilli(accessToken.get().getExpirationTimeMilliSeconds()))));
 
     } catch (IOException e) {
       logger.atSevere().withCause(e).log("Couldn't refresh token");
@@ -115,19 +127,25 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
                 new ClientParametersAuthentication(clientId, clientSecret.value()));
 
     TokenResponse tokenResponse = request.execute();
-    this.previousRefreshToken =
+    previousRefreshToken =
         Optional.ofNullable(RedactedString.create(tokenResponse.getRefreshToken()));
 
-    Long expirationTimeMilliSeconds =
-        tokenResponse.getExpiresInSeconds() == null
-            ? null
-            : System.currentTimeMillis() + (tokenResponse.getExpiresInSeconds() * 1000L);
+    long expirationTimeMilliSeconds;
+    if (tokenResponse.getExpiresInSeconds() != null) {
+      expirationTimeMilliSeconds =
+          System.currentTimeMillis() + (tokenResponse.getExpiresInSeconds() * 1000L);
+    } else {
+      logger.atWarning().log(
+          "The OAuth2 provider has returned an access token without a defined expiration (ie `expires_in` was null). "
+              + "We will consider the access token as expired.");
+      expirationTimeMilliSeconds = 0L;
+    }
     return new AccessToken(tokenResponse.getAccessToken(), expirationTimeMilliSeconds);
   }
 
   @Override
   public Configuration getConf() {
-    return this.config;
+    return config;
   }
 
   @Override
@@ -138,12 +156,11 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
   private HttpTransport getTransport() throws IOException {
     if (httpTransport == null) {
       GoogleCloudStorageOptions gcsOptions =
-          GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(this.config).build();
+          GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
       String proxyAddress = gcsOptions.getProxyAddress();
       RedactedString proxyUsername = gcsOptions.getProxyUsername();
       RedactedString proxyPassword = gcsOptions.getProxyPassword();
-      logger.atFine().log(
-          "Proxy setup: '" + proxyAddress + "' with username = '" + proxyUsername + "'");
+      logger.atFine().log("Proxy setup: '%s' with username = '%s'", proxyAddress, proxyUsername);
       httpTransport =
           HttpTransportFactory.createHttpTransport(proxyAddress, proxyUsername, proxyPassword);
     }
@@ -157,6 +174,6 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
 
   @VisibleForTesting
   Optional<RedactedString> getPreviousRefreshToken() {
-    return this.previousRefreshToken;
+    return previousRefreshToken;
   }
 }
