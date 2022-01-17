@@ -74,7 +74,7 @@ public class GoogleHadoopSyncableOutputStreamTest {
 
   @Test
   public void testEndToEndHsync() throws Exception {
-    Path objectPath = new Path(ghfs.getFileSystemRoot(), "dir/object.txt");
+    Path objectPath = new Path(ghfs.getUri().resolve("/dir/object.txt"));
     FSDataOutputStream fout = ghfs.create(objectPath);
 
     byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
@@ -120,7 +120,7 @@ public class GoogleHadoopSyncableOutputStreamTest {
 
   @Test
   public void testExceptionOnDelete() throws IOException {
-    Path objectPath = new Path(ghfs.getFileSystemRoot(), "dir/object2.txt");
+    Path objectPath = new Path(ghfs.getUri().resolve("/dir/object2.txt"));
     GoogleHadoopSyncableOutputStream fout =
         new GoogleHadoopSyncableOutputStream(
             ghfs,
@@ -152,7 +152,7 @@ public class GoogleHadoopSyncableOutputStreamTest {
 
   @Test
   public void testCloseTwice() throws IOException {
-    Path objectPath = new Path(ghfs.getFileSystemRoot(), "dir/object.txt");
+    Path objectPath = new Path(ghfs.getUri().resolve("/dir/object.txt"));
     FSDataOutputStream fout = ghfs.create(objectPath);
     fout.close();
     fout.close(); // Fine to close twice.
@@ -160,7 +160,7 @@ public class GoogleHadoopSyncableOutputStreamTest {
 
   @Test
   public void testWrite1AfterClose() throws IOException {
-    Path objectPath = new Path(ghfs.getFileSystemRoot(), "dir/object.txt");
+    Path objectPath = new Path(ghfs.getUri().resolve("/dir/object.txt"));
     FSDataOutputStream fout = ghfs.create(objectPath);
 
     fout.close();
@@ -169,7 +169,7 @@ public class GoogleHadoopSyncableOutputStreamTest {
 
   @Test
   public void testWriteAfterClose() throws IOException {
-    Path objectPath = new Path(ghfs.getFileSystemRoot(), "dir/object.txt");
+    Path objectPath = new Path(ghfs.getUri().resolve("dir/object.txt"));
     FSDataOutputStream fout = ghfs.create(objectPath);
     fout.close();
 
@@ -178,7 +178,7 @@ public class GoogleHadoopSyncableOutputStreamTest {
 
   @Test
   public void testSyncAfterClose() throws IOException {
-    Path objectPath = new Path(ghfs.getFileSystemRoot(), "dir/object.txt");
+    Path objectPath = new Path(ghfs.getUri().resolve("/dir/object.txt"));
     FSDataOutputStream fout = ghfs.create(objectPath);
     fout.close();
 
@@ -187,7 +187,7 @@ public class GoogleHadoopSyncableOutputStreamTest {
 
   @Test
   public void testSyncComposite_withLargeNumberOfComposeComponents() throws Exception {
-    Path objectPath = new Path(ghfs.getFileSystemRoot(), "dir/object.txt");
+    Path objectPath = new Path(ghfs.getUri().resolve("/dir/object.txt"));
 
     // number of compose components should be greater than 1024 (previous limit for GCS compose API)
     byte[] expected = new byte[1536];
@@ -209,7 +209,7 @@ public class GoogleHadoopSyncableOutputStreamTest {
     ghfs.getConf()
         .setLong(GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.getKey(), Duration.ofDays(1).toMillis());
 
-    Path objectPath = new Path(ghfs.getFileSystemRoot(), "hflush_rateLimited_writesEverything.bin");
+    Path objectPath = new Path(ghfs.getUri().resolve("/hflush_rateLimited_writesEverything.bin"));
 
     byte[] testData = new byte[100];
     new Random().nextBytes(testData);
@@ -233,7 +233,7 @@ public class GoogleHadoopSyncableOutputStreamTest {
 
   @Test
   public void testWriteStatistics() throws IOException {
-    Path objectPath = new Path(ghfs.getFileSystemRoot(), "dir/object2.txt");
+    Path objectPath = new Path(ghfs.getUri().resolve("/dir/object2.txt"));
     FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
     GoogleHadoopSyncableOutputStream fout =
         new GoogleHadoopSyncableOutputStream(
@@ -261,7 +261,7 @@ public class GoogleHadoopSyncableOutputStreamTest {
 
   @Test
   public void testStatistics() throws IOException {
-    Path objectPath = new Path(ghfs.getFileSystemRoot(), "dir/object2.txt");
+    Path objectPath = new Path(ghfs.getUri().resolve("/dir/object2.txt"));
     FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
     GoogleHadoopSyncableOutputStream fout =
         new GoogleHadoopSyncableOutputStream(

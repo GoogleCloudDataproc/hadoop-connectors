@@ -325,9 +325,8 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
   @Test
   public void testMakeQualifiedNotRoot() {
     GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) ghfs;
-    Path fsRootPath = myGhfs.getFileSystemRoot();
-    URI fsRootUri = fsRootPath.toUri();
-    String fsRoot = fsRootPath.toString();
+    URI fsRootUri = myGhfs.getUri();
+    String fsRoot = fsRootUri.toString();
     String workingParent = fsRoot + "working/";
     String workingDir = workingParent + "dir";
     myGhfs.setWorkingDirectory(new Path(workingDir));
@@ -388,10 +387,9 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
   @Test
   public void testMakeQualifiedRoot() {
     GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) ghfs;
-    myGhfs.setWorkingDirectory(myGhfs.getFileSystemRoot());
-    Path fsRootPath = myGhfs.getFileSystemRoot();
-    URI fsRootUri = fsRootPath.toUri();
-    String fsRoot = fsRootPath.toString();
+    myGhfs.setWorkingDirectory(new Path(ghfs.getUri()));
+    URI fsRootUri = ghfs.getUri();
+    String fsRoot = fsRootUri.toString();
     Map<String, String> qualifiedPaths = new HashMap<>();
     qualifiedPaths.put("/", fsRoot);
     qualifiedPaths.put("/foo", fsRoot + "foo");
@@ -481,6 +479,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
       localTempFile.delete();
     }
   }
+
   /**
    * We override certain methods in FileSystem simply to provide debug tracing. (Search for
    * "Overridden functions for debug tracing" in GoogleHadoopFileSystem.java). We do not add or
@@ -508,6 +507,7 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
 
     // Temporary file in local FS.
     File localTempFile = File.createTempFile("ghfs-test-", null);
+    File localCopiedFile = null;
     Path localTempFilePath = new Path(localTempFile.getPath());
     Path localTempDirPath = localTempFilePath.getParent();
 
@@ -520,10 +520,10 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
       ghfs.getDelegationToken("foo");
       ghfs.copyFromLocalFile(false, true, localTempFilePath, tempDirPath);
       ghfs.copyFromLocalFile(false, true, new Path[] {localTempFilePath}, tempDirPath);
-      localTempFile.delete();
+      assertThat(localTempFile.delete()).isTrue();
       ghfs.copyToLocalFile(true, tempFilePath, localTempDirPath);
-      File localCopiedFile = new File(localTempDirPath.toString(), tempFilePath.getName());
-      localCopiedFile.delete();
+      localCopiedFile = new File(localTempDirPath.toString(), tempFilePath.getName());
+      assertThat(localCopiedFile.delete()).isTrue();
       Path localOutputPath = ghfs.startLocalOutput(tempFilePath2, localTempFilePath);
       try (Writer writer = Files.newBufferedWriter(Paths.get(localOutputPath.toString()), UTF_8)) {
         writer.write(text);
@@ -545,7 +545,10 @@ public abstract class GoogleHadoopFileSystemTestBase extends HadoopFileSystemTes
       // We do not need to separately delete the temp files created in GHFS because
       // we delete all test buckets recursively at the end of the tests.
       if (localTempFile.exists()) {
-        localTempFile.delete();
+        assertThat(localTempFile.delete()).isTrue();
+      }
+      if (localCopiedFile != null && localCopiedFile.exists()) {
+        assertThat(localCopiedFile.delete()).isTrue();
       }
     }
   }

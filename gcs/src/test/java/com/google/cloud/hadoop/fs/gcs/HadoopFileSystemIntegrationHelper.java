@@ -44,7 +44,6 @@ public class HadoopFileSystemIntegrationHelper
     extends GoogleCloudStorageFileSystemIntegrationHelper {
 
   FileSystem ghfs;
-  FileSystemDescriptor ghfsFileSystemDescriptor;
 
   /** FS statistics mode. */
   public enum FileSystemStatistics {
@@ -66,8 +65,7 @@ public class HadoopFileSystemIntegrationHelper
   // FS statistics mode of the FS tested by this class.
   FileSystemStatistics statistics = FileSystemStatistics.IGNORE;
 
-  public HadoopFileSystemIntegrationHelper(
-      FileSystem hfs, FileSystemDescriptor ghfsFileSystemDescriptor) throws IOException {
+  public HadoopFileSystemIntegrationHelper(FileSystem hfs) throws IOException {
     super(
         new GoogleCloudStorageFileSystem(
             InMemoryGoogleCloudStorage::new,
@@ -75,7 +73,6 @@ public class HadoopFileSystemIntegrationHelper
                 .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
                 .build()));
     this.ghfs = hfs;
-    this.ghfsFileSystemDescriptor = ghfsFileSystemDescriptor;
   }
 
   /** Turn off statistics collection. */
@@ -211,8 +208,7 @@ public class HadoopFileSystemIntegrationHelper
     String text = null;
     FSDataInputStream readStream = null;
     long fileSystemBytesRead = 0;
-    FileSystem.Statistics stats =
-        FileSystem.getStatistics(ghfsFileSystemDescriptor.getScheme(), ghfs.getClass());
+    FileSystem.Statistics stats = FileSystem.getStatistics(ghfs.getScheme(), ghfs.getClass());
     if (stats != null) {
       // Let it be null in case no stats have been added for our scheme yet.
       fileSystemBytesRead = stats.getBytesRead();
@@ -238,7 +234,7 @@ public class HadoopFileSystemIntegrationHelper
     }
 
     // After the read, the stats better be non-null for our ghfs scheme.
-    stats = FileSystem.getStatistics(ghfsFileSystemDescriptor.getScheme(), ghfs.getClass());
+    stats = FileSystem.getStatistics(ghfs.getScheme(), ghfs.getClass());
     assertThat(stats).isNotNull();
     long endFileSystemBytesRead = stats.getBytesRead();
     int bytesReadStats = (int) (endFileSystemBytesRead - fileSystemBytesRead);
@@ -347,13 +343,13 @@ public class HadoopFileSystemIntegrationHelper
       childPath = childPath.substring(1);
     }
     if (isNullOrEmpty(childPath)) {
-      return isNullOrEmpty(authority)
-          ? ghfsFileSystemDescriptor.getFileSystemRoot()
-          : new Path(ghfsFileSystemDescriptor.getFileSystemRoot(), authority);
+      return new Path(
+          isNullOrEmpty(authority) ? ghfs.getUri() : ghfs.getUri().resolve("/" + authority));
     }
-    return isNullOrEmpty(authority)
-        ? new Path(ghfsFileSystemDescriptor.getFileSystemRoot(), childPath)
-        : new Path(ghfsFileSystemDescriptor.getFileSystemRoot(), new Path(authority, childPath));
+    return new Path(
+        isNullOrEmpty(authority)
+            ? ghfs.getUri().resolve("/" + childPath)
+            : ghfs.getUri().resolve("/" + authority + "/" + childPath));
   }
 
   /** Lists status of file(s) at the given path. */
@@ -407,8 +403,7 @@ public class HadoopFileSystemIntegrationHelper
     int totalBytesWritten = 0;
 
     long fileSystemBytesWritten = 0;
-    FileSystem.Statistics stats =
-        FileSystem.getStatistics(ghfsFileSystemDescriptor.getScheme(), ghfs.getClass());
+    FileSystem.Statistics stats = FileSystem.getStatistics(ghfs.getScheme(), ghfs.getClass());
     if (stats != null) {
       // Let it be null in case no stats have been added for our scheme yet.
       fileSystemBytesWritten = stats.getBytesWritten();
@@ -430,7 +425,7 @@ public class HadoopFileSystemIntegrationHelper
     }
 
     // After the write, the stats better be non-null for our ghfs scheme.
-    stats = FileSystem.getStatistics(ghfsFileSystemDescriptor.getScheme(), ghfs.getClass());
+    stats = FileSystem.getStatistics(ghfs.getScheme(), ghfs.getClass());
     assertThat(stats).isNotNull();
     long endFileSystemBytesWritten = stats.getBytesWritten();
     int bytesWrittenStats = (int) (endFileSystemBytesWritten - fileSystemBytesWritten);

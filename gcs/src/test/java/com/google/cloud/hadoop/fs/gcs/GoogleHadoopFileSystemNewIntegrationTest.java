@@ -72,7 +72,7 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
         new RetryHttpInitializer(credential, gcsOptions.toRetryHttpInitializerOptions());
 
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
-    ghfsIHelper = new HadoopFileSystemIntegrationHelper(ghfs, ghfs);
+    ghfsIHelper = new HadoopFileSystemIntegrationHelper(ghfs);
 
     testBucketName = ghfsIHelper.getUniqueBucketName("new-it");
     URI testBucketUri = new URI("gs://" + testBucketName);

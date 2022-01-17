@@ -64,7 +64,7 @@ import org.apache.hadoop.metrics2.lib.MutableMetric;
  *
  * <p>GoogleHadoopFileSystem StorageStatistics are dynamically derived from the IOStatistics.
  */
-class GhfsInstrumentation
+public class GhfsInstrumentation
     implements Closeable, MetricsSource, IOStatisticsSource, DurationTrackerFactory {
   private static final String METRICS_SOURCE_BASENAME = "GCSMetrics";
 

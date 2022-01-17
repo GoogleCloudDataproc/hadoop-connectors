@@ -262,7 +262,7 @@ public class GcsDelegationTokens extends AbstractService {
     } catch (RuntimeException e) {
       Throwable cause = e.getCause();
       if (cause != null) {
-        // its a wrapping around class instantiation.
+        // It's a wrapping around class instantiation.
         throw new DelegationTokenIOException("Decoding GCS token " + cause, cause);
       }
       throw e;

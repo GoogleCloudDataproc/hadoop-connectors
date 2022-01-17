@@ -143,8 +143,7 @@ import org.apache.hadoop.util.Progressable;
  * particular, it is not subject to bucket-naming constraints, and files are allowed to be placed in
  * root.
  */
-public class GoogleHadoopFileSystem extends FileSystem
-    implements IOStatisticsSource, FileSystemDescriptor {
+public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSource {
 
   /** Default value of replication factor. */
   public static final short REPLICATION_FACTOR_DEFAULT = 3;
@@ -260,21 +259,22 @@ public class GoogleHadoopFileSystem extends FileSystem
     defaultBlockSize = BLOCK_SIZE.get(config, config::getLong);
     reportedPermissions = new FsPermission(PERMISSIONS_TO_REPORT.get(config, config::get));
 
-    instrumentation = new GhfsInstrumentation(initUri);
-    storageStatistics =
-        (GhfsStorageStatistics)
-            GlobalStorageStatistics.INSTANCE.put(
-                GhfsStorageStatistics.NAME, () -> new GhfsStorageStatistics(getIOStatistics()));
-
     initializeFsRoot();
     initializeWorkingDirectory(config);
     initializeDelegationTokenSupport(config);
     initializeGcsFs(config);
+
+    instrumentation = new GhfsInstrumentation(initUri);
+    storageStatistics =
+        (GhfsStorageStatistics)
+            GlobalStorageStatistics.INSTANCE.put(
+                GhfsStorageStatistics.NAME,
+                () -> new GhfsStorageStatistics(instrumentation.getIOStatistics()));
   }
 
   private void initializeFsRoot() {
-    String rootBucket =
-        checkNotNull(initUri.getAuthority(), "No bucket specified in GCS URI: %s", initUri);
+    String rootBucket = initUri.getAuthority();
+    checkArgument(rootBucket != null, "No bucket specified in GCS URI: %s", initUri);
     // Validate root bucket name
     UriPaths.fromStringPathComponents(
         rootBucket, /* objectName= */ null, /* allowEmptyObjectName= */ true);
@@ -291,9 +291,7 @@ public class GoogleHadoopFileSystem extends FileSystem
     // Use the public method to ensure proper behavior of normalizing and resolving the new
     // working directory relative to the initial filesystem-root directory.
     setWorkingDirectory(
-        isNullOrEmpty(configWorkingDirectory)
-            ? getFileSystemRoot()
-            : new Path(configWorkingDirectory));
+        isNullOrEmpty(configWorkingDirectory) ? fsRoot : new Path(configWorkingDirectory));
     logger.atFiner().log(
         "Configured working directory: %s = %s",
         GCS_WORKING_DIRECTORY.getKey(), getWorkingDirectory());
@@ -307,7 +305,7 @@ public class GoogleHadoopFileSystem extends FileSystem
     }
 
     GcsDelegationTokens dts = new GcsDelegationTokens();
-    Text service = new Text(getFileSystemRoot().toString());
+    Text service = new Text(fsRoot.toString());
     dts.bindToFileSystem(this, service);
     dts.init(config);
     dts.start();
@@ -516,8 +514,8 @@ public class GoogleHadoopFileSystem extends FileSystem
     logger.atFiner().log("getHadoopPath(gcsPath: %s)", gcsPath);
 
     // Handle root. Delegate to getGcsPath on "gs:/" to resolve the appropriate gs://<bucket> URI.
-    if (gcsPath.equals(getGcsPath(getFileSystemRoot()))) {
-      return getFileSystemRoot();
+    if (gcsPath.equals(getGcsPath(fsRoot))) {
+      return fsRoot;
     }
 
     StorageResourceId resourceId = StorageResourceId.fromUriPath(gcsPath, true);
@@ -564,11 +562,6 @@ public class GoogleHadoopFileSystem extends FileSystem
   @Override
   public String getScheme() {
     return GoogleCloudStorageFileSystem.SCHEME;
-  }
-
-  @Override
-  public Path getFileSystemRoot() {
-    return fsRoot;
   }
 
   @Override
@@ -704,7 +697,7 @@ public class GoogleHadoopFileSystem extends FileSystem
     // Even though the underlying GCSFS will also throw an IAE if src is root, since our filesystem
     // root happens to equal the global root, we want to explicitly check it here since derived
     // classes may not have filesystem roots equal to the global root.
-    if (this.makeQualified(src).equals(getFileSystemRoot())) {
+    if (this.makeQualified(src).equals(fsRoot)) {
       logger.atFiner().log("rename(src: %s, dst: %s): false [src is a root]", src, dst);
       return false;
     }
@@ -1112,7 +1105,7 @@ public class GoogleHadoopFileSystem extends FileSystem
   /** Returns a URI of the root of this FileSystem. */
   @Override
   public URI getUri() {
-    return getFileSystemRoot().toUri();
+    return fsRoot.toUri();
   }
 
   /** The default port is listed as -1 as an indication that ports are not used. */
@@ -1495,7 +1488,7 @@ public class GoogleHadoopFileSystem extends FileSystem
    */
   @Override
   public Path getHomeDirectory() {
-    Path result = new Path(getFileSystemRoot(), "user/" + System.getProperty("user.name"));
+    Path result = new Path(fsRoot, "user/" + System.getProperty("user.name"));
     logger.atFiner().log("getHomeDirectory(): %s", result);
     return result;
   }
