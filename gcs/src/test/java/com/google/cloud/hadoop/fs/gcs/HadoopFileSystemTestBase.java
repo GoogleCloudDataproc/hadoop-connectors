@@ -785,13 +785,13 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     wddList.add(WorkingDirData.any(rootPath, rootPath));
 
     // Set working directory to an existing directory (empty).
-    wddList.add(WorkingDirData.absolute(ghfsHelper, "d0/", "d0/"));
+    wddList.add(WorkingDirData.absolute(ghfsHelper, "d0/", "d0"));
 
     // Set working directory to an existing directory (non-empty).
-    wddList.add(WorkingDirData.absolute(ghfsHelper, "d1/", "d1/"));
+    wddList.add(WorkingDirData.absolute(ghfsHelper, "d1/", "d1"));
 
     // Set working directory to an existing directory (multi-level).
-    wddList.add(WorkingDirData.absolute(ghfsHelper, "d1/d11/", "d1/d11/"));
+    wddList.add(WorkingDirData.absolute(ghfsHelper, "d1/d11/", "d1/d11"));
 
     // Set working directory to an existing directory (bucket).
     wddList.add(WorkingDirData.absolute(ghfsHelper, null, null));
@@ -807,13 +807,10 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     // -------------------------------------------------------
     // Call setWorkingDirectory() for each path and verify the expected behavior.
     for (WorkingDirData wdd : wddList) {
-      Path path = wdd.path;
-      Path expectedWorkingDir = wdd.expectedPath;
-      Path currentWorkingDir = ghfs.getWorkingDirectory();
-      ghfs.setWorkingDirectory(path);
+      ghfs.setWorkingDirectory(wdd.path);
       Path newWorkingDir = ghfs.getWorkingDirectory();
       assertThat(newWorkingDir)
-          .isEqualTo(expectedWorkingDir == null ? currentWorkingDir : expectedWorkingDir);
+          .isEqualTo(wdd.expectedPath == null ? ghfs.getWorkingDirectory() : wdd.expectedPath);
     }
   }
 

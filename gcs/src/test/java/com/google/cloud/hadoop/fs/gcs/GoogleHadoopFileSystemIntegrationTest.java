@@ -46,6 +46,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Arrays.stream;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
@@ -321,7 +322,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
-  public void listLocatedStatus_IOstatistics() throws IOException {
+  public void listLocatedStatus_IOStatistics() throws IOException {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
 
     try (FSDataOutputStream fout = myGhfs.create(new Path("/file1"))) {
@@ -1000,7 +1001,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
     Path workingDirRoot = new Path(ghfs.getWorkingDirectory(), testRoot);
 
-    assertThat(Arrays.stream(files).map(FileStatus::getPath).collect(toImmutableList()))
+    assertThat(stream(files).map(FileStatus::getPath).collect(toImmutableList()))
         .containsExactly(
             workingDirRoot.suffix("/date/2020/07/17/0/file1.json"),
             workingDirRoot.suffix("/date/2020/07/18/0/file2.json"),
@@ -1037,8 +1038,8 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     createFile(new Path("/directory1/subdirectory2/file2"), data);
 
     FileStatus[] rootDirectories = ghfs.globStatus(new Path("/d*"));
-    assertThat(rootDirectories).hasLength(1);
-    assertThat(rootDirectories[0].getPath().getName()).isEqualTo("directory1");
+    assertThat(stream(rootDirectories).map(d -> d.getPath().getName()).collect(toImmutableList()))
+        .containsExactly("directory1");
 
     FileStatus[] subDirectories = ghfs.globStatus(new Path("/directory1/s*"));
     assertThat(subDirectories).hasLength(2);
@@ -1450,7 +1451,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
     FileStatus[] rootDirStatuses = ghfs.globStatus(new Path("/d*"));
     List<String> rootDirs =
-        Arrays.stream(rootDirStatuses).map(d -> d.getPath().toString()).collect(toImmutableList());
+        stream(rootDirStatuses).map(d -> d.getPath().toString()).collect(toImmutableList());
 
     assertThat(rootDirs).containsExactly(ghfs.getWorkingDirectory() + "directory1");
 

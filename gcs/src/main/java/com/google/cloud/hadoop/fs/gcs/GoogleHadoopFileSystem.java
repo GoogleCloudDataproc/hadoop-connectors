@@ -510,7 +510,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
    * Validates that GCS path belongs to this file system. The bucket must match the root bucket
    * provided at initialization time.
    */
-  public Path getHadoopPath(URI gcsPath) {
+  Path getHadoopPath(URI gcsPath) {
     logger.atFiner().log("getHadoopPath(gcsPath: %s)", gcsPath);
 
     // Handle root. Delegate to getGcsPath on "gs:/" to resolve the appropriate gs://<bucket> URI.
@@ -528,16 +528,16 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         resourceId.getBucketName(),
         rootBucket);
 
-    Path hadoopPath = new Path(getWorkingDirectory(), resourceId.getObjectName());
+    Path hadoopPath = new Path(fsRoot, resourceId.getObjectName());
     logger.atFiner().log("getHadoopPath(gcsPath: %s): %s", gcsPath, hadoopPath);
     return hadoopPath;
   }
 
   /**
    * Translates a "gs:/" style hadoopPath (or relative path which is not fully-qualified) into the
-   * appropriate GCS path which is compatible with the underlying GcsFs or gsutil.
+   * appropriate GCS path which is compatible with the underlying GcsFs.
    */
-  public URI getGcsPath(Path hadoopPath) {
+  URI getGcsPath(Path hadoopPath) {
     logger.atFiner().log("getGcsPath(hadoopPath: %s)", hadoopPath);
 
     // Convert to fully qualified absolute path; the Path object will call back to get our current

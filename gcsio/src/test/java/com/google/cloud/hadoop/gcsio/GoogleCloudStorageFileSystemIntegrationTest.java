@@ -594,11 +594,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     // fmt:off
     // Objects created for this test.
     String[] objectNames = {
-      "f1",
-      "d0/",
-      "d1/f1",
-      "d1/d0/",
-      "d1/d11/f1",
+      "f1", "d0/", "d1/f1", "d1/d0/", "d1/d11/f1",
     };
     // fmt:on
 
@@ -793,9 +789,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     // fmt:off
     // Objects created for this test.
     String[] objectNames = {
-      "f1",
-      "d0/",
-      "d1/f11",
+      "f1", "d0/", "d1/f11",
     };
     // fmt:on
 
@@ -901,8 +895,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     // fmt:off
     // Objects created for this test.
     String[] objectNames = {
-      "f1",
-      "d0/",
+      "f1", "d0/",
     };
     // fmt:on
 
@@ -1717,19 +1710,20 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
       List<String> objectNames,
       boolean expectedToExist)
       throws IOException {
-    if (objectNames != null) {
-      for (String object : objectNames) {
-        URI path = gcsiHelper.getPath(bucketName, object);
-        String msg =
-            String.format(
-                "test-case: %s :: %s: %s",
-                testCaseDescription,
-                (expectedToExist
-                    ? "Path expected to exist but not found"
-                    : "Path expected to not exist but found"),
-                path.toString());
-        assertWithMessage(msg).that(gcsiHelper.exists(path)).isEqualTo(expectedToExist);
-      }
+    if (objectNames == null) {
+      return;
+    }
+    for (String object : objectNames) {
+      URI path = gcsiHelper.getPath(bucketName, object);
+      assertWithMessage(
+              "test-case: %s :: %s: %s",
+              testCaseDescription,
+              (expectedToExist
+                  ? "Path expected to exist but not found"
+                  : "Path expected to not exist but found"),
+              path)
+          .that(gcsiHelper.exists(path))
+          .isEqualTo(expectedToExist);
     }
   }
 }

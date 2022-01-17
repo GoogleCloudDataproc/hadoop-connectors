@@ -342,14 +342,11 @@ public class HadoopFileSystemIntegrationHelper
     if (childPath != null && childPath.startsWith("/")) {
       childPath = childPath.substring(1);
     }
+    Path ghfsPath = new Path(ghfs.getUri());
     if (isNullOrEmpty(childPath)) {
-      return new Path(
-          isNullOrEmpty(authority) ? ghfs.getUri() : ghfs.getUri().resolve("/" + authority));
+      return isNullOrEmpty(authority) ? ghfsPath : new Path(ghfsPath, authority);
     }
-    return new Path(
-        isNullOrEmpty(authority)
-            ? ghfs.getUri().resolve("/" + childPath)
-            : ghfs.getUri().resolve("/" + authority + "/" + childPath));
+    return new Path(ghfsPath, isNullOrEmpty(authority) ? childPath : authority + "/" + childPath);
   }
 
   /** Lists status of file(s) at the given path. */
