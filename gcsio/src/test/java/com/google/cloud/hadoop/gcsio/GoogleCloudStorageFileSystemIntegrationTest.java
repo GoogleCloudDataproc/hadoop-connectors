@@ -594,7 +594,11 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     // fmt:off
     // Objects created for this test.
     String[] objectNames = {
-      "f1", "d0/", "d1/f1", "d1/d0/", "d1/d11/f1",
+      "f1",
+      "d0/",
+      "d1/f1",
+      "d1/d0/",
+      "d1/d11/f1",
     };
     // fmt:on
 
@@ -789,7 +793,9 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     // fmt:off
     // Objects created for this test.
     String[] objectNames = {
-      "f1", "d0/", "d1/f11",
+      "f1",
+      "d0/",
+      "d1/f11",
     };
     // fmt:on
 
@@ -895,7 +901,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     // fmt:off
     // Objects created for this test.
     String[] objectNames = {
-      "f1", "d0/",
+      "f1",
+      "d0/",
     };
     // fmt:on
 

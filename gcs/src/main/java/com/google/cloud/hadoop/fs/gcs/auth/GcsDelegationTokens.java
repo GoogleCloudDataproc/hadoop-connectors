@@ -310,8 +310,6 @@ public class GcsDelegationTokens extends AbstractService {
 
   /** Get the IOStatistics of GoogleHadoopFileSystem to update the Delegation token Statistics */
   private DelegationTokenStatistics getStats() {
-    return ((GoogleHadoopFileSystem) fileSystem)
-        .getInstrumentation()
-        .newDelegationTokenStatistics();
+    return fileSystem.getInstrumentation().newDelegationTokenStatistics();
   }
 }

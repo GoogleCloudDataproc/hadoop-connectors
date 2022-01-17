@@ -57,7 +57,7 @@ public class GoogleHadoopFileSystemDelegationTokensTest {
     assertWithMessage("Expected a delegation token").that(dt).isNotNull();
     assertWithMessage("Unexpected delegation token service")
         .that(dt.getService().toString())
-        .isEqualTo("gs://test/");
+        .isEqualTo("gs://test");
     assertWithMessage("Unexpected delegation token kind")
         .that(dt.getKind())
         .isEqualTo(expectedKind);
