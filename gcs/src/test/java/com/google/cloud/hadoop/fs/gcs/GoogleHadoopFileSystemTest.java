@@ -36,7 +36,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/** Unittests for {@link GoogleHadoopFileSystem} class. */
+/** Unit tests for {@link GoogleHadoopFileSystem} class. */
 @RunWith(JUnit4.class)
 public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegrationTest {
 
@@ -51,7 +51,6 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
           Logger.getLogger("").setLevel(Level.OFF);
 
           ghfs = GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem();
-          ghfsFileSystemDescriptor = (FileSystemDescriptor) ghfs;
 
           GoogleHadoopFileSystemIntegrationTest.postCreateInit();
         }
@@ -64,9 +63,8 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
 
   @Test
   public void testVersionString() {
-    assertThat(GoogleHadoopFileSystemBase.VERSION).isNotNull();
-    assertThat(
-            GoogleHadoopFileSystemBase.UNKNOWN_VERSION.equals(GoogleHadoopFileSystemBase.VERSION))
+    assertThat(GoogleHadoopFileSystem.VERSION).isNotNull();
+    assertThat(GoogleHadoopFileSystem.UNKNOWN_VERSION.equals(GoogleHadoopFileSystem.VERSION))
         .isFalse();
   }
 
@@ -155,10 +153,8 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
 
   @Test
   public void testCouldUseFlatGlob() throws IOException, URISyntaxException {
-    Configuration lazyConf = new Configuration();
-    lazyConf.setBoolean(GCS_LAZY_INITIALIZATION_ENABLE.getKey(), true);
-    try (GoogleHadoopFileSystem lazyFs = new GoogleHadoopFileSystem()) {
-      assertThat(lazyFs.couldUseFlatGlob(new Path(new URI("gs://**/test/")))).isFalse();
+    try (GoogleHadoopFileSystem lazyFs = new InMemoryGoogleHadoopFileSystem()) {
+      assertThat(lazyFs.couldUseFlatGlob(new Path("gs://**/test/"))).isFalse();
     }
   }
 
@@ -192,8 +188,6 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   // -----------------------------------------------------------------
   // Inherited tests that we suppress because their behavior differs
   // from the base class.
-  // TODO(user): Add tests for subtleties of how global-rooted
-  // initialization differs from bucket-rooted initialization.
   // -----------------------------------------------------------------
   @Override
   public void testInitializeSuccess() {}

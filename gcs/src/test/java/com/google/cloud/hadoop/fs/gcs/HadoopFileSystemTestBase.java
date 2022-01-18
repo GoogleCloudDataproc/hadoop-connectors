@@ -68,19 +68,17 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
 
   // GHFS access instance.
   static FileSystem ghfs;
-  static FileSystemDescriptor ghfsFileSystemDescriptor;
 
   protected static HadoopFileSystemIntegrationHelper ghfsHelper;
 
   public static void postCreateInit() throws IOException {
-    postCreateInit(new HadoopFileSystemIntegrationHelper(ghfs, ghfsFileSystemDescriptor));
+    postCreateInit(new HadoopFileSystemIntegrationHelper(ghfs));
   }
 
   /** Perform initialization after creating test instances. */
   public static void postCreateInit(HadoopFileSystemIntegrationHelper helper) throws IOException {
     ghfsHelper = helper;
-    ghfsHelper.ghfs.mkdirs(
-        new Path(ghfsHelper.ghfsFileSystemDescriptor.getFileSystemRoot().toUri()));
+    ghfsHelper.ghfs.mkdirs(new Path(ghfsHelper.ghfs.getUri()));
     GoogleCloudStorageFileSystemIntegrationTest.postCreateInit(ghfsHelper);
 
     // Ensures that we do not accidentally end up testing wrong functionality.
@@ -93,8 +91,8 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
         @Override
         public void after() {
           if (ghfs != null) {
-            if (ghfs instanceof GoogleHadoopFileSystemBase) {
-              gcs = ((GoogleHadoopFileSystemBase) ghfs).getGcsFs().getGcs();
+            if (ghfs instanceof GoogleHadoopFileSystem) {
+              gcs = ((GoogleHadoopFileSystem) ghfs).getGcsFs().getGcs();
             }
             GoogleCloudStorageFileSystemIntegrationTest.storageResource.after();
             try {
@@ -103,7 +101,6 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
               throw new RuntimeException("Unexpected exception", e);
             }
             ghfs = null;
-            ghfsFileSystemDescriptor = null;
           }
         }
       };
@@ -113,7 +110,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   // -----------------------------------------------------------------
 
   /**
-   * Actual logic for validating the GoogleHadoopFileSystemBase-specific FileStatus returned by
+   * Actual logic for validating the GoogleHadoopFileSystem-specific FileStatus returned by
    * getFileStatus() or listStatus().
    */
   private void validateFileStatusInternal(
@@ -240,7 +237,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
           .isFalse();
     }
 
-    if (!ghfsFileSystemDescriptor.getScheme().equals("file")) {
+    if (!ghfs.getScheme().equals("file")) {
       assertWithMessage("Hadoop path %s", hadoopPath)
           .that(fileStatus != null)
           .isEqualTo(expectedToExist);
@@ -511,7 +508,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   @Test
   public void testGetDefaultReplication() throws IOException {
     assertThat(ghfs.getDefaultReplication())
-        .isEqualTo(GoogleHadoopFileSystemBase.REPLICATION_FACTOR_DEFAULT);
+        .isEqualTo(GoogleHadoopFileSystem.REPLICATION_FACTOR_DEFAULT);
   }
 
   /** Validates functionality related to getting/setting current position. */
@@ -573,7 +570,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
 
       // Perform some misc checks.
       // TODO(user): Make it no longer necessary to do instanceof.
-      if (ghfs instanceof GoogleHadoopFileSystemBase) {
+      if (ghfs instanceof GoogleHadoopFileSystem) {
         long someValidPosition = 2;
         assertThat(readStream.seekToNewSource(someValidPosition)).isFalse();
         assertThat(readStream.markSupported()).isFalse();
@@ -692,7 +689,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
   public void testPreemptivelyEscapedPaths() throws IOException {
     URI parentUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
     Path parentPath = ghfsHelper.castAsHadoopPath(parentUri);
-    Path escapedPath = new Path(parentPath, new Path("foo%3Abar"));
+    Path escapedPath = new Path(parentPath, "foo%3Abar");
 
     ghfsHelper.writeFile(escapedPath, "foo", 1, /* overwrite= */ true);
     assertThat(ghfs.exists(escapedPath)).isTrue();
@@ -784,14 +781,14 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     List<WorkingDirData> wddList = new ArrayList<>();
 
     // Set working directory to root.
-    Path rootPath = ghfsFileSystemDescriptor.getFileSystemRoot();
+    Path rootPath = new Path(ghfs.getUri());
     wddList.add(WorkingDirData.any(rootPath, rootPath));
 
     // Set working directory to an existing directory (empty).
     wddList.add(WorkingDirData.absolute(ghfsHelper, "d0/", "d0/"));
 
     // Set working directory to an existing directory (non-empty).
-    wddList.add(WorkingDirData.absolute(ghfsHelper, "d1/", "d1/"));
+    wddList.add(WorkingDirData.absolute(ghfsHelper, "d1/", "d1"));
 
     // Set working directory to an existing directory (multi-level).
     wddList.add(WorkingDirData.absolute(ghfsHelper, "d1/d11/", "d1/d11/"));
@@ -810,16 +807,10 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     // -------------------------------------------------------
     // Call setWorkingDirectory() for each path and verify the expected behavior.
     for (WorkingDirData wdd : wddList) {
-      Path path = wdd.path;
-      Path expectedWorkingDir = wdd.expectedPath;
-      Path currentWorkingDir = ghfs.getWorkingDirectory();
-      ghfs.setWorkingDirectory(path);
+      ghfs.setWorkingDirectory(wdd.path);
       Path newWorkingDir = ghfs.getWorkingDirectory();
-      if (expectedWorkingDir != null) {
-        assertThat(newWorkingDir).isEqualTo(expectedWorkingDir);
-      } else {
-        assertThat(newWorkingDir).isEqualTo(currentWorkingDir);
-      }
+      assertThat(newWorkingDir)
+          .isEqualTo(wdd.expectedPath == null ? ghfs.getWorkingDirectory() : wdd.expectedPath);
     }
   }
 

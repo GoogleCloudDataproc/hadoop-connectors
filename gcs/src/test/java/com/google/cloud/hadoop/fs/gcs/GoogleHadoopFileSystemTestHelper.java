@@ -35,7 +35,7 @@ public class GoogleHadoopFileSystemTestHelper {
   public static final String IN_MEMORY_TEST_BUCKET = "gs://fake-in-memory-test-bucket";
 
   /**
-   * Creates an instance of a bucket-rooted GoogleHadoopFileSystemBase using an in-memory underlying
+   * Creates an instance of a bucket-rooted GoogleHadoopFileSystem using an in-memory underlying
    * store.
    */
   public static GoogleHadoopFileSystem createInMemoryGoogleHadoopFileSystem() throws IOException {
