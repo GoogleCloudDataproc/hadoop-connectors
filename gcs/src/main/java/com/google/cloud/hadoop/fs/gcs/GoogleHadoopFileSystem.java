@@ -145,23 +145,21 @@ import org.apache.hadoop.util.Progressable;
  */
 public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSource {
 
-  /** Default value of replication factor. */
-  public static final short REPLICATION_FACTOR_DEFAULT = 3;
-  /** Default PathFilter that accepts all paths. */
-  public static final PathFilter DEFAULT_FILTER = path -> true;
-  /** A resource file containing GCS related build properties. */
-  public static final String PROPERTIES_FILE = "gcs.properties";
-  /** The key in the PROPERTIES_FILE that contains the version built. */
-  public static final String VERSION_PROPERTY = "gcs.connector.version";
-  /** The version returned when one cannot be found in properties. */
-  public static final String UNKNOWN_VERSION = "0.0.0";
-  /** Current version. */
-  public static final String VERSION;
-  /** Identifies this version of the {@link GoogleHadoopFileSystem} library. */
-  public static final String GHFS_ID;
-
-  static final String SCHEME = GoogleCloudStorageFileSystem.SCHEME;
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
+  /** URI scheme for GoogleHadoopFileSystem */
+  public static final String SCHEME = GoogleCloudStorageFileSystem.SCHEME;
+
+  /** Default value of replication factor. */
+  static final short REPLICATION_FACTOR_DEFAULT = 3;
+  /** Default PathFilter that accepts all paths. */
+  private static final PathFilter DEFAULT_FILTER = path -> true;
+  /** A resource file containing GCS related build properties. */
+  private static final String PROPERTIES_FILE = "gcs.properties";
+  /** The key in the PROPERTIES_FILE that contains the version built. */
+  private static final String VERSION_PROPERTY = "gcs.connector.version";
+  /** The version returned when one cannot be found in properties. */
+  static final String UNKNOWN_VERSION = "0.0.0";
 
   // Request only object fields that are used in Hadoop FileStatus:
   // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
@@ -174,6 +172,11 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   private static final ThreadFactory DAEMON_THREAD_FACTORY =
       new ThreadFactoryBuilder().setNameFormat("ghfs-thread-%d").setDaemon(true).build();
 
+  /** Current version. */
+  static final String VERSION;
+  /** Identifies this version of the {@link GoogleHadoopFileSystem} library. */
+  static final String GHFS_ID;
+
   static {
     VERSION =
         PropertyUtil.getPropertyOrDefault(
@@ -183,16 +186,16 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   }
 
   /** The URI the File System is passed in initialize. */
-  protected URI initUri;
+  URI initUri;
   /** Delegation token support */
-  protected GcsDelegationTokens delegationTokens = null;
+  GcsDelegationTokens delegationTokens = null;
   /**
    * Default block size. Note that this is the size that is reported to Hadoop FS clients. It does
    * not modify the actual block size of an underlying GCS object, because GCS JSON API does not
    * allow modifying or querying the value. Modifying this value allows one to control how many
    * mappers are used to process a given file.
    */
-  protected long defaultBlockSize = BLOCK_SIZE.getDefault();
+  private long defaultBlockSize = BLOCK_SIZE.getDefault();
 
   @VisibleForTesting GlobAlgorithm globAlgorithm = GCS_GLOB_ALGORITHM.getDefault();
 
@@ -1501,12 +1504,9 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
    */
   @Override
   public String getCanonicalServiceName() {
-    String service = null;
-    if (delegationTokens != null) {
-      service = delegationTokens.getService().toString();
-    }
-    logger.atFiner().log("getCanonicalServiceName(): %s", service);
-    return service;
+    String result = delegationTokens == null ? null : delegationTokens.getService().toString();
+    logger.atFiner().log("getCanonicalServiceName(): %s", result);
+    return result;
   }
 
   /** Gets GCS FS instance. */
