@@ -276,9 +276,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     String rootBucket = initUri.getAuthority();
     checkArgument(rootBucket != null, "No bucket specified in GCS URI: %s", initUri);
     // Validate root bucket name
-    UriPaths.fromStringPathComponents(
-        rootBucket, /* objectName= */ null, /* allowEmptyObjectName= */ true);
-    fsRoot = new Path(getScheme(), /* authority= */ rootBucket, /* path= */ "/");
+    URI rootUri =
+        UriPaths.fromStringPathComponents(
+            rootBucket, /* objectName= */ null, /* allowEmptyObjectName= */ true);
+    fsRoot = new Path(rootUri);
     logger.atFiner().log("Configured FS root: '%s'", fsRoot);
   }
 
