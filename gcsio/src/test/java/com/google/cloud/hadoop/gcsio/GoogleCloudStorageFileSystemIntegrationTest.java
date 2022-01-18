@@ -1717,19 +1717,20 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
       List<String> objectNames,
       boolean expectedToExist)
       throws IOException {
-    if (objectNames != null) {
-      for (String object : objectNames) {
-        URI path = gcsiHelper.getPath(bucketName, object);
-        String msg =
-            String.format(
-                "test-case: %s :: %s: %s",
-                testCaseDescription,
-                (expectedToExist
-                    ? "Path expected to exist but not found"
-                    : "Path expected to not exist but found"),
-                path.toString());
-        assertWithMessage(msg).that(gcsiHelper.exists(path)).isEqualTo(expectedToExist);
-      }
+    if (objectNames == null) {
+      return;
+    }
+    for (String object : objectNames) {
+      URI path = gcsiHelper.getPath(bucketName, object);
+      assertWithMessage(
+              "test-case: %s :: %s: %s",
+              testCaseDescription,
+              (expectedToExist
+                  ? "Path expected to exist but not found"
+                  : "Path expected to not exist but found"),
+              path)
+          .that(gcsiHelper.exists(path))
+          .isEqualTo(expectedToExist);
     }
   }
 }

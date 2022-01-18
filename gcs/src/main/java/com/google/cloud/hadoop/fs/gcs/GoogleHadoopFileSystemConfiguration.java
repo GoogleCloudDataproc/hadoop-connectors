@@ -22,15 +22,14 @@ import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_U
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.getConfigKeyPrefixes;
 import static com.google.common.base.Strings.nullToEmpty;
 
-import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksumType;
-import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GlobAlgorithm;
-import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType;
+import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GcsFileChecksumType;
+import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GlobAlgorithm;
+import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
-import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
 import com.google.cloud.hadoop.util.RedactedString;
@@ -354,11 +353,19 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>(
           "fs.gs.grpc.server.address", GoogleCloudStorageOptions.DEFAULT_GCS_GRPC_SERVER_ADDRESS);
 
+  /** Configuration key for check interval (in millisecond) for gRPC request timeout to GCS. */
+  public static final HadoopConfigurationProperty<Long> GCS_GRPC_CHECK_INTERVAL_TIMEOUT_MS =
+      new HadoopConfigurationProperty<>("fs.gs.grpc.checkinterval.timeout.ms", 1_000L);
+
   /**
    * Configuration key for the connection timeout (in millisecond) for gRPC read requests to GCS.
    */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_TIMEOUT_MS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.read.timeout.ms", 30 * 1000L);
+
+  /** Configuration key for the message timeout (in millisecond) for gRPC read requests to GCS. */
+  public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_MESSAGE_TIMEOUT_MS =
+      new HadoopConfigurationProperty<>("fs.gs.grpc.read.message.timeout.ms", 5 * 1_000L);
 
   /**
    * Configuration key for the connection timeout (in millisecond) for gRPC read requests to GCS.
@@ -385,6 +392,10 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_WRITE_TIMEOUT_MS =
       new HadoopConfigurationProperty<>("fs.gs.grpc.write.timeout.ms", 10 * 60 * 1000L);
 
+  /** Configuration key for the message timeout (in millisecond) for gRPC write requests to GCS. */
+  public static final HadoopConfigurationProperty<Long> GCS_GRPC_WRITE_MESSAGE_TIMEOUT_MS =
+      new HadoopConfigurationProperty<>("fs.gs.grpc.write.message.timeout.ms", 5 * 1_000L);
+
   /** Configuration key for enabling use of directpath gRPC API for read/write. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_DIRECTPATH_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.grpc.directpath.enable", true);
@@ -392,27 +403,6 @@ public class GoogleHadoopFileSystemConfiguration {
   /** Configuration key for enabling use of traffic director gRPC API for read/write. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_TRAFFICDIRECTOR_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.grpc.trafficdirector.enable", false);
-
-  /**
-   * Configuration key for using cooperative locking to achieve a directory mutation operations
-   * isolation.
-   */
-  public static final HadoopConfigurationProperty<Boolean> GCS_COOPERATIVE_LOCKING_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.cooperative.locking.enable", false);
-
-  /** Configuration key for lock expiration when using cooperative locking. */
-  public static final HadoopConfigurationProperty<Long>
-      GCS_COOPERATIVE_LOCKING_EXPIRATION_TIMEOUT_MS =
-          new HadoopConfigurationProperty<>(
-              "fs.gs.cooperative.locking.expiration.timeout.ms",
-              CooperativeLockingOptions.LOCK_EXPIRATION_TIMEOUT_MS_DEFAULT);
-
-  /** Configuration key for maximum allowed concurrent operations when using cooperative locking. */
-  public static final HadoopConfigurationProperty<Integer>
-      GCS_COOPERATIVE_LOCKING_MAX_CONCURRENT_OPERATIONS =
-          new HadoopConfigurationProperty<>(
-              "fs.gs.cooperative.locking.max.concurrent.operations",
-              CooperativeLockingOptions.MAX_CONCURRENT_OPERATIONS_DEFAULT);
 
   /** Configuration key for the headers for HTTP request to GCS. */
   public static final HadoopConfigurationProperty<Map<String, String>> GCS_HTTP_HEADERS =
@@ -437,8 +427,6 @@ public class GoogleHadoopFileSystemConfiguration {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setCloudStorageOptions(getGcsOptionsBuilder(config).build())
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))
-        .setCooperativeLockingEnabled(
-            GCS_COOPERATIVE_LOCKING_ENABLE.get(config, config::getBoolean))
         .setEnsureNoConflictingItems(
             GCS_CREATE_ITEMS_CONFLICT_CHECK_ENABLE.get(config, config::getBoolean))
         .setMarkerFilePattern(GCS_MARKER_FILE_PATTERN.get(config, config::get))
@@ -460,11 +448,9 @@ public class GoogleHadoopFileSystemConfiguration {
         .setProxyAddress(
             PROXY_ADDRESS_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::get))
         .setProxyUsername(
-            RedactedString.create(
-                PROXY_USERNAME_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config)))
+            PROXY_USERNAME_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config))
         .setProxyPassword(
-            RedactedString.create(
-                PROXY_PASSWORD_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config)))
+            PROXY_PASSWORD_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config))
         .setProjectId(projectId)
         .setMaxListItemsPerCall(GCS_MAX_LIST_ITEMS_PER_CALL.get(config, config::getLong))
         .setMaxRequestsPerBatch(GCS_MAX_REQUESTS_PER_BATCH.get(config, config::getLong))
@@ -478,13 +464,14 @@ public class GoogleHadoopFileSystemConfiguration {
         .setReadChannelOptions(getReadChannelOptions(config))
         .setWriteChannelOptions(getWriteChannelOptions(config))
         .setRequesterPaysOptions(getRequesterPaysOptions(config, projectId))
-        .setCooperativeLockingOptions(getCooperativeLockingOptions(config))
         .setHttpRequestHeaders(GCS_HTTP_HEADERS.getPropsWithPrefix(config))
         .setEncryptionAlgorithm(GCS_ENCRYPTION_ALGORITHM.get(config, config::get))
-        .setEncryptionKey(RedactedString.create(GCS_ENCRYPTION_KEY.getPassword(config)))
-        .setEncryptionKeyHash(RedactedString.create(GCS_ENCRYPTION_KEY_HASH.getPassword(config)))
+        .setEncryptionKey(GCS_ENCRYPTION_KEY.getPassword(config))
+        .setEncryptionKeyHash(GCS_ENCRYPTION_KEY_HASH.getPassword(config))
         .setGrpcEnabled(GCS_GRPC_ENABLE.get(config, config::getBoolean))
         .setGrpcServerAddress(GCS_GRPC_SERVER_ADDRESS.get(config, config::get))
+        .setGrpcMessageTimeoutCheckInterval(
+            GCS_GRPC_CHECK_INTERVAL_TIMEOUT_MS.get(config, config::getLong))
         .setDirectPathPreferred(GCS_GRPC_DIRECTPATH_ENABLE.get(config, config::getBoolean))
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean));
   }
@@ -516,6 +503,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
         .setGrpcReadTimeoutMillis(GCS_GRPC_READ_TIMEOUT_MS.get(config, config::getLong))
         .setGrpcReadSpeedBytesPerSec(GCS_GRPC_READ_SPEED_BYTES_PER_SEC.get(config, config::getLong))
+        .setGrpcReadMessageTimeoutMillis(
+            GCS_GRPC_READ_MESSAGE_TIMEOUT_MS.get(config, config::getLong))
         .setGrpcReadMetadataTimeoutMillis(
             GCS_GRPC_READ_METADATA_TIMEOUT_MS.get(config, config::getLong))
         .setGrpcReadZeroCopyEnabled(GCS_GRPC_READ_ZEROCOPY_ENABLE.get(config, config::getBoolean))
@@ -533,6 +522,8 @@ public class GoogleHadoopFileSystemConfiguration {
             GCS_OUTPUT_STREAM_DIRECT_UPLOAD_ENABLE.get(config, config::getBoolean))
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
         .setGrpcWriteTimeout(GCS_GRPC_WRITE_TIMEOUT_MS.get(config, config::getLong))
+        .setGrpcWriteMessageTimeoutMillis(
+            GCS_GRPC_WRITE_MESSAGE_TIMEOUT_MS.get(config, config::getLong))
         .setNumberOfBufferedRequests(GCS_GRPC_UPLOAD_BUFFERED_REQUESTS.get(config, config::getLong))
         .build();
   }
@@ -544,15 +535,6 @@ public class GoogleHadoopFileSystemConfiguration {
         .setMode(GCS_REQUESTER_PAYS_MODE.get(config, config::getEnum))
         .setProjectId(requesterPaysProjectId == null ? projectId : requesterPaysProjectId)
         .setBuckets(GCS_REQUESTER_PAYS_BUCKETS.getStringCollection(config))
-        .build();
-  }
-
-  private static CooperativeLockingOptions getCooperativeLockingOptions(Configuration config) {
-    return CooperativeLockingOptions.builder()
-        .setLockExpirationTimeoutMilli(
-            GCS_COOPERATIVE_LOCKING_EXPIRATION_TIMEOUT_MS.get(config, config::getLong))
-        .setMaxConcurrentOperations(
-            GCS_COOPERATIVE_LOCKING_MAX_CONCURRENT_OPERATIONS.get(config, config::getInt))
         .build();
   }
 }

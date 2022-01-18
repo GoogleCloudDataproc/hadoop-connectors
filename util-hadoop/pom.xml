@@ -81,6 +81,13 @@
       <artifactId>system-lambda</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.google.cloud.bigdataoss</groupId>
+      <artifactId>util</artifactId>
+      <version>${bigdataoss.version}</version>
+      <classifier>tests</classifier>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>com.google.truth</groupId>
       <artifactId>truth</artifactId>
     </dependency>

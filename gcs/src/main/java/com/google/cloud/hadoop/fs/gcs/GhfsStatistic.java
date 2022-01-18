@@ -16,24 +16,28 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatisticTypeEnum.*;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatisticTypeEnum.TYPE_COUNTER;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatisticTypeEnum.TYPE_DURATION;
 
-import java.util.HashMap;
-import java.util.Map;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterators;
+import com.google.common.collect.Maps;
+import java.util.EnumSet;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.statistics.StoreStatisticNames;
 import org.apache.hadoop.fs.statistics.StreamStatisticNames;
 
 /**
  * Statistics which are collected in GCS. Counter and duration statistics are published in {@link
- * GoogleHadoopFileSystemBase} and as metrics in {@link GhfsInstrumentation}.
+ * GoogleHadoopFileSystem} and as metrics in {@link GhfsInstrumentation}.
  *
  * <p>Where possible, stream names come from {@link StreamStatisticNames} and {@link
  * StoreStatisticNames}
  */
 @InterfaceStability.Unstable
 public enum GhfsStatistic {
-  /** Http Request counters */
+  /** HTTP request counters */
   ACTION_HTTP_HEAD_REQUEST(
       StoreStatisticNames.ACTION_HTTP_HEAD_REQUEST, "HEAD request.", TYPE_COUNTER),
   ACTION_HTTP_GET_REQUEST(
@@ -46,20 +50,20 @@ public enum GhfsStatistic {
       StoreStatisticNames.ACTION_HTTP_PATCH_REQUEST, "POST request.", TYPE_COUNTER),
   ACTION_HTTP_DELETE_REQUEST(
       StoreStatisticNames.ACTION_HTTP_DELETE_REQUEST, "DELETE request.", TYPE_COUNTER),
-  ACTION_HTTP_HEAD_REQUEST_FAILURES(
-      "action_http_head_request_failures", "HEAD request Failures.", TYPE_COUNTER),
-  ACTION_HTTP_GET_REQUEST_FAILURES(
-      "action_http_get_request_failures", "GET request Failures.", TYPE_COUNTER),
-  ACTION_HTTP_PUT_REQUEST_FAILURES(
-      "action_http_put_request_failures", "PUT request Failures.", TYPE_COUNTER),
-  ACTION_HTTP_PATCH_REQUEST_FAILURES(
-      "action_http_patch_request_failures", "PATCH request Failures.", TYPE_COUNTER),
-  ACTION_HTTP_POST_REQUEST_FAILURES(
-      "action_http_post_request_failures", "POST request Failures.", TYPE_COUNTER),
-  ACTION_HTTP_DELETE_REQUEST_FAILURES(
-      "action_http_delete_request_failures", "DELETE request Failures.", TYPE_COUNTER),
+  ACTION_HTTP_HEAD_REQUEST_FAILURE(
+      "action_http_head_request_failures", "HEAD request failure.", TYPE_COUNTER),
+  ACTION_HTTP_GET_REQUEST_FAILURE(
+      "action_http_get_request_failures", "GET request failure.", TYPE_COUNTER),
+  ACTION_HTTP_PUT_REQUEST_FAILURE(
+      "action_http_put_request_failures", "PUT request failure.", TYPE_COUNTER),
+  ACTION_HTTP_PATCH_REQUEST_FAILURE(
+      "action_http_patch_request_failures", "PATCH request failure.", TYPE_COUNTER),
+  ACTION_HTTP_POST_REQUEST_FAILURE(
+      "action_http_post_request_failures", "POST request failure.", TYPE_COUNTER),
+  ACTION_HTTP_DELETE_REQUEST_FAILURE(
+      "action_http_delete_request_failures", "DELETE request failure.", TYPE_COUNTER),
 
-  /** FileSystem Level statistics */
+  /** FileSystem-level statistics */
   DIRECTORIES_CREATED(
       "directories_created",
       "Total number of directories created through the object store.",
@@ -100,13 +104,7 @@ public enum GhfsStatistic {
   INVOCATION_LIST_LOCATED_STATUS(
       StoreStatisticNames.OP_LIST_LOCATED_STATUS, "Calls of listLocatedStatus()", TYPE_COUNTER),
 
-  /** Object IO */
-  OBJECT_DELETE_OBJECTS(
-      StoreStatisticNames.OBJECT_DELETE_OBJECTS,
-      "Objects deleted in delete requests",
-      TYPE_COUNTER),
-
-  /** Stream Reads */
+  /** Stream reads */
   STREAM_READ_BYTES(
       StreamStatisticNames.STREAM_READ_BYTES,
       "Bytes read from an input stream in read() calls",
@@ -152,7 +150,7 @@ public enum GhfsStatistic {
       "Total count of bytes read from an input stream",
       TYPE_COUNTER),
 
-  /** Stream Write statistics */
+  /** Stream writes */
   STREAM_WRITE_EXCEPTIONS(
       StreamStatisticNames.STREAM_WRITE_EXCEPTIONS,
       "Count of stream write failures reported",
@@ -162,7 +160,7 @@ public enum GhfsStatistic {
       "Count of bytes written to output stream" + " (including all not yet uploaded)",
       TYPE_COUNTER),
 
-  /** The XAttr API metrics are all durations */
+  /** The XAttr API statistics */
   INVOCATION_XATTR_GET_MAP(
       StoreStatisticNames.OP_XATTR_GET_MAP, "Calls of getXAttrs(Path path)", TYPE_DURATION),
   INVOCATION_XATTR_GET_NAMED(
@@ -174,20 +172,18 @@ public enum GhfsStatistic {
       "Calls of getXAttrs(Path path, List<String> names)",
       TYPE_DURATION),
 
-  /** Delegation Token Operations. */
+  /** Delegation token operations */
   DELEGATION_TOKENS_ISSUED(
       StoreStatisticNames.DELEGATION_TOKENS_ISSUED,
       "Count of delegation tokens issued",
       TYPE_DURATION);
 
-  /** A map used to support the {@link #fromSymbol(String)} call. */
-  private static final Map<String, GhfsStatistic> SYMBOL_MAP = new HashMap<>(values().length);
+  public static final ImmutableSet<GhfsStatistic> VALUES =
+      ImmutableSet.copyOf(EnumSet.allOf(GhfsStatistic.class));
 
-  static {
-    for (GhfsStatistic stat : values()) {
-      SYMBOL_MAP.put(stat.getSymbol(), stat);
-    }
-  }
+  /** A map used to support the {@link #fromSymbol(String)} call. */
+  private static final ImmutableMap<String, GhfsStatistic> SYMBOL_MAP =
+      Maps.uniqueIndex(Iterators.forArray(values()), GhfsStatistic::getSymbol);
 
   /**
    * Statistic definition.
