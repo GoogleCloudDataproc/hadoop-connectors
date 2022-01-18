@@ -13,9 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.google.cloud.hadoop.fs.gcs;
+package com.google.cloud.hadoop.fs.gcs.auth;
 
 import static com.google.api.client.util.Preconditions.checkNotNull;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.CONFIG_KEY_PREFIXES;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.AUTH_CLIENT_ID_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.AUTH_CLIENT_SECRET_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.AUTH_REFRESH_TOKEN_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_ADDRESS_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_PASSWORD_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_USERNAME_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.TOKEN_SERVER_URL_SUFFIX;
 import static com.google.common.flogger.LazyArgs.lazy;
 
 import com.google.api.client.auth.oauth2.ClientParametersAuthentication;
@@ -26,7 +34,6 @@ import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.RedactedString;
@@ -70,17 +77,19 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
         "Refreshing access-token based token. Our token is set to expire at '%s' and it is now '%s'",
         lazy(
             () ->
-                dateFormat.format(
-                    Instant.ofEpochMilli(
-                        accessToken.orElse(EXPIRED_TOKEN).getExpirationTimeMilliSeconds()))),
-        lazy(() -> dateFormat.format(Instant.now())));
+                Instant.ofEpochMilli(
+                    accessToken.orElse(EXPIRED_TOKEN).getExpirationTimeMilliSeconds())),
+        lazy(() -> Instant.now()));
 
-    GoogleCloudStorageOptions gcsOptions =
-        GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
-    String tokenServerUrl = gcsOptions.getTokenServerUrl();
-    RedactedString refreshToken = gcsOptions.getRefreshToken();
-    String clientId = gcsOptions.getClientId();
-    RedactedString clientSecret = gcsOptions.getClientSecret();
+    String tokenServerUrl =
+        TOKEN_SERVER_URL_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::get);
+    RedactedString refreshToken =
+        AUTH_REFRESH_TOKEN_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config);
+    String clientId =
+        AUTH_CLIENT_ID_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::get);
+    RedactedString clientSecret =
+        AUTH_CLIENT_SECRET_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config);
+
     checkNotNull(refreshToken, "Must provide a refresh token");
     checkNotNull(clientSecret, "Must provide a client secret");
 
@@ -100,10 +109,7 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
 
       logger.atFine().log(
           "New access token expires at '%s'",
-          lazy(
-              () ->
-                  dateFormat.format(
-                      Instant.ofEpochMilli(accessToken.get().getExpirationTimeMilliSeconds()))));
+          lazy(() -> Instant.ofEpochMilli(accessToken.get().getExpirationTimeMilliSeconds())));
 
     } catch (IOException e) {
       logger.atSevere().withCause(e).log("Couldn't refresh token");
@@ -155,11 +161,13 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
 
   private HttpTransport getTransport() throws IOException {
     if (httpTransport == null) {
-      GoogleCloudStorageOptions gcsOptions =
-          GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
-      String proxyAddress = gcsOptions.getProxyAddress();
-      RedactedString proxyUsername = gcsOptions.getProxyUsername();
-      RedactedString proxyPassword = gcsOptions.getProxyPassword();
+      String proxyAddress =
+          PROXY_ADDRESS_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::get);
+      RedactedString proxyUsername =
+          PROXY_USERNAME_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config);
+      RedactedString proxyPassword =
+          PROXY_PASSWORD_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config);
+
       logger.atFine().log("Proxy setup: '%s' with username = '%s'", proxyAddress, proxyUsername);
       httpTransport =
           HttpTransportFactory.createHttpTransport(proxyAddress, proxyUsername, proxyPassword);

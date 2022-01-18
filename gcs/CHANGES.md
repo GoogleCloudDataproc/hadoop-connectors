@@ -29,13 +29,19 @@
 1.  Remove Cooperative Locking support for directory operations and related
     properties:
 
-    ```
+    ```properties
     fs.gs.cooperative.locking.enable
     fs.gs.cooperative.locking.expiration.timeout.ms
     fs.gs.cooperative.locking.max.concurrent.operations
     ```
 
 1.  Add support for refresh token grant flow.
+    Retrieve a refresh token using the authorisation code grant flow and set up the following properties:
+    ```properties
+    fs.gs.auth.refresh.token=YOUR_OAUTH2_REFRESH_TOKEN
+    fs.gs.auth.client.id=YOUR_OAUTH2_CLIENT_ID
+    fs.gs.auth.client.secret=YOUR_OAUTH2_CLIENT_SECRET
+    ```
 
 ### 2.2.2 - 2021-06-25
 

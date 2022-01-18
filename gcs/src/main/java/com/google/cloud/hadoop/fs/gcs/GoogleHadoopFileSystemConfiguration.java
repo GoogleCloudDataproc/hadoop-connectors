@@ -16,9 +16,6 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.AUTH_CLIENT_ID_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.AUTH_CLIENT_SECRET_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.AUTH_REFRESH_TOKEN_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_ADDRESS_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_PASSWORD_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_USERNAME_SUFFIX;
@@ -451,12 +448,6 @@ public class GoogleHadoopFileSystemConfiguration {
         .setMaxBytesRewrittenPerCall(GCS_REWRITE_MAX_BYTES_PER_CALL.get(config, config::getLong))
         .setTokenServerUrl(
             TOKEN_SERVER_URL_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::get))
-        .setRefreshToken(
-            AUTH_REFRESH_TOKEN_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config))
-        .setClientId(
-            AUTH_CLIENT_ID_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::get))
-        .setClientSecret(
-            AUTH_CLIENT_SECRET_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config))
         .setProxyAddress(
             PROXY_ADDRESS_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::get))
         .setProxyUsername(
