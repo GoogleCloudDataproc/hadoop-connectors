@@ -137,7 +137,7 @@ final class Watchdog implements Runnable {
     try {
       runUnsafe();
     } catch (RuntimeException e) {
-      logger.atWarning().withCause(e).log("Caught throwable in periodic Watchdog run. Continuing.");
+      logger.atWarning().withCause(e).log("Caught RuntimeException in periodic Watchdog run, continuing.");
     }
   }
 
