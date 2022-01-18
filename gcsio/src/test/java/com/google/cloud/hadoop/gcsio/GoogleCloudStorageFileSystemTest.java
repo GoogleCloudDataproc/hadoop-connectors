@@ -111,9 +111,7 @@ public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSyst
     new GoogleCloudStorageFileSystem(cred, optionsBuilder.build());
 
     optionsBuilder.setCloudStorageOptions(
-        options
-            .getCloudStorageOptions()
-            .toBuilder()
+        options.getCloudStorageOptions().toBuilder()
             .setProjectId("projectId")
             .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
             .build());

@@ -299,8 +299,7 @@ public class GoogleCloudStorageTestHelper {
       }
 
       List<GoogleCloudStorageItemInfo> objectsToDelete =
-          bucketsToDelete
-              .parallelStream()
+          bucketsToDelete.parallelStream()
               .flatMap(
                   bucket -> {
                     try {

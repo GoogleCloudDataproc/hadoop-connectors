@@ -81,8 +81,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
   // the way we pick temp file names and already ensured directories for the destination file,
   // we can optimize tempfile creation by skipping various directory checks.
   private static final CreateFileOptions TEMPFILE_CREATE_OPTIONS =
-      CreateFileOptions.DEFAULT_NO_OVERWRITE
-          .toBuilder()
+      CreateFileOptions.DEFAULT_NO_OVERWRITE.toBuilder()
           .setEnsureNoDirectoryConflict(false)
           .setOverwriteGenerationId(0)
           .build();

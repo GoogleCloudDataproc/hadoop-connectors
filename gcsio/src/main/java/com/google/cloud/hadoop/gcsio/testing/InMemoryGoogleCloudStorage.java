@@ -52,8 +52,7 @@ import java.util.stream.Collectors;
 public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
   private static final CreateObjectOptions EMPTY_OBJECT_CREATE_OPTIONS =
-      CreateObjectOptions.DEFAULT_OVERWRITE
-          .toBuilder()
+      CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
           .setEnsureEmptyObjectsMetadataMatch(false)
           .build();
 
