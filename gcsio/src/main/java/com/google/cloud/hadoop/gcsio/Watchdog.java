@@ -14,10 +14,12 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.grpc.ClientCall;
 import io.grpc.Context.CancellableContext;
 import io.grpc.stub.StreamObserver;
@@ -49,21 +51,26 @@ final class Watchdog implements Runnable {
 
   private final KeySetView<WatchdogStream, Boolean> openStreams = ConcurrentHashMap.newKeySet();
 
-  private final Clock clock;
   private final Duration scheduleInterval;
-  private final ScheduledExecutorService executor;
+
+  private final Clock clock = Clock.systemUTC();
+
+  private final ScheduledExecutorService executor =
+      newSingleThreadScheduledExecutor(
+          new ThreadFactoryBuilder()
+              .setNameFormat("gcs-background-watchdog-pool-%d")
+              .setDaemon(true)
+              .build());
 
   /** returns a Watchdog which is scheduled at the provided interval. */
-  public static Watchdog create(Duration scheduleInterval, ScheduledExecutorService executor) {
-    Watchdog watchdog = new Watchdog(scheduleInterval, executor);
+  public static Watchdog create(Duration scheduleInterval) {
+    Watchdog watchdog = new Watchdog(scheduleInterval);
     watchdog.start();
     return watchdog;
   }
 
-  private Watchdog(Duration scheduleInterval, ScheduledExecutorService executor) {
-    this.clock = Clock.systemUTC();
+  private Watchdog(Duration scheduleInterval) {
     this.scheduleInterval = scheduleInterval;
-    this.executor = executor;
   }
 
   private void start() {
@@ -141,6 +148,11 @@ final class Watchdog implements Runnable {
 
   private void runUnsafe() {
     openStreams.removeIf(WatchdogStream::cancelIfStale);
+  }
+
+  /** clean up resources used by the class */
+  public void shutdown() {
+    executor.shutdown();
   }
 
   enum State {
