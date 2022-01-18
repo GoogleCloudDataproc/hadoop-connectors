@@ -1,7 +1,6 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.truth.Truth.assertThat;
-import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
@@ -80,8 +79,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
           .build();
   private static final QueryWriteStatusRequest WRITE_STATUS_REQUEST =
       QueryWriteStatusRequest.newBuilder().setUploadId(UPLOAD_ID).build();
-  private static final Watchdog watchdog =
-      Watchdog.create(Duration.ofMillis(100), newSingleThreadScheduledExecutor());
+  private static final Watchdog watchdog = Watchdog.create(Duration.ofMillis(100));
 
   private StorageStub stub;
   private FakeService fakeService;
