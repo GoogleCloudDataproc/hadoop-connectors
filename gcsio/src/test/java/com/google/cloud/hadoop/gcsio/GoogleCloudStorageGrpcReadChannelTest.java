@@ -7,7 +7,7 @@ import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonD
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonErrorResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.truth.Truth.assertThat;
-import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
+import static java.lang.Math.min;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -100,8 +100,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   private ApiErrorExtractor errorExtractor;
   private Get get;
   private StorageObject storageObject;
-  private static final Watchdog watchdog =
-      Watchdog.create(Duration.ofMillis(100), newSingleThreadScheduledExecutor());
+  private static final Watchdog watchdog = Watchdog.create(Duration.ofMillis(100));
 
   @Before
   public void setUp() throws Exception {
@@ -1658,11 +1657,11 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         int readStart = (int) request.getReadOffset();
         int readEnd =
             request.getReadLimit() > 0
-                ? (int) Math.min(object.getSize(), readStart + request.getReadLimit())
+                ? (int) min(object.getSize(), readStart + request.getReadLimit())
                 : (int) object.getSize();
         for (int position = readStart; position < readEnd; position += CHUNK_SIZE) {
-          int endIndex = Math.min((int) object.getSize(), position + CHUNK_SIZE);
-          endIndex = Math.min(endIndex, readEnd);
+          int endIndex = min((int) object.getSize(), position + CHUNK_SIZE);
+          endIndex = min(endIndex, readEnd);
           ByteString messageData = data.substring(position, endIndex);
           int crc32c = Hashing.crc32c().hashBytes(messageData.toByteArray()).asInt();
           if (alterMessageChecksum) {
