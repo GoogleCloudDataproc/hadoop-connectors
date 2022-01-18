@@ -34,6 +34,7 @@ import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listR
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.resumableUploadChunkRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.resumableUploadRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.uploadRequestString;
+import static com.google.cloud.hadoop.util.RetryHttpInitializer.HTTP_REQUEST_TIMEOUT;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.dataResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.emptyResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.inputStreamResponse;
@@ -123,7 +124,6 @@ public class GoogleCloudStorageTest {
       new StorageResourceId(BUCKET_NAME, OBJECT_NAME);
 
   private static final int STATUS_CODE_RESUME_INCOMPLETE = 308;
-  private static final int STATUS_CODE_REQUEST_TIMEOUT = 408;
 
   private static final ImmutableList<String[]> ILLEGAL_OBJECTS =
       ImmutableList.copyOf(
@@ -432,7 +432,7 @@ public class GoogleCloudStorageTest {
         mockTransport(
             emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
-            emptyResponse(STATUS_CODE_REQUEST_TIMEOUT),
+            emptyResponse(HTTP_REQUEST_TIMEOUT),
             jsonDataResponse(
                 newStorageObject(BUCKET_NAME, OBJECT_NAME)
                     .setSize(BigInteger.valueOf(testData.length))));
