@@ -129,8 +129,8 @@ final class Watchdog implements Runnable {
   public void run() {
     try {
       runUnsafe();
-    } catch (RuntimeException t) {
-      logger.atSevere().withCause(t).log("Caught throwable in periodic Watchdog run. Continuing.");
+    } catch (RuntimeException e) {
+      logger.atWarning().withCause(e).log("Caught throwable in periodic Watchdog run. Continuing.");
     }
   }
 
@@ -212,8 +212,7 @@ final class Watchdog implements Runnable {
       Throwable throwable = null;
       synchronized (lock) {
         long waitTime = clock.millis() - lastActivityAt;
-        if (state == State.WAITING
-            && (!waitTimeout.isZero() && waitTime >= waitTimeout.toMillis())) {
+        if (state == State.WAITING && !waitTimeout.isZero() && waitTime >= waitTimeout.toMillis()) {
           throwable = new TimeoutException("Canceled due to timeout waiting for next response");
         }
       }
@@ -234,7 +233,9 @@ final class Watchdog implements Runnable {
         hasNext = innerIterator.hasNext();
       } finally {
         // stream is complete successfully with no more items or has thrown an exception
-        if (!hasNext) openStreams.remove(this);
+        if (!hasNext) {
+          openStreams.remove(this);
+        }
       }
       return hasNext;
     }
@@ -272,8 +273,7 @@ final class Watchdog implements Runnable {
       Throwable throwable = null;
       synchronized (lock) {
         long waitTime = clock.millis() - lastActivityAt;
-        if (this.state == State.WAITING
-            && (!waitTimeout.isZero() && waitTime >= waitTimeout.toMillis())) {
+        if (state == State.WAITING && !waitTimeout.isZero() && waitTime >= waitTimeout.toMillis()) {
           throwable = new TimeoutException("Canceled due to timeout waiting for next response");
         }
       }
