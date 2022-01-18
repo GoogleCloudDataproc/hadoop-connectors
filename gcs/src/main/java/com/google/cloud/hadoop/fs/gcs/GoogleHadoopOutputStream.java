@@ -26,14 +26,14 @@ public class GoogleHadoopOutputStream extends InstrumentatedGoogleHadoopOutputSt
   /**
    * Constructs an instance of GoogleHadoopOutputStream object.
    *
-   * @param ghfs Instance of GoogleHadoopFileSystemBase.
+   * @param ghfs Instance of {@link GoogleHadoopFileSystem}.
    * @param gcsPath Path of the file to write to.
    * @param statistics File system statistics object.
    * @param createFileOptions options for file creation
    * @throws IOException if an IO error occurs.
    */
   GoogleHadoopOutputStream(
-      GoogleHadoopFileSystemBase ghfs,
+      GoogleHadoopFileSystem ghfs,
       URI gcsPath,
       FileSystem.Statistics statistics,
       CreateFileOptions createFileOptions)
