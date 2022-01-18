@@ -454,7 +454,7 @@ public class GoogleCloudStorageTest {
   }
 
   @Test
-  public void upload_does_not_retry_forbidden() throws Exception {
+  public void upload_noRetries_forbidden() throws Exception {
     byte[] testData = new byte[MediaHttpUploader.MINIMUM_CHUNK_SIZE];
     new Random().nextBytes(testData);
 
