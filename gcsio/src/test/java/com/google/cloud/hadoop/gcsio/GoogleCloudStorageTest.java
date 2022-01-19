@@ -3244,8 +3244,7 @@ public class GoogleCloudStorageTest {
 
     gcs.createEmptyObject(
         RESOURCE_ID,
-        CreateObjectOptions.DEFAULT_OVERWRITE
-            .toBuilder()
+        CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
             .setMetadata(ImmutableMap.of("foo", new byte[0]))
             .build());
 
@@ -3267,8 +3266,7 @@ public class GoogleCloudStorageTest {
         mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithoutRetries);
 
     CreateObjectOptions createOptions =
-        CreateObjectOptions.DEFAULT_OVERWRITE
-            .toBuilder()
+        CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
             .setMetadata(ImmutableMap.of("foo", new byte[0]))
             .build();
 

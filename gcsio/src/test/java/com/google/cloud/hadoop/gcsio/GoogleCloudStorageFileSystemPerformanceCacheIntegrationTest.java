@@ -45,8 +45,7 @@ public class GoogleCloudStorageFileSystemPerformanceCacheIntegrationTest {
           .build();
 
   private static final PerformanceCachingGoogleCloudStorageOptions PERF_CACHE_GCS_OPTIONS =
-      PerformanceCachingGoogleCloudStorageOptions.DEFAULT
-          .toBuilder()
+      PerformanceCachingGoogleCloudStorageOptions.DEFAULT.toBuilder()
           .setMaxEntryAgeMillis(10_000)
           .build();
 

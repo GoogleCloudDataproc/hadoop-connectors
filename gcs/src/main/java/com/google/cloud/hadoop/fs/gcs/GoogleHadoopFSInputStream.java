@@ -24,7 +24,7 @@ import org.apache.hadoop.fs.FileSystem;
 
 public class GoogleHadoopFSInputStream extends InstrumentatedgoogleHadoopFSInputStream {
   GoogleHadoopFSInputStream(
-      GoogleHadoopFileSystemBase ghfs,
+      GoogleHadoopFileSystem ghfs,
       URI gcsPath,
       GoogleCloudStorageReadOptions readOptions,
       FileSystem.Statistics statistics)
@@ -33,7 +33,7 @@ public class GoogleHadoopFSInputStream extends InstrumentatedgoogleHadoopFSInput
   }
 
   GoogleHadoopFSInputStream(
-      GoogleHadoopFileSystemBase ghfs, FileInfo fileInfo, FileSystem.Statistics statistics)
+      GoogleHadoopFileSystem ghfs, FileInfo fileInfo, FileSystem.Statistics statistics)
       throws IOException {
     super(ghfs, fileInfo, statistics);
   }

@@ -871,8 +871,7 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     // Create gzipped file so Content-Encoding will be not null
     CreateObjectOptions createOptions =
-        GZIP_CREATE_OPTIONS
-            .toBuilder()
+        GZIP_CREATE_OPTIONS.toBuilder()
             .setMetadata(ImmutableMap.of("test-key", "val".getBytes(UTF_8)))
             .build();
 
@@ -907,8 +906,7 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     // Create gzipped file so Content-Encoding will be not null
     CreateObjectOptions createOptions =
-        GZIP_CREATE_OPTIONS
-            .toBuilder()
+        GZIP_CREATE_OPTIONS.toBuilder()
             .setMetadata(ImmutableMap.of("test-key", "val".getBytes(UTF_8)))
             .build();
 

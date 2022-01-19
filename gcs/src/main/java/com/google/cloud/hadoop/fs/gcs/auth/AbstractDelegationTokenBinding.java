@@ -21,7 +21,7 @@ import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDura
 
 import com.google.cloud.hadoop.fs.gcs.DelegationTokenStatistics;
 import com.google.cloud.hadoop.fs.gcs.GhfsStatistic;
-import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase;
+import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
@@ -45,10 +45,8 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
 
   private Text service;
 
-  /**
-   * The owning filesystem. Valid after {@link #bindToFileSystem(GoogleHadoopFileSystemBase, Text)}.
-   */
-  private GoogleHadoopFileSystemBase fileSystem;
+  /** The owning filesystem. Valid after {@link #bindToFileSystem(GoogleHadoopFileSystem, Text)}. */
+  private GoogleHadoopFileSystem fileSystem;
 
   /** Statistics for the operations. */
   private DelegationTokenStatistics stats;
@@ -67,7 +65,7 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
   }
 
   /** Returns the bound file system */
-  public GoogleHadoopFileSystemBase getFileSystem() {
+  public GoogleHadoopFileSystem getFileSystem() {
     return fileSystem;
   }
 
@@ -105,7 +103,7 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
    * @param fileSystem owning FS.
    * @param service name of the service (i.e. bucket name) for the FS.
    */
-  public void bindToFileSystem(GoogleHadoopFileSystemBase fileSystem, Text service) {
+  public void bindToFileSystem(GoogleHadoopFileSystem fileSystem, Text service) {
     this.fileSystem = requireNonNull(fileSystem);
     this.service = requireNonNull(service);
   }

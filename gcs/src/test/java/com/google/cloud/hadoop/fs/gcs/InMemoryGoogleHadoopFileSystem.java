@@ -77,7 +77,7 @@ public class InMemoryGoogleHadoopFileSystem extends GoogleHadoopFileSystem {
    * @throws IOException on IO Error.
    */
   private void initialize() throws IOException {
-    // Initialize the GoogleHadoopFileSystemBase.
+    // Initialize the GoogleHadoopFileSystem.
     URI initUri;
     try {
       initUri = new URI("gs://test_bucket/");

@@ -21,7 +21,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -73,7 +72,7 @@ public class HadoopFileSystemIntegrationTest extends HadoopFileSystemTestBase {
           }
 
           // Create a FileSystem instance to access the given HDFS.
-          URI hdfsUri = null;
+          URI hdfsUri;
           try {
             hdfsUri = new URI(hdfsRoot);
           } catch (URISyntaxException e) {
@@ -82,18 +81,6 @@ public class HadoopFileSystemIntegrationTest extends HadoopFileSystemTestBase {
           Configuration config = new Configuration();
           config.set("fs.default.name", hdfsRoot);
           ghfs = FileSystem.get(hdfsUri, config);
-          ghfsFileSystemDescriptor =
-              new FileSystemDescriptor() {
-                @Override
-                public Path getFileSystemRoot() {
-                  return new Path(hdfsRoot);
-                }
-
-                @Override
-                public String getScheme() {
-                  return getFileSystemRoot().toUri().getScheme();
-                }
-              };
 
           postCreateInit();
           ghfsHelper.setIgnoreStatistics(); // Multi-threaded code screws us up.

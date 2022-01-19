@@ -81,8 +81,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
   // the way we pick temp file names and already ensured directories for the destination file,
   // we can optimize tempfile creation by skipping various directory checks.
   private static final CreateFileOptions TEMPFILE_CREATE_OPTIONS =
-      CreateFileOptions.DEFAULT_NO_OVERWRITE
-          .toBuilder()
+      CreateFileOptions.DEFAULT_NO_OVERWRITE.toBuilder()
           .setEnsureNoDirectoryConflict(false)
           .setOverwriteGenerationId(0)
           .build();
@@ -97,13 +96,12 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
               .setDaemon(true)
               .build());
 
-  // Instance of GoogleHadoopFileSystemBase.
-  private final GoogleHadoopFileSystemBase ghfs;
+  private final GoogleHadoopFileSystem ghfs;
 
   // The final destination path for this stream.
   private final URI finalGcsPath;
 
-  // Statistics tracker provided by the parent GoogleHadoopFileSystemBase for recording
+  // Statistics tracker provided by the parent GoogleHadoopFileSystem for recording
   // numbers of bytes written.
   private final FileSystem.Statistics statistics;
 
@@ -137,7 +135,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
 
   /** Creates a new GoogleHadoopSyncableOutputStream. */
   public GoogleHadoopSyncableOutputStream(
-      GoogleHadoopFileSystemBase ghfs,
+      GoogleHadoopFileSystem ghfs,
       URI gcsPath,
       FileSystem.Statistics statistics,
       CreateFileOptions createFileOptions,
@@ -148,7 +146,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
 
   @VisibleForTesting
   GoogleHadoopSyncableOutputStream(
-      GoogleHadoopFileSystemBase ghfs,
+      GoogleHadoopFileSystem ghfs,
       URI gcsPath,
       FileSystem.Statistics statistics,
       CreateFileOptions createFileOptions,

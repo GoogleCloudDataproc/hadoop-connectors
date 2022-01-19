@@ -29,7 +29,6 @@ import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
 import static java.util.Arrays.stream;
-import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 
@@ -99,7 +98,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -127,8 +125,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private static final String USER_PROJECT_FIELD_NAME = "userProject";
 
   private static final CreateObjectOptions EMPTY_OBJECT_CREATE_OPTIONS =
-      CreateObjectOptions.DEFAULT_OVERWRITE
-          .toBuilder()
+      CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
           .setEnsureEmptyObjectsMetadataMatch(false)
           .build();
 
@@ -247,10 +244,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               .setDaemon(true)
               .build());
 
-  // Thread-pool used for background watchdog
-  private final ScheduledExecutorService scheduledExecutorService =
-      newSingleThreadScheduledExecutor();
-
   // Thread-pool for manual matching of metadata tasks.
   // TODO(user): Wire out GoogleCloudStorageOptions for these.
   private ExecutorService manualBatchingThreadPool = createManualBatchingThreadPool();
@@ -283,7 +276,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private final Function<List<AccessBoundary>, String> downscopedAccessTokenFn;
 
   // Watchdog to monitor gRPC streams
-  private final Watchdog watchdog;
+  private Watchdog watchdog;
 
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
@@ -369,13 +362,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             ? null
             : this.storage.getRequestFactory().getInitializer();
 
-    this.watchdog =
-        Watchdog.create(
-            Duration.ofMillis(storageOptions.getGrpcMessageTimeoutCheckInterval()),
-            scheduledExecutorService);
-
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
+      this.watchdog =
+          Watchdog.create(Duration.ofMillis(storageOptions.getGrpcMessageTimeoutCheckInterval()));
       this.storageStubProvider =
           StorageStubProvider.newInstance(
               this.storageOptions, this.backgroundTasksThreadPool, credential);
@@ -408,13 +398,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             ? null
             : this.storage.getRequestFactory().getInitializer();
 
-    this.watchdog =
-        Watchdog.create(
-            Duration.ofMillis(options.getGrpcMessageTimeoutCheckInterval()),
-            scheduledExecutorService);
-
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
+      this.watchdog =
+          Watchdog.create(Duration.ofMillis(options.getGrpcMessageTimeoutCheckInterval()));
       if (credentials != null) {
         this.storageStubProvider =
             StorageStubProvider.newInstance(
@@ -1575,7 +1562,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       throws IOException {
     logger.atFiner().log(
         "createListRequest(%s, %s, %s, %s, %d)",
-        bucketName, objectNamePrefix, delimiter, maxResults);
+        bucketName, objectNamePrefix, objectFields, delimiter, maxResults);
     checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
 
     Storage.Objects.List listObject =
@@ -2073,15 +2060,18 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         if (storageStubProvider != null) {
           storageStubProvider.shutdown();
         }
+        if (watchdog != null) {
+          watchdog.shutdown();
+        }
       } finally {
         backgroundTasksThreadPool.shutdown();
         manualBatchingThreadPool.shutdown();
-        scheduledExecutorService.shutdown();
       }
     } finally {
       backgroundTasksThreadPool = null;
       manualBatchingThreadPool = null;
       storageStubProvider = null;
+      watchdog = null;
     }
   }
 
@@ -2237,8 +2227,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             .collect(Collectors.toList());
     StorageResourceId destinationId = new StorageResourceId(bucketName, destination);
     CreateObjectOptions options =
-        CreateObjectOptions.DEFAULT_OVERWRITE
-            .toBuilder()
+        CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
             .setContentType(contentType)
             .setEnsureEmptyObjectsMetadataMatch(false)
             .build();
