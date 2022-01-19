@@ -1,7 +1,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.truth.Truth.assertThat;
-import static java.lang.Thread.sleep;
+import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
 import static org.junit.Assert.assertThrows;
 
 import com.google.common.collect.Lists;
@@ -85,12 +85,8 @@ public class WatchdogTest {
         new StreamObserver<WriteObjectRequest>() {
           @Override
           public void onNext(WriteObjectRequest value) {
-            try {
-              logger.atInfo().log("Sleeping for 10 seconds");
-              sleep(10000);
-            } catch (InterruptedException e) {
-              logger.atSevere().log("thread interrupted ", e);
-            }
+            logger.atInfo().log("Sleeping for 10 seconds");
+            sleepUninterruptibly(Duration.ofSeconds(10));
           }
 
           @Override
@@ -114,12 +110,8 @@ public class WatchdogTest {
         new Iterator<ReadObjectResponse>() {
           @Override
           public boolean hasNext() {
-            try {
-              logger.atInfo().log("Sleeping for 10 seconds");
-              sleep(10000);
-            } catch (InterruptedException e) {
-              logger.atSevere().log("thread interrupted ", e);
-            }
+            logger.atInfo().log("Sleeping for 10 seconds");
+            sleepUninterruptibly(Duration.ofSeconds(10));
             return true;
           }
 
@@ -141,12 +133,8 @@ public class WatchdogTest {
         new StreamObserver<WriteObjectRequest>() {
           @Override
           public void onNext(WriteObjectRequest value) {
-            try {
-              logger.atInfo().log("Sleeping for 10 seconds");
-              sleep(10000);
-            } catch (InterruptedException e) {
-              logger.atSevere().log("thread interrupted ", e);
-            }
+            logger.atInfo().log("Sleeping for 10 seconds");
+            sleepUninterruptibly(Duration.ofSeconds(10));
           }
 
           @Override
@@ -161,12 +149,8 @@ public class WatchdogTest {
         new Iterator<ReadObjectResponse>() {
           @Override
           public boolean hasNext() {
-            try {
-              logger.atInfo().log("Sleeping for 10 seconds");
-              sleep(10000);
-            } catch (InterruptedException e) {
-              logger.atSevere().log("thread interrupted ", e);
-            }
+            logger.atInfo().log("Sleeping for 10 seconds");
+            sleepUninterruptibly(Duration.ofSeconds(10));
             return true;
           }
 
@@ -200,12 +184,8 @@ public class WatchdogTest {
         new StreamObserver<WriteObjectRequest>() {
           @Override
           public void onNext(WriteObjectRequest value) {
-            try {
-              logger.atInfo().log("Sleeping for 10 seconds");
-              sleep(10000);
-            } catch (InterruptedException e) {
-              logger.atSevere().log("thread interrupted ", e);
-            }
+            logger.atInfo().log("Sleeping for 10 seconds");
+            sleepUninterruptibly(Duration.ofSeconds(10));
           }
 
           @Override
@@ -229,12 +209,8 @@ public class WatchdogTest {
         new Iterator<ReadObjectResponse>() {
           @Override
           public boolean hasNext() {
-            try {
-              logger.atInfo().log("Sleeping for 10 seconds");
-              sleep(10000);
-            } catch (InterruptedException e) {
-              logger.atSevere().log("thread interrupted ", e);
-            }
+            logger.atInfo().log("Sleeping for 10 seconds");
+            sleepUninterruptibly(Duration.ofSeconds(10));
             return true;
           }
 
