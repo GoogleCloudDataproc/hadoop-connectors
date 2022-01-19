@@ -41,9 +41,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.util.Optional;
 import org.apache.hadoop.conf.Configuration;
 
 /**
@@ -54,99 +51,87 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
 
-  private static final DateTimeFormatter dateFormat =
-      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.systemDefault());
   private static final AccessToken EXPIRED_TOKEN = new AccessToken("", -1L);
 
+  private String tokenServerUrl;
+  private String clientId;
+  private RedactedString clientSecret;
+  private RedactedString refreshToken;
+  private AccessToken accessToken = null;
   private Configuration config;
-  private Optional<AccessToken> accessToken = Optional.empty();
   private HttpTransport httpTransport;
-  private Optional<RedactedString> previousRefreshToken = Optional.empty();
 
   @Override
   public AccessToken getAccessToken() {
-    if (!accessToken.isPresent()) {
+    if (accessToken == null) {
+      accessToken = EXPIRED_TOKEN;
       refresh();
     }
-    return accessToken.get();
+    return accessToken;
   }
 
   @Override
   public void refresh() {
     logger.atFine().log(
-        "Refreshing access-token based token. Our token is set to expire at '%s' and it is now '%s'",
-        lazy(
-            () ->
-                Instant.ofEpochMilli(
-                    accessToken.orElse(EXPIRED_TOKEN).getExpirationTimeMilliSeconds())),
-        lazy(() -> Instant.now()));
+        "Refreshing access token using the refresh token grant flow. Our current token is set to expire at '%s' and it is now '%s'",
+        lazy(() -> Instant.ofEpochMilli(accessToken.getExpirationTimeMilliSeconds())),
+        lazy(Instant::now));
 
-    String tokenServerUrl =
+    tokenServerUrl =
         TOKEN_SERVER_URL_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::get);
-    RedactedString refreshToken =
-        AUTH_REFRESH_TOKEN_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config);
-    String clientId =
-        AUTH_CLIENT_ID_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::get);
-    RedactedString clientSecret =
-        AUTH_CLIENT_SECRET_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config);
+    refreshToken = AUTH_REFRESH_TOKEN_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config);
+    clientId = AUTH_CLIENT_ID_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::get);
+    clientSecret = AUTH_CLIENT_SECRET_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config);
 
     checkNotNull(refreshToken, "Must provide a refresh token");
     checkNotNull(clientSecret, "Must provide a client secret");
 
     logger.atFine().log(
-        "Refresh token calling endpoint '%s' with client id '%s'", tokenServerUrl, clientId);
+        "Refresh token provider setup with token server url '%s', refresh token '%s', client id='%s' and client secret '%s'",
+        tokenServerUrl, refreshToken, clientId, clientSecret);
 
     try {
-      HttpTransport httpTransport = getTransport();
-      accessToken =
-          Optional.of(
-              getAccessToken(
-                  tokenServerUrl,
-                  clientId,
-                  clientSecret,
-                  previousRefreshToken.orElse(refreshToken),
-                  httpTransport));
+      if (httpTransport == null) {
+        String proxyAddress =
+            PROXY_ADDRESS_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::get);
+        RedactedString proxyUsername =
+            PROXY_USERNAME_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config);
+        RedactedString proxyPassword =
+            PROXY_PASSWORD_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config);
+        httpTransport =
+            HttpTransportFactory.createHttpTransport(proxyAddress, proxyUsername, proxyPassword);
+      }
+      TokenRequest request =
+          new RefreshTokenRequest(
+                  httpTransport, JSON_FACTORY, new GenericUrl(tokenServerUrl), refreshToken.value())
+              .setClientAuthentication(
+                  new ClientParametersAuthentication(clientId, clientSecret.value()));
+
+      TokenResponse tokenResponse = request.execute();
+      if (tokenResponse.getRefreshToken() != null) {
+        // Some OAuth2 provider may not issue a new refresh token
+        refreshToken = RedactedString.create(tokenResponse.getRefreshToken());
+      }
+
+      long expirationTimeMilliSeconds;
+      if (tokenResponse.getExpiresInSeconds() != null) {
+        expirationTimeMilliSeconds =
+            System.currentTimeMillis() + (tokenResponse.getExpiresInSeconds() * 1000L);
+      } else {
+        logger.atWarning().log(
+            "The OAuth2 provider has returned an access token without a defined expiration (ie `expires_in` was null). "
+                + "We will consider the access token as expired.");
+        expirationTimeMilliSeconds = 0L;
+      }
+      accessToken = new AccessToken(tokenResponse.getAccessToken(), expirationTimeMilliSeconds);
 
       logger.atFine().log(
           "New access token expires at '%s'",
-          lazy(() -> Instant.ofEpochMilli(accessToken.get().getExpirationTimeMilliSeconds())));
+          lazy(() -> Instant.ofEpochMilli(accessToken.getExpirationTimeMilliSeconds())));
 
     } catch (IOException e) {
       logger.atSevere().withCause(e).log("Couldn't refresh token");
     }
-  }
-
-  private AccessTokenProvider.AccessToken getAccessToken(
-      String tokenServerUrl,
-      String clientId,
-      RedactedString clientSecret,
-      RedactedString refreshToken,
-      HttpTransport httpTransport)
-      throws IOException {
-
-    logger.atFine().log("Get a new access token using the refresh token grant flow");
-
-    TokenRequest request =
-        new RefreshTokenRequest(
-                httpTransport, JSON_FACTORY, new GenericUrl(tokenServerUrl), refreshToken.value())
-            .setClientAuthentication(
-                new ClientParametersAuthentication(clientId, clientSecret.value()));
-
-    TokenResponse tokenResponse = request.execute();
-    previousRefreshToken =
-        Optional.ofNullable(RedactedString.create(tokenResponse.getRefreshToken()));
-
-    long expirationTimeMilliSeconds;
-    if (tokenResponse.getExpiresInSeconds() != null) {
-      expirationTimeMilliSeconds =
-          System.currentTimeMillis() + (tokenResponse.getExpiresInSeconds() * 1000L);
-    } else {
-      logger.atWarning().log(
-          "The OAuth2 provider has returned an access token without a defined expiration (ie `expires_in` was null). "
-              + "We will consider the access token as expired.");
-      expirationTimeMilliSeconds = 0L;
-    }
-    return new AccessToken(tokenResponse.getAccessToken(), expirationTimeMilliSeconds);
   }
 
   @Override
@@ -159,29 +144,13 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
     this.config = config;
   }
 
-  private HttpTransport getTransport() throws IOException {
-    if (httpTransport == null) {
-      String proxyAddress =
-          PROXY_ADDRESS_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::get);
-      RedactedString proxyUsername =
-          PROXY_USERNAME_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config);
-      RedactedString proxyPassword =
-          PROXY_PASSWORD_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).getPassword(config);
-
-      logger.atFine().log("Proxy setup: '%s' with username = '%s'", proxyAddress, proxyUsername);
-      httpTransport =
-          HttpTransportFactory.createHttpTransport(proxyAddress, proxyUsername, proxyPassword);
-    }
-    return httpTransport;
-  }
-
   @VisibleForTesting
   void setTransport(HttpTransport httpTransport) {
     this.httpTransport = httpTransport;
   }
 
   @VisibleForTesting
-  Optional<RedactedString> getPreviousRefreshToken() {
-    return previousRefreshToken;
+  RedactedString getRefreshToken() {
+    return refreshToken;
   }
 }

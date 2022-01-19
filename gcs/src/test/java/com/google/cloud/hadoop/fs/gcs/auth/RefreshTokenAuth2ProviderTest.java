@@ -24,7 +24,6 @@ import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.RedactedString;
 import java.io.IOException;
-import java.util.Optional;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -63,8 +62,7 @@ public class RefreshTokenAuth2ProviderTest {
     refreshTokenAuth2Provider.setTransport(transport);
     refreshTokenAuth2Provider.refresh();
     AccessTokenProvider.AccessToken accessToken = refreshTokenAuth2Provider.getAccessToken();
-    Optional<RedactedString> previousRefreshToken =
-        refreshTokenAuth2Provider.getPreviousRefreshToken();
+    RedactedString previousRefreshToken = refreshTokenAuth2Provider.getRefreshToken();
 
     // THEN
     assertThat(accessToken).isNotNull();
@@ -74,7 +72,7 @@ public class RefreshTokenAuth2ProviderTest {
         .isGreaterThan(now + ((expireInSec - 10) * 1000L));
     assertThat(accessToken.getExpirationTimeMilliSeconds())
         .isLessThan(now + ((expireInSec + 10) * 1000L));
-    assertThat(previousRefreshToken.isPresent()).isFalse();
+    assertThat(previousRefreshToken).isNotNull();
   }
 
   @Test
@@ -111,8 +109,7 @@ public class RefreshTokenAuth2ProviderTest {
     refreshTokenAuth2Provider.setTransport(transport);
     refreshTokenAuth2Provider.refresh();
     AccessTokenProvider.AccessToken accessToken = refreshTokenAuth2Provider.getAccessToken();
-    Optional<RedactedString> previousRefreshToken =
-        refreshTokenAuth2Provider.getPreviousRefreshToken();
+    RedactedString previousRefreshToken = refreshTokenAuth2Provider.getRefreshToken();
 
     // THEN
     assertThat(accessToken).isNotNull();
@@ -123,7 +120,7 @@ public class RefreshTokenAuth2ProviderTest {
         .isGreaterThan(now + ((expireInSec - 10) * 1000L));
     assertThat(accessToken.getExpirationTimeMilliSeconds())
         .isLessThan(now + ((expireInSec + 10) * 1000L));
-    assertThat(previousRefreshToken.isPresent()).isTrue();
-    assertThat(previousRefreshToken.get()).isEqualTo(RedactedString.create(newRefreshToken));
+    assertThat(previousRefreshToken).isNotNull();
+    assertThat(previousRefreshToken).isEqualTo(RedactedString.create(newRefreshToken));
   }
 }
