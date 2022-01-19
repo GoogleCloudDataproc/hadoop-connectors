@@ -68,8 +68,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   private final ZeroCopyMessageMarshaller<ReadObjectResponse> getObjectMediaResponseMarshaller =
       new ZeroCopyMessageMarshaller<>(ReadObjectResponse.getDefaultInstance());
   private final MethodDescriptor<ReadObjectRequest, ReadObjectResponse> getObjectMediaMethod =
-      StorageGrpc.getReadObjectMethod()
-          .toBuilder()
+      StorageGrpc.getReadObjectMethod().toBuilder()
           .setResponseMarshaller(getObjectMediaResponseMarshaller)
           .build();
   private final boolean useZeroCopyMarshaller;
