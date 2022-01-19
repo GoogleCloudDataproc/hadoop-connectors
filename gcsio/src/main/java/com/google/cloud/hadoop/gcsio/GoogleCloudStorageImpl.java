@@ -125,8 +125,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private static final String USER_PROJECT_FIELD_NAME = "userProject";
 
   private static final CreateObjectOptions EMPTY_OBJECT_CREATE_OPTIONS =
-      CreateObjectOptions.DEFAULT_OVERWRITE
-          .toBuilder()
+      CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
           .setEnsureEmptyObjectsMetadataMatch(false)
           .build();
 
@@ -2228,8 +2227,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             .collect(Collectors.toList());
     StorageResourceId destinationId = new StorageResourceId(bucketName, destination);
     CreateObjectOptions options =
-        CreateObjectOptions.DEFAULT_OVERWRITE
-            .toBuilder()
+        CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
             .setContentType(contentType)
             .setEnsureEmptyObjectsMetadataMatch(false)
             .build();

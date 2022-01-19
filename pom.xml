@@ -627,7 +627,7 @@
               <on>fmt:on</on>
             </toggleOffOn>
             <googleJavaFormat>
-              <version>1.7</version>
+              <version>1.13.0</version>
             </googleJavaFormat>
           </java>
         </configuration>

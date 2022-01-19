@@ -474,8 +474,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     byte[] expectedCrc32C = {51, 121, -76, -54};
 
     fakeService.setObject(
-        FakeService.DEFAULT_OBJECT
-            .toBuilder()
+        FakeService.DEFAULT_OBJECT.toBuilder()
             .setSize(9)
             .setGeneration(1)
             .setMetageneration(2)

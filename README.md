@@ -31,7 +31,7 @@ interfaces. For more details see
 
 ## Building the Cloud Storage and BigQuery connectors
 
-> Note that build requires Java 8 and fails with newer Java versions.
+> Note that build requires Java 11+ and fails with older Java versions.
 
 To build the connector for specific Hadoop version, run the following commands
 from the main directory:

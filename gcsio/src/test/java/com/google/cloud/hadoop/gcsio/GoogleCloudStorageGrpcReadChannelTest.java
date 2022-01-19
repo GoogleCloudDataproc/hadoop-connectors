@@ -571,8 +571,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   @Test
   public void singleReadSucceedsWithValidObjectChecksum() throws Exception {
     fakeService.setObject(
-        DEFAULT_OBJECT
-            .toBuilder()
+        DEFAULT_OBJECT.toBuilder()
             .setChecksums(ObjectChecksums.newBuilder().setCrc32C(DEFAULT_OBJECT_CRC32C))
             .build());
     GoogleCloudStorageReadOptions options =
@@ -588,8 +587,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   @Test
   public void partialReadSucceedsWithInvalidObjectChecksum() throws Exception {
     fakeService.setObject(
-        DEFAULT_OBJECT
-            .toBuilder()
+        DEFAULT_OBJECT.toBuilder()
             .setChecksums(ObjectChecksums.newBuilder().setCrc32C(DEFAULT_OBJECT_CRC32C))
             .build());
     GoogleCloudStorageReadOptions options =
@@ -606,8 +604,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   @Test
   public void multipleSequentialReadsSucceedWithValidObjectChecksum() throws Exception {
     fakeService.setObject(
-        DEFAULT_OBJECT
-            .toBuilder()
+        DEFAULT_OBJECT.toBuilder()
             .setChecksums(ObjectChecksums.newBuilder().setCrc32C(DEFAULT_OBJECT_CRC32C))
             .build());
     GoogleCloudStorageReadOptions options =
@@ -671,8 +668,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   @Test
   public void multipleReadsIgnoreObjectChecksumForLatestGenerationReads() throws Exception {
     fakeService.setObject(
-        DEFAULT_OBJECT
-            .toBuilder()
+        DEFAULT_OBJECT.toBuilder()
             .setChecksums(ObjectChecksums.newBuilder().setCrc32C(DEFAULT_OBJECT_CRC32C))
             .build());
     GoogleCloudStorageReadOptions options =
