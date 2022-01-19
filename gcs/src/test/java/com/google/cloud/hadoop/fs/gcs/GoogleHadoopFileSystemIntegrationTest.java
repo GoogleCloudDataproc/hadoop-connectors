@@ -86,6 +86,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.Service;
 import org.junit.Before;
 import org.junit.ClassRule;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -1319,7 +1320,9 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     assertThat(myGhfs.delete(testRoot, true)).isTrue();
   }
 
-  public void http_IOstatistics() throws IOException {
+  @Test
+  @Ignore("Test is failing")
+  public void http_IOStatistics() throws IOException {
     FSDataOutputStream fout = ghfs.create(new Path("/file1"));
     fout.writeBytes("Test Content");
     fout.close();
