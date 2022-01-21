@@ -28,10 +28,14 @@
     # Add the credentials/settings for Google Cloud Storage with the three
     # keys: fs.gs.auth.service.account.email, fs.gs.auth.service.account.keyfile
     # and fs.gs.project.id.
-    # Uncomment out the following include.
-    <include xmlns="http://www.w3.org/2001/XInclude"
-             href="auth-keys.xml"/>
+    # Tip: you can use an xinclude in auth-keys.xml to refer to another configuration
+    # file outside this source tree, so be confident your credentials can never
+    # be accidentally published
     -->
+  <include xmlns="http://www.w3.org/2001/XInclude"
+             href="auth-keys.xml">
+    <fallback />
+  </include>
 
     <!--
     Example:
