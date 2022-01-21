@@ -24,13 +24,18 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.net.Authenticator;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.PasswordAuthentication;
 import java.net.Proxy;
+import java.net.Socket;
+import java.net.SocketException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.GeneralSecurityException;
 import javax.annotation.Nullable;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLSocketFactory;
 
 /** Factory for creating HttpTransport types. */
 public class HttpTransportFactory {
@@ -79,7 +84,7 @@ public class HttpTransportFactory {
       PasswordAuthentication proxyAuth =
           proxyUsername != null
               ? new PasswordAuthentication(
-                  proxyUsername.value(), proxyPassword.value().toCharArray())
+              proxyUsername.value(), proxyPassword.value().toCharArray())
               : null;
       return createNetHttpTransport(proxyUri, proxyAuth);
     } catch (GeneralSecurityException e) {
@@ -122,6 +127,7 @@ public class HttpTransportFactory {
 
     return new NetHttpTransport.Builder()
         .trustCertificates(GoogleUtils.getCertificateTrustStore())
+        .setSslSocketFactory(new KeepAliveSslSocketFactory())
         .setProxy(
             proxyUri == null
                 ? null
@@ -163,6 +169,58 @@ public class HttpTransportFactory {
     } catch (URISyntaxException e) {
       throw new IllegalArgumentException(
           String.format("Invalid proxy address '%s'.", proxyAddress), e);
+    }
+  }
+
+  static class KeepAliveSslSocketFactory extends SSLSocketFactory {
+
+    private final SSLSocketFactory wrappedSockedFactory;
+
+    public KeepAliveSslSocketFactory() {
+      wrappedSockedFactory = HttpsURLConnection.getDefaultSSLSocketFactory();
+    }
+
+    @Override
+    public String[] getDefaultCipherSuites() {
+      return wrappedSockedFactory.getDefaultCipherSuites();
+    }
+
+    @Override
+    public String[] getSupportedCipherSuites() {
+      return wrappedSockedFactory.getSupportedCipherSuites();
+    }
+
+    @Override
+    public Socket createSocket(Socket s, String host, int port, boolean autoClose)
+        throws IOException {
+      return addExtraParams(wrappedSockedFactory.createSocket(s, host, port, autoClose));
+    }
+
+    public Socket createSocket(String host, int port) throws IOException {
+      return addExtraParams(wrappedSockedFactory.createSocket(host, port));
+    }
+
+    public Socket createSocket(InetAddress address, int port) throws IOException {
+      return addExtraParams(wrappedSockedFactory.createSocket(address, port));
+    }
+
+    public Socket createSocket(String host, int port, InetAddress clientAddress, int clientPort)
+        throws IOException {
+      return addExtraParams(
+          wrappedSockedFactory.createSocket(host, port, clientAddress, clientPort));
+    }
+
+    public Socket createSocket(
+        InetAddress address, int port, InetAddress clientAddress, int clientPort)
+        throws IOException {
+      return addExtraParams(
+          wrappedSockedFactory.createSocket(address, port, clientAddress, clientPort));
+    }
+
+    private static Socket addExtraParams(Socket socket) throws SocketException {
+      socket.setKeepAlive(true);
+      socket.setSoTimeout(200_000);
+      return socket;
     }
   }
 }
