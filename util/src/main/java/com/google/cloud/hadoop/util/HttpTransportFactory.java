@@ -84,7 +84,7 @@ public class HttpTransportFactory {
       PasswordAuthentication proxyAuth =
           proxyUsername != null
               ? new PasswordAuthentication(
-              proxyUsername.value(), proxyPassword.value().toCharArray())
+                  proxyUsername.value(), proxyPassword.value().toCharArray())
               : null;
       return createNetHttpTransport(proxyUri, proxyAuth);
     } catch (GeneralSecurityException e) {
