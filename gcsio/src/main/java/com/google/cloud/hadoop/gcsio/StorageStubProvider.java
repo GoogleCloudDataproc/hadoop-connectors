@@ -140,7 +140,8 @@ class StorageStubProvider {
 
     public ManagedChannelBuilder<?> createChannelBuilder(String target) {
       return Grpc.newChannelBuilder(
-          "google-c2p:///" + target, GoogleDefaultChannelCredentials.create());
+          // TODO(veblush): Remove experimental suffix once this code is proven stable.
+          "google-c2p-experimental:///" + target, GoogleDefaultChannelCredentials.create());
     }
 
     public AbstractStub<?> applyCallOption(AbstractStub<?> stub) {
