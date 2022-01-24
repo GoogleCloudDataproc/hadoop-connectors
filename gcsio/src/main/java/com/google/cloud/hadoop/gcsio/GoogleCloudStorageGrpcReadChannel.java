@@ -14,7 +14,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_GRPC_READ_SPEED_BYTES_PER_SEC;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
@@ -32,7 +32,6 @@ import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
-import com.google.common.base.Preconditions;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.hash.Hashing;
 import com.google.protobuf.ByteString;
@@ -264,10 +263,10 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       throws IOException {
     // TODO(b/135138893): We can avoid this call by adding metadata to a read request.
     //      That will save about 40ms per read.
-    Preconditions.checkArgument(storage != null, "GCS json client cannot be null");
+    checkArgument(storage != null, "GCS json client cannot be null");
     GoogleCloudStorageItemInfo itemInfo =
         getObjectMetadata(resourceId, errorExtractor, backOffFactory, storage);
-    Preconditions.checkArgument(itemInfo != null, "object metadata cannot be null");
+    checkArgument(itemInfo != null, "object metadata cannot be null");
     return openChannel(stubProvider, storage, itemInfo, watchdog, readOptions, backOffFactory);
   }
 
@@ -292,8 +291,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       BackOffFactory backOffFactory)
       throws IOException {
     StorageBlockingStub stub = stubProvider.newBlockingStub();
-    Preconditions.checkArgument(storage != null, "GCS json client cannot be null");
-    Preconditions.checkArgument(itemInfo != null, "object metadata cannot be null");
+    checkArgument(storage != null, "GCS json client cannot be null");
+    checkArgument(itemInfo != null, "object metadata cannot be null");
     // The non-gRPC read channel has special support for gzip. This channel doesn't
     // decompress gzip-encoded objects on the fly, so best to fail fast rather than return
     // gibberish unexpectedly.
@@ -314,8 +313,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     long footerOffsetInBytes = Math.max(0, (objectSize - prefetchSizeInBytes));
 
     long startTime = System.currentTimeMillis();
-    ByteString footerContent =
-        getFooterContent(resourceId, readOptions, stub, footerOffsetInBytes, objectSize);
+    ByteString footerContent = getFooterContent(resourceId, readOptions, stub, footerOffsetInBytes);
     long endTime = System.currentTimeMillis();
     if (footerContent == null) {
       logger.atFiner().log(
@@ -331,7 +329,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         stub,
         resourceId,
         itemInfo.getContentGeneration(),
-        objectSize,
+        itemInfo.getSize(),
         footerOffsetInBytes,
         footerContent,
         watchdog,
@@ -396,12 +394,11 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       StorageResourceId resourceId,
       GoogleCloudStorageReadOptions readOptions,
       StorageBlockingStub stub,
-      long footerOffset,
-      long objectSize)
+      long footerOffset)
       throws IOException {
     try {
       Iterator<ReadObjectResponse> footerContentResponse =
-          stub.withDeadlineAfter(getReadTimeoutMillis(readOptions, objectSize), MILLISECONDS)
+          stub.withDeadlineAfter(readOptions.getGrpcReadTimeoutMillis(), MILLISECONDS)
               .readObject(
                   ReadObjectRequest.newBuilder()
                       .setReadOffset(footerOffset)
@@ -427,16 +424,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     }
   }
 
-  // Estimates a read time out based on read speeds
-  static long getReadTimeoutMillis(GoogleCloudStorageReadOptions readOptions, long objectSize) {
-    long readSpeedInBytesPerSec = DEFAULT_GRPC_READ_SPEED_BYTES_PER_SEC;
-    if (readOptions.getGrpcReadSpeedBytesPerSec() > 0) {
-      readSpeedInBytesPerSec = readOptions.getGrpcReadSpeedBytesPerSec();
-    }
-
-    return readOptions.getGrpcReadTimeoutMillis() + ((objectSize / readSpeedInBytesPerSec) * 1000);
-  }
-
   private GoogleCloudStorageGrpcReadChannel(
       StorageBlockingStub gcsGrpcBlockingStub,
       StorageResourceId resourceId,
@@ -449,7 +436,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       BackOffFactory backOffFactory) {
     this.useZeroCopyMarshaller =
         ZeroCopyReadinessChecker.isReady() && readOptions.isGrpcReadZeroCopyEnabled();
-    this.readTimeout = getReadTimeoutMillis(readOptions, objectSize);
     this.stub = gcsGrpcBlockingStub;
     this.resourceId = resourceId;
     this.objectGeneration = objectGeneration;
@@ -734,7 +720,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
     requestContext = Context.current().withCancellation();
     Context toReattach = requestContext.attach();
-    StorageBlockingStub blockingStub = stub.withDeadlineAfter(readTimeout, MILLISECONDS);
+    StorageBlockingStub blockingStub =
+        stub.withDeadlineAfter(readOptions.getGrpcReadTimeoutMillis(), MILLISECONDS);
     try {
       if (useZeroCopyMarshaller) {
         Iterator<ReadObjectResponse> responseIterator =
@@ -813,9 +800,9 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     if (!isOpen()) {
       throw new ClosedChannelException();
     }
-    Preconditions.checkArgument(
+    checkArgument(
         newPosition >= 0, "Read position must be non-negative, but was %s", newPosition);
-    Preconditions.checkArgument(
+    checkArgument(
         newPosition < size(),
         "Read position must be before end of file (%s), but was %s",
         size(),
