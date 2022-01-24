@@ -44,6 +44,7 @@ import static org.junit.Assert.assertThrows;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksumType;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType;
+import com.google.cloud.hadoop.fs.gcs.auth.DelegationTokenInstantiationStrategy;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
@@ -128,6 +129,9 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.storage.root.url", "https://storage.googleapis.com/");
           put("fs.gs.storage.service.path", "storage/v1/");
           put("fs.gs.working.dir", "/");
+          put(
+              "fs.gs.delegation.token.instantiation_strategy",
+              DelegationTokenInstantiationStrategy.INSTANCE_PER_SERVICE);
         }
       };
 

@@ -25,6 +25,7 @@ import static com.google.common.base.Strings.nullToEmpty;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksumType;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType;
+import com.google.cloud.hadoop.fs.gcs.auth.DelegationTokenInstantiationStrategy;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
@@ -94,6 +95,17 @@ public class GoogleHadoopFileSystemConfiguration {
   /** Configuration key for Delegation Token binding class. Default value: none */
   public static final HadoopConfigurationProperty<String> DELEGATION_TOKEN_BINDING_CLASS =
       new HadoopConfigurationProperty<>("fs.gs.delegation.token.binding");
+
+  /**
+   * Configuration key for GCS delegation token instantiation strategy. SHARED means delegation
+   * tokens are shared across multiple instanced of Cloud storage file services . Default value:
+   * INSTANCE_PER_SERVICE
+   */
+  public static final HadoopConfigurationProperty<DelegationTokenInstantiationStrategy>
+      DELEGATION_TOKEN_INSTANTIATION_STRATEGY =
+          new HadoopConfigurationProperty<>(
+              "fs.gs.delegation.token.instantiation_strategy",
+              DelegationTokenInstantiationStrategy.INSTANCE_PER_SERVICE);
 
   /** Configuration key for GCS project ID. Default value: none */
   public static final HadoopConfigurationProperty<String> GCS_PROJECT_ID =

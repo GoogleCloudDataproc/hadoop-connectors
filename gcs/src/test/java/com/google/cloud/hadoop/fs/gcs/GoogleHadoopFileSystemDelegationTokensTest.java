@@ -23,6 +23,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.assertThrows;
 
+import com.google.cloud.hadoop.fs.gcs.auth.DelegationTokenInstantiationStrategy;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
 import com.google.cloud.hadoop.fs.gcs.auth.TestTokenIdentifierImpl;
@@ -139,6 +140,89 @@ public class GoogleHadoopFileSystemDelegationTokensTest {
     fs.close();
   }
 
+  @Test
+  public void testDelegationTokenStatisticsForSharedTokens() throws IOException {
+
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+    fs.initialize(new Path("gs://test/").toUri(), loadSharedDelegationTokenConfig());
+
+    Token<?> dt = fs.getDelegationToken("shared_token_test1");
+    assertThat(fs.getIOStatistics().counters().get(INVOCATION_GET_DELEGATION_TOKEN.getSymbol()))
+        .isEqualTo(1);
+    assertThat(fs.getIOStatistics().counters().get(DELEGATION_TOKENS_ISSUED.getSymbol()))
+        .isEqualTo(1);
+
+    // second test for renewer which is null
+    Token<?> dt2 = fs.getDelegationToken(null);
+    assertThat(fs.getIOStatistics().counters().get(INVOCATION_GET_DELEGATION_TOKEN.getSymbol()))
+        .isEqualTo(2);
+    assertThat(fs.getIOStatistics().counters().get(DELEGATION_TOKENS_ISSUED.getSymbol()))
+        .isEqualTo(2);
+    fs.close();
+  }
+
+  @Test
+  public void testDelegationTokensAreSharedForSharedTokensConfigAndSameRenewers()
+      throws IOException {
+
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+    fs.initialize(new Path("gs://test/").toUri(), loadSharedDelegationTokenConfig());
+
+    GoogleHadoopFileSystem fsOther = new GoogleHadoopFileSystem();
+    fsOther.initialize(new Path("gs://test2/").toUri(), loadSharedDelegationTokenConfig());
+
+    Token<?> dt1 = fs.getDelegationToken("current_user");
+    Token<?> dt2 = fsOther.getDelegationToken("current_user");
+    assertThat(dt1).isEqualTo(dt2);
+
+    fs.close();
+    fsOther.close();
+  }
+
+  @Test
+  public void testDelegationTokensAreSharedForSharedTokensConfigAndNullRenewers()
+      throws IOException {
+
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+    fs.initialize(new Path("gs://test/").toUri(), loadSharedDelegationTokenConfig());
+
+    GoogleHadoopFileSystem fsOther = new GoogleHadoopFileSystem();
+    fsOther.initialize(new Path("gs://test2/").toUri(), loadSharedDelegationTokenConfig());
+
+    Token<?> dt1 = fs.getDelegationToken(null);
+    Token<?> dt2 = fsOther.getDelegationToken(null);
+    assertThat(dt1).isEqualTo(dt2);
+
+    fs.close();
+    fsOther.close();
+  }
+
+  @Test
+  public void testDelegationTokensAreNotSharedForSharedTokensConfigAndDifferentRenewers()
+      throws IOException {
+
+    GoogleHadoopFileSystem fs = new GoogleHadoopFileSystem();
+    fs.initialize(new Path("gs://test/").toUri(), loadSharedDelegationTokenConfig());
+
+    GoogleHadoopFileSystem fsOther = new GoogleHadoopFileSystem();
+    fsOther.initialize(new Path("gs://test2/").toUri(), loadSharedDelegationTokenConfig());
+
+    GoogleHadoopFileSystem fsNullRenewer = new GoogleHadoopFileSystem();
+    fsNullRenewer.initialize(new Path("gs://test3/").toUri(), loadConfig());
+
+    Token<?> dt1 = fs.getDelegationToken("current_user");
+    Token<?> dt2 = fsOther.getDelegationToken("current_user2");
+    Token<?> dt3 = fsOther.getDelegationToken(null);
+
+    assertThat(dt1).isNotEqualTo(dt2);
+    assertThat(dt1).isNotEqualTo(dt3);
+    assertThat(dt3).isNotEqualTo(dt2);
+
+    fs.close();
+    fsOther.close();
+    fsNullRenewer.close();
+  }
+
   private Configuration loadConfig() {
     Configuration config = new Configuration();
 
@@ -152,6 +236,14 @@ public class GoogleHadoopFileSystemDelegationTokensTest {
         TestDelegationTokenBindingImpl.TestAccessTokenProviderImpl.TOKEN_CONFIG_PROPERTY_NAME,
         "qWDAWFA3WWFAWFAWFAW3FAWF3AWF3WFAF33GR5G5"); // Bogus auth token
 
+    return config;
+  }
+
+  private Configuration loadSharedDelegationTokenConfig() {
+    Configuration config = loadConfig();
+    config.setEnum(
+        GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_INSTANTIATION_STRATEGY.getKey(),
+        DelegationTokenInstantiationStrategy.SHARED);
     return config;
   }
 }

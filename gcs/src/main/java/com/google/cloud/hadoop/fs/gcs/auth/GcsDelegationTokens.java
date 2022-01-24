@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.fs.gcs.auth;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_INSTANTIATION_STRATEGY;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
@@ -27,6 +28,9 @@ import com.google.cloud.hadoop.fs.gcs.InstrumentatedGoogleHadoopFileSystem;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.Credentials;
@@ -59,6 +63,11 @@ public class GcsDelegationTokens extends AbstractService {
   /** Active Delegation token. */
   private Token<DelegationTokenIdentifier> boundDT;
 
+  private DelegationTokenInstantiationStrategy tokenInstantiationStrategy =
+      DelegationTokenInstantiationStrategy.INSTANCE_PER_SERVICE;
+  private static Map<Optional<String>, Token<DelegationTokenIdentifier>> sharedTokens =
+      new HashMap<>();
+
   public GcsDelegationTokens() throws IOException {
     super("GCSDelegationTokens");
     user = UserGroupInformation.getCurrentUser();
@@ -67,7 +76,8 @@ public class GcsDelegationTokens extends AbstractService {
   @Override
   public void serviceInit(Configuration conf) {
     String tokenBindingImpl = DELEGATION_TOKEN_BINDING_CLASS.get(conf, conf::get);
-
+    this.tokenInstantiationStrategy =
+        DELEGATION_TOKEN_INSTANTIATION_STRATEGY.get(conf, conf::getEnum);
     checkState(tokenBindingImpl != null, "Delegation Tokens are not configured");
 
     try {
@@ -237,6 +247,24 @@ public class GcsDelegationTokens extends AbstractService {
       // the FS was created on startup with a token, so return it.
       logger.atFine().log("Returning current token");
       return getBoundDT();
+    }
+
+    // not bounded tokens, but using shared token instantiation strategy.
+    // in this case we create or reuse token per renewer but share across multiple services.
+    if (this.tokenInstantiationStrategy == DelegationTokenInstantiationStrategy.SHARED) {
+      Optional<String> renewerKey = Optional.ofNullable(renewer);
+      synchronized (sharedTokens) {
+        if (sharedTokens.containsKey(renewerKey)) {
+          logger.atFine().log("Reusing the shared GCS delegation token");
+          return sharedTokens.get(renewerKey);
+        } else {
+          Token<DelegationTokenIdentifier> token =
+              tokenBinding.createDelegationToken(renewer, getStats());
+          sharedTokens.put(renewerKey, token);
+          logger.atFine().log("Created a shared GCS delegation token");
+          return token;
+        }
+      }
     }
 
     // not bound to a token, so create a new one.
