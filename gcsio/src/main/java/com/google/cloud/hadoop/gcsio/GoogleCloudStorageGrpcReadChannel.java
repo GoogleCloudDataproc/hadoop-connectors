@@ -800,8 +800,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     if (!isOpen()) {
       throw new ClosedChannelException();
     }
-    checkArgument(
-        newPosition >= 0, "Read position must be non-negative, but was %s", newPosition);
+    checkArgument(newPosition >= 0, "Read position must be non-negative, but was %s", newPosition);
     checkArgument(
         newPosition < size(),
         "Read position must be before end of file (%s), but was %s",
