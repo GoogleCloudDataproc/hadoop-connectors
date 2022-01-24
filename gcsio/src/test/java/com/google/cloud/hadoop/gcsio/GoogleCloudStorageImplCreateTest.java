@@ -31,7 +31,7 @@ import org.junit.runners.JUnit4;
 public class GoogleCloudStorageImplCreateTest {
   private Storage createStorage() throws IOException {
     return new Storage.Builder(
-            HttpTransportFactory.createHttpTransport(),
+            HttpTransportFactory.createHttpTransport(true),
             JacksonFactory.getDefaultInstance(),
             new RetryHttpInitializer(null, "foo-user-agent"))
         .build();

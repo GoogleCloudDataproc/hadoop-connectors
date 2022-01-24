@@ -340,6 +340,9 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.inputstream.min.range.request.size",
           GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE);
 
+  public static final HadoopConfigurationProperty<Boolean> SOCKET_KEEP_ALIVE_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.socket.keep.alive.enable", true);
+
   /** Configuration key for enabling use of the gRPC API for read/write. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.grpc.enable", false);
@@ -462,6 +465,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setEncryptionAlgorithm(GCS_ENCRYPTION_ALGORITHM.get(config, config::get))
         .setEncryptionKey(GCS_ENCRYPTION_KEY.getPassword(config))
         .setEncryptionKeyHash(GCS_ENCRYPTION_KEY_HASH.getPassword(config))
+        .setSocketKeepAlive(SOCKET_KEEP_ALIVE_ENABLE.get(config, config::getBoolean))
         .setGrpcEnabled(GCS_GRPC_ENABLE.get(config, config::getBoolean))
         .setGrpcServerAddress(GCS_GRPC_SERVER_ADDRESS.get(config, config::get))
         .setGrpcMessageTimeoutCheckInterval(

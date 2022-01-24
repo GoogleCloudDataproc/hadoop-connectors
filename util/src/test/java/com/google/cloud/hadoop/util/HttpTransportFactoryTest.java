@@ -15,16 +15,32 @@
 package com.google.cloud.hadoop.util;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.Mockito.when;
 
+import com.google.cloud.hadoop.util.HttpTransportFactory.ConfiguredSslSocketFactory;
+import java.io.IOException;
+import java.net.Socket;
 import java.net.URI;
 import java.net.URISyntaxException;
+import javax.net.ssl.SSLSocketFactory;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnit4.class)
 public class HttpTransportFactoryTest {
+
+  @Mock SSLSocketFactory mockSslSocketFactory;
+
+  @Before
+  public void setUp() {
+    MockitoAnnotations.openMocks(this);
+  }
 
   @Test
   public void testParseProxyAddress() throws Exception {
@@ -104,6 +120,50 @@ public class HttpTransportFactoryTest {
     assertThat(thrown)
         .hasMessageThat()
         .contains("Invalid proxy address 'foo-host:1234/some/path'.");
+  }
+
+  @Test
+  public void testConfiguredSocketFactoryDefaultCipherSuites() {
+    ConfiguredSslSocketFactory configuredSslSocketFactory =
+        new ConfiguredSslSocketFactory(mockSslSocketFactory, true);
+
+    String[] defaultSuites = {"testDefaultCipherSuite"};
+    when(mockSslSocketFactory.getDefaultCipherSuites()).thenReturn(defaultSuites);
+    assertThat(configuredSslSocketFactory.getDefaultCipherSuites()).isEqualTo(defaultSuites);
+  }
+
+  @Test
+  public void testConfiguredSocketFactorySupportedCipherSuites() {
+    ConfiguredSslSocketFactory configuredSslSocketFactory =
+        new ConfiguredSslSocketFactory(mockSslSocketFactory, true);
+
+    String[] supportedSuites = {"testSuite"};
+    when(mockSslSocketFactory.getSupportedCipherSuites()).thenReturn(supportedSuites);
+    assertThat(configuredSslSocketFactory.getSupportedCipherSuites()).isEqualTo(supportedSuites);
+  }
+
+  @Test
+  public void testConfiguredSocketFactorySocketKeepAlive() throws IOException {
+    ConfiguredSslSocketFactory configuredSslSocketFactory =
+        new ConfiguredSslSocketFactory(mockSslSocketFactory, true);
+
+    Socket socket = new Socket();
+    when(mockSslSocketFactory.createSocket()).thenReturn(socket);
+    Socket actual = configuredSslSocketFactory.createSocket();
+    assertSame(socket, actual);
+    assertThat(actual.getKeepAlive()).isTrue();
+  }
+
+  @Test
+  public void testConfiguredSocketFactoryNoSocketKeepAlive() throws IOException {
+    ConfiguredSslSocketFactory configuredSslSocketFactory =
+        new ConfiguredSslSocketFactory(mockSslSocketFactory, false);
+
+    Socket socket = new Socket();
+    when(mockSslSocketFactory.createSocket()).thenReturn(socket);
+    Socket actual = configuredSslSocketFactory.createSocket();
+    assertSame(socket, actual);
+    assertThat(actual.getKeepAlive()).isFalse();
   }
 
   private static URI getURI(String scheme, String host, int port) throws URISyntaxException {

@@ -78,6 +78,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.encryption.key", null);
           put("fs.gs.glob.algorithm", GlobAlgorithm.CONCURRENT);
           put("fs.gs.grpc.checksums.enable", false);
+          put("fs.gs.socket.keep.alive.enable", true);
           put("fs.gs.grpc.enable", false);
           put("fs.gs.grpc.checkinterval.timeout.ms", 1 * 1000L);
           put("fs.gs.grpc.read.metadata.timeout.ms", 60 * 1000L);
