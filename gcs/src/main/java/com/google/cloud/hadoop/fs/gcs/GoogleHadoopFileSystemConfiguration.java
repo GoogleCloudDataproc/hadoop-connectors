@@ -368,12 +368,6 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>("fs.gs.grpc.read.message.timeout.ms", 5 * 1_000L);
 
   /**
-   * Configuration key for the connection timeout (in millisecond) for gRPC read requests to GCS.
-   */
-  public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_SPEED_BYTES_PER_SEC =
-      new HadoopConfigurationProperty<>("fs.gs.grpc.read.speed.bytespersec", 50 * 1024 * 1024L);
-
-  /**
    * Configuration key for the connection timeout (in millisecond) for gRPC metadata requests to
    * GCS.
    */
@@ -502,7 +496,6 @@ public class GoogleHadoopFileSystemConfiguration {
         .setMinRangeRequestSize(GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getInt))
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
         .setGrpcReadTimeoutMillis(GCS_GRPC_READ_TIMEOUT_MS.get(config, config::getLong))
-        .setGrpcReadSpeedBytesPerSec(GCS_GRPC_READ_SPEED_BYTES_PER_SEC.get(config, config::getLong))
         .setGrpcReadMessageTimeoutMillis(
             GCS_GRPC_READ_MESSAGE_TIMEOUT_MS.get(config, config::getLong))
         .setGrpcReadMetadataTimeoutMillis(
