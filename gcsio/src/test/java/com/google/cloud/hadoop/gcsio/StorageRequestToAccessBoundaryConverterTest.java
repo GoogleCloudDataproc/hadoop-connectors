@@ -111,14 +111,29 @@ public class StorageRequestToAccessBoundaryConverterTest {
   }
 
   @Test
-  public void testTranslateObjectGetRequest() throws IOException {
+  public void testTranslateObjectGetMediaRequest() throws IOException {
     Storage.Objects.Get request = storage.objects().get(BUCKET_NAME, OBJECT_NAME);
+
+    // Indicates that this is a get media instead of get metadata request.
+    request.set("alt", "media");
 
     List<AccessBoundary> results =
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
     assertThat(results)
         .containsExactly(AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, Action.READ_OBJECTS));
+  }
+
+  @Test
+  public void testTranslateObjectGetMetadataRequest() throws IOException {
+    Storage.Objects.Get request = storage.objects().get(BUCKET_NAME, OBJECT_NAME);
+
+    List<AccessBoundary> results =
+        StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
+
+    assertThat(results)
+        .containsExactly(
+            AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, Action.GET_OBJECT_METADATA));
   }
 
   @Test

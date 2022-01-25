@@ -107,8 +107,13 @@ class StorageRequestToAccessBoundaryConverter {
   }
 
   private static List<AccessBoundary> translateObjectGetRequest(Storage.Objects.Get request) {
-    return Collections.singletonList(
-        AccessBoundary.create(request.getBucket(), request.getObject(), Action.READ_OBJECTS));
+    if (request.getOrDefault("alt", "").equals("media")) {
+      return ImmutableList.of(
+          AccessBoundary.create(request.getBucket(), request.getObject(), Action.READ_OBJECTS));
+    }
+    return ImmutableList.of(
+        AccessBoundary.create(
+            request.getBucket(), request.getObject(), Action.GET_OBJECT_METADATA));
   }
 
   private static List<AccessBoundary> translateObjectDeleteRequest(Storage.Objects.Delete request) {

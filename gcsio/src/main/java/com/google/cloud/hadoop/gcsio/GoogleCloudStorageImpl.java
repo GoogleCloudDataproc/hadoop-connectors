@@ -767,7 +767,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
       @Override
       protected Storage.Objects.Get createRequest() throws IOException {
-        return initializeRequest(super.createRequest(), resourceId.getBucketName());
+        // Creates a storage request that will be used to request media data from GCS.
+        // Sets "alt=media" query parameter to indicate that this is a media request (instead of
+        // a metadata request) so that the request can be initialized properly.
+        Storage.Objects.Get request = super.createRequest();
+        request.set("alt", "media");
+        return initializeRequest(request, resourceId.getBucketName());
       }
     };
   }
