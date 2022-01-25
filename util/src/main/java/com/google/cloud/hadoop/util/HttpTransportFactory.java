@@ -43,19 +43,15 @@ public class HttpTransportFactory {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   /**
-   * Create an {@link HttpTransport} based on an type class.
+   * Create an {@link HttpTransport} with socketKeepAlive true
    *
    * @return The resulting HttpTransport.
    * @throws IllegalArgumentException If the proxy address is invalid.
    * @throws IOException If there is an issue connecting to Google's Certification server.
-   * @param socketKeepAlive Whether to keep TCP socket alive
    */
-  public static HttpTransport createHttpTransport(boolean socketKeepAlive) throws IOException {
+  public static HttpTransport createHttpTransport() throws IOException {
     return createHttpTransport(
-        /* proxyAddress= */ null,
-        /* proxyUsername= */ null,
-        /* proxyPassword= */ null,
-        socketKeepAlive);
+        /* proxyAddress= */ null, /* proxyUsername= */ null, /* proxyPassword= */ null, true);
   }
 
   /**

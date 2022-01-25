@@ -212,7 +212,7 @@ public class CredentialFactory {
    */
   private static synchronized HttpTransport getStaticHttpTransport() throws IOException {
     if (staticHttpTransport == null) {
-      staticHttpTransport = HttpTransportFactory.createHttpTransport(SOCKET_KEEP_ALIVE);
+      staticHttpTransport = HttpTransportFactory.createHttpTransport();
     }
     return staticHttpTransport;
   }

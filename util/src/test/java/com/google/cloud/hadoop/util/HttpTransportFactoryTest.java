@@ -15,27 +15,28 @@
 package com.google.cloud.hadoop.util;
 
 import static com.google.common.truth.Truth.assertThat;
-import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
-import static org.mockito.Mockito.when;
 
 import com.google.cloud.hadoop.util.HttpTransportFactory.ConfiguredSslSocketFactory;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.Socket;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.UnknownHostException;
 import javax.net.ssl.SSLSocketFactory;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnit4.class)
 public class HttpTransportFactoryTest {
 
-  @Mock SSLSocketFactory mockSslSocketFactory;
+  private static final FakeSslSocketFactory FAKE_SOCKET_FACTORY = new FakeSslSocketFactory();
+  private static final String[] SUPPORTED_TEST_SUITES = {"testSuite"};
+  private static final String[] DEFAULT_CIPHER_SUITES = {"testDefaultCipherSuite"};
 
   @Before
   public void setUp() {
@@ -125,45 +126,82 @@ public class HttpTransportFactoryTest {
   @Test
   public void testConfiguredSocketFactoryDefaultCipherSuites() {
     ConfiguredSslSocketFactory configuredSslSocketFactory =
-        new ConfiguredSslSocketFactory(mockSslSocketFactory, true);
+        new ConfiguredSslSocketFactory(FAKE_SOCKET_FACTORY, true);
 
-    String[] defaultSuites = {"testDefaultCipherSuite"};
-    when(mockSslSocketFactory.getDefaultCipherSuites()).thenReturn(defaultSuites);
-    assertThat(configuredSslSocketFactory.getDefaultCipherSuites()).isEqualTo(defaultSuites);
+    assertThat(configuredSslSocketFactory.getDefaultCipherSuites())
+        .isEqualTo(DEFAULT_CIPHER_SUITES);
   }
 
   @Test
   public void testConfiguredSocketFactorySupportedCipherSuites() {
     ConfiguredSslSocketFactory configuredSslSocketFactory =
-        new ConfiguredSslSocketFactory(mockSslSocketFactory, true);
+        new ConfiguredSslSocketFactory(FAKE_SOCKET_FACTORY, true);
 
-    String[] supportedSuites = {"testSuite"};
-    when(mockSslSocketFactory.getSupportedCipherSuites()).thenReturn(supportedSuites);
-    assertThat(configuredSslSocketFactory.getSupportedCipherSuites()).isEqualTo(supportedSuites);
+    assertThat(configuredSslSocketFactory.getSupportedCipherSuites())
+        .isEqualTo(SUPPORTED_TEST_SUITES);
   }
 
   @Test
   public void testConfiguredSocketFactorySocketKeepAlive() throws IOException {
     ConfiguredSslSocketFactory configuredSslSocketFactory =
-        new ConfiguredSslSocketFactory(mockSslSocketFactory, true);
+        new ConfiguredSslSocketFactory(FAKE_SOCKET_FACTORY, true);
 
-    Socket socket = new Socket();
-    when(mockSslSocketFactory.createSocket()).thenReturn(socket);
     Socket actual = configuredSslSocketFactory.createSocket();
-    assertSame(socket, actual);
     assertThat(actual.getKeepAlive()).isTrue();
   }
 
   @Test
   public void testConfiguredSocketFactoryNoSocketKeepAlive() throws IOException {
     ConfiguredSslSocketFactory configuredSslSocketFactory =
-        new ConfiguredSslSocketFactory(mockSslSocketFactory, false);
+        new ConfiguredSslSocketFactory(FAKE_SOCKET_FACTORY, false);
 
-    Socket socket = new Socket();
-    when(mockSslSocketFactory.createSocket()).thenReturn(socket);
     Socket actual = configuredSslSocketFactory.createSocket();
-    assertSame(socket, actual);
     assertThat(actual.getKeepAlive()).isFalse();
+  }
+
+  static class FakeSslSocketFactory extends SSLSocketFactory {
+
+    @Override
+    public String[] getDefaultCipherSuites() {
+      return DEFAULT_CIPHER_SUITES;
+    }
+
+    @Override
+    public String[] getSupportedCipherSuites() {
+      return SUPPORTED_TEST_SUITES;
+    }
+
+    @Override
+    public Socket createSocket() {
+      return new Socket();
+    }
+
+    @Override
+    public Socket createSocket(Socket socket, String s, int i, boolean b) throws IOException {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Socket createSocket(String s, int i) throws IOException, UnknownHostException {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Socket createSocket(String s, int i, InetAddress inetAddress, int i1)
+        throws IOException, UnknownHostException {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Socket createSocket(InetAddress inetAddress, int i) throws IOException {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Socket createSocket(InetAddress inetAddress, int i, InetAddress inetAddress1, int i1)
+        throws IOException {
+      throw new UnsupportedOperationException();
+    }
   }
 
   private static URI getURI(String scheme, String host, int port) throws URISyntaxException {
