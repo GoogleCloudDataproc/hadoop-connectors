@@ -745,6 +745,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       requestContext.close();
       requestContext = null;
     }
+    // gRPC read calls use blocking server streaming api. On cancellation, iterator can be leaked.
+    // To avoid oom, we drain the iterator ref b/210660938
     drainIterator();
     resIterator = null;
     List<InputStream> unclosedStreams = getObjectMediaResponseMarshaller.popAllStreams();
@@ -758,6 +760,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     contentChannelEndOffset = -1;
   }
 
+  /** Drains the iterator */
   private void drainIterator() {
     if (resIterator == null) {
       return;
