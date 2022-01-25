@@ -105,7 +105,7 @@ public class GhfsInstrumentation
   /**
    * This is the IOStatistics store for the GoogleHadoopFileSystem instance. It is not kept in sync
    * with the rest of the Ghfsinstrumentation. Most inner statistics implementation classes only
-   * update this store when it is pushed back, such as as in close().
+   * update this store when it is pushed back, such as in close().
    */
   private final IOStatisticsStore instanceIOStatistics;
 

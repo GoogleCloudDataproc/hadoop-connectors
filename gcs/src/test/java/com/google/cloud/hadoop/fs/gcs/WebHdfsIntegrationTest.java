@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.net.URI;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -67,18 +66,6 @@ public class WebHdfsIntegrationTest extends HadoopFileSystemTestBase {
           Configuration config = new Configuration();
           config.set("fs.default.name", hdfsRoot);
           ghfs = FileSystem.get(hdfsUri, config);
-          ghfsFileSystemDescriptor =
-              new FileSystemDescriptor() {
-                @Override
-                public Path getFileSystemRoot() {
-                  return new Path(hdfsRoot);
-                }
-
-                @Override
-                public String getScheme() {
-                  return getFileSystemRoot().toUri().getScheme();
-                }
-              };
 
           postCreateInit();
           ghfsHelper.setIgnoreStatistics();

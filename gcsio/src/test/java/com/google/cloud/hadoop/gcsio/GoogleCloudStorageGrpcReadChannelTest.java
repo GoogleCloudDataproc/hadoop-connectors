@@ -8,7 +8,6 @@ import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonE
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.truth.Truth.assertThat;
 import static java.lang.Math.min;
-import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -101,8 +100,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   private ApiErrorExtractor errorExtractor;
   private Get get;
   private StorageObject storageObject;
-  private static final Watchdog watchdog =
-      Watchdog.create(Duration.ofMillis(100), newSingleThreadScheduledExecutor());
+  private static final Watchdog watchdog = Watchdog.create(Duration.ofMillis(100));
 
   @Before
   public void setUp() throws Exception {
@@ -573,8 +571,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   @Test
   public void singleReadSucceedsWithValidObjectChecksum() throws Exception {
     fakeService.setObject(
-        DEFAULT_OBJECT
-            .toBuilder()
+        DEFAULT_OBJECT.toBuilder()
             .setChecksums(ObjectChecksums.newBuilder().setCrc32C(DEFAULT_OBJECT_CRC32C))
             .build());
     GoogleCloudStorageReadOptions options =
@@ -590,8 +587,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   @Test
   public void partialReadSucceedsWithInvalidObjectChecksum() throws Exception {
     fakeService.setObject(
-        DEFAULT_OBJECT
-            .toBuilder()
+        DEFAULT_OBJECT.toBuilder()
             .setChecksums(ObjectChecksums.newBuilder().setCrc32C(DEFAULT_OBJECT_CRC32C))
             .build());
     GoogleCloudStorageReadOptions options =
@@ -608,8 +604,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   @Test
   public void multipleSequentialReadsSucceedWithValidObjectChecksum() throws Exception {
     fakeService.setObject(
-        DEFAULT_OBJECT
-            .toBuilder()
+        DEFAULT_OBJECT.toBuilder()
             .setChecksums(ObjectChecksums.newBuilder().setCrc32C(DEFAULT_OBJECT_CRC32C))
             .build());
     GoogleCloudStorageReadOptions options =
@@ -673,8 +668,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   @Test
   public void multipleReadsIgnoreObjectChecksumForLatestGenerationReads() throws Exception {
     fakeService.setObject(
-        DEFAULT_OBJECT
-            .toBuilder()
+        DEFAULT_OBJECT.toBuilder()
             .setChecksums(ObjectChecksums.newBuilder().setCrc32C(DEFAULT_OBJECT_CRC32C))
             .build());
     GoogleCloudStorageReadOptions options =
@@ -1522,34 +1516,6 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
     readChannel.close();
     assertFalse(readChannel.isOpen());
-  }
-
-  @Test
-  public void readTimeOutBasedOnObjectSize() {
-    GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder()
-            .setGrpcReadTimeoutMillis(60 * 1000) // 60 sec
-            .setGrpcReadSpeedBytesPerSec(100 * 1024 * 1024) // 100 MBps
-            .build();
-    long objectSize = 500 * 1024 * 1024; // 500MB
-    long readTimeoutMillis =
-        GoogleCloudStorageGrpcReadChannel.getReadTimeoutMillis(readOptions, objectSize);
-    // 60 sec + 5 sec
-    assertEquals(65000, readTimeoutMillis);
-  }
-
-  @Test
-  public void readTimeOutBasedOnObjectSizeMisconfigured() {
-    GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder()
-            .setGrpcReadTimeoutMillis(60 * 1000) // 60 sec
-            .setGrpcReadSpeedBytesPerSec(0) // 0 Bps
-            .build();
-    long objectSize = 500 * 1024 * 1024; // 500MB
-    long readTimeoutMillis =
-        GoogleCloudStorageGrpcReadChannel.getReadTimeoutMillis(readOptions, objectSize);
-    // 60 sec + 10 sec (500 MB at 50 MBps of default value)
-    assertEquals(70000, readTimeoutMillis);
   }
 
   private GoogleCloudStorageGrpcReadChannel newReadChannel() throws IOException {

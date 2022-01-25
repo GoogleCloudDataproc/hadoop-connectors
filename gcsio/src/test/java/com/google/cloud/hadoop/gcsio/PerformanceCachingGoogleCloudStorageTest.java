@@ -55,8 +55,7 @@ public class PerformanceCachingGoogleCloudStorageTest {
           .build();
 
   private static final CreateObjectOptions CREATE_OBJECT_OPTIONS =
-      CreateObjectOptions.DEFAULT_OVERWRITE
-          .toBuilder()
+      CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
           .setContentType("test_content_type")
           .setMetadata(TEST_METADATA)
           .build();
