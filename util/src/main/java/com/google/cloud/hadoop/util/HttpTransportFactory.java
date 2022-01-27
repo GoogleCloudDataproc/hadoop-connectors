@@ -233,7 +233,7 @@ public class HttpTransportFactory {
           wrappedSockedFactory.createSocket(address, port, clientAddress, clientPort));
     }
 
-    private Socket setSocketKeepAlive(Socket socket) throws SocketException {
+    private static Socket setSocketKeepAlive(Socket socket) throws SocketException {
       socket.setKeepAlive(true);
       return socket;
     }

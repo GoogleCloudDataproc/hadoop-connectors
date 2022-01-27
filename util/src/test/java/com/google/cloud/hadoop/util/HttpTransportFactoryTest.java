@@ -19,6 +19,7 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.util.HttpTransportFactory.SslKeepAliveSocketFactory;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.URI;
@@ -138,8 +139,23 @@ public class HttpTransportFactoryTest {
     SslKeepAliveSocketFactory sslKeepAliveSocketFactory =
         new SslKeepAliveSocketFactory(FAKE_SOCKET_FACTORY);
 
-    Socket actual = sslKeepAliveSocketFactory.createSocket();
-    assertThat(actual.getKeepAlive()).isTrue();
+    assertThat(sslKeepAliveSocketFactory.createSocket().getKeepAlive()).isTrue();
+
+    assertThat(sslKeepAliveSocketFactory.createSocket(null, "localhost", 80, false).getKeepAlive())
+        .isTrue();
+
+    assertThat(sslKeepAliveSocketFactory.createSocket(null, null, false).getKeepAlive()).isTrue();
+
+    assertThat(sslKeepAliveSocketFactory.createSocket("localhost", 80).getKeepAlive()).isTrue();
+
+    assertThat(sslKeepAliveSocketFactory.createSocket("localhost", 80, null, 443).getKeepAlive())
+        .isTrue();
+
+    InetAddress fakeInet = InetAddress.getByName("10.0.0.0");
+    assertThat(sslKeepAliveSocketFactory.createSocket(fakeInet, 443).getKeepAlive()).isTrue();
+
+    assertThat(sslKeepAliveSocketFactory.createSocket(fakeInet, 443, fakeInet, 80).getKeepAlive())
+        .isTrue();
   }
 
   private static class FakeSslSocketFactory extends SSLSocketFactory {
@@ -161,29 +177,35 @@ public class HttpTransportFactoryTest {
 
     @Override
     public Socket createSocket(Socket socket, String s, int i, boolean b) throws IOException {
-      throw new UnsupportedOperationException();
+      return createSocket();
+    }
+
+    @Override
+    public Socket createSocket(Socket socket, InputStream inputStream, boolean b)
+        throws IOException {
+      return createSocket();
     }
 
     @Override
     public Socket createSocket(String s, int i) throws IOException, UnknownHostException {
-      throw new UnsupportedOperationException();
+      return createSocket();
     }
 
     @Override
     public Socket createSocket(String s, int i, InetAddress inetAddress, int i1)
         throws IOException, UnknownHostException {
-      throw new UnsupportedOperationException();
+      return createSocket();
     }
 
     @Override
     public Socket createSocket(InetAddress inetAddress, int i) throws IOException {
-      throw new UnsupportedOperationException();
+      return createSocket();
     }
 
     @Override
     public Socket createSocket(InetAddress inetAddress, int i, InetAddress inetAddress1, int i1)
         throws IOException {
-      throw new UnsupportedOperationException();
+      return createSocket();
     }
   }
 
