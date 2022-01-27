@@ -104,7 +104,7 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<DelegationTokenInstantiationStrategy>
       DELEGATION_TOKEN_INSTANTIATION_STRATEGY =
           new HadoopConfigurationProperty<>(
-              "fs.gs.delegation.token.instantiation_strategy",
+              "fs.gs.delegation.token.instantiation.strategy",
               DelegationTokenInstantiationStrategy.INSTANCE_PER_SERVICE);
 
   /** Configuration key for GCS project ID. Default value: none */

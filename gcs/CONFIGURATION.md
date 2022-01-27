@@ -36,14 +36,16 @@
 *   `fs.gs.delegation.token.binding` (not set by default)
 
     Delegation Token binding class.
-*   `fs.gs.delegation.token.instantiation_strategy` (default `INSTANCE_PER_SERVICE`)
+
+*   `fs.gs.delegation.token.instantiation.strategy` (default `INSTANCE_PER_SERVICE`)
 
     Defines GCS delegation token instantiation strategy.
 
     Valid values:
       * `INSTANCE_PER_SERVICE`  New token instance is created for each service instance;
-      * `SHARED` -  Token instance is shared across the instances of GCS services. 
+      * `SHARED` -  Token instance is shared across the instances of GCS services.
          Different renewers still get unique token instances;
+
 *   `fs.gs.bucket.delete.enable` (default: `false`)
 
     If `true`, recursive delete on a path that refers to a Cloud Storage bucket

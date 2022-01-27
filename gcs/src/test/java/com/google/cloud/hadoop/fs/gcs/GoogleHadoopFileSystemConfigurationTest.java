@@ -74,6 +74,9 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.copy.with.rewrite.enable", true);
           put("fs.gs.create.items.conflict.check.enable", true);
           put("fs.gs.delegation.token.binding", null);
+          put(
+              "fs.gs.delegation.token.instantiation.strategy",
+              DelegationTokenInstantiationStrategy.INSTANCE_PER_SERVICE);
           put("fs.gs.encryption.algorithm", null);
           put("fs.gs.encryption.key.hash", null);
           put("fs.gs.encryption.key", null);
@@ -127,9 +130,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.storage.root.url", "https://storage.googleapis.com/");
           put("fs.gs.storage.service.path", "storage/v1/");
           put("fs.gs.working.dir", "/");
-          put(
-              "fs.gs.delegation.token.instantiation_strategy",
-              DelegationTokenInstantiationStrategy.INSTANCE_PER_SERVICE);
         }
       };
 

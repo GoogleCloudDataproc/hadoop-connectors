@@ -64,7 +64,7 @@ public class GcsDelegationTokens extends AbstractService {
 
   private DelegationTokenInstantiationStrategy tokenInstantiationStrategy =
       DelegationTokenInstantiationStrategy.INSTANCE_PER_SERVICE;
-  private static ConcurrentHashMap<Optional<String>, Token<DelegationTokenIdentifier>>
+  private static final ConcurrentHashMap<Optional<String>, Token<DelegationTokenIdentifier>>
       sharedTokens = new ConcurrentHashMap<>();
 
   public GcsDelegationTokens() throws IOException {
@@ -75,8 +75,7 @@ public class GcsDelegationTokens extends AbstractService {
   @Override
   public void serviceInit(Configuration conf) {
     String tokenBindingImpl = DELEGATION_TOKEN_BINDING_CLASS.get(conf, conf::get);
-    this.tokenInstantiationStrategy =
-        DELEGATION_TOKEN_INSTANTIATION_STRATEGY.get(conf, conf::getEnum);
+    tokenInstantiationStrategy = DELEGATION_TOKEN_INSTANTIATION_STRATEGY.get(conf, conf::getEnum);
     checkState(tokenBindingImpl != null, "Delegation Tokens are not configured");
 
     try {
