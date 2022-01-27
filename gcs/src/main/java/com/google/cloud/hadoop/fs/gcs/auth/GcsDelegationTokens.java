@@ -27,9 +27,9 @@ import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
+import java.io.UncheckedIOException;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.Credentials;
@@ -64,8 +64,8 @@ public class GcsDelegationTokens extends AbstractService {
 
   private DelegationTokenInstantiationStrategy tokenInstantiationStrategy =
       DelegationTokenInstantiationStrategy.INSTANCE_PER_SERVICE;
-  private static Map<Optional<String>, Token<DelegationTokenIdentifier>> sharedTokens =
-      new HashMap<>();
+  private static ConcurrentHashMap<Optional<String>, Token<DelegationTokenIdentifier>>
+      sharedTokens = new ConcurrentHashMap<>();
 
   public GcsDelegationTokens() throws IOException {
     super("GCSDelegationTokens");
@@ -251,18 +251,21 @@ public class GcsDelegationTokens extends AbstractService {
     // not bounded tokens, but using shared token instantiation strategy.
     // in this case we create or reuse token per renewer but share across multiple services.
     if (this.tokenInstantiationStrategy == DelegationTokenInstantiationStrategy.SHARED) {
-      Optional<String> renewerKey = Optional.ofNullable(renewer);
-      synchronized (sharedTokens) {
-        if (sharedTokens.containsKey(renewerKey)) {
-          logger.atFine().log("Reusing the shared GCS delegation token");
-          return sharedTokens.get(renewerKey);
-        } else {
-          Token<DelegationTokenIdentifier> token =
-              tokenBinding.createDelegationToken(renewer, getStats());
-          sharedTokens.put(renewerKey, token);
-          logger.atFine().log("Created a shared GCS delegation token");
-          return token;
-        }
+      try {
+        return sharedTokens.computeIfAbsent(
+            Optional.ofNullable(renewer),
+            k -> {
+              logger.atFine().log("Created a shared GCS delegation token");
+              try {
+                return tokenBinding.createDelegationToken(k.orElse(null), getStats());
+              } catch (IOException ex) {
+                // Wrapping into an unchecked exception
+                throw new UncheckedIOException(ex);
+              }
+            });
+      } catch (UncheckedIOException ex) {
+        // Unwrapping from the unchecked exception
+        throw ex.getCause();
       }
     }
 

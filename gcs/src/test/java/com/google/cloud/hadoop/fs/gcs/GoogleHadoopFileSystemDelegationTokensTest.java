@@ -173,7 +173,7 @@ public class GoogleHadoopFileSystemDelegationTokensTest {
 
     Token<?> dt1 = fs.getDelegationToken("current_user");
     Token<?> dt2 = fsOther.getDelegationToken("current_user");
-    assertThat(dt1).isEqualTo(dt2);
+    assertThat(dt1).isSameInstanceAs(dt2);
 
     fs.close();
     fsOther.close();
@@ -191,7 +191,7 @@ public class GoogleHadoopFileSystemDelegationTokensTest {
 
     Token<?> dt1 = fs.getDelegationToken(null);
     Token<?> dt2 = fsOther.getDelegationToken(null);
-    assertThat(dt1).isEqualTo(dt2);
+    assertThat(dt1).isSameInstanceAs(dt2);
 
     fs.close();
     fsOther.close();
