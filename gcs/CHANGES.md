@@ -1,5 +1,6 @@
 ### 2.2.5 - 2021-XX-XX
-1. Enable TCP keep alive by default in all HttpTransport
+
+1.  Enable TCP keep alive by default.
 
 ### 2.2.4 - 2021-11-05
 
