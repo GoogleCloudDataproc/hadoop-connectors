@@ -98,7 +98,7 @@ public class GoogleHadoopFileSystemConfiguration {
 
   /**
    * Configuration key for GCS delegation token instantiation strategy. SHARED means delegation
-   * tokens are shared across multiple instanced of Cloud storage file services . Default value:
+   * tokens are shared across multiple instanced of Cloud storage file services. Default value:
    * INSTANCE_PER_SERVICE
    */
   public static final HadoopConfigurationProperty<DelegationTokenInstantiationStrategy>
