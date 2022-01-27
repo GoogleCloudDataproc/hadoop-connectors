@@ -121,7 +121,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.requester.pays.mode", RequesterPaysMode.DISABLED);
           put("fs.gs.requester.pays.project.id", null);
           put("fs.gs.rewrite.max.bytes.per.call", 512 * 1024 * 1024L);
-          put("fs.gs.socket.keep.alive.enable", true);
           put("fs.gs.status.parallel.enable", true);
           put("fs.gs.storage.http.headers.", ImmutableMap.of());
           put("fs.gs.storage.root.url", "https://storage.googleapis.com/");

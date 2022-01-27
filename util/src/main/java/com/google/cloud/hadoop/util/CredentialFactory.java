@@ -62,7 +62,6 @@ public class CredentialFactory {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   static final String CREDENTIAL_ENV_VAR = "GOOGLE_APPLICATION_CREDENTIALS";
-  private static final boolean SOCKET_KEEP_ALIVE = true;
 
   /**
    * Simple HttpRequestInitializer that retries requests that result in 5XX response codes and IO
@@ -422,10 +421,7 @@ public class CredentialFactory {
     if (transport == null) {
       transport =
           HttpTransportFactory.createHttpTransport(
-              options.getProxyAddress(),
-              options.getProxyUsername(),
-              options.getProxyPassword(),
-              SOCKET_KEEP_ALIVE);
+              options.getProxyAddress(), options.getProxyUsername(), options.getProxyPassword());
     }
     return transport;
   }

@@ -447,10 +447,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       GoogleCloudStorageOptions options = gcsFsOptions.getCloudStorageOptions();
       HttpTransport httpTransport =
           HttpTransportFactory.createHttpTransport(
-              options.getProxyAddress(),
-              options.getProxyUsername(),
-              options.getProxyPassword(),
-              options.getSocketKeepAlive());
+              options.getProxyAddress(), options.getProxyUsername(), options.getProxyPassword());
       GoogleCredential impersonatedCredential =
           new GoogleCredentialWithIamAccessToken(
               httpTransport,

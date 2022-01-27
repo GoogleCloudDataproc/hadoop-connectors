@@ -17,7 +17,7 @@ package com.google.cloud.hadoop.util;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
-import com.google.cloud.hadoop.util.HttpTransportFactory.ConfiguredSslSocketFactory;
+import com.google.cloud.hadoop.util.HttpTransportFactory.SslKeepAliveSocketFactory;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
@@ -25,11 +25,9 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import javax.net.ssl.SSLSocketFactory;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnit4.class)
 public class HttpTransportFactoryTest {
@@ -37,11 +35,6 @@ public class HttpTransportFactoryTest {
   private static final FakeSslSocketFactory FAKE_SOCKET_FACTORY = new FakeSslSocketFactory();
   private static final String[] SUPPORTED_TEST_SUITES = {"testSuite"};
   private static final String[] DEFAULT_CIPHER_SUITES = {"testDefaultCipherSuite"};
-
-  @Before
-  public void setUp() {
-    MockitoAnnotations.openMocks(this);
-  }
 
   @Test
   public void testParseProxyAddress() throws Exception {
@@ -124,42 +117,32 @@ public class HttpTransportFactoryTest {
   }
 
   @Test
-  public void testConfiguredSocketFactoryDefaultCipherSuites() {
-    ConfiguredSslSocketFactory configuredSslSocketFactory =
-        new ConfiguredSslSocketFactory(FAKE_SOCKET_FACTORY, true);
+  public void testKeepAliveSocketFactoryDefaultCipherSuites() {
+    SslKeepAliveSocketFactory sslKeepAliveSocketFactory =
+        new SslKeepAliveSocketFactory(FAKE_SOCKET_FACTORY);
 
-    assertThat(configuredSslSocketFactory.getDefaultCipherSuites())
-        .isEqualTo(DEFAULT_CIPHER_SUITES);
+    assertThat(sslKeepAliveSocketFactory.getDefaultCipherSuites()).isEqualTo(DEFAULT_CIPHER_SUITES);
   }
 
   @Test
-  public void testConfiguredSocketFactorySupportedCipherSuites() {
-    ConfiguredSslSocketFactory configuredSslSocketFactory =
-        new ConfiguredSslSocketFactory(FAKE_SOCKET_FACTORY, true);
+  public void testKeepAliveSocketFactorySupportedCipherSuites() {
+    SslKeepAliveSocketFactory sslKeepAliveSocketFactory =
+        new SslKeepAliveSocketFactory(FAKE_SOCKET_FACTORY);
 
-    assertThat(configuredSslSocketFactory.getSupportedCipherSuites())
+    assertThat(sslKeepAliveSocketFactory.getSupportedCipherSuites())
         .isEqualTo(SUPPORTED_TEST_SUITES);
   }
 
   @Test
-  public void testConfiguredSocketFactorySocketKeepAlive() throws IOException {
-    ConfiguredSslSocketFactory configuredSslSocketFactory =
-        new ConfiguredSslSocketFactory(FAKE_SOCKET_FACTORY, true);
+  public void testKeepAliveSocketFactoryKeepAliveTrue() throws IOException {
+    SslKeepAliveSocketFactory sslKeepAliveSocketFactory =
+        new SslKeepAliveSocketFactory(FAKE_SOCKET_FACTORY);
 
-    Socket actual = configuredSslSocketFactory.createSocket();
+    Socket actual = sslKeepAliveSocketFactory.createSocket();
     assertThat(actual.getKeepAlive()).isTrue();
   }
 
-  @Test
-  public void testConfiguredSocketFactoryNoSocketKeepAlive() throws IOException {
-    ConfiguredSslSocketFactory configuredSslSocketFactory =
-        new ConfiguredSslSocketFactory(FAKE_SOCKET_FACTORY, false);
-
-    Socket actual = configuredSslSocketFactory.createSocket();
-    assertThat(actual.getKeepAlive()).isFalse();
-  }
-
-  static class FakeSslSocketFactory extends SSLSocketFactory {
+  private static class FakeSslSocketFactory extends SSLSocketFactory {
 
     @Override
     public String[] getDefaultCipherSuites() {

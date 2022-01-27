@@ -92,9 +92,6 @@ public abstract class GoogleCloudStorageOptions {
   /** Default setting for grpc message timeout check interval (in milliseconds) */
   public static final long GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL = 1000;
 
-  /** Default setting to keep TCP socket in HTTPTransport alive or not */
-  public static final boolean SOCKET_KEEP_ALIVE_DEFAULT = true;
-
   /** Default setting for GCS HTTP request headers. */
   public static final ImmutableMap<String, String> HTTP_REQUEST_HEADERS_DEFAULT = ImmutableMap.of();
 
@@ -122,8 +119,7 @@ public abstract class GoogleCloudStorageOptions {
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
         .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
         .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT)
-        .setGrpcMessageTimeoutCheckInterval(GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL)
-        .setSocketKeepAlive(SOCKET_KEEP_ALIVE_DEFAULT);
+        .setGrpcMessageTimeoutCheckInterval(GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL);
   }
 
   public abstract Builder toBuilder();
@@ -193,8 +189,6 @@ public abstract class GoogleCloudStorageOptions {
   public abstract RedactedString getEncryptionKeyHash();
 
   public abstract long getGrpcMessageTimeoutCheckInterval();
-
-  public abstract boolean getSocketKeepAlive();
 
   public RetryHttpInitializerOptions toRetryHttpInitializerOptions() {
     return RetryHttpInitializerOptions.builder()
@@ -274,8 +268,6 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setGrpcMessageTimeoutCheckInterval(
         long grpcMessageTimeoutInMillisCheckInterval);
-
-    public abstract Builder setSocketKeepAlive(boolean socketKeepAlive);
 
     abstract GoogleCloudStorageOptions autoBuild();
 

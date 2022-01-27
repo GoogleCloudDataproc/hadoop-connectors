@@ -51,7 +51,7 @@ public class HttpTransportFactory {
    */
   public static HttpTransport createHttpTransport() throws IOException {
     return createHttpTransport(
-        /* proxyAddress= */ null, /* proxyUsername= */ null, /* proxyPassword= */ null, true);
+        /* proxyAddress= */ null, /* proxyUsername= */ null, /* proxyPassword= */ null);
   }
 
   /**
@@ -63,7 +63,6 @@ public class HttpTransportFactory {
    *     username will be used.
    * @param proxyPassword The HTTP proxy password to use with the transport. If empty no proxy
    *     password will be used.
-   * @param socketKeepAlive Whether to keep TCP socket alive
    * @return The resulting HttpTransport.
    * @throws IllegalArgumentException If the proxy address is invalid.
    * @throws IOException If there is an issue connecting to Google's Certification server.
@@ -71,8 +70,7 @@ public class HttpTransportFactory {
   public static HttpTransport createHttpTransport(
       @Nullable String proxyAddress,
       @Nullable RedactedString proxyUsername,
-      @Nullable RedactedString proxyPassword,
-      boolean socketKeepAlive)
+      @Nullable RedactedString proxyPassword)
       throws IOException {
     logger.atFiner().log(
         "createHttpTransport(%s, %s, %s)", proxyAddress, proxyUsername, proxyPassword);
@@ -89,7 +87,7 @@ public class HttpTransportFactory {
               ? new PasswordAuthentication(
                   proxyUsername.value(), proxyPassword.value().toCharArray())
               : null;
-      return createNetHttpTransport(proxyUri, proxyAuth, socketKeepAlive);
+      return createNetHttpTransport(proxyUri, proxyAuth);
     } catch (GeneralSecurityException e) {
       throw new IOException(e);
     }
@@ -105,7 +103,7 @@ public class HttpTransportFactory {
    * @throws GeneralSecurityException If there is a security issue with the keystore.
    */
   public static NetHttpTransport createNetHttpTransport(
-      @Nullable URI proxyUri, @Nullable PasswordAuthentication proxyAuth, boolean socketKeepAlive)
+      @Nullable URI proxyUri, @Nullable PasswordAuthentication proxyAuth)
       throws IOException, GeneralSecurityException {
     checkArgument(
         proxyUri != null || proxyAuth == null,
@@ -128,9 +126,8 @@ public class HttpTransportFactory {
           });
     }
 
-    ConfiguredSslSocketFactory sslSocketFactory =
-        new ConfiguredSslSocketFactory(
-            HttpsURLConnection.getDefaultSSLSocketFactory(), socketKeepAlive);
+    SslKeepAliveSocketFactory sslSocketFactory =
+        new SslKeepAliveSocketFactory(HttpsURLConnection.getDefaultSSLSocketFactory());
     return new NetHttpTransport.Builder()
         .trustCertificates(GoogleUtils.getCertificateTrustStore())
         .setSslSocketFactory(sslSocketFactory)
@@ -178,16 +175,14 @@ public class HttpTransportFactory {
     }
   }
 
-  /** Wrapper class to inject socketKeepAlive property while creating the socket */
-  static class ConfiguredSslSocketFactory extends SSLSocketFactory {
+  /** Wrapper class to have socketKeepAlive property while creating the socket */
+  @VisibleForTesting
+  static class SslKeepAliveSocketFactory extends SSLSocketFactory {
 
     private final SSLSocketFactory wrappedSockedFactory;
-    private final boolean socketKeepAlive;
 
-    public ConfiguredSslSocketFactory(
-        SSLSocketFactory wrappedSocketFactory, boolean socketKeepAlive) {
+    public SslKeepAliveSocketFactory(SSLSocketFactory wrappedSocketFactory) {
       this.wrappedSockedFactory = wrappedSocketFactory;
-      this.socketKeepAlive = socketKeepAlive;
     }
 
     @Override
@@ -202,44 +197,44 @@ public class HttpTransportFactory {
 
     @Override
     public Socket createSocket() throws IOException {
-      return configureSocket(wrappedSockedFactory.createSocket());
+      return setSocketKeepAlive(wrappedSockedFactory.createSocket());
     }
 
     @Override
     public Socket createSocket(Socket s, InputStream consumed, boolean autoClose)
         throws IOException {
-      return configureSocket(wrappedSockedFactory.createSocket(s, consumed, autoClose));
+      return setSocketKeepAlive(wrappedSockedFactory.createSocket(s, consumed, autoClose));
     }
 
     @Override
     public Socket createSocket(Socket s, String host, int port, boolean autoClose)
         throws IOException {
-      return configureSocket(wrappedSockedFactory.createSocket(s, host, port, autoClose));
+      return setSocketKeepAlive(wrappedSockedFactory.createSocket(s, host, port, autoClose));
     }
 
     public Socket createSocket(String host, int port) throws IOException {
-      return configureSocket(wrappedSockedFactory.createSocket(host, port));
+      return setSocketKeepAlive(wrappedSockedFactory.createSocket(host, port));
     }
 
     public Socket createSocket(InetAddress address, int port) throws IOException {
-      return configureSocket(wrappedSockedFactory.createSocket(address, port));
+      return setSocketKeepAlive(wrappedSockedFactory.createSocket(address, port));
     }
 
     public Socket createSocket(String host, int port, InetAddress clientAddress, int clientPort)
         throws IOException {
-      return configureSocket(
+      return setSocketKeepAlive(
           wrappedSockedFactory.createSocket(host, port, clientAddress, clientPort));
     }
 
     public Socket createSocket(
         InetAddress address, int port, InetAddress clientAddress, int clientPort)
         throws IOException {
-      return configureSocket(
+      return setSocketKeepAlive(
           wrappedSockedFactory.createSocket(address, port, clientAddress, clientPort));
     }
 
-    private Socket configureSocket(Socket socket) throws SocketException {
-      socket.setKeepAlive(socketKeepAlive);
+    private Socket setSocketKeepAlive(Socket socket) throws SocketException {
+      socket.setKeepAlive(true);
       return socket;
     }
   }
