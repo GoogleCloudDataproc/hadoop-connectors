@@ -17,7 +17,8 @@ package com.google.cloud.hadoop.util;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
-import com.google.cloud.hadoop.util.HttpTransportFactory.SslKeepAliveSocketFactory;
+import com.google.cloud.hadoop.util.HttpTransportFactory.ApacheSslKeepAliveSocketFactory;
+import com.google.cloud.hadoop.util.HttpTransportFactory.JavaxSslKeepAliveSocketFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
@@ -118,43 +119,49 @@ public class HttpTransportFactoryTest {
   }
 
   @Test
-  public void testKeepAliveSocketFactoryDefaultCipherSuites() {
-    SslKeepAliveSocketFactory sslKeepAliveSocketFactory =
-        new SslKeepAliveSocketFactory(FAKE_SOCKET_FACTORY);
-
-    assertThat(sslKeepAliveSocketFactory.getDefaultCipherSuites()).isEqualTo(DEFAULT_CIPHER_SUITES);
+  public void testApacheKeepAliveSocketFactory() throws IOException {
+    Socket socket = new ApacheSslKeepAliveSocketFactory().createSocket();
+    assertThat(socket.getKeepAlive()).isTrue();
   }
 
   @Test
-  public void testKeepAliveSocketFactorySupportedCipherSuites() {
-    SslKeepAliveSocketFactory sslKeepAliveSocketFactory =
-        new SslKeepAliveSocketFactory(FAKE_SOCKET_FACTORY);
+  public void testJavaxKeepAliveSocketFactoryDefaultCipherSuites() {
+    JavaxSslKeepAliveSocketFactory javaxSslKeepAliveSocketFactory =
+        new JavaxSslKeepAliveSocketFactory(FAKE_SOCKET_FACTORY);
 
-    assertThat(sslKeepAliveSocketFactory.getSupportedCipherSuites())
+    assertThat(javaxSslKeepAliveSocketFactory.getDefaultCipherSuites()).isEqualTo(DEFAULT_CIPHER_SUITES);
+  }
+
+  @Test
+  public void testJavaxKeepAliveSocketFactorySupportedCipherSuites() {
+    JavaxSslKeepAliveSocketFactory javaxSslKeepAliveSocketFactory =
+        new JavaxSslKeepAliveSocketFactory(FAKE_SOCKET_FACTORY);
+
+    assertThat(javaxSslKeepAliveSocketFactory.getSupportedCipherSuites())
         .isEqualTo(SUPPORTED_TEST_SUITES);
   }
 
   @Test
-  public void testKeepAliveSocketFactoryKeepAliveTrue() throws IOException {
-    SslKeepAliveSocketFactory sslKeepAliveSocketFactory =
-        new SslKeepAliveSocketFactory(FAKE_SOCKET_FACTORY);
+  public void testJavaxKeepAliveSocketFactoryKeepAliveTrue() throws IOException {
+    JavaxSslKeepAliveSocketFactory javaxSslKeepAliveSocketFactory =
+        new JavaxSslKeepAliveSocketFactory(FAKE_SOCKET_FACTORY);
 
-    assertThat(sslKeepAliveSocketFactory.createSocket().getKeepAlive()).isTrue();
+    assertThat(javaxSslKeepAliveSocketFactory.createSocket().getKeepAlive()).isTrue();
 
-    assertThat(sslKeepAliveSocketFactory.createSocket(null, "localhost", 80, false).getKeepAlive())
+    assertThat(javaxSslKeepAliveSocketFactory.createSocket(null, "localhost", 80, false).getKeepAlive())
         .isTrue();
 
-    assertThat(sslKeepAliveSocketFactory.createSocket(null, null, false).getKeepAlive()).isTrue();
+    assertThat(javaxSslKeepAliveSocketFactory.createSocket(null, null, false).getKeepAlive()).isTrue();
 
-    assertThat(sslKeepAliveSocketFactory.createSocket("localhost", 80).getKeepAlive()).isTrue();
+    assertThat(javaxSslKeepAliveSocketFactory.createSocket("localhost", 80).getKeepAlive()).isTrue();
 
-    assertThat(sslKeepAliveSocketFactory.createSocket("localhost", 80, null, 443).getKeepAlive())
+    assertThat(javaxSslKeepAliveSocketFactory.createSocket("localhost", 80, null, 443).getKeepAlive())
         .isTrue();
 
     InetAddress fakeInet = InetAddress.getByName("10.0.0.0");
-    assertThat(sslKeepAliveSocketFactory.createSocket(fakeInet, 443).getKeepAlive()).isTrue();
+    assertThat(javaxSslKeepAliveSocketFactory.createSocket(fakeInet, 443).getKeepAlive()).isTrue();
 
-    assertThat(sslKeepAliveSocketFactory.createSocket(fakeInet, 443, fakeInet, 80).getKeepAlive())
+    assertThat(javaxSslKeepAliveSocketFactory.createSocket(fakeInet, 443, fakeInet, 80).getKeepAlive())
         .isTrue();
   }
 

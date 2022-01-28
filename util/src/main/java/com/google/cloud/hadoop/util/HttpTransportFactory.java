@@ -34,6 +34,7 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.UnknownHostException;
 import java.security.GeneralSecurityException;
 import javax.annotation.Nullable;
 import javax.net.ssl.HttpsURLConnection;
@@ -42,11 +43,10 @@ import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.Credentials;
 import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.client.CredentialsProvider;
-import org.apache.http.config.SocketConfig;
-import org.apache.http.impl.client.BasicCredentialsProvider;
-import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.conn.ssl.SSLContexts;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.params.HttpParams;
+import org.apache.http.protocol.HttpContext;
 
 /**
  * Factory for creating HttpTransport types.
@@ -151,6 +151,7 @@ public class HttpTransportFactory {
     ApacheHttpTransport transport =
         new ApacheHttpTransport.Builder()
             .trustCertificates(GoogleUtils.getCertificateTrustStore())
+            .setSocketFactory(new ApacheSslKeepAliveSocketFactory())
             .setProxy(
                 proxyUri == null ? null : new HttpHost(proxyUri.getHost(), proxyUri.getPort()))
             .build();
@@ -197,8 +198,8 @@ public class HttpTransportFactory {
           });
     }
 
-    SslKeepAliveSocketFactory sslSocketFactory =
-        new SslKeepAliveSocketFactory(HttpsURLConnection.getDefaultSSLSocketFactory());
+    JavaxSslKeepAliveSocketFactory sslSocketFactory =
+        new JavaxSslKeepAliveSocketFactory(HttpsURLConnection.getDefaultSSLSocketFactory());
     return new NetHttpTransport.Builder()
         .trustCertificates(GoogleUtils.getCertificateTrustStore())
         .setSslSocketFactory(sslSocketFactory)
@@ -242,13 +243,42 @@ public class HttpTransportFactory {
     }
   }
 
+  @VisibleForTesting
+  static class ApacheSslKeepAliveSocketFactory extends org.apache.http.conn.ssl.SSLSocketFactory {
+
+    public ApacheSslKeepAliveSocketFactory() {
+      super(SSLContexts.createDefault(), BROWSER_COMPATIBLE_HOSTNAME_VERIFIER);
+    }
+
+    @Override
+    public Socket createSocket() throws IOException {
+      return setKeepAlive(super.createSocket());
+    }
+
+    @Override
+    public Socket createSocket(HttpParams params) throws IOException {
+      return setKeepAlive(super.createSocket(params));
+    }
+
+    @Override
+    public Socket createSocket(Socket socket, String host, int port, boolean autoClose)
+        throws IOException, UnknownHostException {
+      return setKeepAlive(super.createSocket(socket, host, port, autoClose));
+    }
+
+    @Override
+    public Socket createSocket(HttpContext context) throws IOException {
+      return setKeepAlive(super.createSocket(context));
+    }
+  }
+
   /** Wrapper class to have socketKeepAlive property while creating the socket */
   @VisibleForTesting
-  static class SslKeepAliveSocketFactory extends SSLSocketFactory {
+  static class JavaxSslKeepAliveSocketFactory extends SSLSocketFactory {
 
     private final SSLSocketFactory wrappedSockedFactory;
 
-    public SslKeepAliveSocketFactory(SSLSocketFactory wrappedSocketFactory) {
+    public JavaxSslKeepAliveSocketFactory(SSLSocketFactory wrappedSocketFactory) {
       this.wrappedSockedFactory = wrappedSocketFactory;
     }
 
@@ -264,45 +294,46 @@ public class HttpTransportFactory {
 
     @Override
     public Socket createSocket() throws IOException {
-      return setSocketKeepAlive(wrappedSockedFactory.createSocket());
+      return setKeepAlive(wrappedSockedFactory.createSocket());
     }
 
     @Override
     public Socket createSocket(Socket s, InputStream consumed, boolean autoClose)
         throws IOException {
-      return setSocketKeepAlive(wrappedSockedFactory.createSocket(s, consumed, autoClose));
+      return setKeepAlive(wrappedSockedFactory.createSocket(s, consumed, autoClose));
     }
 
     @Override
     public Socket createSocket(Socket s, String host, int port, boolean autoClose)
         throws IOException {
-      return setSocketKeepAlive(wrappedSockedFactory.createSocket(s, host, port, autoClose));
+      return setKeepAlive(wrappedSockedFactory.createSocket(s, host, port, autoClose));
     }
 
     public Socket createSocket(String host, int port) throws IOException {
-      return setSocketKeepAlive(wrappedSockedFactory.createSocket(host, port));
+      return setKeepAlive(wrappedSockedFactory.createSocket(host, port));
     }
 
     public Socket createSocket(InetAddress address, int port) throws IOException {
-      return setSocketKeepAlive(wrappedSockedFactory.createSocket(address, port));
+      return setKeepAlive(wrappedSockedFactory.createSocket(address, port));
     }
 
     public Socket createSocket(String host, int port, InetAddress clientAddress, int clientPort)
         throws IOException {
-      return setSocketKeepAlive(
+      return setKeepAlive(
           wrappedSockedFactory.createSocket(host, port, clientAddress, clientPort));
     }
 
     public Socket createSocket(
         InetAddress address, int port, InetAddress clientAddress, int clientPort)
         throws IOException {
-      return setSocketKeepAlive(
+      return setKeepAlive(
           wrappedSockedFactory.createSocket(address, port, clientAddress, clientPort));
     }
 
-    private static Socket setSocketKeepAlive(Socket socket) throws SocketException {
-      socket.setKeepAlive(true);
-      return socket;
-    }
+  }
+
+  private static Socket setKeepAlive(Socket socket) throws SocketException {
+    socket.setKeepAlive(true);
+    return socket;
   }
 }
