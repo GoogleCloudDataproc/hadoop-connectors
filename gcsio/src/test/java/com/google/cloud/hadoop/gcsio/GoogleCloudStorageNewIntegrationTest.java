@@ -174,14 +174,13 @@ public class GoogleCloudStorageNewIntegrationTest {
     List<String> listedObjects = gcs.listObjectNames(testBucket, testDir, PATH_DELIMITER);
 
     assertThat(listedObjects).containsExactly(testDir + "f1", testDir + "f2", testDir + "subdir/");
-    // Assert that 5 GCS requests were sent
+    // Assert that 4 GCS requests were sent
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             listRequestString(testBucket, testDir, maxResultsPerRequest, /* pageToken= */ null),
             listRequestString(testBucket, testDir, maxResultsPerRequest, "token_1"),
             listRequestString(testBucket, testDir, maxResultsPerRequest, "token_2"),
-            listRequestString(testBucket, testDir, maxResultsPerRequest, "token_3"),
-            listRequestString(testBucket, testDir, maxResultsPerRequest, "token_4"));
+            listRequestString(testBucket, testDir, maxResultsPerRequest, "token_3"));
   }
 
   @Test
