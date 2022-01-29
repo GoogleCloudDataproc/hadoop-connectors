@@ -116,14 +116,10 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
    * @throws IOException if one cannot be created
    */
   public Token<DelegationTokenIdentifier> createDelegationToken(
-      String renewer, DelegationTokenStatistics stats) throws IOException {
-    Text renewerText = new Text();
+      Text renewer, DelegationTokenStatistics stats) throws IOException {
     this.stats = stats;
-    if (renewer != null) {
-      renewerText.set(renewer);
-    }
     DelegationTokenIdentifier tokenIdentifier =
-        requireNonNull(createTokenIdentifier(renewerText), "Token identifier");
+        requireNonNull(createTokenIdentifier(renewer), "Token identifier");
     Token<DelegationTokenIdentifier> token =
         trackDuration(
             this.stats,

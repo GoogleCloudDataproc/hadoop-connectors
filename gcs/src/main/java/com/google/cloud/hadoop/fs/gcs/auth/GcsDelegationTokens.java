@@ -28,7 +28,6 @@ import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
@@ -64,8 +63,8 @@ public class GcsDelegationTokens extends AbstractService {
 
   private DelegationTokenInstantiationStrategy tokenInstantiationStrategy =
       DelegationTokenInstantiationStrategy.INSTANCE_PER_SERVICE;
-  private static final ConcurrentHashMap<Optional<String>, Token<DelegationTokenIdentifier>>
-      sharedTokens = new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap<Text, Token<DelegationTokenIdentifier>> sharedTokens =
+      new ConcurrentHashMap<>();
 
   public GcsDelegationTokens() throws IOException {
     super("GCSDelegationTokens");
@@ -239,7 +238,7 @@ public class GcsDelegationTokens extends AbstractService {
    * @return a delegation token.
    * @throws IOException if one cannot be created
    */
-  public Token<DelegationTokenIdentifier> getBoundOrNewDT(String renewer) throws IOException {
+  public Token<DelegationTokenIdentifier> getBoundOrNewDT(Text renewer) throws IOException {
     logger.atFiner().log("Delegation token requested");
     if (isBoundToDT()) {
       // the FS was created on startup with a token, so return it.
@@ -252,11 +251,11 @@ public class GcsDelegationTokens extends AbstractService {
     if (this.tokenInstantiationStrategy == DelegationTokenInstantiationStrategy.SHARED) {
       try {
         return sharedTokens.computeIfAbsent(
-            Optional.ofNullable(renewer),
-            k -> {
-              logger.atFine().log("Created a shared GCS delegation token");
+            renewer,
+            r -> {
+              logger.atFine().log("Created a shared GCS delegation token for renewer %s", r);
               try {
-                return tokenBinding.createDelegationToken(k.orElse(null), getStats());
+                return tokenBinding.createDelegationToken(r, getStats());
               } catch (IOException ex) {
                 // Wrapping into an unchecked exception
                 throw new UncheckedIOException(ex);

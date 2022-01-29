@@ -856,8 +856,12 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   public Token<?> getDelegationToken(String renewer) throws IOException {
     incrementStatistic(GhfsStatistic.INVOCATION_GET_DELEGATION_TOKEN);
     Token<?> result = null;
+    Text renewerText = new Text();
+    if (renewer != null) {
+      renewerText.set(renewer);
+    }
     if (delegationTokens != null) {
-      result = delegationTokens.getBoundOrNewDT(renewer);
+      result = delegationTokens.getBoundOrNewDT(renewerText);
     }
 
     logger.atFiner().log("getDelegationToken(renewer: %s): %s", renewer, result);
