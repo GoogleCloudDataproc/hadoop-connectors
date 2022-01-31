@@ -17,14 +17,26 @@ package com.google.cloud.hadoop.util;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
+import com.google.cloud.hadoop.util.HttpTransportFactory.ApacheSslKeepAliveSocketFactory;
+import com.google.cloud.hadoop.util.HttpTransportFactory.JavaxSslKeepAliveSocketFactory;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.InetAddress;
+import java.net.Socket;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.UnknownHostException;
+import javax.net.ssl.SSLSocketFactory;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class HttpTransportFactoryTest {
+
+  private static final FakeSslSocketFactory FAKE_SOCKET_FACTORY = new FakeSslSocketFactory();
+  private static final String[] SUPPORTED_TEST_SUITES = {"testSuite"};
+  private static final String[] DEFAULT_CIPHER_SUITES = {"testDefaultCipherSuite"};
 
   @Test
   public void testParseProxyAddress() throws Exception {
@@ -104,6 +116,104 @@ public class HttpTransportFactoryTest {
     assertThat(thrown)
         .hasMessageThat()
         .contains("Invalid proxy address 'foo-host:1234/some/path'.");
+  }
+
+  @Test
+  public void testApacheKeepAliveSocketFactory() throws IOException {
+    Socket socket = new ApacheSslKeepAliveSocketFactory().createSocket();
+    assertThat(socket.getKeepAlive()).isTrue();
+  }
+
+  @Test
+  public void testJavaxKeepAliveSocketFactoryDefaultCipherSuites() {
+    JavaxSslKeepAliveSocketFactory javaxSslKeepAliveSocketFactory =
+        new JavaxSslKeepAliveSocketFactory(FAKE_SOCKET_FACTORY);
+
+    assertThat(javaxSslKeepAliveSocketFactory.getDefaultCipherSuites()).isEqualTo(DEFAULT_CIPHER_SUITES);
+  }
+
+  @Test
+  public void testJavaxKeepAliveSocketFactorySupportedCipherSuites() {
+    JavaxSslKeepAliveSocketFactory javaxSslKeepAliveSocketFactory =
+        new JavaxSslKeepAliveSocketFactory(FAKE_SOCKET_FACTORY);
+
+    assertThat(javaxSslKeepAliveSocketFactory.getSupportedCipherSuites())
+        .isEqualTo(SUPPORTED_TEST_SUITES);
+  }
+
+  @Test
+  public void testJavaxKeepAliveSocketFactoryKeepAliveTrue() throws IOException {
+    JavaxSslKeepAliveSocketFactory javaxSslKeepAliveSocketFactory =
+        new JavaxSslKeepAliveSocketFactory(FAKE_SOCKET_FACTORY);
+
+    assertThat(javaxSslKeepAliveSocketFactory.createSocket().getKeepAlive()).isTrue();
+
+    assertThat(javaxSslKeepAliveSocketFactory.createSocket(null, "localhost", 80, false).getKeepAlive())
+        .isTrue();
+
+    assertThat(javaxSslKeepAliveSocketFactory.createSocket(null, null, false).getKeepAlive()).isTrue();
+
+    assertThat(javaxSslKeepAliveSocketFactory.createSocket("localhost", 80).getKeepAlive()).isTrue();
+
+    assertThat(javaxSslKeepAliveSocketFactory.createSocket("localhost", 80, null, 443).getKeepAlive())
+        .isTrue();
+
+    InetAddress fakeInet = InetAddress.getByName("10.0.0.0");
+    assertThat(javaxSslKeepAliveSocketFactory.createSocket(fakeInet, 443).getKeepAlive()).isTrue();
+
+    assertThat(javaxSslKeepAliveSocketFactory.createSocket(fakeInet, 443, fakeInet, 80).getKeepAlive())
+        .isTrue();
+  }
+
+  private static class FakeSslSocketFactory extends SSLSocketFactory {
+
+    @Override
+    public String[] getDefaultCipherSuites() {
+      return DEFAULT_CIPHER_SUITES;
+    }
+
+    @Override
+    public String[] getSupportedCipherSuites() {
+      return SUPPORTED_TEST_SUITES;
+    }
+
+    @Override
+    public Socket createSocket() {
+      return new Socket();
+    }
+
+    @Override
+    public Socket createSocket(Socket socket, String s, int i, boolean b) throws IOException {
+      return createSocket();
+    }
+
+    @Override
+    public Socket createSocket(Socket socket, InputStream inputStream, boolean b)
+        throws IOException {
+      return createSocket();
+    }
+
+    @Override
+    public Socket createSocket(String s, int i) throws IOException, UnknownHostException {
+      return createSocket();
+    }
+
+    @Override
+    public Socket createSocket(String s, int i, InetAddress inetAddress, int i1)
+        throws IOException, UnknownHostException {
+      return createSocket();
+    }
+
+    @Override
+    public Socket createSocket(InetAddress inetAddress, int i) throws IOException {
+      return createSocket();
+    }
+
+    @Override
+    public Socket createSocket(InetAddress inetAddress, int i, InetAddress inetAddress1, int i1)
+        throws IOException {
+      return createSocket();
+    }
   }
 
   private static URI getURI(String scheme, String host, int port) throws URISyntaxException {
