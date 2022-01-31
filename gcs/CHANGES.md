@@ -1,4 +1,6 @@
-### 2.2.5 - 2021-XX-XX
+### 2.2.6 - 2022-XX-XX
+
+### 2.2.5 - 2022-01-31
 
 1.  Enable TCP keep alive by default.
 
