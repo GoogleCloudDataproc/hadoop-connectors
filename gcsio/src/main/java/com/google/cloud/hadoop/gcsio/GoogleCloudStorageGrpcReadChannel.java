@@ -770,7 +770,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         resIterator.next();
       }
     } catch (Exception e) {
-      logger.atInfo().withCause(e).log("Exception while draining the iteration on cancellation");
+      logger.atFiner().withCause(e).log("Exception while draining the iteration on cancellation");
     }
   }
 
