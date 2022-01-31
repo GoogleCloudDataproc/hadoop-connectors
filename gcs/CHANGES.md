@@ -1,6 +1,14 @@
-### 2.2.5 - 2021-XX-XX
+### 2.2.6 - 2022-XX-XX
+
+### 2.2.5 - 2022-01-31
 
 1.  Enable TCP keep alive by default.
+
+1.  Upgrade gRPC to 1.43
+
+1.  Add message level timeouts for gRPC requests
+
+1.  Added Traffic Director support
 
 ### 2.2.4 - 2021-11-05
 
