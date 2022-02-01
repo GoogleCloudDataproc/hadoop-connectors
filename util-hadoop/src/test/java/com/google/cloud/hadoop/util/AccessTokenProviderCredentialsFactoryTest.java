@@ -14,7 +14,7 @@
 
 package com.google.cloud.hadoop.util;
 
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.google.auth.oauth2.AccessToken;
@@ -49,7 +49,7 @@ public class AccessTokenProviderCredentialsFactoryTest {
   }
 
   @Test
-  public void testCreateCredentialFromProviderClassFactory() throws IOException {
+  public void testCreateCredentialsFromProviderClassFactory() throws IOException {
     GoogleCredentials credentials =
         AccessTokenProviderCredentialsFactory.credentials(
             config, ImmutableList.of(TEST_PROPERTY_PREFIX));
@@ -63,7 +63,7 @@ public class AccessTokenProviderCredentialsFactoryTest {
   }
 
   @Test
-  public void testCreateCredentialFromAccessTokenProvider() {
+  public void testCreateCredentialsFromAccessTokenProvider() {
     AccessTokenProvider accessTokenProvider = new TestingAccessTokenProvider();
     GoogleCredentials credentials = new AccessTokenProviderCredentials(accessTokenProvider);
 

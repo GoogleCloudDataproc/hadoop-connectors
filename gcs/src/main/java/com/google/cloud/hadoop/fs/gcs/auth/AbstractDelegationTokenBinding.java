@@ -74,18 +74,18 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
   }
 
   /**
-   * Perform any actions when deploying unbonded, and return a list of credential providers.
+   * Perform any actions when deploying unbonded, and return a list of credentials providers.
    *
    * @throws IOException any failure.
    */
   public abstract AccessTokenProvider deployUnbonded() throws IOException;
 
   /**
-   * Bind to the token identifier, returning the credential providers to use for the owner to talk
+   * Bind to the token identifier, returning the credentials providers to use for the owner to talk
    * to GCP services.
    *
    * @param retrievedIdentifier the unmarshalled data
-   * @return non-empty list of GCP credential providers to use for authenticating this client with
+   * @return non-empty list of GCP credentials providers to use for authenticating this client with
    *     GCP services.
    * @throws IOException any failure.
    */

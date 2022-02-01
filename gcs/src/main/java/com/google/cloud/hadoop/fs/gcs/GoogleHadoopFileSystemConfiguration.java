@@ -16,10 +16,10 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_ADDRESS_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_PASSWORD_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_USERNAME_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.getConfigKeyPrefixes;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_ADDRESS_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_PASSWORD_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_USERNAME_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.getConfigKeyPrefixes;
 import static com.google.common.base.Strings.nullToEmpty;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GcsFileChecksumType;

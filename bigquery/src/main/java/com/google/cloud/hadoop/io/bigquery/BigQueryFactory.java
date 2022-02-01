@@ -23,7 +23,7 @@ import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.bigquery.Bigquery;
 import com.google.auth.Credentials;
 import com.google.cloud.hadoop.util.AccessTokenProviderCredentialsFactory;
-import com.google.cloud.hadoop.util.HadoopCredentialConfiguration;
+import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration;
 import com.google.cloud.hadoop.util.PropertyUtil;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
@@ -79,13 +79,13 @@ public class BigQueryFactory {
    * @throws IOException on IO Error.
    * @throws GeneralSecurityException on General Security Error.
    */
-  public Credentials createBigQueryCredential(Configuration config)
+  public Credentials createBigQueryCredentials(Configuration config)
       throws GeneralSecurityException, IOException {
     Credentials credentials =
         AccessTokenProviderCredentialsFactory.credentials(
             config, ImmutableList.of(BIGQUERY_CONFIG_PREFIX));
     return credentials == null
-        ? HadoopCredentialConfiguration.getCredentialsFactory(config, BIGQUERY_CONFIG_PREFIX)
+        ? HadoopCredentialsConfiguration.getCredentialsFactory(config, BIGQUERY_CONFIG_PREFIX)
             .getCredentials()
         : credentials;
   }
@@ -97,23 +97,23 @@ public class BigQueryFactory {
   }
 
   /**
-   * Constructs a BigQuery from the credential constructed from the environment.
+   * Constructs a BigQuery from the credentials constructed from the environment.
    *
    * @throws IOException on IO Error.
    * @throws GeneralSecurityException on General Security Error.
    */
   public Bigquery getBigQuery(Configuration config) throws GeneralSecurityException, IOException {
-    logger.atInfo().log("Creating BigQuery from default credential.");
-    Credentials credentials = createBigQueryCredential(config);
-    // Use the credential to create an authorized BigQuery client
-    return getBigQueryFromCredential(config, credentials, BQC_ID);
+    logger.atInfo().log("Creating BigQuery from default credentials.");
+    Credentials credentials = createBigQueryCredentials(config);
+    // Use the credentials to create an authorized BigQuery client
+    return getBigQueryFromCredentials(config, credentials, BQC_ID);
   }
 
-  /** Constructs a BigQuery from a given Credential. */
-  public Bigquery getBigQueryFromCredential(
+  /** Constructs a BigQuery from a given Credentials. */
+  public Bigquery getBigQueryFromCredentials(
       Configuration config, Credentials credentials, String appName) {
-    logger.atInfo().log("Creating BigQuery from given credential.");
-    // Use the credential to create an authorized BigQuery client
+    logger.atInfo().log("Creating BigQuery from given credentials.");
+    // Use the credentials to create an authorized BigQuery client
     if (credentials != null) {
       return new Bigquery.Builder(
               HTTP_TRANSPORT,

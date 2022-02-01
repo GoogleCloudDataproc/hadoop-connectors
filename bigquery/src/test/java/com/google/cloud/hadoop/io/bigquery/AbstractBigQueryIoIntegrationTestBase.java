@@ -15,8 +15,8 @@ package com.google.cloud.hadoop.io.bigquery;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.BIGQUERY_CONFIG_PREFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.truth.Truth.assertThat;
@@ -131,7 +131,7 @@ public abstract class AbstractBigQueryIoIntegrationTestBase<T> {
 
   /**
    * Helper method for grabbing service-account email and private keyfile name based on settings
-   * intended for BigQueryFactory and adding them as GCS-equivalent credential settings.
+   * intended for BigQueryFactory and adding them as GCS-equivalent credentials settings.
    */
   public static Configuration getConfigForGcsFromBigquerySettings(String projectIdValue) {
     TestConfiguration testConf = TestConfiguration.getInstance();

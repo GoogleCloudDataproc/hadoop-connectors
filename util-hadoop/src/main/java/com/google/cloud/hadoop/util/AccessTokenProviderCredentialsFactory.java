@@ -25,7 +25,7 @@ import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 
 /**
- * Given an {@link HadoopCredentialConfiguration#getAccessTokenProviderImplClass(Configuration,
+ * Given an {@link HadoopCredentialsConfiguration#getAccessTokenProviderImplClass(Configuration,
  * String...)} and a Hadoop {@link Configuration}, generate a {@link GoogleCredentials}.
  */
 public final class AccessTokenProviderCredentialsFactory {
@@ -56,7 +56,7 @@ public final class AccessTokenProviderCredentialsFactory {
     }
   }
 
-  /** Generate the credential from the {@link AccessTokenProvider}. */
+  /** Generate the credentials from the {@link AccessTokenProvider}. */
   public static GoogleCredentials credentials(AccessTokenProvider provider) {
     return provider == null
         ? null
@@ -65,13 +65,13 @@ public final class AccessTokenProviderCredentialsFactory {
   }
 
   /**
-   * Generate the credential.
+   * Generate the credentials.
    *
-   * <p>If the {@link HadoopCredentialConfiguration#getAccessTokenProviderImplClass(Configuration,
+   * <p>If the {@link HadoopCredentialsConfiguration#getAccessTokenProviderImplClass(Configuration,
    * String...)} generates no Class for the provider, return {@code null}.
    */
   public static GoogleCredentials credentials(Configuration config, List<String> keyPrefixes)
       throws IOException {
-    return credentials(HadoopCredentialConfiguration.getAccessTokenProvider(config, keyPrefixes));
+    return credentials(HadoopCredentialsConfiguration.getAccessTokenProvider(config, keyPrefixes));
   }
 }

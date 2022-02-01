@@ -15,11 +15,11 @@
 package com.google.cloud.hadoop.util;
 
 import static com.github.stefanbirkner.systemlambda.SystemLambda.withEnvironmentVariable;
-import static com.google.cloud.hadoop.util.CredentialsFactory.CREDENTIAL_ENV_VAR;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_NULL_CREDENTIAL_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.TOKEN_SERVER_URL_SUFFIX;
+import static com.google.cloud.hadoop.util.CredentialsFactory.CREDENTIALS_ENV_VAR;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.ENABLE_NULL_CREDENTIALS_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.TOKEN_SERVER_URL_SUFFIX;
 import static com.google.cloud.hadoop.util.testing.HadoopConfigurationUtils.getDefaultProperties;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonDataResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
@@ -47,7 +47,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public class HadoopCredentialConfigurationTest {
+public class HadoopCredentialsConfigurationTest {
 
   @SuppressWarnings("DoubleBraceInitialization")
   private static final Map<String, Object> expectedDefaultConfiguration =
@@ -71,7 +71,7 @@ public class HadoopCredentialConfigurationTest {
   private Configuration configuration;
 
   private static String getConfigKey(HadoopConfigurationProperty<?> suffixProperty) {
-    return HadoopCredentialConfiguration.BASE_KEY_PREFIX + suffixProperty.getKey();
+    return HadoopCredentialsConfiguration.BASE_KEY_PREFIX + suffixProperty.getKey();
   }
 
   @Before
@@ -79,33 +79,36 @@ public class HadoopCredentialConfigurationTest {
     configuration = new Configuration();
   }
 
-  private CredentialsFactory getCredentialFactory() {
-    return getCredentialFactory(new MockHttpTransport());
+  private CredentialsFactory getCredentialsFactory() {
+    return getCredentialsFactory(new MockHttpTransport());
   }
 
-  private CredentialsFactory getCredentialFactory(HttpTransport transport) {
-    CredentialOptions options = HadoopCredentialConfiguration.getCredentialsOptions(configuration);
+  private CredentialsFactory getCredentialsFactory(HttpTransport transport) {
+    CredentialsOptions options =
+        HadoopCredentialsConfiguration.getCredentialsOptions(configuration);
     return new CredentialsFactory(options, Suppliers.ofInstance(transport));
   }
 
   @Test
   public void nullCredentialsAreCreatedForTesting() throws Exception {
     configuration.setBoolean(getConfigKey(ENABLE_SERVICE_ACCOUNTS_SUFFIX), false);
-    configuration.setBoolean(getConfigKey(ENABLE_NULL_CREDENTIAL_SUFFIX), true);
+    configuration.setBoolean(getConfigKey(ENABLE_NULL_CREDENTIALS_SUFFIX), true);
 
-    CredentialsFactory credentialsFactory = getCredentialFactory();
+    CredentialsFactory credentialsFactory = getCredentialsFactory();
 
     assertThat(credentialsFactory.getCredentials()).isNull();
   }
 
   @Test
-  public void exceptionIsThrownForNoCredentialOptions() {
+  public void exceptionIsThrownForNoCredentialsOptions() {
     configuration.setBoolean(getConfigKey(ENABLE_SERVICE_ACCOUNTS_SUFFIX), false);
 
     IllegalArgumentException thrown =
-        assertThrows(IllegalArgumentException.class, this::getCredentialFactory);
+        assertThrows(IllegalArgumentException.class, this::getCredentialsFactory);
 
-    assertThat(thrown).hasMessageThat().startsWith("No valid credential configuration discovered:");
+    assertThat(thrown)
+        .hasMessageThat()
+        .startsWith("No valid credentials configuration discovered:");
   }
 
   @Test
@@ -115,7 +118,7 @@ public class HadoopCredentialConfigurationTest {
 
     MockHttpTransport transport = mockTransport(jsonDataResponse(token));
 
-    CredentialsFactory credentialsFactory = getCredentialFactory(transport);
+    CredentialsFactory credentialsFactory = getCredentialsFactory(transport);
     GoogleCredentials credentials = credentialsFactory.getCredentials();
 
     credentials.refreshIfExpired();
@@ -126,11 +129,11 @@ public class HadoopCredentialConfigurationTest {
 
   @Test
   public void applicationDefaultServiceAccountWhenConfigured() throws Exception {
-    CredentialsFactory credentialsFactory = getCredentialFactory();
+    CredentialsFactory credentialsFactory = getCredentialsFactory();
 
     ServiceAccountCredentials credentials =
         (ServiceAccountCredentials)
-            withEnvironmentVariable(CREDENTIAL_ENV_VAR, getStringPath("test-credential.json"))
+            withEnvironmentVariable(CREDENTIALS_ENV_VAR, getStringPath("test-credentials.json"))
                 .execute(credentialsFactory::getCredentials);
 
     assertThat(credentials.getClientEmail()).isEqualTo("test-email@gserviceaccount.com");
@@ -140,9 +143,9 @@ public class HadoopCredentialConfigurationTest {
   @Test
   public void jsonKeyFileUsedWhenConfigured() throws Exception {
     configuration.set(
-        getConfigKey(SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX), getStringPath("test-credential.json"));
+        getConfigKey(SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX), getStringPath("test-credentials.json"));
 
-    CredentialsFactory credentialsFactory = getCredentialFactory();
+    CredentialsFactory credentialsFactory = getCredentialsFactory();
 
     ServiceAccountCredentials credentials =
         (ServiceAccountCredentials) credentialsFactory.getCredentials();
@@ -154,10 +157,10 @@ public class HadoopCredentialConfigurationTest {
   @Test
   public void customTokenServerUrl() throws Exception {
     configuration.set(
-        getConfigKey(SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX), getStringPath("test-credential.json"));
+        getConfigKey(SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX), getStringPath("test-credentials.json"));
     configuration.set(getConfigKey(TOKEN_SERVER_URL_SUFFIX), "https://test.oauth.com/token");
 
-    CredentialsFactory credentialsFactory = getCredentialFactory();
+    CredentialsFactory credentialsFactory = getCredentialsFactory();
 
     ServiceAccountCredentials credentials =
         (ServiceAccountCredentials) credentialsFactory.getCredentials();
@@ -167,7 +170,7 @@ public class HadoopCredentialConfigurationTest {
 
   @Test
   public void defaultPropertiesValues() {
-    assertThat(getDefaultProperties(HadoopCredentialConfiguration.class))
+    assertThat(getDefaultProperties(HadoopCredentialsConfiguration.class))
         .containsExactlyEntriesIn(expectedDefaultConfiguration);
   }
 

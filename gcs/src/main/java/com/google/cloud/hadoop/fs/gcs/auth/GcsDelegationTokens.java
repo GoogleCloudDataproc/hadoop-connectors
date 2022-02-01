@@ -113,7 +113,7 @@ public class GcsDelegationTokens extends AbstractService {
   }
 
   /**
-   * Perform the unbonded deployment operations. Create the GCP credential provider chain to use
+   * Perform the unbonded deployment operations. Create the GCP credentials provider chain to use
    * when talking to GCP when there is no delegation token to work with. authenticating this client
    * with GCP services, and saves it to {@link #accessTokenProvider}
    *
@@ -128,13 +128,13 @@ public class GcsDelegationTokens extends AbstractService {
 
   /**
    * Attempt to bind to any existing DT, including unmarshalling its contents and creating the GCP
-   * credential provider used to authenticate the client.
+   * credentials provider used to authenticate the client.
    *
    * <p>If successful:
    *
    * <ol>
    *   <li>{@link #boundDT} is set to the retrieved token.
-   *   <li>{@link #accessTokenProvider} is set to the credential provider(s) returned by the token
+   *   <li>{@link #accessTokenProvider} is set to the credentials provider(s) returned by the token
    *       binding.
    * </ol>
    *
@@ -190,7 +190,7 @@ public class GcsDelegationTokens extends AbstractService {
    *
    * <ol>
    *   <li>{@link #boundDT} is set to {@code token}.
-   *   <li>{@link #accessTokenProvider} is set to the credential provider(s) returned by the token
+   *   <li>{@link #accessTokenProvider} is set to the credentials provider(s) returned by the token
    *       binding.
    * </ol>
    *
@@ -202,7 +202,7 @@ public class GcsDelegationTokens extends AbstractService {
     boundDT = token;
     DelegationTokenIdentifier dti = extractIdentifier(token);
     logger.atInfo().log("Using delegation token %s", dti);
-    // extract the credential providers.
+    // extract the credentials providers.
     accessTokenProvider = tokenBinding.bindToTokenIdentifier(dti);
   }
 

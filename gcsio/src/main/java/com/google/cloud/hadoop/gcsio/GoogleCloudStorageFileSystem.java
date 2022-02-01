@@ -134,7 +134,7 @@ public class GoogleCloudStorageFileSystem {
   /**
    * Constructs an instance of GoogleCloudStorageFileSystem.
    *
-   * @param credentials OAuth2 credential that allows access to GCS.
+   * @param credentials OAuth2 credentials that allows access to GCS.
    * @param options Options for how this filesystem should operate and configure its underlying
    *     storage.
    */
@@ -151,7 +151,7 @@ public class GoogleCloudStorageFileSystem {
   /**
    * Constructs an instance of GoogleCloudStorageFileSystem.
    *
-   * @param credentials OAuth2 credential that allows access to GCS.
+   * @param credentials OAuth2 credentials that allows access to GCS.
    * @param downscopedAccessTokenFn Function that generates downscoped access token.
    * @param options Options for how this filesystem should operate and configure its underlying
    *     storage.

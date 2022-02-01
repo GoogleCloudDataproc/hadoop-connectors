@@ -32,18 +32,18 @@ import java.net.URI;
 import java.security.GeneralSecurityException;
 import java.util.function.Supplier;
 
-/** Miscellaneous helper methods for getting a {@code Credential} from various sources. */
+/** Miscellaneous helper methods for getting a {@code Credentials} from various sources. */
 public class CredentialsFactory {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  static final String CREDENTIAL_ENV_VAR = "GOOGLE_APPLICATION_CREDENTIALS";
+  static final String CREDENTIALS_ENV_VAR = "GOOGLE_APPLICATION_CREDENTIALS";
 
-  private final CredentialOptions options;
+  private final CredentialsOptions options;
 
   private final java.util.function.Supplier<HttpTransport> transport;
 
-  public CredentialsFactory(CredentialOptions options) {
+  public CredentialsFactory(CredentialsOptions options) {
     this(
         options,
         Suppliers.memoize(
@@ -60,25 +60,25 @@ public class CredentialsFactory {
   }
 
   @VisibleForTesting
-  CredentialsFactory(CredentialOptions options, Supplier<HttpTransport> transport) {
+  CredentialsFactory(CredentialsOptions options, Supplier<HttpTransport> transport) {
     this.options = options;
     this.transport = transport;
   }
 
   /**
-   * Initializes OAuth2 credential using preconfigured ServiceAccount settings on the local GCE VM.
+   * Initializes OAuth2 credentials using preconfigured ServiceAccount settings on the local GCE VM.
    * See: <a href="https://developers.google.com/compute/docs/authentication">Authenticating from
    * Google Compute Engine</a>.
    */
-  public GoogleCredentials getCredentialFromMetadataServiceAccount() {
+  public GoogleCredentials getCredentialsFromMetadataServiceAccount() {
     logger.atFine().log("Getting service account credentials from metadata service.");
     return ComputeEngineCredentials.newBuilder().setHttpTransportFactory(transport::get).build();
   }
 
   /** Get credentials listed in a JSON file. */
-  private GoogleCredentials getCredentialFromJsonKeyFile() throws IOException {
+  private GoogleCredentials getCredentialsFromJsonKeyFile() throws IOException {
     logger.atFine().log(
-        "getCredentialFromJsonKeyFile() from '%s'", options.getServiceAccountJsonKeyFile());
+        "getCredentialsFromJsonKeyFile() from '%s'", options.getServiceAccountJsonKeyFile());
     try (FileInputStream fis = new FileInputStream(options.getServiceAccountJsonKeyFile())) {
       return ServiceAccountCredentials.fromStream(fis, transport::get)
           .createScoped("https://www.googleapis.com/auth/cloud-platform");
@@ -92,7 +92,7 @@ public class CredentialsFactory {
    * <p>In this class for testability.
    */
   private static boolean isApplicationDefaultCredentialsConfigured() {
-    return System.getenv(CREDENTIAL_ENV_VAR) != null;
+    return System.getenv(CREDENTIALS_ENV_VAR) != null;
   }
 
   /**
@@ -101,14 +101,14 @@ public class CredentialsFactory {
    * >Google Application Default Credentials</a>
    */
   private GoogleCredentials getApplicationDefaultCredentials() throws IOException {
-    logger.atFine().log("getApplicationDefaultCredential()");
+    logger.atFine().log("getApplicationDefaultCredentials()");
     return GoogleCredentials.getApplicationDefault(transport::get);
   }
 
   /**
-   * Get the credential as configured.
+   * Get the credentials as configured.
    *
-   * <p>The following is the order in which properties are applied to create the Credential:
+   * <p>The following is the order in which properties are applied to create the Credentials:
    *
    * <ol>
    *   <li>If service accounts are not disabled and no service account key file or service account
@@ -116,13 +116,13 @@ public class CredentialsFactory {
    *   <li>If service accounts are not disabled and a service-account email and keyfile, or service
    *       account parameters are provided, use service account authentication with the given
    *       parameters.
-   *   <li>If service accounts are disabled and client id, client secret and OAuth credential file
+   *   <li>If service accounts are disabled and client id, client secret and OAuth credentials file
    *       is provided, use the Installed App authentication flow.
    *   <li>If service accounts are disabled and null credentials are enabled for unit testing,
    *       return null
    * </ol>
    *
-   * @throws IllegalStateException if none of the above conditions are met and a Credential cannot
+   * @throws IllegalStateException if none of the above conditions are met and a Credentials cannot
    *     be created
    */
   public GoogleCredentials getCredentials() throws IOException, GeneralSecurityException {
@@ -137,21 +137,21 @@ public class CredentialsFactory {
       // By default, we want to use service accounts with the meta-data service
       // (assuming we're running in GCE).
       if (useMetadataService()) {
-        return getCredentialFromMetadataServiceAccount();
+        return getCredentialsFromMetadataServiceAccount();
       }
 
       if (!isNullOrEmpty(options.getServiceAccountJsonKeyFile())) {
-        return getCredentialFromJsonKeyFile();
+        return getCredentialsFromJsonKeyFile();
       }
 
       if (isApplicationDefaultCredentialsConfigured()) {
         return getApplicationDefaultCredentials();
       }
-    } else if (options.isNullCredentialEnabled()) {
+    } else if (options.isNullCredentialsEnabled()) {
       return null;
     }
 
-    throw new IllegalStateException("No valid credential configuration discovered: " + this);
+    throw new IllegalStateException("No valid credentials configuration discovered: " + this);
   }
 
   private GoogleCredentials configureCredentials(GoogleCredentials credentials) {
@@ -172,6 +172,6 @@ public class CredentialsFactory {
   private boolean useMetadataService() {
     return isNullOrEmpty(options.getServiceAccountJsonKeyFile())
         && !isApplicationDefaultCredentialsConfigured()
-        && !options.isNullCredentialEnabled();
+        && !options.isNullCredentialsEnabled();
   }
 }

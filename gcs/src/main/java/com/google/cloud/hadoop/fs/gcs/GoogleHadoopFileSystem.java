@@ -29,9 +29,9 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT;
 import static com.google.cloud.hadoop.gcsio.CreateFileOptions.DEFAULT_OVERWRITE;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -63,7 +63,7 @@ import com.google.cloud.hadoop.gcsio.UriPaths;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.AccessTokenProviderCredentialsFactory;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
-import com.google.cloud.hadoop.util.HadoopCredentialConfiguration;
+import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.PropertyUtil;
 import com.google.common.annotations.VisibleForTesting;
@@ -1520,9 +1520,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   /**
    * Loads an {@link AccessTokenProvider} implementation. If the user provided an
    * AbstractDelegationTokenBinding we get the AccessTokenProvider, otherwise if a class name is
-   * provided (See {@link
-   * com.google.cloud.hadoop.util.HadoopCredentialConfiguration#ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX})
-   * then we use it, otherwise it's null.
+   * provided (See {@link HadoopCredentialsConfiguration#ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX}) then we
+   * use it, otherwise it's null.
    */
   private AccessTokenProvider getAccessTokenProvider(Configuration config) throws IOException {
     // Check if delegation token support is configured
@@ -1532,22 +1531,20 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
             ? delegationTokens.getAccessTokenProvider()
             // If delegation token support is not configured, check if a
             // custom AccessTokenProvider implementation is configured
-            : com.google.cloud.hadoop.util.HadoopCredentialConfiguration.getAccessTokenProvider(
+            : HadoopCredentialsConfiguration.getAccessTokenProvider(
                 config, ImmutableList.of(GCS_CONFIG_PREFIX));
 
     if (accessTokenProvider != null) {
       if (accessTokenProvider.getAccessTokenType()
           == AccessTokenProvider.AccessTokenType.DOWNSCOPED) {
         checkArgument(
-            com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_NULL_CREDENTIAL_SUFFIX
+            HadoopCredentialsConfiguration.ENABLE_NULL_CREDENTIALS_SUFFIX
                     .withPrefixes(
-                        com.google.cloud.hadoop.util.HadoopCredentialConfiguration
-                            .getConfigKeyPrefixes(GCS_CONFIG_PREFIX))
+                        HadoopCredentialsConfiguration.getConfigKeyPrefixes(GCS_CONFIG_PREFIX))
                     .get(config, config::getBoolean)
-                && !com.google.cloud.hadoop.util.HadoopCredentialConfiguration
-                    .ENABLE_SERVICE_ACCOUNTS_SUFFIX
+                && !HadoopCredentialsConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX
                     .withPrefixes(
-                        HadoopCredentialConfiguration.getConfigKeyPrefixes(GCS_CONFIG_PREFIX))
+                        HadoopCredentialsConfiguration.getConfigKeyPrefixes(GCS_CONFIG_PREFIX))
                     .get(config, config::getBoolean),
             "When using DOWNSCOPED access token, `fs.gs.auth.null.enabled` should"
                 + " be set to true and `fs.gs.auth.service.account.enable` should be set to false");
@@ -1560,10 +1557,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   }
 
   /**
-   * Retrieve user's Credential. If user implemented {@link AccessTokenProvider} and provided the
-   * class name (See {@link HadoopCredentialConfiguration#ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX}) then
-   * build a credential with access token provided by this provider; Otherwise obtain credential
-   * through {@link HadoopCredentialConfiguration#getCredentialsFactory(Configuration, String...)}.
+   * Retrieve user's Credentials. If user implemented {@link AccessTokenProvider} and provided the
+   * class name (See {@link HadoopCredentialsConfiguration#ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX}) then
+   * build a credentials with access token provided by this provider; Otherwise obtain credentials
+   * through {@link HadoopCredentialsConfiguration#getCredentialsFactory(Configuration, String...)}.
    */
   private GoogleCredentials getCredentials(
       Configuration config,
@@ -1584,7 +1581,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         // Finally, if no credentials have been acquired at this point, employ
         // the default mechanism.
         credentials =
-            HadoopCredentialConfiguration.getCredentialsFactory(config, GCS_CONFIG_PREFIX)
+            HadoopCredentialsConfiguration.getCredentialsFactory(config, GCS_CONFIG_PREFIX)
                 .getCredentials();
       }
     } else {
@@ -1595,7 +1592,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
           credentials = AccessTokenProviderCredentialsFactory.credentials(accessTokenProvider);
           break;
         case DOWNSCOPED:
-          // If the AccessTokenType is set to DOWNSCOPED`, Credential will be generated
+          // If the AccessTokenType is set to DOWNSCOPED`, Credentials will be generated
           // when GCS requests are created.
           credentials = null;
           break;

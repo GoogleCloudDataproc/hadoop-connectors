@@ -33,8 +33,8 @@ import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.CheckedFunction;
-import com.google.cloud.hadoop.util.CredentialOptions;
 import com.google.cloud.hadoop.util.CredentialsFactory;
+import com.google.cloud.hadoop.util.CredentialsOptions;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
@@ -71,12 +71,12 @@ public class GoogleCloudStorageTestHelper {
   }
 
   public static Credentials getCredentials() throws IOException {
-    CredentialOptions credentialOptions =
-        CredentialOptions.builder()
+    CredentialsOptions credentialsOptions =
+        CredentialsOptions.builder()
             .setServiceAccountJsonKeyFile(
                 TestConfiguration.getInstance().getServiceAccountJsonKeyFile())
             .build();
-    CredentialsFactory credentialsFactory = new CredentialsFactory(credentialOptions);
+    CredentialsFactory credentialsFactory = new CredentialsFactory(credentialsOptions);
 
     try {
       return credentialsFactory.getCredentials();

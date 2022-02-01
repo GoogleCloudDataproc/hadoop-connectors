@@ -23,17 +23,16 @@ import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 
 /**
- * Hadoop credential configuration.
+ * The Hadoop credentials configuration.
  *
  * <p>When reading configuration this class makes use of a list of key prefixes that are each
  * applied to key suffixes to create a complete configuration key. There is a base prefix of
- * 'google.cloud.' that is included by the builder for each EntriesCredentialConfiguration created.
- * When constructing, other prefixes can be specified. Prefixes specified later can be used to
- * override the values of previously set values. In this way a set of global credentials can be
- * specified for most connectors with an override specified for any connectors that need different
- * credentials.
+ * 'google.cloud.' that is included by the builder for each configuration key suffix. When
+ * constructing, other prefixes can be specified. Prefixes specified later can be used to override
+ * the values of previously set values. In this way a set of global credentials can be specified for
+ * most connectors with an override specified for any connectors that need different credentials.
  */
-public class HadoopCredentialConfiguration {
+public class HadoopCredentialsConfiguration {
 
   /**
    * All instances constructed using the builder will use {@code google.cloud} as the first prefix
@@ -49,7 +48,7 @@ public class HadoopCredentialConfiguration {
   public static final HadoopConfigurationProperty<Boolean> ENABLE_SERVICE_ACCOUNTS_SUFFIX =
       new HadoopConfigurationProperty<>(
           ".auth.service.account.enable",
-          CredentialOptions.SERVICE_ACCOUNT_ENABLED_DEFAULT,
+          CredentialsOptions.SERVICE_ACCOUNT_ENABLED_DEFAULT,
           ".enable.service.account.auth");
 
   /**
@@ -61,12 +60,12 @@ public class HadoopCredentialConfiguration {
       new HadoopConfigurationProperty<>(".auth.service.account.json.keyfile");
 
   /**
-   * For unit-testing, the key suffix allowing null to be returned from credential creation instead
-   * of logging an error and aborting.
+   * The key suffix allowing null to be returned from credentials creation to allow unauthenticated
+   * access.
    */
-  public static final HadoopConfigurationProperty<Boolean> ENABLE_NULL_CREDENTIAL_SUFFIX =
+  public static final HadoopConfigurationProperty<Boolean> ENABLE_NULL_CREDENTIALS_SUFFIX =
       new HadoopConfigurationProperty<>(
-          ".auth.null.enable", CredentialOptions.NULL_CREDENTIALS_ENABLED_DEFAULT);
+          ".auth.null.enable", CredentialsOptions.NULL_CREDENTIALS_ENABLED_DEFAULT);
 
   /** Configuration key for setting a token server URL to use to refresh OAuth token. */
   public static final HadoopConfigurationProperty<String> TOKEN_SERVER_URL_SUFFIX =
@@ -125,23 +124,25 @@ public class HadoopCredentialConfiguration {
 
   public static CredentialsFactory getCredentialsFactory(
       Configuration config, String... keyPrefixesVararg) {
-    CredentialOptions credentialOptions = getCredentialsOptions(config, keyPrefixesVararg);
-    return new CredentialsFactory(credentialOptions);
+    CredentialsOptions credentialsOptions = getCredentialsOptions(config, keyPrefixesVararg);
+    return new CredentialsFactory(credentialsOptions);
   }
 
   @VisibleForTesting
-  static CredentialOptions getCredentialsOptions(
+  static CredentialsOptions getCredentialsOptions(
       Configuration config, String... keyPrefixesVararg) {
     List<String> keyPrefixes = getConfigKeyPrefixes(keyPrefixesVararg);
-    return CredentialOptions.builder()
+    return CredentialsOptions.builder()
         .setServiceAccountEnabled(
             ENABLE_SERVICE_ACCOUNTS_SUFFIX
                 .withPrefixes(keyPrefixes)
                 .get(config, config::getBoolean))
         .setServiceAccountJsonKeyFile(
             SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
-        .setNullCredentialEnabled(
-            ENABLE_NULL_CREDENTIAL_SUFFIX.withPrefixes(keyPrefixes).get(config, config::getBoolean))
+        .setNullCredentialsEnabled(
+            ENABLE_NULL_CREDENTIALS_SUFFIX
+                .withPrefixes(keyPrefixes)
+                .get(config, config::getBoolean))
         .setTokenServerUrl(
             TOKEN_SERVER_URL_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
         .setProxyAddress(PROXY_ADDRESS_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
@@ -179,5 +180,5 @@ public class HadoopCredentialConfiguration {
     return ImmutableList.<String>builder().add(keyPrefixes).add(BASE_KEY_PREFIX).build();
   }
 
-  protected HadoopCredentialConfiguration() {}
+  protected HadoopCredentialsConfiguration() {}
 }

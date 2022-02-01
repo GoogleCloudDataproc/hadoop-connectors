@@ -133,7 +133,7 @@ public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSyst
     optionsBuilder.setCloudStorageOptions(
         options.getCloudStorageOptions().toBuilder().setAppName("appName").build());
 
-    // Verify that credential == null works - this is required for unauthenticated access.
+    // Verify that credentials == null works - this is required for unauthenticated access.
     new GoogleCloudStorageFileSystem((Credentials) null, optionsBuilder.build());
 
     // Verify that fake projectId/appName and empty cred does not throw.

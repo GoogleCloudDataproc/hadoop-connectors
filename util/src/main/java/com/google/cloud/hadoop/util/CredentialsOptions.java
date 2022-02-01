@@ -21,7 +21,7 @@ import javax.annotation.Nullable;
 
 /** Configuration for how components should obtain Credentials. */
 @AutoValue
-public abstract class CredentialOptions {
+public abstract class CredentialsOptions {
 
   static final boolean SERVICE_ACCOUNT_ENABLED_DEFAULT = true;
 
@@ -29,9 +29,9 @@ public abstract class CredentialOptions {
   ;
 
   public static Builder builder() {
-    return new AutoValue_CredentialOptions.Builder()
+    return new AutoValue_CredentialsOptions.Builder()
         .setServiceAccountEnabled(SERVICE_ACCOUNT_ENABLED_DEFAULT)
-        .setNullCredentialEnabled(NULL_CREDENTIALS_ENABLED_DEFAULT);
+        .setNullCredentialsEnabled(NULL_CREDENTIALS_ENABLED_DEFAULT);
   }
 
   public abstract Builder toBuilder();
@@ -41,7 +41,7 @@ public abstract class CredentialOptions {
   @Nullable
   public abstract String getServiceAccountJsonKeyFile();
 
-  public abstract boolean isNullCredentialEnabled();
+  public abstract boolean isNullCredentialsEnabled();
 
   @Nullable
   public abstract String getTokenServerUrl();
@@ -55,7 +55,7 @@ public abstract class CredentialOptions {
   @Nullable
   public abstract RedactedString getProxyPassword();
 
-  /** Builder for {@link CredentialOptions} */
+  /** Builder for {@link CredentialsOptions} */
   @AutoValue.Builder
   public abstract static class Builder {
 
@@ -63,7 +63,7 @@ public abstract class CredentialOptions {
 
     public abstract Builder setServiceAccountJsonKeyFile(String serviceAccountJsonKeyFile);
 
-    public abstract Builder setNullCredentialEnabled(boolean nullCredentialEnabled);
+    public abstract Builder setNullCredentialsEnabled(boolean nullCredentialsEnabled);
 
     public abstract Builder setTokenServerUrl(String tokenServerUrl);
 
@@ -73,15 +73,15 @@ public abstract class CredentialOptions {
 
     public abstract Builder setProxyPassword(RedactedString proxyPassword);
 
-    abstract CredentialOptions autoBuild();
+    abstract CredentialsOptions autoBuild();
 
-    public CredentialOptions build() {
-      CredentialOptions options = autoBuild();
+    public CredentialsOptions build() {
+      CredentialsOptions options = autoBuild();
 
       if (!options.isServiceAccountEnabled()) {
         checkArgument(
-            options.isNullCredentialEnabled(),
-            "No valid credential configuration discovered: ",
+            options.isNullCredentialsEnabled(),
+            "No valid credentials configuration discovered: ",
             options);
       }
 

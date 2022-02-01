@@ -203,7 +203,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
    * @param delegate an instance of {@link HttpRequestInitializer} credentials which will be set as
    *     an interceptor on HttpRequests and as the
    * @param credentials A credentials which will be set as an interceptor on HttpRequests and as the
-   *     delegate for a CredentialOrBackoffResponseHandler.
+   *     delegate for a {@link CredentialsOrBackoffResponseHandler}.
    * @param options An options that configure {@link RetryHttpInitializer} instance behaviour.
    */
   public RetryHttpInitializer(
@@ -244,7 +244,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     }
 
     // Supply a new composite handler for unsuccessful return codes. 401 Unauthorized will be
-    // handled by the Credential, 410 Gone will be logged, and 5XX will be handled by a backoff
+    // handled by the Credentials, 410 Gone will be logged, and 5XX will be handled by a backoff
     // handler.
     LoggingResponseHandler loggingResponseHandler =
         new LoggingResponseHandler(

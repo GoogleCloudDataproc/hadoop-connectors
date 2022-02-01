@@ -145,7 +145,7 @@
 ### Authentication
 
 When one of the following two properties is set, it will precede all other
-credential settings, and credentials will be obtained from the access token
+credentials settings, and credentials will be obtained from the access token
 provider.
 
 * `fs.gs.auth.access.token.provider.impl` (not set by default)
@@ -195,11 +195,11 @@ group name, or for all users by default using below properties:
     Default service account impersonation for all users.
 
 If any of the above properties are set then the service account specified will
-be impersonated by generating a short-lived credential when accessing Google
+be impersonated by generating a short-lived credentials when accessing Google
 Cloud Storage.
 
 Configured authentication method will be used to authenticate the request to
-generate this short-lived credential.
+generate this short-lived credentials.
 
 If more than one property is set then the service account associated with the
 user name will take precedence over the service account associated with the

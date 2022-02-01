@@ -281,7 +281,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * Constructs an instance of GoogleCloudStorageImpl.
    *
    * @param options options to customize behavior
-   * @param credentials OAuth2 credential that allows access to GCS
+   * @param credentials OAuth2 credentials that allows access to GCS
    * @throws IOException on IO error
    */
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Credentials credentials)
@@ -316,7 +316,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * Constructs an instance of GoogleCloudStorageImpl.
    *
    * @param options options to customize behavior
-   * @param credentials OAuth2 credential that allows access to GCS
+   * @param credentials OAuth2 credentials that allows access to GCS
    * @param downscopedAccessTokenFn Function that generates downscoped access token.
    * @throws IOException on IO error
    */
