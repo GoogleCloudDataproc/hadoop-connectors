@@ -1,4 +1,4 @@
-### 2.1.7 - 2020-XX-XX
+### 2.1.7 - 2022-02-03
 
 1.  Enable TCP keep alive by default.
 
