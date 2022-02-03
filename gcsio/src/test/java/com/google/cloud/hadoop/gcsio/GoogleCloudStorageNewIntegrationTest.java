@@ -750,7 +750,7 @@ public class GoogleCloudStorageNewIntegrationTest {
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
     GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
 
-    String testBucket = gcsfsIHelper.createUniqueBucket("lst-objs_incl-pfx_impl-dir-in-bckt");
+    String testBucket = gcsfsIHelper.createUniqueBucket("lst-obj_inc-pfx_imp-dir-in-bkt");
     gcsfsIHelper.createObjects(testBucket, "implDir/obj");
 
     List<GoogleCloudStorageItemInfo> listedObjects =
