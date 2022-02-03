@@ -22,6 +22,7 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.bigquery.Bigquery;
 import com.google.auth.Credentials;
+import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.hadoop.util.AccessTokenProviderCredentialsFactory;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration;
 import com.google.cloud.hadoop.util.PropertyUtil;
@@ -81,7 +82,7 @@ public class BigQueryFactory {
    */
   public Credentials createBigQueryCredentials(Configuration config)
       throws GeneralSecurityException, IOException {
-    Credentials credentials =
+    GoogleCredentials credentials =
         AccessTokenProviderCredentialsFactory.credentials(
             config, ImmutableList.of(BIGQUERY_CONFIG_PREFIX));
     return credentials == null

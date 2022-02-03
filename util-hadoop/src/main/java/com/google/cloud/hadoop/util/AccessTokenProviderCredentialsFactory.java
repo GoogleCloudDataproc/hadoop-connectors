@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.util;
 
+import static com.google.cloud.hadoop.util.CredentialsFactory.CLOUD_PLATFORM_SCOPE;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.auth.oauth2.AccessToken;
@@ -60,8 +61,7 @@ public final class AccessTokenProviderCredentialsFactory {
   public static GoogleCredentials credentials(AccessTokenProvider provider) {
     return provider == null
         ? null
-        : new AccessTokenProviderCredentials(provider)
-            .createScoped("https://www.googleapis.com/auth/cloud-platform");
+        : new AccessTokenProviderCredentials(provider).createScoped(CLOUD_PLATFORM_SCOPE);
   }
 
   /**

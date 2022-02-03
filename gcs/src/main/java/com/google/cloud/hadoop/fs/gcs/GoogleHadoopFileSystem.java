@@ -42,7 +42,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
 import com.google.api.client.http.HttpTransport;
-import com.google.api.services.storage.StorageScopes;
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.ImpersonatedCredentials;
@@ -63,6 +62,7 @@ import com.google.cloud.hadoop.gcsio.UriPaths;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.AccessTokenProviderCredentialsFactory;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
+import com.google.cloud.hadoop.util.CredentialsFactory;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.PropertyUtil;
@@ -454,7 +454,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
           ImpersonatedCredentials.newBuilder()
               .setSourceCredentials(credentials)
               .setTargetPrincipal(serviceAccountToImpersonate.get())
-              .setScopes(ImmutableList.of(StorageScopes.CLOUD_PLATFORM))
+              .setScopes(ImmutableList.of(CredentialsFactory.CLOUD_PLATFORM_SCOPE))
               .setHttpTransportFactory(() -> httpTransport)
               .build();
       logger.atFine().log(
@@ -1592,7 +1592,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
           credentials = AccessTokenProviderCredentialsFactory.credentials(accessTokenProvider);
           break;
         case DOWNSCOPED:
-          // If the AccessTokenType is set to DOWNSCOPED`, Credentials will be generated
+          // If the AccessTokenType is set to DOWNSCOPED, Credentials will be generated
           // when GCS requests are created.
           credentials = null;
           break;

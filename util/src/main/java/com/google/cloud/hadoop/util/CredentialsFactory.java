@@ -37,6 +37,9 @@ public class CredentialsFactory {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
+  public static final String CLOUD_PLATFORM_SCOPE =
+      "https://www.googleapis.com/auth/cloud-platform";
+
   static final String CREDENTIALS_ENV_VAR = "GOOGLE_APPLICATION_CREDENTIALS";
 
   private final CredentialsOptions options;
@@ -81,7 +84,7 @@ public class CredentialsFactory {
         "getCredentialsFromJsonKeyFile() from '%s'", options.getServiceAccountJsonKeyFile());
     try (FileInputStream fis = new FileInputStream(options.getServiceAccountJsonKeyFile())) {
       return ServiceAccountCredentials.fromStream(fis, transport::get)
-          .createScoped("https://www.googleapis.com/auth/cloud-platform");
+          .createScoped(CLOUD_PLATFORM_SCOPE);
     }
   }
 
@@ -111,11 +114,10 @@ public class CredentialsFactory {
    * <p>The following is the order in which properties are applied to create the Credentials:
    *
    * <ol>
-   *   <li>If service accounts are not disabled and no service account key file or service account
+   *   <li>If service accounts are enabled and no service account key file or service account
    *       parameters are set, use the metadata service.
-   *   <li>If service accounts are not disabled and a service-account email and keyfile, or service
-   *       account parameters are provided, use service account authentication with the given
-   *       parameters.
+   *   <li>If service accounts are enabled and a service-account json keyfile is provided, use
+   *       service account authentication.
    *   <li>If service accounts are disabled and client id, client secret and OAuth credentials file
    *       is provided, use the Installed App authentication flow.
    *   <li>If service accounts are disabled and null credentials are enabled for unit testing,
@@ -130,7 +132,7 @@ public class CredentialsFactory {
     return credentials == null ? null : configureCredentials(credentials);
   }
 
-  private GoogleCredentials getCredentialsInternal() throws IOException, GeneralSecurityException {
+  private GoogleCredentials getCredentialsInternal() throws IOException {
     if (options.isServiceAccountEnabled()) {
       logger.atFine().log("Using service account credentials");
 

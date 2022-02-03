@@ -23,7 +23,7 @@ import com.google.cloud.hadoop.util.AccessTokenProviderCredentialsFactory.Access
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
-import java.sql.Date;
+import java.util.Date;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.Before;
 import org.junit.Test;
