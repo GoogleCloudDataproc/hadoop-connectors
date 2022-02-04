@@ -41,27 +41,24 @@ public class ChainingHttpRequestInitializer implements HttpRequestInitializer {
 
   @Override
   public void initialize(HttpRequest request) throws IOException {
-    List<HttpIOExceptionHandler> ioExceptionHandlers = new ArrayList<>();
-    List<HttpUnsuccessfulResponseHandler> unsuccessfulResponseHandlers = new ArrayList<>();
-    List<HttpExecuteInterceptor> interceptors = new ArrayList<>();
-    List<HttpResponseInterceptor> responseInterceptors = new ArrayList<>();
+    List<HttpIOExceptionHandler> ioExceptionHandlers = new ArrayList<>(initializers.size());
+    List<HttpUnsuccessfulResponseHandler> unsuccessfulResponseHandlers =
+        new ArrayList<>(initializers.size());
+    List<HttpExecuteInterceptor> interceptors = new ArrayList<>(initializers.size());
+    List<HttpResponseInterceptor> responseInterceptors = new ArrayList<>(initializers.size());
     for (HttpRequestInitializer initializer : initializers) {
       initializer.initialize(request);
       if (request.getIOExceptionHandler() != null) {
         ioExceptionHandlers.add(request.getIOExceptionHandler());
-        request.setIOExceptionHandler(null);
       }
       if (request.getUnsuccessfulResponseHandler() != null) {
         unsuccessfulResponseHandlers.add(request.getUnsuccessfulResponseHandler());
-        request.setUnsuccessfulResponseHandler(null);
       }
       if (request.getInterceptor() != null) {
         interceptors.add(request.getInterceptor());
-        request.setInterceptor(null);
       }
       if (request.getResponseInterceptor() != null) {
         responseInterceptors.add(request.getResponseInterceptor());
-        request.setResponseInterceptor(null);
       }
     }
     request.setIOExceptionHandler(makeIoExceptionHandler(ioExceptionHandlers));

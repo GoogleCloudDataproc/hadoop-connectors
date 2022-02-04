@@ -149,7 +149,6 @@ public class RetryHttpInitializerTest {
 
   private static RetryHttpInitializer createRetryHttpInitializer(Credentials credentials) {
     return new RetryHttpInitializer(
-        /* delegate= */ null,
         credentials,
         RetryHttpInitializerOptions.builder()
             .setDefaultUserAgent("foo-user-agent")

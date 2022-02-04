@@ -120,7 +120,6 @@ public class BigQueryFactory {
               HTTP_TRANSPORT,
               JSON_FACTORY,
               new RetryHttpInitializer(
-                  /* delegate= */ null,
                   credentials,
                   RetryHttpInitializerOptions.builder().setDefaultUserAgent(appName).build()))
           .setApplicationName(appName)

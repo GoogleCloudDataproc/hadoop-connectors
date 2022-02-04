@@ -153,7 +153,6 @@ public class GoogleCloudStorageTest {
     trackingRequestInitializerWithRetries =
         new TrackingHttpRequestInitializer(
             new RetryHttpInitializer(
-                /* delegate= */ null,
                 new FakeCredentials(),
                 RetryHttpInitializerOptions.builder()
                     .setDefaultUserAgent("gcs-io-unit-test")
