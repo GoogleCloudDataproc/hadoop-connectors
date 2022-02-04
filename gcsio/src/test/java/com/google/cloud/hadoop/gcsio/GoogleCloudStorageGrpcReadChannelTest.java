@@ -712,7 +712,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
 
     IOException thrown = assertThrows(IOException.class, () -> newReadChannel(storage, options));
-    assertThat(thrown).hasCauseThat().hasCauseThat().hasMessageThat().contains("backendError");
+    assertThat(thrown).hasCauseThat().hasMessageThat().contains("backendError");
   }
 
   @Test
@@ -736,11 +736,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
             .asException());
     verify(fakeService).setReadObjectException(any());
     IOException thrown = assertThrows(IOException.class, this::newReadChannel);
-    assertThat(thrown)
-        .hasCauseThat()
-        .hasCauseThat()
-        .hasMessageThat()
-        .contains("Custom error message.");
+    assertThat(thrown).hasCauseThat().hasMessageThat().contains("Custom error message.");
     verify(get).setFields(METADATA_FIELDS);
     verify(get).execute();
     verify(fakeService).readObject(any(), any());
@@ -754,7 +750,6 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     verify(fakeService).setReadObjectException(any());
     IOException thrown = assertThrows(IOException.class, this::newReadChannel);
     assertThat(thrown)
-        .hasCauseThat()
         .hasCauseThat()
         .hasCauseThat()
         .hasMessageThat()
@@ -778,7 +773,6 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
     IOException e = assertThrows(IOException.class, () -> newReadChannel(storage, readOptions));
     assertThat(e)
-        .hasCauseThat()
         .hasMessageThat()
         .isEqualTo("Cannot read GZIP encoded files - content encoding support is disabled.");
   }
@@ -1431,7 +1425,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(true).build();
 
     Throwable throwable = assertThrows(IOException.class, () -> newReadChannel(storage, options));
-    assertThat(throwable).hasCauseThat().hasMessageThat().contains("Item not found");
+    assertThat(throwable).hasMessageThat().contains("Item not found");
   }
 
   @Test
@@ -1448,7 +1442,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     // If the user hasn't mandated fail fast, it is permissible for either open() or read() to
     // raise this exception.
     IOException thrown = assertThrows(IOException.class, () -> newReadChannel(storage, options));
-    assertThat(thrown).hasCauseThat().hasMessageThat().contains("Item not found");
+    assertThat(thrown).hasMessageThat().contains("Item not found");
   }
 
   @Test
@@ -1467,7 +1461,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     // If the user hasn't mandated fail fast, it is permissible for either open() or read() to
     // raise this exception.
     IOException thrown = assertThrows(IOException.class, () -> newReadChannel(itemInfo, options));
-    assertThat(thrown).hasCauseThat().hasMessageThat().contains("File not found");
+    assertThat(thrown).hasMessageThat().contains("File not found");
   }
 
   @Test
@@ -1524,7 +1518,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
   private GoogleCloudStorageGrpcReadChannel newReadChannel(
       Storage storage, GoogleCloudStorageReadOptions options) throws IOException {
-    return GoogleCloudStorageGrpcReadChannel.open(
+    return new GoogleCloudStorageGrpcReadChannel(
         new FakeStubProvider(mockCredentials),
         storage,
         errorExtractor,
@@ -1536,7 +1530,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
   private GoogleCloudStorageGrpcReadChannel newReadChannel(GoogleCloudStorageReadOptions options)
       throws IOException {
-    return GoogleCloudStorageGrpcReadChannel.open(
+    return new GoogleCloudStorageGrpcReadChannel(
         new FakeStubProvider(mockCredentials),
         storage,
         errorExtractor,
@@ -1549,7 +1543,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   private GoogleCloudStorageGrpcReadChannel newReadChannel(
       StorageResourceId storageResourceId, GoogleCloudStorageReadOptions options)
       throws IOException {
-    return GoogleCloudStorageGrpcReadChannel.open(
+    return new GoogleCloudStorageGrpcReadChannel(
         new FakeStubProvider(mockCredentials),
         storage,
         errorExtractor,
@@ -1562,9 +1556,8 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   private GoogleCloudStorageGrpcReadChannel newReadChannel(
       GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions options)
       throws IOException {
-    return GoogleCloudStorageGrpcReadChannel.open(
+    return new GoogleCloudStorageGrpcReadChannel(
         new FakeStubProvider(mockCredentials),
-        storage,
         itemInfo,
         watchdog,
         options,
