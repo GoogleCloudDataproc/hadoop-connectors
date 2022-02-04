@@ -28,7 +28,7 @@ import static java.lang.Math.min;
 import static java.util.Comparator.comparing;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
-import com.google.api.client.auth.oauth2.Credential;
+import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.CheckedFunction;
@@ -134,15 +134,16 @@ public class GoogleCloudStorageFileSystem {
   /**
    * Constructs an instance of GoogleCloudStorageFileSystem.
    *
-   * @param credential OAuth2 credential that allows access to GCS.
+   * @param credentials OAuth2 credentials that allows access to GCS.
    * @param options Options for how this filesystem should operate and configure its underlying
    *     storage.
    */
   public GoogleCloudStorageFileSystem(
-      Credential credential, GoogleCloudStorageFileSystemOptions options) throws IOException {
+      Credentials credentials, GoogleCloudStorageFileSystemOptions options) throws IOException {
     this(
         new GoogleCloudStorageImpl(
-            checkNotNull(options, "options must not be null").getCloudStorageOptions(), credential),
+            checkNotNull(options, "options must not be null").getCloudStorageOptions(),
+            credentials),
         options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }
@@ -150,20 +151,20 @@ public class GoogleCloudStorageFileSystem {
   /**
    * Constructs an instance of GoogleCloudStorageFileSystem.
    *
-   * @param credential OAuth2 credential that allows access to GCS.
+   * @param credentials OAuth2 credentials that allows access to GCS.
    * @param downscopedAccessTokenFn Function that generates downscoped access token.
    * @param options Options for how this filesystem should operate and configure its underlying
    *     storage.
    */
   public GoogleCloudStorageFileSystem(
-      Credential credential,
+      Credentials credentials,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
       GoogleCloudStorageFileSystemOptions options)
       throws IOException {
     this(
         new GoogleCloudStorageImpl(
             checkNotNull(options, "options must not be null").getCloudStorageOptions(),
-            credential,
+            credentials,
             downscopedAccessTokenFn),
         options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);

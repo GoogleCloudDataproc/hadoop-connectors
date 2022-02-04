@@ -15,19 +15,20 @@
 package com.google.cloud.hadoop.util.testing;
 
 import com.google.cloud.hadoop.util.AccessTokenProvider;
+import java.time.Instant;
 import org.apache.hadoop.conf.Configuration;
 
 /** A mock implementation of the {@link AccessTokenProvider} interface to be used in tests. */
 public final class TestingAccessTokenProvider implements AccessTokenProvider {
 
   public static final String FAKE_ACCESS_TOKEN = "invalid-access-token";
-  public static final Long EXPIRATION_TIME_MILLISECONDS = 2000L;
+  public static final Instant EXPIRATION_TIME = Instant.now().plusSeconds(600);
 
   private Configuration config;
 
   @Override
   public AccessToken getAccessToken() {
-    return new AccessToken(FAKE_ACCESS_TOKEN, EXPIRATION_TIME_MILLISECONDS);
+    return new AccessToken(FAKE_ACCESS_TOKEN, EXPIRATION_TIME);
   }
 
   @Override

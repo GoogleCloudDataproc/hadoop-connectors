@@ -19,7 +19,6 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import static java.lang.Math.toIntExact;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
-import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.http.HttpBackOffIOExceptionHandler;
 import com.google.api.client.http.HttpBackOffUnsuccessfulResponseHandler;
 import com.google.api.client.http.HttpIOExceptionHandler;
@@ -31,6 +30,8 @@ import com.google.api.client.http.HttpUnsuccessfulResponseHandler;
 import com.google.api.client.util.BackOff;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.Sleeper;
+import com.google.auth.Credentials;
+import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
@@ -53,12 +54,12 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
       BASE_HTTP_BACKOFF_REQUIRED =
           HttpBackOffUnsuccessfulResponseHandler.BackOffRequired.ON_SERVER_ERROR;
 
-  private HttpRequestInitializer delegate;
+  private final HttpRequestInitializer delegate;
 
   // To be used as a request interceptor for filling in the "Authorization" header field, as well
-  // as a response handler for certain unsuccessful error codes wherein the Credential must refresh
+  // as a response handler for certain unsuccessful error codes wherein the Credentials must refresh
   // its token for a retry.
-  private final Credential credential;
+  private final HttpCredentialsAdapter credentials;
 
   private final RetryHttpInitializerOptions options;
 
@@ -84,7 +85,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
      *     errors.
      * @param delegateIOExceptionHandler The HttpIOExceptionResponseHandler to delegate to.
      * @param responseCodesToLog The set of response codes to log URLs for.
-     * @param responseCodesToLogWithRateLimit The set of response codes to log URLs for with reate
+     * @param responseCodesToLogWithRateLimit The set of response codes to log URLs for with rate
      *     limit.
      */
     public LoggingResponseHandler(
@@ -140,15 +141,15 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
   /**
    * An inner class allowing this initializer to create a new handler instance per HttpRequest which
-   * shares the Credential of the outer class and which will compose the Credential with a backoff
+   * shares the Credentials of the outer class and which will compose the Credentials with a backoff
    * handler to handle unsuccessful HTTP codes.
    */
-  private class CredentialOrBackoffResponseHandler implements HttpUnsuccessfulResponseHandler {
-    // The backoff-handler instance to use whenever the outer-class's Credential does not handle
+  private class CredentialsOrBackoffResponseHandler implements HttpUnsuccessfulResponseHandler {
+    // The backoff-handler instance to use whenever the outer-class's Credentials does not handle
     // the error.
     private final HttpUnsuccessfulResponseHandler delegateHandler;
 
-    public CredentialOrBackoffResponseHandler() {
+    public CredentialsOrBackoffResponseHandler() {
       HttpBackOffUnsuccessfulResponseHandler errorCodeHandler =
           new HttpBackOffUnsuccessfulResponseHandler(getDefaultBackOff());
       errorCodeHandler.setBackOffRequired(
@@ -164,8 +165,8 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     @Override
     public boolean handleResponse(HttpRequest request, HttpResponse response, boolean supportsRetry)
         throws IOException {
-      if (credential != null && credential.handleResponse(request, response, supportsRetry)) {
-        // If credential decides it can handle it, the return code or message indicated something
+      if (credentials != null && credentials.handleResponse(request, response, supportsRetry)) {
+        // If credentials decides it can handle it, the return code or message indicated something
         // specific to authentication, and no backoff is desired.
         return true;
       }
@@ -181,8 +182,8 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
           && response.getHeaders().getLocation() != null) {
         // Hack: Reach in and fix any '+' in the URL but still report 'false'. The client library
         // incorrectly tries to decode '+' into ' ', even though the backend servers treat '+'
-        // as a legitimate path character, and so do not encode it. This is safe to do whether
-        // or not the client library fixes the bug, since %2B will correctly be decoded as '+'
+        // as a legitimate path character, and so do not encode it. This is safe to do regardless
+        // whether the client library fixes the bug, since %2B will correctly be decoded as '+'
         // even after the fix.
         String redirectLocation = response.getHeaders().getLocation();
         if (redirectLocation.contains("+")) {
@@ -199,34 +200,20 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
   }
 
   /**
-   * @param credential A credential which will be set as an interceptor on HttpRequests and as the
-   *     delegate for a CredentialOrBackoffResponseHandler.
-   * @param defaultUserAgent A String to set as the user-agent when initializing an HttpRequest if
-   *     the HttpRequest doesn't already have a user-agent header.
-   */
-  public RetryHttpInitializer(Credential credential, String defaultUserAgent) {
-    this(
-        credential,
-        RetryHttpInitializerOptions.DEFAULT.toBuilder()
-            .setDefaultUserAgent(defaultUserAgent)
-            .build());
-  }
-
-  /**
-   * @param credential A credential which will be set as an interceptor on HttpRequests and as the
-   *     delegate for a CredentialOrBackoffResponseHandler.
+   * @param delegate an instance of {@link HttpRequestInitializer} credentials which will be set as
+   *     an interceptor on HttpRequests and as the
+   * @param credentials A credentials which will be set as an interceptor on HttpRequests and as the
+   *     delegate for a {@link CredentialsOrBackoffResponseHandler}.
    * @param options An options that configure {@link RetryHttpInitializer} instance behaviour.
    */
-  public RetryHttpInitializer(Credential credential, RetryHttpInitializerOptions options) {
-    this.credential = credential;
+  public RetryHttpInitializer(
+      HttpRequestInitializer delegate,
+      Credentials credentials,
+      RetryHttpInitializerOptions options) {
+    this.delegate = delegate;
+    this.credentials = credentials == null ? null : new HttpCredentialsAdapter(credentials);
     this.options = options;
     this.sleeperOverride = null;
-  }
-
-  public RetryHttpInitializer(
-      HttpRequestInitializer delegate, Credential credential, RetryHttpInitializerOptions options) {
-    this(credential, options);
-    this.delegate = delegate;
   }
 
   @Override
@@ -235,8 +222,11 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
       delegate.initialize(request);
     }
 
-    // Credential must be the interceptor to fill in accessToken fields.
-    request.setInterceptor(credential);
+    // Initialize request with credentials and let CredentialsOrBackoffResponseHandler
+    // to refresh credentials later if necessary
+    if (credentials != null) {
+      credentials.initialize(request);
+    }
 
     // Request will be retried if server errors (5XX) or I/O errors are encountered.
     request.setNumberOfRetries(options.getMaxRequestRetries());
@@ -254,11 +244,11 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     }
 
     // Supply a new composite handler for unsuccessful return codes. 401 Unauthorized will be
-    // handled by the Credential, 410 Gone will be logged, and 5XX will be handled by a backoff
+    // handled by the Credentials, 410 Gone will be logged, and 5XX will be handled by a backoff
     // handler.
     LoggingResponseHandler loggingResponseHandler =
         new LoggingResponseHandler(
-            new CredentialOrBackoffResponseHandler(),
+            new CredentialsOrBackoffResponseHandler(),
             exceptionHandler,
             ImmutableSet.of(HTTP_SC_GONE, HttpStatusCodes.STATUS_CODE_SERVICE_UNAVAILABLE),
             ImmutableSet.of(HTTP_SC_TOO_MANY_REQUESTS));
@@ -276,13 +266,13 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     request.getHeaders().putAll(options.getHttpHeaders());
   }
 
-  public Credential getCredential() {
-    return credential;
+  public Credentials getCredentials() {
+    return credentials == null ? null : credentials.getCredentials();
   }
 
   private static BackOff getDefaultBackOff() {
     return new ExponentialBackOff.Builder()
-        // Set initial timeout to 1.25 seconds to have a 1 second minimum initial interval
+        // Set initial timeout to 1.25 seconds to have a 1-second minimum initial interval
         // after 0.2 randomization factor will be applied
         .setInitialIntervalMillis(1_250)
         .setMultiplier(1.6)

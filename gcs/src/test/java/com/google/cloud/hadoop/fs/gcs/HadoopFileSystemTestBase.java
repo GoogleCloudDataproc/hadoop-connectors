@@ -139,7 +139,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
       Instant modificationTime = Instant.ofEpochMilli(fileStatus.getModificationTime());
       // Ignore modification time for inferred directories that always set to 0
       if (!expectedToBeDir || fileStatus.getModificationTime() != 0) {
-        // We must subtract 1000, because some FileSystems, like LocalFileSystem, have only
+        // We must subtract 1000 (1s), because some FileSystems, like LocalFileSystem, have only
         // second granularity, so we might have something like testStartTime == 1234123
         // and modificationTime == 1234000. Unfortunately, "Instant" doesn't support easy
         // conversions between units to clip to the "second" precision.
@@ -148,10 +148,10 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
                 "Stale file? testStartTime: %s modificationTime: %s bucket: '%s' object: '%s'",
                 testStartTime, modificationTime, bucketName, objectName)
             .that(modificationTime)
-            .isAtLeast(testStartTime.minusMillis(1000));
+            .isAtLeast(testStartTime.minusSeconds(1));
       }
       assertWithMessage(
-              "Clock skew? currentTime: %s modificationTime: %s bucket: '%s' object: '%s'",
+              "Clock skew? currentTime: %s, modificationTime: %s, bucket: '%s', object: '%s'",
               currentTime, modificationTime, bucketName, objectName)
           .that(modificationTime)
           .isAtMost(currentTime);

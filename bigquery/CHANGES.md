@@ -4,6 +4,16 @@
 
 1.  Update all dependencies to the latest versions.
 
+1.  Migrate authentication to `com.google.auth.Credentials` and remove obsolete
+    properties:
+
+    ```
+    mapred.bq.auth.service.account.email
+    mapred.bq.auth.service.account.keyfile
+    mapred.bq.auth.service.account.private.key
+    mapred.bq.auth.service.account.private.key.id
+    ```
+
 ### 1.2.0 - 2021-01-06
 
 1.  Update all dependencies to latest versions.

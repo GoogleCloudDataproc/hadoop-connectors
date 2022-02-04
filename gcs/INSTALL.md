@@ -15,7 +15,7 @@ must do one of the following:
     Engine VMs, including Dataproc clusters,
     `google.cloud.auth.service.account.enable` is set to false by default, which
     means you don't need to manually configure a service account for the
-    connector; it will automatically get the service account credential from the
+    connector; it will automatically get the service account credentials from the
     metadata server of the VM. But you must need to make sure the VM service
     account has permission to access the GCS bucket.
 *   **non-Google Cloud Platform** - Obtain an

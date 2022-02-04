@@ -17,7 +17,7 @@ import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.BQ_ROOT_
 import static com.google.common.truth.Truth.assertThat;
 
 import com.google.api.services.bigquery.Bigquery;
-import com.google.cloud.hadoop.util.testing.CredentialConfigurationUtil;
+import com.google.cloud.hadoop.util.testing.CredentialsConfigurationUtil;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -34,7 +34,7 @@ public class BigQueryFactoryTest {
   @Test
   public void getBigQuery_localDev() throws Exception {
     BigQueryFactory factory = new BigQueryFactory();
-    Configuration configuration = CredentialConfigurationUtil.getTestConfiguration();
+    Configuration configuration = CredentialsConfigurationUtil.getTestConfiguration();
 
     Bigquery bigquery = factory.getBigQuery(configuration);
 
@@ -45,7 +45,7 @@ public class BigQueryFactoryTest {
   @Test
   public void getBigQuery_customEndpoint() throws Exception {
     BigQueryFactory factory = new BigQueryFactory();
-    Configuration configuration = CredentialConfigurationUtil.getTestConfiguration();
+    Configuration configuration = CredentialsConfigurationUtil.getTestConfiguration();
     configuration.set(BQ_ROOT_URL.getKey(), "https://unit-test-bigquery.googleapis.com/");
 
     Bigquery bigquery = factory.getBigQuery(configuration);
