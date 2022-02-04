@@ -70,8 +70,7 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
 
     gcsOptions = getStandardOptionBuilder().build();
     httpRequestsInitializer =
-        new RetryHttpInitializer(
-            /* delegate= */ null, credentials, gcsOptions.toRetryHttpInitializerOptions());
+        new RetryHttpInitializer(credentials, gcsOptions.toRetryHttpInitializerOptions());
 
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
     ghfsIHelper = new HadoopFileSystemIntegrationHelper(ghfs);

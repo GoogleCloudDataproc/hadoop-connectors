@@ -342,7 +342,6 @@ public class GoogleCloudStorageTestHelper {
       this.requestsTracker =
           new TrackingHttpRequestInitializer(
               new RetryHttpInitializer(
-                  /* delegate= */ null,
                   GoogleCloudStorageTestHelper.getCredentials(),
                   options.toRetryHttpInitializerOptions()));
       this.delegate = delegateStorageFn.apply(this.requestsTracker);

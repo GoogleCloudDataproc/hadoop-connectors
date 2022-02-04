@@ -69,8 +69,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
 
     gcsOptions = getStandardOptionBuilder().build();
     httpRequestsInitializer =
-        new RetryHttpInitializer(
-            /* delegate= */ null, credentials, gcsOptions.toRetryHttpInitializerOptions());
+        new RetryHttpInitializer(credentials, gcsOptions.toRetryHttpInitializerOptions());
 
     GoogleCloudStorageFileSystem gcsfs =
         new GoogleCloudStorageFileSystem(

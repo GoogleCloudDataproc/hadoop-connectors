@@ -182,7 +182,6 @@ public class RegionalIntegrationTest {
                 HTTP_TRANSPORT,
                 JSON_FACTORY,
                 new RetryHttpInitializer(
-                    /* delegate= */ null,
                     GoogleCloudStorageTestHelper.getCredentials(),
                     RetryHttpInitializerOptions.builder().setDefaultUserAgent(BQC_ID).build()))
             .setApplicationName(BQC_ID)

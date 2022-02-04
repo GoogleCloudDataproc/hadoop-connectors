@@ -32,7 +32,6 @@ import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.Sleeper;
 import com.google.auth.Credentials;
 import com.google.auth.http.HttpCredentialsAdapter;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
@@ -54,8 +53,6 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
       BASE_HTTP_BACKOFF_REQUIRED =
           HttpBackOffUnsuccessfulResponseHandler.BackOffRequired.ON_SERVER_ERROR;
 
-  private final HttpRequestInitializer delegate;
-
   // To be used as a request interceptor for filling in the "Authorization" header field, as well
   // as a response handler for certain unsuccessful error codes wherein the Credentials must refresh
   // its token for a retry.
@@ -65,7 +62,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
   // If non-null, the backoff handlers will be set to use this sleeper instead of their defaults.
   // Only used for testing.
-  private Sleeper sleeperOverride;
+  private final Sleeper sleeperOverride;
 
   /** A HttpUnsuccessfulResponseHandler logs the URL that generated certain failures. */
   private static class LoggingResponseHandler
@@ -200,17 +197,11 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
   }
 
   /**
-   * @param delegate an instance of {@link HttpRequestInitializer} credentials which will be set as
-   *     an interceptor on HttpRequests and as the
-   * @param credentials A credentials which will be set as an interceptor on HttpRequests and as the
+   * @param credentials A credentials which will be used to initialize on HttpRequests and as the
    *     delegate for a {@link CredentialsOrBackoffResponseHandler}.
    * @param options An options that configure {@link RetryHttpInitializer} instance behaviour.
    */
-  public RetryHttpInitializer(
-      HttpRequestInitializer delegate,
-      Credentials credentials,
-      RetryHttpInitializerOptions options) {
-    this.delegate = delegate;
+  public RetryHttpInitializer(Credentials credentials, RetryHttpInitializerOptions options) {
     this.credentials = credentials == null ? null : new HttpCredentialsAdapter(credentials);
     this.options = options;
     this.sleeperOverride = null;
@@ -218,10 +209,6 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
   @Override
   public void initialize(HttpRequest request) throws IOException {
-    if (delegate != null) {
-      delegate.initialize(request);
-    }
-
     // Initialize request with credentials and let CredentialsOrBackoffResponseHandler
     // to refresh credentials later if necessary
     if (credentials != null) {
@@ -281,11 +268,5 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
         // 30 minutes
         .setMaxElapsedTimeMillis(1_800_000)
         .build();
-  }
-
-  /** Overrides the default Sleepers used in backoff retry handler instances. */
-  @VisibleForTesting
-  void setSleeperOverride(Sleeper sleeper) {
-    sleeperOverride = sleeper;
   }
 }

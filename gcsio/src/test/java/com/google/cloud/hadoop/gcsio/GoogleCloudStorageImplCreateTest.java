@@ -101,7 +101,6 @@ public class GoogleCloudStorageImplCreateTest {
             HttpTransportFactory.createHttpTransport(),
             JacksonFactory.getDefaultInstance(),
             new RetryHttpInitializer(
-                /* delegate= */ null,
                 credentials,
                 RetryHttpInitializerOptions.builder()
                     .setDefaultUserAgent("foo-user-agent")

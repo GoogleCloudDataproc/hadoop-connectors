@@ -58,6 +58,7 @@ import com.google.auth.Credentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
+import com.google.cloud.hadoop.util.ChainingHttpRequestInitializer;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.ResilientOperation;
@@ -330,10 +331,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     this.storageOptions = checkNotNull(options, "options must not be null");
     this.storageOptions.throwIfNotValid();
     HttpRequestInitializer retryHttpInitializer =
-        new RetryHttpInitializer(
+        new ChainingHttpRequestInitializer(
             new StatisticsTrackingHttpRequestInitializer(statistics),
-            credentials,
-            options.toRetryHttpInitializerOptions());
+            new RetryHttpInitializer(credentials, options.toRetryHttpInitializerOptions()));
 
     this.storage =
         checkNotNull(createStorage(options, retryHttpInitializer), "storage must not be null");
