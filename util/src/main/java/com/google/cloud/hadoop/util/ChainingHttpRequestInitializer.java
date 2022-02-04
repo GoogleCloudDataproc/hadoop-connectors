@@ -50,15 +50,19 @@ public class ChainingHttpRequestInitializer implements HttpRequestInitializer {
       initializer.initialize(request);
       if (request.getIOExceptionHandler() != null) {
         ioExceptionHandlers.add(request.getIOExceptionHandler());
+        request.setIOExceptionHandler(null);
       }
       if (request.getUnsuccessfulResponseHandler() != null) {
         unsuccessfulResponseHandlers.add(request.getUnsuccessfulResponseHandler());
+        request.setUnsuccessfulResponseHandler(null);
       }
       if (request.getInterceptor() != null) {
         interceptors.add(request.getInterceptor());
+        request.setInterceptor(null);
       }
       if (request.getResponseInterceptor() != null) {
         responseInterceptors.add(request.getResponseInterceptor());
+        request.setResponseInterceptor(null);
       }
     }
     request.setIOExceptionHandler(makeIoExceptionHandler(ioExceptionHandlers));
