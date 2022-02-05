@@ -145,10 +145,10 @@
 ### Authentication
 
 When one of the following two properties is set, it will precede all other
-credential settings, and credentials will be obtained from the access token
+credentials settings, and credentials will be obtained from the access token
 provider.
 
-*   `fs.gs.auth.access.token.provider.impl` (not set by default)
+* `fs.gs.auth.access.token.provider.impl` (not set by default)
 
     The implementation of the `AccessTokenProvider` interface used for GCS
     Connector.
@@ -156,60 +156,24 @@ provider.
 *   `fs.gs.auth.service.account.enable` (default: `true`)
 
     Whether to use a service account for GCS authorization. If an email and
-    keyfile are provided (see `fs.gs.auth.service.account.email` and
-    `fs.gs.auth.service.account.keyfile`), then that service account will be
-    used. Otherwise the connector will look to see if it is running on a GCE VM
-    with some level of GCS access in it's service account scope, and use that
-    service account.
+    keyfile are provided (see `fs.gs.auth.service.account.json.keyfile`), then
+    that service account will be used. Otherwise, the connector will look to see
+    if it is running on a GCE VM with some level of GCS access in its service
+    account scope, and use that service account.
 
 #### Service account authentication
 
-The following properties are required only when running not on a GCE VM and
-`fs.gs.auth.service.account.enable` is `true`. There are 3 ways to configure
-these credentials, which are mutually exclusive.
+The following property is required only when running not on a GCE VM and
+`fs.gs.auth.service.account.enable` is `true`.
 
-*   `fs.gs.auth.service.account.email` (not set by default)
+### JSON Keyfile
 
-    The email address is associated with the service account used for GCS access
-    when `fs.gs.auth.service.account.enable` is `true`. Required when
-    authentication key specified in the Configuration file (Method 1) or a
-    PKCS12 certificate (Method 3) is being used.
-
-##### Method 1
-
-Configure service account details directly in the Configuration file or via
-[Hadoop Credentials](https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/CredentialProviderAPI.html).
-
-*   `fs.gs.auth.service.account.private.key.id` (not set by default)
-
-    The private key id associated with the service account used for GCS access.
-    This can be extracted from the json keyfile generated via the Google Cloud
-    Console.
-
-*   `fs.gs.auth.service.account.private.key` (not set by default)
-
-    The private key associated with the service account used for GCS access.
-    This can be extracted from the json keyfile generated via the Google Cloud
-    Console.
-
-##### Method 2
-
-Configure service account credentials using a json keyfile. The file must exist
-at the same path on all nodes
+Configure service account credentials using a JSON keyfile. The file must exist
+at the same path on all nodes:
 
 *   `fs.gs.auth.service.account.json.keyfile` (not set by default)
 
-    The path to the json keyfile for the service account.
-
-##### Method 3
-
-Configure service account credentials using a P12 certificate. The file must
-exist at the same path on all nodes
-
-*   `fs.gs.auth.service.account.keyfile` (not set by default)
-
-    The PKCS12 (p12) certificate file of the service account used for GCS access
-    when `fs.gs.auth.service.account.enable` is `true`.
+    The path to the JSON keyfile for the service account.
 
 #### Service account impersonation
 
@@ -231,11 +195,11 @@ group name, or for all users by default using below properties:
     Default service account impersonation for all users.
 
 If any of the above properties are set then the service account specified will
-be impersonated by generating a short-lived credential when accessing Google
+be impersonated by generating a short-lived credentials when accessing Google
 Cloud Storage.
 
 Configured authentication method will be used to authenticate the request to
-generate this short-lived credential.
+generate this short-lived credentials.
 
 If more than one property is set then the service account associated with the
 user name will take precedence over the service account associated with the
@@ -383,7 +347,7 @@ over default service account impersonation.
 
     Google Cloud Storage service path.
 
-*   `fs.gs.token.server.url` (default: `https://oauth2.googleapis.com/token`)
+*   `fs.gs.token.server.url` (not set by default)
 
     Google Token Server root URL.
 

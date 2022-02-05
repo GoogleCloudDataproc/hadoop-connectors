@@ -159,7 +159,7 @@ public class GoogleCloudStorageImplTest {
     GoogleCloudStorageImpl gcs =
         new GoogleCloudStorageImpl(
             getOptionsWithUploadChunk(uploadChunkSize),
-            GoogleCloudStorageTestHelper.getCredential());
+            GoogleCloudStorageTestHelper.getCredentials());
 
     byte[] partition = writeObject(gcs, resourceId, /* objectSize= */ 5 * uploadChunkSize);
 

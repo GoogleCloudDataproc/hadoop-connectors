@@ -15,6 +15,7 @@
 package com.google.cloud.hadoop.util;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import org.apache.hadoop.conf.Configurable;
 
@@ -34,11 +35,11 @@ public interface AccessTokenProvider extends Configurable {
   class AccessToken {
 
     private final String token;
-    private final Long expirationTimeMilliSeconds;
+    private final Instant expirationTime;
 
-    public AccessToken(String token, Long expirationTimeMilliSeconds) {
+    public AccessToken(String token, Instant expirationTime) {
       this.token = token;
-      this.expirationTimeMilliSeconds = expirationTimeMilliSeconds;
+      this.expirationTime = expirationTime;
     }
 
     /** @return the Access Token string. */
@@ -47,8 +48,8 @@ public interface AccessTokenProvider extends Configurable {
     }
 
     /** @return the Time when the token will expire, expressed in milliseconds. */
-    public Long getExpirationTimeMilliSeconds() {
-      return expirationTimeMilliSeconds;
+    public Instant getExpirationTime() {
+      return expirationTime;
     }
   }
 

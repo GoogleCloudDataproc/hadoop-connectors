@@ -14,18 +14,18 @@
 
 package com.google.cloud.hadoop.util.testing;
 
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.BASE_KEY_PREFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_NULL_CREDENTIAL_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.BASE_KEY_PREFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.ENABLE_NULL_CREDENTIALS_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
 
 import org.apache.hadoop.conf.Configuration;
 
 /** Utility methods for creating Configuration objects for use in testing. */
-public class CredentialConfigurationUtil {
+public class CredentialsConfigurationUtil {
 
   public static void addTestConfigurationSettings(Configuration configuration) {
     configuration.setBoolean(BASE_KEY_PREFIX + ENABLE_SERVICE_ACCOUNTS_SUFFIX.getKey(), false);
-    configuration.setBoolean(BASE_KEY_PREFIX + ENABLE_NULL_CREDENTIAL_SUFFIX.getKey(), true);
+    configuration.setBoolean(BASE_KEY_PREFIX + ENABLE_NULL_CREDENTIALS_SUFFIX.getKey(), true);
   }
 
   public static Configuration getTestConfiguration() {

@@ -32,7 +32,7 @@ import com.google.api.services.bigquery.model.JobStatus;
 import com.google.api.services.bigquery.model.Table;
 import com.google.api.services.bigquery.model.TableReference;
 import com.google.cloud.hadoop.fs.gcs.InMemoryGoogleHadoopFileSystem;
-import com.google.cloud.hadoop.util.testing.CredentialConfigurationUtil;
+import com.google.cloud.hadoop.util.testing.CredentialsConfigurationUtil;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -133,7 +133,7 @@ public class GsonBigQueryInputFormatTest {
         AbstractBigQueryInputFormat.class);
     config.setBoolean(BigQueryConfiguration.DELETE_EXPORT_FILES_FROM_GCS.getKey(), true);
 
-    CredentialConfigurationUtil.addTestConfigurationSettings(config);
+    CredentialsConfigurationUtil.addTestConfigurationSettings(config);
 
     // Create a GoogleHadoopFileSystem to use to initialize and write to
     // the in-memory GcsFs.

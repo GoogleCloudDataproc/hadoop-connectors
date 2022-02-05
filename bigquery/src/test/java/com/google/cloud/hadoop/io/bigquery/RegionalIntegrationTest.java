@@ -23,6 +23,7 @@ import com.google.cloud.hadoop.io.bigquery.output.BigQueryTableFieldSchema;
 import com.google.cloud.hadoop.io.bigquery.output.BigQueryTableSchema;
 import com.google.cloud.hadoop.io.bigquery.output.IndirectBigQueryOutputFormat;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
+import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.common.collect.ImmutableList;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -180,7 +181,9 @@ public class RegionalIntegrationTest {
         new Storage.Builder(
                 HTTP_TRANSPORT,
                 JSON_FACTORY,
-                new RetryHttpInitializer(GoogleCloudStorageTestHelper.getCredential(), BQC_ID))
+                new RetryHttpInitializer(
+                    GoogleCloudStorageTestHelper.getCredentials(),
+                    RetryHttpInitializerOptions.builder().setDefaultUserAgent(BQC_ID).build()))
             .setApplicationName(BQC_ID)
             .build();
     GoogleCloudStorageFileSystem gcsFs =

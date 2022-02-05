@@ -23,7 +23,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import com.google.api.client.auth.oauth2.Credential;
+import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
@@ -64,12 +64,13 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
 
   @BeforeClass
   public static void beforeClass() throws Throwable {
-    Credential credential =
-        checkNotNull(GoogleCloudStorageTestHelper.getCredential(), "credential should not be null");
+    Credentials credentials =
+        checkNotNull(
+            GoogleCloudStorageTestHelper.getCredentials(), "credentials should not be null");
 
     gcsOptions = getStandardOptionBuilder().build();
     httpRequestsInitializer =
-        new RetryHttpInitializer(credential, gcsOptions.toRetryHttpInitializerOptions());
+        new RetryHttpInitializer(credentials, gcsOptions.toRetryHttpInitializerOptions());
 
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
     ghfsIHelper = new HadoopFileSystemIntegrationHelper(ghfs);

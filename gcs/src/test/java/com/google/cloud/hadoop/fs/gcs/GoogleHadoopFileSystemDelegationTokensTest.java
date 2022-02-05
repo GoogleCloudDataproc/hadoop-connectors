@@ -132,6 +132,7 @@ public class GoogleHadoopFileSystemDelegationTokensTest {
     fs.initialize(new Path("gs://test/").toUri(), loadConfig());
 
     Token<?> dt = fs.getDelegationToken("current-user");
+
     assertThat(fs.getIOStatistics().counters().get(INVOCATION_GET_DELEGATION_TOKEN.getSymbol()))
         .isEqualTo(1);
     assertThat(fs.getIOStatistics().counters().get(DELEGATION_TOKENS_ISSUED.getSymbol()))

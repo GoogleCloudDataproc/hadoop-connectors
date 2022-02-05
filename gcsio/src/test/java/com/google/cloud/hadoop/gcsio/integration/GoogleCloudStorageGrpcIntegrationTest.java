@@ -38,7 +38,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   private static GoogleCloudStorage createGoogleCloudStorage() throws IOException {
     return new GoogleCloudStorageImpl(
         GoogleCloudStorageTestHelper.getStandardOptionBuilder().setGrpcEnabled(true).build(),
-        GoogleCloudStorageTestHelper.getCredential());
+        GoogleCloudStorageTestHelper.getCredentials());
   }
 
   private static GoogleCloudStorage createGoogleCloudStorage(
@@ -48,7 +48,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
             .setWriteChannelOptions(asyncWriteChannelOptions)
             .setGrpcEnabled(true)
             .build(),
-        GoogleCloudStorageTestHelper.getCredential());
+        GoogleCloudStorageTestHelper.getCredentials());
   }
 
   @BeforeClass
