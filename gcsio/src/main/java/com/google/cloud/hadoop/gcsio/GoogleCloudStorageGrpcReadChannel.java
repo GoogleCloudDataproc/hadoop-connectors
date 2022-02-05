@@ -498,7 +498,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private boolean hasMoreFooterContentToRead(ByteBuffer byteBuffer) {
     return footerBuffer != null
-        && positionInGrpcStream >= footerStartOffsetInBytes
+        && (positionInGrpcStream + bytesToSkipBeforeReading) >= footerStartOffsetInBytes
         && byteBuffer.hasRemaining();
   }
 
