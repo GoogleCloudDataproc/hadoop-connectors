@@ -35,15 +35,16 @@ import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.CheckedFunction;
 import com.google.cloud.hadoop.util.CredentialsFactory;
 import com.google.cloud.hadoop.util.CredentialsOptions;
+import com.google.cloud.hadoop.util.CredentialsOptions.AuthenticationType;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.base.Stopwatch;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
-import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -71,18 +72,18 @@ public class GoogleCloudStorageTestHelper {
   }
 
   public static Credentials getCredentials() throws IOException {
+    String serviceAccountJsonKeyFile =
+        TestConfiguration.getInstance().getServiceAccountJsonKeyFile();
     CredentialsOptions credentialsOptions =
-        CredentialsOptions.builder()
-            .setServiceAccountJsonKeyFile(
-                TestConfiguration.getInstance().getServiceAccountJsonKeyFile())
-            .build();
-    CredentialsFactory credentialsFactory = new CredentialsFactory(credentialsOptions);
-
-    try {
-      return credentialsFactory.getCredentials();
-    } catch (GeneralSecurityException e) {
-      throw new IOException("Failed to create test credentials", e);
-    }
+        serviceAccountJsonKeyFile == null
+            ? CredentialsOptions.builder().build()
+            : CredentialsOptions.builder()
+                .setAuthenticationType(AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE)
+                .setServiceAccountJsonKeyFile(serviceAccountJsonKeyFile)
+                .build();
+    CredentialsFactory credentialsFactory =
+        new CredentialsFactory(credentialsOptions, /* config= */ ImmutableList.of());
+    return credentialsFactory.getCredentials();
   }
 
   public static GoogleCloudStorageOptions.Builder getStandardOptionBuilder() {

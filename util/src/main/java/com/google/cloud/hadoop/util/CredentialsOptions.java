@@ -15,6 +15,7 @@
 package com.google.cloud.hadoop.util;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.auto.value.AutoValue;
 import javax.annotation.Nullable;
@@ -23,25 +24,28 @@ import javax.annotation.Nullable;
 @AutoValue
 public abstract class CredentialsOptions {
 
-  static final boolean SERVICE_ACCOUNT_ENABLED_DEFAULT = true;
-
-  static final boolean NULL_CREDENTIALS_ENABLED_DEFAULT = false;
-  ;
+  public enum AuthenticationType {
+    ACCESS_TOKEN_PROVIDER,
+    APPLICATION_DEFAULT,
+    GCE_METADATA_SERVICE,
+    SERVICE_ACCOUNT_JSON_KEYFILE,
+    UNAUTHENTICATED,
+  }
 
   public static Builder builder() {
     return new AutoValue_CredentialsOptions.Builder()
-        .setServiceAccountEnabled(SERVICE_ACCOUNT_ENABLED_DEFAULT)
-        .setNullCredentialsEnabled(NULL_CREDENTIALS_ENABLED_DEFAULT);
+        .setAuthenticationType(AuthenticationType.GCE_METADATA_SERVICE);
   }
 
   public abstract Builder toBuilder();
 
-  public abstract boolean isServiceAccountEnabled();
+  public abstract AuthenticationType getAuthenticationType();
 
   @Nullable
   public abstract String getServiceAccountJsonKeyFile();
 
-  public abstract boolean isNullCredentialsEnabled();
+  @Nullable
+  public abstract Class<? extends AccessTokenProvider> getAccessTokenProviderClass();
 
   @Nullable
   public abstract String getTokenServerUrl();
@@ -59,11 +63,12 @@ public abstract class CredentialsOptions {
   @AutoValue.Builder
   public abstract static class Builder {
 
-    public abstract Builder setServiceAccountEnabled(boolean value);
+    public abstract Builder setAuthenticationType(AuthenticationType authenticationType);
 
     public abstract Builder setServiceAccountJsonKeyFile(String serviceAccountJsonKeyFile);
 
-    public abstract Builder setNullCredentialsEnabled(boolean nullCredentialsEnabled);
+    public abstract Builder setAccessTokenProviderClass(
+        Class<? extends AccessTokenProvider> accessTokenProviderClass);
 
     public abstract Builder setTokenServerUrl(String tokenServerUrl);
 
@@ -78,11 +83,59 @@ public abstract class CredentialsOptions {
     public CredentialsOptions build() {
       CredentialsOptions options = autoBuild();
 
-      if (!options.isServiceAccountEnabled()) {
-        checkArgument(
-            options.isNullCredentialsEnabled(),
-            "No valid credentials configuration discovered: ",
-            options);
+      switch (options.getAuthenticationType()) {
+        case ACCESS_TOKEN_PROVIDER:
+          checkArgument(
+              options.getAccessTokenProviderClass() != null,
+              "Access token provider class should not be specified for %s authentication",
+              AuthenticationType.ACCESS_TOKEN_PROVIDER);
+          checkArgument(
+              isNullOrEmpty(options.getServiceAccountJsonKeyFile()),
+              "Service account JSON keyfile should not be specified for %s authentication",
+              AuthenticationType.ACCESS_TOKEN_PROVIDER);
+          break;
+        case APPLICATION_DEFAULT:
+          checkArgument(
+              options.getAccessTokenProviderClass() == null,
+              "Access token provider class should not be specified for %s authentication",
+              AuthenticationType.ACCESS_TOKEN_PROVIDER);
+          checkArgument(
+              isNullOrEmpty(options.getServiceAccountJsonKeyFile()),
+              "Service account JSON keyfile should not be specified for %s authentication",
+              AuthenticationType.ACCESS_TOKEN_PROVIDER);
+          break;
+        case GCE_METADATA_SERVICE:
+          checkArgument(
+              options.getAccessTokenProviderClass() == null,
+              "Access token provider class should not be specified for %s authentication",
+              AuthenticationType.GCE_METADATA_SERVICE);
+          checkArgument(
+              isNullOrEmpty(options.getServiceAccountJsonKeyFile()),
+              "Service account JSON keyfile should not be specified for %s authentication",
+              AuthenticationType.GCE_METADATA_SERVICE);
+          break;
+        case SERVICE_ACCOUNT_JSON_KEYFILE:
+          checkArgument(
+              options.getAccessTokenProviderClass() == null,
+              "Access token provider class should not be specified for %s authentication",
+              AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
+          checkArgument(
+              !isNullOrEmpty(options.getServiceAccountJsonKeyFile()),
+              "Service account JSON keyfile should be specified for %s authentication",
+              AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
+          break;
+        case UNAUTHENTICATED:
+          checkArgument(
+              options.getAccessTokenProviderClass() == null,
+              "Access token provider class should not be specified for %s authentication",
+              AuthenticationType.UNAUTHENTICATED);
+          checkArgument(
+              isNullOrEmpty(options.getServiceAccountJsonKeyFile()),
+              "Service account JSON keyfile should not be specified for %s authentication",
+              AuthenticationType.UNAUTHENTICATED);
+          break;
+        default:
+          throw new IllegalArgumentException("Unknown authentication ");
       }
 
       return options;

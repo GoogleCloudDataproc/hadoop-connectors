@@ -18,10 +18,12 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE;
 import static com.google.cloud.hadoop.gcsio.testing.TestConfiguration.GCS_TEST_PROJECT_ID;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTHENTICATION_TYPE_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
+import com.google.cloud.hadoop.util.CredentialsOptions.AuthenticationType;
 import java.net.URI;
 import org.apache.hadoop.conf.Configuration;
 
@@ -50,6 +52,9 @@ public final class GoogleHadoopFileSystemIntegrationHelper {
     String projectId = checkNotNull(testConf.getProjectId(), ENV_VAR_MSG_FMT, GCS_TEST_PROJECT_ID);
     config.set(GCS_PROJECT_ID.getKey(), projectId);
     if (testConf.getServiceAccountJsonKeyFile() != null) {
+      config.setEnum(
+          GCS_CONFIG_PREFIX + AUTHENTICATION_TYPE_SUFFIX.getKey(),
+          AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
       config.set(
           GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.getKey(),
           testConf.getServiceAccountJsonKeyFile());

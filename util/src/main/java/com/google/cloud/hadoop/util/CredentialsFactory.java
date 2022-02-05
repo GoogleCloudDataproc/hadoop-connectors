@@ -15,9 +15,10 @@
  */
 package com.google.cloud.hadoop.util;
 
-import static com.google.common.base.Strings.isNullOrEmpty;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.api.client.http.HttpTransport;
+import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.ComputeEngineCredentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
@@ -29,7 +30,9 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
-import java.security.GeneralSecurityException;
+import java.time.Instant;
+import java.util.Date;
+import java.util.Map;
 import java.util.function.Supplier;
 
 /** Miscellaneous helper methods for getting a {@code Credentials} from various sources. */
@@ -40,15 +43,17 @@ public class CredentialsFactory {
   public static final String CLOUD_PLATFORM_SCOPE =
       "https://www.googleapis.com/auth/cloud-platform";
 
-  static final String CREDENTIALS_ENV_VAR = "GOOGLE_APPLICATION_CREDENTIALS";
-
   private final CredentialsOptions options;
 
-  private final java.util.function.Supplier<HttpTransport> transport;
+  private final Iterable<Map.Entry<String, String>> config;
 
-  public CredentialsFactory(CredentialsOptions options) {
+  private final Supplier<HttpTransport> transport;
+
+  public CredentialsFactory(
+      CredentialsOptions options, Iterable<Map.Entry<String, String>> config) {
     this(
         options,
+        config,
         Suppliers.memoize(
             () -> {
               try {
@@ -63,49 +68,13 @@ public class CredentialsFactory {
   }
 
   @VisibleForTesting
-  CredentialsFactory(CredentialsOptions options, Supplier<HttpTransport> transport) {
+  CredentialsFactory(
+      CredentialsOptions options,
+      Iterable<Map.Entry<String, String>> config,
+      Supplier<HttpTransport> transport) {
     this.options = options;
+    this.config = checkNotNull(config, "config can not be null");
     this.transport = transport;
-  }
-
-  /**
-   * Initializes OAuth2 credentials using preconfigured ServiceAccount settings on the local GCE VM.
-   * See: <a href="https://developers.google.com/compute/docs/authentication">Authenticating from
-   * Google Compute Engine</a>.
-   */
-  public GoogleCredentials getCredentialsFromMetadataServiceAccount() {
-    logger.atFine().log("Getting service account credentials from metadata service.");
-    return ComputeEngineCredentials.newBuilder().setHttpTransportFactory(transport::get).build();
-  }
-
-  /** Get credentials listed in a JSON file. */
-  private GoogleCredentials getCredentialsFromJsonKeyFile() throws IOException {
-    logger.atFine().log(
-        "getCredentialsFromJsonKeyFile() from '%s'", options.getServiceAccountJsonKeyFile());
-    try (FileInputStream fis = new FileInputStream(options.getServiceAccountJsonKeyFile())) {
-      return ServiceAccountCredentials.fromStream(fis, transport::get)
-          .createScoped(CLOUD_PLATFORM_SCOPE);
-    }
-  }
-
-  /**
-   * Determines whether Application Default Credentials have been configured as an environment
-   * variable.
-   *
-   * <p>In this class for testability.
-   */
-  private static boolean isApplicationDefaultCredentialsConfigured() {
-    return System.getenv(CREDENTIALS_ENV_VAR) != null;
-  }
-
-  /**
-   * Get Google Application Default Credentials as described in <a
-   * href="https://developers.google.com/identity/protocols/application-default-credentials#callingjava"
-   * >Google Application Default Credentials</a>
-   */
-  private GoogleCredentials getApplicationDefaultCredentials() throws IOException {
-    logger.atFine().log("getApplicationDefaultCredentials()");
-    return GoogleCredentials.getApplicationDefault(transport::get);
   }
 
   /**
@@ -114,7 +83,7 @@ public class CredentialsFactory {
    * <p>The following is the order in which properties are applied to create the Credentials:
    *
    * <ol>
-   *   <li>If service accounts are enabled and no service account key file or service account
+   *   <li>If service accounts are enabled and no service account keyfile or service account
    *       parameters are set, use the metadata service.
    *   <li>If service accounts are enabled and a service-account json keyfile is provided, use
    *       service account authentication.
@@ -127,33 +96,45 @@ public class CredentialsFactory {
    * @throws IllegalStateException if none of the above conditions are met and a Credentials cannot
    *     be created
    */
-  public GoogleCredentials getCredentials() throws IOException, GeneralSecurityException {
+  public GoogleCredentials getCredentials() throws IOException {
     GoogleCredentials credentials = getCredentialsInternal();
     return credentials == null ? null : configureCredentials(credentials);
   }
 
   private GoogleCredentials getCredentialsInternal() throws IOException {
-    if (options.isServiceAccountEnabled()) {
-      logger.atFine().log("Using service account credentials");
-
-      // By default, we want to use service accounts with the meta-data service
-      // (assuming we're running in GCE).
-      if (useMetadataService()) {
-        return getCredentialsFromMetadataServiceAccount();
-      }
-
-      if (!isNullOrEmpty(options.getServiceAccountJsonKeyFile())) {
-        return getCredentialsFromJsonKeyFile();
-      }
-
-      if (isApplicationDefaultCredentialsConfigured()) {
-        return getApplicationDefaultCredentials();
-      }
-    } else if (options.isNullCredentialsEnabled()) {
-      return null;
+    switch (options.getAuthenticationType()) {
+      case ACCESS_TOKEN_PROVIDER:
+        Class<? extends AccessTokenProvider> clazz = options.getAccessTokenProviderClass();
+        AccessTokenProvider accessTokenProvider;
+        try {
+          accessTokenProvider = clazz.getDeclaredConstructor().newInstance();
+        } catch (ReflectiveOperationException e) {
+          throw new IOException("Can't instantiate " + clazz.getName(), e);
+        }
+        accessTokenProvider.setConf(config);
+        return new AccessTokenProviderCredentials(accessTokenProvider)
+            .createScoped(CLOUD_PLATFORM_SCOPE);
+      case APPLICATION_DEFAULT:
+        logger.atFine().log("getApplicationDefaultCredentials()");
+        return GoogleCredentials.getApplicationDefault(transport::get);
+      case GCE_METADATA_SERVICE:
+        logger.atFine().log("Getting service account credentials from metadata service.");
+        return ComputeEngineCredentials.newBuilder()
+            .setHttpTransportFactory(transport::get)
+            .build();
+      case SERVICE_ACCOUNT_JSON_KEYFILE:
+        logger.atFine().log(
+            "getCredentialsFromJsonKeyFile() from '%s'", options.getServiceAccountJsonKeyFile());
+        try (FileInputStream fis = new FileInputStream(options.getServiceAccountJsonKeyFile())) {
+          return ServiceAccountCredentials.fromStream(fis, transport::get)
+              .createScoped(CLOUD_PLATFORM_SCOPE);
+        }
+      case UNAUTHENTICATED:
+        return null;
+      default:
+        throw new IllegalArgumentException(
+            "Unknown authentication type: " + options.getAuthenticationType());
     }
-
-    throw new IllegalStateException("No valid credentials configuration discovered: " + this);
   }
 
   private GoogleCredentials configureCredentials(GoogleCredentials credentials) {
@@ -171,9 +152,29 @@ public class CredentialsFactory {
     return credentials;
   }
 
-  private boolean useMetadataService() {
-    return isNullOrEmpty(options.getServiceAccountJsonKeyFile())
-        && !isApplicationDefaultCredentialsConfigured()
-        && !options.isNullCredentialsEnabled();
+  public static final class AccessTokenProviderCredentials extends GoogleCredentials {
+    private final AccessTokenProvider accessTokenProvider;
+
+    public AccessTokenProviderCredentials(AccessTokenProvider accessTokenProvider) {
+      super(convertAccessToken(accessTokenProvider.getAccessToken()));
+      this.accessTokenProvider = accessTokenProvider;
+    }
+
+    private static AccessToken convertAccessToken(AccessTokenProvider.AccessToken accessToken) {
+      checkNotNull(accessToken, "AccessToken cannot be null!");
+      String token = checkNotNull(accessToken.getToken(), "AccessToken value cannot be null!");
+      Instant expirationTime = accessToken.getExpirationTime();
+      return new AccessToken(token, expirationTime == null ? null : Date.from(expirationTime));
+    }
+
+    public AccessTokenProvider getAccessTokenProvider() {
+      return accessTokenProvider;
+    }
+
+    @Override
+    public AccessToken refreshAccessToken() throws IOException {
+      accessTokenProvider.refresh();
+      return convertAccessToken(accessTokenProvider.getAccessToken());
+    }
   }
 }

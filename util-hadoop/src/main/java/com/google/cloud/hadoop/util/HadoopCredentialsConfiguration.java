@@ -14,10 +14,10 @@
 
 package com.google.cloud.hadoop.util;
 
+import com.google.cloud.hadoop.util.CredentialsOptions.AuthenticationType;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
@@ -45,11 +45,8 @@ public class HadoopCredentialsConfiguration {
    * disable the use of the service accounts for authentication. The default value is {@code true} -
    * use a service account for authentication.
    */
-  public static final HadoopConfigurationProperty<Boolean> ENABLE_SERVICE_ACCOUNTS_SUFFIX =
-      new HadoopConfigurationProperty<>(
-          ".auth.service.account.enable",
-          CredentialsOptions.SERVICE_ACCOUNT_ENABLED_DEFAULT,
-          ".enable.service.account.auth");
+  public static final HadoopConfigurationProperty<AuthenticationType> AUTHENTICATION_TYPE_SUFFIX =
+      new HadoopConfigurationProperty<>(".auth.type", AuthenticationType.GCE_METADATA_SERVICE);
 
   /**
    * Key suffix used to indicate the path to a JSON file containing a Service Account key and
@@ -58,14 +55,6 @@ public class HadoopCredentialsConfiguration {
    */
   public static final HadoopConfigurationProperty<String> SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX =
       new HadoopConfigurationProperty<>(".auth.service.account.json.keyfile");
-
-  /**
-   * The key suffix allowing null to be returned from credentials creation to allow unauthenticated
-   * access.
-   */
-  public static final HadoopConfigurationProperty<Boolean> ENABLE_NULL_CREDENTIALS_SUFFIX =
-      new HadoopConfigurationProperty<>(
-          ".auth.null.enable", CredentialsOptions.NULL_CREDENTIALS_ENABLED_DEFAULT);
 
   /** Configuration key for setting a token server URL to use to refresh OAuth token. */
   public static final HadoopConfigurationProperty<String> TOKEN_SERVER_URL_SUFFIX =
@@ -125,7 +114,7 @@ public class HadoopCredentialsConfiguration {
   public static CredentialsFactory getCredentialsFactory(
       Configuration config, String... keyPrefixesVararg) {
     CredentialsOptions credentialsOptions = getCredentialsOptions(config, keyPrefixesVararg);
-    return new CredentialsFactory(credentialsOptions);
+    return new CredentialsFactory(credentialsOptions, config);
   }
 
   @VisibleForTesting
@@ -133,44 +122,20 @@ public class HadoopCredentialsConfiguration {
       Configuration config, String... keyPrefixesVararg) {
     List<String> keyPrefixes = getConfigKeyPrefixes(keyPrefixesVararg);
     return CredentialsOptions.builder()
-        .setServiceAccountEnabled(
-            ENABLE_SERVICE_ACCOUNTS_SUFFIX
-                .withPrefixes(keyPrefixes)
-                .get(config, config::getBoolean))
+        .setAuthenticationType(
+            AUTHENTICATION_TYPE_SUFFIX.withPrefixes(keyPrefixes).get(config, config::getEnum))
         .setServiceAccountJsonKeyFile(
             SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
-        .setNullCredentialsEnabled(
-            ENABLE_NULL_CREDENTIALS_SUFFIX
+        .setAccessTokenProviderClass(
+            ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX
                 .withPrefixes(keyPrefixes)
-                .get(config, config::getBoolean))
+                .get(config, (k, d) -> config.getClass(k, d, AccessTokenProvider.class)))
         .setTokenServerUrl(
             TOKEN_SERVER_URL_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
         .setProxyAddress(PROXY_ADDRESS_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
         .setProxyUsername(PROXY_USERNAME_SUFFIX.withPrefixes(keyPrefixes).getPassword(config))
         .setProxyPassword(PROXY_PASSWORD_SUFFIX.withPrefixes(keyPrefixes).getPassword(config))
         .build();
-  }
-
-  /** Creates an {@link AccessTokenProvider} based on the configuration. */
-  public static AccessTokenProvider getAccessTokenProvider(
-      Configuration config, List<String> keyPrefixes) throws IOException {
-    Class<? extends AccessTokenProvider> clazz =
-        getAccessTokenProviderImplClass(config, keyPrefixes.toArray(new String[0]));
-    if (clazz == null) {
-      return null;
-    }
-    try {
-      return clazz.getDeclaredConstructor().newInstance();
-    } catch (ReflectiveOperationException ex) {
-      throw new IOException("Can't instantiate " + clazz.getName(), ex);
-    }
-  }
-
-  public static Class<? extends AccessTokenProvider> getAccessTokenProviderImplClass(
-      Configuration config, String... keyPrefixes) {
-    return ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX
-        .withPrefixes(getConfigKeyPrefixes(keyPrefixes))
-        .get(config, (k, d) -> config.getClass(k, d, AccessTokenProvider.class));
   }
 
   /**

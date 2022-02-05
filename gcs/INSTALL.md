@@ -39,7 +39,7 @@ Google Cloud Storage. You can follow
 [these directions](https://cloud.google.com/storage/docs/authentication#service_accounts)
 to obtain a JSON keyfile.
 
-Once you have the JSON key file, you can configure framework that you use to use
+Once you have the JSON keyfile, you can configure framework that you use to use
 GCS connector when accessing data on Google Cloud Storage.
 
 You can alternatively set the environment variable
@@ -81,7 +81,7 @@ properties in `core-site.xml` on your Hadoop cluster:
   <name>google.cloud.auth.service.account.json.keyfile</name>
   <value>/path/to/keyfile</value>
   <description>
-    The JSON key file of the service account used for GCS
+    The JSON keyfile of the service account used for GCS
     access when google.cloud.auth.service.account.enable is true.
   </description>
 </property>
@@ -108,7 +108,7 @@ spark.hadoop.fs.gs.project.id=
 # property to `false` will disable use of service accounts for authentication.
 spark.hadoop.google.cloud.auth.service.account.enable=true
 
-# The JSON key file of the service account used for GCS
+# The JSON keyfile of the service account used for GCS
 # access when google.cloud.auth.service.account.enable is true.
 spark.hadoop.google.cloud.auth.service.account.json.keyfile=/path/to/keyfile
 ```

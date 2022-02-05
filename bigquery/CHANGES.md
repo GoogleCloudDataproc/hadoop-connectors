@@ -527,7 +527,7 @@
 
 1.  Changed credential configuration values to allow per connector overrides. To
     use the metadata service, no extra configuration is required. To a use
-    PKCS12 private key file, specify `mapred.bq.auth.service.account.email` and
+    PKCS12 private keyfile, specify `mapred.bq.auth.service.account.email` and
     `mapred.bq.auth.service.account.keyfile`. To use the installed app workflow,
     set `mapred.bq.service.account.enable` to `false` and
     `mapred.bq.auth.client.id`, `mapred.bq.auth.client.secret` and

@@ -17,10 +17,10 @@ package com.google.cloud.hadoop.util;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
-import org.apache.hadoop.conf.Configurable;
+import java.util.Map;
 
 /** A provider to provide access token, and upon access token expiration, the utility to refresh. */
-public interface AccessTokenProvider extends Configurable {
+public interface AccessTokenProvider {
 
   /** Supported access token types. */
   enum AccessTokenType {
@@ -75,4 +75,18 @@ public interface AccessTokenProvider extends Configurable {
    * @throws IOException when refresh fails.
    */
   void refresh() throws IOException;
+
+  /**
+   * Set the configuration to be used by this object.
+   *
+   * @param conf configuration to be used
+   */
+  void setConf(Iterable<Map.Entry<String, String>> conf);
+
+  /**
+   * Return the configuration used by this object.
+   *
+   * @return Configuration
+   */
+  Iterable<Map.Entry<String, String>> getConf();
 }
