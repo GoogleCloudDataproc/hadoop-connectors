@@ -152,6 +152,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
                 ReadObjectRequest.newBuilder()
                     .setBucket(BUCKET_NAME)
                     .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
                     .setReadOffset(objectSize - 2)
                     .build()),
             any());
@@ -190,6 +191,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
             eq(
                 ReadObjectRequest.newBuilder()
                     .setBucket(BUCKET_NAME)
+                    .setGeneration(OBJECT_GENERATION)
                     .setObject(OBJECT_NAME)
                     .setReadOffset(objectSize - 2)
                     .build()),
@@ -241,6 +243,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
                 ReadObjectRequest.newBuilder()
                     .setBucket(BUCKET_NAME)
                     .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
                     .setReadOffset(footerOffset)
                     .build()),
             any());
@@ -304,6 +307,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
                 ReadObjectRequest.newBuilder()
                     .setBucket(BUCKET_NAME)
                     .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
                     .setReadOffset(footerOffset)
                     .build()),
             any());
@@ -358,6 +362,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
                 ReadObjectRequest.newBuilder()
                     .setBucket(BUCKET_NAME)
                     .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
                     .setReadOffset(footerOffset)
                     .build()),
             any());
@@ -415,6 +420,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
                 ReadObjectRequest.newBuilder()
                     .setBucket(BUCKET_NAME)
                     .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
                     .setReadOffset(footerOffset)
                     .build()),
             any());
@@ -482,6 +488,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
                 ReadObjectRequest.newBuilder()
                     .setBucket(BUCKET_NAME)
                     .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
                     .setReadOffset(footerOffset)
                     .build()),
             any());
@@ -515,6 +522,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
                 ReadObjectRequest.newBuilder()
                     .setBucket(BUCKET_NAME)
                     .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
                     .setReadOffset(footerOffset)
                     .build()),
             any());
@@ -561,6 +569,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
                 ReadObjectRequest.newBuilder()
                     .setBucket(BUCKET_NAME)
                     .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
                     .setReadOffset(98)
                     .build()),
             any());
@@ -653,13 +662,8 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     fakeService.setReturnIncorrectMessageChecksum();
     GoogleCloudStorageReadOptions options =
         GoogleCloudStorageReadOptions.builder().setGrpcChecksumsEnabled(true).build();
-    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
 
-    byte[] array = new byte[OBJECT_SIZE + 100];
-    // `ByteBuffer.slice` generates a ByteBuffer with a non-zero `arrayOffset`.
-    ByteBuffer buffer = ByteBuffer.wrap(array, 50, OBJECT_SIZE).slice();
-
-    IOException thrown = assertThrows(IOException.class, () -> readChannel.read(buffer));
+    IOException thrown = assertThrows(IOException.class, () -> newReadChannel(options));
     assertTrue(
         thrown.getMessage() + " should have contained 'checksum'",
         thrown.getMessage().contains("checksum"));
@@ -873,6 +877,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
                 ReadObjectRequest.newBuilder()
                     .setBucket(BUCKET_NAME)
                     .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
                     .setReadOffset(95)
                     .build()),
             any());
@@ -938,6 +943,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
                 ReadObjectRequest.newBuilder()
                     .setBucket(BUCKET_NAME)
                     .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
                     .setReadOffset(95)
                     .build()),
             any());
@@ -989,6 +995,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
                 ReadObjectRequest.newBuilder()
                     .setBucket(BUCKET_NAME)
                     .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
                     .setReadOffset(0)
                     .build()),
             any());
@@ -1023,6 +1030,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
                 ReadObjectRequest.newBuilder()
                     .setBucket(BUCKET_NAME)
                     .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
                     .setReadOffset(footerOffset)
                     .build()),
             any());
@@ -1078,6 +1086,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
                 ReadObjectRequest.newBuilder()
                     .setBucket(BUCKET_NAME)
                     .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
                     .setReadOffset(footerOffset)
                     .build()),
             any());
@@ -1147,6 +1156,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
                 ReadObjectRequest.newBuilder()
                     .setBucket(BUCKET_NAME)
                     .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
                     .setReadOffset(footerOffset)
                     .build()),
             any());
@@ -1218,6 +1228,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
                 ReadObjectRequest.newBuilder()
                     .setBucket(BUCKET_NAME)
                     .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
                     .setReadOffset(footerOffset)
                     .build()),
             any());
@@ -1286,6 +1297,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
                 ReadObjectRequest.newBuilder()
                     .setBucket(BUCKET_NAME)
                     .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
                     .setReadOffset(footerOffset)
                     .build()),
             any());
@@ -1342,6 +1354,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
                 ReadObjectRequest.newBuilder()
                     .setBucket(BUCKET_NAME)
                     .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
                     .setReadOffset(footerOffset)
                     .build()),
             any());
