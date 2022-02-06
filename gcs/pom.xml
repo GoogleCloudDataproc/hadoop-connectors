@@ -125,13 +125,6 @@
       <type>test-jar</type>
     </dependency>
     <dependency>
-      <groupId>com.google.cloud.bigdataoss</groupId>
-      <artifactId>util</artifactId>
-      <version>${bigdataoss.version}</version>
-      <scope>test</scope>
-      <type>test-jar</type>
-    </dependency>
-    <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
     </dependency>
