@@ -189,7 +189,6 @@ public class HadoopCredentialsConfiguration {
       case COMPUTE_ENGINE:
         return ComputeEngineCredentials.newBuilder()
             .setHttpTransportFactory(transport::get)
-            .setScopes(ImmutableList.of(CLOUD_PLATFORM_SCOPE))
             .build();
       case SERVICE_ACCOUNT_JSON_KEYFILE:
         String keyFile =

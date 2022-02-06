@@ -1444,8 +1444,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   }
 
   /**
-   * Loads an {@link AccessTokenProvider} implementation retrieved from the provided
-   * {@code AbstractDelegationTokenBinding} if configured, otherwise it's null.
+   * Loads an {@link AccessTokenProvider} implementation retrieved from the provided {@code
+   * AbstractDelegationTokenBinding} if configured, otherwise it's null.
    */
   private AccessTokenProvider getDelegationAccessTokenProvider(Configuration config) {
     AccessTokenProvider accessTokenProvider =
