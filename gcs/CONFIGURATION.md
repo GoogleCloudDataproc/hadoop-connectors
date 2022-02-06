@@ -176,7 +176,8 @@
 *   `fs.gs.auth.access.token.provider` (not set by default)
 
     The implementation of the `AccessTokenProvider` interface used for Google
-    Cloud Storage Connector.
+    Cloud Storage Connector when `fs.gs.auth.type` property is set to
+    `ACCESS_TOKEN_PROVIDER`.
 
 *   `fs.gs.token.server.url` (not set by default)
 
