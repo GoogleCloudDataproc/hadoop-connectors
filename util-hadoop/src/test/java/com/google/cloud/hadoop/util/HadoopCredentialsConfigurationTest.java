@@ -63,7 +63,7 @@ public class HadoopCredentialsConfigurationTest {
           put(".auth.impersonation.service.account.for.group.", ImmutableMap.of());
           put(".auth.impersonation.service.account.for.user.", ImmutableMap.of());
           put(".auth.service.account.json.keyfile", null);
-          put(".auth.type", AuthenticationType.GCE_METADATA_SERVICE);
+          put(".auth.type", AuthenticationType.COMPUTE_ENGINE_METADATA);
           put(".proxy.address", null);
           put(".proxy.password", null);
           put(".proxy.username", null);

@@ -14,6 +14,16 @@
     mapred.bq.auth.service.account.private.key.id
     ```
 
+1.  Refactor authentication configuration to use an explicit
+    `mapred.bq.auth.type` enum property, instead of relying on inference of the
+    authentication type based on the set configuration properties, and remove
+    obsolete properties:
+
+    ```
+    mapred.bq.gs.auth.null.enable
+    mapred.bq.gs.auth.service.account.enable
+    ```
+
 ### 1.2.0 - 2021-01-06
 
 1.  Update all dependencies to latest versions.

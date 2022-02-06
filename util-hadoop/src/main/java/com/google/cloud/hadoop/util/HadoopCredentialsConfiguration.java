@@ -67,55 +67,29 @@ public class HadoopCredentialsConfiguration {
   public static final String CLOUD_PLATFORM_SCOPE =
       "https://www.googleapis.com/auth/cloud-platform";
 
-  /**
-   * Key suffix for enabling GCE service account authentication. A value of {@code false} will
-   * disable the use of the service accounts for authentication. The default value is {@code true} -
-   * use a service account for authentication.
-   */
+  /** Key suffix used to configure authentication type. */
   public static final HadoopConfigurationProperty<AuthenticationType> AUTHENTICATION_TYPE_SUFFIX =
-      new HadoopConfigurationProperty<>(".auth.type", AuthenticationType.GCE_METADATA_SERVICE);
+      new HadoopConfigurationProperty<>(".auth.type", AuthenticationType.COMPUTE_ENGINE_METADATA);
 
   /**
-   * Key suffix used to indicate the path to a JSON file containing a Service Account key and
+   * Key suffix used to configure the path to a JSON file containing a Service Account key and
    * identifier (email). Technically, this could be a JSON containing a non-service account user,
    * but this setting is only used in the service account flow and is namespaced as such.
    */
   public static final HadoopConfigurationProperty<String> SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX =
       new HadoopConfigurationProperty<>(".auth.service.account.json.keyfile");
 
-  /** Configuration key for setting a token server URL to use to refresh OAuth token. */
-  public static final HadoopConfigurationProperty<String> TOKEN_SERVER_URL_SUFFIX =
-      new HadoopConfigurationProperty<>(".token.server.url");
-
   /**
-   * Configuration key for setting a proxy for the connector to use to connect to GCS. The proxy
-   * must be an HTTP proxy of the form "host:port".
+   * Key suffix used to configure {@link AccessTokenProvider} that will be used to generate {@link
+   * AccessTokenProvider.AccessToken}s.
    */
-  public static final HadoopConfigurationProperty<String> PROXY_ADDRESS_SUFFIX =
-      new HadoopConfigurationProperty<>(".proxy.address");
-
-  /**
-   * Configuration key for setting a proxy username for the connector to use to authenticate with
-   * proxy used to connect to GCS.
-   */
-  public static final HadoopConfigurationProperty<String> PROXY_USERNAME_SUFFIX =
-      new HadoopConfigurationProperty<>(".proxy.username");
-
-  /**
-   * Configuration key for setting a proxy password for the connector to use to authenticate with
-   * proxy used to connect to GCS.
-   */
-  public static final HadoopConfigurationProperty<String> PROXY_PASSWORD_SUFFIX =
-      new HadoopConfigurationProperty<>(".proxy.password");
-
-  /** Configuration key for the name of the AccessTokenProvider to use to generate AccessTokens. */
   public static final HadoopConfigurationProperty<Class<? extends AccessTokenProvider>>
       ACCESS_TOKEN_PROVIDER_SUFFIX =
           new HadoopConfigurationProperty<>(".auth.access.token.provider");
 
   /**
-   * Key suffix specifying the impersonating service account with which to call GCS API to get
-   * access token.
+   * Key suffix used to configure the impersonating service account with which to call GCS API to
+   * get access token.
    */
   public static final HadoopConfigurationProperty<String> IMPERSONATION_SERVICE_ACCOUNT_SUFFIX =
       new HadoopConfigurationProperty<>(".auth.impersonation.service.account");
@@ -138,24 +112,42 @@ public class HadoopCredentialsConfiguration {
           new HadoopConfigurationProperty<>(
               ".auth.impersonation.service.account.for.group.", ImmutableMap.of());
 
+  /** Key suffix for setting a token server URL to use to refresh OAuth token. */
+  public static final HadoopConfigurationProperty<String> TOKEN_SERVER_URL_SUFFIX =
+      new HadoopConfigurationProperty<>(".token.server.url");
+
   /**
-   * Get the credentials as configured.
+   * Key suffix for setting a proxy for the connector to use to connect to GCS. The proxy must be an
+   * HTTP proxy of the form "host:port".
+   */
+  public static final HadoopConfigurationProperty<String> PROXY_ADDRESS_SUFFIX =
+      new HadoopConfigurationProperty<>(".proxy.address");
+
+  /**
+   * Key suffix for setting a proxy username for the connector to use to authenticate with proxy
+   * used to connect to GCS.
+   */
+  public static final HadoopConfigurationProperty<String> PROXY_USERNAME_SUFFIX =
+      new HadoopConfigurationProperty<>(".proxy.username");
+
+  /**
+   * Key suffix for setting a proxy password for the connector to use to authenticate with proxy
+   * used to connect to GCS.
+   */
+  public static final HadoopConfigurationProperty<String> PROXY_PASSWORD_SUFFIX =
+      new HadoopConfigurationProperty<>(".proxy.password");
+
+  /**
+   * Returns full list of config prefixes that will be resolved based on the order in returned list.
+   */
+  public static List<String> getConfigKeyPrefixes(String... keyPrefixes) {
+    return ImmutableList.<String>builder().add(keyPrefixes).add(BASE_KEY_PREFIX).build();
+  }
+
+  /**
+   * Get the credentials for the configured via {@link AuthenticationType}
    *
-   * <p>The following is the order in which properties are applied to create the Credentials:
-   *
-   * <ol>
-   *   <li>If service accounts are enabled and no service account keyfile or service account
-   *       parameters are set, use the metadata service.
-   *   <li>If service accounts are enabled and a service-account json keyfile is provided, use
-   *       service account authentication.
-   *   <li>If service accounts are disabled and client id, client secret and OAuth credentials file
-   *       is provided, use the Installed App authentication flow.
-   *   <li>If service accounts are disabled and null credentials are enabled for unit testing,
-   *       return null
-   * </ol>
-   *
-   * @throws IllegalStateException if none of the above conditions are met and a Credentials cannot
-   *     be created
+   * @throws IllegalStateException if configured {@link AuthenticationType} is not recognized
    */
   public static GoogleCredentials getCredentials(Configuration config, String... keyPrefixesVararg)
       throws IOException {
@@ -194,9 +186,8 @@ public class HadoopCredentialsConfiguration {
       case APPLICATION_DEFAULT:
         return GoogleCredentials.getApplicationDefault(transport::get)
             .createScoped(CLOUD_PLATFORM_SCOPE);
-      case GCE_METADATA_SERVICE:
+      case COMPUTE_ENGINE_METADATA:
         return ComputeEngineCredentials.newBuilder()
-            .setHttpTransportFactory(transport::get)
             .setScopes(ImmutableList.of(CLOUD_PLATFORM_SCOPE))
             .build();
       case SERVICE_ACCOUNT_JSON_KEYFILE:
@@ -214,8 +205,7 @@ public class HadoopCredentialsConfiguration {
   }
 
   /**
-   * Generate a {@link GoogleCredentials} from the internal access token provider based on the
-   * service account to impersonate.
+   * Create a {@link ImpersonatedCredentials} based on service account to impersonate configuration
    */
   public static GoogleCredentials getImpersonatedCredentials(
       Configuration config, GoogleCredentials sourceCredentials, String... keyPrefixesVararg)
@@ -284,13 +274,6 @@ public class HadoopCredentialsConfiguration {
         .findFirst();
   }
 
-  /**
-   * Returns full list of config prefixes that will be resolved based on the order in returned list.
-   */
-  public static List<String> getConfigKeyPrefixes(String... keyPrefixes) {
-    return ImmutableList.<String>builder().add(keyPrefixes).add(BASE_KEY_PREFIX).build();
-  }
-
   private static Supplier<HttpTransport> getHttpTransport(
       Configuration config, List<String> keyPrefixes) {
     return Suppliers.memoize(
@@ -350,11 +333,17 @@ public class HadoopCredentialsConfiguration {
     }
   }
 
+  /** Enumerates all supported authentication types */
   public enum AuthenticationType {
+    /** Configures {@link AccessTokenProvider} authentication */
     ACCESS_TOKEN_PROVIDER,
+    /** Configures Application Default Credentials authentication */
     APPLICATION_DEFAULT,
-    GCE_METADATA_SERVICE,
+    /** Configures Google Compute Engine service account authentication */
+    COMPUTE_ENGINE_METADATA,
+    /** Configures JSON keyfile service account authentication */
     SERVICE_ACCOUNT_JSON_KEYFILE,
+    /** Configures unauthenticated access */
     UNAUTHENTICATED,
   }
 
