@@ -69,7 +69,7 @@ public class HadoopCredentialsConfiguration {
 
   /** Key suffix used to configure authentication type. */
   public static final HadoopConfigurationProperty<AuthenticationType> AUTHENTICATION_TYPE_SUFFIX =
-      new HadoopConfigurationProperty<>(".auth.type", AuthenticationType.COMPUTE_ENGINE_METADATA);
+      new HadoopConfigurationProperty<>(".auth.type", AuthenticationType.COMPUTE_ENGINE);
 
   /**
    * Key suffix used to configure the path to a JSON file containing a Service Account key and
@@ -186,7 +186,7 @@ public class HadoopCredentialsConfiguration {
       case APPLICATION_DEFAULT:
         return GoogleCredentials.getApplicationDefault(transport::get)
             .createScoped(CLOUD_PLATFORM_SCOPE);
-      case COMPUTE_ENGINE_METADATA:
+      case COMPUTE_ENGINE:
         return ComputeEngineCredentials.newBuilder()
             .setScopes(ImmutableList.of(CLOUD_PLATFORM_SCOPE))
             .build();
@@ -340,7 +340,7 @@ public class HadoopCredentialsConfiguration {
     /** Configures Application Default Credentials authentication */
     APPLICATION_DEFAULT,
     /** Configures Google Compute Engine service account authentication */
-    COMPUTE_ENGINE_METADATA,
+    COMPUTE_ENGINE,
     /** Configures JSON keyfile service account authentication */
     SERVICE_ACCOUNT_JSON_KEYFILE,
     /** Configures unauthenticated access */

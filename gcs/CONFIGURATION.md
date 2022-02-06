@@ -145,16 +145,7 @@
 
 ### Authentication
 
-Authentication type is configured via `fs.gs.auth.type`, with property one of
-the following two properties is set, it will precede all other credentials
-settings, and credentials will be obtained from the access token provider.
-
-*   `fs.gs.auth.access.token.provider` (not set by default)
-
-    The implementation of the `AccessTokenProvider` interface used for Google
-    Cloud Storage Connector.
-
-*   `fs.gs.auth.type` (default: `COMPUTE_ENGINE_METADATA`)
+*   `fs.gs.auth.type` (default: `COMPUTE_ENGINE`)
 
     What type of authentication mechanism to use for Google Cloud Storage
     access.
@@ -168,8 +159,8 @@ settings, and credentials will be obtained from the access token provider.
         [Application Default Credentials](https://javadoc.io/doc/com.google.auth/google-auth-library-oauth2-http/latest/com/google/auth/oauth2/GoogleCredentials.html)
         authentication
 
-    *   `COMPUTE_ENGINE_METADATA` - configures Google Compute Engine service
-        account authentication
+    *   `COMPUTE_ENGINE` - configures Google Compute Engine service account
+        authentication
 
     *   `SERVICE_ACCOUNT_JSON_KEYFILE` - configures JSON keyfile service account
         authentication
@@ -181,6 +172,11 @@ settings, and credentials will be obtained from the access token provider.
     The path to the JSON keyfile for the service account when `fs.gs.auth.type`
     property is set to `SERVICE_ACCOUNT_JSON_KEYFILE`. The file must exist at
     the same path on all nodes
+
+*   `fs.gs.auth.access.token.provider` (not set by default)
+
+    The implementation of the `AccessTokenProvider` interface used for Google
+    Cloud Storage Connector.
 
 *   `fs.gs.token.server.url` (not set by default)
 
