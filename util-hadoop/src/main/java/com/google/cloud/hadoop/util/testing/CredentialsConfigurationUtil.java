@@ -17,7 +17,7 @@ package com.google.cloud.hadoop.util.testing;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTHENTICATION_TYPE_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.BASE_KEY_PREFIX;
 
-import com.google.cloud.hadoop.util.CredentialsOptions.AuthenticationType;
+import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
 import org.apache.hadoop.conf.Configuration;
 
 /** Utility methods for creating Configuration objects for use in testing. */

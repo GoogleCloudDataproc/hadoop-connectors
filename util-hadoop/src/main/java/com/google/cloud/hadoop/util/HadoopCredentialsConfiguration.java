@@ -14,12 +14,27 @@
 
 package com.google.cloud.hadoop.util;
 
-import com.google.cloud.hadoop.util.CredentialsOptions.AuthenticationType;
+import static com.google.common.base.Preconditions.checkNotNull;
+
+import com.google.api.client.http.HttpTransport;
+import com.google.auth.oauth2.AccessToken;
+import com.google.auth.oauth2.ComputeEngineCredentials;
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.oauth2.ServiceAccountCredentials;
+import com.google.auth.oauth2.UserCredentials;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URI;
+import java.time.Instant;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.apache.hadoop.conf.Configuration;
 
 /**
@@ -36,9 +51,13 @@ public class HadoopCredentialsConfiguration {
 
   /**
    * All instances constructed using the builder will use {@code google.cloud} as the first prefix
-   * checked. Other prefixes can be added and will override values in the google.cloud prefix.
+   * checked. Other prefixes can be added and will override values in the {@code google.cloud}
+   * prefix.
    */
   public static final String BASE_KEY_PREFIX = "google.cloud";
+
+  public static final String CLOUD_PLATFORM_SCOPE =
+      "https://www.googleapis.com/auth/cloud-platform";
 
   /**
    * Key suffix for enabling GCE service account authentication. A value of {@code false} will
@@ -111,31 +130,47 @@ public class HadoopCredentialsConfiguration {
           new HadoopConfigurationProperty<>(
               ".auth.impersonation.service.account.for.group.", ImmutableMap.of());
 
-  public static CredentialsFactory getCredentialsFactory(
-      Configuration config, String... keyPrefixesVararg) {
-    CredentialsOptions credentialsOptions = getCredentialsOptions(config, keyPrefixesVararg);
-    return new CredentialsFactory(credentialsOptions, config);
+  /**
+   * Get the credentials as configured.
+   *
+   * <p>The following is the order in which properties are applied to create the Credentials:
+   *
+   * <ol>
+   *   <li>If service accounts are enabled and no service account keyfile or service account
+   *       parameters are set, use the metadata service.
+   *   <li>If service accounts are enabled and a service-account json keyfile is provided, use
+   *       service account authentication.
+   *   <li>If service accounts are disabled and client id, client secret and OAuth credentials file
+   *       is provided, use the Installed App authentication flow.
+   *   <li>If service accounts are disabled and null credentials are enabled for unit testing,
+   *       return null
+   * </ol>
+   *
+   * @throws IllegalStateException if none of the above conditions are met and a Credentials cannot
+   *     be created
+   */
+  public static GoogleCredentials getCredentials(Configuration config, String... keyPrefixesVararg)
+      throws IOException {
+    List<String> keyPrefixes = getConfigKeyPrefixes(keyPrefixesVararg);
+    return getCredentials(
+        Suppliers.memoize(
+            () -> {
+              try {
+                return getHttpTransport(config, keyPrefixes);
+              } catch (IOException e) {
+                throw new UncheckedIOException(e);
+              }
+            }),
+        config,
+        keyPrefixes);
   }
 
   @VisibleForTesting
-  static CredentialsOptions getCredentialsOptions(
-      Configuration config, String... keyPrefixesVararg) {
-    List<String> keyPrefixes = getConfigKeyPrefixes(keyPrefixesVararg);
-    return CredentialsOptions.builder()
-        .setAuthenticationType(
-            AUTHENTICATION_TYPE_SUFFIX.withPrefixes(keyPrefixes).get(config, config::getEnum))
-        .setServiceAccountJsonKeyFile(
-            SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
-        .setAccessTokenProviderClass(
-            ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX
-                .withPrefixes(keyPrefixes)
-                .get(config, (k, d) -> config.getClass(k, d, AccessTokenProvider.class)))
-        .setTokenServerUrl(
-            TOKEN_SERVER_URL_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
-        .setProxyAddress(PROXY_ADDRESS_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
-        .setProxyUsername(PROXY_USERNAME_SUFFIX.withPrefixes(keyPrefixes).getPassword(config))
-        .setProxyPassword(PROXY_PASSWORD_SUFFIX.withPrefixes(keyPrefixes).getPassword(config))
-        .build();
+  static GoogleCredentials getCredentials(
+      Supplier<HttpTransport> transport, Configuration config, List<String> keyPrefixes)
+      throws IOException {
+    GoogleCredentials credentials = getCredentialsInternal(transport, config, keyPrefixes);
+    return credentials == null ? null : configureCredentials(config, keyPrefixes, credentials);
   }
 
   /**
@@ -145,5 +180,167 @@ public class HadoopCredentialsConfiguration {
     return ImmutableList.<String>builder().add(keyPrefixes).add(BASE_KEY_PREFIX).build();
   }
 
+  // public void validate() {
+  //   CredentialsOptions options = autoBuild();
+  //
+  //   switch (options.getAuthenticationType()) {
+  //     case ACCESS_TOKEN_PROVIDER:
+  //       checkArgument(
+  //           options.getAccessTokenProviderClass() != null,
+  //           "Access token provider class should not be specified for %s authentication",
+  //           AuthenticationType.ACCESS_TOKEN_PROVIDER);
+  //       checkArgument(
+  //           isNullOrEmpty(options.getServiceAccountJsonKeyFile()),
+  //           "Service account JSON keyfile should not be specified for %s authentication",
+  //           AuthenticationType.ACCESS_TOKEN_PROVIDER);
+  //       break;
+  //     case APPLICATION_DEFAULT:
+  //       checkArgument(
+  //           options.getAccessTokenProviderClass() == null,
+  //           "Access token provider class should not be specified for %s authentication",
+  //           AuthenticationType.ACCESS_TOKEN_PROVIDER);
+  //       checkArgument(
+  //           isNullOrEmpty(options.getServiceAccountJsonKeyFile()),
+  //           "Service account JSON keyfile should not be specified for %s authentication",
+  //           AuthenticationType.ACCESS_TOKEN_PROVIDER);
+  //       break;
+  //     case GCE_METADATA_SERVICE:
+  //       checkArgument(
+  //           options.getAccessTokenProviderClass() == null,
+  //           "Access token provider class should not be specified for %s authentication",
+  //           AuthenticationType.GCE_METADATA_SERVICE);
+  //       checkArgument(
+  //           isNullOrEmpty(options.getServiceAccountJsonKeyFile()),
+  //           "Service account JSON keyfile should not be specified for %s authentication",
+  //           AuthenticationType.GCE_METADATA_SERVICE);
+  //       break;
+  //     case SERVICE_ACCOUNT_JSON_KEYFILE:
+  //       checkArgument(
+  //           options.getAccessTokenProviderClass() == null,
+  //           "Access token provider class should not be specified for %s authentication",
+  //           AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
+  //       checkArgument(
+  //           !isNullOrEmpty(options.getServiceAccountJsonKeyFile()),
+  //           "Service account JSON keyfile should be specified for %s authentication",
+  //           AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
+  //       break;
+  //     case UNAUTHENTICATED:
+  //       checkArgument(
+  //           options.getAccessTokenProviderClass() == null,
+  //           "Access token provider class should not be specified for %s authentication",
+  //           AuthenticationType.UNAUTHENTICATED);
+  //       checkArgument(
+  //           isNullOrEmpty(options.getServiceAccountJsonKeyFile()),
+  //           "Service account JSON keyfile should not be specified for %s authentication",
+  //           AuthenticationType.UNAUTHENTICATED);
+  //       break;
+  //     default:
+  //       throw new IllegalArgumentException("Unknown authentication ");
+  //   }
+  //
+  //   return options;
+  // }
+
+  private static HttpTransport getHttpTransport(Configuration config, List<String> keyPrefixes)
+      throws IOException {
+    return HttpTransportFactory.createHttpTransport(
+        PROXY_ADDRESS_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get),
+        PROXY_USERNAME_SUFFIX.withPrefixes(keyPrefixes).getPassword(config),
+        PROXY_PASSWORD_SUFFIX.withPrefixes(keyPrefixes).getPassword(config));
+  }
+
+  private static GoogleCredentials getCredentialsInternal(
+      Supplier<HttpTransport> transport, Configuration config, List<String> keyPrefixes)
+      throws IOException {
+    AuthenticationType authenticationType =
+        AUTHENTICATION_TYPE_SUFFIX.withPrefixes(keyPrefixes).get(config, config::getEnum);
+    switch (authenticationType) {
+      case ACCESS_TOKEN_PROVIDER:
+        Class<? extends AccessTokenProvider> clazz =
+            ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX
+                .withPrefixes(keyPrefixes)
+                .get(config, (k, d) -> config.getClass(k, d, AccessTokenProvider.class));
+        AccessTokenProvider accessTokenProvider;
+        try {
+          accessTokenProvider = clazz.getDeclaredConstructor().newInstance();
+        } catch (ReflectiveOperationException e) {
+          throw new IOException("Can't instantiate " + clazz.getName(), e);
+        }
+        accessTokenProvider.setConf(config);
+        return new AccessTokenProviderCredentials(accessTokenProvider)
+            .createScoped(CLOUD_PLATFORM_SCOPE);
+      case APPLICATION_DEFAULT:
+        return GoogleCredentials.getApplicationDefault(transport::get);
+      case GCE_METADATA_SERVICE:
+        return ComputeEngineCredentials.newBuilder()
+            .setHttpTransportFactory(transport::get)
+            .build();
+      case SERVICE_ACCOUNT_JSON_KEYFILE:
+        String keyFile =
+            SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get);
+        try (FileInputStream fis = new FileInputStream(keyFile)) {
+          return ServiceAccountCredentials.fromStream(fis, transport::get)
+              .createScoped(CLOUD_PLATFORM_SCOPE);
+        }
+      case UNAUTHENTICATED:
+        return null;
+      default:
+        throw new IllegalArgumentException("Unknown authentication type: " + authenticationType);
+    }
+  }
+
+  private static GoogleCredentials configureCredentials(
+      Configuration config, List<String> keyPrefixes, GoogleCredentials credentials) {
+    String tokenServerUrl =
+        TOKEN_SERVER_URL_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get);
+
+    if (tokenServerUrl == null) {
+      return credentials;
+    }
+    if (credentials instanceof ServiceAccountCredentials) {
+      return ((ServiceAccountCredentials) credentials)
+          .toBuilder().setTokenServerUri(URI.create(tokenServerUrl)).build();
+    }
+    if (credentials instanceof UserCredentials) {
+      return ((UserCredentials) credentials)
+          .toBuilder().setTokenServerUri(URI.create(tokenServerUrl)).build();
+    }
+    return credentials;
+  }
+
+  public static final class AccessTokenProviderCredentials extends GoogleCredentials {
+    private final AccessTokenProvider accessTokenProvider;
+
+    public AccessTokenProviderCredentials(AccessTokenProvider accessTokenProvider) {
+      super(convertAccessToken(accessTokenProvider.getAccessToken()));
+      this.accessTokenProvider = accessTokenProvider;
+    }
+
+    private static AccessToken convertAccessToken(AccessTokenProvider.AccessToken accessToken) {
+      checkNotNull(accessToken, "AccessToken cannot be null!");
+      String token = checkNotNull(accessToken.getToken(), "AccessToken value cannot be null!");
+      Instant expirationTime = accessToken.getExpirationTime();
+      return new AccessToken(token, expirationTime == null ? null : Date.from(expirationTime));
+    }
+
+    public AccessTokenProvider getAccessTokenProvider() {
+      return accessTokenProvider;
+    }
+
+    @Override
+    public AccessToken refreshAccessToken() throws IOException {
+      accessTokenProvider.refresh();
+      return convertAccessToken(accessTokenProvider.getAccessToken());
+    }
+  }
+
   protected HadoopCredentialsConfiguration() {}
+
+  public enum AuthenticationType {
+    ACCESS_TOKEN_PROVIDER,
+    APPLICATION_DEFAULT,
+    GCE_METADATA_SERVICE,
+    SERVICE_ACCOUNT_JSON_KEYFILE,
+    UNAUTHENTICATED,
+  }
 }

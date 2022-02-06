@@ -19,7 +19,6 @@ package com.google.cloud.hadoop.fs.gcs.auth;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -77,18 +76,15 @@ public class TestDelegationTokenBindingImpl extends AbstractDelegationTokenBindi
     }
 
     @Override
-    public void refresh() throws IOException {
-      //
+    public void refresh() throws IOException {}
+
+    @Override
+    public void setConf(Configuration config) {
+      this.config = config;
     }
 
     @Override
-    public void setConf(Iterable<Map.Entry<String, String>> config) {
-      this.config = new Configuration(/* loadDefaults= */ false);
-      config.forEach(e -> this.config.set(e.getKey(), e.getValue()));
-    }
-
-    @Override
-    public Iterable<Map.Entry<String, String>> getConf() {
+    public Configuration getConf() {
       return config;
     }
   }

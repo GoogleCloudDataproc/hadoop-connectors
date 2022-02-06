@@ -29,7 +29,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT;
 import static com.google.cloud.hadoop.gcsio.CreateFileOptions.DEFAULT_OVERWRITE;
-import static com.google.cloud.hadoop.util.CredentialsFactory.CLOUD_PLATFORM_SCOPE;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.CLOUD_PLATFORM_SCOPE;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
@@ -62,8 +62,8 @@ import com.google.cloud.hadoop.gcsio.UriPaths;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.AccessTokenProvider.AccessTokenType;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
-import com.google.cloud.hadoop.util.CredentialsFactory.AccessTokenProviderCredentials;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration;
+import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AccessTokenProviderCredentials;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.PropertyUtil;
 import com.google.common.annotations.VisibleForTesting;
@@ -373,8 +373,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     }
 
     GoogleCredentials credentials =
-        HadoopCredentialsConfiguration.getCredentialsFactory(config, GCS_CONFIG_PREFIX)
-            .getCredentials();
+        HadoopCredentialsConfiguration.getCredentials(config, GCS_CONFIG_PREFIX);
 
     // If impersonation service account exists, then use current credentials to request access
     // token for the impersonating service account.

@@ -16,7 +16,7 @@ package com.google.cloud.hadoop.util.testing;
 
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import java.time.Instant;
-import java.util.Map;
+import org.apache.hadoop.conf.Configuration;
 
 /** A mock implementation of the {@link AccessTokenProvider} interface to be used in tests. */
 public final class TestingAccessTokenProvider implements AccessTokenProvider {
@@ -24,7 +24,7 @@ public final class TestingAccessTokenProvider implements AccessTokenProvider {
   public static final String FAKE_ACCESS_TOKEN = "invalid-access-token";
   public static final Instant EXPIRATION_TIME = Instant.now().plusSeconds(600);
 
-  private Iterable<Map.Entry<String, String>> config;
+  private Configuration config;
 
   @Override
   public AccessToken getAccessToken() {
@@ -35,12 +35,12 @@ public final class TestingAccessTokenProvider implements AccessTokenProvider {
   public void refresh() {}
 
   @Override
-  public void setConf(Iterable<Map.Entry<String, String>> config) {
+  public void setConf(Configuration config) {
     this.config = config;
   }
 
   @Override
-  public Iterable<Map.Entry<String, String>> getConf() {
+  public Configuration getConf() {
     return config;
   }
 }

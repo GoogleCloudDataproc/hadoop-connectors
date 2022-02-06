@@ -23,7 +23,7 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
-import com.google.cloud.hadoop.util.CredentialsOptions.AuthenticationType;
+import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import java.io.FileNotFoundException;
 import java.io.IOException;

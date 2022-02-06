@@ -23,7 +23,7 @@ import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.SERVIC
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
-import com.google.cloud.hadoop.util.CredentialsOptions.AuthenticationType;
+import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
 import java.net.URI;
 import org.apache.hadoop.conf.Configuration;
 

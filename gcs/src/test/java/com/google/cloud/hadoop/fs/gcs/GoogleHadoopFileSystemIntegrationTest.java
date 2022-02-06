@@ -61,7 +61,7 @@ import com.google.cloud.hadoop.gcsio.MethodOutcome;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
-import com.google.cloud.hadoop.util.CredentialsOptions.AuthenticationType;
+import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import com.google.common.collect.ImmutableList;
 import com.google.common.hash.Hashing;
@@ -615,10 +615,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     }
 
     assertThat(thrown).hasMessageThat().startsWith("No enum constant ");
-    assertThat(thrown)
-        .hasMessageThat()
-        .contains(
-            "com.google.cloud.hadoop.util.CredentialsOptions.AuthenticationType.INVALID_AUTH_TYPE");
+    assertThat(thrown).hasMessageThat().contains("AuthenticationType.INVALID_AUTH_TYPE");
   }
 
   /** Validates initialize() with configuration key fs.gs.working.dir set. */

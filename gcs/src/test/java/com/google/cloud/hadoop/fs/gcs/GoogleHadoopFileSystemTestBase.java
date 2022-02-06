@@ -31,7 +31,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
-import com.google.cloud.hadoop.util.CredentialsOptions.AuthenticationType;
+import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
 import java.io.File;
 import java.io.IOException;
 import java.io.Writer;

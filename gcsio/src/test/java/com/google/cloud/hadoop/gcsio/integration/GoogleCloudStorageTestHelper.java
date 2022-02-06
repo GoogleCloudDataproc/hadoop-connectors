@@ -22,7 +22,10 @@ import static com.google.common.truth.Truth.assertWithMessage;
 import static java.lang.Math.min;
 import static org.junit.Assert.fail;
 
+import com.google.api.services.storage.StorageScopes;
 import com.google.auth.Credentials;
+import com.google.auth.oauth2.ComputeEngineCredentials;
+import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
@@ -33,14 +36,11 @@ import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.CheckedFunction;
-import com.google.cloud.hadoop.util.CredentialsFactory;
-import com.google.cloud.hadoop.util.CredentialsOptions;
-import com.google.cloud.hadoop.util.CredentialsOptions.AuthenticationType;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.base.Stopwatch;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
@@ -74,16 +74,12 @@ public class GoogleCloudStorageTestHelper {
   public static Credentials getCredentials() throws IOException {
     String serviceAccountJsonKeyFile =
         TestConfiguration.getInstance().getServiceAccountJsonKeyFile();
-    CredentialsOptions credentialsOptions =
-        serviceAccountJsonKeyFile == null
-            ? CredentialsOptions.builder().build()
-            : CredentialsOptions.builder()
-                .setAuthenticationType(AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE)
-                .setServiceAccountJsonKeyFile(serviceAccountJsonKeyFile)
-                .build();
-    CredentialsFactory credentialsFactory =
-        new CredentialsFactory(credentialsOptions, /* config= */ ImmutableList.of());
-    return credentialsFactory.getCredentials();
+    if (serviceAccountJsonKeyFile == null) {
+      return ComputeEngineCredentials.create().createScoped(StorageScopes.CLOUD_PLATFORM);
+    }
+    try (FileInputStream fis = new FileInputStream(serviceAccountJsonKeyFile)) {
+      return ServiceAccountCredentials.fromStream(fis).createScoped(StorageScopes.CLOUD_PLATFORM);
+    }
   }
 
   public static GoogleCloudStorageOptions.Builder getStandardOptionBuilder() {

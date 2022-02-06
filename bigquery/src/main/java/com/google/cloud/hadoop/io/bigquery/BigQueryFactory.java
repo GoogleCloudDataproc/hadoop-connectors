@@ -22,7 +22,6 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.bigquery.Bigquery;
 import com.google.auth.Credentials;
-import com.google.cloud.hadoop.util.CredentialsFactory;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration;
 import com.google.cloud.hadoop.util.PropertyUtil;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
@@ -79,9 +78,7 @@ public class BigQueryFactory {
    * @throws GeneralSecurityException on General Security Error.
    */
   public Credentials createBigQueryCredentials(Configuration config) throws IOException {
-    CredentialsFactory credentialsFactory =
-        HadoopCredentialsConfiguration.getCredentialsFactory(config, BIGQUERY_CONFIG_PREFIX);
-    return credentialsFactory.getCredentials();
+    return HadoopCredentialsConfiguration.getCredentials(config, BIGQUERY_CONFIG_PREFIX);
   }
 
   /** Constructs a BigQueryHelper from a raw Bigquery constructed with {@link #getBigQuery}. */
