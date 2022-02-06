@@ -15,7 +15,7 @@
 package com.google.cloud.hadoop.util;
 
 import static com.github.stefanbirkner.systemlambda.SystemLambda.withEnvironmentVariable;
-import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.ACCESS_TOKEN_PROVIDER_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTHENTICATION_TYPE_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.TOKEN_SERVER_URL_SUFFIX;
@@ -58,7 +58,7 @@ public class HadoopCredentialsConfigurationTest {
   private static final Map<String, Object> expectedDefaultConfiguration =
       new HashMap<String, Object>() {
         {
-          put(".auth.access.token.provider.impl", null);
+          put(".auth.access.token.provider", null);
           put(".auth.impersonation.service.account", null);
           put(".auth.impersonation.service.account.for.group.", ImmutableMap.of());
           put(".auth.impersonation.service.account.for.user.", ImmutableMap.of());
@@ -161,7 +161,7 @@ public class HadoopCredentialsConfigurationTest {
     configuration.setEnum(
         getConfigKey(AUTHENTICATION_TYPE_SUFFIX), AuthenticationType.ACCESS_TOKEN_PROVIDER);
     configuration.setClass(
-        getConfigKey(ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX),
+        getConfigKey(ACCESS_TOKEN_PROVIDER_SUFFIX),
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
 

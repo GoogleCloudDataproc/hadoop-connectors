@@ -189,7 +189,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
         GCS_CONFIG_PREFIX + AUTHENTICATION_TYPE_SUFFIX.getKey(),
         AuthenticationType.ACCESS_TOKEN_PROVIDER);
     config.setClass(
-        "fs.gs.auth.access.token.provider.impl",
+        "fs.gs.auth.access.token.provider",
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
     URI gsUri = new URI("gs://foobar/");

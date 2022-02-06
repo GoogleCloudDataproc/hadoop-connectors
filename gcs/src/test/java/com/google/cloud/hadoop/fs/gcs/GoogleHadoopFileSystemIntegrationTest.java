@@ -1621,7 +1621,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     Configuration config = new Configuration();
     config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
     config.setClass(
-        "fs.gs.auth.access.token.provider.impl",
+        "fs.gs.auth.access.token.provider",
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
     URI gsUri = new URI("gs://foobar/");
@@ -1639,7 +1639,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     Configuration config = new Configuration();
     config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
     config.setClass(
-        "fs.gs.auth.access.token.provider.impl",
+        "fs.gs.auth.access.token.provider",
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
     config.set(
@@ -1659,7 +1659,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     Configuration config = new Configuration();
     config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
     config.setClass(
-        "fs.gs.auth.access.token.provider.impl",
+        "fs.gs.auth.access.token.provider",
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
     config.set(
@@ -1682,7 +1682,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     Configuration config = new Configuration();
     config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
     config.setClass(
-        "fs.gs.auth.access.token.provider.impl",
+        "fs.gs.auth.access.token.provider",
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
     config.set(
@@ -1705,7 +1705,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     Configuration config = new Configuration();
     config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
     config.setClass(
-        "fs.gs.auth.access.token.provider.impl",
+        "fs.gs.auth.access.token.provider",
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
     config.set(
@@ -1733,7 +1733,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     Configuration config = new Configuration();
     config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
     config.setClass(
-        "fs.gs.auth.access.token.provider.impl",
+        "fs.gs.auth.access.token.provider",
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
     config.set(
@@ -1763,7 +1763,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     Configuration config = new Configuration();
     config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
     config.setClass(
-        "fs.gs.auth.access.token.provider.impl",
+        "fs.gs.auth.access.token.provider",
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
     config.set(
