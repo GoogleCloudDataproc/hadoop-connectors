@@ -16,7 +16,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.storage.Storage;
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.ComputeEngineCredentials;
@@ -99,7 +99,7 @@ public class GoogleCloudStorageImplCreateTest {
   private static Storage createStorage(Credentials credentials) throws IOException {
     return new Storage.Builder(
             HttpTransportFactory.createHttpTransport(),
-            JacksonFactory.getDefaultInstance(),
+            GsonFactory.getDefaultInstance(),
             new RetryHttpInitializer(
                 credentials,
                 RetryHttpInitializerOptions.builder()

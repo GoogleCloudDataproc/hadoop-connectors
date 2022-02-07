@@ -27,7 +27,7 @@ import com.google.api.client.http.LowLevelHttpRequest;
 import com.google.api.client.json.GenericJson;
 import com.google.api.client.json.Json;
 import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.testing.http.HttpTesting;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.testing.http.MockLowLevelHttpRequest;
@@ -470,7 +470,7 @@ public class ApiErrorExtractorTest {
 
   private static GoogleJsonResponseException googleJsonResponseException(
       int status, GoogleJsonError.ErrorInfo errorInfo, String httpStatusString) throws IOException {
-    JsonFactory jsonFactory = JacksonFactory.getDefaultInstance();
+    JsonFactory jsonFactory = GsonFactory.getDefaultInstance();
     HttpTransport transport =
         new MockHttpTransport() {
           @Override
