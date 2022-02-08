@@ -110,7 +110,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   // Fine-grained options.
   private final GoogleCloudStorageReadOptions readOptions;
 
-  private final BackOffFactory backOffFactory = BackOffFactory.DEFAULT;
+  private final BackOffFactory backOffFactory;
 
   // Context of the request that returned resIterator.
   @Nullable CancellableContext requestContext;
@@ -136,12 +136,14 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       Storage storage,
       StorageResourceId resourceId,
       Watchdog watchdog,
-      GoogleCloudStorageReadOptions readOptions)
+      GoogleCloudStorageReadOptions readOptions,
+      BackOffFactory backOffFactory)
       throws IOException {
     checkArgument(storage != null, "GCS json client cannot be null");
     this.useZeroCopyMarshaller =
         ZeroCopyReadinessChecker.isReady() && readOptions.isGrpcReadZeroCopyEnabled();
     this.stub = stubProvider.newBlockingStub();
+    this.backOffFactory = backOffFactory;
     GoogleCloudStorageItemInfo itemInfo = getObjectMetadata(resourceId, storage);
     validate(itemInfo);
     this.resourceId = itemInfo.getResourceId();
@@ -192,7 +194,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       StorageStubProvider stubProvider,
       GoogleCloudStorageItemInfo itemInfo,
       Watchdog watchdog,
-      GoogleCloudStorageReadOptions readOptions)
+      GoogleCloudStorageReadOptions readOptions,
+      BackOffFactory backOffFactory)
       throws IOException {
     validate(itemInfo);
     this.useZeroCopyMarshaller =
@@ -203,6 +206,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     this.objectSize = itemInfo.getSize();
     this.watchdog = watchdog;
     this.readOptions = readOptions;
+    this.backOffFactory = backOffFactory;
     this.readStrategy = readOptions.getFadvise();
     int prefetchSizeInBytes = readOptions.getMinRangeRequestSize() / 2;
     this.gRPCReadMessageTimeout = readOptions.getGrpcReadMessageTimeoutMillis();

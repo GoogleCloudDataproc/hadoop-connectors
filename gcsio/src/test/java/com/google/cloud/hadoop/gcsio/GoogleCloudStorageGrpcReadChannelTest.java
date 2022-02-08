@@ -24,6 +24,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.testing.http.MockHttpTransport;
+import com.google.api.client.util.BackOff;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.Storage.Objects;
 import com.google.api.services.storage.Storage.Objects.Get;
@@ -1535,7 +1536,8 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         storage,
         new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
         watchdog,
-        options);
+        options,
+        () -> BackOff.STOP_BACKOFF);
   }
 
   private GoogleCloudStorageGrpcReadChannel newReadChannel(GoogleCloudStorageReadOptions options)
@@ -1545,21 +1547,31 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         storage,
         new StorageResourceId(V1_BUCKET_NAME, OBJECT_NAME),
         watchdog,
-        options);
+        options,
+        () -> BackOff.STOP_BACKOFF);
   }
 
   private GoogleCloudStorageGrpcReadChannel newReadChannel(
       StorageResourceId storageResourceId, GoogleCloudStorageReadOptions options)
       throws IOException {
     return new GoogleCloudStorageGrpcReadChannel(
-        new FakeStubProvider(mockCredentials), storage, storageResourceId, watchdog, options);
+        new FakeStubProvider(mockCredentials),
+        storage,
+        storageResourceId,
+        watchdog,
+        options,
+        () -> BackOff.STOP_BACKOFF);
   }
 
   private GoogleCloudStorageGrpcReadChannel newReadChannel(
       GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions options)
       throws IOException {
     return new GoogleCloudStorageGrpcReadChannel(
-        new FakeStubProvider(mockCredentials), itemInfo, watchdog, options);
+        new FakeStubProvider(mockCredentials),
+        itemInfo,
+        watchdog,
+        options,
+        () -> BackOff.STOP_BACKOFF);
   }
 
   private static class FakeGrpcDecorator implements StorageStubProvider.GrpcDecorator {
