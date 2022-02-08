@@ -758,8 +758,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
 
     if (storageOptions.isGrpcEnabled()) {
-      return GoogleCloudStorageGrpcReadChannel.open(
-          storageStubProvider, storage, errorExtractor, resourceId, watchdog, readOptions);
+      return new GoogleCloudStorageGrpcReadChannel(
+          storageStubProvider, storage, resourceId, watchdog, readOptions, BackOffFactory.DEFAULT);
     }
 
     // The underlying channel doesn't initially read data, which means that we won't see a
