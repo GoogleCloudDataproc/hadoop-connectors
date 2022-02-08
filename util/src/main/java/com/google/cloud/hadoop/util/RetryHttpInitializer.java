@@ -82,8 +82,6 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
         // Set the timeout configurations.
         .setConnectTimeout(toIntExact(options.getConnectTimeout().toMillis()))
         .setReadTimeout(toIntExact(options.getReadTimeout().toMillis()))
-        // Supply a new handler for unsuccessful return codes. 401 Unauthorized will be handled by
-        // the Credentials, 410 Gone will be logged, and 5XX will be handled by a backoff handler.
         .setUnsuccessfulResponseHandler(new UnsuccessfulResponseHandler(credentials))
         .setIOExceptionHandler(new IoExceptionHandler());
 
@@ -101,6 +99,15 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     return credentials == null ? null : credentials.getCredentials();
   }
 
+  /**
+   * Handles unsuccessful responses:
+   *
+   * <ul>
+   *   <li>log responses based on the response code
+   *   <li>401 Unauthorized responses are handled by the {@link HttpCredentialsAdapter}
+   *   <li>5XX are handled by the a backoff handler.
+   * </ul>
+   */
   private static class UnsuccessfulResponseHandler implements HttpUnsuccessfulResponseHandler {
 
     private static final int HTTP_SC_GONE = 410;

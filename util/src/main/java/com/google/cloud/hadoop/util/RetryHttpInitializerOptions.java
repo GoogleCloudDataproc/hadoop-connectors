@@ -13,6 +13,8 @@
  */
 package com.google.cloud.hadoop.util;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableMap;
 import java.time.Duration;
@@ -78,6 +80,14 @@ public abstract class RetryHttpInitializerOptions {
 
     public abstract Builder setMaxRequestRetries(int maxRequestRetries);
 
-    public abstract RetryHttpInitializerOptions build();
+    abstract RetryHttpInitializerOptions autoBuild();
+
+    public RetryHttpInitializerOptions build() {
+      RetryHttpInitializerOptions options = autoBuild();
+      checkArgument(
+          !options.getHttpHeaders().keySet().stream().anyMatch("User-Agent"::equalsIgnoreCase),
+          "The User-Agent header must be provided explicitly via the defaultUserAgent option");
+      return options;
+    }
   }
 }
