@@ -145,7 +145,7 @@ public class HadoopCredentialsConfiguration {
   }
 
   /**
-   * Get the credentials for the configured via {@link AuthenticationType}
+   * Get the credentials for the configured {@link AuthenticationType}
    *
    * @throws IllegalStateException if configured {@link AuthenticationType} is not recognized
    */
