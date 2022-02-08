@@ -24,7 +24,6 @@ import static org.mockito.Mockito.when;
 
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.testing.http.MockHttpTransport;
-import com.google.api.client.util.BackOff;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.Storage.Objects;
 import com.google.api.services.storage.Storage.Objects.Get;
@@ -1534,11 +1533,9 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     return new GoogleCloudStorageGrpcReadChannel(
         new FakeStubProvider(mockCredentials),
         storage,
-        errorExtractor,
         new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
         watchdog,
-        options,
-        () -> BackOff.STOP_BACKOFF);
+        options);
   }
 
   private GoogleCloudStorageGrpcReadChannel newReadChannel(GoogleCloudStorageReadOptions options)
@@ -1546,35 +1543,23 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     return new GoogleCloudStorageGrpcReadChannel(
         new FakeStubProvider(mockCredentials),
         storage,
-        errorExtractor,
         new StorageResourceId(V1_BUCKET_NAME, OBJECT_NAME),
         watchdog,
-        options,
-        () -> BackOff.STOP_BACKOFF);
+        options);
   }
 
   private GoogleCloudStorageGrpcReadChannel newReadChannel(
       StorageResourceId storageResourceId, GoogleCloudStorageReadOptions options)
       throws IOException {
     return new GoogleCloudStorageGrpcReadChannel(
-        new FakeStubProvider(mockCredentials),
-        storage,
-        errorExtractor,
-        storageResourceId,
-        watchdog,
-        options,
-        () -> BackOff.STOP_BACKOFF);
+        new FakeStubProvider(mockCredentials), storage, storageResourceId, watchdog, options);
   }
 
   private GoogleCloudStorageGrpcReadChannel newReadChannel(
       GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions options)
       throws IOException {
     return new GoogleCloudStorageGrpcReadChannel(
-        new FakeStubProvider(mockCredentials),
-        itemInfo,
-        watchdog,
-        options,
-        () -> BackOff.STOP_BACKOFF);
+        new FakeStubProvider(mockCredentials), itemInfo, watchdog, options);
   }
 
   private static class FakeGrpcDecorator implements StorageStubProvider.GrpcDecorator {

@@ -110,7 +110,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   // Fine-grained options.
   private final GoogleCloudStorageReadOptions readOptions;
 
-  private final BackOffFactory backOffFactory;
+  private final BackOffFactory backOffFactory = BackOffFactory.DEFAULT;
 
   // Context of the request that returned resIterator.
   @Nullable CancellableContext requestContext;
@@ -128,29 +128,27 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private final long gRPCReadMessageTimeout;
 
+  private final ApiErrorExtractor errorExtractor = ApiErrorExtractor.INSTANCE;
+
   @VisibleForTesting
   GoogleCloudStorageGrpcReadChannel(
       StorageStubProvider stubProvider,
       Storage storage,
-      ApiErrorExtractor errorExtractor,
       StorageResourceId resourceId,
       Watchdog watchdog,
-      GoogleCloudStorageReadOptions readOptions,
-      BackOffFactory backOffFactory)
+      GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     checkArgument(storage != null, "GCS json client cannot be null");
     this.useZeroCopyMarshaller =
         ZeroCopyReadinessChecker.isReady() && readOptions.isGrpcReadZeroCopyEnabled();
     this.stub = stubProvider.newBlockingStub();
-    GoogleCloudStorageItemInfo itemInfo =
-        getObjectMetadata(resourceId, errorExtractor, backOffFactory, storage);
+    GoogleCloudStorageItemInfo itemInfo = getObjectMetadata(resourceId, storage);
     validate(itemInfo);
     this.resourceId = itemInfo.getResourceId();
     this.objectGeneration = itemInfo.getContentGeneration();
     this.objectSize = itemInfo.getSize();
     this.watchdog = watchdog;
     this.readOptions = readOptions;
-    this.backOffFactory = backOffFactory;
     this.readStrategy = readOptions.getFadvise();
     int prefetchSizeInBytes = readOptions.getMinRangeRequestSize() / 2;
     this.gRPCReadMessageTimeout = readOptions.getGrpcReadMessageTimeoutMillis();
@@ -194,8 +192,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       StorageStubProvider stubProvider,
       GoogleCloudStorageItemInfo itemInfo,
       Watchdog watchdog,
-      GoogleCloudStorageReadOptions readOptions,
-      BackOffFactory backOffFactory)
+      GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     validate(itemInfo);
     this.useZeroCopyMarshaller =
@@ -206,7 +203,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     this.objectSize = itemInfo.getSize();
     this.watchdog = watchdog;
     this.readOptions = readOptions;
-    this.backOffFactory = backOffFactory;
     this.readStrategy = readOptions.getFadvise();
     int prefetchSizeInBytes = readOptions.getMinRangeRequestSize() / 2;
     this.gRPCReadMessageTimeout = readOptions.getGrpcReadMessageTimeoutMillis();
@@ -215,11 +211,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     this.footerBuffer = getFooterContent(footerStartOffsetInBytes, footerSize);
   }
 
-  private GoogleCloudStorageItemInfo getObjectMetadata(
-      StorageResourceId resourceId,
-      ApiErrorExtractor errorExtractor,
-      BackOffFactory backOffFactory,
-      Storage gcs)
+  private GoogleCloudStorageItemInfo getObjectMetadata(StorageResourceId resourceId, Storage gcs)
       throws IOException {
     StorageObject object;
     long startTime = System.currentTimeMillis();
