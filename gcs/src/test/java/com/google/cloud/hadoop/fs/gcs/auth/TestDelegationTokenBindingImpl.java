@@ -55,7 +55,7 @@ public class TestDelegationTokenBindingImpl extends AbstractDelegationTokenBindi
   }
 
   @Override
-  public DelegationTokenIdentifier createTokenIdentifier() throws IOException {
+  public DelegationTokenIdentifier createTokenIdentifier() {
     return createEmptyIdentifier();
   }
 
@@ -68,7 +68,7 @@ public class TestDelegationTokenBindingImpl extends AbstractDelegationTokenBindi
 
     public static final String TOKEN_CONFIG_PROPERTY_NAME = "test.token.value";
 
-    private Configuration config = null;
+    private Configuration config;
 
     @Override
     public AccessToken getAccessToken() {
@@ -76,9 +76,7 @@ public class TestDelegationTokenBindingImpl extends AbstractDelegationTokenBindi
     }
 
     @Override
-    public void refresh() throws IOException {
-      //
-    }
+    public void refresh() throws IOException {}
 
     @Override
     public void setConf(Configuration config) {

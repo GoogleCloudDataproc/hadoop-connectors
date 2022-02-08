@@ -15,7 +15,7 @@ package com.google.cloud.hadoop.io.bigquery;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.BIGQUERY_CONFIG_PREFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTHENTICATION_TYPE_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
@@ -33,6 +33,7 @@ import com.google.cloud.hadoop.io.bigquery.output.BigQueryOutputConfiguration;
 import com.google.cloud.hadoop.io.bigquery.output.BigQueryTableFieldSchema;
 import com.google.cloud.hadoop.io.bigquery.output.BigQueryTableSchema;
 import com.google.cloud.hadoop.io.bigquery.output.IndirectBigQueryOutputFormat;
+import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import com.google.common.flogger.GoogleLogger;
@@ -146,7 +147,12 @@ public abstract class AbstractBigQueryIoIntegrationTestBase<T> {
     config.set(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(), projectIdValue);
 
     if (serviceAccountJsonKeyFile != null) {
-      config.setBoolean(BIGQUERY_CONFIG_PREFIX + ENABLE_SERVICE_ACCOUNTS_SUFFIX.getKey(), true);
+      config.setEnum(
+          BIGQUERY_CONFIG_PREFIX + AUTHENTICATION_TYPE_SUFFIX.getKey(),
+          AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
+      config.setEnum(
+          GCS_CONFIG_PREFIX + AUTHENTICATION_TYPE_SUFFIX.getKey(),
+          AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
       config.set(
           BIGQUERY_CONFIG_PREFIX + SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.getKey(),
           serviceAccountJsonKeyFile);

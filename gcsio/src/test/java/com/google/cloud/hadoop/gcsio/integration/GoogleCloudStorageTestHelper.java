@@ -22,7 +22,10 @@ import static com.google.common.truth.Truth.assertWithMessage;
 import static java.lang.Math.min;
 import static org.junit.Assert.fail;
 
+import com.google.api.services.storage.StorageScopes;
 import com.google.auth.Credentials;
+import com.google.auth.oauth2.ComputeEngineCredentials;
+import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
@@ -33,17 +36,15 @@ import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.CheckedFunction;
-import com.google.cloud.hadoop.util.CredentialsFactory;
-import com.google.cloud.hadoop.util.CredentialsOptions;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
-import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -71,17 +72,13 @@ public class GoogleCloudStorageTestHelper {
   }
 
   public static Credentials getCredentials() throws IOException {
-    CredentialsOptions credentialsOptions =
-        CredentialsOptions.builder()
-            .setServiceAccountJsonKeyFile(
-                TestConfiguration.getInstance().getServiceAccountJsonKeyFile())
-            .build();
-    CredentialsFactory credentialsFactory = new CredentialsFactory(credentialsOptions);
-
-    try {
-      return credentialsFactory.getCredentials();
-    } catch (GeneralSecurityException e) {
-      throw new IOException("Failed to create test credentials", e);
+    String serviceAccountJsonKeyFile =
+        TestConfiguration.getInstance().getServiceAccountJsonKeyFile();
+    if (serviceAccountJsonKeyFile == null) {
+      return ComputeEngineCredentials.create().createScoped(StorageScopes.CLOUD_PLATFORM);
+    }
+    try (FileInputStream fis = new FileInputStream(serviceAccountJsonKeyFile)) {
+      return ServiceAccountCredentials.fromStream(fis).createScoped(StorageScopes.CLOUD_PLATFORM);
     }
   }
 

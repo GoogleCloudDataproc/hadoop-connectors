@@ -16,11 +16,14 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_LAZY_INITIALIZATION_ENABLE;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTHENTICATION_TYPE_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
+import com.google.cloud.hadoop.util.AccessTokenProvider;
+import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -86,6 +89,9 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
       throws Exception {
     Configuration lazyConf = new Configuration();
     lazyConf.setBoolean(GCS_LAZY_INITIALIZATION_ENABLE.getKey(), true);
+    lazyConf.setEnum(
+        GCS_CONFIG_PREFIX + AUTHENTICATION_TYPE_SUFFIX.getKey(),
+        AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
     lazyConf.set(
         GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.getKey(), "non-existent.json");
     GoogleHadoopFileSystem lazyFs = new GoogleHadoopFileSystem();
@@ -114,6 +120,9 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     new GoogleHadoopFileSystem();
     Configuration eagerConf = new Configuration();
     eagerConf.setBoolean(GCS_LAZY_INITIALIZATION_ENABLE.getKey(), false);
+    eagerConf.setEnum(
+        GCS_CONFIG_PREFIX + AUTHENTICATION_TYPE_SUFFIX.getKey(),
+        AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
     eagerConf.set(
         GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.getKey(), "non-existent.json");
     FileSystem eagerFs = new GoogleHadoopFileSystem();
@@ -152,7 +161,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   }
 
   @Test
-  public void testCouldUseFlatGlob() throws IOException, URISyntaxException {
+  public void testCouldUseFlatGlob() throws IOException {
     try (GoogleHadoopFileSystem lazyFs = new InMemoryGoogleHadoopFileSystem()) {
       assertThat(lazyFs.couldUseFlatGlob(new Path("gs://**/test/"))).isFalse();
     }
@@ -176,7 +185,13 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   @Test
   public void testGetDefaultPortIndicatesPortsAreNotUsed() throws Exception {
     Configuration config = new Configuration();
-    config.set("fs.gs.auth.access.token.provider.impl", TestingAccessTokenProvider.class.getName());
+    config.setEnum(
+        GCS_CONFIG_PREFIX + AUTHENTICATION_TYPE_SUFFIX.getKey(),
+        AuthenticationType.ACCESS_TOKEN_PROVIDER);
+    config.setClass(
+        "fs.gs.auth.access.token.provider",
+        TestingAccessTokenProvider.class,
+        AccessTokenProvider.class);
     URI gsUri = new URI("gs://foobar/");
 
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();

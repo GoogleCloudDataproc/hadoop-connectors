@@ -15,9 +15,8 @@
 package com.google.cloud.hadoop.util;
 
 import static com.github.stefanbirkner.systemlambda.SystemLambda.withEnvironmentVariable;
-import static com.google.cloud.hadoop.util.CredentialsFactory.CREDENTIALS_ENV_VAR;
-import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.ENABLE_NULL_CREDENTIALS_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.ACCESS_TOKEN_PROVIDER_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTHENTICATION_TYPE_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.TOKEN_SERVER_URL_SUFFIX;
 import static com.google.cloud.hadoop.util.testing.HadoopConfigurationUtils.getDefaultProperties;
@@ -29,15 +28,21 @@ import static org.junit.Assert.assertThrows;
 import com.google.api.client.auth.oauth2.TokenResponse;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.testing.http.MockHttpTransport;
+import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.ComputeEngineCredentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
+import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
+import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import com.google.common.base.Suppliers;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Resources;
+import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
@@ -53,18 +58,16 @@ public class HadoopCredentialsConfigurationTest {
   private static final Map<String, Object> expectedDefaultConfiguration =
       new HashMap<String, Object>() {
         {
-          put(".auth.access.token.provider.impl", null);
-          put(".auth.null.enable", false);
-          put(".auth.service.account.enable", true);
-          put(".enable.service.account.auth", true);
+          put(".auth.access.token.provider", null);
+          put(".auth.impersonation.service.account", null);
+          put(".auth.impersonation.service.account.for.group.", ImmutableMap.of());
+          put(".auth.impersonation.service.account.for.user.", ImmutableMap.of());
           put(".auth.service.account.json.keyfile", null);
-          put(".token.server.url", null);
+          put(".auth.type", AuthenticationType.COMPUTE_ENGINE);
           put(".proxy.address", null);
           put(".proxy.password", null);
           put(".proxy.username", null);
-          put(".auth.impersonation.service.account", null);
-          put(".auth.impersonation.service.account.for.user.", ImmutableMap.of());
-          put(".auth.impersonation.service.account.for.group.", ImmutableMap.of());
+          put(".token.server.url", null);
         }
       };
 
@@ -79,47 +82,45 @@ public class HadoopCredentialsConfigurationTest {
     configuration = new Configuration();
   }
 
-  private CredentialsFactory getCredentialsFactory() {
-    return getCredentialsFactory(new MockHttpTransport());
+  private GoogleCredentials getCredentials() throws IOException {
+    return getCredentials(new MockHttpTransport());
   }
 
-  private CredentialsFactory getCredentialsFactory(HttpTransport transport) {
-    CredentialsOptions options =
-        HadoopCredentialsConfiguration.getCredentialsOptions(configuration);
-    return new CredentialsFactory(options, Suppliers.ofInstance(transport));
+  private GoogleCredentials getCredentials(HttpTransport transport) throws IOException {
+    return HadoopCredentialsConfiguration.getCredentials(
+        Suppliers.ofInstance(transport),
+        configuration,
+        ImmutableList.of(HadoopCredentialsConfiguration.BASE_KEY_PREFIX));
   }
 
   @Test
   public void nullCredentialsAreCreatedForTesting() throws Exception {
-    configuration.setBoolean(getConfigKey(ENABLE_SERVICE_ACCOUNTS_SUFFIX), false);
-    configuration.setBoolean(getConfigKey(ENABLE_NULL_CREDENTIALS_SUFFIX), true);
+    configuration.setEnum(
+        getConfigKey(AUTHENTICATION_TYPE_SUFFIX), AuthenticationType.UNAUTHENTICATED);
 
-    CredentialsFactory credentialsFactory = getCredentialsFactory();
+    GoogleCredentials credentials = getCredentials();
 
-    assertThat(credentialsFactory.getCredentials()).isNull();
+    assertThat(credentials).isNull();
   }
 
   @Test
-  public void exceptionIsThrownForNoCredentialsOptions() {
-    configuration.setBoolean(getConfigKey(ENABLE_SERVICE_ACCOUNTS_SUFFIX), false);
+  public void invalidAuthType_exceptionIsThrown() {
+    configuration.set(getConfigKey(AUTHENTICATION_TYPE_SUFFIX), "INVALID_TEST");
 
     IllegalArgumentException thrown =
-        assertThrows(IllegalArgumentException.class, this::getCredentialsFactory);
+        assertThrows(IllegalArgumentException.class, this::getCredentials);
 
-    assertThat(thrown)
-        .hasMessageThat()
-        .startsWith("No valid credentials configuration discovered:");
+    assertThat(thrown).hasMessageThat().startsWith("No enum constant ");
+    assertThat(thrown).hasMessageThat().contains("AuthenticationType.INVALID_TEST");
   }
 
   @Test
   public void metadataServiceIsUsedByDefault() throws Exception {
     TokenResponse token =
         new TokenResponse().setAccessToken("metadata-test-token").setExpiresInSeconds(100L);
-
     MockHttpTransport transport = mockTransport(jsonDataResponse(token));
 
-    CredentialsFactory credentialsFactory = getCredentialsFactory(transport);
-    GoogleCredentials credentials = credentialsFactory.getCredentials();
+    GoogleCredentials credentials = getCredentials(transport);
 
     credentials.refreshIfExpired();
 
@@ -129,12 +130,14 @@ public class HadoopCredentialsConfigurationTest {
 
   @Test
   public void applicationDefaultServiceAccountWhenConfigured() throws Exception {
-    CredentialsFactory credentialsFactory = getCredentialsFactory();
+    configuration.setEnum(
+        getConfigKey(AUTHENTICATION_TYPE_SUFFIX), AuthenticationType.APPLICATION_DEFAULT);
 
     ServiceAccountCredentials credentials =
         (ServiceAccountCredentials)
-            withEnvironmentVariable(CREDENTIALS_ENV_VAR, getStringPath("test-credentials.json"))
-                .execute(credentialsFactory::getCredentials);
+            withEnvironmentVariable(
+                    "GOOGLE_APPLICATION_CREDENTIALS", getStringPath("test-credentials.json"))
+                .execute(() -> getCredentials());
 
     assertThat(credentials.getClientEmail()).isEqualTo("test-email@gserviceaccount.com");
     assertThat(credentials.getPrivateKeyId()).isEqualTo("test-key-id");
@@ -142,28 +145,45 @@ public class HadoopCredentialsConfigurationTest {
 
   @Test
   public void jsonKeyFileUsedWhenConfigured() throws Exception {
+    configuration.setEnum(
+        getConfigKey(AUTHENTICATION_TYPE_SUFFIX), AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
     configuration.set(
         getConfigKey(SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX), getStringPath("test-credentials.json"));
 
-    CredentialsFactory credentialsFactory = getCredentialsFactory();
-
-    ServiceAccountCredentials credentials =
-        (ServiceAccountCredentials) credentialsFactory.getCredentials();
+    ServiceAccountCredentials credentials = (ServiceAccountCredentials) getCredentials();
 
     assertThat(credentials.getClientEmail()).isEqualTo("test-email@gserviceaccount.com");
     assertThat(credentials.getPrivateKeyId()).isEqualTo("test-key-id");
   }
 
   @Test
+  public void accessTokenProviderCredentials_credentialFactory() throws IOException {
+    configuration.setEnum(
+        getConfigKey(AUTHENTICATION_TYPE_SUFFIX), AuthenticationType.ACCESS_TOKEN_PROVIDER);
+    configuration.setClass(
+        getConfigKey(ACCESS_TOKEN_PROVIDER_SUFFIX),
+        TestingAccessTokenProvider.class,
+        AccessTokenProvider.class);
+
+    GoogleCredentials credentials = getCredentials();
+
+    AccessToken accessToken = credentials.getAccessToken();
+
+    assertThat(accessToken).isNotNull();
+    assertThat(accessToken.getTokenValue()).isEqualTo(TestingAccessTokenProvider.FAKE_ACCESS_TOKEN);
+    assertThat(accessToken.getExpirationTime())
+        .isEqualTo(Date.from(TestingAccessTokenProvider.EXPIRATION_TIME));
+  }
+
+  @Test
   public void customTokenServerUrl() throws Exception {
+    configuration.setEnum(
+        getConfigKey(AUTHENTICATION_TYPE_SUFFIX), AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
     configuration.set(
         getConfigKey(SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX), getStringPath("test-credentials.json"));
     configuration.set(getConfigKey(TOKEN_SERVER_URL_SUFFIX), "https://test.oauth.com/token");
 
-    CredentialsFactory credentialsFactory = getCredentialsFactory();
-
-    ServiceAccountCredentials credentials =
-        (ServiceAccountCredentials) credentialsFactory.getCredentials();
+    ServiceAccountCredentials credentials = (ServiceAccountCredentials) getCredentials();
 
     assertThat(credentials.getTokenServerUri()).isEqualTo(new URI("https://test.oauth.com/token"));
   }
