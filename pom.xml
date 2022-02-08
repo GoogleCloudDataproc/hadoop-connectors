@@ -80,7 +80,11 @@
 
     <gpg.skip>true</gpg.skip>
 
+<<<<<<< HEAD
     <bigdataoss.version>2.1.8-SNAPSHOT</bigdataoss.version>
+=======
+    <bigdataoss.version>2.1.7</bigdataoss.version>
+>>>>>>> upstream/branch-2.1.x
     <bigquery-connector.version>1.1.7-SNAPSHOT</bigquery-connector.version>
 
     <!-- Keep in sync with Hadoop dependencies -->
