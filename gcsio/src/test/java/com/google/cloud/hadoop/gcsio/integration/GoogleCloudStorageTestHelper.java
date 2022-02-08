@@ -22,7 +22,10 @@ import static com.google.common.truth.Truth.assertWithMessage;
 import static java.lang.Math.min;
 import static org.junit.Assert.fail;
 
-import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.services.storage.StorageScopes;
+import com.google.auth.Credentials;
+import com.google.auth.oauth2.ComputeEngineCredentials;
+import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
@@ -33,17 +36,15 @@ import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.CheckedFunction;
-import com.google.cloud.hadoop.util.CredentialFactory;
-import com.google.cloud.hadoop.util.CredentialOptions;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
-import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -64,24 +65,20 @@ public class GoogleCloudStorageTestHelper {
 
   public static GoogleCloudStorage createGoogleCloudStorage() {
     try {
-      return new GoogleCloudStorageImpl(getStandardOptionBuilder().build(), getCredential());
+      return new GoogleCloudStorageImpl(getStandardOptionBuilder().build(), getCredentials());
     } catch (IOException e) {
       throw new RuntimeException("Failed to create GoogleCloudStorage instance", e);
     }
   }
 
-  public static Credential getCredential() throws IOException {
-    CredentialOptions credentialOptions =
-        CredentialOptions.builder()
-            .setServiceAccountEmail(TestConfiguration.getInstance().getServiceAccount())
-            .setServiceAccountKeyFile(TestConfiguration.getInstance().getPrivateKeyFile())
-            .build();
-    CredentialFactory credentialFactory = new CredentialFactory(credentialOptions);
-
-    try {
-      return credentialFactory.getCredential(CredentialFactory.DEFAULT_SCOPES);
-    } catch (GeneralSecurityException e) {
-      throw new IOException("Failed to create test credentials", e);
+  public static Credentials getCredentials() throws IOException {
+    String serviceAccountJsonKeyFile =
+        TestConfiguration.getInstance().getServiceAccountJsonKeyFile();
+    if (serviceAccountJsonKeyFile == null) {
+      return ComputeEngineCredentials.create().createScoped(StorageScopes.CLOUD_PLATFORM);
+    }
+    try (FileInputStream fis = new FileInputStream(serviceAccountJsonKeyFile)) {
+      return ServiceAccountCredentials.fromStream(fis).createScoped(StorageScopes.CLOUD_PLATFORM);
     }
   }
 
@@ -259,8 +256,8 @@ public class GoogleCloudStorageTestHelper {
 
     private static String makeBucketName(String prefix) {
       String username = System.getProperty("user.name", "unknown").replaceAll("[-.]", "");
-      username = username.substring(0, min(username.length(), 10));
-      String uuidSuffix = UUID.randomUUID().toString().substring(0, 8);
+      username = username.substring(0, min(username.length(), 9));
+      String uuidSuffix = UUID.randomUUID().toString().substring(0, 6);
       return prefix + DELIMITER + username + DELIMITER + uuidSuffix;
     }
 
@@ -286,7 +283,7 @@ public class GoogleCloudStorageTestHelper {
           bucketsToDelete.add(bucketName);
         }
       }
-      // randomize buckets order in case concurrent clean ups are running
+      // randomize buckets order in case concurrent cleanups are running
       Collections.shuffle(bucketsToDelete);
       if (bucketsToDelete.size() > MAX_CLEANUP_BUCKETS) {
         logger.atInfo().log(
@@ -342,7 +339,7 @@ public class GoogleCloudStorageTestHelper {
       this.requestsTracker =
           new TrackingHttpRequestInitializer(
               new RetryHttpInitializer(
-                  GoogleCloudStorageTestHelper.getCredential(),
+                  GoogleCloudStorageTestHelper.getCredentials(),
                   options.toRetryHttpInitializerOptions()));
       this.delegate = delegateStorageFn.apply(this.requestsTracker);
     }

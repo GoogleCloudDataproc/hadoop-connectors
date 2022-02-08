@@ -21,7 +21,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.cloud.hadoop.fs.gcs.InMemoryGoogleHadoopFileSystem;
 import com.google.cloud.hadoop.io.bigquery.BigQueryFileFormat;
-import com.google.cloud.hadoop.util.testing.CredentialConfigurationUtil;
+import com.google.cloud.hadoop.util.testing.CredentialsConfigurationUtil;
 import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -106,7 +106,7 @@ public class IndirectBigQueryOutputFormatTest {
     // Create the configuration, but setup in the tests.
     job = Job.getInstance(InMemoryGoogleHadoopFileSystem.getSampleConfiguration());
     conf = job.getConfiguration();
-    CredentialConfigurationUtil.addTestConfigurationSettings(conf);
+    CredentialsConfigurationUtil.addTestConfigurationSettings(conf);
     BigQueryOutputConfiguration.configureWithAutoSchema(
         conf,
         QUALIFIED_TEST_TABLE_ID,

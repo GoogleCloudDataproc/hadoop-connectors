@@ -11,8 +11,8 @@
  * express or implied. See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.google.cloud.hadoop.fs.gcs;
+package com.google.cloud.hadoop.io.bigquery;
 
-/** Hadoop credential configuration for Google Cloud Storage Connector */
-public class HadoopCredentialConfiguration
-    extends com.google.cloud.hadoop.util.HadoopCredentialConfiguration {}
+/** {@code HadoopCredentialsConfiguration} for BigQuery Connector */
+public class HadoopCredentialsConfiguration
+    extends com.google.cloud.hadoop.util.HadoopCredentialsConfiguration {}

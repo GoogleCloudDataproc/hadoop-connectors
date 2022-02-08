@@ -37,10 +37,10 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem;
 import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTHENTICATION_TYPE_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.common.base.StandardSystemProperty.USER_NAME;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
@@ -49,7 +49,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.stream;
 import static org.junit.Assert.assertThrows;
 
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.HttpResponseException;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GcsFileChecksumType;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
@@ -60,6 +60,8 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
+import com.google.cloud.hadoop.util.ApiErrorExtractor;
+import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import com.google.common.collect.ImmutableList;
 import com.google.common.hash.Hashing;
@@ -526,7 +528,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   /** Validates that we correctly build our Options object from a Hadoop config. */
   @Test
   public void testBuildOptionsFromConfig() {
-    Configuration config = loadConfig("projectId", "serviceAccount", "priveKeyFile");
+    Configuration config = loadConfig("projectId", "path/to/serviceAccountKeyFile.json");
 
     GoogleCloudStorageFileSystemOptions.Builder optionsBuilder =
         GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config);
@@ -597,7 +599,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     URI gsUri = new URI("gs://foobar/");
     String fakeProjectId = "123456";
     Configuration config = new Configuration();
-    config.setBoolean(GCS_CONFIG_PREFIX + ENABLE_SERVICE_ACCOUNTS_SUFFIX.getKey(), false);
+    config.set(GCS_CONFIG_PREFIX + AUTHENTICATION_TYPE_SUFFIX.getKey(), "INVALID_AUTH_TYPE");
     // Set project ID.
     config.set(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(), fakeProjectId);
 
@@ -612,7 +614,8 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
       thrown = assertThrows(IllegalArgumentException.class, () -> ghfs.initialize(gsUri, config));
     }
 
-    assertThat(thrown).hasMessageThat().startsWith("No valid credential configuration discovered:");
+    assertThat(thrown).hasMessageThat().startsWith("No enum constant ");
+    assertThat(thrown).hasMessageThat().contains("AuthenticationType.INVALID_AUTH_TYPE");
   }
 
   /** Validates initialize() with configuration key fs.gs.working.dir set. */
@@ -1614,10 +1617,11 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
-  public void testInvalidCredentialFromAccessTokenProvider() throws Exception {
+  public void testInvalidCredentialsFromAccessTokenProvider() throws Exception {
     Configuration config = new Configuration();
+    config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
     config.setClass(
-        "fs.gs.auth.access.token.provider.impl",
+        "fs.gs.auth.access.token.provider",
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
     URI gsUri = new URI("gs://foobar/");
@@ -1633,26 +1637,29 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   @Test
   public void testImpersonationServiceAccountUsed() throws Exception {
     Configuration config = new Configuration();
+    config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
     config.setClass(
-        "fs.gs.auth.access.token.provider.impl",
+        "fs.gs.auth.access.token.provider",
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
     config.set(
         GCS_CONFIG_PREFIX + IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey(), "test-service-account");
 
-    URI gsUri = new URI("gs://foobar/");
+    Path gcsPath = new Path("gs://foobar/");
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+    ghfs.initialize(gcsPath.toUri(), config);
 
-    Exception exception =
-        assertThrows(GoogleJsonResponseException.class, () -> ghfs.initialize(gsUri, config));
-    assertThat(exception).hasMessageThat().startsWith("401 Unauthorized");
+    IOException thrown = assertThrows(IOException.class, () -> ghfs.listStatus(gcsPath));
+    HttpResponseException httpException = ApiErrorExtractor.getHttpResponseException(thrown);
+    assertThat(httpException).hasMessageThat().startsWith("401 Unauthorized");
   }
 
   @Test
   public void testImpersonationUserNameIdentifierUsed() throws Exception {
     Configuration config = new Configuration();
+    config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
     config.setClass(
-        "fs.gs.auth.access.token.provider.impl",
+        "fs.gs.auth.access.token.provider",
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
     config.set(
@@ -1661,19 +1668,21 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
             + UserGroupInformation.getCurrentUser().getShortUserName(),
         "test-service-account");
 
-    URI gsUri = new URI("gs://foobar/");
+    Path gcsPath = new Path("gs://foobar/");
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+    ghfs.initialize(gcsPath.toUri(), config);
 
-    Exception exception =
-        assertThrows(GoogleJsonResponseException.class, () -> ghfs.initialize(gsUri, config));
-    assertThat(exception).hasMessageThat().startsWith("401 Unauthorized");
+    IOException thrown = assertThrows(IOException.class, () -> ghfs.listStatus(gcsPath));
+    HttpResponseException httpException = ApiErrorExtractor.getHttpResponseException(thrown);
+    assertThat(httpException).hasMessageThat().startsWith("401 Unauthorized");
   }
 
   @Test
   public void testImpersonationGroupNameIdentifierUsed() throws Exception {
     Configuration config = new Configuration();
+    config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
     config.setClass(
-        "fs.gs.auth.access.token.provider.impl",
+        "fs.gs.auth.access.token.provider",
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
     config.set(
@@ -1682,19 +1691,21 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
             + UserGroupInformation.getCurrentUser().getGroupNames()[0],
         "test-service-account");
 
-    URI gsUri = new URI("gs://foobar/");
+    Path gcsPath = new Path("gs://foobar/");
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+    ghfs.initialize(gcsPath.toUri(), config);
 
-    Exception exception =
-        assertThrows(GoogleJsonResponseException.class, () -> ghfs.initialize(gsUri, config));
-    assertThat(exception).hasMessageThat().startsWith("401 Unauthorized");
+    IOException thrown = assertThrows(IOException.class, () -> ghfs.listStatus(gcsPath));
+    HttpResponseException httpException = ApiErrorExtractor.getHttpResponseException(thrown);
+    assertThat(httpException).hasMessageThat().startsWith("401 Unauthorized");
   }
 
   @Test
   public void testImpersonationUserAndGroupNameIdentifiersUsed() throws Exception {
     Configuration config = new Configuration();
+    config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
     config.setClass(
-        "fs.gs.auth.access.token.provider.impl",
+        "fs.gs.auth.access.token.provider",
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
     config.set(
@@ -1708,19 +1719,21 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
             + UserGroupInformation.getCurrentUser().getGroupNames()[0],
         "test-service-account2");
 
-    URI gsUri = new URI("gs://foobar/");
+    Path gcsPath = new Path("gs://foobar/");
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+    ghfs.initialize(gcsPath.toUri(), config);
 
-    Exception exception =
-        assertThrows(GoogleJsonResponseException.class, () -> ghfs.initialize(gsUri, config));
-    assertThat(exception).hasMessageThat().startsWith("401 Unauthorized");
+    IOException thrown = assertThrows(IOException.class, () -> ghfs.listStatus(gcsPath));
+    HttpResponseException httpException = ApiErrorExtractor.getHttpResponseException(thrown);
+    assertThat(httpException).hasMessageThat().startsWith("401 Unauthorized");
   }
 
   @Test
   public void testImpersonationServiceAccountAndUserAndGroupNameIdentifierUsed() throws Exception {
     Configuration config = new Configuration();
+    config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
     config.setClass(
-        "fs.gs.auth.access.token.provider.impl",
+        "fs.gs.auth.access.token.provider",
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
     config.set(
@@ -1736,19 +1749,21 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
             + UserGroupInformation.getCurrentUser().getGroupNames()[0],
         "test-service-account3");
 
-    URI gsUri = new URI("gs://foobar/");
+    Path gcsPath = new Path("gs://foobar/");
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+    ghfs.initialize(gcsPath.toUri(), config);
 
-    Exception exception =
-        assertThrows(GoogleJsonResponseException.class, () -> ghfs.initialize(gsUri, config));
-    assertThat(exception).hasMessageThat().startsWith("401 Unauthorized");
+    IOException thrown = assertThrows(IOException.class, () -> ghfs.listStatus(gcsPath));
+    HttpResponseException httpException = ApiErrorExtractor.getHttpResponseException(thrown);
+    assertThat(httpException).hasMessageThat().startsWith("401 Unauthorized");
   }
 
   @Test
   public void testImpersonationInvalidUserNameIdentifierUsed() throws Exception {
     Configuration config = new Configuration();
+    config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
     config.setClass(
-        "fs.gs.auth.access.token.provider.impl",
+        "fs.gs.auth.access.token.provider",
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
     config.set(
@@ -1765,8 +1780,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     String publicBucket = "gs://gcp-public-data-landsat";
 
     Configuration config = new Configuration();
-    config.setBoolean("fs.gs.auth.service.account.enable", false);
-    config.setBoolean("fs.gs.auth.null.enable", true);
+    config.setEnum("fs.gs.auth.type", AuthenticationType.UNAUTHENTICATED);
 
     FileSystem fs = FileSystem.get(new URI(publicBucket), config);
 
@@ -1793,8 +1807,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     String publicBucket = "gs://gcp-public-data-landsat";
 
     Configuration config = new Configuration();
-    config.setBoolean("google.cloud.auth.service.account.enable", false);
-    config.setBoolean("google.cloud.auth.null.enable", true);
+    config.setEnum("google.cloud.auth.type", AuthenticationType.UNAUTHENTICATED);
 
     FileSystem fs = FileSystem.get(new URI(publicBucket), config);
 

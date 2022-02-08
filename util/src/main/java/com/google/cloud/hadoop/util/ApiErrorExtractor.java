@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.util;
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonError.ErrorInfo;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.HttpResponseException;
 import com.google.api.client.http.HttpStatusCodes;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -75,14 +76,14 @@ public class ApiErrorExtractor {
    * user error.
    */
   public boolean requestFailure(IOException e) {
-    GoogleJsonResponseException jsonException = getJsonResponseException(e);
-    return jsonException != null
-        && (accessDenied(jsonException)
-            || badRequest(jsonException)
-            || internalServerError(jsonException)
-            || rateLimited(jsonException)
-            || IoExceptionHelper.isSocketError(jsonException)
-            || unauthorized(jsonException));
+    HttpResponseException httpException = getHttpResponseException(e);
+    return httpException != null
+        && (accessDenied(httpException)
+            || badRequest(httpException)
+            || internalServerError(httpException)
+            || rateLimited(httpException)
+            || IoExceptionHelper.isSocketError(httpException)
+            || unauthorized(httpException));
   }
 
   /**
@@ -122,14 +123,14 @@ public class ApiErrorExtractor {
 
   /** Determines if the exception is a client error. */
   public boolean clientError(IOException e) {
-    GoogleJsonResponseException jsonException = getJsonResponseException(e);
-    return jsonException != null && getHttpStatusCode(jsonException) / 100 == 4;
+    HttpResponseException httpException = getHttpResponseException(e);
+    return httpException != null && getHttpStatusCode(httpException) / 100 == 4;
   }
 
   /** Determines if the exception is an internal server error. */
   public boolean internalServerError(IOException e) {
-    GoogleJsonResponseException jsonException = getJsonResponseException(e);
-    return jsonException != null && getHttpStatusCode(jsonException) / 100 == 5;
+    HttpResponseException httpException = getHttpResponseException(e);
+    return httpException != null && getHttpStatusCode(httpException) / 100 == 5;
   }
 
   /**
@@ -273,7 +274,7 @@ public class ApiErrorExtractor {
    * <p>Note: GoogleJsonResponseException.getStatusCode() method is marked final therefore it cannot
    * be mocked using Mockito. We use this helper so that we can override it in tests.
    */
-  protected int getHttpStatusCode(GoogleJsonResponseException e) {
+  protected int getHttpStatusCode(HttpResponseException e) {
     return e.getStatusCode();
   }
 
@@ -297,8 +298,8 @@ public class ApiErrorExtractor {
 
   /** Recursively checks getCause() if outer exception isn't an instance of the correct class. */
   protected boolean recursiveCheckForCode(IOException e, int code) {
-    GoogleJsonResponseException jsonException = getJsonResponseException(e);
-    return jsonException != null && getHttpStatusCode(jsonException) == code;
+    HttpResponseException httpException = getHttpResponseException(e);
+    return httpException != null && getHttpStatusCode(httpException) == code;
   }
 
   @Nullable
@@ -307,6 +308,18 @@ public class ApiErrorExtractor {
     while (cause != null) {
       if (cause instanceof GoogleJsonResponseException) {
         return (GoogleJsonResponseException) cause;
+      }
+      cause = cause.getCause();
+    }
+    return null;
+  }
+
+  @Nullable
+  public static HttpResponseException getHttpResponseException(Throwable throwable) {
+    Throwable cause = throwable;
+    while (cause != null) {
+      if (cause instanceof HttpResponseException) {
+        return (HttpResponseException) cause;
       }
       cause = cause.getCause();
     }

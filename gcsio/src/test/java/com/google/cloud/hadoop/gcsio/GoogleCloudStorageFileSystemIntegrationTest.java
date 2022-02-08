@@ -21,7 +21,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
-import com.google.api.client.auth.oauth2.Credential;
+import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
@@ -115,7 +115,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
         @Override
         public void before() throws Throwable {
           if (gcsfs == null) {
-            Credential credential = GoogleCloudStorageTestHelper.getCredential();
+            Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
             String projectId = checkNotNull(TestConfiguration.getInstance().getProjectId());
 
             GoogleCloudStorageFileSystemOptions.Builder optionsBuilder =
@@ -134,7 +134,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
                                 .build())
                         .build());
 
-            gcsfs = new GoogleCloudStorageFileSystem(credential, optionsBuilder.build());
+            gcsfs = new GoogleCloudStorageFileSystem(credentials, optionsBuilder.build());
 
             gcs = gcsfs.getGcs();
 

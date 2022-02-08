@@ -16,12 +16,12 @@ package com.google.cloud.hadoop.fs.gcs.contract;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_KEYFILE_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTHENTICATION_TYPE_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
 
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
+import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
 import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -44,13 +44,13 @@ public class GoogleContract extends AbstractBondedFSContract {
     if (testConf.getProjectId() != null) {
       conf.set(GCS_PROJECT_ID.getKey(), testConf.getProjectId());
     }
-    if (testConf.getServiceAccount() != null && testConf.getPrivateKeyFile() != null) {
-      conf.setBoolean(GCS_CONFIG_PREFIX + ENABLE_SERVICE_ACCOUNTS_SUFFIX.getKey(), true);
+    if (testConf.getServiceAccountJsonKeyFile() != null) {
+      conf.setEnum(
+          GCS_CONFIG_PREFIX + AUTHENTICATION_TYPE_SUFFIX.getKey(),
+          AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
       conf.set(
-          GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_EMAIL_SUFFIX.getKey(), testConf.getServiceAccount());
-      conf.set(
-          GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_KEYFILE_SUFFIX.getKey(),
-          testConf.getPrivateKeyFile());
+          GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.getKey(),
+          testConf.getServiceAccountJsonKeyFile());
     }
   }
 

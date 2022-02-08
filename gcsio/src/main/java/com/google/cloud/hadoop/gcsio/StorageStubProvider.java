@@ -2,22 +2,17 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.googleapis.compute.ComputeCredential;
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.ComputeEngineCredentials;
-import com.google.cloud.hadoop.util.CredentialAdapter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.google.storage.v2.StorageGrpc;
 import com.google.storage.v2.StorageGrpc.StorageBlockingStub;
 import com.google.storage.v2.StorageGrpc.StorageStub;
 import io.grpc.Grpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
-import io.grpc.Status;
 import io.grpc.alts.GoogleDefaultChannelBuilder;
 import io.grpc.alts.GoogleDefaultChannelCredentials;
 import io.grpc.auth.MoreCallCredentials;
@@ -26,9 +21,6 @@ import java.util.concurrent.ExecutorService;
 
 /** Provides gRPC stubs for accessing the Storage gRPC API. */
 class StorageStubProvider {
-
-  private static final ImmutableSet<Status.Code> STUB_BROKEN_ERROR_CODES =
-      ImmutableSet.of(Status.Code.DEADLINE_EXCEEDED, Status.Code.UNAVAILABLE);
 
   private final GoogleCloudStorageOptions options;
   private final ExecutorService backgroundTasksThreadPool;
@@ -56,10 +48,6 @@ class StorageStubProvider {
         .enableRetry()
         .userAgent(options.getAppName())
         .build();
-  }
-
-  public static boolean isStubBroken(Status.Code statusCode) {
-    return STUB_BROKEN_ERROR_CODES.contains(statusCode);
   }
 
   public StorageBlockingStub newBlockingStub() {
@@ -133,7 +121,8 @@ class StorageStubProvider {
 
     public ManagedChannelBuilder<?> createChannelBuilder(String target) {
       return Grpc.newChannelBuilder(
-          "google-c2p:///" + target, GoogleDefaultChannelCredentials.create());
+          // TODO(veblush): Remove experimental suffix once this code is proven stable.
+          "google-c2p-experimental:///" + target, GoogleDefaultChannelCredentials.create());
     }
 
     public AbstractStub<?> applyCallOption(AbstractStub<?> stub) {
@@ -144,40 +133,21 @@ class StorageStubProvider {
   public static StorageStubProvider newInstance(
       GoogleCloudStorageOptions options,
       ExecutorService backgroundTasksThreadPool,
-      Credential credential) {
-    boolean defaultServiceAccount =
-        credential != null
-            && java.util.Objects.equals(
-                credential.getTokenServerEncodedUrl(), ComputeCredential.TOKEN_SERVER_ENCODED_URL);
-    GrpcDecorator grpcDecorator =
-        getGrpcDecorator(
-            options,
-            defaultServiceAccount,
-            new CloudPathGrpcDecorator(new CredentialAdapter(credential)));
-    return new StorageStubProvider(options, backgroundTasksThreadPool, grpcDecorator);
-  }
-
-  public static StorageStubProvider newInstance(
-      GoogleCloudStorageOptions options,
-      ExecutorService backgroundTasksThreadPool,
       Credentials credentials) {
-    boolean defaultServiceAccount = credentials instanceof ComputeEngineCredentials;
     return new StorageStubProvider(
-        options,
-        backgroundTasksThreadPool,
-        getGrpcDecorator(options, defaultServiceAccount, new CloudPathGrpcDecorator(credentials)));
+        options, backgroundTasksThreadPool, getGrpcDecorator(options, credentials));
   }
 
   private static GrpcDecorator getGrpcDecorator(
-      GoogleCloudStorageOptions options,
-      boolean defaultServiceAccount,
-      CloudPathGrpcDecorator credential) {
-    if (options.isTrafficDirectorEnabled() && defaultServiceAccount) {
-      return new TrafficDirectorGrpcDecorator();
+      GoogleCloudStorageOptions options, Credentials credentials) {
+    if (credentials instanceof ComputeEngineCredentials) {
+      if (options.isTrafficDirectorEnabled()) {
+        return new TrafficDirectorGrpcDecorator();
+      }
+      if (options.isDirectPathPreferred()) {
+        return new DirectPathGrpcDecorator();
+      }
     }
-    if (options.isDirectPathPreferred() && defaultServiceAccount) {
-      return new DirectPathGrpcDecorator();
-    }
-    return credential;
+    return new CloudPathGrpcDecorator(credentials);
   }
 }

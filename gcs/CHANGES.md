@@ -35,6 +35,25 @@
     fs.gs.cooperative.locking.max.concurrent.operations
     ```
 
+1.  Migrate authentication to `com.google.auth.Credentials` and remove obsolete
+    properties:
+
+    ```
+    fs.gs.auth.service.account.email
+    fs.gs.auth.service.account.keyfile
+    fs.gs.auth.service.account.private.key
+    fs.gs.auth.service.account.private.key.id
+    ```
+
+1.  Refactor authentication configuration to use an explicit `fs.gs.auth.type`
+    enum property, instead of relying on inference of the authentication type
+    based on the set configuration properties, and remove obsolete properties:
+
+    ```
+    fs.gs.auth.null.enable
+    fs.gs.auth.service.account.enable
+    ```
+
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.
@@ -135,7 +154,7 @@
     ```
 
     If any of these properties are set, an access token will be generated for
-    the service account associated with specified user name or group name in
+    the service account associated with specified username or group name in
     order to access GCS. The caller who issues a request for the access token
     must have been granted the Service Account Token Creator role
     (`roles/iam.serviceAccountTokenCreator`) on the service account to
@@ -620,9 +639,9 @@
         version.
 
     *   `BEST_EFFORT`: The connector will try to read the generation determined
-        when the `GoogleCloudStorageReadChannel` is first established. However
+        when the `GoogleCloudStorageReadChannel` is first established. However,
         if that generation cannot be found anymore, connector will fall back to
-        read the live version. This mode allows to improve performance by
+        read the live version. This mode allows to improve the performance by
         requesting the same object generation from GCS. Using this mode
         connector can read changing objects from GCS buckets with disabled
         object versioning without failure.
@@ -934,8 +953,8 @@
     `CacheSupplementedGoogleCloudStorage` which only serves as an advisory cache
     for enforcement of list consistency, the new optional caching layer is able
     to serving certain metadata and listing requests purely out of a short-lived
-    in-memory cache to enhance performance of some workloads. By default this
-    feature is disabled, and can be controlled with the config settings:
+    in-memory cache to enhance performance of some workloads. This feature is
+    disabled by default, and can be controlled with the config settings:
 
     ```
     fs.gs.performance.cache.enable=true (default: false)
@@ -1008,7 +1027,7 @@
 ### 1.5.2 - 2016-08-23
 
 1.  Updated `AbstractGoogleAsyncWriteChannel` to always set the
-    `X-Goog-Upload-Desired-Chunk-Granularity` header independently from the
+    `X-Goog-Upload-Desired-Chunk-Granularity` header independently of the
     deprecated `X-Goog-Upload-Max-Raw-Size`; in general this improves
     performance of large uploads.
 
@@ -1111,7 +1130,7 @@
     ```
 
     This key should point to a file that is available locally to jobs to
-    clusters.
+    cluster.
 
 ### 1.4.3 - 2015-11-12
 
@@ -1184,7 +1203,7 @@
 1.  The new inferImplicitDirectories option to `GoogleCloudStorage` tells it to
     infer the existence of a directory (such as `foo`) when that directory node
     does not exist in GCS but there are GCS files that start with that path
-    (such as as `foo/bar`). This allows the GCS connector to be used on
+    (such as `foo/bar`). This allows the GCS connector to be used on
     read-only filesystems where those intermediate directory nodes can not be
     created by the connector. The value of this option can be controlled by the
     Hadoop boolean config option `fs.gs.implicit.dir.infer.enable`. The default
@@ -1243,8 +1262,8 @@
     `core-site.xml` will re-enable marker files. The use of marker files should
     be considered for applications that depend on early failing when two
     concurrent writes attempt to write to the same file. Note that file
-    overwrite semantics are preserved with or without marker files, but failures
-    will occur sooner with marker files present.
+    overwrites semantics are preserved with or without marker files, but
+    failures will occur sooner with marker files present.
 
 ### 1.3.1 - 2014-12-16
 
@@ -1291,7 +1310,7 @@
     configured with a "consistent view", making it safe to use GCS as the
     `DEFAULT_FS` for arbitrary multi-stage or even multi-platform workloads.
     This is now enabled by default for machine-wide consistency, but it is
-    strongly recommended to configure clusters with an NFS directory for
+    strongly recommended configuring clusters with an NFS directory for
     cluster-wide strong consistency. Relevant configuration settings:
 
     ```
@@ -1379,7 +1398,7 @@
 1.  Implemented new version of globStatus which initially performs a flat
     listing before performing the recursive glob logic in-memory to dramatically
     speed up globs with lots of directories; the new behavior is default, but
-    can disabled by setting `fs.gs.glob.flatlist.enable=false`.
+    can be disabled by setting `fs.gs.glob.flatlist.enable=false`.
 
 ### 1.2.4 - 2014-04-09
 
@@ -1393,7 +1412,7 @@
 
 1.  Fixed a bug where renaming a directory could cause the file contents to get
     shuffled between files when the fully-qualified file paths have different
-    lengths. Does not apply to renames on files directly, such as when using a
+    lengths. Does not apply to rename on files directly, such as when using a
     glob expression inside a flat directory.
 
 1.  Changed the behavior of batch request API calls such that they are retried
@@ -1411,7 +1430,7 @@
     of 8MB, just printing out a warning instead of check-failing.
 
 1.  Added some debug-level logging of exceptions before throwing in cases where
-    Hadoop tends to swallows the exception along with its useful info.
+    Hadoop tends to swallow the exception along with its useful info.
 
 ### 1.2.1 - 2014-01-23
 
