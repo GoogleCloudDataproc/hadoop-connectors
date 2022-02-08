@@ -765,10 +765,15 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
     if (storageOptions.isGrpcEnabled()) {
       return itemInfo == null
-          ? GoogleCloudStorageGrpcReadChannel.open(
-              storageStubProvider, storage, errorExtractor, resourceId, watchdog, readOptions)
-          : GoogleCloudStorageGrpcReadChannel.open(
-              storageStubProvider, storage, itemInfo, watchdog, readOptions);
+          ? new GoogleCloudStorageGrpcReadChannel(
+              storageStubProvider,
+              storage,
+              resourceId,
+              watchdog,
+              readOptions,
+              BackOffFactory.DEFAULT)
+          : new GoogleCloudStorageGrpcReadChannel(
+              storageStubProvider, itemInfo, watchdog, readOptions, BackOffFactory.DEFAULT);
     }
 
     return new GoogleCloudStorageReadChannel(
