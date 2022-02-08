@@ -12,12 +12,12 @@ must do one of the following:
     to the
     [Cloud Storage scope](https://cloud.google.com/storage/docs/authentication#oauth)
     you intend to use the connector for. When running inside of Google Compute
-    Engine VMs, including Dataproc clusters,
-    `google.cloud.auth.service.account.enable` is set to false by default, which
-    means you don't need to manually configure a service account for the
-    connector; it will automatically get the service account credentials from the
-    metadata server of the VM. But you must need to make sure the VM service
-    account has permission to access the GCS bucket.
+    Engine VMs, including Dataproc clusters, `google.cloud.auth.type` is set to
+    `COMPUTE_ENGINE` by default, which means you don't need to manually
+    configure a service account for the connector; it will automatically get the
+    service account credentials from the metadata server of the GCE VM. But you
+    must need to make sure the VM service account has permission to access the
+    GCS bucket.
 *   **non-Google Cloud Platform** - Obtain an
     [OAuth 2.0 private key](https://cloud.google.com/storage/docs/authentication#generating-a-private-key).
     Installing the connector on a machine other than a GCE VM can lead to higher
@@ -39,11 +39,8 @@ Google Cloud Storage. You can follow
 [these directions](https://cloud.google.com/storage/docs/authentication#service_accounts)
 to obtain a JSON keyfile.
 
-Once you have the JSON key file, you can configure framework that you use to use
+Once you have the JSON keyfile, you can configure framework that you use to use
 GCS connector when accessing data on Google Cloud Storage.
-
-You can alternatively set the environment variable
-`GOOGLE_APPLICATION_CREDENTIALS` to your keyfile (`/path/to/keyfile.json`).
 
 Additional properties can be specified for the Cloud Storage connector,
 including alternative authentication options. For more information, see the
@@ -69,20 +66,18 @@ properties in `core-site.xml` on your Hadoop cluster:
   </description>
 </property>
 <property>
-  <name>google.cloud.auth.service.account.enable</name>
-  <value>true</value>
+  <name>google.cloud.auth.type</name>
+  <value>SERVICE_ACCOUNT_JSON_KEYFILE</value>
   <description>
-    Whether to use a service account for GCS authorization.
-    Setting this property to `false` will disable use of service accounts for
-    authentication.
+    Authentication type to use for GCS access.
   </description>
 </property>
 <property>
   <name>google.cloud.auth.service.account.json.keyfile</name>
   <value>/path/to/keyfile</value>
   <description>
-    The JSON key file of the service account used for GCS
-    access when google.cloud.auth.service.account.enable is true.
+    The JSON keyfile of the service account used for GCS
+    access when google.cloud.auth.type is SERVICE_ACCOUNT_JSON_KEYFILE.
   </description>
 </property>
 ```
@@ -108,7 +103,7 @@ spark.hadoop.fs.gs.project.id=
 # property to `false` will disable use of service accounts for authentication.
 spark.hadoop.google.cloud.auth.service.account.enable=true
 
-# The JSON key file of the service account used for GCS
+# The JSON keyfile of the service account used for GCS
 # access when google.cloud.auth.service.account.enable is true.
 spark.hadoop.google.cloud.auth.service.account.json.keyfile=/path/to/keyfile
 ```

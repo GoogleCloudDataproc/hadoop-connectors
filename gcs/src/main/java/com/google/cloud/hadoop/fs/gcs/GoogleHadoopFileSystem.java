@@ -18,7 +18,6 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.OutputStreamType.FLUSHABLE_COMPOSITE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.CONFIG_KEY_PREFIXES;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE;
@@ -29,9 +28,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT;
 import static com.google.cloud.hadoop.gcsio.CreateFileOptions.DEFAULT_OVERWRITE;
-import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.CLOUD_PLATFORM_SCOPE;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -41,10 +38,7 @@ import static com.google.common.flogger.LazyArgs.lazy;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
-import com.google.api.client.http.HttpTransport;
-import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
-import com.google.auth.oauth2.ImpersonatedCredentials;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
@@ -53,18 +47,16 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.ListFileOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
 import com.google.cloud.hadoop.gcsio.UriPaths;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
-import com.google.cloud.hadoop.util.AccessTokenProviderCredentialsFactory;
+import com.google.cloud.hadoop.util.AccessTokenProvider.AccessTokenType;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
-import com.google.cloud.hadoop.util.CredentialsFactory;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration;
-import com.google.cloud.hadoop.util.HttpTransportFactory;
+import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AccessTokenProviderCredentials;
 import com.google.cloud.hadoop.util.PropertyUtil;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ascii;
@@ -83,7 +75,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
 import java.nio.file.DirectoryNotEmptyException;
-import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -104,7 +95,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
@@ -349,23 +339,35 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     GoogleCloudStorageFileSystemOptions gcsFsOptions =
         GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
 
-    AccessTokenProvider accessTokenProvider = getAccessTokenProvider(config);
+    GoogleCredentials credentials = getCredentials(config);
 
-    Credentials credentials;
-    try {
-      credentials = getCredentials(config, gcsFsOptions, accessTokenProvider);
-    } catch (GeneralSecurityException e) {
-      throw new RuntimeException(e);
-    }
+    AccessTokenProvider accessTokenProvider =
+        credentials instanceof AccessTokenProviderCredentials
+            ? ((AccessTokenProviderCredentials) credentials).getAccessTokenProvider()
+            : null;
+    return accessTokenProvider != null
+            && accessTokenProvider.getAccessTokenType() == AccessTokenType.DOWNSCOPED
+        ? new GoogleCloudStorageFileSystem(
+            /* credentials= */ null,
+            accessBoundaries -> accessTokenProvider.getAccessToken(accessBoundaries).getToken(),
+            gcsFsOptions)
+        : new GoogleCloudStorageFileSystem(
+            credentials, /* downscopedAccessTokenFn= */ null, gcsFsOptions);
+  }
 
-    return new GoogleCloudStorageFileSystem(
-        credentials,
-        accessTokenProvider != null
-                && accessTokenProvider.getAccessTokenType()
-                    == AccessTokenProvider.AccessTokenType.DOWNSCOPED
-            ? accessBoundaries -> accessTokenProvider.getAccessToken(accessBoundaries).getToken()
-            : null,
-        gcsFsOptions);
+  private GoogleCredentials getCredentials(Configuration config) throws IOException {
+    AccessTokenProvider delegationAccessTokenProvider = getDelegationAccessTokenProvider(config);
+    GoogleCredentials credentials =
+        delegationAccessTokenProvider == null
+            ? HadoopCredentialsConfiguration.getCredentials(config, GCS_CONFIG_PREFIX)
+            // If impersonation service account exists, then use current credentials
+            // to request access token for the impersonating service account.
+            : new AccessTokenProviderCredentials(delegationAccessTokenProvider)
+                .createScoped(CLOUD_PLATFORM_SCOPE);
+    return Optional.ofNullable(
+            HadoopCredentialsConfiguration.getImpersonatedCredentials(
+                config, credentials, GCS_CONFIG_PREFIX))
+        .orElse(credentials);
   }
 
   private static String validatePathCapabilityArgs(Path path, String capability) {
@@ -396,82 +398,6 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     return String.format(
         "path: %s, isDir: %s, len: %d, owner: %s",
         fileStatus.getPath(), fileStatus.isDirectory(), fileStatus.getLen(), fileStatus.getOwner());
-  }
-
-  /**
-   * Generate a {@link GoogleCredentials} from the internal access token provider based on the
-   * service account to impersonate.
-   */
-  private static Optional<GoogleCredentials> getImpersonatedCredentials(
-      Configuration config,
-      GoogleCloudStorageFileSystemOptions gcsFsOptions,
-      GoogleCredentials credentials)
-      throws IOException {
-    Map<String, String> userImpersonationServiceAccounts =
-        USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
-            .withPrefixes(CONFIG_KEY_PREFIXES)
-            .getPropsWithPrefix(config);
-    Map<String, String> groupImpersonationServiceAccounts =
-        GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
-            .withPrefixes(CONFIG_KEY_PREFIXES)
-            .getPropsWithPrefix(config);
-    String impersonationServiceAccount =
-        IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
-            .withPrefixes(CONFIG_KEY_PREFIXES)
-            .get(config, config::get);
-
-    // Exit early if impersonation is not configured
-    if (userImpersonationServiceAccounts.isEmpty()
-        && groupImpersonationServiceAccounts.isEmpty()
-        && isNullOrEmpty(impersonationServiceAccount)) {
-      return Optional.empty();
-    }
-
-    UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
-    Optional<String> serviceAccountToImpersonate =
-        Stream.of(
-                () ->
-                    getServiceAccountToImpersonateForUserGroup(
-                        userImpersonationServiceAccounts,
-                        ImmutableList.of(currentUser.getShortUserName())),
-                () ->
-                    getServiceAccountToImpersonateForUserGroup(
-                        groupImpersonationServiceAccounts,
-                        ImmutableList.copyOf(currentUser.getGroupNames())),
-                (Supplier<Optional<String>>) () -> Optional.ofNullable(impersonationServiceAccount))
-            .map(Supplier::get)
-            .filter(Optional::isPresent)
-            .map(Optional::get)
-            .filter(sa -> !isNullOrEmpty(sa))
-            .findFirst();
-
-    if (serviceAccountToImpersonate.isPresent()) {
-      GoogleCloudStorageOptions options = gcsFsOptions.getCloudStorageOptions();
-      HttpTransport httpTransport =
-          HttpTransportFactory.createHttpTransport(
-              options.getProxyAddress(), options.getProxyUsername(), options.getProxyPassword());
-      ImpersonatedCredentials impersonatedCredentials =
-          ImpersonatedCredentials.newBuilder()
-              .setSourceCredentials(credentials)
-              .setTargetPrincipal(serviceAccountToImpersonate.get())
-              .setScopes(ImmutableList.of(CredentialsFactory.CLOUD_PLATFORM_SCOPE))
-              .setHttpTransportFactory(() -> httpTransport)
-              .build();
-      logger.atFine().log(
-          "Impersonating '%s' service account for '%s' user",
-          serviceAccountToImpersonate.get(), currentUser);
-      return Optional.of(impersonatedCredentials);
-    }
-
-    return Optional.empty();
-  }
-
-  private static Optional<String> getServiceAccountToImpersonateForUserGroup(
-      Map<String, String> serviceAccountMapping, List<String> userGroups) {
-    return serviceAccountMapping.entrySet().stream()
-        .filter(e -> userGroups.contains(e.getKey()))
-        .map(Map.Entry::getValue)
-        .findFirst();
   }
 
   private static FileChecksum getFileChecksum(GcsFileChecksumType type, FileInfo fileInfo)
@@ -1518,94 +1444,16 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   }
 
   /**
-   * Loads an {@link AccessTokenProvider} implementation. If the user provided an
-   * AbstractDelegationTokenBinding we get the AccessTokenProvider, otherwise if a class name is
-   * provided (See {@link HadoopCredentialsConfiguration#ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX}) then we
-   * use it, otherwise it's null.
+   * Loads an {@link AccessTokenProvider} implementation retrieved from the provided {@code
+   * AbstractDelegationTokenBinding} if configured, otherwise it's null.
    */
-  private AccessTokenProvider getAccessTokenProvider(Configuration config) throws IOException {
-    // Check if delegation token support is configured
+  private AccessTokenProvider getDelegationAccessTokenProvider(Configuration config) {
     AccessTokenProvider accessTokenProvider =
-        delegationTokens != null
-            // If so, use the delegation token to acquire the Google credentials
-            ? delegationTokens.getAccessTokenProvider()
-            // If delegation token support is not configured, check if a
-            // custom AccessTokenProvider implementation is configured
-            : HadoopCredentialsConfiguration.getAccessTokenProvider(
-                config, ImmutableList.of(GCS_CONFIG_PREFIX));
-
+        delegationTokens == null ? null : delegationTokens.getAccessTokenProvider();
     if (accessTokenProvider != null) {
-      if (accessTokenProvider.getAccessTokenType()
-          == AccessTokenProvider.AccessTokenType.DOWNSCOPED) {
-        checkArgument(
-            HadoopCredentialsConfiguration.ENABLE_NULL_CREDENTIALS_SUFFIX
-                    .withPrefixes(
-                        HadoopCredentialsConfiguration.getConfigKeyPrefixes(GCS_CONFIG_PREFIX))
-                    .get(config, config::getBoolean)
-                && !HadoopCredentialsConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX
-                    .withPrefixes(
-                        HadoopCredentialsConfiguration.getConfigKeyPrefixes(GCS_CONFIG_PREFIX))
-                    .get(config, config::getBoolean),
-            "When using DOWNSCOPED access token, `fs.gs.auth.null.enabled` should"
-                + " be set to true and `fs.gs.auth.service.account.enable` should be set to false");
-      }
-
       accessTokenProvider.setConf(config);
     }
-
     return accessTokenProvider;
-  }
-
-  /**
-   * Retrieve user's Credentials. If user implemented {@link AccessTokenProvider} and provided the
-   * class name (See {@link HadoopCredentialsConfiguration#ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX}) then
-   * build a credentials with access token provided by this provider; Otherwise obtain credentials
-   * through {@link HadoopCredentialsConfiguration#getCredentialsFactory(Configuration, String...)}.
-   */
-  private GoogleCredentials getCredentials(
-      Configuration config,
-      GoogleCloudStorageFileSystemOptions gcsFsOptions,
-      AccessTokenProvider accessTokenProvider)
-      throws IOException, GeneralSecurityException {
-    GoogleCredentials credentials;
-
-    if (accessTokenProvider == null) {
-      // If delegation token support is not configured, check if a
-      // custom AccessTokenProvider implementation is configured, and attempt
-      // to acquire the GoogleCredentials using it
-      credentials =
-          AccessTokenProviderCredentialsFactory.credentials(
-              config, ImmutableList.of(GCS_CONFIG_PREFIX));
-
-      if (credentials == null) {
-        // Finally, if no credentials have been acquired at this point, employ
-        // the default mechanism.
-        credentials =
-            HadoopCredentialsConfiguration.getCredentialsFactory(config, GCS_CONFIG_PREFIX)
-                .getCredentials();
-      }
-    } else {
-      switch (accessTokenProvider.getAccessTokenType()) {
-        case GENERIC:
-          // check if an AccessTokenProvider is configured
-          // if so, try to get the credentials through the access token provider
-          credentials = AccessTokenProviderCredentialsFactory.credentials(accessTokenProvider);
-          break;
-        case DOWNSCOPED:
-          // If the AccessTokenType is set to DOWNSCOPED, Credentials will be generated
-          // when GCS requests are created.
-          credentials = null;
-          break;
-        default:
-          throw new IllegalStateException(
-              String.format(
-                  "Unknown AccessTokenType: %s", accessTokenProvider.getAccessTokenType()));
-      }
-    }
-
-    // If impersonation service account exists, then use current credentials to request access token
-    // for the impersonating service account.
-    return getImpersonatedCredentials(config, gcsFsOptions, credentials).orElse(credentials);
   }
 
   /** Assert that the FileSystem has been initialized and not close()d. */

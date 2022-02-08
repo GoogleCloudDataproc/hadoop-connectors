@@ -22,13 +22,10 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.bigquery.Bigquery;
 import com.google.auth.Credentials;
-import com.google.auth.oauth2.GoogleCredentials;
-import com.google.cloud.hadoop.util.AccessTokenProviderCredentialsFactory;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration;
 import com.google.cloud.hadoop.util.PropertyUtil;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -37,7 +34,7 @@ import org.apache.hadoop.conf.Configuration;
 /** Helper class to get BigQuery from environment credentials. */
 public class BigQueryFactory {
 
-  // Environment variable name for variable specifying path of SA JSON key file for BigQuery
+  // Environment variable name for variable specifying path of SA JSON keyfile for BigQuery
   // authentication.
   public static final String BIGQUERY_SERVICE_ACCOUNT_JSON_KEYFILE =
       "BIGQUERY_SERVICE_ACCOUNT_JSON_KEYFILE";
@@ -80,15 +77,8 @@ public class BigQueryFactory {
    * @throws IOException on IO Error.
    * @throws GeneralSecurityException on General Security Error.
    */
-  public Credentials createBigQueryCredentials(Configuration config)
-      throws GeneralSecurityException, IOException {
-    GoogleCredentials credentials =
-        AccessTokenProviderCredentialsFactory.credentials(
-            config, ImmutableList.of(BIGQUERY_CONFIG_PREFIX));
-    return credentials == null
-        ? HadoopCredentialsConfiguration.getCredentialsFactory(config, BIGQUERY_CONFIG_PREFIX)
-            .getCredentials()
-        : credentials;
+  public Credentials createBigQueryCredentials(Configuration config) throws IOException {
+    return HadoopCredentialsConfiguration.getCredentials(config, BIGQUERY_CONFIG_PREFIX);
   }
 
   /** Constructs a BigQueryHelper from a raw Bigquery constructed with {@link #getBigQuery}. */

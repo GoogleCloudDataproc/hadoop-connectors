@@ -14,13 +14,34 @@
 
 package com.google.cloud.hadoop.util;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Strings.isNullOrEmpty;
+
+import com.google.api.client.http.HttpTransport;
+import com.google.auth.oauth2.AccessToken;
+import com.google.auth.oauth2.ComputeEngineCredentials;
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.oauth2.ImpersonatedCredentials;
+import com.google.auth.oauth2.ServiceAccountCredentials;
+import com.google.auth.oauth2.UserCredentials;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.flogger.GoogleLogger;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URI;
+import java.time.Instant;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Supplier;
+import java.util.stream.Stream;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.UserGroupInformation;
 
 /**
  * The Hadoop credentials configuration.
@@ -34,25 +55,24 @@ import org.apache.hadoop.conf.Configuration;
  */
 public class HadoopCredentialsConfiguration {
 
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
   /**
    * All instances constructed using the builder will use {@code google.cloud} as the first prefix
-   * checked. Other prefixes can be added and will override values in the google.cloud prefix.
+   * checked. Other prefixes can be added and will override values in the {@code google.cloud}
+   * prefix.
    */
   public static final String BASE_KEY_PREFIX = "google.cloud";
 
-  /**
-   * Key suffix for enabling GCE service account authentication. A value of {@code false} will
-   * disable the use of the service accounts for authentication. The default value is {@code true} -
-   * use a service account for authentication.
-   */
-  public static final HadoopConfigurationProperty<Boolean> ENABLE_SERVICE_ACCOUNTS_SUFFIX =
-      new HadoopConfigurationProperty<>(
-          ".auth.service.account.enable",
-          CredentialsOptions.SERVICE_ACCOUNT_ENABLED_DEFAULT,
-          ".enable.service.account.auth");
+  public static final String CLOUD_PLATFORM_SCOPE =
+      "https://www.googleapis.com/auth/cloud-platform";
+
+  /** Key suffix used to configure authentication type. */
+  public static final HadoopConfigurationProperty<AuthenticationType> AUTHENTICATION_TYPE_SUFFIX =
+      new HadoopConfigurationProperty<>(".auth.type", AuthenticationType.COMPUTE_ENGINE);
 
   /**
-   * Key suffix used to indicate the path to a JSON file containing a Service Account key and
+   * Key suffix used to configure the path to a JSON file containing a Service Account key and
    * identifier (email). Technically, this could be a JSON containing a non-service account user,
    * but this setting is only used in the service account flow and is namespaced as such.
    */
@@ -60,46 +80,16 @@ public class HadoopCredentialsConfiguration {
       new HadoopConfigurationProperty<>(".auth.service.account.json.keyfile");
 
   /**
-   * The key suffix allowing null to be returned from credentials creation to allow unauthenticated
-   * access.
+   * Key suffix used to configure {@link AccessTokenProvider} that will be used to generate {@link
+   * AccessTokenProvider.AccessToken}s.
    */
-  public static final HadoopConfigurationProperty<Boolean> ENABLE_NULL_CREDENTIALS_SUFFIX =
-      new HadoopConfigurationProperty<>(
-          ".auth.null.enable", CredentialsOptions.NULL_CREDENTIALS_ENABLED_DEFAULT);
-
-  /** Configuration key for setting a token server URL to use to refresh OAuth token. */
-  public static final HadoopConfigurationProperty<String> TOKEN_SERVER_URL_SUFFIX =
-      new HadoopConfigurationProperty<>(".token.server.url");
-
-  /**
-   * Configuration key for setting a proxy for the connector to use to connect to GCS. The proxy
-   * must be an HTTP proxy of the form "host:port".
-   */
-  public static final HadoopConfigurationProperty<String> PROXY_ADDRESS_SUFFIX =
-      new HadoopConfigurationProperty<>(".proxy.address");
-
-  /**
-   * Configuration key for setting a proxy username for the connector to use to authenticate with
-   * proxy used to connect to GCS.
-   */
-  public static final HadoopConfigurationProperty<String> PROXY_USERNAME_SUFFIX =
-      new HadoopConfigurationProperty<>(".proxy.username");
-
-  /**
-   * Configuration key for setting a proxy password for the connector to use to authenticate with
-   * proxy used to connect to GCS.
-   */
-  public static final HadoopConfigurationProperty<String> PROXY_PASSWORD_SUFFIX =
-      new HadoopConfigurationProperty<>(".proxy.password");
-
-  /** Configuration key for the name of the AccessTokenProvider to use to generate AccessTokens. */
   public static final HadoopConfigurationProperty<Class<? extends AccessTokenProvider>>
-      ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX =
-          new HadoopConfigurationProperty<>(".auth.access.token.provider.impl");
+      ACCESS_TOKEN_PROVIDER_SUFFIX =
+          new HadoopConfigurationProperty<>(".auth.access.token.provider");
 
   /**
-   * Key suffix specifying the impersonating service account with which to call GCS API to get
-   * access token.
+   * Key suffix used to configure the impersonating service account with which to call GCS API to
+   * get access token.
    */
   public static final HadoopConfigurationProperty<String> IMPERSONATION_SERVICE_ACCOUNT_SUFFIX =
       new HadoopConfigurationProperty<>(".auth.impersonation.service.account");
@@ -122,62 +112,239 @@ public class HadoopCredentialsConfiguration {
           new HadoopConfigurationProperty<>(
               ".auth.impersonation.service.account.for.group.", ImmutableMap.of());
 
-  public static CredentialsFactory getCredentialsFactory(
-      Configuration config, String... keyPrefixesVararg) {
-    CredentialsOptions credentialsOptions = getCredentialsOptions(config, keyPrefixesVararg);
-    return new CredentialsFactory(credentialsOptions);
-  }
+  /** Key suffix for setting a token server URL to use to refresh OAuth token. */
+  public static final HadoopConfigurationProperty<String> TOKEN_SERVER_URL_SUFFIX =
+      new HadoopConfigurationProperty<>(".token.server.url");
 
-  @VisibleForTesting
-  static CredentialsOptions getCredentialsOptions(
-      Configuration config, String... keyPrefixesVararg) {
-    List<String> keyPrefixes = getConfigKeyPrefixes(keyPrefixesVararg);
-    return CredentialsOptions.builder()
-        .setServiceAccountEnabled(
-            ENABLE_SERVICE_ACCOUNTS_SUFFIX
-                .withPrefixes(keyPrefixes)
-                .get(config, config::getBoolean))
-        .setServiceAccountJsonKeyFile(
-            SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
-        .setNullCredentialsEnabled(
-            ENABLE_NULL_CREDENTIALS_SUFFIX
-                .withPrefixes(keyPrefixes)
-                .get(config, config::getBoolean))
-        .setTokenServerUrl(
-            TOKEN_SERVER_URL_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
-        .setProxyAddress(PROXY_ADDRESS_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
-        .setProxyUsername(PROXY_USERNAME_SUFFIX.withPrefixes(keyPrefixes).getPassword(config))
-        .setProxyPassword(PROXY_PASSWORD_SUFFIX.withPrefixes(keyPrefixes).getPassword(config))
-        .build();
-  }
+  /**
+   * Key suffix for setting a proxy for the connector to use to connect to GCS. The proxy must be an
+   * HTTP proxy of the form "host:port".
+   */
+  public static final HadoopConfigurationProperty<String> PROXY_ADDRESS_SUFFIX =
+      new HadoopConfigurationProperty<>(".proxy.address");
 
-  /** Creates an {@link AccessTokenProvider} based on the configuration. */
-  public static AccessTokenProvider getAccessTokenProvider(
-      Configuration config, List<String> keyPrefixes) throws IOException {
-    Class<? extends AccessTokenProvider> clazz =
-        getAccessTokenProviderImplClass(config, keyPrefixes.toArray(new String[0]));
-    if (clazz == null) {
-      return null;
-    }
-    try {
-      return clazz.getDeclaredConstructor().newInstance();
-    } catch (ReflectiveOperationException ex) {
-      throw new IOException("Can't instantiate " + clazz.getName(), ex);
-    }
-  }
+  /**
+   * Key suffix for setting a proxy username for the connector to use to authenticate with proxy
+   * used to connect to GCS.
+   */
+  public static final HadoopConfigurationProperty<String> PROXY_USERNAME_SUFFIX =
+      new HadoopConfigurationProperty<>(".proxy.username");
 
-  public static Class<? extends AccessTokenProvider> getAccessTokenProviderImplClass(
-      Configuration config, String... keyPrefixes) {
-    return ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX
-        .withPrefixes(getConfigKeyPrefixes(keyPrefixes))
-        .get(config, (k, d) -> config.getClass(k, d, AccessTokenProvider.class));
-  }
+  /**
+   * Key suffix for setting a proxy password for the connector to use to authenticate with proxy
+   * used to connect to GCS.
+   */
+  public static final HadoopConfigurationProperty<String> PROXY_PASSWORD_SUFFIX =
+      new HadoopConfigurationProperty<>(".proxy.password");
 
   /**
    * Returns full list of config prefixes that will be resolved based on the order in returned list.
    */
-  public static ImmutableList<String> getConfigKeyPrefixes(String... keyPrefixes) {
+  public static List<String> getConfigKeyPrefixes(String... keyPrefixes) {
     return ImmutableList.<String>builder().add(keyPrefixes).add(BASE_KEY_PREFIX).build();
+  }
+
+  /**
+   * Get the credentials for the configured {@link AuthenticationType}
+   *
+   * @throws IllegalStateException if configured {@link AuthenticationType} is not recognized
+   */
+  public static GoogleCredentials getCredentials(Configuration config, String... keyPrefixesVararg)
+      throws IOException {
+    List<String> keyPrefixes = getConfigKeyPrefixes(keyPrefixesVararg);
+    return getCredentials(getHttpTransport(config, keyPrefixes), config, keyPrefixes);
+  }
+
+  @VisibleForTesting
+  static GoogleCredentials getCredentials(
+      Supplier<HttpTransport> transport, Configuration config, List<String> keyPrefixes)
+      throws IOException {
+    GoogleCredentials credentials = getCredentialsInternal(transport, config, keyPrefixes);
+    return credentials == null ? null : configureCredentials(config, keyPrefixes, credentials);
+  }
+
+  private static GoogleCredentials getCredentialsInternal(
+      Supplier<HttpTransport> transport, Configuration config, List<String> keyPrefixes)
+      throws IOException {
+    AuthenticationType authenticationType =
+        AUTHENTICATION_TYPE_SUFFIX.withPrefixes(keyPrefixes).get(config, config::getEnum);
+    switch (authenticationType) {
+      case ACCESS_TOKEN_PROVIDER:
+        Class<? extends AccessTokenProvider> clazz =
+            ACCESS_TOKEN_PROVIDER_SUFFIX
+                .withPrefixes(keyPrefixes)
+                .get(config, (k, d) -> config.getClass(k, d, AccessTokenProvider.class));
+        AccessTokenProvider accessTokenProvider;
+        try {
+          accessTokenProvider = clazz.getDeclaredConstructor().newInstance();
+        } catch (ReflectiveOperationException e) {
+          throw new IOException("Can't instantiate " + clazz.getName(), e);
+        }
+        accessTokenProvider.setConf(config);
+        return new AccessTokenProviderCredentials(accessTokenProvider)
+            .createScoped(CLOUD_PLATFORM_SCOPE);
+      case APPLICATION_DEFAULT:
+        return GoogleCredentials.getApplicationDefault(transport::get)
+            .createScoped(CLOUD_PLATFORM_SCOPE);
+      case COMPUTE_ENGINE:
+        return ComputeEngineCredentials.newBuilder()
+            .setHttpTransportFactory(transport::get)
+            .build();
+      case SERVICE_ACCOUNT_JSON_KEYFILE:
+        String keyFile =
+            SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get);
+        try (FileInputStream fis = new FileInputStream(keyFile)) {
+          return ServiceAccountCredentials.fromStream(fis, transport::get)
+              .createScoped(CLOUD_PLATFORM_SCOPE);
+        }
+      case UNAUTHENTICATED:
+        return null;
+      default:
+        throw new IllegalArgumentException("Unknown authentication type: " + authenticationType);
+    }
+  }
+
+  /**
+   * Create a {@link ImpersonatedCredentials} based on service account to impersonate configuration
+   */
+  public static GoogleCredentials getImpersonatedCredentials(
+      Configuration config, GoogleCredentials sourceCredentials, String... keyPrefixesVararg)
+      throws IOException {
+    List<String> keyPrefixes = getConfigKeyPrefixes(keyPrefixesVararg);
+    Map<String, String> userImpersonationServiceAccounts =
+        USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
+            .withPrefixes(keyPrefixes)
+            .getPropsWithPrefix(config);
+    Map<String, String> groupImpersonationServiceAccounts =
+        GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
+            .withPrefixes(keyPrefixes)
+            .getPropsWithPrefix(config);
+    String impersonationServiceAccount =
+        IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get);
+
+    // Exit early if impersonation is not configured
+    if (userImpersonationServiceAccounts.isEmpty()
+        && groupImpersonationServiceAccounts.isEmpty()
+        && isNullOrEmpty(impersonationServiceAccount)) {
+      return null;
+    }
+
+    checkNotNull(sourceCredentials, "credentials can not be null");
+    UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
+    Optional<String> serviceAccountToImpersonate =
+        Stream.of(
+                () ->
+                    getServiceAccountToImpersonateForUserGroup(
+                        userImpersonationServiceAccounts,
+                        ImmutableList.of(currentUser.getShortUserName())),
+                () ->
+                    getServiceAccountToImpersonateForUserGroup(
+                        groupImpersonationServiceAccounts,
+                        ImmutableList.copyOf(currentUser.getGroupNames())),
+                (Supplier<Optional<String>>) () -> Optional.ofNullable(impersonationServiceAccount))
+            .map(Supplier::get)
+            .filter(Optional::isPresent)
+            .map(Optional::get)
+            .filter(sa -> !isNullOrEmpty(sa))
+            .findFirst();
+
+    if (serviceAccountToImpersonate.isPresent()) {
+      Supplier<HttpTransport> transport = getHttpTransport(config, keyPrefixes);
+      ImpersonatedCredentials impersonatedCredentials =
+          ImpersonatedCredentials.newBuilder()
+              .setSourceCredentials(sourceCredentials)
+              .setTargetPrincipal(serviceAccountToImpersonate.get())
+              .setScopes(ImmutableList.of(CLOUD_PLATFORM_SCOPE))
+              .setHttpTransportFactory(transport::get)
+              .build();
+      logger.atFine().log(
+          "Impersonating '%s' service account for '%s' user",
+          serviceAccountToImpersonate.get(), currentUser);
+      return impersonatedCredentials;
+    }
+
+    return null;
+  }
+
+  private static Optional<String> getServiceAccountToImpersonateForUserGroup(
+      Map<String, String> serviceAccountMapping, List<String> userGroups) {
+    return serviceAccountMapping.entrySet().stream()
+        .filter(e -> userGroups.contains(e.getKey()))
+        .map(Map.Entry::getValue)
+        .findFirst();
+  }
+
+  private static Supplier<HttpTransport> getHttpTransport(
+      Configuration config, List<String> keyPrefixes) {
+    return Suppliers.memoize(
+        () -> {
+          try {
+            return HttpTransportFactory.createHttpTransport(
+                PROXY_ADDRESS_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get),
+                PROXY_USERNAME_SUFFIX.withPrefixes(keyPrefixes).getPassword(config),
+                PROXY_PASSWORD_SUFFIX.withPrefixes(keyPrefixes).getPassword(config));
+          } catch (IOException e) {
+            throw new UncheckedIOException(e);
+          }
+        });
+  }
+
+  private static GoogleCredentials configureCredentials(
+      Configuration config, List<String> keyPrefixes, GoogleCredentials credentials) {
+    String tokenServerUrl =
+        TOKEN_SERVER_URL_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get);
+    if (tokenServerUrl == null) {
+      return credentials;
+    }
+    if (credentials instanceof ServiceAccountCredentials) {
+      return ((ServiceAccountCredentials) credentials)
+          .toBuilder().setTokenServerUri(URI.create(tokenServerUrl)).build();
+    }
+    if (credentials instanceof UserCredentials) {
+      return ((UserCredentials) credentials)
+          .toBuilder().setTokenServerUri(URI.create(tokenServerUrl)).build();
+    }
+    return credentials;
+  }
+
+  public static final class AccessTokenProviderCredentials extends GoogleCredentials {
+    private final AccessTokenProvider accessTokenProvider;
+
+    public AccessTokenProviderCredentials(AccessTokenProvider accessTokenProvider) {
+      super(convertAccessToken(accessTokenProvider.getAccessToken()));
+      this.accessTokenProvider = accessTokenProvider;
+    }
+
+    private static AccessToken convertAccessToken(AccessTokenProvider.AccessToken accessToken) {
+      checkNotNull(accessToken, "AccessToken cannot be null!");
+      String token = checkNotNull(accessToken.getToken(), "AccessToken value cannot be null!");
+      Instant expirationTime = accessToken.getExpirationTime();
+      return new AccessToken(token, expirationTime == null ? null : Date.from(expirationTime));
+    }
+
+    public AccessTokenProvider getAccessTokenProvider() {
+      return accessTokenProvider;
+    }
+
+    @Override
+    public AccessToken refreshAccessToken() throws IOException {
+      accessTokenProvider.refresh();
+      return convertAccessToken(accessTokenProvider.getAccessToken());
+    }
+  }
+
+  /** Enumerates all supported authentication types */
+  public enum AuthenticationType {
+    /** Configures {@link AccessTokenProvider} authentication */
+    ACCESS_TOKEN_PROVIDER,
+    /** Configures Application Default Credentials authentication */
+    APPLICATION_DEFAULT,
+    /** Configures Google Compute Engine service account authentication */
+    COMPUTE_ENGINE,
+    /** Configures JSON keyfile service account authentication */
+    SERVICE_ACCOUNT_JSON_KEYFILE,
+    /** Configures unauthenticated access */
+    UNAUTHENTICATED,
   }
 
   protected HadoopCredentialsConfiguration() {}

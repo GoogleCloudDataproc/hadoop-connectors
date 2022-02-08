@@ -4,23 +4,23 @@
 
 *   `fs.gs.project.id` (not set by default)
 
-    Google Cloud Project ID with access to GCS buckets. Required only for list
-    buckets and create bucket operations.
+    Google Cloud Project ID with access to Google Cloud Storage buckets.
+    Required only for list buckets and create bucket operations.
 
 *   `fs.gs.working.dir` (default: `/`)
 
-    The directory relative `gs:` uris resolve in inside of the default bucket.
+    The directory relative `gs:` uris resolve in inside the default bucket.
 
 *   `fs.gs.implicit.dir.repair.enable` (default: `true`)
 
-    Whether or not to create objects for the parent directories of objects with
-    `/` in their path e.g. creating `gs://bucket/foo/` upon deleting or renaming
+    Whether to create objects for the parent directories of objects with `/` in
+    their path e.g. creating `gs://bucket/foo/` upon deleting or renaming
     `gs://bucket/foo/bar`.
 
 *   `fs.gs.copy.with.rewrite.enable` (default: `true`)
 
-    Whether or not to perform copy operation using Rewrite requests. Allows to
-    copy files between different locations and storage classes.
+    Whether to perform copy operation using Rewrite requests which allows copy
+    files between different locations and storage classes.
 
 *   `fs.gs.rewrite.max.bytes.per.call` (default: `536870912`)
 
@@ -66,8 +66,9 @@
 *   `fs.gs.block.size` (default: `67108864`)
 
     The reported block size of the file system. This does not change any
-    behavior of the connector or the underlying GCS objects. However it will
-    affect the number of splits Hadoop MapReduce uses for a given input.
+    behavior of the connector or the underlying Google Cloud Storage objects.
+    However, it will affect the number of splits Hadoop MapReduce uses for a
+    given input.
 
 *   `fs.gs.create.items.conflict.check.enable` (default: `true`)
 
@@ -83,7 +84,7 @@
     Valid values:
 
     *   `FLAT` - fetch potential glob matches in a single list request to
-        minimize calls to GCS in nested glob cases.
+        minimize calls to Google Cloud Storage in nested glob cases.
 
     *   `DEFAULT` - use default Hadoop glob search algorithm implementation.
 
@@ -144,40 +145,47 @@
 
 ### Authentication
 
-When one of the following two properties is set, it will precede all other
-credentials settings, and credentials will be obtained from the access token
-provider.
+*   `fs.gs.auth.type` (default: `COMPUTE_ENGINE`)
 
-* `fs.gs.auth.access.token.provider.impl` (not set by default)
+    What type of authentication mechanism to use for Google Cloud Storage
+    access.
 
-    The implementation of the `AccessTokenProvider` interface used for GCS
-    Connector.
+    Valid values:
 
-*   `fs.gs.auth.service.account.enable` (default: `true`)
+    *   `ACCESS_TOKEN_PROVIDER` - configures `AccessTokenProvider`
+        authentication
 
-    Whether to use a service account for GCS authorization. If an email and
-    keyfile are provided (see `fs.gs.auth.service.account.json.keyfile`), then
-    that service account will be used. Otherwise, the connector will look to see
-    if it is running on a GCE VM with some level of GCS access in its service
-    account scope, and use that service account.
+    *   `APPLICATION_DEFAULT` - configures
+        [Application Default Credentials](https://javadoc.io/doc/com.google.auth/google-auth-library-oauth2-http/latest/com/google/auth/oauth2/GoogleCredentials.html)
+        authentication
 
-#### Service account authentication
+    *   `COMPUTE_ENGINE` - configures Google Compute Engine service account
+        authentication
 
-The following property is required only when running not on a GCE VM and
-`fs.gs.auth.service.account.enable` is `true`.
+    *   `SERVICE_ACCOUNT_JSON_KEYFILE` - configures JSON keyfile service account
+        authentication
 
-### JSON Keyfile
-
-Configure service account credentials using a JSON keyfile. The file must exist
-at the same path on all nodes:
+    *   `UNAUTHENTICATED` - configures unauthenticated access
 
 *   `fs.gs.auth.service.account.json.keyfile` (not set by default)
 
-    The path to the JSON keyfile for the service account.
+    The path to the JSON keyfile for the service account when `fs.gs.auth.type`
+    property is set to `SERVICE_ACCOUNT_JSON_KEYFILE`. The file must exist at
+    the same path on all nodes
 
-#### Service account impersonation
+*   `fs.gs.auth.access.token.provider` (not set by default)
 
-Service account impersonation can be configured for a specific user name and a
+    The implementation of the `AccessTokenProvider` interface used for Google
+    Cloud Storage Connector when `fs.gs.auth.type` property is set to
+    `ACCESS_TOKEN_PROVIDER`.
+
+*   `fs.gs.token.server.url` (not set by default)
+
+    Google Token Server root URL.
+
+### Service account impersonation
+
+Service account impersonation can be configured for a specific username and a
 group name, or for all users by default using below properties:
 
 *   `fs.gs.auth.impersonation.service.account.for.user.<USER_NAME>` (not set by
@@ -202,9 +210,9 @@ Configured authentication method will be used to authenticate the request to
 generate this short-lived credentials.
 
 If more than one property is set then the service account associated with the
-user name will take precedence over the service account associated with the
-group name for a matching user and group, which in turn will take precedence
-over default service account impersonation.
+username will take precedence over the service account associated with the group
+name for a matching user and group, which in turn will take precedence over
+default service account impersonation.
 
 ### IO configuration
 
@@ -260,7 +268,7 @@ over default service account impersonation.
 
 *   `fs.gs.outputstream.upload.chunk.size` (default: `67108864`)
 
-    The number of bytes in one GCS upload request.
+    The number of bytes in one Google Cloud Storage upload request.
 
 *   `fs.gs.outputstream.upload.cache.size` (default: `0`)
 
@@ -281,13 +289,13 @@ over default service account impersonation.
 
     Valid values:
 
-    *   `BASIC` - stream is closest analogue to direct wrapper around low-level
-        HTTP stream into GCS.
+    *   `BASIC` - stream is the closest analogue to direct wrapper around the
+        low-level HTTP stream into Google Cloud Storage.
 
     *   `SYNCABLE_COMPOSITE` - stream behaves similarly to `BASIC` when used
         with basic create/write/close patterns, but supports `hsync()` by
-        creating discrete temporary GCS objects which are composed onto the
-        destination object.
+        creating discrete temporary Google Cloud Storage objects which are
+        composed onto the destination object.
 
     *   `FLUSHABLE_COMPOSITE` - stream behaves similarly to
         `SYNCABLE_COMPOSITE`, except `hflush()` is also supported. It will use
@@ -297,10 +305,10 @@ over default service account impersonation.
 
     `SYNCABLE_COMPOSITE` and `FLUSHABLE_COMPOSITE` streams configuration that
     controls the minimum interval (milliseconds) between consecutive syncs. This
-    is to avoid getting rate-limited by GCS. Default is `0` - no wait between
-    syncs. Note that `hflush()` for `FLUSHABLE_COMPOSITE` stream will be no-op
-    if called more frequently than minimum sync interval and `hsync()` will
-    block for both streams until an end of a min sync interval.
+    is to avoid getting rate-limited by Google Cloud Storage. Default is `0` -
+    no wait between syncs. Note that `hflush()` for `FLUSHABLE_COMPOSITE` stream
+    will be no-op if called more frequently than minimum sync interval and
+    `hsync()` will block for both streams until an end of a min sync interval.
 
 ### HTTP transport configuration
 
@@ -324,8 +332,8 @@ over default service account impersonation.
 
 *   `fs.gs.http.max.retry` (default: `10`)
 
-    The maximum number of retries for low-level HTTP requests to GCS when server
-    errors (code: `5XX`) or I/O errors are encountered.
+    The maximum number of retries for low-level HTTP requests to Google Cloud
+    Storage when server errors (code: `5XX`) or I/O errors are encountered.
 
 *   `fs.gs.http.connect-timeout` (default: `20000`)
 
@@ -346,10 +354,6 @@ over default service account impersonation.
 *   `fs.gs.storage.service.path` (default: `storage/v1/`)
 
     Google Cloud Storage service path.
-
-*   `fs.gs.token.server.url` (not set by default)
-
-    Google Token Server root URL.
 
 ### Fadvise feature configuration
 
@@ -401,7 +405,7 @@ over default service account impersonation.
     Enables a performance cache that temporarily stores successfully queried
     Cloud Storage objects in memory. Caching provides a faster access to the
     recently queried objects, but because objects metadata is cached,
-    modifications made outside of this connector instance may not be immediately
+    modifications made outside this connector instance may not be immediately
     reflected.
 
 *   `fs.gs.performance.cache.max.entry.age.ms` (default: `5000`)
@@ -415,25 +419,27 @@ over default service account impersonation.
 
     Valid values:
 
-    *   `AUTO` - Requester Pays feature enabled only for GCS buckets that
-        require it;
+    *   `AUTO` - Requester Pays feature enabled only for Google Cloud Storage
+        buckets that require it;
 
-    *   `CUSTOM` - Requester Pays feature enabled only for GCS buckets that are
-        specified in the `fs.gs.requester.pays.buckets`;
+    *   `CUSTOM` - Requester Pays feature enabled only for Google Cloud Storage
+        buckets that are specified in the `fs.gs.requester.pays.buckets`;
 
-    *   `DISABLED` - Requester Pays feature disabled for all GCS buckets;
+    *   `DISABLED` - Requester Pays feature disabled for all Google Cloud
+        Storage buckets;
 
-    *   `ENABLED` - Requester Pays feature enabled for all GCS buckets.
+    *   `ENABLED` - Requester Pays feature enabled for all Google Cloud Storage
+        buckets.
 
 *   `fs.gs.requester.pays.project.id` (not set by default)
 
-    Google Cloud Project ID that will be used for billing when GCS Requester
-    Pays feature is active (in `AUTO`, `CUSTOM` or `ENABLED` mode). If not
-    specified and GCS Requester Pays is active then value of the
-    `fs.gs.project.id` property will be used.
+    Google Cloud Project ID that will be used for billing when Google Cloud
+    Storage Requester Pays feature is active (in `AUTO`, `CUSTOM` or `ENABLED`
+    mode). If not specified and Google Cloud Storage Requester Pays is active
+    then value of the `fs.gs.project.id` property will be used.
 
 *   `fs.gs.requester.pays.buckets` (not set by default)
 
-    Comma-separated list of Google Cloud Storage Buckets for which GCS Requester
-    Pays feature should be activated if `fs.gs.requester.pays.mode` property
-    value is set to `CUSTOM`.
+    Comma-separated list of Google Cloud Storage Buckets for which Google Cloud
+    Storage Requester Pays feature should be activated if
+    `fs.gs.requester.pays.mode` property value is set to `CUSTOM`.
