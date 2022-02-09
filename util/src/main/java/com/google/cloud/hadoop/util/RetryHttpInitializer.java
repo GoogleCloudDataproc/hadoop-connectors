@@ -21,37 +21,35 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 
 import com.google.api.client.http.HttpBackOffIOExceptionHandler;
 import com.google.api.client.http.HttpBackOffUnsuccessfulResponseHandler;
+import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpIOExceptionHandler;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpStatusCodes;
 import com.google.api.client.http.HttpUnsuccessfulResponseHandler;
-import com.google.api.client.util.BackOff;
 import com.google.api.client.util.ExponentialBackOff;
-import com.google.api.client.util.Sleeper;
 import com.google.auth.Credentials;
 import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.flogger.LogContext;
 import java.io.IOException;
-import java.util.Set;
 
 public class RetryHttpInitializer implements HttpRequestInitializer {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  private static final int HTTP_SC_GONE = 410;
-
-  /** HTTP status code indicating too many requests in a given amount of time. */
-  private static final int HTTP_SC_TOO_MANY_REQUESTS = 429;
-
-  // Base impl of BackOffRequired determining the default set of cases where we'll retry on
-  // unsuccessful HTTP responses; we'll mix in additional retryable response cases on top
-  // of the bases cases defined by this instance.
-  private static final HttpBackOffUnsuccessfulResponseHandler.BackOffRequired
-      BASE_HTTP_BACKOFF_REQUIRED =
-          HttpBackOffUnsuccessfulResponseHandler.BackOffRequired.ON_SERVER_ERROR;
+  private static final ExponentialBackOff.Builder BACKOFF_BUILDER =
+      new ExponentialBackOff.Builder()
+          // Set initial timeout to 1.25 seconds to have a 1-second minimum initial interval
+          // after 0.2 randomization factor will be applied
+          .setInitialIntervalMillis(1_250)
+          .setMultiplier(1.6)
+          .setRandomizationFactor(0.2)
+          .setMaxIntervalMillis(20_000)
+          // 30 minutes
+          .setMaxElapsedTimeMillis(1_800_000);
 
   // To be used as a request interceptor for filling in the "Authorization" header field, as well
   // as a response handler for certain unsuccessful error codes wherein the Credentials must refresh
@@ -60,119 +58,131 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
 
   private final RetryHttpInitializerOptions options;
 
-  // If non-null, the backoff handlers will be set to use this sleeper instead of their defaults.
-  // Only used for testing.
-  private final Sleeper sleeperOverride;
+  /**
+   * @param credentials A credentials which will be used to initialize on HttpRequests and as the
+   *     delegate for a {@link UnsuccessfulResponseHandler}.
+   * @param options An options that configure {@link RetryHttpInitializer} instance behaviour.
+   */
+  public RetryHttpInitializer(Credentials credentials, RetryHttpInitializerOptions options) {
+    this.credentials = credentials == null ? null : new HttpCredentialsAdapter(credentials);
+    this.options = options;
+  }
 
-  /** A HttpUnsuccessfulResponseHandler logs the URL that generated certain failures. */
-  private static class LoggingResponseHandler
-      implements HttpUnsuccessfulResponseHandler, HttpIOExceptionHandler {
-
-    private static final String LOG_MESSAGE_FORMAT =
-        "Encountered status code %d when sending %s request to URL '%s'. "
-            + "Delegating to response handler for possible retry.";
-
-    private final HttpUnsuccessfulResponseHandler delegateResponseHandler;
-    private final HttpIOExceptionHandler delegateIOExceptionHandler;
-    private final ImmutableSet<Integer> responseCodesToLog;
-    private final ImmutableSet<Integer> responseCodesToLogWithRateLimit;
-
-    /**
-     * @param delegateResponseHandler The HttpUnsuccessfulResponseHandler to invoke to really handle
-     *     errors.
-     * @param delegateIOExceptionHandler The HttpIOExceptionResponseHandler to delegate to.
-     * @param responseCodesToLog The set of response codes to log URLs for.
-     * @param responseCodesToLogWithRateLimit The set of response codes to log URLs for with rate
-     *     limit.
-     */
-    public LoggingResponseHandler(
-        HttpUnsuccessfulResponseHandler delegateResponseHandler,
-        HttpIOExceptionHandler delegateIOExceptionHandler,
-        Set<Integer> responseCodesToLog,
-        Set<Integer> responseCodesToLogWithRateLimit) {
-      this.delegateResponseHandler = delegateResponseHandler;
-      this.delegateIOExceptionHandler = delegateIOExceptionHandler;
-      this.responseCodesToLog = ImmutableSet.copyOf(responseCodesToLog);
-      this.responseCodesToLogWithRateLimit = ImmutableSet.copyOf(responseCodesToLogWithRateLimit);
+  @Override
+  public void initialize(HttpRequest request) throws IOException {
+    // Initialize request with credentials and let CredentialsOrBackoffResponseHandler
+    // to refresh credentials later if necessary
+    if (credentials != null) {
+      credentials.initialize(request);
     }
 
-    @Override
-    public boolean handleResponse(
-        HttpRequest httpRequest, HttpResponse httpResponse, boolean supportsRetry)
-        throws IOException {
-      if (responseCodesToLogWithRateLimit.contains(httpResponse.getStatusCode())) {
-        switch (httpResponse.getStatusCode()) {
-          case HTTP_SC_TOO_MANY_REQUESTS:
-            logger.atInfo().atMostEvery(10, SECONDS).log(
-                LOG_MESSAGE_FORMAT,
-                httpResponse.getStatusCode(),
-                httpRequest.getRequestMethod(),
-                httpRequest.getUrl());
-            break;
-          default:
-            logger.atInfo().atMostEvery(10, SECONDS).log(
-                "Encountered status code %d (and maybe others) when sending %s request to URL '%s'."
-                    + " Delegating to response handler for possible retry.",
-                httpResponse.getStatusCode(), httpRequest.getRequestMethod(), httpRequest.getUrl());
-        }
-      } else if (responseCodesToLog.contains(httpResponse.getStatusCode())) {
-        logger.atInfo().log(
-            LOG_MESSAGE_FORMAT,
-            httpResponse.getStatusCode(),
-            httpRequest.getRequestMethod(),
-            httpRequest.getUrl());
-      }
+    request
+        // Request will be retried if server errors (5XX) or I/O errors are encountered.
+        .setNumberOfRetries(options.getMaxRequestRetries())
+        // Set the timeout configurations.
+        .setConnectTimeout(toIntExact(options.getConnectTimeout().toMillis()))
+        .setReadTimeout(toIntExact(options.getReadTimeout().toMillis()))
+        .setUnsuccessfulResponseHandler(new UnsuccessfulResponseHandler(credentials))
+        .setIOExceptionHandler(new IoExceptionHandler());
 
-      return delegateResponseHandler.handleResponse(httpRequest, httpResponse, supportsRetry);
+    HttpHeaders headers = request.getHeaders();
+    if (isNullOrEmpty(headers.getUserAgent()) && !isNullOrEmpty(options.getDefaultUserAgent())) {
+      logger.atFiner().log(
+          "Request is missing a user-agent header, adding default value of '%s'",
+          options.getDefaultUserAgent());
+      headers.setUserAgent(options.getDefaultUserAgent());
     }
+    headers.putAll(options.getHttpHeaders());
+  }
 
-    @Override
-    public boolean handleIOException(HttpRequest httpRequest, boolean supportsRetry)
-        throws IOException {
-      // We sadly don't get anything helpful to see if this is something we want to log. As a result
-      // we'll turn down the logging level to debug.
-      logger.atFine().log("Encountered an IOException when accessing URL %s", httpRequest.getUrl());
-      return delegateIOExceptionHandler.handleIOException(httpRequest, supportsRetry);
-    }
+  public Credentials getCredentials() {
+    return credentials == null ? null : credentials.getCredentials();
   }
 
   /**
-   * An inner class allowing this initializer to create a new handler instance per HttpRequest which
-   * shares the Credentials of the outer class and which will compose the Credentials with a backoff
-   * handler to handle unsuccessful HTTP codes.
+   * Handles unsuccessful responses:
+   *
+   * <ul>
+   *   <li>log responses based on the response code
+   *   <li>401 Unauthorized responses are handled by the {@link HttpCredentialsAdapter}
+   *   <li>5XX are handled by the a backoff handler.
+   * </ul>
    */
-  private class CredentialsOrBackoffResponseHandler implements HttpUnsuccessfulResponseHandler {
-    // The backoff-handler instance to use whenever the outer-class's Credentials does not handle
-    // the error.
-    private final HttpUnsuccessfulResponseHandler delegateHandler;
+  private static class UnsuccessfulResponseHandler implements HttpUnsuccessfulResponseHandler {
 
-    public CredentialsOrBackoffResponseHandler() {
-      HttpBackOffUnsuccessfulResponseHandler errorCodeHandler =
-          new HttpBackOffUnsuccessfulResponseHandler(getDefaultBackOff());
-      errorCodeHandler.setBackOffRequired(
-          response ->
-              BASE_HTTP_BACKOFF_REQUIRED.isRequired(response)
-                  || response.getStatusCode() == HTTP_SC_TOO_MANY_REQUESTS);
-      if (sleeperOverride != null) {
-        errorCodeHandler.setSleeper(sleeperOverride);
-      }
-      this.delegateHandler = errorCodeHandler;
+    private static final int HTTP_SC_GONE = 410;
+
+    /** HTTP status code indicating too many requests in a given amount of time. */
+    private static final int HTTP_SC_TOO_MANY_REQUESTS = 429;
+
+    // The set of response codes to log URLs for with a rate limit.
+    private static final ImmutableSet<Integer> RESPONSE_CODES_TO_LOG_WITH_RATE_LIMIT =
+        ImmutableSet.of(HTTP_SC_TOO_MANY_REQUESTS);
+
+    // The set of response codes to log URLs for.
+    private static final ImmutableSet<Integer> RESPONSE_CODES_TO_LOG =
+        ImmutableSet.<Integer>builder()
+            .addAll(RESPONSE_CODES_TO_LOG_WITH_RATE_LIMIT)
+            .add(HTTP_SC_GONE, HttpStatusCodes.STATUS_CODE_SERVICE_UNAVAILABLE)
+            .build();
+
+    // Base implementation of BackOffRequired determining the default set of cases where we'll retry
+    // on unsuccessful HTTP responses; we'll mix in additional retryable response cases on top
+    // of the bases cases defined by this instance.
+    private static final HttpBackOffUnsuccessfulResponseHandler.BackOffRequired BACK_OFF_REQUIRED =
+        response ->
+            response.getStatusCode() == HTTP_SC_TOO_MANY_REQUESTS
+                || HttpBackOffUnsuccessfulResponseHandler.BackOffRequired.ON_SERVER_ERROR
+                    .isRequired(response);
+
+    private final HttpCredentialsAdapter credentials;
+    private final HttpBackOffUnsuccessfulResponseHandler delegate;
+
+    public UnsuccessfulResponseHandler(HttpCredentialsAdapter credentials) {
+      this.credentials = credentials;
+      this.delegate =
+          new HttpBackOffUnsuccessfulResponseHandler(BACKOFF_BUILDER.build())
+              .setBackOffRequired(BACK_OFF_REQUIRED);
     }
 
     @Override
     public boolean handleResponse(HttpRequest request, HttpResponse response, boolean supportsRetry)
         throws IOException {
+      logResponseCode(request, response);
+
       if (credentials != null && credentials.handleResponse(request, response, supportsRetry)) {
         // If credentials decides it can handle it, the return code or message indicated something
         // specific to authentication, and no backoff is desired.
         return true;
       }
 
-      if (delegateHandler.handleResponse(request, response, supportsRetry)) {
+      if (delegate.handleResponse(request, response, supportsRetry)) {
         // Otherwise, we defer to the judgement of our internal backoff handler.
         return true;
       }
 
+      escapeRedirectPath(request, response);
+
+      return false;
+    }
+
+    private void logResponseCode(HttpRequest request, HttpResponse response) {
+      if (RESPONSE_CODES_TO_LOG.contains(response.getStatusCode())) {
+        logger
+            .atInfo()
+            // Apply rate limit (atMostEvery) based on the response status code
+            .with(LogContext.Key.LOG_SITE_GROUPING_KEY, response.getStatusCode())
+            .atMostEvery(
+                RESPONSE_CODES_TO_LOG_WITH_RATE_LIMIT.contains(response.getStatusCode()) ? 10 : 0,
+                SECONDS)
+            .log(
+                "Encountered status code %d when sending %s request to URL '%s'."
+                    + " Delegating to response handler for possible retry.",
+                response.getStatusCode(), request.getRequestMethod(), request.getUrl());
+      }
+    }
+
+    private void escapeRedirectPath(HttpRequest request, HttpResponse response) {
       if (HttpStatusCodes.isRedirect(response.getStatusCode())
           && request.getFollowRedirects()
           && response.getHeaders() != null
@@ -191,82 +201,25 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
           response.getHeaders().setLocation(escapedLocation);
         }
       }
-
-      return false;
     }
   }
 
-  /**
-   * @param credentials A credentials which will be used to initialize on HttpRequests and as the
-   *     delegate for a {@link CredentialsOrBackoffResponseHandler}.
-   * @param options An options that configure {@link RetryHttpInitializer} instance behaviour.
-   */
-  public RetryHttpInitializer(Credentials credentials, RetryHttpInitializerOptions options) {
-    this.credentials = credentials == null ? null : new HttpCredentialsAdapter(credentials);
-    this.options = options;
-    this.sleeperOverride = null;
-  }
+  private static class IoExceptionHandler implements HttpIOExceptionHandler {
 
-  @Override
-  public void initialize(HttpRequest request) throws IOException {
-    // Initialize request with credentials and let CredentialsOrBackoffResponseHandler
-    // to refresh credentials later if necessary
-    if (credentials != null) {
-      credentials.initialize(request);
+    private final HttpIOExceptionHandler delegate;
+
+    public IoExceptionHandler() {
+      // Retry IOExceptions such as "socket timed out" of "insufficient bytes written" with backoff.
+      this.delegate = new HttpBackOffIOExceptionHandler(BACKOFF_BUILDER.build());
     }
 
-    // Request will be retried if server errors (5XX) or I/O errors are encountered.
-    request.setNumberOfRetries(options.getMaxRequestRetries());
-
-    // Set the timeout configurations.
-    request.setConnectTimeout(toIntExact(options.getConnectTimeout().toMillis()));
-    request.setReadTimeout(toIntExact(options.getReadTimeout().toMillis()));
-
-    // IOExceptions such as "socket timed out" of "insufficient bytes written" will follow a
-    // straightforward backoff.
-    HttpBackOffIOExceptionHandler exceptionHandler =
-        new HttpBackOffIOExceptionHandler(getDefaultBackOff());
-    if (sleeperOverride != null) {
-      exceptionHandler.setSleeper(sleeperOverride);
+    @Override
+    public boolean handleIOException(HttpRequest httpRequest, boolean supportsRetry)
+        throws IOException {
+      // We sadly don't get anything helpful to see if this is something we want to log.
+      // As a result we'll turn down the logging level to debug.
+      logger.atFine().log("Encountered an IOException when accessing URL %s", httpRequest.getUrl());
+      return delegate.handleIOException(httpRequest, supportsRetry);
     }
-
-    // Supply a new composite handler for unsuccessful return codes. 401 Unauthorized will be
-    // handled by the Credentials, 410 Gone will be logged, and 5XX will be handled by a backoff
-    // handler.
-    LoggingResponseHandler loggingResponseHandler =
-        new LoggingResponseHandler(
-            new CredentialsOrBackoffResponseHandler(),
-            exceptionHandler,
-            ImmutableSet.of(HTTP_SC_GONE, HttpStatusCodes.STATUS_CODE_SERVICE_UNAVAILABLE),
-            ImmutableSet.of(HTTP_SC_TOO_MANY_REQUESTS));
-    request.setUnsuccessfulResponseHandler(loggingResponseHandler);
-    request.setIOExceptionHandler(loggingResponseHandler);
-
-    if (isNullOrEmpty(request.getHeaders().getUserAgent())
-        && !isNullOrEmpty(options.getDefaultUserAgent())) {
-      logger.atFiner().log(
-          "Request is missing a user-agent, adding default value of '%s'",
-          options.getDefaultUserAgent());
-      request.getHeaders().setUserAgent(options.getDefaultUserAgent());
-    }
-
-    request.getHeaders().putAll(options.getHttpHeaders());
-  }
-
-  public Credentials getCredentials() {
-    return credentials == null ? null : credentials.getCredentials();
-  }
-
-  private static BackOff getDefaultBackOff() {
-    return new ExponentialBackOff.Builder()
-        // Set initial timeout to 1.25 seconds to have a 1-second minimum initial interval
-        // after 0.2 randomization factor will be applied
-        .setInitialIntervalMillis(1_250)
-        .setMultiplier(1.6)
-        .setRandomizationFactor(0.2)
-        .setMaxIntervalMillis(20_000)
-        // 30 minutes
-        .setMaxElapsedTimeMillis(1_800_000)
-        .build();
   }
 }
