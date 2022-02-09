@@ -131,7 +131,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     StorageResourceId resourceId =
         new StorageResourceId(BUCKET_NAME, "testOpenNonExistentItem_Object");
     IOException exception = assertThrows(IOException.class, () -> rawStorage.open(resourceId));
-    assertThat(exception).hasMessageThat().contains("Item not found");
+    assertThat(exception).hasMessageThat().contains("404 Not Found");
   }
 
   @Test
