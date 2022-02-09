@@ -34,8 +34,7 @@ import com.google.api.client.http.LowLevelHttpRequest;
 import com.google.api.client.http.LowLevelHttpResponse;
 import com.google.api.client.json.GenericJson;
 import com.google.api.client.json.Json;
-import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.testing.http.HttpTesting;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.testing.http.MockLowLevelHttpRequest;
@@ -105,8 +104,6 @@ public final class MockHttpTransportHelper {
   }
 
   private static final int UNKNOWN_CONTENT_LENGTH = -1;
-
-  public static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
 
   private MockHttpTransportHelper() {}
 
@@ -220,7 +217,7 @@ public final class MockHttpTransportHelper {
   }
 
   public static MockLowLevelHttpResponse jsonDataResponse(Object object) throws IOException {
-    return dataResponse(JSON_FACTORY.toByteArray(object));
+    return dataResponse(GsonFactory.getDefaultInstance().toByteArray(object));
   }
 
   public static MockLowLevelHttpResponse dataResponse(byte[] content) {
@@ -236,17 +233,17 @@ public final class MockHttpTransportHelper {
     GoogleJsonError.ErrorInfo errorInfo = new GoogleJsonError.ErrorInfo();
     errorInfo.setReason(errorResponse.getErrorReason());
     errorInfo.setDomain(errorResponse.getErrorDomain());
-    errorInfo.setFactory(JSON_FACTORY);
+    errorInfo.setFactory(GsonFactory.getDefaultInstance());
 
     GoogleJsonError jsonError = new GoogleJsonError();
     jsonError.setCode(errorResponse.getErrorCode());
     jsonError.setErrors(ImmutableList.of(errorInfo));
     jsonError.setMessage(errorResponse.getErrorMessage());
-    jsonError.setFactory(JSON_FACTORY);
+    jsonError.setFactory(GsonFactory.getDefaultInstance());
 
     GenericJson errorResponseJson = new GenericJson();
     errorResponseJson.set("error", jsonError);
-    errorResponseJson.setFactory(JSON_FACTORY);
+    errorResponseJson.setFactory(GsonFactory.getDefaultInstance());
 
     return new MockLowLevelHttpResponse()
         .setContent(errorResponseJson.toPrettyString())

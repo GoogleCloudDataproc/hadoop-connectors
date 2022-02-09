@@ -32,11 +32,11 @@
   <dependencies>
     <dependency>
       <groupId>com.google.http-client</groupId>
-      <artifactId>google-http-client-jackson2</artifactId>
+      <artifactId>google-http-client-gson</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.api-client</groupId>
-      <artifactId>google-api-client-jackson2</artifactId>
+      <artifactId>google-api-client-gson</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.apis</groupId>

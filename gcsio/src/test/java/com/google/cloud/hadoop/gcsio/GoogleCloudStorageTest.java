@@ -19,7 +19,6 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.createItemInf
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInferredDirectory;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.HTTP_TRANSPORT;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.JSON_FACTORY;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.resumableUploadResponse;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.batchRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.composeRequestString;
@@ -56,6 +55,7 @@ import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpStatusCodes;
 import com.google.api.client.http.HttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.util.BackOff;
 import com.google.api.client.util.DateTime;
@@ -1643,7 +1643,7 @@ public class GoogleCloudStorageTest {
     IOException exception = assertThrows(IOException.class, () -> gcs.createBucket(BUCKET_NAME));
     assertThat(exception)
         .hasMessageThat()
-        .contains("\"code\" : " + ErrorResponses.GONE.getErrorCode());
+        .contains("\"code\": " + ErrorResponses.GONE.getErrorCode());
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(createBucketRequestString(PROJECT_ID))
@@ -3149,7 +3149,10 @@ public class GoogleCloudStorageTest {
         GoogleCloudStorageOptions.builder().setAppName("appName").setProjectId("projectId");
 
     Storage storage =
-        new Storage(HTTP_TRANSPORT, JSON_FACTORY, trackingRequestInitializerWithRetries);
+        new Storage(
+            HTTP_TRANSPORT,
+            GsonFactory.getDefaultInstance(),
+            trackingRequestInitializerWithRetries);
     // Verify that fake projectId/appName and mock storage does not throw.
     new GoogleCloudStorageImpl(optionsBuilder.build(), storage);
 
@@ -3459,7 +3462,7 @@ public class GoogleCloudStorageTest {
       HttpTransport transport,
       HttpRequestInitializer requestInitializer,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
-    Storage storage = new Storage(transport, JSON_FACTORY, requestInitializer);
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requestInitializer);
     return new GoogleCloudStorageImpl(gcsOptions, storage, downscopedAccessTokenFn);
   }
 

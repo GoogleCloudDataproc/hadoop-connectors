@@ -14,7 +14,7 @@
 package com.google.cloud.hadoop.io.bigquery.output;
 
 import com.google.api.client.json.JsonParser;
-import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.bigquery.model.TimePartitioning;
 import java.io.IOException;
 
@@ -88,12 +88,12 @@ public class BigQueryTimePartitioning {
   }
 
   static TimePartitioning getFromJson(String json) throws IOException {
-    JsonParser parser = JacksonFactory.getDefaultInstance().createJsonParser(json);
+    JsonParser parser = GsonFactory.getDefaultInstance().createJsonParser(json);
     return parser.parseAndClose(TimePartitioning.class);
   }
 
   public String getAsJson() throws IOException {
-    return JacksonFactory.getDefaultInstance().toString(timePartitioning);
+    return GsonFactory.getDefaultInstance().toString(timePartitioning);
   }
 
   static BigQueryTimePartitioning wrap(TimePartitioning tableTimePartitioning) {

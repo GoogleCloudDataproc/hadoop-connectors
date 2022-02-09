@@ -2,7 +2,6 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageGrpcReadChannel.METADATA_FIELDS;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTest.newStorageObject;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.JSON_FACTORY;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonDataResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonErrorResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
@@ -23,6 +22,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.api.client.http.HttpRequest;
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.util.BackOff;
 import com.google.api.services.storage.Storage;
@@ -710,7 +710,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
     List<HttpRequest> requests = new ArrayList<>();
 
-    Storage storage = new Storage(transport, JSON_FACTORY, requests::add);
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadOptions options =
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
@@ -771,7 +771,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
             jsonDataResponse(
                 newStorageObject(BUCKET_NAME, OBJECT_NAME).setContentEncoding("gzip")));
 
-    Storage storage = new Storage(transport, JSON_FACTORY, r -> {});
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), r -> {});
 
     GoogleCloudStorageReadOptions readOptions = GoogleCloudStorageReadOptions.builder().build();
 
@@ -1432,7 +1432,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
     List<HttpRequest> requests = new ArrayList<>();
 
-    Storage storage = new Storage(transport, JSON_FACTORY, requests::add);
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadOptions options =
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(true).build();
@@ -1447,7 +1447,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
     List<HttpRequest> requests = new ArrayList<>();
 
-    Storage storage = new Storage(transport, JSON_FACTORY, requests::add);
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadOptions options =
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
@@ -1464,7 +1464,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
     List<HttpRequest> requests = new ArrayList<>();
 
-    Storage storage = new Storage(transport, JSON_FACTORY, requests::add);
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadOptions options =
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
