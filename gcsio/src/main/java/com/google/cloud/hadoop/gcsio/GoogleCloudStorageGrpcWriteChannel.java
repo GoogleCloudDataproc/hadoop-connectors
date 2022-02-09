@@ -273,11 +273,13 @@ public final class GoogleCloudStorageGrpcWriteChannel
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         throw new IOException(
-            String.format("Interrupted while awaiting response during upload of '%s'", resourceId),
-            e);
+                String.format("Interrupted while awaiting response during upload of '%s' with UploadID '%s'",
+                        resourceId, responseObserver.uploadId),
+                e);
       }
       if (responseObserver.hasTransientError()) {
-        throw new IOException(responseObserver.transientError);
+          throw new IOException(String.format("Got transient error for UploadID '%s'", responseObserver.uploadId),
+                  responseObserver.transientError);
       }
 
       return responseObserver.getResponseOrThrow();
