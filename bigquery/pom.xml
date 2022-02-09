@@ -37,7 +37,7 @@
   <dependencies>
     <dependency>
       <groupId>com.google.http-client</groupId>
-      <artifactId>google-http-client-jackson2</artifactId>
+      <artifactId>google-http-client-gson</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.apis</groupId>
@@ -241,7 +241,6 @@
               </filters>
               <artifactSet>
                 <includes>
-                  <include>com.fasterxml.jackson.core:jackson-core</include>
                   <include>com.google.api</include>
                   <include>com.google.api.grpc</include>
                   <include>com.google.api-client</include>
@@ -270,7 +269,6 @@
                   <pattern>com</pattern>
                   <shadedPattern>com.google.cloud.hadoop.repackaged.bigquery.com</shadedPattern>
                   <includes>
-                    <include>com.fasterxml.**</include>
                     <include>com.google.api.**</include>
                     <include>com.google.auth.**</include>
                     <include>com.google.cloud.bigquery.**</include>

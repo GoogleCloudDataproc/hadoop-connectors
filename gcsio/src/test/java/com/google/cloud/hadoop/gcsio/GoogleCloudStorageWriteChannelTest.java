@@ -16,12 +16,12 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.BUCKET_NAME;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.HTTP_TRANSPORT;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.JSON_FACTORY;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.OBJECT_NAME;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 
 import com.google.api.client.http.InputStreamContent;
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.storage.Storage;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
@@ -41,7 +41,7 @@ public class GoogleCloudStorageWriteChannelTest {
 
     GoogleCloudStorageWriteChannel writeChannel =
         new GoogleCloudStorageWriteChannel(
-            new Storage(HTTP_TRANSPORT, JSON_FACTORY, r -> {}),
+            new Storage(HTTP_TRANSPORT, GsonFactory.getDefaultInstance(), r -> {}),
             new ClientRequestHelper<>(),
             newDirectExecutorService(),
             AsyncWriteChannelOptions.DEFAULT,

@@ -18,8 +18,7 @@ import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.BQ_ROOT_
 
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.bigquery.Bigquery;
 import com.google.auth.Credentials;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration;
@@ -34,12 +33,12 @@ import org.apache.hadoop.conf.Configuration;
 /** Helper class to get BigQuery from environment credentials. */
 public class BigQueryFactory {
 
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
   // Environment variable name for variable specifying path of SA JSON keyfile for BigQuery
   // authentication.
   public static final String BIGQUERY_SERVICE_ACCOUNT_JSON_KEYFILE =
       "BIGQUERY_SERVICE_ACCOUNT_JSON_KEYFILE";
-
-  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // A resource file containing bigquery related build properties.
   public static final String PROPERTIES_FILE = "bigquery.properties";
@@ -69,7 +68,6 @@ public class BigQueryFactory {
 
   // Objects for handling HTTP transport and JSON formatting of API calls
   private static final HttpTransport HTTP_TRANSPORT = new NetHttpTransport();
-  private static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
 
   /**
    * Construct credentials from the passed Configuration.
@@ -103,21 +101,15 @@ public class BigQueryFactory {
   /** Constructs a BigQuery from a given Credentials. */
   public Bigquery getBigQueryFromCredentials(
       Configuration config, Credentials credentials, String appName) {
-    logger.atInfo().log("Creating BigQuery from given credentials.");
-    // Use the credentials to create an authorized BigQuery client
-    if (credentials != null) {
-      return new Bigquery.Builder(
-              HTTP_TRANSPORT,
-              JSON_FACTORY,
-              new RetryHttpInitializer(
-                  credentials,
-                  RetryHttpInitializerOptions.builder().setDefaultUserAgent(appName).build()))
-          .setApplicationName(appName)
-          .build();
-    }
-    return new Bigquery.Builder(HTTP_TRANSPORT, JSON_FACTORY, /* httpRequestInitializer= */ null)
-        .setRootUrl(BQ_ROOT_URL.get(config, config::get))
+    logger.atFine().log("Creating BigQuery from given credentials.");
+    return new Bigquery.Builder(
+            HTTP_TRANSPORT,
+            GsonFactory.getDefaultInstance(),
+            new RetryHttpInitializer(
+                credentials,
+                RetryHttpInitializerOptions.builder().setDefaultUserAgent(appName).build()))
         .setApplicationName(appName)
+        .setRootUrl(BQ_ROOT_URL.get(config, config::get))
         .build();
   }
 }

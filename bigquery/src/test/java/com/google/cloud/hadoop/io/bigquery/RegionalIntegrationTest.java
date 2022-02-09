@@ -1,11 +1,11 @@
 package com.google.cloud.hadoop.io.bigquery;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.HTTP_TRANSPORT;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.JSON_FACTORY;
 import static com.google.cloud.hadoop.io.bigquery.AbstractBigQueryIoIntegrationTestBase.getConfigForGcsFromBigquerySettings;
 import static com.google.cloud.hadoop.io.bigquery.BigQueryFactory.BQC_ID;
 import static org.junit.Assume.assumeFalse;
 
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.bigquery.Bigquery;
 import com.google.api.services.bigquery.model.Dataset;
 import com.google.api.services.bigquery.model.DatasetReference;
@@ -180,7 +180,7 @@ public class RegionalIntegrationTest {
     Storage storage =
         new Storage.Builder(
                 HTTP_TRANSPORT,
-                JSON_FACTORY,
+                GsonFactory.getDefaultInstance(),
                 new RetryHttpInitializer(
                     GoogleCloudStorageTestHelper.getCredentials(),
                     RetryHttpInitializerOptions.builder().setDefaultUserAgent(BQC_ID).build()))
