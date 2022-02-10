@@ -24,13 +24,9 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.emptyToNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
-import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
-import static java.util.Arrays.stream;
-import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.toMap;
 
 import com.google.api.client.googleapis.batch.json.JsonBatchCallback;
 import com.google.api.client.googleapis.json.GoogleJsonError;
@@ -85,7 +81,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -99,7 +94,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -190,20 +184,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     BackOff newBackOff();
   }
 
-  private final ImmutableMap<GoogleCloudStorageStatistics, AtomicLong> statistics =
-      ImmutableMap.copyOf(
-          stream(GoogleCloudStorageStatistics.values())
-              .collect(
-                  toMap(
-                      identity(),
-                      k -> new AtomicLong(0),
-                      (u, v) -> {
-                        throw new IllegalStateException(
-                            String.format(
-                                "Duplicate key (attempted merging values %s and %s)", u, u));
-                      },
-                      () -> new EnumMap<>(GoogleCloudStorageStatistics.class))));
-
   private final LoadingCache<String, Boolean> autoBuckets =
       CacheBuilder.newBuilder()
           .expireAfterWrite(Duration.ofHours(1))
@@ -255,6 +235,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   // Request initializer to use for batch and non-batch requests.
   private final HttpRequestInitializer httpRequestInitializer;
+
+  private final StatisticsTrackingHttpRequestInitializer httpStatistics;
 
   // Configuration values for this instance
   private final GoogleCloudStorageOptions storageOptions;
@@ -326,9 +308,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     this.storageOptions = checkNotNull(options, "options must not be null");
     this.storageOptions.throwIfNotValid();
+    this.httpStatistics = new StatisticsTrackingHttpRequestInitializer();
     HttpRequestInitializer retryHttpInitializer =
         new ChainingHttpRequestInitializer(
-            new StatisticsTrackingHttpRequestInitializer(statistics),
+            this.httpStatistics,
             new RetryHttpInitializer(credentials, options.toRetryHttpInitializerOptions()));
 
     this.storage =
@@ -368,6 +351,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     this.storage = checkNotNull(storage, "storage must not be null");
 
+    this.httpStatistics = null;
     this.httpRequestInitializer =
         this.storage.getRequestFactory() == null
             ? null
@@ -2371,7 +2355,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   @Override
   public Map<String, Long> getStatistics() {
-    return statistics.entrySet().stream()
-        .collect(toImmutableMap(e -> e.getKey().name(), e -> e.getValue().get()));
+    return httpStatistics == null ? ImmutableMap.of() : httpStatistics.getStatistics();
   }
 }
