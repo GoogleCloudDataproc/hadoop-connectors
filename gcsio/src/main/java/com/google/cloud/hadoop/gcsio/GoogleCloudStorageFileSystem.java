@@ -564,16 +564,22 @@ public class GoogleCloudStorageFileSystem {
     List<FileInfo> fileInfos = getFileInfos(paths);
     FileInfo srcInfo = fileInfos.get(0);
     FileInfo dstInfo = fileInfos.get(1);
-    FileInfo dstParentInfo = dstParent == null ? null : fileInfos.get(2);
+
+    // Make sure paths match what getFileInfo() returned (it can add / at the end).
+    src = srcInfo.getPath();
+    dst = dstInfo.getPath();
 
     // Throw if the source file does not exist.
     if (!srcInfo.exists()) {
       throw new FileNotFoundException("Item not found: " + src);
     }
 
-    // Make sure paths match what getFileInfo() returned (it can add / at the end).
-    src = srcInfo.getPath();
-    dst = getDstUri(srcInfo, dstInfo, dstParentInfo);
+    FileInfo dstParentInfo = dstParent == null ? null : fileInfos.get(2);
+    try {
+      dst = getDstUri(srcInfo, dstInfo, dstParentInfo);
+    } catch (IOException e) {
+      throw e;
+    }
 
     // if src and dst are equal then do nothing
     if (src.equals(dst)) {

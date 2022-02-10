@@ -73,6 +73,7 @@ public class BigQueryFactory {
    * Construct credentials from the passed Configuration.
    *
    * @throws IOException on IO Error.
+   * @throws GeneralSecurityException on General Security Error.
    */
   public Credentials createBigQueryCredentials(Configuration config) throws IOException {
     return HadoopCredentialsConfiguration.getCredentials(config, BIGQUERY_CONFIG_PREFIX);

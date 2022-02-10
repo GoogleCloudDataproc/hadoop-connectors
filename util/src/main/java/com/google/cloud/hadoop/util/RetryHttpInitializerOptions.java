@@ -85,7 +85,7 @@ public abstract class RetryHttpInitializerOptions {
     public RetryHttpInitializerOptions build() {
       RetryHttpInitializerOptions options = autoBuild();
       checkArgument(
-          options.getHttpHeaders().keySet().stream().noneMatch("User-Agent"::equalsIgnoreCase),
+          !options.getHttpHeaders().keySet().stream().anyMatch("User-Agent"::equalsIgnoreCase),
           "The User-Agent header must be provided via the defaultUserAgent option");
       return options;
     }
