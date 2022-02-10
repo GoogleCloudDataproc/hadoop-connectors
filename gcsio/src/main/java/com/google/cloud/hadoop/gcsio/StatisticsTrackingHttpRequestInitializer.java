@@ -15,50 +15,37 @@
  */
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
+
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
-import com.google.api.client.http.HttpResponse;
 import com.google.common.base.Ascii;
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-/** To track and update the statistics related to http requests */
+/** Tracks and updates the statistics related to HTTP requests */
 class StatisticsTrackingHttpRequestInitializer implements HttpRequestInitializer {
 
-  private final ConcurrentMap<String, AtomicLong> statistics;
-
-  public StatisticsTrackingHttpRequestInitializer(ConcurrentMap<String, AtomicLong> statistics) {
-    this.statistics = statistics;
-  }
+  private final ConcurrentMap<String, AtomicLong> statistics = new ConcurrentHashMap<>();
 
   @Override
   public void initialize(HttpRequest request) throws IOException {
     request.setResponseInterceptor(
         httpResponse -> {
-          setHttpRequestStats(httpResponse.getRequest());
-          setHttpRequestFailureStats(httpResponse);
+          String requestMethod = Ascii.toLowerCase(httpResponse.getRequest().getRequestMethod());
+          int statusCode = httpResponse.getStatusCode();
+          statistics
+              .computeIfAbsent("http_" + requestMethod + "_" + statusCode, k -> new AtomicLong())
+              .incrementAndGet();
         });
   }
 
-  /** Set HTTP request stats */
-  private void setHttpRequestStats(HttpRequest request) {
-    String requestMethod = Ascii.toUpperCase(request.getRequestMethod());
-    increment("HTTP_" + requestMethod + "_REQUEST");
-  }
-
-  /** Set stats for the HTTP request failures */
-  private void setHttpRequestFailureStats(HttpResponse response) {
-    if (response.isSuccessStatusCode()) {
-      return;
-    }
-
-    String requestMethod = Ascii.toUpperCase(response.getRequest().getRequestMethod());
-    increment("HTTP_" + requestMethod + "_REQUEST_FAILURE");
-  }
-
-  /** Increment the value for a given key. */
-  private void increment(String key) {
-    statistics.computeIfAbsent(key, __ -> new AtomicLong(0)).incrementAndGet();
+  public ImmutableMap<String, Long> getStatistics() {
+    return statistics.entrySet().stream()
+        .collect(toImmutableMap(Map.Entry::getKey, e -> e.getValue().get()));
   }
 }

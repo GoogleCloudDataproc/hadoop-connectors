@@ -3269,14 +3269,26 @@ public class GoogleCloudStorageTest {
             GsonFactory.getDefaultInstance(),
             trackingRequestInitializerWithRetries);
     // Verify that fake projectId/appName and mock storage does not throw.
-    new GoogleCloudStorageImpl(optionsBuilder.build(), storage);
+    new GoogleCloudStorageImpl(
+        optionsBuilder.build(),
+        storage,
+        /* downscopedAccessTokenFn= */ null,
+        GoogleCloudStorageImpl.tryGetCredentialsFromStorage(storage));
 
     // Verify that projectId == null or empty does not throw.
     optionsBuilder.setProjectId(null);
-    new GoogleCloudStorageImpl(optionsBuilder.build(), storage);
+    new GoogleCloudStorageImpl(
+        optionsBuilder.build(),
+        storage,
+        /* downscopedAccessTokenFn= */ null,
+        GoogleCloudStorageImpl.tryGetCredentialsFromStorage(storage));
 
     optionsBuilder.setProjectId("");
-    new GoogleCloudStorageImpl(optionsBuilder.build(), storage);
+    new GoogleCloudStorageImpl(
+        optionsBuilder.build(),
+        storage,
+        /* downscopedAccessTokenFn= */ null,
+        GoogleCloudStorageImpl.tryGetCredentialsFromStorage(storage));
 
     optionsBuilder.setProjectId("projectId");
 
@@ -3285,19 +3297,34 @@ public class GoogleCloudStorageTest {
     optionsBuilder.setAppName(null);
     assertThrows(
         IllegalArgumentException.class,
-        () -> new GoogleCloudStorageImpl(optionsBuilder.build(), storage));
+        () ->
+            new GoogleCloudStorageImpl(
+                optionsBuilder.build(),
+                storage,
+                /* downscopedAccessTokenFn= */ null,
+                GoogleCloudStorageImpl.tryGetCredentialsFromStorage(storage)));
 
     optionsBuilder.setAppName("");
     assertThrows(
         IllegalArgumentException.class,
-        () -> new GoogleCloudStorageImpl(optionsBuilder.build(), storage));
+        () ->
+            new GoogleCloudStorageImpl(
+                optionsBuilder.build(),
+                storage,
+                /* downscopedAccessTokenFn= */ null,
+                GoogleCloudStorageImpl.tryGetCredentialsFromStorage(storage)));
 
     optionsBuilder.setAppName("appName");
 
     // Verify that gcs == null throws NullPointerException.
     assertThrows(
         NullPointerException.class,
-        () -> new GoogleCloudStorageImpl(optionsBuilder.build(), (Storage) null));
+        () ->
+            new GoogleCloudStorageImpl(
+                optionsBuilder.build(),
+                (Storage) null,
+                /* downscopedAccessTokenFn= */ null,
+                GoogleCloudStorageImpl.tryGetCredentialsFromStorage((Storage) null)));
   }
 
   /** Coverage for GoogleCloudStorageItemInfo.metadataEquals. */
@@ -3579,7 +3606,11 @@ public class GoogleCloudStorageTest {
       HttpRequestInitializer requestInitializer,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requestInitializer);
-    return new GoogleCloudStorageImpl(gcsOptions, storage, downscopedAccessTokenFn);
+    return new GoogleCloudStorageImpl(
+        gcsOptions,
+        storage,
+        downscopedAccessTokenFn,
+        GoogleCloudStorageImpl.tryGetCredentialsFromStorage(storage));
   }
 
   static Bucket newBucket(String name) {
