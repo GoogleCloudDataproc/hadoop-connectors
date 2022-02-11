@@ -241,6 +241,7 @@ public class GhfsInstrumentation
     counter(op.getSymbol(), op.getDescription());
     counter(op.getSymbol() + SUFFIX_FAILURES, op.getDescription());
   }
+
   /**
    * Create a gauge in the registry.
    *
@@ -514,6 +515,7 @@ public class GhfsInstrumentation
       // create initial snapshot of merged statistics
       mergedStats = snapshotIOStatistics(st);
     }
+
     /**
      * Increment a named counter by one.
      *
@@ -741,7 +743,7 @@ public class GhfsInstrumentation
      */
     private void promoteInputStreamCountersToMetrics() {
       // iterate through all the counters
-      localIOStatistics().counters().keySet().stream().forEach(e -> promoteIOCounter(e));
+      localIOStatistics().counters().keySet().forEach(this::promoteIOCounter);
     }
 
     /**
@@ -858,6 +860,7 @@ public class GhfsInstrumentation
       return lookupCounterValue(StreamStatisticNames.STREAM_WRITE_EXCEPTIONS);
     }
   }
+
   /**
    * Merge in the statistics of a single output stream into the filesystem-wide statistics.
    *
@@ -935,7 +938,7 @@ public class GhfsInstrumentation
 
   private IOStatisticsStoreBuilder createStoreBuilder() {
     IOStatisticsStoreBuilder storeBuilder = iostatisticsStore();
-    EnumSet.allOf(GhfsStatistic.class).stream()
+    EnumSet.allOf(GhfsStatistic.class)
         .forEach(
             stat -> {
               // declare all counter statistics

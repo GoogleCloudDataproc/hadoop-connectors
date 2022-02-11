@@ -63,7 +63,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
 
   @SuppressWarnings("DoubleBraceInitialization")
   private static final Map<String, Object> expectedDefaultConfiguration =
-      new HashMap<String, Object>() {
+      new HashMap<>() {
         {
           put("fs.gs.application.name.suffix", "");
           put("fs.gs.batch.threads", 15);
