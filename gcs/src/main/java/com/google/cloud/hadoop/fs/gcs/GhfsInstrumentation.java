@@ -211,6 +211,7 @@ public class GhfsInstrumentation
     }
     return metricsSystem;
   }
+
   /**
    * Create a counter in the registry.
    *
@@ -411,11 +412,12 @@ public class GhfsInstrumentation
   public void fileDeleted(int count) {
     incrementCounter(FILES_DELETED, count);
   }
+
   /**
    * Create a stream input statistics instance.
    *
-   * @return the new instance
    * @param filesystemStatistics FS Statistics to update in close().
+   * @return the new instance
    */
   public GhfsInputStreamStatistics newInputStreamStatistics(
       @Nullable FileSystem.Statistics filesystemStatistics) {
