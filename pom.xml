@@ -82,7 +82,6 @@
 
     <bigdataoss.version>3.0.0-SNAPSHOT</bigdataoss.version>
 
-    <google.api.grpc.proto-google-iam-v1.version>1.2.2</google.api.grpc.proto-google-iam-v1.version>
     <google.api-client.version>2.0.1</google.api-client.version>
     <google.api-client-libraries.version>2.0.0</google.api-client-libraries.version>
     <google.api-iamcredentials.version>v1-rev20211203-${google.api-client-libraries.version}</google.api-iamcredentials.version>
@@ -476,7 +475,7 @@
         </plugin>
         <plugin>
           <artifactId>maven-jar-plugin</artifactId>
-          <version>3.2.0</version>
+          <version>3.2.2</version>
           <executions>
             <execution>
               <id>default-jar</id>
@@ -490,7 +489,7 @@
         </plugin>
         <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.8.1</version>
+          <version>3.9.0</version>
         </plugin>
         <plugin>
           <artifactId>maven-enforcer-plugin</artifactId>
@@ -511,7 +510,7 @@
         <plugin>
           <groupId>com.diffplug.spotless</groupId>
           <artifactId>spotless-maven-plugin</artifactId>
-          <version>2.18.0</version>
+          <version>2.20.2</version>
         </plugin>
         <plugin>
           <groupId>org.jacoco</groupId>
@@ -588,11 +587,6 @@
               <artifactId>auto-value</artifactId>
               <version>${google.auto-value.version}</version>
             </path>
-            <path>
-              <groupId>com.google.auto.service</groupId>
-              <artifactId>auto-service</artifactId>
-              <version>1.0.1</version>
-            </path>
           </annotationProcessorPaths>
         </configuration>
       </plugin>
@@ -616,7 +610,7 @@
               <on>fmt:on</on>
             </toggleOffOn>
             <googleJavaFormat>
-              <version>1.13.0</version>
+              <version>${google.java-format.version}</version>
             </googleJavaFormat>
           </java>
         </configuration>
