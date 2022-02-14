@@ -15,7 +15,11 @@
  */
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.common.base.Preconditions.checkState;
+
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
+import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
@@ -37,6 +41,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.Syncable;
@@ -97,12 +102,12 @@ class GoogleHadoopSyncableOutputStream extends OutputStream implements Syncable 
 
   private final GoogleHadoopFileSystem ghfs;
 
-  // The final destination path for this stream.
-  private final URI finalGcsPath;
-
   // Statistics tracker provided by the parent GoogleHadoopFileSystem for recording
   // numbers of bytes written.
   private final FileSystem.Statistics statistics;
+
+  // The final destination path for this stream.
+  private final URI finalGcsPath;
 
   // Metadata/overwrite options to use on final file.
   private final CreateFileOptions fileOptions;
@@ -130,7 +135,7 @@ class GoogleHadoopSyncableOutputStream extends OutputStream implements Syncable 
 
   // The last known generationId of the final destination file, or possibly
   // StorageResourceId.UNKNOWN_GENERATION_ID if unknown.
-  private long curDestGenerationId;
+  private long curDstGenerationId;
 
   /** Creates a new GoogleHadoopSyncableOutputStream. */
   public GoogleHadoopSyncableOutputStream(
@@ -162,11 +167,15 @@ class GoogleHadoopSyncableOutputStream extends OutputStream implements Syncable 
     this.deletionFutures = new ArrayList<>();
     this.cleanupThreadpool = cleanupThreadpool;
     this.options = options;
-    this.syncRateLimiter = createRateLimiter(options.getMinSyncInterval());
+    Duration minSyncInterval = options.getMinSyncInterval();
+    this.syncRateLimiter =
+        minSyncInterval.isNegative() || minSyncInterval.isZero()
+            ? null
+            : RateLimiter.create(/* permitsPerSecond= */ 1_000.0 / minSyncInterval.toMillis());
 
     if (options.isAppendEnabled()) {
       // When appending first component has to go to new temporary file.
-      this.curGcsPath = getNextTemporaryPath();
+      this.curGcsPath = getNextTempPath();
       this.curComponentIndex = 1;
     } else {
       // The first component of the stream will go straight to the destination filename to optimize
@@ -177,15 +186,7 @@ class GoogleHadoopSyncableOutputStream extends OutputStream implements Syncable 
     }
 
     this.curDelegate = new GoogleHadoopOutputStream(ghfs, curGcsPath, statistics, fileOptions);
-    this.curDestGenerationId = StorageResourceId.UNKNOWN_GENERATION_ID;
-  }
-
-  private static RateLimiter createRateLimiter(Duration minSyncInterval) {
-    if (minSyncInterval.isNegative() || minSyncInterval.isZero()) {
-      return null;
-    }
-    double permitsPerSecond = 1000.0 / minSyncInterval.toMillis();
-    return RateLimiter.create(permitsPerSecond);
+    this.curDstGenerationId = StorageResourceId.UNKNOWN_GENERATION_ID;
   }
 
   @Override
@@ -195,43 +196,9 @@ class GoogleHadoopSyncableOutputStream extends OutputStream implements Syncable 
   }
 
   @Override
-  public void write(byte[] b, int offset, int len) throws IOException {
+  public void write(@Nonnull byte[] b, int offset, int len) throws IOException {
     throwIfNotOpen();
     curDelegate.write(b, offset, len);
-  }
-
-  @Override
-  public void close() throws IOException {
-    logger.atFiner().log(
-        "close(): Current tail file: %s final destination: %s", curGcsPath, finalGcsPath);
-    if (!isOpen()) {
-      logger.atFiner().log("close(): Ignoring; stream already closed.");
-      return;
-    }
-    getStatistics().close();
-    commitCurrentFile();
-
-    // null denotes stream closed.
-    // TODO(user): Add checks which throw IOException if further operations are attempted on a
-    // closed stream, except for multiple calls to close(), which should behave as no-ops.
-    curGcsPath = null;
-    curDelegate = null;
-
-    logger.atFiner().log("close(): Awaiting %s deletionFutures", deletionFutures.size());
-    for (Future<?> deletion : deletionFutures) {
-      try {
-        deletion.get();
-      } catch (ExecutionException | InterruptedException e) {
-        if (e instanceof InterruptedException) {
-          Thread.currentThread().interrupt();
-        }
-        throw new IOException("Failed to delete files while closing stream", e);
-      }
-    }
-  }
-
-  public void sync() throws IOException {
-    hsync();
   }
 
   /**
@@ -244,45 +211,46 @@ class GoogleHadoopSyncableOutputStream extends OutputStream implements Syncable 
    */
   @Override
   public void hflush() throws IOException {
-    long startTimeNs = System.nanoTime();
+    logger.atFiner().log("hflush(): %s", finalGcsPath);
+    throwIfNotOpen();
+    long startMs = System.currentTimeMillis();
     // update the output stream statistics of hflush()
     curDelegate.getStreamStatistics().hflushInvoked();
     if (!options.isSyncOnFlushEnabled()) {
       logger.atWarning().log(
           "hflush(): No-op: readers will *not* yet see flushed data for %s", finalGcsPath);
-      throwIfNotOpen();
       return;
     }
     // If rate limit not set or permit acquired than use hsync()
     if (syncRateLimiter == null || syncRateLimiter.tryAcquire()) {
-      logger.atFine().log("hflush() uses hsync() for %s", finalGcsPath);
-      hsyncInternal(startTimeNs);
+      logger.atFine().log("hflush() uses hsyncInternal() for %s", finalGcsPath);
+      hsyncInternal(startMs);
       return;
     }
     logger.atInfo().atMostEvery(1, TimeUnit.MINUTES).log(
         "hflush(): No-op due to rate limit (%s): readers will *not* yet see flushed data for %s",
         syncRateLimiter, finalGcsPath);
-    throwIfNotOpen();
   }
 
   @Override
   public void hsync() throws IOException {
-    long startTimeNs = System.nanoTime();
+    logger.atFiner().log("hsync(): %s", finalGcsPath);
+    throwIfNotOpen();
+    long startMs = System.currentTimeMillis();
     if (syncRateLimiter != null) {
       logger.atFiner().log(
           "hsync(): Rate limited (%s) with blocking permit acquisition for %s",
           syncRateLimiter, finalGcsPath);
       syncRateLimiter.acquire();
     }
-    hsyncInternal(startTimeNs);
+    hsyncInternal(startMs);
   }
 
   /** Internal implementation of hsync, can be reused by hflush() as well. */
-  private void hsyncInternal(long startTimeNs) throws IOException {
+  private void hsyncInternal(long startMs) throws IOException {
     logger.atFiner().log(
-        "hsync(): Committing tail file %s to final destination %s", curGcsPath, finalGcsPath);
-    throwIfNotOpen();
-
+        "hsyncInternal(): Committing tail file %s to final destination %s",
+        curGcsPath, finalGcsPath);
     // update the output stream statistics of hsync()
     curDelegate.getStreamStatistics().hsyncInvoked();
     commitCurrentFile();
@@ -290,7 +258,7 @@ class GoogleHadoopSyncableOutputStream extends OutputStream implements Syncable 
     // Use a different temporary path for each temporary component to reduce the possible avenues of
     // race conditions in the face of low-level retries, etc.
     ++curComponentIndex;
-    curGcsPath = getNextTemporaryPath();
+    curGcsPath = getNextTempPath();
 
     logger.atFiner().log(
         "hsync(): Opening next temporary tail file %s as component number %s",
@@ -298,8 +266,8 @@ class GoogleHadoopSyncableOutputStream extends OutputStream implements Syncable 
     curDelegate =
         new GoogleHadoopOutputStream(ghfs, curGcsPath, statistics, TEMPFILE_CREATE_OPTIONS);
 
-    long finishTimeNs = System.nanoTime();
-    logger.atFiner().log("Took %d ns to sync() for %s", finishTimeNs - startTimeNs, finalGcsPath);
+    long finishMs = System.currentTimeMillis();
+    logger.atFiner().log("Took %dms to sync() for %s", finishMs - startMs, finalGcsPath);
   }
 
   private void commitCurrentFile() throws IOException {
@@ -326,56 +294,76 @@ class GoogleHadoopSyncableOutputStream extends OutputStream implements Syncable 
     // necessary. Otherwise, we compose in-place into the destination object and then delete
     // the temporary object.
     if (!finalGcsPath.equals(curGcsPath)) {
-      StorageResourceId destResourceId =
-          StorageResourceId.fromStringPath(finalGcsPath.toString(), curDestGenerationId);
-      StorageResourceId tempResourceId =
+      StorageResourceId dstId =
+          StorageResourceId.fromStringPath(finalGcsPath.toString(), curDstGenerationId);
+      StorageResourceId tempId =
           StorageResourceId.fromStringPath(curGcsPath.toString(), generationId);
-      if (!destResourceId.getBucketName().equals(tempResourceId.getBucketName())) {
-        throw new IllegalStateException(
-            String.format(
-                "Destination bucket in path '%s' doesn't match temp file bucket in path '%s'",
-                finalGcsPath, curGcsPath));
-      }
+      checkState(
+          dstId.getBucketName().equals(tempId.getBucketName()),
+          "Destination bucket in path '%s' doesn't match temp file bucket in path '%s'",
+          finalGcsPath,
+          curGcsPath);
+      CreateObjectOptions objectOptions =
+          GoogleCloudStorageFileSystem.objectOptionsFromFileOptions(fileOptions);
+      GoogleCloudStorage gcs = ghfs.getGcsFs().getGcs();
       GoogleCloudStorageItemInfo composedObject =
-          ghfs.getGcsFs()
-              .getGcs()
-              .composeObjects(
-                  ImmutableList.of(destResourceId, tempResourceId),
-                  destResourceId,
-                  GoogleCloudStorageFileSystem.objectOptionsFromFileOptions(fileOptions));
-      curDestGenerationId = composedObject.getContentGeneration();
+          gcs.composeObjects(ImmutableList.of(dstId, tempId), dstId, objectOptions);
+      curDstGenerationId = composedObject.getContentGeneration();
       deletionFutures.add(
           cleanupThreadpool.submit(
               () -> {
-                ghfs.getGcsFs().getGcs().deleteObjects(ImmutableList.of(tempResourceId));
+                gcs.deleteObjects(ImmutableList.of(tempId));
                 return null;
               }));
     } else {
       // First commit was direct to the destination; the generationId of the object we just
       // committed will be used as the destination generation id for future compose calls.
-      curDestGenerationId = generationId;
+      curDstGenerationId = generationId;
     }
   }
 
   /** Returns URI to be used for the next "tail" file in the series. */
-  private URI getNextTemporaryPath() {
+  private URI getNextTempPath() {
     Path basePath = ghfs.getHadoopPath(finalGcsPath);
-    Path baseDir = basePath.getParent();
     Path tempPath =
         new Path(
-            baseDir,
+            basePath.getParent(),
             String.format(
                 "%s%s.%d.%s",
                 TEMPFILE_PREFIX, basePath.getName(), curComponentIndex, UUID.randomUUID()));
     return ghfs.getGcsPath(tempPath);
   }
 
-  private boolean isOpen() {
-    return curDelegate != null;
+  @Override
+  public void close() throws IOException {
+    logger.atFiner().log(
+        "close(): Current tail file: %s final destination: %s", curGcsPath, finalGcsPath);
+    if (curDelegate == null) {
+      logger.atFiner().log("close(): Ignoring; stream already closed.");
+      return;
+    }
+    getStatistics().close();
+    commitCurrentFile();
+
+    // null denotes stream closed.
+    curDelegate = null;
+    curGcsPath = null;
+
+    logger.atFiner().log("close(): Awaiting %s deletionFutures", deletionFutures.size());
+    for (Future<?> deletion : deletionFutures) {
+      try {
+        deletion.get();
+      } catch (ExecutionException | InterruptedException e) {
+        if (e instanceof InterruptedException) {
+          Thread.currentThread().interrupt();
+        }
+        throw new IOException("Failed to delete files while closing stream", e);
+      }
+    }
   }
 
   private void throwIfNotOpen() throws IOException {
-    if (!isOpen()) {
+    if (curDelegate == null) {
       throw new ClosedChannelException();
     }
   }
