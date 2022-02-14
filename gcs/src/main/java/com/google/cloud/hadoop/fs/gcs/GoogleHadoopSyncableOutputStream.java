@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
 import java.nio.channels.ClosedChannelException;
-import java.nio.channels.WritableByteChannel;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -306,18 +305,21 @@ class GoogleHadoopSyncableOutputStream extends OutputStream implements Syncable 
   private void commitCurrentFile() throws IOException {
     // TODO(user): Optimize the case where 0 bytes have been written in the current component
     // to return early.
-    WritableByteChannel innerChannel = curDelegate.getInternalChannel();
+    OutputStream innerOutputStream = curDelegate.getInternalOutputStream();
     curDelegate.close();
 
     long generationId = StorageResourceId.UNKNOWN_GENERATION_ID;
-    if (innerChannel instanceof GoogleCloudStorageItemInfo.Provider) {
+    if (innerOutputStream instanceof GoogleCloudStorageItemInfo.Provider) {
       generationId =
-          ((GoogleCloudStorageItemInfo.Provider) innerChannel).getItemInfo().getContentGeneration();
+          ((GoogleCloudStorageItemInfo.Provider) innerOutputStream)
+              .getItemInfo()
+              .getContentGeneration();
       logger.atFiner().log(
-          "innerChannel is GoogleCloudStorageItemInfo.Provider; closed generationId %s.",
+          "innerOutputStream is GoogleCloudStorageItemInfo.Provider; closed generationId %s.",
           generationId);
     } else {
-      logger.atFiner().log("innerChannel NOT instanceof provider: %s", innerChannel.getClass());
+      logger.atFiner().log(
+          "innerOutputStream NOT instanceof provider: %s", innerOutputStream.getClass());
     }
 
     // On the first component, curGcsPath will equal finalGcsPath, and no compose() call is
