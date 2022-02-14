@@ -27,6 +27,7 @@ import java.net.URI;
 import java.nio.channels.Channels;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.WritableByteChannel;
+import javax.annotation.Nonnull;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.statistics.IOStatistics;
@@ -35,7 +36,7 @@ import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSource {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-  // Statistics tracker for outputstream related statistics
+  // Statistics tracker for output stream related statistics
   private final GhfsOutputStreamStatistics streamStatistics;
   // IO Statistics tracker from Output Stream
   private final IOStatistics ioStatistics;
@@ -104,7 +105,7 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
   }
 
   @Override
-  public void write(byte[] b, int offset, int len) throws IOException {
+  public void write(@Nonnull byte[] b, int offset, int len) throws IOException {
     streamStatistics.writeBytes(len);
     throwIfNotOpen();
     out.write(b, offset, len);
