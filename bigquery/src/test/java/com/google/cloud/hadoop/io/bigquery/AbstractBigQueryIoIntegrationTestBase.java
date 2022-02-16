@@ -15,9 +15,8 @@ package com.google.cloud.hadoop.io.bigquery;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.BIGQUERY_CONFIG_PREFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_KEYFILE_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTHENTICATION_TYPE_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.truth.Truth.assertThat;
@@ -34,6 +33,7 @@ import com.google.cloud.hadoop.io.bigquery.output.BigQueryOutputConfiguration;
 import com.google.cloud.hadoop.io.bigquery.output.BigQueryTableFieldSchema;
 import com.google.cloud.hadoop.io.bigquery.output.BigQueryTableSchema;
 import com.google.cloud.hadoop.io.bigquery.output.IndirectBigQueryOutputFormat;
+import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import com.google.common.flogger.GoogleLogger;
@@ -78,7 +78,7 @@ public abstract class AbstractBigQueryIoIntegrationTestBase<T> {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Environment variable name for the projectId with which we will run this test.
-  public static final String BIGQUERY_PROJECT_ID_ENVVARNAME = "BIGQUERY_PROJECT_ID";
+  public static final String BIGQUERY_PROJECT_ID = "BIGQUERY_PROJECT_ID";
 
   protected static final BigQueryTableFieldSchema COMPANY_NAME_FIELD =
       new BigQueryTableFieldSchema().setName("CompanyName").setType("STRING");
@@ -132,29 +132,33 @@ public abstract class AbstractBigQueryIoIntegrationTestBase<T> {
 
   /**
    * Helper method for grabbing service-account email and private keyfile name based on settings
-   * intended for BigQueryFactory and adding them as GCS-equivalent credential settings.
+   * intended for BigQueryFactory and adding them as GCS-equivalent credentials settings.
    */
   public static Configuration getConfigForGcsFromBigquerySettings(String projectIdValue) {
     TestConfiguration testConf = TestConfiguration.getInstance();
-    String serviceAccount = testConf.getServiceAccount();
-    if (isNullOrEmpty(serviceAccount)) {
-      serviceAccount = System.getenv(BigQueryFactory.BIGQUERY_SERVICE_ACCOUNT);
-    }
-    String privateKeyFile = testConf.getPrivateKeyFile();
-    if (isNullOrEmpty(privateKeyFile)) {
-      privateKeyFile = System.getenv(BigQueryFactory.BIGQUERY_PRIVATE_KEY_FILE);
+    String serviceAccountJsonKeyFile = testConf.getServiceAccountJsonKeyFile();
+    if (isNullOrEmpty(serviceAccountJsonKeyFile)) {
+      serviceAccountJsonKeyFile =
+          System.getenv(BigQueryFactory.BIGQUERY_SERVICE_ACCOUNT_JSON_KEYFILE);
     }
 
     Configuration config = new Configuration();
     config.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem");
     config.set(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(), projectIdValue);
 
-    if (serviceAccount != null && privateKeyFile != null) {
-      config.setBoolean(BIGQUERY_CONFIG_PREFIX + ENABLE_SERVICE_ACCOUNTS_SUFFIX.getKey(), true);
-      config.set(BIGQUERY_CONFIG_PREFIX + SERVICE_ACCOUNT_EMAIL_SUFFIX.getKey(), serviceAccount);
-      config.set(BIGQUERY_CONFIG_PREFIX + SERVICE_ACCOUNT_KEYFILE_SUFFIX.getKey(), privateKeyFile);
-      config.set(GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_EMAIL_SUFFIX.getKey(), serviceAccount);
-      config.set(GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_KEYFILE_SUFFIX.getKey(), privateKeyFile);
+    if (serviceAccountJsonKeyFile != null) {
+      config.setEnum(
+          BIGQUERY_CONFIG_PREFIX + AUTHENTICATION_TYPE_SUFFIX.getKey(),
+          AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
+      config.setEnum(
+          GCS_CONFIG_PREFIX + AUTHENTICATION_TYPE_SUFFIX.getKey(),
+          AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
+      config.set(
+          BIGQUERY_CONFIG_PREFIX + SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.getKey(),
+          serviceAccountJsonKeyFile);
+      config.set(
+          GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.getKey(),
+          serviceAccountJsonKeyFile);
     }
 
     return config;
@@ -182,11 +186,10 @@ public abstract class AbstractBigQueryIoIntegrationTestBase<T> {
 
     projectIdValue = TestConfiguration.getInstance().getProjectId();
     if (isNullOrEmpty(projectIdValue)) {
-      projectIdValue = System.getenv(BIGQUERY_PROJECT_ID_ENVVARNAME);
+      projectIdValue = System.getenv(BIGQUERY_PROJECT_ID);
     }
 
-    checkArgument(
-        !isNullOrEmpty(projectIdValue), "Must provide %s", BIGQUERY_PROJECT_ID_ENVVARNAME);
+    checkArgument(!isNullOrEmpty(projectIdValue), "Must provide %s", BIGQUERY_PROJECT_ID);
     testDataset = testId + "_dataset";
     testBucket = testId + "_bucket";
 

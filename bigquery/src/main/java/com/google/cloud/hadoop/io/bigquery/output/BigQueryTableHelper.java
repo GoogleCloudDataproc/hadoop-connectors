@@ -14,7 +14,7 @@
 package com.google.cloud.hadoop.io.bigquery.output;
 
 import com.google.api.client.json.JsonParser;
-import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.bigquery.model.TableFieldSchema;
 import com.google.api.services.bigquery.model.TableSchema;
 import java.io.IOException;
@@ -31,7 +31,7 @@ class BigQueryTableHelper {
    * @throws IOException if the JSON is invalid.
    */
   static TableSchema parseTableSchema(String tableSchemaJson) throws IOException {
-    JsonParser parser = JacksonFactory.getDefaultInstance().createJsonParser(tableSchemaJson);
+    JsonParser parser = GsonFactory.getDefaultInstance().createJsonParser(tableSchemaJson);
     return parser.parseAndClose(TableSchema.class);
   }
 
@@ -43,7 +43,7 @@ class BigQueryTableHelper {
    */
   static TableSchema createTableSchemaFromFields(String fieldsJson) throws IOException {
     List<TableFieldSchema> fields = new ArrayList<>();
-    JsonParser parser = JacksonFactory.getDefaultInstance().createJsonParser(fieldsJson);
+    JsonParser parser = GsonFactory.getDefaultInstance().createJsonParser(fieldsJson);
     parser.parseArrayAndClose(fields, TableFieldSchema.class);
 
     return new TableSchema().setFields(fields);
@@ -56,7 +56,7 @@ class BigQueryTableHelper {
    * @return the JSON of the table schema.
    */
   static String getTableSchemaJson(TableSchema tableSchema) throws IOException {
-    return JacksonFactory.getDefaultInstance().toString(tableSchema);
+    return GsonFactory.getDefaultInstance().toString(tableSchema);
   }
 
   /**
@@ -66,6 +66,6 @@ class BigQueryTableHelper {
    * @return the JSON of the fields.
    */
   static String getTableFieldsJson(TableSchema tableSchema) throws IOException {
-    return JacksonFactory.getDefaultInstance().toString(tableSchema.getFields());
+    return GsonFactory.getDefaultInstance().toString(tableSchema.getFields());
   }
 }

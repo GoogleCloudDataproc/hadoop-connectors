@@ -32,7 +32,6 @@ import static java.util.Arrays.stream;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 
-import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.batch.json.JsonBatchCallback;
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
@@ -41,8 +40,7 @@ import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.InputStreamContent;
-import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.util.BackOff;
 import com.google.api.client.util.Data;
 import com.google.api.client.util.ExponentialBackOff;
@@ -59,6 +57,7 @@ import com.google.auth.Credentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
+import com.google.cloud.hadoop.util.ChainingHttpRequestInitializer;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.ResilientOperation;
@@ -115,9 +114,6 @@ import javax.annotation.Nullable;
 public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-
-  // JSON factory used for formatting GCS JSON API payloads.
-  private static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
 
   // Maximum number of times to retry deletes in the case of precondition failures.
   private static final int MAXIMUM_PRECONDITION_FAILURES_IN_DELETE = 4;
@@ -212,7 +208,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       CacheBuilder.newBuilder()
           .expireAfterWrite(Duration.ofHours(1))
           .build(
-              new CacheLoader<String, Boolean>() {
+              new CacheLoader<>() {
                 final List<String> iamPermissions = ImmutableList.of("storage.buckets.get");
 
                 @Override
@@ -281,22 +277,19 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
    *
-   * @param credential OAuth2 credential that allows access to GCS
+   * @param options options to customize behavior
+   * @param credentials OAuth2 credentials that allows access to GCS
    * @throws IOException on IO error
    */
-  public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Credential credential)
+  public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Credentials credentials)
       throws IOException {
-    this(options, credential, /* downscopedAccessTokenFn= */ null);
+    this(options, credentials, /* downscopedAccessTokenFn= */ null);
   }
 
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer)
       throws IOException {
-    this(
-        options,
-        createStorage(options, httpRequestInitializer),
-        /* credentials= */ null,
-        /* accessTokenProvider= */ null);
+    this(options, createStorage(options, httpRequestInitializer), /* accessTokenProvider= */ null);
   }
 
   public GoogleCloudStorageImpl(
@@ -304,11 +297,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       HttpRequestInitializer httpRequestInitializer,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
-    this(
-        options,
-        createStorage(options, httpRequestInitializer),
-        /* credentials= */ null,
-        downscopedAccessTokenFn);
+    this(options, createStorage(options, httpRequestInitializer), downscopedAccessTokenFn);
   }
 
   /**
@@ -317,31 +306,20 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param storage {@link Storage} to use for I/O.
    */
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage storage) {
-    this(options, storage, /* credentials= */ null, /* downscopedAccessTokenFn= */ null);
+    this(options, storage, /* downscopedAccessTokenFn= */ null);
   }
 
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
    *
-   * @param options {@link GoogleCloudStorageOptions} to use to initialize the object.
-   * @param storage {@link Storage} to use for I/O.
+   * @param options options to customize behavior
    * @param credentials OAuth2 credentials that allows access to GCS
-   */
-  public GoogleCloudStorageImpl(
-      GoogleCloudStorageOptions options, Storage storage, Credentials credentials) {
-    this(options, storage, credentials, /* downscopedAccessTokenFn= */ null);
-  }
-
-  /**
-   * Constructs an instance of GoogleCloudStorageImpl.
-   *
-   * @param credential OAuth2 credential that allows access to GCS
    * @param downscopedAccessTokenFn Function that generates downscoped access token.
    * @throws IOException on IO error
    */
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options,
-      Credential credential,
+      Credentials credentials,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
     logger.atFiner().log("GCS(options: %s)", options);
@@ -349,10 +327,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     this.storageOptions = checkNotNull(options, "options must not be null");
     this.storageOptions.throwIfNotValid();
     HttpRequestInitializer retryHttpInitializer =
-        new RetryHttpInitializer(
+        new ChainingHttpRequestInitializer(
             new StatisticsTrackingHttpRequestInitializer(statistics),
-            credential,
-            options.toRetryHttpInitializerOptions());
+            new RetryHttpInitializer(credentials, options.toRetryHttpInitializerOptions()));
 
     this.storage =
         checkNotNull(createStorage(options, retryHttpInitializer), "storage must not be null");
@@ -368,7 +345,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           Watchdog.create(Duration.ofMillis(storageOptions.getGrpcMessageTimeoutCheckInterval()));
       this.storageStubProvider =
           StorageStubProvider.newInstance(
-              this.storageOptions, this.backgroundTasksThreadPool, credential);
+              this.storageOptions, this.backgroundTasksThreadPool, credentials);
     }
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
   }
@@ -378,13 +355,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    *
    * @param options {@link GoogleCloudStorageOptions} to use to initialize the object.
    * @param storage {@link Storage} to use for I/O.
-   * @param credentials OAuth2 credentials that allows access to GCS
    * @param downscopedAccessTokenFn Function that generates downscoped access token.
    */
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options,
       Storage storage,
-      Credentials credentials,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
     logger.atFiner().log("GCS(options: %s)", options);
 
@@ -402,20 +377,14 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     if (this.storageOptions.isGrpcEnabled()) {
       this.watchdog =
           Watchdog.create(Duration.ofMillis(options.getGrpcMessageTimeoutCheckInterval()));
-      if (credentials != null) {
-        this.storageStubProvider =
-            StorageStubProvider.newInstance(
-                this.storageOptions, this.backgroundTasksThreadPool, credentials);
-      } else {
-        checkArgument(
-            httpRequestInitializer instanceof RetryHttpInitializer,
-            "request initializer must be an instance of the RetryHttpInitializer class"
-                + " when gRPC API enabled");
-        Credential credential = ((RetryHttpInitializer) httpRequestInitializer).getCredential();
-        this.storageStubProvider =
-            StorageStubProvider.newInstance(
-                this.storageOptions, this.backgroundTasksThreadPool, credential);
-      }
+      checkArgument(
+          httpRequestInitializer instanceof RetryHttpInitializer,
+          "request initializer must be an instance of the RetryHttpInitializer class"
+              + " when gRPC API enabled");
+      Credentials credentials = ((RetryHttpInitializer) httpRequestInitializer).getCredentials();
+      this.storageStubProvider =
+          StorageStubProvider.newInstance(
+              this.storageOptions, this.backgroundTasksThreadPool, credentials);
     }
 
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
@@ -427,7 +396,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     HttpTransport httpTransport =
         HttpTransportFactory.createHttpTransport(
             options.getProxyAddress(), options.getProxyUsername(), options.getProxyPassword());
-    return new Storage.Builder(httpTransport, JSON_FACTORY, httpRequestInitializer)
+    return new Storage.Builder(
+            httpTransport, GsonFactory.getDefaultInstance(), httpRequestInitializer)
         .setRootUrl(options.getStorageRootUrl())
         .setServicePath(options.getStorageServicePath())
         .setApplicationName(options.getAppName())
@@ -792,10 +762,15 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
     if (storageOptions.isGrpcEnabled()) {
       return itemInfo == null
-          ? GoogleCloudStorageGrpcReadChannel.open(
-              storageStubProvider, storage, errorExtractor, resourceId, watchdog, readOptions)
-          : GoogleCloudStorageGrpcReadChannel.open(
-              storageStubProvider, storage, itemInfo, watchdog, readOptions);
+          ? new GoogleCloudStorageGrpcReadChannel(
+              storageStubProvider,
+              storage,
+              resourceId,
+              watchdog,
+              readOptions,
+              BackOffFactory.DEFAULT)
+          : new GoogleCloudStorageGrpcReadChannel(
+              storageStubProvider, itemInfo, watchdog, readOptions, BackOffFactory.DEFAULT);
     }
 
     return new GoogleCloudStorageReadChannel(
@@ -899,7 +874,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       BatchHelper batchHelper,
       int attempt,
       long generation) {
-    return new JsonBatchCallback<Void>() {
+    return new JsonBatchCallback<>() {
       @Override
       public void onSuccess(Void obj, HttpHeaders responseHeaders) {
         logger.atFiner().log("Successfully deleted %s at generation %s", resourceId, generation);
@@ -959,7 +934,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               .setFields("generation");
       batchHelper.queue(
           getObject,
-          new JsonBatchCallback<StorageObject>() {
+          new JsonBatchCallback<>() {
             @Override
             public void onSuccess(StorageObject storageObject, HttpHeaders httpHeaders)
                 throws IOException {
@@ -981,8 +956,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                   createJsonResponseException(jsonError, responseHeaders);
               if (errorExtractor.itemNotFound(cause)) {
                 // If the item isn't found, treat it the same as if it's not found
-                // in the delete
-                // case: assume the user wanted the object gone and now it is.
+                // in the delete case: assume the user wanted the object gone, and now it is.
                 logger.atFiner().log(
                     "deleteObjects(%s): get not found:%n%s", resourceId, jsonError);
               } else {
@@ -1144,7 +1118,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       StorageResourceId dstObject = entry.getValue();
       if (storageOptions.isCopyWithRewriteEnabled()) {
         // Rewrite request has the same effect as Copy, but it can handle moving
-        // large objects that may potentially timeout a Copy request.
+        // large objects that may potentially time out a Copy request.
         rewriteInternal(
             batchHelper,
             innerExceptions,
@@ -1198,7 +1172,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // TODO(b/79750454) do not batch rewrite requests because they time out in batches.
     batchHelper.queue(
         rewriteObject,
-        new JsonBatchCallback<RewriteResponse>() {
+        new JsonBatchCallback<>() {
           @Override
           public void onSuccess(RewriteResponse rewriteResponse, HttpHeaders responseHeaders) {
             String srcString = StringPaths.fromComponents(srcBucketName, srcObjectName);
@@ -1264,7 +1238,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     batchHelper.queue(
         copyObject,
-        new JsonBatchCallback<StorageObject>() {
+        new JsonBatchCallback<>() {
           @Override
           public void onSuccess(StorageObject copyResponse, HttpHeaders responseHeaders) {
             String srcString = StringPaths.fromComponents(srcBucketName, srcObjectName);
@@ -1422,7 +1396,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     // List +1 object if prefix is not included in the result,
     // because GCS always includes prefix object
-    // in the result if it exists and we filter it out.
+    // in the result if it exists, and we filter it out.
     //
     // Example:
     //
@@ -1822,7 +1796,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         batchHelper.queue(
             initializeRequest(
                 storage.buckets().get(resourceId.getBucketName()), resourceId.getBucketName()),
-            new JsonBatchCallback<Bucket>() {
+            new JsonBatchCallback<>() {
               @Override
               public void onSuccess(Bucket bucket, HttpHeaders responseHeaders) {
                 logger.atFiner().log(
@@ -1856,7 +1830,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                 // Request only fields used in GoogleCloudStorageItemInfo:
                 // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
                 .setFields(OBJECT_FIELDS),
-            new JsonBatchCallback<StorageObject>() {
+            new JsonBatchCallback<>() {
               @Override
               public void onSuccess(StorageObject obj, HttpHeaders responseHeaders) {
                 logger.atFiner().log(
@@ -1954,7 +1928,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
       batchHelper.queue(
           patch,
-          new JsonBatchCallback<StorageObject>() {
+          new JsonBatchCallback<>() {
             @Override
             public void onSuccess(StorageObject obj, HttpHeaders responseHeaders) {
               logger.atFiner().log(

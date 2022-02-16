@@ -16,11 +16,14 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.storage.Storage;
+import com.google.auth.Credentials;
 import com.google.auth.oauth2.ComputeEngineCredentials;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
+import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
+import com.google.cloud.hadoop.util.testing.FakeCredentials;
 import java.io.IOException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -29,21 +32,13 @@ import org.junit.runners.JUnit4;
 /** Tests that require a particular configuration of GoogleCloudStorageImpl. */
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageImplCreateTest {
-  private Storage createStorage() throws IOException {
-    return new Storage.Builder(
-            HttpTransportFactory.createHttpTransport(),
-            JacksonFactory.getDefaultInstance(),
-            new RetryHttpInitializer(null, "foo-user-agent"))
-        .build();
-  }
 
   @Test
   public void create_grpcAndVmComputeEngineCredentials_useDirectpath() throws IOException {
     GoogleCloudStorageImpl gcs =
         new GoogleCloudStorageImpl(
             GoogleCloudStorageOptions.builder().setAppName("app").setGrpcEnabled(true).build(),
-            createStorage(),
-            ComputeEngineCredentials.newBuilder().build());
+            createStorage());
     assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
         .isInstanceOf(StorageStubProvider.DirectPathGrpcDecorator.class);
   }
@@ -58,9 +53,7 @@ public class GoogleCloudStorageImplCreateTest {
                 .setGrpcEnabled(true)
                 .setDirectPathPreferred(false)
                 .build(),
-            createStorage(),
-            ComputeEngineCredentials.newBuilder().build(),
-            null);
+            createStorage());
     assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
         .isInstanceOf(StorageStubProvider.CloudPathGrpcDecorator.class);
   }
@@ -70,7 +63,17 @@ public class GoogleCloudStorageImplCreateTest {
     GoogleCloudStorageImpl gcs =
         new GoogleCloudStorageImpl(
             GoogleCloudStorageOptions.builder().setAppName("app").setGrpcEnabled(true).build(),
-            createStorage());
+            createStorage(new FakeCredentials()));
+    assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
+        .isInstanceOf(StorageStubProvider.CloudPathGrpcDecorator.class);
+  }
+
+  @Test
+  public void create_grpcAndNullCredentials_useCloudpath() throws IOException {
+    GoogleCloudStorageImpl gcs =
+        new GoogleCloudStorageImpl(
+            GoogleCloudStorageOptions.builder().setAppName("app").setGrpcEnabled(true).build(),
+            createStorage(/* credentials= */ null));
     assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
         .isInstanceOf(StorageStubProvider.CloudPathGrpcDecorator.class);
   }
@@ -84,10 +87,24 @@ public class GoogleCloudStorageImplCreateTest {
                 .setGrpcEnabled(true)
                 .setTrafficDirectorEnabled(true)
                 .build(),
-            createStorage(),
-            ComputeEngineCredentials.newBuilder().build(),
-            null);
+            createStorage());
     assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
         .isInstanceOf(StorageStubProvider.TrafficDirectorGrpcDecorator.class);
+  }
+
+  private static Storage createStorage() throws IOException {
+    return createStorage(ComputeEngineCredentials.create());
+  }
+
+  private static Storage createStorage(Credentials credentials) throws IOException {
+    return new Storage.Builder(
+            HttpTransportFactory.createHttpTransport(),
+            GsonFactory.getDefaultInstance(),
+            new RetryHttpInitializer(
+                credentials,
+                RetryHttpInitializerOptions.builder()
+                    .setDefaultUserAgent("foo-user-agent")
+                    .build()))
+        .build();
   }
 }

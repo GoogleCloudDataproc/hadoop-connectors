@@ -14,16 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# tools/run_integration_tests.sh <project_id> <service_account_email> <path_to_p12> [optional_maven_parameters, [...]]
+# tools/run_integration_tests.sh <project_id> <path_to_json_keyfile> [optional_maven_parameters, [...]]
 
 set -Eeuo pipefail
 
 export GCS_TEST_PROJECT_ID=$1
-export GCS_TEST_SERVICE_ACCOUNT=$2
-GCS_TEST_PRIVATE_KEYFILE=$3
+GCS_TEST_JSON_KEYFILE=$2
 
 print_usage() {
-  echo -n "$0 <project ID> <service_account_email> <path_to_p12> [optional_maven_parameters, [...]]"
+  echo -en "Usage:\n  $0 <project_id> <path_to_json_keyfile> [optional_maven_parameters, [...]]"
 }
 
 check_required_param() {
@@ -37,13 +36,12 @@ check_required_param() {
 }
 
 check_required_params() {
-  check_required_param "${GCS_TEST_PROJECT_ID}" "Project ID required."
-  check_required_param "${GCS_TEST_SERVICE_ACCOUNT}" "Service account email is required."
-  check_required_param "${GCS_TEST_PRIVATE_KEYFILE}" "Private key file is required."
+  check_required_param "${GCS_TEST_PROJECT_ID}" "Project ID parameter is required."
+  check_required_param "${GCS_TEST_JSON_KEYFILE}" "Keyfile parameter is required."
 
-  if [[ ! -f "${GCS_TEST_PRIVATE_KEYFILE}" ]]; then
-    echo "Can't find private key file ${GCS_TEST_PRIVATE_KEYFILE}"
-    print_Usage
+  if [[ ! -f ${GCS_TEST_JSON_KEYFILE} ]]; then
+    echo "Can't find keyfile: ${GCS_TEST_JSON_KEYFILE}"
+    print_usage
     exit 1
   fi
 }
@@ -55,23 +53,23 @@ check_required_params
 if [[ $(uname -s) == Darwin ]]; then
   # On MacOS `readlink` does not support `-f` parameter
   # so we need manually resolve absolute path and symlink after that
-  abs_path() {    
-   echo "$(cd $(dirname "$1"); pwd)/$(basename "$1")"
+  abs_path() {
+    echo "$(cd $(dirname "$1"); pwd)/$(basename "$1")"
   }
-  GCS_TEST_PRIVATE_KEYFILE=$(abs_path "${GCS_TEST_PRIVATE_KEYFILE}")
-  while [[ -L $GCS_TEST_PRIVATE_KEYFILE ]]; do
-    GCS_TEST_PRIVATE_KEYFILE=$(readlink -n "${GCS_TEST_PRIVATE_KEYFILE}")
+  GCS_TEST_JSON_KEYFILE=$(abs_path "${GCS_TEST_JSON_KEYFILE}")
+  while [[ -L ${GCS_TEST_JSON_KEYFILE} ]]; do
+    GCS_TEST_JSON_KEYFILE=$(readlink -n "${GCS_TEST_JSON_KEYFILE}")
   done
 else
-  GCS_TEST_PRIVATE_KEYFILE=$(readlink -n -f "${GCS_TEST_PRIVATE_KEYFILE}")
+  GCS_TEST_JSON_KEYFILE=$(readlink -n -f "${GCS_TEST_JSON_KEYFILE}")
 fi
-if [[ ! -f $GCS_TEST_PRIVATE_KEYFILE ]]; then
-  echo "Resolved '${GCS_TEST_PRIVATE_KEYFILE}' keyfile does not exist."
+if [[ ! -f ${GCS_TEST_JSON_KEYFILE} ]]; then
+  echo "Resolved keyfile does not exist: ${GCS_TEST_JSON_KEYFILE}"
   exit 1
 fi
 
-export GCS_TEST_PRIVATE_KEYFILE
+export GCS_TEST_JSON_KEYFILE
 export HDFS_ROOT=file:///tmp
 export RUN_INTEGRATION_TESTS=true
 
-./mvnw -B -e -T1C -Pintegration-test clean verify "${@:5}"
+./mvnw -B -e -T1C -Pintegration-test clean verify "${@:3}"

@@ -25,7 +25,7 @@ import com.google.api.services.bigquery.model.TableSchema;
 import com.google.cloud.hadoop.fs.gcs.InMemoryGoogleHadoopFileSystem;
 import com.google.cloud.hadoop.io.bigquery.BigQueryFileFormat;
 import com.google.cloud.hadoop.io.bigquery.BigQueryHelper;
-import com.google.cloud.hadoop.util.testing.CredentialConfigurationUtil;
+import com.google.cloud.hadoop.util.testing.CredentialsConfigurationUtil;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.List;
@@ -130,7 +130,7 @@ public class FederatedBigQueryOutputCommitterTest {
     // Setup the configuration.
     job = Job.getInstance(InMemoryGoogleHadoopFileSystem.getSampleConfiguration());
     conf = job.getConfiguration();
-    CredentialConfigurationUtil.addTestConfigurationSettings(conf);
+    CredentialsConfigurationUtil.addTestConfigurationSettings(conf);
     BigQueryOutputConfiguration.configure(
         conf,
         QUALIFIED_TEST_TABLE_ID,

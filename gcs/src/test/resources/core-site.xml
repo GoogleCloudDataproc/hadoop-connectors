@@ -26,22 +26,26 @@
     To run these tests:
     # Create a file auth-keys.xml  - DO NOT ADD TO REVISION CONTROL
     # Add the credentials/settings for Google Cloud Storage with the three
-    # keys: fs.gs.auth.service.account.email, fs.gs.auth.service.account.keyfile
-    # and fs.gs.project.id.
-    # Uncomment out the following include.
-    <include xmlns="http://www.w3.org/2001/XInclude"
-             href="auth-keys.xml"/>
+    # keys: fs.gs.auth.type, fs.gs.auth.service.account.json.keyfile and
+    # fs.gs.project.id
+    # Tip: you can use an xinclude in auth-keys.xml to refer to another configuration
+    # file outside this source tree, so be confident your credentials can never
+    # be accidentally published
     -->
+    <include xmlns="http://www.w3.org/2001/XInclude"
+             href="auth-keys.xml">
+      <fallback/>
+    </include>
 
     <!--
     Example:
     <property>
-      <name>fs.gs.auth.service.account.email</name>
-      <value>YOUR_SERVICE_ACCOUNT_EMAIL_HERE</value>
+      <name>fs.gs.auth.type</name>
+      <value>SERVICE_ACCOUNT_JSON_KEYFILE</value>
     </property>
     <property>
-      <name>fs.gs.auth.service.account.keyfile</name>
-      <value>PATH_TO_YOUR_P12_FILE_HERE</value>
+      <name>fs.gs.auth.service.account.json.keyfile</name>
+      <value>PATH_TO_YOUR_JSON_FILE_HERE</value>
     </property>
     <property>
       <name>fs.gs.project.id</name>

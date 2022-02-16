@@ -75,7 +75,7 @@ final class Watchdog implements Runnable {
 
   private void start() {
     executor.scheduleAtFixedRate(
-        this, scheduleInterval.toMillis(), scheduleInterval.toMillis(), MILLISECONDS);
+        this, /* initialDelay= */ 0, scheduleInterval.toMillis(), MILLISECONDS);
   }
 
   /**

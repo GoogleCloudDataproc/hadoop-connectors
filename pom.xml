@@ -73,8 +73,8 @@
   <properties>
     <argLine/>
 
-    <build.java.source.version>8</build.java.source.version>
-    <build.java.target.version>8</build.java.target.version>
+    <build.java.source.version>11</build.java.source.version>
+    <build.java.target.version>11</build.java.target.version>
 
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
@@ -265,17 +265,17 @@
     <dependencies>
       <dependency>
         <groupId>com.google.http-client</groupId>
-        <artifactId>google-http-client-jackson2</artifactId>
+        <artifactId>google-http-client-gson</artifactId>
         <version>${google.http-client.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.api-client</groupId>
-        <artifactId>google-api-client-jackson2</artifactId>
+        <artifactId>google-api-client-gson</artifactId>
         <version>${google.api-client.version}</version>
         <exclusions>
           <exclusion>
             <groupId>com.google.http-client</groupId>
-            <artifactId>google-http-client-jackson2</artifactId>
+            <artifactId>google-http-client-gson</artifactId>
           </exclusion>
         </exclusions>
       </dependency>

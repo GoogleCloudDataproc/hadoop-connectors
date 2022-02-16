@@ -19,7 +19,6 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTest.newStorageObject;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.BUCKET_NAME;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.HTTP_TRANSPORT;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.JSON_FACTORY;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.OBJECT_NAME;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.batchRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
@@ -31,6 +30,7 @@ import static org.junit.Assert.assertThrows;
 import com.google.api.client.googleapis.batch.json.JsonBatchCallback;
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.http.HttpHeaders;
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.StorageObject;
@@ -54,7 +54,8 @@ public class BatchHelperTest {
 
   @Test
   public void newBatchHelper_throwsException_whenMaxRequestsPerBatchZero() {
-    Storage storage = new Storage(HTTP_TRANSPORT, JSON_FACTORY, httpRequestInitializer);
+    Storage storage =
+        new Storage(HTTP_TRANSPORT, GsonFactory.getDefaultInstance(), httpRequestInitializer);
 
     IllegalArgumentException e =
         assertThrows(
@@ -72,7 +73,8 @@ public class BatchHelperTest {
 
   @Test
   public void newBatchHelper_throwsException_whenTotalRequestsZero() {
-    Storage storage = new Storage(HTTP_TRANSPORT, JSON_FACTORY, httpRequestInitializer);
+    Storage storage =
+        new Storage(HTTP_TRANSPORT, GsonFactory.getDefaultInstance(), httpRequestInitializer);
 
     IllegalArgumentException e =
         assertThrows(
@@ -90,7 +92,8 @@ public class BatchHelperTest {
 
   @Test
   public void newBatchHelper_throwsException_whenMaxThreadsLessThanZero() {
-    Storage storage = new Storage(HTTP_TRANSPORT, JSON_FACTORY, httpRequestInitializer);
+    Storage storage =
+        new Storage(HTTP_TRANSPORT, GsonFactory.getDefaultInstance(), httpRequestInitializer);
 
     IllegalArgumentException e =
         assertThrows(
@@ -120,7 +123,8 @@ public class BatchHelperTest {
             /* requestsPerBatch= */ 2, jsonDataResponse(object1), jsonDataResponse(object2));
 
     // 3. Configure BatchHelper with mocked HTTP transport
-    Storage storage = new Storage(transport, JSON_FACTORY, httpRequestInitializer);
+    Storage storage =
+        new Storage(transport, GsonFactory.getDefaultInstance(), httpRequestInitializer);
     BatchHelper batchHelper =
         batchFactory.newBatchHelper(
             httpRequestInitializer,
@@ -169,7 +173,8 @@ public class BatchHelperTest {
             /* requestsPerBatch= */ 2, jsonDataResponse(object1), jsonDataResponse(object2));
 
     // 3. Configure BatchHelper with mocked HTTP transport
-    Storage storage = new Storage(transport, JSON_FACTORY, httpRequestInitializer);
+    Storage storage =
+        new Storage(transport, GsonFactory.getDefaultInstance(), httpRequestInitializer);
     BatchHelper batchHelper =
         batchFactory.newBatchHelper(
             httpRequestInitializer,
@@ -209,7 +214,8 @@ public class BatchHelperTest {
     MockHttpTransport transport =
         mockBatchTransport(/* requestsPerBatch= */ 1, jsonDataResponse(object1));
 
-    Storage storage = new Storage(transport, JSON_FACTORY, httpRequestInitializer);
+    Storage storage =
+        new Storage(transport, GsonFactory.getDefaultInstance(), httpRequestInitializer);
     BatchHelper batchHelper =
         batchFactory.newBatchHelper(httpRequestInitializer, storage, /* maxRequestsPerBatch= */ 1);
 
@@ -229,7 +235,8 @@ public class BatchHelperTest {
 
   @Test
   public void testIsEmpty() {
-    Storage storage = new Storage(HTTP_TRANSPORT, JSON_FACTORY, httpRequestInitializer);
+    Storage storage =
+        new Storage(HTTP_TRANSPORT, GsonFactory.getDefaultInstance(), httpRequestInitializer);
     BatchHelper batchHelper =
         batchFactory.newBatchHelper(httpRequestInitializer, storage, /* maxRequestsPerBatch= */ 2);
 
@@ -237,7 +244,7 @@ public class BatchHelperTest {
   }
 
   private JsonBatchCallback<StorageObject> assertCallback(StorageObject expectedObject) {
-    return new JsonBatchCallback<StorageObject>() {
+    return new JsonBatchCallback<>() {
       @Override
       public void onSuccess(StorageObject storageObject, HttpHeaders responseHeaders) {
         assertThat(storageObject).isEqualTo(expectedObject);

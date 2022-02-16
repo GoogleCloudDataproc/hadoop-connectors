@@ -19,7 +19,6 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.createItemInf
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInferredDirectory;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.HTTP_TRANSPORT;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.JSON_FACTORY;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.resumableUploadResponse;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.batchRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.composeRequestString;
@@ -52,11 +51,11 @@ import static org.mockito.Mockito.when;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.googleapis.media.MediaHttpUploader;
-import com.google.api.client.googleapis.testing.auth.oauth2.MockGoogleCredential;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpStatusCodes;
 import com.google.api.client.http.HttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.util.BackOff;
 import com.google.api.client.util.DateTime;
@@ -72,7 +71,10 @@ import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
+import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
+import com.google.cloud.hadoop.util.testing.FakeCredentials;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
+import com.google.cloud.hadoop.util.testing.ThrowingInputStream;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -150,7 +152,11 @@ public class GoogleCloudStorageTest {
   public void setUp() {
     trackingRequestInitializerWithRetries =
         new TrackingHttpRequestInitializer(
-            new RetryHttpInitializer(new MockGoogleCredential.Builder().build(), "gcs-io-unt-test"),
+            new RetryHttpInitializer(
+                new FakeCredentials(),
+                RetryHttpInitializerOptions.builder()
+                    .setDefaultUserAgent("gcs-io-unit-test")
+                    .build()),
             /* replaceRequestParams= */ false);
     trackingRequestInitializerWithoutRetries =
         new TrackingHttpRequestInitializer(/* replaceRequestParams= */ false);
@@ -854,7 +860,7 @@ public class GoogleCloudStorageTest {
             // even though we'll set maxRetries == 1.
             inputStreamResponse(CONTENT_LENGTH, 2, new ByteArrayInputStream(truncatedRetryData)),
             // Third time, we claim we'll deliver the one remaining byte, but give none. Since no
-            // progress is made, the retry counter does not get reset and we've exhausted all
+            // progress is made, the retry counter does not get reset, and we've exhausted all
             // retries.
             inputStreamResponse(CONTENT_LENGTH, 1, new ByteArrayInputStream(new byte[0])));
 
@@ -908,7 +914,7 @@ public class GoogleCloudStorageTest {
             // even though we'll set maxRetries == 1.
             inputStreamResponse(CONTENT_LENGTH, 2, new ByteArrayInputStream(secondReadData)),
             // Third time, we claim we'll deliver the one remaining byte, but give none. Since no
-            // progress is made, the retry counter does not get reset and we've exhausted all
+            // progress is made, the retry counter does not get reset, and we've exhausted all
             // retries.
             inputStreamResponse(CONTENT_LENGTH, 1, new ByteArrayInputStream(thirdReadData)));
 
@@ -1637,7 +1643,7 @@ public class GoogleCloudStorageTest {
     IOException exception = assertThrows(IOException.class, () -> gcs.createBucket(BUCKET_NAME));
     assertThat(exception)
         .hasMessageThat()
-        .contains("\"code\" : " + ErrorResponses.GONE.getErrorCode());
+        .contains("\"code\": " + ErrorResponses.GONE.getErrorCode());
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(createBucketRequestString(PROJECT_ID))
@@ -3143,7 +3149,10 @@ public class GoogleCloudStorageTest {
         GoogleCloudStorageOptions.builder().setAppName("appName").setProjectId("projectId");
 
     Storage storage =
-        new Storage(HTTP_TRANSPORT, JSON_FACTORY, trackingRequestInitializerWithRetries);
+        new Storage(
+            HTTP_TRANSPORT,
+            GsonFactory.getDefaultInstance(),
+            trackingRequestInitializerWithRetries);
     // Verify that fake projectId/appName and mock storage does not throw.
     new GoogleCloudStorageImpl(optionsBuilder.build(), storage);
 
@@ -3453,9 +3462,8 @@ public class GoogleCloudStorageTest {
       HttpTransport transport,
       HttpRequestInitializer requestInitializer,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
-    Storage storage = new Storage(transport, JSON_FACTORY, requestInitializer);
-    return new GoogleCloudStorageImpl(
-        gcsOptions, storage, /* credentials= */ null, downscopedAccessTokenFn);
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requestInitializer);
+    return new GoogleCloudStorageImpl(gcsOptions, storage, downscopedAccessTokenFn);
   }
 
   static Bucket newBucket(String name) {

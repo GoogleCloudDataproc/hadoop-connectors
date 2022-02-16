@@ -23,21 +23,27 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.Authenticator;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.PasswordAuthentication;
 import java.net.Proxy;
+import java.net.Socket;
+import java.net.SocketException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.GeneralSecurityException;
 import javax.annotation.Nullable;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLSocketFactory;
 
 /** Factory for creating HttpTransport types. */
 public class HttpTransportFactory {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   /**
-   * Create an {@link HttpTransport} based on an type class.
+   * Create an {@link HttpTransport} with socketKeepAlive true
    *
    * @return The resulting HttpTransport.
    * @throws IllegalArgumentException If the proxy address is invalid.
@@ -120,8 +126,11 @@ public class HttpTransportFactory {
           });
     }
 
+    SslKeepAliveSocketFactory sslSocketFactory =
+        new SslKeepAliveSocketFactory(HttpsURLConnection.getDefaultSSLSocketFactory());
     return new NetHttpTransport.Builder()
         .trustCertificates(GoogleUtils.getCertificateTrustStore())
+        .setSslSocketFactory(sslSocketFactory)
         .setProxy(
             proxyUri == null
                 ? null
@@ -163,6 +172,70 @@ public class HttpTransportFactory {
     } catch (URISyntaxException e) {
       throw new IllegalArgumentException(
           String.format("Invalid proxy address '%s'.", proxyAddress), e);
+    }
+  }
+
+  /** Wrapper class to have socketKeepAlive property while creating the socket */
+  @VisibleForTesting
+  static class SslKeepAliveSocketFactory extends SSLSocketFactory {
+
+    private final SSLSocketFactory wrappedSockedFactory;
+
+    public SslKeepAliveSocketFactory(SSLSocketFactory wrappedSocketFactory) {
+      this.wrappedSockedFactory = wrappedSocketFactory;
+    }
+
+    @Override
+    public String[] getDefaultCipherSuites() {
+      return wrappedSockedFactory.getDefaultCipherSuites();
+    }
+
+    @Override
+    public String[] getSupportedCipherSuites() {
+      return wrappedSockedFactory.getSupportedCipherSuites();
+    }
+
+    @Override
+    public Socket createSocket() throws IOException {
+      return setSocketKeepAlive(wrappedSockedFactory.createSocket());
+    }
+
+    @Override
+    public Socket createSocket(Socket s, InputStream consumed, boolean autoClose)
+        throws IOException {
+      return setSocketKeepAlive(wrappedSockedFactory.createSocket(s, consumed, autoClose));
+    }
+
+    @Override
+    public Socket createSocket(Socket s, String host, int port, boolean autoClose)
+        throws IOException {
+      return setSocketKeepAlive(wrappedSockedFactory.createSocket(s, host, port, autoClose));
+    }
+
+    public Socket createSocket(String host, int port) throws IOException {
+      return setSocketKeepAlive(wrappedSockedFactory.createSocket(host, port));
+    }
+
+    public Socket createSocket(InetAddress address, int port) throws IOException {
+      return setSocketKeepAlive(wrappedSockedFactory.createSocket(address, port));
+    }
+
+    public Socket createSocket(String host, int port, InetAddress clientAddress, int clientPort)
+        throws IOException {
+      return setSocketKeepAlive(
+          wrappedSockedFactory.createSocket(host, port, clientAddress, clientPort));
+    }
+
+    public Socket createSocket(
+        InetAddress address, int port, InetAddress clientAddress, int clientPort)
+        throws IOException {
+      return setSocketKeepAlive(
+          wrappedSockedFactory.createSocket(address, port, clientAddress, clientPort));
+    }
+
+    private static Socket setSocketKeepAlive(Socket socket) throws SocketException {
+      socket.setKeepAlive(true);
+      return socket;
     }
   }
 }

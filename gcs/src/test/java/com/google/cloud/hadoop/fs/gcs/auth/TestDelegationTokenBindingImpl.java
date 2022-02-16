@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.fs.gcs.auth;
 
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import java.io.IOException;
+import java.time.Instant;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -54,7 +55,7 @@ public class TestDelegationTokenBindingImpl extends AbstractDelegationTokenBindi
   }
 
   @Override
-  public DelegationTokenIdentifier createTokenIdentifier() throws IOException {
+  public DelegationTokenIdentifier createTokenIdentifier() {
     return createEmptyIdentifier();
   }
 
@@ -67,18 +68,15 @@ public class TestDelegationTokenBindingImpl extends AbstractDelegationTokenBindi
 
     public static final String TOKEN_CONFIG_PROPERTY_NAME = "test.token.value";
 
-    private Configuration config = null;
+    private Configuration config;
 
     @Override
     public AccessToken getAccessToken() {
-      return new AccessToken(
-          config.get(TOKEN_CONFIG_PROPERTY_NAME), System.currentTimeMillis() + 60000);
+      return new AccessToken(config.get(TOKEN_CONFIG_PROPERTY_NAME), Instant.now().plusSeconds(60));
     }
 
     @Override
-    public void refresh() throws IOException {
-      //
-    }
+    public void refresh() throws IOException {}
 
     @Override
     public void setConf(Configuration config) {

@@ -82,7 +82,7 @@ public class WatchdogTest {
     NoopClientCallStub<WriteObjectRequest, WriteObjectResponse> clientCall =
         new NoopClientCallStub<>();
     StreamObserver<WriteObjectRequest> timeoutStreamObserver =
-        new StreamObserver<WriteObjectRequest>() {
+        new StreamObserver<>() {
           @Override
           public void onNext(WriteObjectRequest value) {
             logger.atInfo().log("Sleeping for 10 seconds");
@@ -107,7 +107,7 @@ public class WatchdogTest {
   public void watchOnServerStreamingRPCTimeout() {
     CancellableContext requestContext = Context.current().withCancellation();
     Iterator<ReadObjectResponse> responseIterator =
-        new Iterator<ReadObjectResponse>() {
+        new Iterator<>() {
           @Override
           public boolean hasNext() {
             logger.atInfo().log("Sleeping for 10 seconds");
@@ -130,7 +130,7 @@ public class WatchdogTest {
     NoopClientCallStub<WriteObjectRequest, WriteObjectResponse> clientCall =
         new NoopClientCallStub<>();
     StreamObserver<WriteObjectRequest> timeoutStreamObserver =
-        new StreamObserver<WriteObjectRequest>() {
+        new StreamObserver<>() {
           @Override
           public void onNext(WriteObjectRequest value) {
             logger.atInfo().log("Sleeping for 10 seconds");
@@ -146,7 +146,7 @@ public class WatchdogTest {
 
     CancellableContext requestContext = Context.current().withCancellation();
     Iterator<ReadObjectResponse> responseIterator =
-        new Iterator<ReadObjectResponse>() {
+        new Iterator<>() {
           @Override
           public boolean hasNext() {
             logger.atInfo().log("Sleeping for 10 seconds");
@@ -181,7 +181,7 @@ public class WatchdogTest {
     NoopClientCallStub<WriteObjectRequest, WriteObjectResponse> clientCall =
         new NoopClientCallStub<>();
     StreamObserver<WriteObjectRequest> timeoutStreamObserver =
-        new StreamObserver<WriteObjectRequest>() {
+        new StreamObserver<>() {
           @Override
           public void onNext(WriteObjectRequest value) {
             logger.atInfo().log("Sleeping for 10 seconds");
@@ -206,7 +206,7 @@ public class WatchdogTest {
   public void watchOnServerStreamingRPCWithoutTimeout() {
     CancellableContext requestContext = Context.current().withCancellation();
     Iterator<ReadObjectResponse> responseIterator =
-        new Iterator<ReadObjectResponse>() {
+        new Iterator<>() {
           @Override
           public boolean hasNext() {
             logger.atInfo().log("Sleeping for 10 seconds");

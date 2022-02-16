@@ -4,6 +4,26 @@
 
 1.  Update all dependencies to the latest versions.
 
+1.  Migrate authentication to `com.google.auth.Credentials` and remove obsolete
+    properties:
+
+    ```
+    mapred.bq.auth.service.account.email
+    mapred.bq.auth.service.account.keyfile
+    mapred.bq.auth.service.account.private.key
+    mapred.bq.auth.service.account.private.key.id
+    ```
+
+1.  Refactor authentication configuration to use an explicit
+    `mapred.bq.auth.type` enum property, instead of relying on inference of the
+    authentication type based on the set configuration properties, and remove
+    obsolete properties:
+
+    ```
+    mapred.bq.gs.auth.null.enable
+    mapred.bq.gs.auth.service.account.enable
+    ```
+
 ### 1.2.0 - 2021-01-06
 
 1.  Update all dependencies to latest versions.
@@ -517,7 +537,7 @@
 
 1.  Changed credential configuration values to allow per connector overrides. To
     use the metadata service, no extra configuration is required. To a use
-    PKCS12 private key file, specify `mapred.bq.auth.service.account.email` and
+    PKCS12 private keyfile, specify `mapred.bq.auth.service.account.email` and
     `mapred.bq.auth.service.account.keyfile`. To use the installed app workflow,
     set `mapred.bq.service.account.enable` to `false` and
     `mapred.bq.auth.client.id`, `mapred.bq.auth.client.secret` and

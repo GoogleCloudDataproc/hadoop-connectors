@@ -23,7 +23,6 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_READ_MESSAGE_TIMEOUT_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_READ_METADATA_TIMEOUT_MS;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_READ_SPEED_BYTES_PER_SEC;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_READ_TIMEOUT_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_TRAFFICDIRECTOR_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_UPLOAD_BUFFERED_REQUESTS;
@@ -32,11 +31,11 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_HTTP_HEADERS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ROOT_URL;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_SERVICE_PATH;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_ADDRESS_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_PASSWORD_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.PROXY_USERNAME_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_ADDRESS_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_PASSWORD_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_USERNAME_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.cloud.hadoop.util.testing.HadoopConfigurationUtils.getDefaultProperties;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
@@ -64,7 +63,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
 
   @SuppressWarnings("DoubleBraceInitialization")
   private static final Map<String, Object> expectedDefaultConfiguration =
-      new HashMap<String, Object>() {
+      new HashMap<>() {
         {
           put("fs.gs.application.name.suffix", "");
           put("fs.gs.batch.threads", 15);
@@ -80,18 +79,17 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.glob.algorithm", GlobAlgorithm.CONCURRENT);
           put("fs.gs.grpc.checksums.enable", false);
           put("fs.gs.grpc.enable", false);
-          put("fs.gs.grpc.checkinterval.timeout.ms", 1 * 1000L);
-          put("fs.gs.grpc.read.metadata.timeout.ms", 60 * 1000L);
-          put("fs.gs.grpc.read.timeout.ms", 30 * 1000L);
-          put("fs.gs.grpc.read.message.timeout.ms", 5 * 1000L);
-          put("fs.gs.grpc.read.speed.bytespersec", 50 * 1024 * 1024L);
+          put("fs.gs.grpc.checkinterval.timeout.ms", 1_000L);
+          put("fs.gs.grpc.read.metadata.timeout.ms", 60_000L);
+          put("fs.gs.grpc.read.timeout.ms", 30_000L);
+          put("fs.gs.grpc.read.message.timeout.ms", 5_000L);
           put("fs.gs.grpc.read.zerocopy.enable", true);
           put("fs.gs.grpc.directpath.enable", true);
           put("fs.gs.grpc.server.address", "storage.googleapis.com");
           put("fs.gs.grpc.trafficdirector.enable", false);
           put("fs.gs.grpc.write.buffered.requests", 20L);
-          put("fs.gs.grpc.write.timeout.ms", 10 * 60 * 1000L);
-          put("fs.gs.grpc.write.message.timeout.ms", 5 * 1000L);
+          put("fs.gs.grpc.write.timeout.ms", 10 * 60_000L);
+          put("fs.gs.grpc.write.message.timeout.ms", 5_000L);
           put("fs.gs.http.connect-timeout", 20_000);
           put("fs.gs.http.max.retry", 10);
           put("fs.gs.http.read-timeout", 20_000);
@@ -317,7 +315,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
     long grpcWriteTimeout = 20;
     long grpcWriteMessageTimeout = 25;
     long grpcUploadBufferedRequests = 30;
-    long grpcReadSpeedBytesPerSec = 100 * 1024 * 1024;
     boolean directPathEnabled = true;
     boolean trafficDirectorEnabled = true;
     boolean grpcEnabled = true;
@@ -330,8 +327,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
         GCS_GRPC_UPLOAD_BUFFERED_REQUESTS.getKey(), String.valueOf(grpcUploadBufferedRequests));
     config.set(GCS_GRPC_DIRECTPATH_ENABLE.getKey(), String.valueOf(directPathEnabled));
     config.set(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.getKey(), String.valueOf(trafficDirectorEnabled));
-    config.set(
-        GCS_GRPC_READ_SPEED_BYTES_PER_SEC.getKey(), String.valueOf(grpcReadSpeedBytesPerSec));
     config.set(
         GCS_GRPC_CHECK_INTERVAL_TIMEOUT_MS.getKey(), String.valueOf(grpcCheckIntervalTimeout));
     config.set(GCS_GRPC_READ_MESSAGE_TIMEOUT_MS.getKey(), String.valueOf(grpcReadMessageTimeout));
@@ -349,8 +344,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
         .isEqualTo(grpcUploadBufferedRequests);
     assertThat(options.isDirectPathPreferred()).isEqualTo(directPathEnabled);
     assertThat(options.isGrpcEnabled()).isEqualTo(grpcEnabled);
-    assertThat(options.getReadChannelOptions().getGrpcReadSpeedBytesPerSec())
-        .isEqualTo(grpcReadSpeedBytesPerSec);
     assertThat(options.getGrpcMessageTimeoutCheckInterval()).isEqualTo(grpcCheckIntervalTimeout);
     assertThat(options.getReadChannelOptions().getGrpcReadMessageTimeoutMillis())
         .isEqualTo(grpcReadMessageTimeout);
