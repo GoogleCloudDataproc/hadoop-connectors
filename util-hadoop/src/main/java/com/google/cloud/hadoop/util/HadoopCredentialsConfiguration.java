@@ -137,6 +137,28 @@ public class HadoopCredentialsConfiguration {
   public static final HadoopConfigurationProperty<String> PROXY_PASSWORD_SUFFIX =
       new HadoopConfigurationProperty<>(".proxy.password");
 
+
+  /**
+   * Configuration key for defining the OAuth2 refresh token. Required when the provider is
+   * RefreshTokenAuth2Provider
+   */
+  public static final HadoopConfigurationProperty<String> AUTH_REFRESH_TOKEN_SUFFIX =
+          new HadoopConfigurationProperty<>(".auth.refresh.token");
+
+  /**
+   * Configuration key for defining the OAUth2 client ID. Required when the provider is
+   * RefreshTokenAuth2Provider
+   */
+  public static final HadoopConfigurationProperty<String> AUTH_CLIENT_ID_SUFFIX =
+          new HadoopConfigurationProperty<>(".auth.client.id");
+
+  /**
+   * Configuration key for defining the OAUth2 client secret. Required when the provider is
+   * RefreshTokenAuth2Provider
+   */
+  public static final HadoopConfigurationProperty<String> AUTH_CLIENT_SECRET_SUFFIX =
+          new HadoopConfigurationProperty<>(".auth.client.secret");
+
   /**
    * Returns full list of config prefixes that will be resolved based on the order in returned list.
    */

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.google.cloud.hadoop.fs.gcs.auth;
+package com.google.cloud.hadoop.util;
 
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonDataResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
@@ -23,7 +23,11 @@ import com.google.api.client.auth.oauth2.TokenResponse;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.RedactedString;
+import com.google.cloud.hadoop.util.RefreshTokenAuth2Provider;
+
 import java.io.IOException;
+import java.time.Instant;
+
 import org.apache.hadoop.conf.Configuration;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -66,12 +70,11 @@ public class RefreshTokenAuth2ProviderTest {
 
     // THEN
     assertThat(accessToken).isNotNull();
-    long now = System.currentTimeMillis();
     // To avoid any timebase issue, we test a time range instead
-    assertThat(accessToken.getExpirationTimeMilliSeconds())
-        .isGreaterThan(now + ((expireInSec - 10) * 1000L));
-    assertThat(accessToken.getExpirationTimeMilliSeconds())
-        .isLessThan(now + ((expireInSec + 10) * 1000L));
+    assertThat(accessToken.getExpirationTime())
+            .isGreaterThan(Instant.now().plusSeconds(expireInSec - 10));
+    assertThat(accessToken.getExpirationTime())
+            .isLessThan(Instant.now().plusSeconds(expireInSec + 10));
     assertThat(previousRefreshToken).isNotNull();
   }
 
@@ -114,12 +117,11 @@ public class RefreshTokenAuth2ProviderTest {
     // THEN
     assertThat(accessToken).isNotNull();
     assertThat(accessToken.getToken()).isEqualTo(accessTokenAsString);
-    long now = System.currentTimeMillis();
     // To avoid any timebase issue, we test a time range instead
-    assertThat(accessToken.getExpirationTimeMilliSeconds())
-        .isGreaterThan(now + ((expireInSec - 10) * 1000L));
-    assertThat(accessToken.getExpirationTimeMilliSeconds())
-        .isLessThan(now + ((expireInSec + 10) * 1000L));
+    assertThat(accessToken.getExpirationTime())
+            .isGreaterThan(Instant.now().plusSeconds(expireInSec - 10));
+    assertThat(accessToken.getExpirationTime())
+            .isLessThan(Instant.now().plusSeconds(expireInSec + 10));
     assertThat(previousRefreshToken).isNotNull();
     assertThat(previousRefreshToken).isEqualTo(RedactedString.create(newRefreshToken));
   }

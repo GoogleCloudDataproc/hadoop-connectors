@@ -68,6 +68,9 @@ public class HadoopCredentialsConfigurationTest {
           put(".proxy.password", null);
           put(".proxy.username", null);
           put(".token.server.url", null);
+          put(".auth.refresh.token", null);
+          put(".auth.client.secret", null);
+          put(".auth.client.id", null);
         }
       };
 

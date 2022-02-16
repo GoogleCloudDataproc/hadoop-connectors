@@ -190,7 +190,7 @@ This is particularly useful when you want to access GCS on behalf of a user usin
 you will need to retrieve a refresh token using the authorization code grant flow and pass it to the connector.
 Configure the refresh token grant flow using the following properties:
 
-*   `fs.gs.auth.access.token.provider.impl=com.google.cloud.hadoop.fs.gcs.auth.RefreshTokenAuth2Provider`
+*   `fs.gs.auth.access.token.provider.impl=com.google.cloud.hadoop.util.RefreshTokenAuth2Provider`
 
     Use the Refresh Token Provider.
 
