@@ -24,6 +24,9 @@ import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.Bucket;
 import com.google.api.services.storage.model.ComposeRequest;
 import com.google.api.services.storage.model.StorageObject;
+import com.google.cloud.hadoop.gcsio.storageapi.ObjectsGetMedia;
+import com.google.cloud.hadoop.gcsio.storageapi.ObjectsGetMetadata;
+import com.google.cloud.hadoop.gcsio.storageapi.StorageRequestFactory;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.AccessBoundary.Action;
 import java.io.IOException;
@@ -111,11 +114,9 @@ public class StorageRequestToAccessBoundaryConverterTest {
   }
 
   @Test
-  public void testTranslateObjectGetMediaRequest() throws IOException {
-    Storage.Objects.Get request = storage.objects().get(BUCKET_NAME, OBJECT_NAME);
-
-    // Indicates that this is a get media instead of get metadata request.
-    request.set("alt", "media");
+  public void testTranslateObjectGetMediaRequest() {
+    Storage.Objects.Get request =
+        new StorageRequestFactory(storage).objectsGetMedia(BUCKET_NAME, OBJECT_NAME);
 
     List<AccessBoundary> results =
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
@@ -125,8 +126,9 @@ public class StorageRequestToAccessBoundaryConverterTest {
   }
 
   @Test
-  public void testTranslateObjectGetMetadataRequest() throws IOException {
-    Storage.Objects.Get request = storage.objects().get(BUCKET_NAME, OBJECT_NAME);
+  public void testTranslateObjectGetMetadataRequest() {
+    Storage.Objects.Get request =
+        new StorageRequestFactory(storage).objectsGetMetadata(BUCKET_NAME, OBJECT_NAME);
 
     List<AccessBoundary> results =
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
@@ -134,6 +136,21 @@ public class StorageRequestToAccessBoundaryConverterTest {
     assertThat(results)
         .containsExactly(
             AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, Action.GET_OBJECT_METADATA));
+  }
+
+  /**
+   * {@link Storage.Objects.Get} is disabled since it gives out permission too wide for getting
+   * metadata. Use {@link ObjectsGetMedia} or {@link ObjectsGetMetadata} instead.
+   *
+   * @throws IOException
+   */
+  @Test
+  public void testDisallowGetRequest() throws IOException {
+    Storage.Objects.Get request = storage.objects().get(BUCKET_NAME, OBJECT_NAME);
+
+    assertThrows(
+        InvalidParameterException.class,
+        () -> StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request));
   }
 
   @Test

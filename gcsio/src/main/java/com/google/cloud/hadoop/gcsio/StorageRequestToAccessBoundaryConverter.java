@@ -22,6 +22,8 @@ import com.google.api.services.storage.StorageRequest;
 import com.google.api.services.storage.model.Bucket;
 import com.google.api.services.storage.model.ComposeRequest;
 import com.google.api.services.storage.model.StorageObject;
+import com.google.cloud.hadoop.gcsio.storageapi.ObjectsGetMedia;
+import com.google.cloud.hadoop.gcsio.storageapi.ObjectsGetMetadata;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.AccessBoundary.Action;
 import com.google.common.collect.ImmutableList;
@@ -46,8 +48,10 @@ class StorageRequestToAccessBoundaryConverter {
       return translateObjectInsertRequest((Storage.Objects.Insert) request);
     } else if (request instanceof Storage.Objects.Compose) {
       return translateObjectComposeRequest((Storage.Objects.Compose) request);
-    } else if (request instanceof Storage.Objects.Get) {
-      return translateObjectGetRequest((Storage.Objects.Get) request);
+    } else if (request instanceof ObjectsGetMetadata) {
+      return translateObjectGetMetadataRequest((ObjectsGetMetadata) request);
+    } else if (request instanceof ObjectsGetMedia) {
+      return translateObjectGetMediaRequest((ObjectsGetMedia) request);
     } else if (request instanceof Storage.Objects.Delete) {
       return translateObjectDeleteRequest((Storage.Objects.Delete) request);
     } else if (request instanceof Storage.Objects.Rewrite) {
@@ -106,11 +110,13 @@ class StorageRequestToAccessBoundaryConverter {
     return listBuilder.build();
   }
 
-  private static List<AccessBoundary> translateObjectGetRequest(Storage.Objects.Get request) {
-    if (request.getOrDefault("alt", "").equals("media")) {
-      return ImmutableList.of(
-          AccessBoundary.create(request.getBucket(), request.getObject(), Action.READ_OBJECTS));
-    }
+  private static List<AccessBoundary> translateObjectGetMediaRequest(ObjectsGetMedia request) {
+    return ImmutableList.of(
+        AccessBoundary.create(request.getBucket(), request.getObject(), Action.READ_OBJECTS));
+  }
+
+  private static List<AccessBoundary> translateObjectGetMetadataRequest(
+      ObjectsGetMetadata request) {
     return ImmutableList.of(
         AccessBoundary.create(
             request.getBucket(), request.getObject(), Action.GET_OBJECT_METADATA));

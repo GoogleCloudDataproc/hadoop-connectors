@@ -46,6 +46,7 @@ public class InMemoryObjectReadChannel extends GoogleCloudStorageReadChannel {
       throws IOException {
     super(
         /* gcs= */ null,
+        /* StorageRequestFactory */ null,
         new StorageResourceId(bucketName, objectName),
         /* errorExtractor= */ null,
         /* requestHelper= */ null,
