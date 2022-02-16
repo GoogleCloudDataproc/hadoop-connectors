@@ -16,7 +16,6 @@
 package com.google.cloud.hadoop.util;
 
 import static com.google.api.client.util.Preconditions.checkNotNull;
-
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTH_CLIENT_ID_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTH_CLIENT_SECRET_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTH_REFRESH_TOKEN_SUFFIX;
@@ -34,7 +33,6 @@ import com.google.api.client.auth.oauth2.TokenResponse;
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.JsonFactory;
-
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -42,7 +40,6 @@ import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
-
 import org.apache.hadoop.conf.Configuration;
 
 /**
@@ -53,7 +50,7 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
   public static final String GCS_CONFIG_PREFIX = "fs.gs";
 
   public static final List<String> CONFIG_KEY_PREFIXES =
-          ImmutableList.copyOf(getConfigKeyPrefixes(GCS_CONFIG_PREFIX));
+      ImmutableList.copyOf(getConfigKeyPrefixes(GCS_CONFIG_PREFIX));
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
@@ -81,8 +78,7 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
   public void refresh() {
     logger.atFine().log(
         "Refreshing access token using the refresh token grant flow. Our current token is set to expire at '%s' and it is now '%s'",
-        lazy(() -> accessToken.getExpirationTime()),
-        lazy(Instant::now));
+        lazy(() -> accessToken.getExpirationTime()), lazy(Instant::now));
 
     tokenServerUrl =
         TOKEN_SERVER_URL_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::get);
@@ -130,11 +126,12 @@ public class RefreshTokenAuth2Provider implements AccessTokenProvider {
                 + "We will consider the access token as expired.");
         expirationTimeMilliSeconds = 0L;
       }
-      accessToken = new AccessToken(tokenResponse.getAccessToken(), Instant.ofEpochMilli(expirationTimeMilliSeconds));
+      accessToken =
+          new AccessToken(
+              tokenResponse.getAccessToken(), Instant.ofEpochMilli(expirationTimeMilliSeconds));
 
       logger.atFine().log(
-          "New access token expires at '%s'",
-          lazy(() -> accessToken.getExpirationTime()));
+          "New access token expires at '%s'", lazy(() -> accessToken.getExpirationTime()));
 
     } catch (IOException e) {
       logger.atSevere().withCause(e).log("Couldn't refresh token");

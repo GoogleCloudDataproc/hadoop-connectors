@@ -21,13 +21,8 @@ import static com.google.common.truth.Truth.assertThat;
 
 import com.google.api.client.auth.oauth2.TokenResponse;
 import com.google.api.client.testing.http.MockHttpTransport;
-import com.google.cloud.hadoop.util.AccessTokenProvider;
-import com.google.cloud.hadoop.util.RedactedString;
-import com.google.cloud.hadoop.util.RefreshTokenAuth2Provider;
-
 import java.io.IOException;
 import java.time.Instant;
-
 import org.apache.hadoop.conf.Configuration;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -72,9 +67,9 @@ public class RefreshTokenAuth2ProviderTest {
     assertThat(accessToken).isNotNull();
     // To avoid any timebase issue, we test a time range instead
     assertThat(accessToken.getExpirationTime())
-            .isGreaterThan(Instant.now().plusSeconds(expireInSec - 10));
+        .isGreaterThan(Instant.now().plusSeconds(expireInSec - 10));
     assertThat(accessToken.getExpirationTime())
-            .isLessThan(Instant.now().plusSeconds(expireInSec + 10));
+        .isLessThan(Instant.now().plusSeconds(expireInSec + 10));
     assertThat(previousRefreshToken).isNotNull();
   }
 
@@ -119,9 +114,9 @@ public class RefreshTokenAuth2ProviderTest {
     assertThat(accessToken.getToken()).isEqualTo(accessTokenAsString);
     // To avoid any timebase issue, we test a time range instead
     assertThat(accessToken.getExpirationTime())
-            .isGreaterThan(Instant.now().plusSeconds(expireInSec - 10));
+        .isGreaterThan(Instant.now().plusSeconds(expireInSec - 10));
     assertThat(accessToken.getExpirationTime())
-            .isLessThan(Instant.now().plusSeconds(expireInSec + 10));
+        .isLessThan(Instant.now().plusSeconds(expireInSec + 10));
     assertThat(previousRefreshToken).isNotNull();
     assertThat(previousRefreshToken).isEqualTo(RedactedString.create(newRefreshToken));
   }
