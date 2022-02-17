@@ -54,13 +54,14 @@
     fs.gs.auth.service.account.enable
     ```
 
-1.  Add support for a new authentication type `USER_CREDENTIALS`.
-    Retrieve a refresh token using the authorisation code grant flow and set up the following properties:
+1.  Add support for a new `USER_CREDENTIALS` authentication type that retrieves
+    a refresh token using the authorisation code grant flow configured via the
+    following properties:
+
     ```properties
-    fs.gs.auth.auth.type=USER_CREDENTIALS
-    fs.gs.auth.refresh.token=YOUR_OAUTH2_REFRESH_TOKEN
-    fs.gs.auth.client.id=YOUR_OAUTH2_CLIENT_ID
-    fs.gs.auth.client.secret=YOUR_OAUTH2_CLIENT_SECRET
+    fs.gs.auth.client.id
+    fs.gs.auth.client.secret
+    fs.gs.auth.refresh.token
     ```
 
 ### 2.2.2 - 2021-06-25
