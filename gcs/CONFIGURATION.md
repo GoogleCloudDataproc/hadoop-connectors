@@ -152,22 +152,22 @@
 
     Valid values:
 
-    * `ACCESS_TOKEN_PROVIDER` - configures `AccessTokenProvider`
+    *   `ACCESS_TOKEN_PROVIDER` - configures `AccessTokenProvider`
         authentication
 
-    * `APPLICATION_DEFAULT` - configures
+    *   `APPLICATION_DEFAULT` - configures
         [Application Default Credentials](https://javadoc.io/doc/com.google.auth/google-auth-library-oauth2-http/latest/com/google/auth/oauth2/GoogleCredentials.html)
         authentication
 
-    * `COMPUTE_ENGINE` - configures Google Compute Engine service account
+    *   `COMPUTE_ENGINE` - configures Google Compute Engine service account
         authentication
 
-    * `SERVICE_ACCOUNT_JSON_KEYFILE` - configures JSON keyfile service account
+    *   `SERVICE_ACCOUNT_JSON_KEYFILE` - configures JSON keyfile service account
         authentication
 
-    * `USER_CREDENTIALS` - configure  [[user credentials](#user-credentials)]
+    *   `USER_CREDENTIALS` - configure  [[user credentials](#user-credentials)]
 
-    * `UNAUTHENTICATED` - configures unauthenticated access
+    *   `UNAUTHENTICATED` - configures unauthenticated access
 
 *   `fs.gs.auth.service.account.json.keyfile` (not set by default)
 
@@ -187,22 +187,29 @@
 
 #### User credentials
 
-User credentials allows you to access Google resources on behalf of a user, with the according permissions associated to this user.
-In order to use this authentication type, you will first need to retrieve a refresh token using the authorization code grant flow and pass it to the connector.
-Behind the scene, the hadoop connector will use the refresh token grant flow to retrieve new access tokens when necessary.
-Configure the following properties:
+User credentials allows you to access Google resources on behalf of a user, with
+the according permissions associated to this user.
 
-* `fs.gs.auth.refresh.token` (not set by default)
+To achieve this the connector will use the
+[refresh token grant flow](https://oauth.net/2/grant-types/refresh-token/) to
+retrieve a new access tokens when necessary.
 
-    The refresh token.
+In order to use this authentication type, you will first need to retrieve a
+refresh token using the
+[authorization code grant flow](https://oauth.net/2/grant-types/authorization-code)
+and pass it to the connector with OAuth cliend ID and secret:
 
-* `fs.gs.auth.client.id` (not set by default)
+*   `fs.gs.auth.client.id` (not set by default)
 
     The OAuth2 client ID.
 
-* `fs.gs.auth.client.secret` (not set by default)
+*   `fs.gs.auth.client.secret` (not set by default)
 
     The OAuth2 client secret.
+
+*   `fs.gs.auth.refresh.token` (not set by default)
+
+    The refresh token.
 
 ### Service account impersonation
 
