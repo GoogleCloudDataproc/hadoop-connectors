@@ -158,7 +158,7 @@ class StorageStubProvider {
             && java.util.Objects.equals(
                 credential.getTokenServerEncodedUrl(), ComputeCredential.TOKEN_SERVER_ENCODED_URL);
     GrpcDecorator decorator;
-    if (options.isTrafficDirectorEnabled() && isDefaultServiceAccount) {
+    if (options.isTrafficDirectorEnabled()) {
       decorator = new TrafficDirectorGrpcDecorator();
     } else if (options.isDirectPathPreferred() && isDefaultServiceAccount) {
       decorator = new DirectPathGrpcDecorator(options.getReadChannelOptions());

@@ -41,6 +41,17 @@ public class GoogleCloudStorageGrpcIntegrationTest {
         GoogleCloudStorageTestHelper.getCredential());
   }
 
+  private static GoogleCloudStorage createGoogleCloudStorageOnlyDP() throws IOException {
+    return new GoogleCloudStorageImpl(
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setGrpcEnabled(true)
+            .setTrafficDirectorEnabled(true)
+            .setStorageRootUrl("https://storage-force-dp.googleusercontent.com")
+            .setGrpcServerAddress("storage-force-dp.googleusercontent.com")
+            .build(),
+        GoogleCloudStorageTestHelper.getCredential());
+  }
+
   private static GoogleCloudStorage createGoogleCloudStorage(
       AsyncWriteChannelOptions asyncWriteChannelOptions) throws IOException {
     return new GoogleCloudStorageImpl(
@@ -68,6 +79,16 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testCreateObject_Object");
+    byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
+
+    assertObjectContent(rawStorage, objectToCreate, objectBytes);
+  }
+
+  @Test
+  public void testWriteAndReadObject_directpath_failOnFallback() throws IOException {
+    GoogleCloudStorage rawStorage = createGoogleCloudStorageOnlyDP();
+    StorageResourceId objectToCreate =
+        new StorageResourceId(BUCKET_NAME, "testWriteAndReadObject_directpath_failOnFallback");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
 
     assertObjectContent(rawStorage, objectToCreate, objectBytes);
