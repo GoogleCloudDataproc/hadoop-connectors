@@ -200,9 +200,6 @@ final class Watchdog implements Runnable {
 
     @Override
     public T next() {
-      synchronized (lock) {
-        lastActivityAt = clock.millis();
-      }
       T next = innerIterator.next();
       synchronized (lock) {
         state = State.DELIVERING;
@@ -235,6 +232,7 @@ final class Watchdog implements Runnable {
       boolean hasNext = false;
       try {
         synchronized (lock) {
+          lastActivityAt = clock.millis();
           state = State.WAITING;
         }
         hasNext = innerIterator.hasNext();
