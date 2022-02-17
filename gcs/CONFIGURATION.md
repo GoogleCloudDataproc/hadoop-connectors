@@ -167,7 +167,7 @@
 
     *   `UNAUTHENTICATED` - configures unauthenticated access
 
-    *   `USER_CREDENTIALS` - configure  [[user credentials](#user-credentials)]
+    *   `USER_CREDENTIALS` - configure [[user credentials](#user-credentials)]
 
 *   `fs.gs.auth.service.account.json.keyfile` (not set by default)
 
