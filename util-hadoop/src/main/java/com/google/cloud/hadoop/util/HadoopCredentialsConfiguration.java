@@ -153,7 +153,7 @@ public class HadoopCredentialsConfiguration {
 
   /**
    * Configuration key for defining the OAUth2 client secret. Required when the authentication type
-   * is * USER_CREDENTIALS
+   * is USER_CREDENTIALS
    */
   public static final HadoopConfigurationProperty<String> AUTH_CLIENT_SECRET_SUFFIX =
       new HadoopConfigurationProperty<>(".auth.client.secret");
