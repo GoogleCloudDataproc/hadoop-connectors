@@ -127,22 +127,15 @@ public class HadoopCredentialsConfiguration {
    * Key suffix for setting a proxy username for the connector to use to authenticate with proxy
    * used to connect to GCS.
    */
-  public static final HadoopConfigurationProperty<String> PROXY_USERNAME_SUFFIX =
+  public static final HadoopConfigurationProperty<RedactedString> PROXY_USERNAME_SUFFIX =
       new HadoopConfigurationProperty<>(".proxy.username");
 
   /**
    * Key suffix for setting a proxy password for the connector to use to authenticate with proxy
    * used to connect to GCS.
    */
-  public static final HadoopConfigurationProperty<String> PROXY_PASSWORD_SUFFIX =
+  public static final HadoopConfigurationProperty<RedactedString> PROXY_PASSWORD_SUFFIX =
       new HadoopConfigurationProperty<>(".proxy.password");
-
-  /**
-   * Configuration key for defining the OAuth2 refresh token. Required when the authentication type
-   * is USER_CREDENTIALS
-   */
-  public static final HadoopConfigurationProperty<String> AUTH_REFRESH_TOKEN_SUFFIX =
-      new HadoopConfigurationProperty<>(".auth.refresh.token");
 
   /**
    * Configuration key for defining the OAUth2 client ID. Required when the authentication type is
@@ -155,8 +148,15 @@ public class HadoopCredentialsConfiguration {
    * Configuration key for defining the OAUth2 client secret. Required when the authentication type
    * is USER_CREDENTIALS
    */
-  public static final HadoopConfigurationProperty<String> AUTH_CLIENT_SECRET_SUFFIX =
+  public static final HadoopConfigurationProperty<RedactedString> AUTH_CLIENT_SECRET_SUFFIX =
       new HadoopConfigurationProperty<>(".auth.client.secret");
+
+  /**
+   * Configuration key for defining the OAuth2 refresh token. Required when the authentication type
+   * is USER_CREDENTIALS
+   */
+  public static final HadoopConfigurationProperty<RedactedString> AUTH_REFRESH_TOKEN_SUFFIX =
+      new HadoopConfigurationProperty<>(".auth.refresh.token");
 
   /**
    * Returns full list of config prefixes that will be resolved based on the order in returned list.
@@ -230,7 +230,8 @@ public class HadoopCredentialsConfiguration {
             .setClientSecret(clientSecret.value())
             .setRefreshToken(refreshToken.value())
             .setHttpTransportFactory(transport::get)
-            .build();
+            .build()
+            .createScoped(CLOUD_PLATFORM_SCOPE);
       case UNAUTHENTICATED:
         return null;
       default:

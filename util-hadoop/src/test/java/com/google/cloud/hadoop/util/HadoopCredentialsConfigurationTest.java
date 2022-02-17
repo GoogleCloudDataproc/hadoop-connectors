@@ -64,18 +64,18 @@ public class HadoopCredentialsConfigurationTest {
       new HashMap<>() {
         {
           put(".auth.access.token.provider", null);
+          put(".auth.client.id", null);
+          put(".auth.client.secret", null);
           put(".auth.impersonation.service.account", null);
           put(".auth.impersonation.service.account.for.group.", ImmutableMap.of());
           put(".auth.impersonation.service.account.for.user.", ImmutableMap.of());
+          put(".auth.refresh.token", null);
           put(".auth.service.account.json.keyfile", null);
           put(".auth.type", AuthenticationType.COMPUTE_ENGINE);
           put(".proxy.address", null);
           put(".proxy.password", null);
           put(".proxy.username", null);
           put(".token.server.url", null);
-          put(".auth.client.id", null);
-          put(".auth.client.secret", null);
-          put(".auth.refresh.token", null);
         }
       };
 
@@ -184,7 +184,7 @@ public class HadoopCredentialsConfigurationTest {
   }
 
   @Test
-  public void userCredentials_credentialFactory_NoNewRefreshToken() throws IOException {
+  public void userCredentials_credentialFactory_noNewRefreshToken() throws IOException {
     // GIVEN
     String initialRefreshToken = "FAKE_REFRESH_TOKEN";
     String tokenServerUrl = "http://localhost/token";
@@ -209,10 +209,13 @@ public class HadoopCredentialsConfigurationTest {
 
     // THEN
     assertThat(credentials).isInstanceOf(UserCredentials.class);
+
     UserCredentials userCredentials = (UserCredentials) credentials;
 
+    assertThat(userCredentials.getClientId()).isEqualTo("FAKE_CLIENT_ID");
+    assertThat(userCredentials.getClientSecret()).isEqualTo("FAKE_CLIENT_SECRET");
+
     AccessToken accessToken = userCredentials.getAccessToken();
-    String refreshToken = userCredentials.getRefreshToken();
 
     assertThat(accessToken).isNotNull();
     // To avoid any timebase issue, we test a time range instead
@@ -220,6 +223,9 @@ public class HadoopCredentialsConfigurationTest {
         .isGreaterThan(Date.from(Instant.now().plusSeconds(expireInSec - 10)));
     assertThat(accessToken.getExpirationTime())
         .isLessThan(Date.from(Instant.now().plusSeconds(expireInSec + 10)));
+
+    String refreshToken = userCredentials.getRefreshToken();
+
     assertThat(refreshToken).isEqualTo(initialRefreshToken);
   }
 

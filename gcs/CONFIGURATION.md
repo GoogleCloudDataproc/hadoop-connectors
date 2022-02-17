@@ -165,9 +165,9 @@
     *   `SERVICE_ACCOUNT_JSON_KEYFILE` - configures JSON keyfile service account
         authentication
 
-    *   `USER_CREDENTIALS` - configure  [[user credentials](#user-credentials)]
-
     *   `UNAUTHENTICATED` - configures unauthenticated access
+
+    *   `USER_CREDENTIALS` - configure  [[user credentials](#user-credentials)]
 
 *   `fs.gs.auth.service.account.json.keyfile` (not set by default)
 
@@ -197,7 +197,7 @@ retrieve a new access tokens when necessary.
 In order to use this authentication type, you will first need to retrieve a
 refresh token using the
 [authorization code grant flow](https://oauth.net/2/grant-types/authorization-code)
-and pass it to the connector with OAuth cliend ID and secret:
+and pass it to the connector with OAuth client ID and secret:
 
 *   `fs.gs.auth.client.id` (not set by default)
 
