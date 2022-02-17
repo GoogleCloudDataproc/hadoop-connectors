@@ -145,7 +145,7 @@ public class HadoopCredentialsConfiguration {
       new HadoopConfigurationProperty<>(".auth.refresh.token");
 
   /**
-   * Configuration key for defining the OAUth2 client ID. Required when the authentication type is *
+   * Configuration key for defining the OAUth2 client ID. Required when the authentication type is
    * USER_CREDENTIALS
    */
   public static final HadoopConfigurationProperty<String> AUTH_CLIENT_ID_SUFFIX =
