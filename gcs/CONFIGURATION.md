@@ -167,6 +167,8 @@
 
     *   `UNAUTHENTICATED` - configures unauthenticated access
 
+    *   `USER_CREDENTIALS` - configure [[user credentials](#user-credentials)]
+
 *   `fs.gs.auth.service.account.json.keyfile` (not set by default)
 
     The path to the JSON keyfile for the service account when `fs.gs.auth.type`
@@ -182,6 +184,32 @@
 *   `fs.gs.token.server.url` (not set by default)
 
     Google Token Server root URL.
+
+#### User credentials
+
+User credentials allows you to access Google resources on behalf of a user, with
+the according permissions associated to this user.
+
+To achieve this the connector will use the
+[refresh token grant flow](https://oauth.net/2/grant-types/refresh-token/) to
+retrieve a new access tokens when necessary.
+
+In order to use this authentication type, you will first need to retrieve a
+refresh token using the
+[authorization code grant flow](https://oauth.net/2/grant-types/authorization-code)
+and pass it to the connector with OAuth client ID and secret:
+
+*   `fs.gs.auth.client.id` (not set by default)
+
+    The OAuth2 client ID.
+
+*   `fs.gs.auth.client.secret` (not set by default)
+
+    The OAuth2 client secret.
+
+*   `fs.gs.auth.refresh.token` (not set by default)
+
+    The refresh token.
 
 ### Service account impersonation
 

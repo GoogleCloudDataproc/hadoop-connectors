@@ -17,6 +17,9 @@ package com.google.cloud.hadoop.util;
 import static com.github.stefanbirkner.systemlambda.SystemLambda.withEnvironmentVariable;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.ACCESS_TOKEN_PROVIDER_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTHENTICATION_TYPE_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTH_CLIENT_ID_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTH_CLIENT_SECRET_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTH_REFRESH_TOKEN_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.TOKEN_SERVER_URL_SUFFIX;
 import static com.google.cloud.hadoop.util.testing.HadoopConfigurationUtils.getDefaultProperties;
@@ -32,6 +35,7 @@ import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.ComputeEngineCredentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
+import com.google.auth.oauth2.UserCredentials;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import com.google.common.base.Suppliers;
@@ -42,6 +46,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -59,9 +64,12 @@ public class HadoopCredentialsConfigurationTest {
       new HashMap<>() {
         {
           put(".auth.access.token.provider", null);
+          put(".auth.client.id", null);
+          put(".auth.client.secret", null);
           put(".auth.impersonation.service.account", null);
           put(".auth.impersonation.service.account.for.group.", ImmutableMap.of());
           put(".auth.impersonation.service.account.for.user.", ImmutableMap.of());
+          put(".auth.refresh.token", null);
           put(".auth.service.account.json.keyfile", null);
           put(".auth.type", AuthenticationType.COMPUTE_ENGINE);
           put(".proxy.address", null);
@@ -173,6 +181,52 @@ public class HadoopCredentialsConfigurationTest {
     assertThat(accessToken.getTokenValue()).isEqualTo(TestingAccessTokenProvider.FAKE_ACCESS_TOKEN);
     assertThat(accessToken.getExpirationTime())
         .isEqualTo(Date.from(TestingAccessTokenProvider.EXPIRATION_TIME));
+  }
+
+  @Test
+  public void userCredentials_credentialFactory_noNewRefreshToken() throws IOException {
+    // GIVEN
+    String initialRefreshToken = "FAKE_REFRESH_TOKEN";
+    String tokenServerUrl = "http://localhost/token";
+    configuration.set(getConfigKey(TOKEN_SERVER_URL_SUFFIX), tokenServerUrl);
+    configuration.setEnum(
+        getConfigKey(AUTHENTICATION_TYPE_SUFFIX), AuthenticationType.USER_CREDENTIALS);
+    configuration.set(getConfigKey(AUTH_REFRESH_TOKEN_SUFFIX), initialRefreshToken);
+    configuration.set(getConfigKey(AUTH_CLIENT_ID_SUFFIX), "FAKE_CLIENT_ID");
+    configuration.set(getConfigKey(AUTH_CLIENT_SECRET_SUFFIX), "FAKE_CLIENT_SECRET");
+
+    long expireInSec = 300L;
+    String accessTokenAsString = "SlAV32hkKG";
+
+    TokenResponse tokenResponse =
+        new TokenResponse().setAccessToken(accessTokenAsString).setExpiresInSeconds(expireInSec);
+
+    MockHttpTransport transport = mockTransport(jsonDataResponse(tokenResponse));
+
+    // WHEN
+    GoogleCredentials credentials = getCredentials(transport);
+    credentials.refresh();
+
+    // THEN
+    assertThat(credentials).isInstanceOf(UserCredentials.class);
+
+    UserCredentials userCredentials = (UserCredentials) credentials;
+
+    assertThat(userCredentials.getClientId()).isEqualTo("FAKE_CLIENT_ID");
+    assertThat(userCredentials.getClientSecret()).isEqualTo("FAKE_CLIENT_SECRET");
+
+    AccessToken accessToken = userCredentials.getAccessToken();
+
+    assertThat(accessToken).isNotNull();
+    // To avoid any timebase issue, we test a time range instead
+    assertThat(accessToken.getExpirationTime())
+        .isGreaterThan(Date.from(Instant.now().plusSeconds(expireInSec - 10)));
+    assertThat(accessToken.getExpirationTime())
+        .isLessThan(Date.from(Instant.now().plusSeconds(expireInSec + 10)));
+
+    String refreshToken = userCredentials.getRefreshToken();
+
+    assertThat(refreshToken).isEqualTo(initialRefreshToken);
   }
 
   @Test
