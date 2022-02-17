@@ -218,6 +218,22 @@ public class HadoopCredentialsConfiguration {
           return ServiceAccountCredentials.fromStream(fis, transport::get)
               .createScoped(CLOUD_PLATFORM_SCOPE);
         }
+      case USER_CREDENTIALS:
+        String tokenServerUrl =
+            TOKEN_SERVER_URL_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get);
+        String clientId = AUTH_CLIENT_ID_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get);
+        RedactedString clientSecret =
+            AUTH_CLIENT_SECRET_SUFFIX.withPrefixes(keyPrefixes).getPassword(config);
+        RedactedString refreshToken =
+            AUTH_REFRESH_TOKEN_SUFFIX.withPrefixes(keyPrefixes).getPassword(config);
+
+        return UserCredentials.newBuilder()
+            .setTokenServerUri(URI.create(tokenServerUrl))
+            .setClientId(clientId)
+            .setClientSecret(clientSecret.value())
+            .setRefreshToken(refreshToken.value())
+            .setHttpTransportFactory(transport::get)
+            .build();
       case UNAUTHENTICATED:
         return null;
       default:
@@ -366,6 +382,8 @@ public class HadoopCredentialsConfiguration {
     SERVICE_ACCOUNT_JSON_KEYFILE,
     /** Configures unauthenticated access */
     UNAUTHENTICATED,
+    /** Configures user credentials authentication */
+    USER_CREDENTIALS,
   }
 
   protected HadoopCredentialsConfiguration() {}
