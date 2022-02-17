@@ -138,22 +138,22 @@ public class HadoopCredentialsConfiguration {
       new HadoopConfigurationProperty<>(".proxy.password");
 
   /**
-   * Configuration key for defining the OAuth2 refresh token. Required when the provider is
-   * RefreshTokenAuth2Provider
+   * Configuration key for defining the OAuth2 refresh token. Required when the authentication type is
+   * USER_CREDENTIALS
    */
   public static final HadoopConfigurationProperty<String> AUTH_REFRESH_TOKEN_SUFFIX =
       new HadoopConfigurationProperty<>(".auth.refresh.token");
 
   /**
-   * Configuration key for defining the OAUth2 client ID. Required when the provider is
-   * RefreshTokenAuth2Provider
+   * Configuration key for defining the OAUth2 client ID. Required when the authentication type is
+   *    * USER_CREDENTIALS
    */
   public static final HadoopConfigurationProperty<String> AUTH_CLIENT_ID_SUFFIX =
       new HadoopConfigurationProperty<>(".auth.client.id");
 
   /**
-   * Configuration key for defining the OAUth2 client secret. Required when the provider is
-   * RefreshTokenAuth2Provider
+   * Configuration key for defining the OAUth2 client secret. Required when the authentication type is
+   *    * USER_CREDENTIALS
    */
   public static final HadoopConfigurationProperty<String> AUTH_CLIENT_SECRET_SUFFIX =
       new HadoopConfigurationProperty<>(".auth.client.secret");
@@ -219,8 +219,6 @@ public class HadoopCredentialsConfiguration {
               .createScoped(CLOUD_PLATFORM_SCOPE);
         }
       case USER_CREDENTIALS:
-        String tokenServerUrl =
-            TOKEN_SERVER_URL_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get);
         String clientId = AUTH_CLIENT_ID_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get);
         RedactedString clientSecret =
             AUTH_CLIENT_SECRET_SUFFIX.withPrefixes(keyPrefixes).getPassword(config);
@@ -228,7 +226,6 @@ public class HadoopCredentialsConfiguration {
             AUTH_REFRESH_TOKEN_SUFFIX.withPrefixes(keyPrefixes).getPassword(config);
 
         return UserCredentials.newBuilder()
-            .setTokenServerUri(URI.create(tokenServerUrl))
             .setClientId(clientId)
             .setClientSecret(clientSecret.value())
             .setRefreshToken(refreshToken.value())

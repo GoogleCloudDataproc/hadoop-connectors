@@ -73,9 +73,9 @@ public class HadoopCredentialsConfigurationTest {
           put(".proxy.password", null);
           put(".proxy.username", null);
           put(".token.server.url", null);
-          put(".auth.refresh.token", null);
-          put(".auth.client.secret", null);
           put(".auth.client.id", null);
+          put(".auth.client.secret", null);
+          put(".auth.refresh.token", null);
         }
       };
 
@@ -220,7 +220,6 @@ public class HadoopCredentialsConfigurationTest {
         .isGreaterThan(Date.from(Instant.now().plusSeconds(expireInSec - 10)));
     assertThat(accessToken.getExpirationTime())
         .isLessThan(Date.from(Instant.now().plusSeconds(expireInSec + 10)));
-    assertThat(refreshToken).isNotNull();
     assertThat(refreshToken).isEqualTo(initialRefreshToken);
   }
 

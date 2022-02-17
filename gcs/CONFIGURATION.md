@@ -181,7 +181,7 @@
     Cloud Storage Connector when `fs.gs.auth.type` property is set to
     `ACCESS_TOKEN_PROVIDER`.
 
-*   `fs.gs.token.server.url` (default: `https://oauth2.googleapis.com/token`)
+*   `fs.gs.token.server.url` (not set by default)
 
     Google Token Server root URL.
 
