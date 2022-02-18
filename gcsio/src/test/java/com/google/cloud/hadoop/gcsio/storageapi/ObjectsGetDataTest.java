@@ -13,7 +13,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public class ObjectsGetMediaTest {
+public class ObjectsGetDataTest {
 
   public static final HttpTransport HTTP_TRANSPORT = new NetHttpTransport();
   public static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
@@ -31,6 +31,6 @@ public class ObjectsGetMediaTest {
     String OBJECT = "TEST_OBJECT";
     assertThrows(
         WrongRequestTypeException.class,
-        new ObjectsGetMedia(storage.objects(), BUCKET, OBJECT)::execute);
+        new ObjectsGetData(storage.objects(), BUCKET, OBJECT)::execute);
   }
 }

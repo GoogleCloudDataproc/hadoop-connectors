@@ -154,8 +154,12 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   @VisibleForTesting protected boolean metadataInitialized = false;
 
   /**
+<<<<<<< HEAD
    * Constructs an instance of GoogleCloudStorageReadChannel. Construct a {@link
    * StorageRequestFactory} from the given {@link Storage} instance.
+=======
+   * Constructs an instance of GoogleCloudStorageReadChannel.
+>>>>>>> 87a5ddbb (Rename ObjectsGetMedia to ObjectsGetData)
    *
    * @param gcs storage object instance
    * @param resourceId contains information about a specific resource
@@ -930,7 +934,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         "contentChannelEnd should be initialized already for '%s'",
         resourceId);
 
-    Get getObject = createMediaRequest(rangeHeader);
+    Get getObject = createDataRequest(rangeHeader);
     HttpResponse response;
     try {
       response = getObject.executeMedia();
@@ -1106,32 +1110,32 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     throw new IOException(msg, e);
   }
 
-  private Get createMediaRequest(String rangeHeader) throws IOException {
-    Get mediaRequest = createMediaRequest();
+  private Get createDataRequest(String rangeHeader) throws IOException {
+    Get dataRequest = createDataRequest();
 
     // Set the headers on the existing request headers that may have
     // been initialized with things like user-agent already.
-    HttpHeaders requestHeaders = clientRequestHelper.getRequestHeaders(mediaRequest);
+    HttpHeaders requestHeaders = clientRequestHelper.getRequestHeaders(dataRequest);
     // Disable GCS decompressive transcoding.
     requestHeaders.setAcceptEncoding("gzip");
     requestHeaders.setRange(rangeHeader);
 
-    return mediaRequest;
+    return dataRequest;
   }
 
-  protected Get createMediaRequest() throws IOException {
+  protected Get createDataRequest() throws IOException {
     checkState(
         !metadataInitialized || resourceId.hasGenerationId(),
         "Generation should always be included for resource '%s'",
         resourceId);
     // Start with unset generation and determine what to ask for based on read consistency.
-    Get getMedia =
-        storageRequestFactory.objectsGetMedia(
+    Get getData =
+        storageRequestFactory.objectsGetData(
             resourceId.getBucketName(), resourceId.getObjectName());
     if (resourceId.hasGenerationId()) {
-      getMedia.setGeneration(resourceId.getGenerationId());
+      getData.setGeneration(resourceId.getGenerationId());
     }
-    return getMedia;
+    return getData;
   }
 
   protected Get createMetadataRequest() throws IOException {

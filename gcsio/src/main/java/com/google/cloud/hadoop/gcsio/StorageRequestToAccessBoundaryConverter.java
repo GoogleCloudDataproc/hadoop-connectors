@@ -22,7 +22,7 @@ import com.google.api.services.storage.StorageRequest;
 import com.google.api.services.storage.model.Bucket;
 import com.google.api.services.storage.model.ComposeRequest;
 import com.google.api.services.storage.model.StorageObject;
-import com.google.cloud.hadoop.gcsio.storageapi.ObjectsGetMedia;
+import com.google.cloud.hadoop.gcsio.storageapi.ObjectsGetData;
 import com.google.cloud.hadoop.gcsio.storageapi.ObjectsGetMetadata;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.AccessBoundary.Action;
@@ -50,8 +50,8 @@ class StorageRequestToAccessBoundaryConverter {
       return translateObjectComposeRequest((Storage.Objects.Compose) request);
     } else if (request instanceof ObjectsGetMetadata) {
       return translateObjectGetMetadataRequest((ObjectsGetMetadata) request);
-    } else if (request instanceof ObjectsGetMedia) {
-      return translateObjectGetMediaRequest((ObjectsGetMedia) request);
+    } else if (request instanceof ObjectsGetData) {
+      return translateObjectGetDataRequest((ObjectsGetData) request);
     } else if (request instanceof Storage.Objects.Delete) {
       return translateObjectDeleteRequest((Storage.Objects.Delete) request);
     } else if (request instanceof Storage.Objects.Rewrite) {
@@ -110,7 +110,7 @@ class StorageRequestToAccessBoundaryConverter {
     return listBuilder.build();
   }
 
-  private static List<AccessBoundary> translateObjectGetMediaRequest(ObjectsGetMedia request) {
+  private static List<AccessBoundary> translateObjectGetDataRequest(ObjectsGetData request) {
     return ImmutableList.of(
         AccessBoundary.create(request.getBucket(), request.getObject(), Action.READ_OBJECTS));
   }

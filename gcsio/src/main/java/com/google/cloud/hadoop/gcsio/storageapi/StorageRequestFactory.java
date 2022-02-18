@@ -18,9 +18,9 @@ public class StorageRequestFactory {
     this.storage = storage;
   }
 
-  /** Instantiates a {@link ObjectsGetMedia} request. */
-  public ObjectsGetMedia objectsGetMedia(String bucketName, String objectName) {
-    return new ObjectsGetMedia(storage.objects(), bucketName, objectName);
+  /** Instantiates a {@link ObjectsGetData} request. */
+  public ObjectsGetData objectsGetData(String bucketName, String objectName) {
+    return new ObjectsGetData(storage.objects(), bucketName, objectName);
   }
 
   /** Instantiates a {@link ObjectsGetMetadata} request. */

@@ -24,6 +24,6 @@ public class ObjectsGetMetadata extends Get {
    */
   @Override
   public HttpResponse executeMedia() {
-    throw new WrongRequestTypeException("Shouldn't Call executeMedia on GetMetadata type. ");
+    throw new WrongRequestTypeException("Shouldn't Call executeMedia on GetMetadata requests. ");
   }
 }

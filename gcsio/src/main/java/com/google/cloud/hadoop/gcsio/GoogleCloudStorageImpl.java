@@ -763,12 +763,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
 
     return new GoogleCloudStorageReadChannel(
-        storage,
-        storageRequestFactory,
-        resourceId,
-        errorExtractor,
-        clientRequestHelper,
-        readOptions) {
+        storage, resourceId, errorExtractor, clientRequestHelper, readOptions) {
 
       @Override
       @Nullable
@@ -777,8 +772,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       }
 
       @Override
-      protected Storage.Objects.Get createMediaRequest() throws IOException {
-        return initializeRequest(super.createMediaRequest(), resourceId.getBucketName());
+      protected Storage.Objects.Get createDataRequest() throws IOException {
+        return initializeRequest(super.createDataRequest(), resourceId.getBucketName());
       }
 
       @Override
