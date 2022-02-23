@@ -607,7 +607,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
    * @return true if more data is available with .next()
    */
   private boolean moreServerContent() {
-    if (resIterator == null || requestContext == null || requestContext.isCancelled()) {
+    if (resIterator == null) {
       return false;
     }
     boolean moreDataAvailable = resIterator.hasNext();
