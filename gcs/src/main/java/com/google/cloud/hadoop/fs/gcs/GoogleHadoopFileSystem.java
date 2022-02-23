@@ -508,10 +508,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     URI gcsPath = getGcsPath(hadoopPath);
     GoogleCloudStorageReadOptions readChannelOptions =
         getGcsFs().getOptions().getCloudStorageOptions().getReadChannelOptions();
-    GoogleHadoopFSInputStreamBase in =
-        new GoogleHadoopFSInputStream(this, gcsPath, readChannelOptions, statistics);
-
-    return new FSDataInputStream(in);
+    return new FSDataInputStream(
+        new GoogleHadoopFSInputStream(this, gcsPath, readChannelOptions, statistics));
   }
 
   @Override
