@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.MockGoogleCloudStorageImplFactory.mockedGcs;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.arbitraryInputStreamSupplier;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonErrorResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
@@ -24,7 +25,6 @@ import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 
-import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.services.storage.Storage;
@@ -51,7 +51,6 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageImplCreateTest {
 
-  private static final String PROJECT_ID = "google.com:foo-project";
   private static final String BUCKET_NAME = "foo-bucket";
   private static final String OBJECT_NAME = "bar-object";
 
@@ -223,26 +222,5 @@ public class GoogleCloudStorageImplCreateTest {
                     .setDefaultUserAgent("foo-user-agent")
                     .build()))
         .build();
-  }
-
-  private GoogleCloudStorageImpl mockedGcs(HttpTransport transport) {
-    Storage storage =
-        new Storage(
-            transport,
-            GsonFactory.getDefaultInstance(),
-            new TrackingHttpRequestInitializer(
-                new RetryHttpInitializer(
-                    new FakeCredentials(),
-                    RetryHttpInitializerOptions.builder()
-                        .setDefaultUserAgent("gcs-io-unit-test")
-                        .build()),
-                false));
-    return new GoogleCloudStorageImpl(
-        GoogleCloudStorageOptions.builder()
-            .setAppName("gcsio-unit-test")
-            .setProjectId(PROJECT_ID)
-            .build(),
-        storage,
-        null);
   }
 }

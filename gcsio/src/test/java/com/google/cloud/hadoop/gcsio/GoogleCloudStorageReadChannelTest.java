@@ -19,6 +19,7 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.BUCKET_N
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.HTTP_TRANSPORT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.OBJECT_NAME;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.createReadChannel;
+import static com.google.cloud.hadoop.gcsio.MockGoogleCloudStorageImplFactory.mockedGcs;
 import static com.google.cloud.hadoop.gcsio.StorageResourceId.UNKNOWN_GENERATION_ID;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.dataRangeResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.dataResponse;
@@ -31,16 +32,12 @@ import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.http.HttpRequest;
-import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.util.DateTime;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
-import com.google.cloud.hadoop.util.RetryHttpInitializer;
-import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
-import com.google.cloud.hadoop.util.testing.FakeCredentials;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
 import com.google.common.collect.ImmutableMap;
 import java.io.FileNotFoundException;
@@ -602,26 +599,5 @@ public class GoogleCloudStorageReadChannelTest {
 
   private static GoogleCloudStorageReadOptions.Builder newLazyReadOptionsBuilder() {
     return GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false);
-  }
-
-  private GoogleCloudStorageImpl mockedGcs(HttpTransport transport) {
-    Storage storage =
-        new Storage(
-            transport,
-            GsonFactory.getDefaultInstance(),
-            new TrackingHttpRequestInitializer(
-                new RetryHttpInitializer(
-                    new FakeCredentials(),
-                    RetryHttpInitializerOptions.builder()
-                        .setDefaultUserAgent("gcs-io-unit-test")
-                        .build()),
-                false));
-    return new GoogleCloudStorageImpl(
-        GoogleCloudStorageOptions.builder()
-            .setAppName("gcsio-unit-test")
-            .setProjectId(PROJECT_ID)
-            .build(),
-        storage,
-        null);
   }
 }

@@ -15,6 +15,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTest.newStorageObject;
+import static com.google.cloud.hadoop.gcsio.MockGoogleCloudStorageImplFactory.mockedGcs;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
@@ -32,16 +33,11 @@ import static org.mockito.Mockito.when;
 import com.google.api.client.googleapis.batch.json.JsonBatchCallback;
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.http.HttpHeaders;
-import com.google.api.client.http.HttpTransport;
-import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.Bucket;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
-import com.google.cloud.hadoop.util.RetryHttpInitializer;
-import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
-import com.google.cloud.hadoop.util.testing.FakeCredentials;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import java.io.FileNotFoundException;
@@ -306,26 +302,5 @@ public class GoogleCloudStorageMockitoTest {
     verify(mockBatchHelper).queue(any(Storage.Objects.Get.class), any());
     verify(mockErrorExtractor, times(2)).itemNotFound(any(IOException.class));
     verify(mockBatchHelper).flush();
-  }
-
-  private GoogleCloudStorageImpl mockedGcs(HttpTransport transport) {
-    Storage storage =
-        new Storage(
-            transport,
-            GsonFactory.getDefaultInstance(),
-            new TrackingHttpRequestInitializer(
-                new RetryHttpInitializer(
-                    new FakeCredentials(),
-                    RetryHttpInitializerOptions.builder()
-                        .setDefaultUserAgent("gcs-io-unit-test")
-                        .build()),
-                false));
-    return new GoogleCloudStorageImpl(
-        GoogleCloudStorageOptions.builder()
-            .setAppName("gcsio-unit-test")
-            .setProjectId(PROJECT_ID)
-            .build(),
-        storage,
-        null);
   }
 }
