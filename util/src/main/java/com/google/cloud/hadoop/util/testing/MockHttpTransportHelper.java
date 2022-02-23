@@ -46,6 +46,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Map;
+import java.util.function.Supplier;
 
 /** Utility methods for testing with {@link MockHttpTransport} */
 public final class MockHttpTransportHelper {
@@ -260,6 +261,75 @@ public final class MockHttpTransportHelper {
       Map<String, Object> headers, InputStream content) {
     return setHeaders(new MockLowLevelHttpResponse(), headers, UNKNOWN_CONTENT_LENGTH)
         .setContent(content);
+  }
+
+  /**
+   * Replies N times successfully then throw IOException.
+   *
+   * @param exception to thrown
+   * @param replies to reply when attempt to read the input steam. Leave empty to throw on the first
+   *     call.
+   * @return a {@link MockLowLevelHttpResponse} that replies the customized InputStream.
+   */
+  public static MockLowLevelHttpResponse readThenThrowIOExceptionOnRead(
+      IOException exception, int... replies) {
+    MockLowLevelHttpResponse response = new MockLowLevelHttpResponse();
+    response.setContent(
+        new InputStream() {
+          private int current = 0;
+
+          @Override
+          public synchronized int read() throws IOException {
+            if (current < replies.length) {
+              current += 1;
+              return replies[current - 1];
+            }
+            throw exception;
+          }
+
+          @Override
+          public int read(byte[] b, int off, int len) throws IOException {
+            if (current < replies.length) {
+              current += 1;
+              return replies[current - 1];
+            }
+            throw exception;
+          }
+        });
+    return response;
+  }
+
+  /**
+   * Return an arbitrary InputStream supplier. This function should only be used to simulate
+   * arbitrary runtime behavior.
+   */
+  public static MockLowLevelHttpResponse arbitraryInputStreamSupplier(
+      Supplier<InputStream> supplier) {
+    return new MockLowLevelHttpResponse() {
+      @Override
+      public InputStream getContent() {
+        return supplier.get();
+      }
+    };
+  }
+
+  public static MockLowLevelHttpResponse throwErrorWhenGetContent(Error throwable) {
+    return new MockLowLevelHttpResponse() {
+      @Override
+      public InputStream getContent() {
+        throw throwable;
+      }
+    };
+  }
+
+  public static MockLowLevelHttpResponse throwRuntimeExceptionWhenGetContent(
+      RuntimeException exception) {
+    return new MockLowLevelHttpResponse() {
+      @Override
+      public InputStream getContent() {
+        throw exception;
+      }
+    };
   }
 
   private static MockLowLevelHttpResponse setHeaders(
