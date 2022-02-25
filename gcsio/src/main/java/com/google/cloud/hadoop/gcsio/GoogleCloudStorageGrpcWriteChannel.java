@@ -229,8 +229,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
         Thread.currentThread().interrupt();
         throw new IOException(
             String.format(
-                "Streaming RPC failed to become ready for resumable upload for '%s'", resourceId),
-            e);
+                "Interrupted while awaiting ready on responseObserver for '%s' with UploadID '%s'",
+                resourceId, responseObserver.uploadId));
       }
 
       boolean objectFinalized = false;
@@ -269,11 +269,14 @@ public final class GoogleCloudStorageGrpcWriteChannel
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         throw new IOException(
-            String.format("Interrupted while awaiting response during upload of '%s'", resourceId),
-            e);
+            String.format(
+                "Interrupted while awaiting response during upload of '%s' with UploadID '%s'",
+                resourceId, responseObserver.uploadId));
       }
       if (responseObserver.hasTransientError()) {
-        throw new IOException(responseObserver.transientError);
+        throw new IOException(
+            String.format("Got transient error for UploadID '%s'", responseObserver.uploadId),
+            responseObserver.transientError);
       }
 
       return responseObserver.getResponseOrThrow();
@@ -378,7 +381,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
       public WriteObjectResponse getResponseOrThrow() throws IOException {
         if (hasNonTransientError()) {
           throw new IOException(
-              String.format("Resumable upload failed for '%s'", resourceId), nonTransientError);
+              String.format(
+                  "Resumable upload failed for '%s' , uploadId : %s ", resourceId, uploadId),
+              nonTransientError);
         }
         return checkNotNull(response, "Response not present for '%s'", resourceId);
       }
