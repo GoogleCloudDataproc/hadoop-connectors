@@ -191,7 +191,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       // Try-with-resource will close this end of the pipe so that
       // the writer at the other end will not hang indefinitely.
       // Send the initial StartResumableWrite request to get an uploadId.
-      uploadId = startResumableUpload();
+      uploadId = startResumableUploadWithRetries();
       try (InputStream ignore = pipeSource) {
         return ResilientOperation.retry(
             this::doResumableUpload,
@@ -437,57 +437,39 @@ public final class GoogleCloudStorageGrpcWriteChannel
     }
 
     /** Send a StartResumableWriteRequest and return the uploadId of the resumable write. */
-    private String startResumableUpload() throws IOException {
-      WriteObjectSpec.Builder insertObjectSpecBuilder =
-          WriteObjectSpec.newBuilder()
-              .setResource(
-                  Object.newBuilder()
-                      .setBucket(GrpcChannelUtils.toV2BucketName(resourceId.getBucketName()))
-                      .setName(resourceId.getObjectName())
-                      .setContentType(createOptions.getContentType())
-                      .putAllMetadata(encodeMetadata(createOptions.getMetadata()))
-                      .build());
-      if (writeConditions.hasContentGenerationMatch()) {
-        insertObjectSpecBuilder.setIfGenerationMatch(writeConditions.getContentGenerationMatch());
-      }
-      if (writeConditions.hasMetaGenerationMatch()) {
-        insertObjectSpecBuilder.setIfMetagenerationMatch(writeConditions.getMetaGenerationMatch());
-      }
-
-      Builder commonRequestParamsBuilder = null;
-      if (requesterPaysProject != null) {
-        commonRequestParamsBuilder =
-            CommonRequestParams.newBuilder().setUserProject(requesterPaysProject);
-      }
-
-      StartResumableWriteRequest.Builder startResumableWriteRequestBuilder =
-          StartResumableWriteRequest.newBuilder().setWriteObjectSpec(insertObjectSpecBuilder);
-      if (commonRequestParamsBuilder != null) {
-        startResumableWriteRequestBuilder.setCommonRequestParams(commonRequestParamsBuilder);
-      }
-      StartResumableWriteRequest request = startResumableWriteRequestBuilder.build();
-
-      SimpleResponseObserver<StartResumableWriteResponse> responseObserver =
-          new SimpleResponseObserver<>();
+    private String startResumableUploadWithRetries() throws IOException {
       try {
-        ResilientOperation.retry(
-            () -> {
-              stub.withDeadlineAfter(START_RESUMABLE_WRITE_TIMEOUT.toMillis(), MILLISECONDS)
-                  .startResumableWrite(request, responseObserver);
-              try {
-                responseObserver.done.await();
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IOException(
-                    String.format(
-                        "Interrupted while awaiting response during upload of '%s'", resourceId),
-                    e);
-              }
-              if (responseObserver.hasError()) {
-                throw new IOException(responseObserver.getError());
-              }
-              return null;
-            },
+        WriteObjectSpec.Builder insertObjectSpecBuilder =
+            WriteObjectSpec.newBuilder()
+                .setResource(
+                    Object.newBuilder()
+                        .setBucket(GrpcChannelUtils.toV2BucketName(resourceId.getBucketName()))
+                        .setName(resourceId.getObjectName())
+                        .setContentType(createOptions.getContentType())
+                        .putAllMetadata(encodeMetadata(createOptions.getMetadata()))
+                        .build());
+        if (writeConditions.hasContentGenerationMatch()) {
+          insertObjectSpecBuilder.setIfGenerationMatch(writeConditions.getContentGenerationMatch());
+        }
+        if (writeConditions.hasMetaGenerationMatch()) {
+          insertObjectSpecBuilder.setIfMetagenerationMatch(
+              writeConditions.getMetaGenerationMatch());
+        }
+
+        Builder commonRequestParamsBuilder = null;
+        if (requesterPaysProject != null) {
+          commonRequestParamsBuilder =
+              CommonRequestParams.newBuilder().setUserProject(requesterPaysProject);
+        }
+
+        StartResumableWriteRequest.Builder startResumableWriteRequestBuilder =
+            StartResumableWriteRequest.newBuilder().setWriteObjectSpec(insertObjectSpecBuilder);
+        if (commonRequestParamsBuilder != null) {
+          startResumableWriteRequestBuilder.setCommonRequestParams(commonRequestParamsBuilder);
+        }
+        StartResumableWriteRequest request = startResumableWriteRequestBuilder.build();
+        return ResilientOperation.retry(
+            () -> startResumableUpload(request),
             backOffFactory.newBackOff(),
             RetryDeterminer.ALL_ERRORS,
             IOException.class);
@@ -496,7 +478,26 @@ public final class GoogleCloudStorageGrpcWriteChannel
         throw new IOException(
             String.format("Failed to start resumable upload for '%s'", resourceId), e);
       }
+    }
 
+    private String startResumableUpload(StartResumableWriteRequest request) throws IOException {
+      // It is essential to re-create the observer on retry, so that the CountDownLatch is not
+      // re-used and we wait for the actual response instead of returning the last response/error
+      SimpleResponseObserver<StartResumableWriteResponse> responseObserver =
+          new SimpleResponseObserver<>();
+      stub.withDeadlineAfter(START_RESUMABLE_WRITE_TIMEOUT.toMillis(), MILLISECONDS)
+          .startResumableWrite(request, responseObserver);
+      try {
+        responseObserver.done.await();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IOException(
+            String.format("Interrupted while awaiting response during upload of '%s'", resourceId),
+            e);
+      }
+      if (responseObserver.hasError()) {
+        throw new IOException(responseObserver.getError());
+      }
       return responseObserver.getResponse().getUploadId();
     }
 
