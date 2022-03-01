@@ -45,7 +45,7 @@ import java.util.List;
 import javax.annotation.concurrent.GuardedBy;
 
 /** Interface for exposing utility methods to publish metrics via open-census api-spec. */
-interface MetricsPublisher {
+interface MetricsRecorder {
 
   /**
    * Publishes metric for specified open-census measurement
@@ -69,7 +69,7 @@ interface MetricsPublisher {
 }
 
 /** Publishes open-census measurements to StackDriver */
-class CloudMonitoringMetricsPublisher implements MetricsPublisher {
+class CloudMonitoringMetricsRecorder implements MetricsRecorder {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
@@ -127,15 +127,15 @@ class CloudMonitoringMetricsPublisher implements MetricsPublisher {
   private static final Tagger tagger = Tags.getTagger();
   private static final StatsRecorder statsRecorder = Stats.getStatsRecorder();
 
-  public static MetricsPublisher create(String projectId, Credentials credentials) {
+  public static MetricsRecorder create(String projectId, Credentials credentials) {
     try {
       registerAllViews();
       setupCloudMonitoringExporter(projectId, credentials);
     } catch (Exception e) {
       logger.atWarning().withCause(e).log("Exception while registering metrics publisher");
-      return new NoOpMetricsPublisher();
+      return new NoOpMetricsRecorder();
     }
-    return new CloudMonitoringMetricsPublisher();
+    return new CloudMonitoringMetricsRecorder();
   }
 
   private static void setupCloudMonitoringExporter(String projectId, Credentials credentials)
@@ -230,7 +230,7 @@ class CloudMonitoringMetricsPublisher implements MetricsPublisher {
 }
 
 /** No-Op metrics publisher */
-class NoOpMetricsPublisher implements MetricsPublisher {
+class NoOpMetricsRecorder implements MetricsRecorder {
 
   @Override
   public void recordTaggedStat(TagKey key, String value, MeasureLong ml, Long n) {

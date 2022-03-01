@@ -144,7 +144,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   private static final String LIST_OBJECT_FIELDS_FORMAT = "items(%s),prefixes,nextPageToken";
 
-  private final MetricsPublisher metricsPublisher;
+  private final MetricsRecorder metricsRecorder;
 
   // A function to encode metadata map values
   static String encodeMetadataValues(byte[] bytes) {
@@ -341,9 +341,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             ? null
             : this.storage.getRequestFactory().getInitializer();
 
-    this.metricsPublisher =
-        this.storageOptions.isMetricsEnabled() ? CloudMonitoringMetricsPublisher.create(
-            options.getProjectId(), credentials) : new NoOpMetricsPublisher();
+    this.metricsRecorder =
+        this.storageOptions.isMetricsEnabled()
+            ? CloudMonitoringMetricsRecorder.create(options.getProjectId(), credentials)
+            : new NoOpMetricsRecorder();
 
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
@@ -381,10 +382,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     if (this.storageOptions.isMetricsEnabled()) {
       Credentials credentials = ((RetryHttpInitializer) httpRequestInitializer).getCredentials();
-      this.metricsPublisher =
-          CloudMonitoringMetricsPublisher.create(options.getProjectId(), credentials);
+      this.metricsRecorder =
+          CloudMonitoringMetricsRecorder.create(options.getProjectId(), credentials);
     } else {
-      this.metricsPublisher = new NoOpMetricsPublisher();
+      this.metricsRecorder = new NoOpMetricsRecorder();
     }
 
     // Create the gRPC stub if necessary;
@@ -781,14 +782,14 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               storage,
               resourceId,
               watchdog,
-              metricsPublisher,
+              metricsRecorder,
               readOptions,
               BackOffFactory.DEFAULT)
           : new GoogleCloudStorageGrpcReadChannel(
               storageStubProvider,
               itemInfo,
               watchdog,
-              metricsPublisher,
+              metricsRecorder,
               readOptions,
               BackOffFactory.DEFAULT);
     }

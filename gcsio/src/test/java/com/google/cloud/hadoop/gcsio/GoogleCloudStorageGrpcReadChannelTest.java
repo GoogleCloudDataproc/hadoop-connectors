@@ -1536,7 +1536,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         storage,
         new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
         watchdog,
-        new NoOpMetricsPublisher(),
+        new NoOpMetricsRecorder(),
         options,
         () -> BackOff.STOP_BACKOFF);
   }
@@ -1548,7 +1548,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         storage,
         new StorageResourceId(V1_BUCKET_NAME, OBJECT_NAME),
         watchdog,
-        new NoOpMetricsPublisher(),
+        new NoOpMetricsRecorder(),
         options,
         () -> BackOff.STOP_BACKOFF);
   }
@@ -1561,7 +1561,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         storage,
         storageResourceId,
         watchdog,
-        new NoOpMetricsPublisher(),
+        new NoOpMetricsRecorder(),
         options,
         () -> BackOff.STOP_BACKOFF);
   }
@@ -1573,7 +1573,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         new FakeStubProvider(mockCredentials),
         itemInfo,
         watchdog,
-        new NoOpMetricsPublisher(),
+        new NoOpMetricsRecorder(),
         options,
         () -> BackOff.STOP_BACKOFF);
   }

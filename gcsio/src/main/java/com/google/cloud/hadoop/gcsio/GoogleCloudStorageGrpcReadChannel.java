@@ -13,13 +13,13 @@
  */
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsPublisher.LATENCY_MS;
-import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsPublisher.MESSAGE_LATENCY_MS;
-import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsPublisher.METHOD;
-import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsPublisher.PROTOCOL;
-import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsPublisher.REQUESTS;
-import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsPublisher.REQUEST_RETRIES;
-import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsPublisher.STATUS;
+import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsRecorder.LATENCY_MS;
+import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsRecorder.MESSAGE_LATENCY_MS;
+import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsRecorder.METHOD;
+import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsRecorder.PROTOCOL;
+import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsRecorder.REQUESTS;
+import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsRecorder.REQUEST_RETRIES;
+import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsRecorder.STATUS;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -97,7 +97,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   // The size of this object generation, in bytes.
   private final long objectSize;
 
-  private final MetricsPublisher metricsPublisher;
+  private final MetricsRecorder metricsRecorder;
 
   // True if this channel is open, false otherwise.
   private boolean channelIsOpen = true;
@@ -153,14 +153,14 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       Storage storage,
       StorageResourceId resourceId,
       Watchdog watchdog,
-      MetricsPublisher metricsPublisher,
+      MetricsRecorder metricsRecorder,
       GoogleCloudStorageReadOptions readOptions,
       BackOffFactory backOffFactory)
       throws IOException {
     checkArgument(storage != null, "GCS json client cannot be null");
     this.useZeroCopyMarshaller =
         ZeroCopyReadinessChecker.isReady() && readOptions.isGrpcReadZeroCopyEnabled();
-    this.metricsPublisher = metricsPublisher;
+    this.metricsRecorder = metricsRecorder;
     this.stub = stubProvider.newBlockingStub();
     this.backOffFactory = backOffFactory;
     GoogleCloudStorageItemInfo itemInfo = getObjectMetadata(resourceId, storage);
@@ -212,14 +212,14 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       StorageStubProvider stubProvider,
       GoogleCloudStorageItemInfo itemInfo,
       Watchdog watchdog,
-      MetricsPublisher metricsPublisher,
+      MetricsRecorder metricsRecorder,
       GoogleCloudStorageReadOptions readOptions,
       BackOffFactory backOffFactory)
       throws IOException {
     validate(itemInfo);
     this.useZeroCopyMarshaller =
         ZeroCopyReadinessChecker.isReady() && readOptions.isGrpcReadZeroCopyEnabled();
-    this.metricsPublisher = metricsPublisher;
+    this.metricsRecorder = metricsRecorder;
     this.stub = stubProvider.newBlockingStub();
     this.resourceId = itemInfo.getResourceId();
     this.objectGeneration = itemInfo.getContentGeneration();
@@ -283,7 +283,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     long time = stopwatch.elapsed(MILLISECONDS);
     TagKey[] keys = new TagKey[] {METHOD, STATUS, PROTOCOL};
     String[] values = new String[] {method, STATUS_OK, protocol};
-    metricsPublisher.recordLong(keys, values, measure, time);
+    metricsRecorder.recordLong(keys, values, measure, time);
     logger.atFinest().log(
         "method : %s , status : %s, protocol : %s , measure : %s , time : %d",
         method, STATUS_OK, protocol, measure, time);
@@ -298,7 +298,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
             : e.getClass().getSimpleName();
     TagKey[] keys = new TagKey[] {METHOD, STATUS, PROTOCOL};
     String[] values = new String[] {method, error, protocol};
-    metricsPublisher.recordLong(keys, values, measure, time);
+    metricsRecorder.recordLong(keys, values, measure, time);
     logger.atFinest().log(
         "method : %s , status : %s, protocol : %s , measure : %s , time : %d",
         method, error, protocol, measure, time);
@@ -325,7 +325,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   private boolean nextSleep(String method, Sleeper sleeper, BackOff backoff, Exception exception)
       throws IOException {
     try {
-      metricsPublisher.recordTaggedStat(METHOD, method, REQUEST_RETRIES, 1L);
+      metricsRecorder.recordTaggedStat(METHOD, method, REQUEST_RETRIES, 1L);
       return ResilientOperation.nextSleep(backoff, sleeper, exception);
     } catch (InterruptedException e) {
       cancelCurrentRequest();
@@ -388,7 +388,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     logger.atFiner().log(
         "GCS gRPC read request for up to %d bytes at offset %d from object '%s'",
         byteBuffer.remaining(), position(), resourceId);
-    metricsPublisher.recordTaggedStat(METHOD, "read", REQUESTS, 1L);
+    metricsRecorder.recordTaggedStat(METHOD, "read", REQUESTS, 1L);
 
     if (!isOpen()) {
       throw new ClosedChannelException();
@@ -696,7 +696,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   @Override
   public SeekableByteChannel position(long newPosition) throws IOException {
-    metricsPublisher.recordTaggedStat(METHOD, "seek", REQUESTS, 1L);
+    metricsRecorder.recordTaggedStat(METHOD, "seek", REQUESTS, 1L);
     if (!isOpen()) {
       throw new ClosedChannelException();
     }
@@ -733,7 +733,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   @Override
   public long size() throws IOException {
-    metricsPublisher.recordTaggedStat(METHOD, "size", REQUESTS, 1L);
+    metricsRecorder.recordTaggedStat(METHOD, "size", REQUESTS, 1L);
     if (!isOpen()) {
       throw new ClosedChannelException();
     }
@@ -752,7 +752,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   @Override
   public void close() {
-    metricsPublisher.recordTaggedStat(METHOD, "read_close", REQUESTS, 1L);
+    metricsRecorder.recordTaggedStat(METHOD, "read_close", REQUESTS, 1L);
     cancelCurrentRequest();
     invalidateBufferedContent();
     channelIsOpen = false;
