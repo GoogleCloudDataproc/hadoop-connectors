@@ -248,7 +248,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private ApiErrorExtractor errorExtractor = ApiErrorExtractor.INSTANCE;
 
   // Helper for interacting with objects involved with the API client libraries.
-  private ClientRequestHelper<StorageObject> clientRequestHelper = new ClientRequestHelper<>();
+  private final ClientRequestHelper<StorageObject> clientRequestHelper =
+      new ClientRequestHelper<>();
 
   // Factory for BatchHelpers setting up BatchRequests; can be swapped out for testing purposes.
   private BatchHelper.Factory batchFactory = new BatchHelper.Factory();
@@ -260,10 +261,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private final GoogleCloudStorageOptions storageOptions;
 
   // Object to use to perform sleep operations
-  private Sleeper sleeper = Sleeper.DEFAULT;
+  private final Sleeper sleeper = Sleeper.DEFAULT;
 
   // BackOff objects are per-request, use this to make new ones.
-  private BackOffFactory backOffFactory = BackOffFactory.DEFAULT;
+  private final BackOffFactory backOffFactory = BackOffFactory.DEFAULT;
 
   // Determine if a given IOException is due to rate-limiting.
   private RetryDeterminer<IOException> rateLimitedRetryDeterminer = errorExtractor::rateLimited;

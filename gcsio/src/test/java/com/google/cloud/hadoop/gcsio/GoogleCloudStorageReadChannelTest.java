@@ -19,14 +19,15 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.BUCKET_N
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.HTTP_TRANSPORT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.OBJECT_NAME;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.createReadChannel;
-import static com.google.cloud.hadoop.gcsio.MockGoogleCloudStorageImplFactory.mockedGcs;
 import static com.google.cloud.hadoop.gcsio.StorageResourceId.UNKNOWN_GENERATION_ID;
+import static com.google.cloud.hadoop.gcsio.testing.MockGoogleCloudStorageImplFactory.mockedGcs;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.dataRangeResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.dataResponse;
+import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.inputStreamResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonDataResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonErrorResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
-import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.readThenThrowIOExceptionOnRead;
+import static com.google.common.net.HttpHeaders.CONTENT_LENGTH;
 import static com.google.common.truth.Truth.assertThat;
 import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
@@ -42,6 +43,7 @@ import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorRespons
 import com.google.common.collect.ImmutableMap;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -575,7 +577,21 @@ public class GoogleCloudStorageReadChannelTest {
                     .setContentEncoding(null)
                     .setGeneration(1L)
                     .setMetageneration(1L)),
-            readThenThrowIOExceptionOnRead(new IOException("In-place seek IOException"), 1),
+            inputStreamResponse(
+                CONTENT_LENGTH,
+                testData.length,
+                new InputStream() {
+                  private int current = 0;
+
+                  @Override
+                  public synchronized int read() throws IOException {
+                    if (current == 0) {
+                      current += 1;
+                      return 1;
+                    }
+                    throw new IOException("In-place seek IOException");
+                  }
+                }),
             dataResponse(ImmutableMap.of("Content-Length", testData2.length), testData2));
     GoogleCloudStorage gcs = mockedGcs(transport);
 

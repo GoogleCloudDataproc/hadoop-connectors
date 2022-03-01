@@ -231,44 +231,8 @@ public final class MockHttpTransportHelper {
   }
 
   /**
-   * Replies N times successfully then throw IOException.
-   *
-   * @param exception to thrown
-   * @param replies to reply when attempt to read the input steam. Leave empty to throw on the first
-   *     call.
-   * @return a {@link MockLowLevelHttpResponse} that replies the customized InputStream.
-   */
-  public static MockLowLevelHttpResponse readThenThrowIOExceptionOnRead(
-      IOException exception, int... replies) {
-    MockLowLevelHttpResponse response = new MockLowLevelHttpResponse();
-    response.setContent(
-        new InputStream() {
-          private int current = 0;
-
-          @Override
-          public synchronized int read() throws IOException {
-            if (current < replies.length) {
-              current += 1;
-              return replies[current - 1];
-            }
-            throw exception;
-          }
-
-          @Override
-          public int read(byte[] b, int off, int len) throws IOException {
-            if (current < replies.length) {
-              current += 1;
-              return replies[current - 1];
-            }
-            throw exception;
-          }
-        });
-    return response;
-  }
-
-  /**
    * Return an arbitrary InputStream supplier. This function should only be used to simulate
-   * arbitrary runtime behavior.
+   * arbitrary runtime behavior when calling `execute` and `executeMedia`.
    */
   public static MockLowLevelHttpResponse arbitraryInputStreamSupplier(
       Supplier<InputStream> supplier) {
@@ -276,25 +240,6 @@ public final class MockHttpTransportHelper {
       @Override
       public InputStream getContent() {
         return supplier.get();
-      }
-    };
-  }
-
-  public static MockLowLevelHttpResponse throwErrorWhenGetContent(Error throwable) {
-    return new MockLowLevelHttpResponse() {
-      @Override
-      public InputStream getContent() {
-        throw throwable;
-      }
-    };
-  }
-
-  public static MockLowLevelHttpResponse throwRuntimeExceptionWhenGetContent(
-      RuntimeException exception) {
-    return new MockLowLevelHttpResponse() {
-      @Override
-      public InputStream getContent() {
-        throw exception;
       }
     };
   }

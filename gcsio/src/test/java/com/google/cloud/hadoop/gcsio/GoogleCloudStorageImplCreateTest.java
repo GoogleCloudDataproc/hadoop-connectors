@@ -14,12 +14,12 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.MockGoogleCloudStorageImplFactory.mockedGcs;
+import static com.google.cloud.hadoop.gcsio.testing.MockGoogleCloudStorageImplFactory.mockedGcs;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.arbitraryInputStreamSupplier;
+import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.inputStreamResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonErrorResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
-import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.throwErrorWhenGetContent;
-import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.throwRuntimeExceptionWhenGetContent;
+import static com.google.common.net.HttpHeaders.CONTENT_LENGTH;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.assertThrows;
@@ -35,6 +35,7 @@ import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.cloud.hadoop.util.testing.FakeCredentials;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
+import com.google.cloud.hadoop.util.testing.ThrowingInputStream;
 import java.io.IOException;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.WritableByteChannel;
@@ -123,7 +124,11 @@ public class GoogleCloudStorageImplCreateTest {
     Error fakeError = new Error("Fake error");
     MockHttpTransport transport =
         mockTransport(
-            jsonErrorResponse(ErrorResponses.NOT_FOUND), throwErrorWhenGetContent(fakeError));
+            jsonErrorResponse(ErrorResponses.NOT_FOUND),
+            inputStreamResponse(
+                CONTENT_LENGTH,
+                /* headerValue = */ 1,
+                new ThrowingInputStream(/* readException = */ null, fakeError)));
     GoogleCloudStorageImpl gcs = mockedGcs(transport);
 
     WritableByteChannel writeChannel = gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
@@ -144,8 +149,11 @@ public class GoogleCloudStorageImplCreateTest {
     MockHttpTransport transport =
         mockTransport(
             jsonErrorResponse(ErrorResponses.NOT_FOUND),
-            throwRuntimeExceptionWhenGetContent(fakeException));
-    GoogleCloudStorageImpl gcs = (GoogleCloudStorageImpl) mockedGcs(transport);
+            inputStreamResponse(
+                CONTENT_LENGTH,
+                /* headerValue = */ 1,
+                new ThrowingInputStream(/* readException = */ null, fakeException)));
+    GoogleCloudStorageImpl gcs = mockedGcs(transport);
 
     WritableByteChannel writeChannel = gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
     assertThat(writeChannel.isOpen()).isTrue();
