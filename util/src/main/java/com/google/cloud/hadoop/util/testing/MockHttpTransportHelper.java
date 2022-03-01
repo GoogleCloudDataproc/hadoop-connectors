@@ -232,7 +232,7 @@ public final class MockHttpTransportHelper {
 
   /**
    * Return an arbitrary InputStream supplier. This function should only be used to simulate
-   * arbitrary runtime behavior when calling `execute` and `executeMedia`.
+   * arbitrary runtime behavior when calling {@code execute} and {@code executeMedia}.
    */
   public static MockLowLevelHttpResponse arbitraryInputStreamSupplier(
       Supplier<InputStream> supplier) {
