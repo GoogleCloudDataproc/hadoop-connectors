@@ -341,12 +341,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             ? null
             : this.storage.getRequestFactory().getInitializer();
 
-    if (this.storageOptions.isMetricsEnabled()) {
-      this.metricsPublisher =
-          CloudMonitoringMetricsPublisher.create(options.getProjectId(), credentials);
-    } else {
-      this.metricsPublisher = new NoOpMetricsPublisher();
-    }
+    this.metricsPublisher =
+        this.storageOptions.isMetricsEnabled() ? CloudMonitoringMetricsPublisher.create(
+            options.getProjectId(), credentials) : new NoOpMetricsPublisher();
 
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
@@ -383,10 +380,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             : this.storage.getRequestFactory().getInitializer();
 
     if (this.storageOptions.isMetricsEnabled()) {
-      checkArgument(
-          httpRequestInitializer instanceof RetryHttpInitializer,
-          "request initializer must be an instance of the RetryHttpInitializer class"
-              + " when gRPC API enabled");
       Credentials credentials = ((RetryHttpInitializer) httpRequestInitializer).getCredentials();
       this.metricsPublisher =
           CloudMonitoringMetricsPublisher.create(options.getProjectId(), credentials);
