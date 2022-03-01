@@ -187,7 +187,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
    * @param watchdog monitors read channel for Idle time
    * @param readOptions readOptions fine-grained options specifying things like retry settings,
    *     buffering, etc.
-   * @return gRPC read channel
    * @throws IOException IOException on IO Error
    */
   GoogleCloudStorageGrpcReadChannel(
@@ -359,6 +358,9 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       // flush that buffer if there is a seek).
       if (bufferedContent != null) {
         bytesRead += readBufferedContentInto(byteBuffer);
+        logger.atFinest().log(
+            "Read with buffered data for %s object, current pos : %d ",
+            resourceId, positionInGrpcStream);
       }
       if (!byteBuffer.hasRemaining()) {
         return bytesRead;
@@ -371,10 +373,15 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       if ((footerBuffer == null) || (effectivePosition < footerStartOffsetInBytes)) {
         OptionalLong bytesToRead = getBytesToRead(byteBuffer);
         bytesRead += readFromGCS(byteBuffer, bytesToRead);
+        logger.atFinest().log(
+            "Read from GCS for %s object, current pos : %d ", resourceId, positionInGrpcStream);
       }
 
       if (hasMoreFooterContentToRead(byteBuffer)) {
         bytesRead += readFooterContentIntoBuffer(byteBuffer);
+        logger.atFinest().log(
+            "Read from footerContent for %s object, current pos : %d ",
+            resourceId, positionInGrpcStream);
       }
 
       return bytesRead;
@@ -392,7 +399,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
    * @param byteBuffer Buffer to be filled with data from GCS
    * @return number of bytes read into the buffer
    * @throws IOException In case of data errors or network errors
-   * @throws InterruptedException In case of thread interrupt while retrying
    */
   private int readFromGCS(ByteBuffer byteBuffer, OptionalLong bytesToRead) throws IOException {
     int read = 0;
@@ -609,7 +615,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
    * @return true if more data is available with .next()
    */
   private boolean moreServerContent() {
-    if (resIterator == null || requestContext == null || requestContext.isCancelled()) {
+    if (resIterator == null) {
       return false;
     }
     boolean moreDataAvailable = resIterator.hasNext();

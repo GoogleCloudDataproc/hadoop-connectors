@@ -482,7 +482,7 @@ public class GoogleCloudStorageFileSystem {
       try {
         gcs.createBucket(resourceId.getBucketName());
       } catch (FileAlreadyExistsException e) {
-        // This means that bucket already exist and we do not need to do anything.
+        // This means that bucket already exist, and we do not need to do anything.
         logger.atFiner().withCause(e).log(
             "mkdirs: %s already exists, ignoring creation failure", resourceId);
       }
@@ -564,22 +564,16 @@ public class GoogleCloudStorageFileSystem {
     List<FileInfo> fileInfos = getFileInfos(paths);
     FileInfo srcInfo = fileInfos.get(0);
     FileInfo dstInfo = fileInfos.get(1);
-
-    // Make sure paths match what getFileInfo() returned (it can add / at the end).
-    src = srcInfo.getPath();
-    dst = dstInfo.getPath();
+    FileInfo dstParentInfo = dstParent == null ? null : fileInfos.get(2);
 
     // Throw if the source file does not exist.
     if (!srcInfo.exists()) {
       throw new FileNotFoundException("Item not found: " + src);
     }
 
-    FileInfo dstParentInfo = dstParent == null ? null : fileInfos.get(2);
-    try {
-      dst = getDstUri(srcInfo, dstInfo, dstParentInfo);
-    } catch (IOException e) {
-      throw e;
-    }
+    // Make sure paths match what getFileInfo() returned (it can add / at the end).
+    src = srcInfo.getPath();
+    dst = getDstUri(srcInfo, dstInfo, dstParentInfo);
 
     // if src and dst are equal then do nothing
     if (src.equals(dst)) {

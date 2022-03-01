@@ -43,8 +43,8 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.Syncable;
 
 /**
- * GoogleHadoopSyncableOutputStream implements the {@code Syncable} interface by composing objects
- * created in separate underlying streams for each hsync() call.
+ * {@link GoogleHadoopSyncableOutputStream} implements the {@code Syncable} interface by composing
+ * objects created in separate underlying streams for each hsync() call.
  *
  * <p>Prior to the first hsync(), sync() or close() call, this channel will behave the same way as a
  * basic non-syncable channel, writing directly to the destination file.
@@ -70,7 +70,7 @@ import org.apache.hadoop.fs.Syncable;
  * with low-level precondition checks will cause all but a one writer to fail their precondition
  * checks during writes, and a single remaining writer will safely occupy the stream.
  */
-public class GoogleHadoopSyncableOutputStream extends OutputStream implements Syncable {
+class GoogleHadoopSyncableOutputStream extends OutputStream implements Syncable {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Prefix used for all temporary files created by this stream.
