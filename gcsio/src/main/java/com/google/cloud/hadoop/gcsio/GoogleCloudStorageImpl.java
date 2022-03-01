@@ -434,23 +434,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   @VisibleForTesting
-  void setClientRequestHelper(ClientRequestHelper<StorageObject> clientRequestHelper) {
-    this.clientRequestHelper = clientRequestHelper;
-  }
-
-  @VisibleForTesting
   void setBatchFactory(BatchHelper.Factory batchFactory) {
     this.batchFactory = batchFactory;
-  }
-
-  @VisibleForTesting
-  void setSleeper(Sleeper sleeper) {
-    this.sleeper = sleeper;
-  }
-
-  @VisibleForTesting
-  void setBackOffFactory(BackOffFactory factory) {
-    backOffFactory = factory;
   }
 
   @VisibleForTesting

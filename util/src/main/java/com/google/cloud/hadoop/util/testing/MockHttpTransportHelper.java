@@ -26,16 +26,12 @@ import static com.google.common.net.HttpHeaders.CONTENT_RANGE;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.api.client.googleapis.json.GoogleJsonError;
-import com.google.api.client.http.HttpRequest;
-import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpStatusCodes;
-import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.LowLevelHttpRequest;
 import com.google.api.client.http.LowLevelHttpResponse;
 import com.google.api.client.json.GenericJson;
 import com.google.api.client.json.Json;
 import com.google.api.client.json.gson.GsonFactory;
-import com.google.api.client.testing.http.HttpTesting;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.testing.http.MockLowLevelHttpRequest;
 import com.google.api.client.testing.http.MockLowLevelHttpResponse;
@@ -107,35 +103,6 @@ public final class MockHttpTransportHelper {
   private static final int UNKNOWN_CONTENT_LENGTH = -1;
 
   private MockHttpTransportHelper() {}
-
-  public static HttpResponse fakeResponse(String header, Object headerValue, InputStream content)
-      throws IOException {
-    return fakeResponse(ImmutableMap.of(header, headerValue), content);
-  }
-
-  public static HttpResponse fakeResponse(Map<String, Object> headers, InputStream content)
-      throws IOException {
-    HttpTransport transport =
-        new MockHttpTransport() {
-          @Override
-          public LowLevelHttpRequest buildRequest(String method, String url) {
-            return new MockLowLevelHttpRequest() {
-              @Override
-              public LowLevelHttpResponse execute() {
-                MockLowLevelHttpResponse response = new MockLowLevelHttpResponse();
-                headers.forEach((h, hv) -> response.addHeader(h, String.valueOf(hv)));
-                return response.setContent(content);
-              }
-            };
-          }
-        };
-    HttpRequest request =
-        transport
-            .createRequestFactory()
-            .buildGetRequest(HttpTesting.SIMPLE_GENERIC_URL)
-            .setResponseReturnRawInputStream(true);
-    return request.execute();
-  }
 
   public static MockHttpTransport mockTransport(Object... responsesIn) {
     return new MockHttpTransport() {
