@@ -92,11 +92,13 @@ public abstract class GoogleCloudStorageOptions {
   /** Default setting for grpc message timeout check interval (in milliseconds) */
   public static final long GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL = 1000;
 
-  /** Default setting for publishing open-census metrics */
-  public static final boolean METRICS_ENABLED = false;
-
   /** Default setting for GCS HTTP request headers. */
   public static final ImmutableMap<String, String> HTTP_REQUEST_HEADERS_DEFAULT = ImmutableMap.of();
+
+  public enum MetricsSink {
+    NONE,
+    CLOUD_MONITORING
+  }
 
   public static final GoogleCloudStorageOptions DEFAULT = builder().build();
 
@@ -123,7 +125,7 @@ public abstract class GoogleCloudStorageOptions {
         .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
         .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT)
         .setGrpcMessageTimeoutCheckInterval(GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL)
-        .setMetricsEnabled(METRICS_ENABLED);
+        .setMetricsSink(MetricsSink.NONE);
   }
 
   public abstract Builder toBuilder();
@@ -194,7 +196,7 @@ public abstract class GoogleCloudStorageOptions {
 
   public abstract long getGrpcMessageTimeoutCheckInterval();
 
-  public abstract boolean isMetricsEnabled();
+  public abstract MetricsSink getMetricsSink();
 
   public RetryHttpInitializerOptions toRetryHttpInitializerOptions() {
     return RetryHttpInitializerOptions.builder()
@@ -275,7 +277,7 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setGrpcMessageTimeoutCheckInterval(
         long grpcMessageTimeoutInMillisCheckInterval);
 
-    public abstract Builder setMetricsEnabled(boolean metricsEnabled);
+    public abstract Builder setMetricsSink(MetricsSink metricsSink);
 
     abstract GoogleCloudStorageOptions autoBuild();
 

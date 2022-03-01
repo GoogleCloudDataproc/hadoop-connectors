@@ -54,6 +54,7 @@ import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.RewriteResponse;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.auth.Credentials;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
 import com.google.cloud.hadoop.util.AbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
@@ -342,7 +343,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             : this.storage.getRequestFactory().getInitializer();
 
     this.metricsRecorder =
-        this.storageOptions.isMetricsEnabled()
+        MetricsSink.CLOUD_MONITORING.equals(this.storageOptions.getMetricsSink())
             ? CloudMonitoringMetricsRecorder.create(options.getProjectId(), credentials)
             : new NoOpMetricsRecorder();
 
@@ -380,7 +381,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             ? null
             : this.storage.getRequestFactory().getInitializer();
 
-    if (this.storageOptions.isMetricsEnabled()) {
+    if (MetricsSink.CLOUD_MONITORING.equals(this.storageOptions.getMetricsSink())) {
       Credentials credentials = ((RetryHttpInitializer) httpRequestInitializer).getCredentials();
       this.metricsRecorder =
           CloudMonitoringMetricsRecorder.create(options.getProjectId(), credentials);
