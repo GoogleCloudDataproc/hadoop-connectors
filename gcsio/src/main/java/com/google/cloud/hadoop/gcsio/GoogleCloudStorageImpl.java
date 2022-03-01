@@ -368,10 +368,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     this.storage = checkNotNull(storage, "storage must not be null");
 
-    this.httpRequestInitializer =
-        this.storage.getRequestFactory() == null
-            ? null
-            : this.storage.getRequestFactory().getInitializer();
+    this.httpRequestInitializer = this.storage.getRequestFactory().getInitializer();
 
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
