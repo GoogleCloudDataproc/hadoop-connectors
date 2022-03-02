@@ -24,6 +24,7 @@ import io.opencensus.contrib.grpc.metrics.RpcViews;
 import io.opencensus.exporter.stats.stackdriver.StackdriverStatsConfiguration;
 import io.opencensus.exporter.stats.stackdriver.StackdriverStatsExporter;
 import io.opencensus.stats.Aggregation;
+import io.opencensus.stats.Aggregation.Count;
 import io.opencensus.stats.Aggregation.Distribution;
 import io.opencensus.stats.BucketBoundaries;
 import io.opencensus.stats.Measure.MeasureLong;
@@ -116,13 +117,7 @@ class CloudMonitoringMetricsRecorder implements MetricsRecorder {
   static final Aggregation AGGREGATION_WITH_MILLIS_HISTOGRAM =
       Distribution.create(BucketBoundaries.create(RPC_MILLIS_BUCKET_BOUNDARIES));
 
-  static final List<Double> RPC_COUNT_BUCKET_BOUNDARIES =
-      ImmutableList.of(
-          0.0, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0, 512.0, 1024.0, 2048.0, 4096.0,
-          8192.0, 16384.0, 32768.0, 65536.0);
-
-  static final Aggregation AGGREGATION_WITH_COUNT_HISTOGRAM =
-      Distribution.create(BucketBoundaries.create(RPC_COUNT_BUCKET_BOUNDARIES));
+  static final Aggregation COUNT = Count.create();
 
   private static final Tagger tagger = Tags.getTagger();
   private static final StatsRecorder statsRecorder = Stats.getStatsRecorder();
@@ -174,13 +169,13 @@ class CloudMonitoringMetricsRecorder implements MetricsRecorder {
               Name.create("gcsio/retries"),
               "The distribution of retry attempts for a method",
               REQUEST_RETRIES,
-              AGGREGATION_WITH_COUNT_HISTOGRAM,
+              COUNT,
               TAG_KEYS),
           View.create(
               Name.create("gcsio/requests"),
               "The distribution of request counts for a method",
               REQUESTS,
-              AGGREGATION_WITH_COUNT_HISTOGRAM,
+              COUNT,
               TAG_KEYS),
         };
 
