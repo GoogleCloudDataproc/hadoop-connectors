@@ -1,4 +1,4 @@
-package com.google.cloud.hadoop.gcsio.storageapi;
+package com.google.cloud.hadoop.gcsio;
 
 import static org.junit.Assert.assertThrows;
 
@@ -13,7 +13,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public class ObjectsGetDataTest {
+public class StorageRequestFactoryTest {
 
   public static final HttpTransport HTTP_TRANSPORT = new NetHttpTransport();
   public static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
@@ -30,7 +30,16 @@ public class ObjectsGetDataTest {
     String BUCKET = "TEST_BUCKET";
     String OBJECT = "TEST_OBJECT";
     assertThrows(
-        WrongRequestTypeException.class,
-        new ObjectsGetData(storage.objects(), BUCKET, OBJECT)::execute);
+        StorageRequestFactory.WrongRequestTypeException.class,
+        new StorageRequestFactory(storage).objectsGetData(BUCKET, OBJECT)::execute);
+  }
+
+  @Test
+  public void throwExceptionWhenCallExecuteMedia() {
+    String BUCKET = "TEST_BUCKET";
+    String OBJECT = "TEST_OBJECT";
+    assertThrows(
+        StorageRequestFactory.WrongRequestTypeException.class,
+        new StorageRequestFactory(storage).objectsGetMetadata(BUCKET, OBJECT)::executeMedia);
   }
 }

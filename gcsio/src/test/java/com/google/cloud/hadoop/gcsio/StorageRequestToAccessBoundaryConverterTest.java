@@ -24,9 +24,6 @@ import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.Bucket;
 import com.google.api.services.storage.model.ComposeRequest;
 import com.google.api.services.storage.model.StorageObject;
-import com.google.cloud.hadoop.gcsio.storageapi.ObjectsGetData;
-import com.google.cloud.hadoop.gcsio.storageapi.ObjectsGetMetadata;
-import com.google.cloud.hadoop.gcsio.storageapi.StorageRequestFactory;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.AccessBoundary.Action;
 import java.io.IOException;
@@ -140,7 +137,8 @@ public class StorageRequestToAccessBoundaryConverterTest {
 
   /**
    * {@link Storage.Objects.Get} is disabled since it gives out permission too wide for getting
-   * metadata. Use {@link ObjectsGetData} or {@link ObjectsGetMetadata} instead.
+   * metadata. Use {@link StorageRequestFactory.ObjectsGetData} or {@link
+   * StorageRequestFactory.ObjectsGetMetadata} instead.
    *
    * @throws IOException
    */
