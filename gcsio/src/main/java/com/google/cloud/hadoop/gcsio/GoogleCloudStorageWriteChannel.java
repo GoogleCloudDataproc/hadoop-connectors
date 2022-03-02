@@ -84,14 +84,12 @@ public class GoogleCloudStorageWriteChannel
             .setName(resourceId.getObjectName())
             .setKmsKeyName(createOptions.getKmsKeyName());
     writeConditions.apply(insert);
-    if (insert.getMediaHttpUploader() != null) {
-      insert
-          .getMediaHttpUploader()
-          .setDirectUploadEnabled(isDirectUploadEnabled())
-          .setProgressListener(
-              new LoggingMediaHttpUploaderProgressListener(
-                  resourceId.getObjectName(), MIN_LOGGING_INTERVAL_MS));
-    }
+    insert
+        .getMediaHttpUploader()
+        .setDirectUploadEnabled(isDirectUploadEnabled())
+        .setProgressListener(
+            new LoggingMediaHttpUploaderProgressListener(
+                resourceId.getObjectName(), MIN_LOGGING_INTERVAL_MS));
     return insert;
   }
 
