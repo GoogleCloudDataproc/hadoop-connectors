@@ -36,7 +36,7 @@ public abstract class AccessBoundary {
     // EDIT_OBJECTS implies READ_OBJECTS and WRITE_OBJECTS
     EDIT_OBJECTS,
     GET_BUCKETS,
-    GET_OBJECT_METADATA,
+    GET_METADATA_OBJECTS,
     LIST_BUCKETS,
     LIST_OBJECTS,
     READ_OBJECTS,

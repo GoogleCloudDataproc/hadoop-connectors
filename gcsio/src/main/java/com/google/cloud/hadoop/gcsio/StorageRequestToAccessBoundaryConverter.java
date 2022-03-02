@@ -119,7 +119,7 @@ class StorageRequestToAccessBoundaryConverter {
       ObjectsGetMetadata request) {
     return ImmutableList.of(
         AccessBoundary.create(
-            request.getBucket(), request.getObject(), Action.GET_OBJECT_METADATA));
+            request.getBucket(), request.getObject(), Action.GET_METADATA_OBJECTS));
   }
 
   private static List<AccessBoundary> translateObjectDeleteRequest(Storage.Objects.Delete request) {
