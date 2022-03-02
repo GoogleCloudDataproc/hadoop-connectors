@@ -20,11 +20,14 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.HTTP_TRA
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.OBJECT_NAME;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.createReadChannel;
 import static com.google.cloud.hadoop.gcsio.StorageResourceId.UNKNOWN_GENERATION_ID;
+import static com.google.cloud.hadoop.gcsio.testing.MockGoogleCloudStorageImplFactory.mockedGcs;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.dataRangeResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.dataResponse;
+import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.inputStreamResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonDataResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonErrorResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
+import static com.google.common.net.HttpHeaders.CONTENT_LENGTH;
 import static com.google.common.truth.Truth.assertThat;
 import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
@@ -32,12 +35,15 @@ import static org.junit.Assert.assertThrows;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.testing.http.MockHttpTransport;
+import com.google.api.client.util.DateTime;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
+import com.google.common.collect.ImmutableMap;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -50,6 +56,8 @@ import org.junit.runners.JUnit4;
 /** Unit tests for {@link GoogleCloudStorageReadChannel} class. */
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageReadChannelTest {
+
+  private static final String PROJECT_ID = "google.com:foo-project";
 
   @Test
   public void metadataInitialization_eager() throws IOException {
@@ -537,6 +545,72 @@ public class GoogleCloudStorageReadChannelTest {
     assertThat(e)
         .hasMessageThat()
         .isEqualTo("Cannot read GZIP encoded files - content encoding support is disabled.");
+  }
+
+  /**
+   * Helper for test cases involving {@code GoogleCloudStorage.open(StorageResourceId)} to set up
+   * the shared sleeper/clock/backoff mocks and set {@code maxRetries}. Also checks basic invariants
+   * of a fresh readChannel, such as its position() and isOpen().
+   */
+  private void setUpAndValidateReadChannelMocksAndSetMaxRetries(
+      GoogleCloudStorageReadChannel readChannel, int maxRetries) throws IOException {
+    readChannel.setMaxRetries(maxRetries);
+    assertThat(readChannel.isOpen()).isTrue();
+    assertThat(readChannel.position()).isEqualTo(0);
+  }
+
+  /** Test error handling of {@link GoogleCloudStorageReadChannel#skipInPlace(long)} */
+  @Test
+  public void testReadWithFailedInplaceSeekSucceeds() throws IOException {
+    byte[] testData = {0x01, 0x02, 0x03, 0x05, 0x08};
+    byte[] testData2 = Arrays.copyOfRange(testData, 3, testData.length);
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                new StorageObject()
+                    .setBucket(BUCKET_NAME)
+                    .setName(OBJECT_NAME)
+                    .setTimeCreated(new DateTime(11L))
+                    .setUpdated(new DateTime(12L))
+                    .setSize(BigInteger.valueOf(testData.length))
+                    .setContentEncoding(null)
+                    .setGeneration(1L)
+                    .setMetageneration(1L)),
+            inputStreamResponse(
+                CONTENT_LENGTH,
+                testData.length,
+                new InputStream() {
+                  private int current = 0;
+
+                  @Override
+                  public synchronized int read() throws IOException {
+                    if (current == 0) {
+                      current += 1;
+                      return 1;
+                    }
+                    throw new IOException("In-place seek IOException");
+                  }
+                }),
+            dataResponse(ImmutableMap.of("Content-Length", testData2.length), testData2));
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    GoogleCloudStorageReadChannel readChannel =
+        (GoogleCloudStorageReadChannel)
+            gcs.open(
+                new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+                GoogleCloudStorageReadOptions.builder().setInplaceSeekLimit(3).build());
+
+    setUpAndValidateReadChannelMocksAndSetMaxRetries(readChannel, 3);
+
+    // Read once then skip to trigger a call to method under testing.
+    assertThat(readChannel.read(ByteBuffer.wrap(new byte[1]))).isEqualTo(1);
+    readChannel.position(3);
+
+    // IOException thrown. Trigger lazy-seek behavior.
+    byte[] byte3 = new byte[1];
+    assertThat(readChannel.read(ByteBuffer.wrap(byte3))).isEqualTo(1);
+    assertThat(byte3).isEqualTo(new byte[] {testData[3]});
   }
 
   private static GoogleCloudStorageReadOptions.Builder newLazyReadOptionsBuilder() {

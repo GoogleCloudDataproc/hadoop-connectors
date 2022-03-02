@@ -65,7 +65,7 @@ public class ApiErrorExtractor {
 
   // HTTP 400 message for 'USER_PROJECT_MISSING' error.
   public static final String USER_PROJECT_MISSING_MESSAGE =
-      "Bucket is requester pays bucket but no user project provided.";
+      "Bucket is a requester pays bucket but no user project provided.";
 
   // The debugInfo field present on Errors collection in GoogleJsonException
   // as an unknown key.
