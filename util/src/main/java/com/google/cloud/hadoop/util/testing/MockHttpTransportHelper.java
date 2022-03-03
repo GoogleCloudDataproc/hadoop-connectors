@@ -28,17 +28,13 @@ import static org.apache.http.HttpStatus.SC_GONE;
 import static org.apache.http.HttpStatus.SC_REQUESTED_RANGE_NOT_SATISFIABLE;
 
 import com.google.api.client.googleapis.json.GoogleJsonError;
-import com.google.api.client.http.HttpRequest;
-import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpStatusCodes;
-import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.LowLevelHttpRequest;
 import com.google.api.client.http.LowLevelHttpResponse;
 import com.google.api.client.json.GenericJson;
 import com.google.api.client.json.Json;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
-import com.google.api.client.testing.http.HttpTesting;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.testing.http.MockLowLevelHttpRequest;
 import com.google.api.client.testing.http.MockLowLevelHttpResponse;
@@ -49,6 +45,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Map;
+import java.util.function.Supplier;
 
 /** Utility methods for testing with {@link MockHttpTransport} */
 public final class MockHttpTransportHelper {
@@ -114,35 +111,6 @@ public final class MockHttpTransportHelper {
   public static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
 
   private MockHttpTransportHelper() {}
-
-  public static HttpResponse fakeResponse(String header, Object headerValue, InputStream content)
-      throws IOException {
-    return fakeResponse(ImmutableMap.of(header, headerValue), content);
-  }
-
-  public static HttpResponse fakeResponse(Map<String, Object> headers, InputStream content)
-      throws IOException {
-    HttpTransport transport =
-        new MockHttpTransport() {
-          @Override
-          public LowLevelHttpRequest buildRequest(String method, String url) {
-            return new MockLowLevelHttpRequest() {
-              @Override
-              public LowLevelHttpResponse execute() {
-                MockLowLevelHttpResponse response = new MockLowLevelHttpResponse();
-                headers.forEach((h, hv) -> response.addHeader(h, String.valueOf(hv)));
-                return response.setContent(content);
-              }
-            };
-          }
-        };
-    HttpRequest request =
-        transport
-            .createRequestFactory()
-            .buildGetRequest(HttpTesting.SIMPLE_GENERIC_URL)
-            .setResponseReturnRawInputStream(true);
-    return request.execute();
-  }
 
   public static MockHttpTransport mockTransport(Object... responsesIn) {
     return new MockHttpTransport() {
@@ -268,6 +236,20 @@ public final class MockHttpTransportHelper {
       Map<String, Object> headers, InputStream content) {
     return setHeaders(new MockLowLevelHttpResponse(), headers, UNKNOWN_CONTENT_LENGTH)
         .setContent(content);
+  }
+
+  /**
+   * Return an arbitrary InputStream supplier. This function should only be used to simulate
+   * arbitrary runtime behavior when calling {@code execute} and {@code executeMedia}.
+   */
+  public static MockLowLevelHttpResponse arbitraryInputStreamSupplier(
+      Supplier<InputStream> supplier) {
+    return new MockLowLevelHttpResponse() {
+      @Override
+      public InputStream getContent() {
+        return supplier.get();
+      }
+    };
   }
 
   private static MockLowLevelHttpResponse setHeaders(
