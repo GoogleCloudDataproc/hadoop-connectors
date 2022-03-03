@@ -2129,7 +2129,18 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
             .setFields(OBJECT_FIELDS);
     try {
-      return getObject.execute();
+      long startTimeOfMetadataRead = System.currentTimeMillis();
+      StorageObject object = getObject.execute();
+      long requestDelay = System.currentTimeMillis() - startTimeOfMetadataRead;
+      logger.atFine().log(
+          "GoogleCloudStorageImpl:getMetadata complete context:%d,time:%d,resource:%s,requestId:%s",
+          Thread.currentThread().getId(),
+          requestDelay,
+          resourceId,
+          requestDelay > 1000
+              ? getObject.getLastResponseHeaders().getFirstHeaderStringValue("x-guploader-uploadid")
+              : "");
+      return object;
     } catch (IOException e) {
       if (errorExtractor.itemNotFound(e)) {
         logger.atFiner().withCause(e).log("getObject(%s): not found", resourceId);
