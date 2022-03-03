@@ -33,7 +33,6 @@ import com.google.auth.oauth2.ComputeEngineCredentials;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
-import com.google.cloud.hadoop.util.testing.FakeCredentials;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
 import com.google.cloud.hadoop.util.testing.ThrowingInputStream;
 import java.io.IOException;
