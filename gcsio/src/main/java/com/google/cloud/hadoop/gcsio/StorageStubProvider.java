@@ -3,7 +3,6 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.auth.Credentials;
-import com.google.auth.oauth2.ComputeEngineCredentials;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -13,7 +12,6 @@ import com.google.storage.v2.StorageGrpc.StorageStub;
 import io.grpc.Grpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
-import io.grpc.alts.GoogleDefaultChannelBuilder;
 import io.grpc.alts.GoogleDefaultChannelCredentials;
 import io.grpc.auth.MoreCallCredentials;
 import io.grpc.stub.AbstractStub;
@@ -95,7 +93,6 @@ class StorageStubProvider {
   }
 
   static class DirectPathGrpcDecorator implements GrpcDecorator {
-
     private static final ImmutableMap<String, Object> GRPC_SERVICE_CONFIG =
         ImmutableMap.of(
             "loadBalancingConfig",
@@ -106,8 +103,19 @@ class StorageStubProvider {
                         "childPolicy",
                         ImmutableList.of(ImmutableMap.of("round_robin", ImmutableMap.of()))))));
 
+    private final Credentials credentials;
+
+    DirectPathGrpcDecorator(Credentials credentials) {
+      this.credentials = credentials;
+    }
+
     public ManagedChannelBuilder<?> createChannelBuilder(String target) {
-      return GoogleDefaultChannelBuilder.forTarget(target)
+      GoogleDefaultChannelCredentials.Builder credentialsBuilder =
+          GoogleDefaultChannelCredentials.newBuilder();
+      if (credentials != null) {
+        credentialsBuilder.callCredentials(MoreCallCredentials.from(credentials));
+      }
+      return Grpc.newChannelBuilder(target, credentialsBuilder.build())
           .defaultServiceConfig(GRPC_SERVICE_CONFIG);
     }
 
@@ -117,12 +125,21 @@ class StorageStubProvider {
   }
 
   static class TrafficDirectorGrpcDecorator implements GrpcDecorator {
-    TrafficDirectorGrpcDecorator() {}
+    private final Credentials credentials;
+
+    TrafficDirectorGrpcDecorator(Credentials credentials) {
+      this.credentials = credentials;
+    }
 
     public ManagedChannelBuilder<?> createChannelBuilder(String target) {
+      GoogleDefaultChannelCredentials.Builder credentialsBuilder =
+          GoogleDefaultChannelCredentials.newBuilder();
+      if (credentialsBuilder != null) {
+        credentialsBuilder.callCredentials(MoreCallCredentials.from(credentials));
+      }
       return Grpc.newChannelBuilder(
           // TODO(veblush): Remove experimental suffix once this code is proven stable.
-          "google-c2p-experimental:///" + target, GoogleDefaultChannelCredentials.create());
+          "google-c2p-experimental:///" + target, credentialsBuilder.build());
     }
 
     public AbstractStub<?> applyCallOption(AbstractStub<?> stub) {
@@ -140,14 +157,12 @@ class StorageStubProvider {
 
   private static GrpcDecorator getGrpcDecorator(
       GoogleCloudStorageOptions options, Credentials credentials) {
-    if (credentials instanceof ComputeEngineCredentials) {
-      if (options.isTrafficDirectorEnabled()) {
-        return new TrafficDirectorGrpcDecorator();
-      }
-      if (options.isDirectPathPreferred()) {
-        return new DirectPathGrpcDecorator();
-      }
+    if (options.isTrafficDirectorEnabled()) {
+      return new TrafficDirectorGrpcDecorator(credentials);
+    } else if (options.isDirectPathPreferred()) {
+      return new DirectPathGrpcDecorator(credentials);
+    } else {
+      return new CloudPathGrpcDecorator(credentials);
     }
-    return new CloudPathGrpcDecorator(credentials);
   }
 }
