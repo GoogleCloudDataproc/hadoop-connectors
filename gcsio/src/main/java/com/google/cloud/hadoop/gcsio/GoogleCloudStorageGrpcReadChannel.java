@@ -358,6 +358,9 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       // flush that buffer if there is a seek).
       if (bufferedContent != null) {
         bytesRead += readBufferedContentInto(byteBuffer);
+        logger.atFinest().log(
+            "Read with buffered data for %s object, current pos : %d ",
+            resourceId, positionInGrpcStream);
       }
       if (!byteBuffer.hasRemaining()) {
         return bytesRead;
@@ -370,10 +373,15 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       if ((footerBuffer == null) || (effectivePosition < footerStartOffsetInBytes)) {
         OptionalLong bytesToRead = getBytesToRead(byteBuffer);
         bytesRead += readFromGCS(byteBuffer, bytesToRead);
+        logger.atFinest().log(
+            "Read from GCS for %s object, current pos : %d ", resourceId, positionInGrpcStream);
       }
 
       if (hasMoreFooterContentToRead(byteBuffer)) {
         bytesRead += readFooterContentIntoBuffer(byteBuffer);
+        logger.atFinest().log(
+            "Read from footerContent for %s object, current pos : %d ",
+            resourceId, positionInGrpcStream);
       }
 
       return bytesRead;
@@ -607,7 +615,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
    * @return true if more data is available with .next()
    */
   private boolean moreServerContent() {
-    if (resIterator == null || requestContext == null || requestContext.isCancelled()) {
+    if (resIterator == null) {
       return false;
     }
     boolean moreDataAvailable = resIterator.hasNext();
