@@ -153,12 +153,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   @VisibleForTesting protected boolean metadataInitialized = false;
 
   /**
-<<<<<<< HEAD
-   * Constructs an instance of GoogleCloudStorageReadChannel. Construct a {@link
-   * StorageRequestFactory} from the given {@link Storage} instance.
-=======
    * Constructs an instance of GoogleCloudStorageReadChannel.
->>>>>>> 87a5ddbb (Rename ObjectsGetMedia to ObjectsGetData)
    *
    * @param gcs storage object instance
    * @param resourceId contains information about a specific resource
