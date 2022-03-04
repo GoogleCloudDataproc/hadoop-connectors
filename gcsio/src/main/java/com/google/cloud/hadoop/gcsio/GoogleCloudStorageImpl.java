@@ -372,7 +372,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     this.storageOptions.throwIfNotValid();
 
     this.storage = checkNotNull(storage, "storage must not be null");
-    this.storageRequestFactory = new StorageRequestFactory(this.storage);
+    this.storageRequestFactory = new StorageRequestFactory(storage);
 
     this.httpRequestInitializer = this.storage.getRequestFactory().getInitializer();
 
