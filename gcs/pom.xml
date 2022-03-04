@@ -226,7 +226,6 @@
                   <include>io.grpc</include>
                   <include>io.opencensus</include>
                   <include>io.perfmark</include>
-                  <include>org.apache.httpcomponents</include>
                   <include>org.threeten:threetenbp</include>
                 </includes>
               </artifactSet>
