@@ -41,6 +41,6 @@ public abstract class AccessBoundary {
     LIST_OBJECTS,
     READ_OBJECTS,
     UNSPECIFIED_ACTION,
-    WRITE_OBJECTS
+    WRITE_OBJECTS,
   }
 }

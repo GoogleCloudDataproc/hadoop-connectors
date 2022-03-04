@@ -32,7 +32,6 @@ import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.NanoClock;
 import com.google.api.client.util.Sleeper;
 import com.google.api.services.storage.Storage;
-import com.google.api.services.storage.Storage.Objects.Get;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
@@ -232,7 +231,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     StorageObject object;
     try {
       // Request only fields that are used for metadata initialization
-      Get getObject = createMetadataRequest().setFields("contentEncoding,generation,size");
+      Storage.Objects.Get getObject =
+          createMetadataRequest().setFields("contentEncoding,generation,size");
       object =
           ResilientOperation.retry(
               getObject::execute,
@@ -928,7 +928,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         "contentChannelEnd should be initialized already for '%s'",
         resourceId);
 
-    Get getObject = createDataRequest(rangeHeader);
+    Storage.Objects.Get getObject = createDataRequest(rangeHeader);
     HttpResponse response;
     try {
       response = getObject.executeMedia();
@@ -1104,8 +1104,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     throw new IOException(msg, e);
   }
 
-  private Get createDataRequest(String rangeHeader) throws IOException {
-    Get dataRequest = createDataRequest();
+  private Storage.Objects.Get createDataRequest(String rangeHeader) throws IOException {
+    Storage.Objects.Get dataRequest = createDataRequest();
 
     // Set the headers on the existing request headers that may have
     // been initialized with things like user-agent already.
@@ -1117,13 +1117,13 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     return dataRequest;
   }
 
-  protected Get createDataRequest() throws IOException {
+  protected Storage.Objects.Get createDataRequest() throws IOException {
     checkState(
         !metadataInitialized || resourceId.hasGenerationId(),
         "Generation should always be included for resource '%s'",
         resourceId);
     // Start with unset generation and determine what to ask for based on read consistency.
-    Get getData =
+    Storage.Objects.Get getData =
         storageRequestFactory.objectsGetData(
             resourceId.getBucketName(), resourceId.getObjectName());
     if (resourceId.hasGenerationId()) {
@@ -1132,13 +1132,13 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     return getData;
   }
 
-  protected Get createMetadataRequest() throws IOException {
+  protected Storage.Objects.Get createMetadataRequest() throws IOException {
     checkState(
         !metadataInitialized || resourceId.hasGenerationId(),
         "Generation should always be included for resource '%s'",
         resourceId);
     // Start with unset generation and determine what to ask for based on read consistency.
-    Get getMetadata =
+    Storage.Objects.Get getMetadata =
         storageRequestFactory.objectsGetMetadata(
             resourceId.getBucketName(), resourceId.getObjectName());
     if (resourceId.hasGenerationId()) {
