@@ -54,6 +54,7 @@ import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.RewriteResponse;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.auth.Credentials;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
 import com.google.cloud.hadoop.util.AbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
@@ -143,6 +144,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           "metadata");
 
   private static final String LIST_OBJECT_FIELDS_FORMAT = "items(%s),prefixes,nextPageToken";
+
+  private final MetricsRecorder metricsRecorder;
 
   // A function to encode metadata map values
   static String encodeMetadataValues(byte[] bytes) {
@@ -340,6 +343,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             ? null
             : this.storage.getRequestFactory().getInitializer();
 
+    this.metricsRecorder =
+        MetricsSink.CLOUD_MONITORING == this.storageOptions.getMetricsSink()
+            ? CloudMonitoringMetricsRecorder.create(options.getProjectId(), credentials)
+            : new NoOpMetricsRecorder();
+
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
       this.watchdog =
@@ -370,6 +378,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     this.storage = checkNotNull(storage, "storage must not be null");
 
     this.httpRequestInitializer = this.storage.getRequestFactory().getInitializer();
+
+    this.metricsRecorder =
+        MetricsSink.CLOUD_MONITORING == this.storageOptions.getMetricsSink()
+            ? CloudMonitoringMetricsRecorder.create(
+                options.getProjectId(),
+                ((RetryHttpInitializer) httpRequestInitializer).getCredentials())
+            : new NoOpMetricsRecorder();
 
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
@@ -750,10 +765,16 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               storage,
               resourceId,
               watchdog,
+              metricsRecorder,
               readOptions,
               BackOffFactory.DEFAULT)
           : new GoogleCloudStorageGrpcReadChannel(
-              storageStubProvider, itemInfo, watchdog, readOptions, BackOffFactory.DEFAULT);
+              storageStubProvider,
+              itemInfo,
+              watchdog,
+              metricsRecorder,
+              readOptions,
+              BackOffFactory.DEFAULT);
     }
 
     return new GoogleCloudStorageReadChannel(
