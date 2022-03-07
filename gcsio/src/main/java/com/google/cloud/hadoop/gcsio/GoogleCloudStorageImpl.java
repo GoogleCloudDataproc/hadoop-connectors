@@ -56,11 +56,13 @@ import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.RewriteResponse;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.auth.Credentials;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
 import com.google.cloud.hadoop.gcsio.authorization.StorageRequestAuthorizer;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
+import com.google.cloud.hadoop.util.CredentialAdapter;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryBoundedBackOff;
@@ -149,6 +151,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           "metadata");
 
   private static final String LIST_OBJECT_FIELDS_FORMAT = "items(%s),prefixes,nextPageToken";
+
+  private final MetricsRecorder metricsRecorder;
 
   // A function to encode metadata map values
   static String encodeMetadataValues(byte[] bytes) {
@@ -366,6 +370,14 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     this.storage = checkNotNull(storage, "storage must not be null");
 
     this.httpRequestInitializer = this.storage.getRequestFactory().getInitializer();
+
+    this.metricsRecorder =
+        MetricsSink.CLOUD_MONITORING == this.storageOptions.getMetricsSink()
+            ? CloudMonitoringMetricsRecorder.create(
+                options.getProjectId(),
+                new CredentialAdapter(
+                    ((RetryHttpInitializer) httpRequestInitializer).getCredential()))
+            : new NoOpMetricsRecorder();
 
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
@@ -742,7 +754,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     if (storageOptions.isGrpcEnabled()) {
       return new GoogleCloudStorageGrpcReadChannel(
-          storageStubProvider, storage, resourceId, watchdog, readOptions, BackOffFactory.DEFAULT);
+          storageStubProvider,
+          storage,
+          resourceId,
+          watchdog,
+          metricsRecorder,
+          readOptions,
+          BackOffFactory.DEFAULT);
     }
 
     // The underlying channel doesn't initially read data, which means that we won't see a
