@@ -13,6 +13,13 @@
  */
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsRecorder.LATENCY_MS;
+import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsRecorder.MESSAGE_LATENCY_MS;
+import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsRecorder.METHOD;
+import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsRecorder.PROTOCOL;
+import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsRecorder.REQUESTS;
+import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsRecorder.REQUEST_RETRIES;
+import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsRecorder.STATUS;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -32,6 +39,7 @@ import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
+import com.google.common.base.Stopwatch;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.hash.Hashing;
 import com.google.protobuf.ByteString;
@@ -45,6 +53,8 @@ import io.grpc.MethodDescriptor;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.ClientCalls;
+import io.opencensus.stats.Measure.MeasureLong;
+import io.opencensus.tags.TagKey;
 import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -62,6 +72,11 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   protected static final String METADATA_FIELDS = "contentEncoding,generation,size";
+  static final String STATUS_OK = "OK";
+  static final String METHOD_GET_OBJECT_METADATA = "getObjectMetadata";
+  static final String METHOD_GET_OBJECT_MEDIA = "getObjectMedia";
+  static final String PROTOCOL_GRPC = "grpc";
+  static final String PROTOCOL_JSON = "json";
 
   // ZeroCopy version of GetObjectMedia Method
   private final ZeroCopyMessageMarshaller<ReadObjectResponse> getObjectMediaResponseMarshaller =
@@ -82,6 +97,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   // The size of this object generation, in bytes.
   private final long objectSize;
+
+  private final MetricsRecorder metricsRecorder;
 
   // True if this channel is open, false otherwise.
   private boolean channelIsOpen = true;
@@ -137,12 +154,14 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       Storage storage,
       StorageResourceId resourceId,
       Watchdog watchdog,
+      MetricsRecorder metricsRecorder,
       GoogleCloudStorageReadOptions readOptions,
       BackOffFactory backOffFactory)
       throws IOException {
     checkArgument(storage != null, "GCS json client cannot be null");
     this.useZeroCopyMarshaller =
         ZeroCopyReadinessChecker.isReady() && readOptions.isGrpcReadZeroCopyEnabled();
+    this.metricsRecorder = metricsRecorder;
     this.stub = stubProvider.newBlockingStub();
     this.backOffFactory = backOffFactory;
     GoogleCloudStorageItemInfo itemInfo = getObjectMetadata(resourceId, storage);
@@ -195,12 +214,14 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       StorageStubProvider stubProvider,
       GoogleCloudStorageItemInfo itemInfo,
       Watchdog watchdog,
+      MetricsRecorder metricsRecorder,
       GoogleCloudStorageReadOptions readOptions,
       BackOffFactory backOffFactory)
       throws IOException {
     validate(itemInfo);
     this.useZeroCopyMarshaller =
         ZeroCopyReadinessChecker.isReady() && readOptions.isGrpcReadZeroCopyEnabled();
+    this.metricsRecorder = metricsRecorder;
     this.stub = stubProvider.newBlockingStub();
     this.resourceId = itemInfo.getResourceId();
     this.objectGeneration = itemInfo.getContentGeneration();
@@ -219,41 +240,70 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   private GoogleCloudStorageItemInfo getObjectMetadata(StorageResourceId resourceId, Storage gcs)
       throws IOException {
     StorageObject object;
-    long startTime = System.currentTimeMillis();
-    try {
-      // TODO(b/190617054) : Migrate to gRPC requests for metadata when available
-      // Request only fields that are used for metadata initialization
-      Get metadataRequest = getMetadataRequest(gcs, resourceId).setFields(METADATA_FIELDS);
-      object =
-          ResilientOperation.retry(
-              metadataRequest::execute,
-              backOffFactory.newBackOff(),
-              RetryDeterminer.SOCKET_ERRORS,
-              IOException.class,
-              Sleeper.DEFAULT);
-    } catch (IOException e) {
-      throw errorExtractor.itemNotFound(e)
-          ? createFileNotFoundException(resourceId, e)
-          : new IOException("Error reading " + resourceId, e);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IOException("Thread interrupt received.", e);
-    } finally {
-      long endTime = System.currentTimeMillis();
-      logger.atFinest().log(
-          "fetched metadata, resource:%s, time:%d", resourceId, (endTime - startTime));
-    }
-    return GoogleCloudStorageItemInfo.createObject(
-        resourceId,
-        /* creationTime= */ 0,
-        /* modificationTime= */ 0,
-        checkNotNull(object.getSize(), "size can not be null for '%s'", resourceId).longValue(),
-        /* contentType= */ null,
-        object.getContentEncoding(),
-        /* metadata= */ null,
-        checkNotNull(object.getGeneration(), "generation can not be null for '%s'", resourceId),
-        /* metaGeneration= */ 0,
-        /* verificationAttributes= */ null);
+    Sleeper sleeper = Sleeper.DEFAULT;
+    BackOff backoff = backOffFactory.newBackOff();
+    IOException exception = null;
+    do {
+      Stopwatch stopwatch = Stopwatch.createStarted();
+      try {
+        Get metadataRequest = getMetadataRequest(gcs, resourceId).setFields(METADATA_FIELDS);
+        object = metadataRequest.execute();
+        recordSuccessMetric(LATENCY_MS, stopwatch, METHOD_GET_OBJECT_METADATA, PROTOCOL_JSON);
+        return GoogleCloudStorageItemInfo.createObject(
+            resourceId,
+            /* creationTime= */ 0,
+            /* modificationTime= */ 0,
+            checkNotNull(object.getSize(), "size can not be null for '%s'", resourceId).longValue(),
+            /* contentType= */ null,
+            object.getContentEncoding(),
+            /* metadata= */ null,
+            checkNotNull(object.getGeneration(), "generation can not be null for '%s'", resourceId),
+            /* metaGeneration= */ 0,
+            /* verificationAttributes= */ null);
+      } catch (IOException ex) {
+        recordErrorMetric(LATENCY_MS, stopwatch, METHOD_GET_OBJECT_METADATA, PROTOCOL_JSON, ex);
+        if (RetryDeterminer.SOCKET_ERRORS.shouldRetry(ex)) {
+          exception = ex;
+        } else {
+          throw errorExtractor.itemNotFound(ex)
+              ? createFileNotFoundException(resourceId, ex)
+              : new IOException("Error reading " + resourceId, ex);
+        }
+      } catch (Exception ex) {
+        recordErrorMetric(LATENCY_MS, stopwatch, METHOD_GET_OBJECT_METADATA, PROTOCOL_JSON, ex);
+        throw ex;
+      }
+    } while (nextSleep(METHOD_GET_OBJECT_METADATA, sleeper, backoff, exception));
+
+    throw errorExtractor.itemNotFound(exception)
+        ? createFileNotFoundException(resourceId, exception)
+        : new IOException("Error reading " + resourceId, exception);
+  }
+
+  private void recordSuccessMetric(
+      MeasureLong measure, Stopwatch stopwatch, String method, String protocol) {
+    long time = stopwatch.elapsed(MILLISECONDS);
+    TagKey[] keys = new TagKey[] {METHOD, STATUS, PROTOCOL};
+    String[] values = new String[] {method, STATUS_OK, protocol};
+    metricsRecorder.recordLong(keys, values, measure, time);
+    logger.atFinest().log(
+        "method : %s , status : %s, protocol : %s , measure : %s , time : %d",
+        method, STATUS_OK, protocol, measure, time);
+  }
+
+  private void recordErrorMetric(
+      MeasureLong measure, Stopwatch stopwatch, String method, String protocol, Exception e) {
+    long time = stopwatch.elapsed(MILLISECONDS);
+    String error =
+        (e instanceof StatusRuntimeException)
+            ? ((StatusRuntimeException) e).getStatus().toString()
+            : e.getClass().getSimpleName();
+    TagKey[] keys = new TagKey[] {METHOD, STATUS, PROTOCOL};
+    String[] values = new String[] {method, error, protocol};
+    metricsRecorder.recordLong(keys, values, measure, time);
+    logger.atFinest().log(
+        "method : %s , status : %s, protocol : %s , measure : %s , time : %d",
+        method, error, protocol, measure, time);
   }
 
   private static Get getMetadataRequest(Storage gcs, StorageResourceId resourceId)
@@ -274,11 +324,11 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     return buffer.array();
   }
 
-  private boolean nextSleep(
-      Sleeper sleeper, BackOff backoff, StatusRuntimeException statusRuntimeException)
+  private boolean nextSleep(String method, Sleeper sleeper, BackOff backoff, Exception exception)
       throws IOException {
     try {
-      return ResilientOperation.nextSleep(backoff, sleeper, statusRuntimeException);
+      metricsRecorder.recordTaggedStat(METHOD, method, REQUEST_RETRIES, 1L);
+      return ResilientOperation.nextSleep(backoff, sleeper, exception);
     } catch (InterruptedException e) {
       cancelCurrentRequest();
       throw new IOException(e);
@@ -340,59 +390,52 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     logger.atFiner().log(
         "GCS gRPC read request for up to %d bytes at offset %d from object '%s'",
         byteBuffer.remaining(), position(), resourceId);
+    metricsRecorder.recordTaggedStat(METHOD, "read", REQUESTS, 1L);
 
     if (!isOpen()) {
       throw new ClosedChannelException();
     }
-    long startTime = System.currentTimeMillis();
-    try {
-      int bytesRead = 0;
+    int bytesRead = 0;
 
-      if (resIterator != null && isByteBufferBeyondCurrentRequestRange(byteBuffer)) {
-        positionInGrpcStream += bytesToSkipBeforeReading;
-        cancelCurrentRequest();
-        invalidateBufferedContent();
-        bytesToSkipBeforeReading = 0;
-      }
-
-      // The server responds in 2MB chunks, but the client can ask for less than that. We
-      // store the remainder in bufferedContent and return pieces of that on the next read call (and
-      // flush that buffer if there is a seek).
-      if (bufferedContent != null) {
-        bytesRead += readBufferedContentInto(byteBuffer);
-        logger.atFinest().log(
-            "Read with buffered data for %s object, current pos : %d ",
-            resourceId, positionInGrpcStream);
-      }
-      if (!byteBuffer.hasRemaining()) {
-        return bytesRead;
-      }
-      if (positionInGrpcStream == objectSize) {
-        return bytesRead > 0 ? bytesRead : -1;
-      }
-
-      long effectivePosition = positionInGrpcStream + bytesToSkipBeforeReading;
-      if ((footerBuffer == null) || (effectivePosition < footerStartOffsetInBytes)) {
-        OptionalLong bytesToRead = getBytesToRead(byteBuffer);
-        bytesRead += readFromGCS(byteBuffer, bytesToRead);
-        logger.atFinest().log(
-            "Read from GCS for %s object, current pos : %d ", resourceId, positionInGrpcStream);
-      }
-
-      if (hasMoreFooterContentToRead(byteBuffer)) {
-        bytesRead += readFooterContentIntoBuffer(byteBuffer);
-        logger.atFinest().log(
-            "Read from footerContent for %s object, current pos : %d ",
-            resourceId, positionInGrpcStream);
-      }
-
-      return bytesRead;
-    } finally {
-      long endTime = System.currentTimeMillis();
-      logger.atFinest().log(
-          "read data, resource:%s, time:%d, offset:%d, remaining:%d",
-          resourceId, (endTime - startTime), positionInGrpcStream, byteBuffer.remaining());
+    if (resIterator != null && isByteBufferBeyondCurrentRequestRange(byteBuffer)) {
+      positionInGrpcStream += bytesToSkipBeforeReading;
+      cancelCurrentRequest();
+      invalidateBufferedContent();
+      bytesToSkipBeforeReading = 0;
     }
+
+    // The server responds in 2MB chunks, but the client can ask for less than that. We
+    // store the remainder in bufferedContent and return pieces of that on the next read call (and
+    // flush that buffer if there is a seek).
+    if (bufferedContent != null) {
+      bytesRead += readBufferedContentInto(byteBuffer);
+      logger.atFinest().log(
+          "Read with buffered data for %s object, current pos : %d ",
+          resourceId, positionInGrpcStream);
+    }
+    if (!byteBuffer.hasRemaining()) {
+      return bytesRead;
+    }
+    if (positionInGrpcStream == objectSize) {
+      return bytesRead > 0 ? bytesRead : -1;
+    }
+
+    long effectivePosition = positionInGrpcStream + bytesToSkipBeforeReading;
+    if ((footerBuffer == null) || (effectivePosition < footerStartOffsetInBytes)) {
+      OptionalLong bytesToRead = getBytesToRead(byteBuffer);
+      bytesRead += readFromGCS(byteBuffer, bytesToRead);
+      logger.atFinest().log(
+          "Read from GCS for %s object, current pos : %d ", resourceId, positionInGrpcStream);
+    }
+
+    if (hasMoreFooterContentToRead(byteBuffer)) {
+      bytesRead += readFooterContentIntoBuffer(byteBuffer);
+      logger.atFinest().log(
+          "Read from footerContent for %s object, current pos : %d ",
+          resourceId, positionInGrpcStream);
+    }
+
+    return bytesRead;
   }
 
   /**
@@ -409,6 +452,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     BackOff backoff = backOffFactory.newBackOff();
     Sleeper sleeper = Sleeper.DEFAULT;
     do {
+      Stopwatch stopwatch = Stopwatch.createStarted();
       try {
         if (resIterator == null) {
           positionInGrpcStream += bytesToSkipBeforeReading;
@@ -423,12 +467,14 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         while (byteBuffer.hasRemaining() && moreServerContent()) {
           read += readObjectContentFromGCS(byteBuffer);
         }
+        recordSuccessMetric(LATENCY_MS, stopwatch, METHOD_GET_OBJECT_MEDIA, PROTOCOL_GRPC);
         return read;
       } catch (StatusRuntimeException e) {
         cancelCurrentRequest();
+        recordErrorMetric(LATENCY_MS, stopwatch, METHOD_GET_OBJECT_MEDIA, PROTOCOL_GRPC, e);
         statusRuntimeException = e;
       }
-    } while (nextSleep(sleeper, backoff, statusRuntimeException));
+    } while (nextSleep(METHOD_GET_OBJECT_MEDIA, sleeper, backoff, statusRuntimeException));
     throw convertError(statusRuntimeException, resourceId);
   }
 
@@ -618,10 +664,18 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
    * @return true if more data is available with .next()
    */
   private boolean moreServerContent() {
-    if (resIterator == null) {
-      return false;
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    boolean moreDataAvailable;
+    try {
+      if (resIterator == null) {
+        return false;
+      }
+      moreDataAvailable = resIterator.hasNext();
+      recordSuccessMetric(MESSAGE_LATENCY_MS, stopwatch, METHOD_GET_OBJECT_MEDIA, PROTOCOL_GRPC);
+    } catch (Exception e) {
+      recordErrorMetric(MESSAGE_LATENCY_MS, stopwatch, METHOD_GET_OBJECT_MEDIA, PROTOCOL_GRPC, e);
+      throw e;
     }
-    boolean moreDataAvailable = resIterator.hasNext();
     if (!moreDataAvailable) {
       cancelCurrentRequest();
     }
@@ -645,6 +699,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   @Override
   public SeekableByteChannel position(long newPosition) throws IOException {
+    metricsRecorder.recordTaggedStat(METHOD, "seek", REQUESTS, 1L);
     if (!isOpen()) {
       throw new ClosedChannelException();
     }
@@ -681,6 +736,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   @Override
   public long size() throws IOException {
+    metricsRecorder.recordTaggedStat(METHOD, "size", REQUESTS, 1L);
     if (!isOpen()) {
       throw new ClosedChannelException();
     }
@@ -699,6 +755,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   @Override
   public void close() {
+    metricsRecorder.recordTaggedStat(METHOD, "read_close", REQUESTS, 1L);
     cancelCurrentRequest();
     invalidateBufferedContent();
     channelIsOpen = false;
