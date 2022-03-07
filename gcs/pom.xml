@@ -208,10 +208,12 @@
               </filters>
               <artifactSet>
                 <includes>
+                  <include>com.google.api</include>
                   <include>com.google.api-client</include>
                   <include>com.google.api.grpc</include>
                   <include>com.google.apis</include>
                   <include>com.google.auth</include>
+                  <include>com.google.cloud</include>
                   <include>com.google.cloud.bigdataoss</include>
                   <include>com.google.flogger</include>
                   <include>com.google.code.gson</include>
@@ -220,9 +222,11 @@
                   <include>com.google.oauth-client</include>
                   <include>com.google.protobuf</include>
                   <include>com.google.storage.v2</include>
+                  <include>com.lmax</include>
                   <include>io.grpc</include>
                   <include>io.opencensus</include>
                   <include>io.perfmark</include>
+                  <include>org.threeten:threetenbp</include>
                 </includes>
               </artifactSet>
               <minimizeJar>true</minimizeJar>
@@ -232,6 +236,7 @@
                   <shadedPattern>com.google.cloud.hadoop.repackaged.gcs.com</shadedPattern>
                   <includes>
                     <include>com.google.api.**</include>
+                    <include>com.google.api.gax.**</include>
                     <include>com.google.auth.**</include>
                     <include>com.google.cloud.audit.**</include>
                     <include>com.google.cloud.hadoop.gcsio.**</include>
@@ -243,11 +248,11 @@
                     <include>com.google.iam.**</include>
                     <include>com.google.logging.**</include>
                     <include>com.google.longrunning.**</include>
-                    <include>com.google.rpc.**</include>
                     <include>com.google.protobuf.**</include>
+                    <include>com.google.rpc.**</include>
+                    <include>com.google.storage.**</include>
                     <include>com.google.thirdparty.**</include>
                     <include>com.google.type.**</include>
-                    <include>com.google.storage.**</include>
                   </includes>
                   <excludes>
                     <exclude>com.google.cloud.hadoop.util.AccessTokenProvider</exclude>
