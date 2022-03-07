@@ -46,6 +46,7 @@ import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler;
 import com.google.cloud.hadoop.gcsio.authorization.FakeAuthorizationHandler;
@@ -112,6 +113,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.marker.file.pattern", null);
           put("fs.gs.max.requests.per.batch", 15L);
           put("fs.gs.max.wait.for.empty.object.creation.ms", 3_000);
+          put("fs.gs.metrics.sink", MetricsSink.NONE);
           put("fs.gs.outputstream.buffer.size", 8 * 1024 * 1024);
           put("fs.gs.outputstream.direct.upload.enable", false);
           put("fs.gs.outputstream.pipe.buffer.size", 1024 * 1024);
