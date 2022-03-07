@@ -344,7 +344,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             : this.storage.getRequestFactory().getInitializer();
 
     this.metricsRecorder =
-        MetricsSink.CLOUD_MONITORING.equals(this.storageOptions.getMetricsSink())
+        MetricsSink.CLOUD_MONITORING == this.storageOptions.getMetricsSink()
             ? CloudMonitoringMetricsRecorder.create(options.getProjectId(), credentials)
             : new NoOpMetricsRecorder();
 
@@ -379,13 +379,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     this.httpRequestInitializer = this.storage.getRequestFactory().getInitializer();
 
-    if (MetricsSink.CLOUD_MONITORING.equals(this.storageOptions.getMetricsSink())) {
-      Credentials credentials = ((RetryHttpInitializer) httpRequestInitializer).getCredentials();
-      this.metricsRecorder =
-          CloudMonitoringMetricsRecorder.create(options.getProjectId(), credentials);
-    } else {
-      this.metricsRecorder = new NoOpMetricsRecorder();
-    }
+    this.metricsRecorder =
+        MetricsSink.CLOUD_MONITORING == this.storageOptions.getMetricsSink()
+            ? CloudMonitoringMetricsRecorder.create(
+                options.getProjectId(),
+                ((RetryHttpInitializer) httpRequestInitializer).getCredentials())
+            : new NoOpMetricsRecorder();
 
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {

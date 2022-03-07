@@ -97,7 +97,7 @@ public abstract class GoogleCloudStorageOptions {
 
   public enum MetricsSink {
     NONE,
-    CLOUD_MONITORING
+    CLOUD_MONITORING,
   }
 
   public static final GoogleCloudStorageOptions DEFAULT = builder().build();
