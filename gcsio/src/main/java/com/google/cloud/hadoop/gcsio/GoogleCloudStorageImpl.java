@@ -232,6 +232,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // GCS access instance.
   @VisibleForTesting Storage storage;
 
+  // Factory to create requests that override storage api.
+  @VisibleForTesting StorageRequestFactory storageRequestFactory;
+
   // Utility for building and caching storage channels and stubs.
   private StorageStubProvider storageStubProvider;
 
@@ -337,6 +340,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     this.storage =
         checkNotNull(createStorage(options, retryHttpInitializer), "storage must not be null");
+    this.storageRequestFactory = new StorageRequestFactory(storage);
 
     this.httpRequestInitializer =
         this.storage.getRequestFactory() == null
@@ -376,6 +380,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     this.storageOptions.throwIfNotValid();
 
     this.storage = checkNotNull(storage, "storage must not be null");
+    this.storageRequestFactory = new StorageRequestFactory(storage);
 
     this.httpRequestInitializer = this.storage.getRequestFactory().getInitializer();
 
@@ -787,8 +792,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       }
 
       @Override
-      protected Storage.Objects.Get createRequest() throws IOException {
-        return initializeRequest(super.createRequest(), resourceId.getBucketName());
+      protected Storage.Objects.Get createDataRequest() throws IOException {
+        return initializeRequest(super.createDataRequest(), resourceId.getBucketName());
+      }
+
+      @Override
+      protected Storage.Objects.Get createMetadataRequest() throws IOException {
+        return initializeRequest(super.createMetadataRequest(), resourceId.getBucketName());
       }
     };
   }
@@ -934,7 +944,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       // We first need to get the current object version to issue a safe delete for only the
       // latest version of the object.
       Storage.Objects.Get getObject =
-          initializeRequest(storage.objects().get(bucketName, objectName), bucketName)
+          initializeRequest(
+                  storageRequestFactory.objectsGetMetadata(bucketName, objectName), bucketName)
               .setFields("generation");
       batchHelper.queue(
           getObject,
@@ -1830,7 +1841,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         String bucketName = resourceId.getBucketName();
         String objectName = resourceId.getObjectName();
         batchHelper.queue(
-            initializeRequest(storage.objects().get(bucketName, objectName), bucketName)
+            initializeRequest(
+                    storageRequestFactory.objectsGetMetadata(bucketName, objectName), bucketName)
                 // Request only fields used in GoogleCloudStorageItemInfo:
                 // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
                 .setFields(OBJECT_FIELDS),
@@ -2113,7 +2125,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     String bucketName = resourceId.getBucketName();
     String objectName = resourceId.getObjectName();
     Storage.Objects.Get getObject =
-        initializeRequest(storage.objects().get(bucketName, objectName), bucketName)
+        initializeRequest(
+                storageRequestFactory.objectsGetMetadata(bucketName, objectName), bucketName)
             // Request only fields used in GoogleCloudStorageItemInfo:
             // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
             .setFields(OBJECT_FIELDS);

@@ -66,11 +66,11 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
   private static final String GZIP_ENCODING = "gzip";
 
-  // GCS access instance.
-  private final Storage gcs;
-
   // GCS resource/object path
   private StorageResourceId resourceId;
+
+  // Factory that creates requests that override storage api.
+  private final StorageRequestFactory storageRequestFactory;
 
   // GCS object content channel.
   @VisibleForTesting ReadableByteChannel contentChannel;
@@ -168,7 +168,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       ClientRequestHelper<StorageObject> requestHelper,
       @Nonnull GoogleCloudStorageReadOptions readOptions)
       throws IOException {
-    this.gcs = gcs;
+    this.storageRequestFactory = new StorageRequestFactory(gcs);
     this.clientRequestHelper = requestHelper;
     this.errorExtractor = errorExtractor;
     this.readOptions = readOptions;
@@ -231,7 +231,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     StorageObject object;
     try {
       // Request only fields that are used for metadata initialization
-      Storage.Objects.Get getObject = createRequest().setFields("contentEncoding,generation,size");
+      Storage.Objects.Get getObject =
+          createMetadataRequest().setFields("contentEncoding,generation,size");
       object =
           ResilientOperation.retry(
               getObject::execute,
@@ -1104,30 +1105,46 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   }
 
   private Storage.Objects.Get createDataRequest(String rangeHeader) throws IOException {
-    Storage.Objects.Get getObject = createRequest();
+    Storage.Objects.Get dataRequest = createDataRequest();
 
     // Set the headers on the existing request headers that may have
     // been initialized with things like user-agent already.
-    HttpHeaders requestHeaders = clientRequestHelper.getRequestHeaders(getObject);
+    HttpHeaders requestHeaders = clientRequestHelper.getRequestHeaders(dataRequest);
     // Disable GCS decompressive transcoding.
     requestHeaders.setAcceptEncoding("gzip");
     requestHeaders.setRange(rangeHeader);
 
-    return getObject;
+    return dataRequest;
   }
 
-  protected Storage.Objects.Get createRequest() throws IOException {
+  protected Storage.Objects.Get createDataRequest() throws IOException {
     checkState(
         !metadataInitialized || resourceId.hasGenerationId(),
         "Generation should always be included for resource '%s'",
         resourceId);
     // Start with unset generation and determine what to ask for based on read consistency.
-    Storage.Objects.Get getObject =
-        gcs.objects().get(resourceId.getBucketName(), resourceId.getObjectName());
+    Storage.Objects.Get getData =
+        storageRequestFactory.objectsGetData(
+            resourceId.getBucketName(), resourceId.getObjectName());
     if (resourceId.hasGenerationId()) {
-      getObject.setGeneration(resourceId.getGenerationId());
+      getData.setGeneration(resourceId.getGenerationId());
     }
-    return getObject;
+    return getData;
+  }
+
+  protected Storage.Objects.Get createMetadataRequest() throws IOException {
+    checkState(
+        !metadataInitialized || resourceId.hasGenerationId(),
+        "Generation should always be included for resource '%s'",
+        resourceId);
+    // Start with unset generation and determine what to ask for based on read consistency.
+    Storage.Objects.Get getMetadata =
+        storageRequestFactory.objectsGetMetadata(
+            resourceId.getBucketName(), resourceId.getObjectName());
+    if (resourceId.hasGenerationId()) {
+      getMetadata.setGeneration(resourceId.getGenerationId());
+    }
+    return getMetadata;
   }
 
   /** Throws if this channel is not currently open. */

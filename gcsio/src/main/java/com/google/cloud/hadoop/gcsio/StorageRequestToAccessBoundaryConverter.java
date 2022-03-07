@@ -46,8 +46,10 @@ class StorageRequestToAccessBoundaryConverter {
       return translateObjectInsertRequest((Storage.Objects.Insert) request);
     } else if (request instanceof Storage.Objects.Compose) {
       return translateObjectComposeRequest((Storage.Objects.Compose) request);
-    } else if (request instanceof Storage.Objects.Get) {
-      return translateObjectGetRequest((Storage.Objects.Get) request);
+    } else if (request instanceof StorageRequestFactory.ObjectsGetMetadata) {
+      return translateObjectGetMetadataRequest((StorageRequestFactory.ObjectsGetMetadata) request);
+    } else if (request instanceof StorageRequestFactory.ObjectsGetData) {
+      return translateObjectGetDataRequest((StorageRequestFactory.ObjectsGetData) request);
     } else if (request instanceof Storage.Objects.Delete) {
       return translateObjectDeleteRequest((Storage.Objects.Delete) request);
     } else if (request instanceof Storage.Objects.Rewrite) {
@@ -106,9 +108,17 @@ class StorageRequestToAccessBoundaryConverter {
     return listBuilder.build();
   }
 
-  private static List<AccessBoundary> translateObjectGetRequest(Storage.Objects.Get request) {
-    return Collections.singletonList(
+  private static List<AccessBoundary> translateObjectGetDataRequest(
+      StorageRequestFactory.ObjectsGetData request) {
+    return ImmutableList.of(
         AccessBoundary.create(request.getBucket(), request.getObject(), Action.READ_OBJECTS));
+  }
+
+  private static List<AccessBoundary> translateObjectGetMetadataRequest(
+      StorageRequestFactory.ObjectsGetMetadata request) {
+    return ImmutableList.of(
+        AccessBoundary.create(
+            request.getBucket(), request.getObject(), Action.GET_METADATA_OBJECTS));
   }
 
   private static List<AccessBoundary> translateObjectDeleteRequest(Storage.Objects.Delete request) {
