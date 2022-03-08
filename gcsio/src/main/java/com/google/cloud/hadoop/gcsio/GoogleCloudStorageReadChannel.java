@@ -247,9 +247,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
           Thread.currentThread().getId(),
           requestDelay,
           resourceId,
-          requestDelay > 1000
-              ? getObject.getLastResponseHeaders().getFirstHeaderStringValue("x-guploader-uploadid")
-              : "");
+          getObject.getLastResponseHeaders().getFirstHeaderStringValue("x-guploader-uploadid"));
     } catch (IOException e) {
       throw errorExtractor.itemNotFound(e)
           ? createFileNotFoundException(resourceId, e)
@@ -956,9 +954,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
           bytesToRead,
           contentChannelEnd - contentChannelPosition,
           resourceId,
-          requestDelay > 1000
-              ? response.getHeaders().getFirstHeaderStringValue("x-guploader-uploadid")
-              : "");
+          response.getHeaders().getFirstHeaderStringValue("x-guploader-uploadid"));
       // TODO(b/110832992): validate response range header against expected/request range
     } catch (IOException e) {
       if (!metadataInitialized && errorExtractor.rangeNotSatisfiable(e) && currentPosition == 0) {

@@ -2155,9 +2155,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           Thread.currentThread().getId(),
           requestDelay,
           resourceId,
-          requestDelay > 1000
-              ? getObject.getLastResponseHeaders().getFirstHeaderStringValue("x-guploader-uploadid")
-              : "");
+          getObject.getLastResponseHeaders().getFirstHeaderStringValue("x-guploader-uploadid"));
       return object;
     } catch (IOException e) {
       if (errorExtractor.itemNotFound(e)) {
