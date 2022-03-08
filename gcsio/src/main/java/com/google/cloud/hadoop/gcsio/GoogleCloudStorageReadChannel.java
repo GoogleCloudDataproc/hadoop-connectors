@@ -40,9 +40,9 @@ import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
-import com.google.common.base.Stopwatch;
 import com.google.common.flogger.GoogleLogger;
 import java.io.ByteArrayInputStream;
 import java.io.EOFException;
@@ -105,7 +105,6 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   private long contentChannelEnd = -1;
 
   private Stopwatch stopwatch;
-
 
   // Whether to use bounded range requests or streaming requests.
   @VisibleForTesting boolean randomAccess;
@@ -245,11 +244,10 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
               IOException.class,
               sleeper);
 
-      long requestDelay = metadataStopwatch.elapsed(MILLISECONDS);
       logger.atFinest().log(
           "GoogleCloudStorageReadChannel:getMetadata complete context:%d,time:%d,resource:%s,requestId:%s",
           Thread.currentThread().getId(),
-          requestDelay,
+          metadataStopwatch.elapsed(MILLISECONDS),
           resourceId,
           getObject.getLastResponseHeaders().getFirstHeaderStringValue("x-guploader-uploadid"));
     } catch (IOException e) {
@@ -950,11 +948,11 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     try {
       stopwatch = Stopwatch.createStarted();
       response = getObject.executeMedia();
-      long requestDelay = stopwatch.elapsed(MILLISECONDS);
+
       logger.atFinest().log(
           "openStream complete context:%d,time:%d,bytesToRead:%d,rangeSize:%d,resource:%s,requestId:%s",
           Thread.currentThread().getId(),
-          requestDelay,
+          stopwatch.elapsed(MILLISECONDS),
           bytesToRead,
           contentChannelEnd - contentChannelPosition,
           resourceId,
