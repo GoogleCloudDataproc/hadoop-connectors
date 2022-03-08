@@ -26,6 +26,7 @@ import static com.google.common.base.Strings.emptyToNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static java.lang.Math.toIntExact;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.batch.json.JsonBatchCallback;
@@ -77,6 +78,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.base.Stopwatch;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -2147,9 +2149,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
             .setFields(OBJECT_FIELDS);
     try {
-      long startTimeOfMetadataRead = System.currentTimeMillis();
+      Stopwatch stopwatch = Stopwatch.createStarted();
       StorageObject object = getObject.execute();
-      long requestDelay = System.currentTimeMillis() - startTimeOfMetadataRead;
+      long requestDelay = stopwatch.elapsed(MILLISECONDS);
       logger.atFinest().log(
           "GoogleCloudStorageImpl:getMetadata complete context:%d,time:%d,resource:%s,requestId:%s",
           Thread.currentThread().getId(),
