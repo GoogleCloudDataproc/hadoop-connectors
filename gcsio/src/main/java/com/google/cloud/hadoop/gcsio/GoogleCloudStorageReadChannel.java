@@ -242,7 +242,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
               sleeper);
 
       long requestDelay = System.currentTimeMillis() - startTimeOfMetadataRead;
-      logger.atFine().log(
+      logger.atFinest().log(
           "GoogleCloudStorageReadChannel:getMetadata complete context:%d,time:%d,resource:%s,requestId:%s",
           Thread.currentThread().getId(),
           requestDelay,
@@ -949,7 +949,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       startTimeOfChannelOpen = System.currentTimeMillis();
       response = getObject.executeMedia();
       long requestDelay = System.currentTimeMillis() - startTimeOfChannelOpen;
-      logger.atFine().log(
+      logger.atFinest().log(
           "openStream complete context:%d,time:%d,bytesToRead:%d,rangeSize:%d,resource:%s,requestId:%s",
           Thread.currentThread().getId(),
           requestDelay,

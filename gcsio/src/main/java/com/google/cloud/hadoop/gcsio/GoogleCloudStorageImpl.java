@@ -2150,7 +2150,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       long startTimeOfMetadataRead = System.currentTimeMillis();
       StorageObject object = getObject.execute();
       long requestDelay = System.currentTimeMillis() - startTimeOfMetadataRead;
-      logger.atFine().log(
+      logger.atFinest().log(
           "GoogleCloudStorageImpl:getMetadata complete context:%d,time:%d,resource:%s,requestId:%s",
           Thread.currentThread().getId(),
           requestDelay,
