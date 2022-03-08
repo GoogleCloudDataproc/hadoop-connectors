@@ -21,6 +21,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.nullToEmpty;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpResponse;
@@ -41,6 +42,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
+import com.google.common.base.Stopwatch;
 import com.google.common.flogger.GoogleLogger;
 import java.io.ByteArrayInputStream;
 import java.io.EOFException;
@@ -102,7 +104,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   // Size of the contentChannel.
   private long contentChannelEnd = -1;
 
-  private long startTimeOfChannelOpen;
+  private Stopwatch stopwatch;
+
 
   // Whether to use bounded range requests or streaming requests.
   @VisibleForTesting boolean randomAccess;
@@ -232,7 +235,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     try {
       // Request only fields that are used for metadata initialization
       Get getObject = createRequest().setFields("contentEncoding,generation,size");
-      long startTimeOfMetadataRead = System.currentTimeMillis();
+      Stopwatch metadataStopwatch = Stopwatch.createStarted();
+
       object =
           ResilientOperation.retry(
               getObject::execute,
@@ -241,7 +245,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
               IOException.class,
               sleeper);
 
-      long requestDelay = System.currentTimeMillis() - startTimeOfMetadataRead;
+      long requestDelay = metadataStopwatch.elapsed(MILLISECONDS);
       logger.atFinest().log(
           "GoogleCloudStorageReadChannel:getMetadata complete context:%d,time:%d,resource:%s,requestId:%s",
           Thread.currentThread().getId(),
@@ -411,7 +415,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
             Thread.currentThread().getId(),
             retriesAttempted,
             maxRetries,
-            System.currentTimeMillis() - startTimeOfChannelOpen,
+            stopwatch.elapsed(MILLISECONDS),
             resourceId);
         try {
           boolean backOffSuccessful = BackOffUtils.next(sleeper, readBackOff.get());
@@ -944,9 +948,9 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     Get getObject = createDataRequest(rangeHeader);
     HttpResponse response;
     try {
-      startTimeOfChannelOpen = System.currentTimeMillis();
+      stopwatch = Stopwatch.createStarted();
       response = getObject.executeMedia();
-      long requestDelay = System.currentTimeMillis() - startTimeOfChannelOpen;
+      long requestDelay = stopwatch.elapsed(MILLISECONDS);
       logger.atFinest().log(
           "openStream complete context:%d,time:%d,bytesToRead:%d,rangeSize:%d,resource:%s,requestId:%s",
           Thread.currentThread().getId(),
@@ -1022,7 +1026,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
                 "Successfully cached footer context:%d,retries:%s,time:%d,resource:%s",
                 Thread.currentThread().getId(),
                 retriesCount,
-                System.currentTimeMillis() - startTimeOfChannelOpen,
+                stopwatch.elapsed(MILLISECONDS),
                 resourceId);
           }
           break;
@@ -1032,7 +1036,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
               Thread.currentThread().getId(),
               retriesCount + 1,
               maxRetries,
-              System.currentTimeMillis() - startTimeOfChannelOpen,
+              stopwatch.elapsed(MILLISECONDS),
               resourceId);
           if (retriesCount == 0) {
             readBackOff.get().reset();
