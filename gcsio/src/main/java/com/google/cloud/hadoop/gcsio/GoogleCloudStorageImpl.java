@@ -71,6 +71,7 @@ import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -78,7 +79,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.base.Stopwatch;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -2151,17 +2151,19 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     try {
       Stopwatch stopwatch = Stopwatch.createStarted();
       StorageObject object = getObject.execute();
-      long requestDelay = stopwatch.elapsed(MILLISECONDS);
+
       logger.atFinest().log(
           "GoogleCloudStorageImpl:getMetadata complete context:%d,time:%d,resource:%s,requestId:%s",
           Thread.currentThread().getId(),
-          requestDelay,
+          stopwatch.elapsed(MILLISECONDS),
           resourceId,
           getObject.getLastResponseHeaders().getFirstHeaderStringValue("x-guploader-uploadid"));
       return object;
     } catch (IOException e) {
       if (errorExtractor.itemNotFound(e)) {
-        logger.atFiner().withCause(e).log("getObject(%s): not found", resourceId);
+        logger.atFiner().withCause(e).log(
+            "getObject(%s): not found, context:%d,time:%d",
+            resourceId, Thread.currentThread().getId(), stopwatch.elapsed(MILLISECONDS));
         return null;
       }
       throw new IOException("Error accessing " + resourceId, e);
