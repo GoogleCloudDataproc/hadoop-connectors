@@ -83,14 +83,14 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.grpc.checkinterval.timeout.ms", 1_000L);
           put("fs.gs.grpc.read.metadata.timeout.ms", 60_000L);
           put("fs.gs.grpc.read.timeout.ms", 30_000L);
-          put("fs.gs.grpc.read.message.timeout.ms", 5_000L);
+          put("fs.gs.grpc.read.message.timeout.ms", 3_000L);
           put("fs.gs.grpc.read.zerocopy.enable", true);
           put("fs.gs.grpc.directpath.enable", true);
           put("fs.gs.grpc.server.address", "storage.googleapis.com");
           put("fs.gs.grpc.trafficdirector.enable", false);
           put("fs.gs.grpc.write.buffered.requests", 20L);
           put("fs.gs.grpc.write.timeout.ms", 10 * 60_000L);
-          put("fs.gs.grpc.write.message.timeout.ms", 5_000L);
+          put("fs.gs.grpc.write.message.timeout.ms", 3_000L);
           put("fs.gs.http.connect-timeout", 20_000);
           put("fs.gs.http.max.retry", 10);
           put("fs.gs.http.read-timeout", 20_000);
