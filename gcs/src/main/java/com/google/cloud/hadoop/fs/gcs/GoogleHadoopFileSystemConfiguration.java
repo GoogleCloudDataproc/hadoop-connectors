@@ -369,7 +369,7 @@ public class GoogleHadoopFileSystemConfiguration {
 
   /** Configuration key for the message timeout (in millisecond) for gRPC read requests to GCS. */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_MESSAGE_TIMEOUT_MS =
-      new HadoopConfigurationProperty<>("fs.gs.grpc.read.message.timeout.ms", 5 * 1_000L);
+      new HadoopConfigurationProperty<>("fs.gs.grpc.read.message.timeout.ms", 3 * 1_000L);
 
   /**
    * Configuration key for the connection timeout (in millisecond) for gRPC metadata requests to
@@ -392,7 +392,7 @@ public class GoogleHadoopFileSystemConfiguration {
 
   /** Configuration key for the message timeout (in millisecond) for gRPC write requests to GCS. */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_WRITE_MESSAGE_TIMEOUT_MS =
-      new HadoopConfigurationProperty<>("fs.gs.grpc.write.message.timeout.ms", 5 * 1_000L);
+      new HadoopConfigurationProperty<>("fs.gs.grpc.write.message.timeout.ms", 3 * 1_000L);
 
   /** Configuration key for enabling use of directpath gRPC API for read/write. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_DIRECTPATH_ENABLE =
