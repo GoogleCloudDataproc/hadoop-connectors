@@ -48,7 +48,7 @@ public abstract class GoogleCloudStorageReadOptions {
   public static final long DEFAULT_GRPC_READ_TIMEOUT_MILLIS = 20 * 60 * 1000;
   public static final long DEFAULT_GRPC_READ_METADATA_TIMEOUT_MILLIS = 60 * 1000;
   public static final boolean DEFAULT_GRPC_READ_ZEROCOPY_ENABLED = true;
-  public static final long DEFAULT_GRPC_READ_MESSAGE_TIMEOUT_MILLIS = 5 * 1000;
+  public static final long DEFAULT_GRPC_READ_MESSAGE_TIMEOUT_MILLIS = 3 * 1000;
 
   // Default builder should be initialized after default values,
   // otherwise it will access not initialized default values.
