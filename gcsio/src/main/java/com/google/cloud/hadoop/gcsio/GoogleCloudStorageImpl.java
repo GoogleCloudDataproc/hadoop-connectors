@@ -2155,17 +2155,14 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       return object;
     } catch (IOException e) {
       if (errorExtractor.itemNotFound(e)) {
-        /*
         logger.atFiner().withCause(e).log(
             "getObject(%s): not found, context:%d,time:%d",
             resourceId, Thread.currentThread().getId(), metadataStopwatch.elapsed(MILLISECONDS));
-            */
         return null;
       }
-      /*
       logger.atSevere().withCause(e).log(
           "GoogleCloudStorageImpl:getMetadata exception context:%d,time:%d,resource:%s",
-          Thread.currentThread().getId(), metadataStopwatch.elapsed(MILLISECONDS), resourceId); */
+          Thread.currentThread().getId(), metadataStopwatch.elapsed(MILLISECONDS), resourceId);
       throw new IOException("Error accessing " + resourceId, e);
     }
   }
