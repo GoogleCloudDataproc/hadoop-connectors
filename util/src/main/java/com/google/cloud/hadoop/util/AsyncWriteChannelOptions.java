@@ -62,7 +62,7 @@ public abstract class AsyncWriteChannelOptions {
   /** Default number of insert requests to retain, in case we need to rewind and resume an upload */
   public static final long DEFAULT_NUM_REQUESTS_BUFFERED_GRPC = 20;
 
-  public static final long DEFAULT_GRPC_WRITE_MESSAGE_TIMEOUT_MILLIS = 5 * 1000;
+  public static final long DEFAULT_GRPC_WRITE_MESSAGE_TIMEOUT_MILLIS = 3 * 1000;
 
   public static final PipeType PIPE_TYPE_DEFAULT = PipeType.IO_STREAM_PIPE;
 
