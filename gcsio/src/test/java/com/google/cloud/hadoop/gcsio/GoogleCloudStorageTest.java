@@ -3296,7 +3296,8 @@ public class GoogleCloudStorageTest {
             /* requestInitializer= */ null,
             /* downscopedAccessTokenFn= */ ignore -> "testDownscopedAccessToken");
 
-    Storage.Objects.Get testGetRequest = gcs.storage.objects().get(BUCKET_NAME, OBJECT_NAME);
+    Storage.Objects.Get testGetRequest =
+        gcs.storageRequestFactory.objectsGetMetadata(BUCKET_NAME, OBJECT_NAME);
     gcs.initializeRequest(testGetRequest, BUCKET_NAME);
 
     assertThat(testGetRequest.getRequestHeaders().getAuthorization())

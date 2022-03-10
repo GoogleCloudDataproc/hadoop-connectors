@@ -30,16 +30,17 @@ public abstract class AccessBoundary {
   public abstract Action action();
 
   public enum Action {
-    UNSPECIFIED_ACTION,
-    LIST_OBJECTS,
-    READ_OBJECTS,
-    WRITE_OBJECTS,
-    // EDIT_OBJECTS implies READ_OBJECTS and WRITE_OBJECTS
-    EDIT_OBJECTS,
-    DELETE_OBJECTS,
-    GET_BUCKETS,
     CREATE_BUCKETS,
     DELETE_BUCKETS,
-    LIST_BUCKETS
+    DELETE_OBJECTS,
+    // EDIT_OBJECTS implies READ_OBJECTS and WRITE_OBJECTS
+    EDIT_OBJECTS,
+    GET_BUCKETS,
+    GET_METADATA_OBJECTS,
+    LIST_BUCKETS,
+    LIST_OBJECTS,
+    READ_OBJECTS,
+    UNSPECIFIED_ACTION,
+    WRITE_OBJECTS,
   }
 }
