@@ -111,14 +111,44 @@ public class StorageRequestToAccessBoundaryConverterTest {
   }
 
   @Test
-  public void testTranslateObjectGetRequest() throws IOException {
-    Storage.Objects.Get request = storage.objects().get(BUCKET_NAME, OBJECT_NAME);
+  public void testTranslateObjectGetDataRequest() {
+    Storage.Objects.Get request =
+        new StorageRequestFactory(storage).objectsGetData(BUCKET_NAME, OBJECT_NAME);
 
     List<AccessBoundary> results =
         StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
 
     assertThat(results)
         .containsExactly(AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, Action.READ_OBJECTS));
+  }
+
+  @Test
+  public void testTranslateObjectGetMetadataRequest() {
+    Storage.Objects.Get request =
+        new StorageRequestFactory(storage).objectsGetMetadata(BUCKET_NAME, OBJECT_NAME);
+
+    List<AccessBoundary> results =
+        StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request);
+
+    assertThat(results)
+        .containsExactly(
+            AccessBoundary.create(BUCKET_NAME, OBJECT_NAME, Action.GET_METADATA_OBJECTS));
+  }
+
+  /**
+   * {@link Storage.Objects.Get} is disabled since it gives out permission too wide for getting
+   * metadata. Use {@link StorageRequestFactory.ObjectsGetData} or {@link
+   * StorageRequestFactory.ObjectsGetMetadata} instead.
+   *
+   * @throws IOException
+   */
+  @Test
+  public void testDisallowGetRequest() throws IOException {
+    Storage.Objects.Get request = storage.objects().get(BUCKET_NAME, OBJECT_NAME);
+
+    assertThrows(
+        InvalidParameterException.class,
+        () -> StorageRequestToAccessBoundaryConverter.fromStorageObjectRequest(request));
   }
 
   @Test
