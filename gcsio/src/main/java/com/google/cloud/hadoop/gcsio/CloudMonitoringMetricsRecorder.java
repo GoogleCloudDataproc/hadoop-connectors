@@ -1,11 +1,14 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static io.opencensus.common.Duration.fromMillis;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.google.auth.Credentials;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
+import io.grpc.StatusRuntimeException;
 import io.opencensus.common.Scope;
 import io.opencensus.contrib.grpc.metrics.RpcViews;
 import io.opencensus.exporter.stats.stackdriver.StackdriverStatsConfiguration;
@@ -41,6 +44,10 @@ class CloudMonitoringMetricsRecorder implements MetricsRecorder {
 
   private static final int EXPORT_INTERVAL = 5000;
 
+  private static final String STATUS_OK = "OK";
+  static final String PROTOCOL_GRPC = "grpc";
+  static final String PROTOCOL_JSON = "json";
+
   @GuardedBy("monitor")
   private static boolean initialized = false;
 
@@ -75,7 +82,8 @@ class CloudMonitoringMetricsRecorder implements MetricsRecorder {
       ImmutableList.of(
           0.0, 0.01, 0.05, 0.1, 0.3, 0.6, 0.8, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 13.0, 16.0,
           20.0, 25.0, 30.0, 40.0, 50.0, 65.0, 80.0, 100.0, 130.0, 160.0, 200.0, 250.0, 300.0, 400.0,
-          500.0, 650.0, 800.0, 1000.0, 2000.0, 5000.0, 10000.0, 20000.0, 50000.0, 100000.0);
+          500.0, 650.0, 800.0, 1000.0, 2000.0, 3000.0, 4000.0, 5000.0, 6000.0, 7000.0, 8000.0,
+          9000.0, 10000.0, 15000.0, 20000.0, 50000.0, 100000.0);
 
   static final Aggregation AGGREGATION_WITH_MILLIS_HISTOGRAM =
       Distribution.create(BucketBoundaries.create(RPC_MILLIS_BUCKET_BOUNDARIES));
@@ -184,5 +192,40 @@ class CloudMonitoringMetricsRecorder implements MetricsRecorder {
     try (Scope ignored = tagger.withTagContext(tagContext)) {
       statsRecorder.newMeasureMap().put(ml, n).record();
     }
+  }
+
+  static void recordSuccessMetric(
+      MetricsRecorder metricsRecorder,
+      MeasureLong measure,
+      Stopwatch stopwatch,
+      String method,
+      String protocol) {
+    long time = stopwatch.elapsed(MILLISECONDS);
+    TagKey[] keys = new TagKey[] {METHOD, STATUS, PROTOCOL};
+    String[] values = new String[] {method, STATUS_OK, protocol};
+    metricsRecorder.recordLong(keys, values, measure, time);
+    logger.atFinest().log(
+        "method : %s , status : %s, protocol : %s , measure : %s , time : %d",
+        method, STATUS_OK, protocol, measure, time);
+  }
+
+  static void recordErrorMetric(
+      MetricsRecorder metricsRecorder,
+      MeasureLong measure,
+      Stopwatch stopwatch,
+      String method,
+      String protocol,
+      Exception e) {
+    long time = stopwatch.elapsed(MILLISECONDS);
+    String error =
+        (e instanceof StatusRuntimeException)
+            ? ((StatusRuntimeException) e).getStatus().toString()
+            : e.getClass().getSimpleName();
+    TagKey[] keys = new TagKey[] {METHOD, STATUS, PROTOCOL};
+    String[] values = new String[] {method, error, protocol};
+    metricsRecorder.recordLong(keys, values, measure, time);
+    logger.atFinest().log(
+        "method : %s , status : %s, protocol : %s , measure : %s , time : %d",
+        method, error, protocol, measure, time);
   }
 }

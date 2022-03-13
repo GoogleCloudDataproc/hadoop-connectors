@@ -16,6 +16,10 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsRecorder.LATENCY_MS;
+import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsRecorder.PROTOCOL_JSON;
+import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsRecorder.recordErrorMetric;
+import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsRecorder.recordSuccessMetric;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createJsonResponseException;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInferredDirectory;
@@ -66,6 +70,7 @@ import com.google.cloud.hadoop.util.RetryBoundedBackOff;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Stopwatch;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -144,6 +149,16 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           "metadata");
 
   private static final String LIST_OBJECT_FIELDS_FORMAT = "items(%s),prefixes,nextPageToken";
+  private static final String METHOD_CREATE_BUCKET = "createBucket";
+  private static final String METHOD_CREATE_EMPTY_OBJECT = "createEmptyObject";
+  private static final String METHOD_CREATE_EMPTY_OBJECTS = "createEmptyObjects";
+  private static final String METHOD_OPEN = "open";
+  private static final String METHOD_DELETE_OBJECTS = "deleteObjects";
+  private static final String METHOD_COPY = "copy";
+  private static final String METHOD_LIST_BUCKET_NAMES = "listBucketNames";
+  private static final String METHOD_LIST_BUCKET_INFO = "listBucketInfo";
+  private static final String METHOD_GET_ITEM_INFOS = "getItemInfos";
+  private static final String METHOD_COMPOSE_OBJECTS = "composeObjects";
 
   private final MetricsRecorder metricsRecorder;
 
@@ -469,7 +484,21 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @Override
   public WritableByteChannel create(StorageResourceId resourceId, CreateObjectOptions options)
       throws IOException {
+    Stopwatch stopwatch = Stopwatch.createStarted();
     logger.atFiner().log("create(%s)", resourceId);
+    try {
+      AbstractGoogleAsyncWriteChannel<?> channel = createInternal(resourceId, options);
+      recordSuccessMetric(metricsRecorder, LATENCY_MS, stopwatch, "create", PROTOCOL_JSON);
+      return channel;
+    } catch (IOException e) {
+      recordErrorMetric(metricsRecorder, LATENCY_MS, stopwatch, "create", PROTOCOL_JSON, e);
+      throw e;
+    }
+  }
+
+  private AbstractGoogleAsyncWriteChannel<?> createInternal(
+      StorageResourceId resourceId, CreateObjectOptions options) throws IOException {
+    AbstractGoogleAsyncWriteChannel<?> channel;
     checkArgument(
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
 
@@ -503,7 +532,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             .setContentGenerationMatch(writeGeneration.orElse(null))
             .build();
 
-    AbstractGoogleAsyncWriteChannel<?> channel;
     if (storageOptions.isGrpcEnabled()) {
       String requesterPaysProjectId = null;
       if (requesterShouldPay(resourceId.getBucketName())) {
@@ -549,6 +577,20 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @Override
   public void createBucket(String bucketName, CreateBucketOptions options) throws IOException {
     logger.atFiner().log("createBucket(%s)", bucketName);
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    try {
+      createBucketInternal(bucketName, options);
+      recordSuccessMetric(
+          metricsRecorder, LATENCY_MS, stopwatch, METHOD_CREATE_BUCKET, PROTOCOL_JSON);
+    } catch (IOException e) {
+      recordErrorMetric(
+          metricsRecorder, LATENCY_MS, stopwatch, METHOD_CREATE_BUCKET, PROTOCOL_JSON, e);
+      throw e;
+    }
+  }
+
+  private void createBucketInternal(String bucketName, CreateBucketOptions options)
+      throws IOException {
     checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
     checkNotNull(options, "options must not be null");
     checkNotNull(storageOptions.getProjectId(), "projectId must not be null");
@@ -596,6 +638,20 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @Override
   public void createEmptyObject(StorageResourceId resourceId, CreateObjectOptions options)
       throws IOException {
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    try {
+      createEmptyObjectInternal(resourceId, options);
+      recordSuccessMetric(
+          metricsRecorder, LATENCY_MS, stopwatch, METHOD_CREATE_EMPTY_OBJECT, PROTOCOL_JSON);
+    } catch (IOException e) {
+      recordErrorMetric(
+          metricsRecorder, LATENCY_MS, stopwatch, METHOD_CREATE_EMPTY_OBJECT, PROTOCOL_JSON, e);
+      throw e;
+    }
+  }
+
+  private void createEmptyObjectInternal(StorageResourceId resourceId, CreateObjectOptions options)
+      throws IOException {
     checkArgument(
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
 
@@ -635,6 +691,20 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @Override
   public void createEmptyObjects(List<StorageResourceId> resourceIds, CreateObjectOptions options)
       throws IOException {
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    try {
+      createEmptyObjectsInternal(resourceIds, options);
+      recordSuccessMetric(
+          metricsRecorder, LATENCY_MS, stopwatch, METHOD_CREATE_EMPTY_OBJECTS, PROTOCOL_JSON);
+    } catch (IOException e) {
+      recordErrorMetric(
+          metricsRecorder, LATENCY_MS, stopwatch, METHOD_CREATE_EMPTY_OBJECTS, PROTOCOL_JSON, e);
+      throw e;
+    }
+  }
+
+  private void createEmptyObjectsInternal(
+      List<StorageResourceId> resourceIds, CreateObjectOptions options) throws IOException {
     // TODO(user): This method largely follows a pattern similar to
     // deleteObjects(List<StorageResourceId>); extract a generic method for both.
     logger.atFiner().log("createEmptyObjects(%s)", resourceIds);
@@ -745,13 +815,21 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     logger.atFiner().log("open(%s, %s)", itemInfo, readOptions);
-    checkNotNull(itemInfo, "itemInfo should not be null");
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    try {
+      checkNotNull(itemInfo, "itemInfo should not be null");
 
-    StorageResourceId resourceId = itemInfo.getResourceId();
-    checkArgument(
-        resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
+      StorageResourceId resourceId = itemInfo.getResourceId();
+      checkArgument(
+          resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
 
-    return open(resourceId, itemInfo, readOptions);
+      SeekableByteChannel seekableByteChannel = open(resourceId, itemInfo, readOptions);
+      recordSuccessMetric(metricsRecorder, LATENCY_MS, stopwatch, METHOD_OPEN, PROTOCOL_JSON);
+      return seekableByteChannel;
+    } catch (IOException e) {
+      recordErrorMetric(metricsRecorder, LATENCY_MS, stopwatch, METHOD_OPEN, PROTOCOL_JSON, e);
+      throw e;
+    }
   }
 
   private SeekableByteChannel open(
@@ -807,7 +885,17 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @Override
   public void deleteBuckets(List<String> bucketNames) throws IOException {
     logger.atFiner().log("deleteBuckets(%s)", bucketNames);
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    try {
+      deleteBucketsInternal(bucketNames);
+      recordSuccessMetric(metricsRecorder, LATENCY_MS, stopwatch, "deleteBuckets", PROTOCOL_JSON);
+    } catch (IOException e) {
+      recordErrorMetric(metricsRecorder, LATENCY_MS, stopwatch, "deleteBuckets", PROTOCOL_JSON, e);
+      throw e;
+    }
+  }
 
+  private void deleteBucketsInternal(List<String> bucketNames) throws IOException {
     // Validate all the inputs first.
     for (String bucketName : bucketNames) {
       checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
@@ -846,7 +934,19 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @Override
   public void deleteObjects(List<StorageResourceId> fullObjectNames) throws IOException {
     logger.atFiner().log("deleteObjects(%s)", fullObjectNames);
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    try {
+      deleteObjectsInternal(fullObjectNames);
+      recordSuccessMetric(
+          metricsRecorder, LATENCY_MS, stopwatch, METHOD_DELETE_OBJECTS, PROTOCOL_JSON);
+    } catch (IOException e) {
+      recordErrorMetric(
+          metricsRecorder, LATENCY_MS, stopwatch, METHOD_DELETE_OBJECTS, PROTOCOL_JSON, e);
+      throw e;
+    }
+  }
 
+  private void deleteObjectsInternal(List<StorageResourceId> fullObjectNames) throws IOException {
     if (fullObjectNames.isEmpty()) {
       return;
     }
@@ -1106,7 +1206,18 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @Override
   public void copy(Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
       throws IOException {
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    try {
+      copyInternal(sourceToDestinationObjectsMap);
+      recordSuccessMetric(metricsRecorder, LATENCY_MS, stopwatch, METHOD_COPY, PROTOCOL_JSON);
+    } catch (IOException e) {
+      recordErrorMetric(metricsRecorder, LATENCY_MS, stopwatch, METHOD_COPY, PROTOCOL_JSON, e);
+      throw e;
+    }
+  }
 
+  private void copyInternal(Map<StorageResourceId, StorageResourceId> sourceToDestinationObjectsMap)
+      throws IOException {
     validateCopyArguments(sourceToDestinationObjectsMap, this);
 
     if (sourceToDestinationObjectsMap.isEmpty()) {
@@ -1328,24 +1439,42 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @Override
   public List<String> listBucketNames() throws IOException {
     logger.atFiner().log("listBucketNames()");
-    List<Bucket> allBuckets = listBucketsInternal();
-    List<String> bucketNames = new ArrayList<>(allBuckets.size());
-    for (Bucket bucket : allBuckets) {
-      bucketNames.add(bucket.getName());
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    try {
+      List<Bucket> allBuckets = listBucketsInternal();
+      List<String> bucketNames = new ArrayList<>(allBuckets.size());
+      for (Bucket bucket : allBuckets) {
+        bucketNames.add(bucket.getName());
+      }
+      recordSuccessMetric(
+          metricsRecorder, LATENCY_MS, stopwatch, METHOD_LIST_BUCKET_NAMES, PROTOCOL_JSON);
+      return bucketNames;
+    } catch (IOException e) {
+      recordErrorMetric(
+          metricsRecorder, LATENCY_MS, stopwatch, METHOD_LIST_BUCKET_NAMES, PROTOCOL_JSON, e);
+      throw e;
     }
-    return bucketNames;
   }
 
   /** See {@link GoogleCloudStorage#listBucketInfo()} for details about expected behavior. */
   @Override
   public List<GoogleCloudStorageItemInfo> listBucketInfo() throws IOException {
     logger.atFiner().log("listBucketInfo()");
-    List<Bucket> allBuckets = listBucketsInternal();
-    List<GoogleCloudStorageItemInfo> bucketInfos = new ArrayList<>(allBuckets.size());
-    for (Bucket bucket : allBuckets) {
-      bucketInfos.add(createItemInfoForBucket(new StorageResourceId(bucket.getName()), bucket));
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    try {
+      List<Bucket> allBuckets = listBucketsInternal();
+      List<GoogleCloudStorageItemInfo> bucketInfos = new ArrayList<>(allBuckets.size());
+      for (Bucket bucket : allBuckets) {
+        bucketInfos.add(createItemInfoForBucket(new StorageResourceId(bucket.getName()), bucket));
+      }
+      recordSuccessMetric(
+          metricsRecorder, LATENCY_MS, stopwatch, METHOD_LIST_BUCKET_INFO, PROTOCOL_JSON);
+      return bucketInfos;
+    } catch (IOException e) {
+      recordErrorMetric(
+          metricsRecorder, LATENCY_MS, stopwatch, METHOD_LIST_BUCKET_INFO, PROTOCOL_JSON, e);
+      throw e;
     }
-    return bucketInfos;
   }
 
   /**
@@ -1785,6 +1914,21 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @Override
   public List<GoogleCloudStorageItemInfo> getItemInfos(List<StorageResourceId> resourceIds)
       throws IOException {
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    try {
+      List<GoogleCloudStorageItemInfo> itemInfos = getItemInfosInternal(resourceIds);
+      recordSuccessMetric(
+          metricsRecorder, LATENCY_MS, stopwatch, METHOD_GET_ITEM_INFOS, PROTOCOL_JSON);
+      return itemInfos;
+    } catch (IOException e) {
+      recordErrorMetric(
+          metricsRecorder, LATENCY_MS, stopwatch, METHOD_GET_ITEM_INFOS, PROTOCOL_JSON, e);
+      throw e;
+    }
+  }
+
+  private List<GoogleCloudStorageItemInfo> getItemInfosInternal(List<StorageResourceId> resourceIds)
+      throws IOException {
     logger.atFiner().log("getItemInfos(%s)", resourceIds);
 
     if (resourceIds.isEmpty()) {
@@ -1904,6 +2048,19 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @Override
   public List<GoogleCloudStorageItemInfo> updateItems(List<UpdatableItemInfo> itemInfoList)
       throws IOException {
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    try {
+      List<GoogleCloudStorageItemInfo> itemInfos = updateItemsInternal(itemInfoList);
+      recordSuccessMetric(metricsRecorder, LATENCY_MS, stopwatch, "updateItems", PROTOCOL_JSON);
+      return itemInfos;
+    } catch (IOException e) {
+      recordErrorMetric(metricsRecorder, LATENCY_MS, stopwatch, "updateItems", PROTOCOL_JSON, e);
+      throw e;
+    }
+  }
+
+  private List<GoogleCloudStorageItemInfo> updateItemsInternal(List<UpdatableItemInfo> itemInfoList)
+      throws IOException {
     logger.atFiner().log("updateItems(%s)", itemInfoList);
 
     if (itemInfoList.isEmpty()) {
@@ -2004,6 +2161,21 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    */
   @Override
   public GoogleCloudStorageItemInfo getItemInfo(StorageResourceId resourceId) throws IOException {
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    try {
+      GoogleCloudStorageItemInfo itemInfo = getItemInfoInternal(resourceId);
+      recordSuccessMetric(
+          metricsRecorder, LATENCY_MS, stopwatch, METHOD_GET_ITEM_INFOS, PROTOCOL_JSON);
+      return itemInfo;
+    } catch (IOException e) {
+      recordErrorMetric(
+          metricsRecorder, LATENCY_MS, stopwatch, METHOD_GET_ITEM_INFOS, PROTOCOL_JSON, e);
+      throw e;
+    }
+  }
+
+  private GoogleCloudStorageItemInfo getItemInfoInternal(StorageResourceId resourceId)
+      throws IOException {
     logger.atFiner().log("getItemInfo(%s)", resourceId);
 
     // Handle ROOT case first.
@@ -2043,6 +2215,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // Calling shutdown() is a no-op if it was already called earlier,
     // therefore no need to guard against that by setting threadPool to null.
     logger.atFiner().log("close()");
+    Stopwatch stopwatch = Stopwatch.createStarted();
     try {
       // TODO: add try-catch around each shutdown() call to make sure
       //  that all resources are shut down
@@ -2062,6 +2235,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       manualBatchingThreadPool = null;
       storageStubProvider = null;
       watchdog = null;
+      recordSuccessMetric(metricsRecorder, LATENCY_MS, stopwatch, "close", PROTOCOL_JSON);
     }
   }
 
@@ -2227,6 +2401,22 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   @Override
   public GoogleCloudStorageItemInfo composeObjects(
+      List<StorageResourceId> sources, StorageResourceId destination, CreateObjectOptions options)
+      throws IOException {
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    try {
+      GoogleCloudStorageItemInfo itemInfo = composeObjectsInternal(sources, destination, options);
+      recordSuccessMetric(
+          metricsRecorder, LATENCY_MS, stopwatch, METHOD_COMPOSE_OBJECTS, PROTOCOL_JSON);
+      return itemInfo;
+    } catch (IOException e) {
+      recordErrorMetric(
+          metricsRecorder, LATENCY_MS, stopwatch, METHOD_COMPOSE_OBJECTS, PROTOCOL_JSON, e);
+      throw e;
+    }
+  }
+
+  private GoogleCloudStorageItemInfo composeObjectsInternal(
       List<StorageResourceId> sources, StorageResourceId destination, CreateObjectOptions options)
       throws IOException {
     logger.atFiner().log("composeObjects(%s, %s, %s)", sources, destination, options);
