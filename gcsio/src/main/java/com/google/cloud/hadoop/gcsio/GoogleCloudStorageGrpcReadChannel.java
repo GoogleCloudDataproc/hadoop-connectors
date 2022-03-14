@@ -245,7 +245,11 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         Get metadataRequest = getMetadataRequest(gcs, resourceId).setFields(METADATA_FIELDS);
         object = metadataRequest.execute();
         recordSuccessMetric(
-            metricsRecorder, LATENCY_MS, stopwatch, METHOD_GET_OBJECT_METADATA, PROTOCOL_JSON);
+            metricsRecorder,
+            LATENCY_MS,
+            stopwatch.elapsed(MILLISECONDS),
+            METHOD_GET_OBJECT_METADATA,
+            PROTOCOL_JSON);
         return GoogleCloudStorageItemInfo.createObject(
             resourceId,
             /* creationTime= */ 0,
@@ -259,7 +263,12 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
             /* verificationAttributes= */ null);
       } catch (IOException ex) {
         recordErrorMetric(
-            metricsRecorder, LATENCY_MS, stopwatch, METHOD_GET_OBJECT_METADATA, PROTOCOL_JSON, ex);
+            metricsRecorder,
+            LATENCY_MS,
+            stopwatch.elapsed(MILLISECONDS),
+            METHOD_GET_OBJECT_METADATA,
+            PROTOCOL_JSON,
+            ex);
         if (RetryDeterminer.SOCKET_ERRORS.shouldRetry(ex)) {
           exception = ex;
         } else {
@@ -269,7 +278,12 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         }
       } catch (Exception ex) {
         recordErrorMetric(
-            metricsRecorder, LATENCY_MS, stopwatch, METHOD_GET_OBJECT_METADATA, PROTOCOL_JSON, ex);
+            metricsRecorder,
+            LATENCY_MS,
+            stopwatch.elapsed(MILLISECONDS),
+            METHOD_GET_OBJECT_METADATA,
+            PROTOCOL_JSON,
+            ex);
         throw ex;
       }
     } while (nextSleep(METHOD_GET_OBJECT_METADATA, sleeper, backoff, exception));
@@ -440,12 +454,21 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
           read += readObjectContentFromGCS(byteBuffer);
         }
         recordSuccessMetric(
-            metricsRecorder, LATENCY_MS, stopwatch, METHOD_GET_OBJECT_MEDIA, PROTOCOL_GRPC);
+            metricsRecorder,
+            LATENCY_MS,
+            stopwatch.elapsed(MILLISECONDS),
+            METHOD_GET_OBJECT_MEDIA,
+            PROTOCOL_GRPC);
         return read;
       } catch (StatusRuntimeException e) {
         cancelCurrentRequest();
         recordErrorMetric(
-            metricsRecorder, LATENCY_MS, stopwatch, METHOD_GET_OBJECT_MEDIA, PROTOCOL_GRPC, e);
+            metricsRecorder,
+            LATENCY_MS,
+            stopwatch.elapsed(MILLISECONDS),
+            METHOD_GET_OBJECT_MEDIA,
+            PROTOCOL_GRPC,
+            e);
         statusRuntimeException = e;
       }
     } while (nextSleep(METHOD_GET_OBJECT_MEDIA, sleeper, backoff, statusRuntimeException));
@@ -646,12 +669,16 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       }
       moreDataAvailable = resIterator.hasNext();
       recordSuccessMetric(
-          metricsRecorder, MESSAGE_LATENCY_MS, stopwatch, METHOD_GET_OBJECT_MEDIA, PROTOCOL_GRPC);
+          metricsRecorder,
+          MESSAGE_LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          METHOD_GET_OBJECT_MEDIA,
+          PROTOCOL_GRPC);
     } catch (Exception e) {
       recordErrorMetric(
           metricsRecorder,
           MESSAGE_LATENCY_MS,
-          stopwatch,
+          stopwatch.elapsed(MILLISECONDS),
           METHOD_GET_OBJECT_MEDIA,
           PROTOCOL_GRPC,
           e);

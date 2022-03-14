@@ -33,6 +33,7 @@ import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
 import static java.util.Arrays.stream;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 
@@ -488,10 +489,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     logger.atFiner().log("create(%s)", resourceId);
     try {
       AbstractGoogleAsyncWriteChannel<?> channel = createInternal(resourceId, options);
-      recordSuccessMetric(metricsRecorder, LATENCY_MS, stopwatch, "create", PROTOCOL_JSON);
+      recordSuccessMetric(
+          metricsRecorder, LATENCY_MS, stopwatch.elapsed(MILLISECONDS), "create", PROTOCOL_JSON);
       return channel;
     } catch (IOException e) {
-      recordErrorMetric(metricsRecorder, LATENCY_MS, stopwatch, "create", PROTOCOL_JSON, e);
+      recordErrorMetric(
+          metricsRecorder, LATENCY_MS, stopwatch.elapsed(MILLISECONDS), "create", PROTOCOL_JSON, e);
       throw e;
     }
   }
@@ -581,10 +584,19 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     try {
       createBucketInternal(bucketName, options);
       recordSuccessMetric(
-          metricsRecorder, LATENCY_MS, stopwatch, METHOD_CREATE_BUCKET, PROTOCOL_JSON);
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          METHOD_CREATE_BUCKET,
+          PROTOCOL_JSON);
     } catch (IOException e) {
       recordErrorMetric(
-          metricsRecorder, LATENCY_MS, stopwatch, METHOD_CREATE_BUCKET, PROTOCOL_JSON, e);
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          METHOD_CREATE_BUCKET,
+          PROTOCOL_JSON,
+          e);
       throw e;
     }
   }
@@ -642,10 +654,19 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     try {
       createEmptyObjectInternal(resourceId, options);
       recordSuccessMetric(
-          metricsRecorder, LATENCY_MS, stopwatch, METHOD_CREATE_EMPTY_OBJECT, PROTOCOL_JSON);
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          METHOD_CREATE_EMPTY_OBJECT,
+          PROTOCOL_JSON);
     } catch (IOException e) {
       recordErrorMetric(
-          metricsRecorder, LATENCY_MS, stopwatch, METHOD_CREATE_EMPTY_OBJECT, PROTOCOL_JSON, e);
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          METHOD_CREATE_EMPTY_OBJECT,
+          PROTOCOL_JSON,
+          e);
       throw e;
     }
   }
@@ -695,10 +716,19 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     try {
       createEmptyObjectsInternal(resourceIds, options);
       recordSuccessMetric(
-          metricsRecorder, LATENCY_MS, stopwatch, METHOD_CREATE_EMPTY_OBJECTS, PROTOCOL_JSON);
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          METHOD_CREATE_EMPTY_OBJECTS,
+          PROTOCOL_JSON);
     } catch (IOException e) {
       recordErrorMetric(
-          metricsRecorder, LATENCY_MS, stopwatch, METHOD_CREATE_EMPTY_OBJECTS, PROTOCOL_JSON, e);
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          METHOD_CREATE_EMPTY_OBJECTS,
+          PROTOCOL_JSON,
+          e);
       throw e;
     }
   }
@@ -824,10 +854,17 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
 
       SeekableByteChannel seekableByteChannel = open(resourceId, itemInfo, readOptions);
-      recordSuccessMetric(metricsRecorder, LATENCY_MS, stopwatch, METHOD_OPEN, PROTOCOL_JSON);
+      recordSuccessMetric(
+          metricsRecorder, LATENCY_MS, stopwatch.elapsed(MILLISECONDS), METHOD_OPEN, PROTOCOL_JSON);
       return seekableByteChannel;
     } catch (IOException e) {
-      recordErrorMetric(metricsRecorder, LATENCY_MS, stopwatch, METHOD_OPEN, PROTOCOL_JSON, e);
+      recordErrorMetric(
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          METHOD_OPEN,
+          PROTOCOL_JSON,
+          e);
       throw e;
     }
   }
@@ -888,9 +925,20 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     Stopwatch stopwatch = Stopwatch.createStarted();
     try {
       deleteBucketsInternal(bucketNames);
-      recordSuccessMetric(metricsRecorder, LATENCY_MS, stopwatch, "deleteBuckets", PROTOCOL_JSON);
+      recordSuccessMetric(
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          "deleteBuckets",
+          PROTOCOL_JSON);
     } catch (IOException e) {
-      recordErrorMetric(metricsRecorder, LATENCY_MS, stopwatch, "deleteBuckets", PROTOCOL_JSON, e);
+      recordErrorMetric(
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          "deleteBuckets",
+          PROTOCOL_JSON,
+          e);
       throw e;
     }
   }
@@ -938,10 +986,19 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     try {
       deleteObjectsInternal(fullObjectNames);
       recordSuccessMetric(
-          metricsRecorder, LATENCY_MS, stopwatch, METHOD_DELETE_OBJECTS, PROTOCOL_JSON);
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          METHOD_DELETE_OBJECTS,
+          PROTOCOL_JSON);
     } catch (IOException e) {
       recordErrorMetric(
-          metricsRecorder, LATENCY_MS, stopwatch, METHOD_DELETE_OBJECTS, PROTOCOL_JSON, e);
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          METHOD_DELETE_OBJECTS,
+          PROTOCOL_JSON,
+          e);
       throw e;
     }
   }
@@ -1209,9 +1266,16 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     Stopwatch stopwatch = Stopwatch.createStarted();
     try {
       copyInternal(sourceToDestinationObjectsMap);
-      recordSuccessMetric(metricsRecorder, LATENCY_MS, stopwatch, METHOD_COPY, PROTOCOL_JSON);
+      recordSuccessMetric(
+          metricsRecorder, LATENCY_MS, stopwatch.elapsed(MILLISECONDS), METHOD_COPY, PROTOCOL_JSON);
     } catch (IOException e) {
-      recordErrorMetric(metricsRecorder, LATENCY_MS, stopwatch, METHOD_COPY, PROTOCOL_JSON, e);
+      recordErrorMetric(
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          METHOD_COPY,
+          PROTOCOL_JSON,
+          e);
       throw e;
     }
   }
@@ -1447,11 +1511,20 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         bucketNames.add(bucket.getName());
       }
       recordSuccessMetric(
-          metricsRecorder, LATENCY_MS, stopwatch, METHOD_LIST_BUCKET_NAMES, PROTOCOL_JSON);
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          METHOD_LIST_BUCKET_NAMES,
+          PROTOCOL_JSON);
       return bucketNames;
     } catch (IOException e) {
       recordErrorMetric(
-          metricsRecorder, LATENCY_MS, stopwatch, METHOD_LIST_BUCKET_NAMES, PROTOCOL_JSON, e);
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          METHOD_LIST_BUCKET_NAMES,
+          PROTOCOL_JSON,
+          e);
       throw e;
     }
   }
@@ -1468,11 +1541,20 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         bucketInfos.add(createItemInfoForBucket(new StorageResourceId(bucket.getName()), bucket));
       }
       recordSuccessMetric(
-          metricsRecorder, LATENCY_MS, stopwatch, METHOD_LIST_BUCKET_INFO, PROTOCOL_JSON);
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          METHOD_LIST_BUCKET_INFO,
+          PROTOCOL_JSON);
       return bucketInfos;
     } catch (IOException e) {
       recordErrorMetric(
-          metricsRecorder, LATENCY_MS, stopwatch, METHOD_LIST_BUCKET_INFO, PROTOCOL_JSON, e);
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          METHOD_LIST_BUCKET_INFO,
+          PROTOCOL_JSON,
+          e);
       throw e;
     }
   }
@@ -1918,11 +2000,20 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     try {
       List<GoogleCloudStorageItemInfo> itemInfos = getItemInfosInternal(resourceIds);
       recordSuccessMetric(
-          metricsRecorder, LATENCY_MS, stopwatch, METHOD_GET_ITEM_INFOS, PROTOCOL_JSON);
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          METHOD_GET_ITEM_INFOS,
+          PROTOCOL_JSON);
       return itemInfos;
     } catch (IOException e) {
       recordErrorMetric(
-          metricsRecorder, LATENCY_MS, stopwatch, METHOD_GET_ITEM_INFOS, PROTOCOL_JSON, e);
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          METHOD_GET_ITEM_INFOS,
+          PROTOCOL_JSON,
+          e);
       throw e;
     }
   }
@@ -2051,10 +2142,21 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     Stopwatch stopwatch = Stopwatch.createStarted();
     try {
       List<GoogleCloudStorageItemInfo> itemInfos = updateItemsInternal(itemInfoList);
-      recordSuccessMetric(metricsRecorder, LATENCY_MS, stopwatch, "updateItems", PROTOCOL_JSON);
+      recordSuccessMetric(
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          "updateItems",
+          PROTOCOL_JSON);
       return itemInfos;
     } catch (IOException e) {
-      recordErrorMetric(metricsRecorder, LATENCY_MS, stopwatch, "updateItems", PROTOCOL_JSON, e);
+      recordErrorMetric(
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          "updateItems",
+          PROTOCOL_JSON,
+          e);
       throw e;
     }
   }
@@ -2165,11 +2267,20 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     try {
       GoogleCloudStorageItemInfo itemInfo = getItemInfoInternal(resourceId);
       recordSuccessMetric(
-          metricsRecorder, LATENCY_MS, stopwatch, METHOD_GET_ITEM_INFOS, PROTOCOL_JSON);
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          METHOD_GET_ITEM_INFOS,
+          PROTOCOL_JSON);
       return itemInfo;
     } catch (IOException e) {
       recordErrorMetric(
-          metricsRecorder, LATENCY_MS, stopwatch, METHOD_GET_ITEM_INFOS, PROTOCOL_JSON, e);
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          METHOD_GET_ITEM_INFOS,
+          PROTOCOL_JSON,
+          e);
       throw e;
     }
   }
@@ -2235,7 +2346,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       manualBatchingThreadPool = null;
       storageStubProvider = null;
       watchdog = null;
-      recordSuccessMetric(metricsRecorder, LATENCY_MS, stopwatch, "close", PROTOCOL_JSON);
+      recordSuccessMetric(
+          metricsRecorder, LATENCY_MS, stopwatch.elapsed(MILLISECONDS), "close", PROTOCOL_JSON);
     }
   }
 
@@ -2407,11 +2519,20 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     try {
       GoogleCloudStorageItemInfo itemInfo = composeObjectsInternal(sources, destination, options);
       recordSuccessMetric(
-          metricsRecorder, LATENCY_MS, stopwatch, METHOD_COMPOSE_OBJECTS, PROTOCOL_JSON);
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          METHOD_COMPOSE_OBJECTS,
+          PROTOCOL_JSON);
       return itemInfo;
     } catch (IOException e) {
       recordErrorMetric(
-          metricsRecorder, LATENCY_MS, stopwatch, METHOD_COMPOSE_OBJECTS, PROTOCOL_JSON, e);
+          metricsRecorder,
+          LATENCY_MS,
+          stopwatch.elapsed(MILLISECONDS),
+          METHOD_COMPOSE_OBJECTS,
+          PROTOCOL_JSON,
+          e);
       throw e;
     }
   }

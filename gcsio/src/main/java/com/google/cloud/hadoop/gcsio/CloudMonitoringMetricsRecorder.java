@@ -1,11 +1,9 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static io.opencensus.common.Duration.fromMillis;
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.google.auth.Credentials;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import io.grpc.StatusRuntimeException;
@@ -197,10 +195,9 @@ class CloudMonitoringMetricsRecorder implements MetricsRecorder {
   static void recordSuccessMetric(
       MetricsRecorder metricsRecorder,
       MeasureLong measure,
-      Stopwatch stopwatch,
+      long time,
       String method,
       String protocol) {
-    long time = stopwatch.elapsed(MILLISECONDS);
     TagKey[] keys = new TagKey[] {METHOD, STATUS, PROTOCOL};
     String[] values = new String[] {method, STATUS_OK, protocol};
     metricsRecorder.recordLong(keys, values, measure, time);
@@ -212,11 +209,10 @@ class CloudMonitoringMetricsRecorder implements MetricsRecorder {
   static void recordErrorMetric(
       MetricsRecorder metricsRecorder,
       MeasureLong measure,
-      Stopwatch stopwatch,
+      long time,
       String method,
       String protocol,
       Exception e) {
-    long time = stopwatch.elapsed(MILLISECONDS);
     String error =
         (e instanceof StatusRuntimeException)
             ? ((StatusRuntimeException) e).getStatus().toString()
