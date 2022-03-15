@@ -93,6 +93,7 @@
     <google.auto-value.version>1.9</google.auto-value.version>
     <google.cloud-bigquerystorage.version>2.7.0</google.cloud-bigquerystorage.version>
     <google.cloud-core.verion>2.5.4</google.cloud-core.verion>
+    <google.cloud-logging.version>3.7.1</google.cloud-logging.version>
     <google.cloud-storage.grpc.version>2.2.2-alpha</google.cloud-storage.grpc.version>
     <google.error-prone.version>2.10.0</google.error-prone.version>
     <google.flogger.version>0.7.4</google.flogger.version>
@@ -413,6 +414,11 @@
         <groupId>com.google.cloud</groupId>
         <artifactId>google-cloud-core</artifactId>
         <version>${google.cloud-core.verion}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.cloud</groupId>
+        <artifactId>google-cloud-logging</artifactId>
+        <version>${google.cloud-logging.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.api</groupId>

@@ -45,6 +45,7 @@ import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.EventLogSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
@@ -77,6 +78,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.encryption.algorithm", null);
           put("fs.gs.encryption.key.hash", null);
           put("fs.gs.encryption.key", null);
+          put("fs.gs.eventlog.sink", EventLogSink.NONE);
           put("fs.gs.glob.algorithm", GlobAlgorithm.CONCURRENT);
           put("fs.gs.grpc.checksums.enable", false);
           put("fs.gs.grpc.enable", false);

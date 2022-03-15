@@ -11,6 +11,7 @@ import static org.junit.Assert.assertThrows;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.EventLogSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
@@ -134,7 +135,22 @@ public class GoogleCloudStorageGrpcIntegrationTest {
                 .setMetricsSink(MetricsSink.CLOUD_MONITORING)
                 .build(),
             GoogleCloudStorageTestHelper.getCredentials());
-    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME, "testOpen_Object");
+    StorageResourceId objectToCreate =
+        new StorageResourceId(BUCKET_NAME, "testOpenWithMetricsEnabled_Object");
+    byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
+    assertObjectContent(rawStorage, objectToCreate, objectBytes);
+  }
+
+  @Test
+  public void testOpenWithEventlogEnabled() throws IOException {
+    GoogleCloudStorage rawStorage =
+        new GoogleCloudStorageImpl(
+            GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+                .setEventLogSink(EventLogSink.CLOUD_LOGGING)
+                .build(),
+            GoogleCloudStorageTestHelper.getCredentials());
+    StorageResourceId objectToCreate =
+        new StorageResourceId(BUCKET_NAME, "testOpenWithEventlogEnabled_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
     assertObjectContent(rawStorage, objectToCreate, objectBytes);
   }

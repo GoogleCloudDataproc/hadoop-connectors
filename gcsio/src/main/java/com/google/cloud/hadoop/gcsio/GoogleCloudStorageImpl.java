@@ -54,6 +54,7 @@ import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.RewriteResponse;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.auth.Credentials;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.EventLogSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
 import com.google.cloud.hadoop.util.AbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.AccessBoundary;
@@ -65,6 +66,8 @@ import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryBoundedBackOff;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
+import com.google.cloud.logging.Logging;
+import com.google.cloud.logging.LoggingOptions;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -146,6 +149,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private static final String LIST_OBJECT_FIELDS_FORMAT = "items(%s),prefixes,nextPageToken";
 
   private final MetricsRecorder metricsRecorder;
+  private Logging cloudLogger;
 
   // A function to encode metadata map values
   static String encodeMetadataValues(byte[] bytes) {
@@ -333,10 +337,24 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     this.storageOptions = checkNotNull(options, "options must not be null");
     this.storageOptions.throwIfNotValid();
+    List<HttpRequestInitializer> httpRequestInitializers = new ArrayList<>();
+    httpRequestInitializers.add(new StatisticsTrackingHttpRequestInitializer(statistics));
+    httpRequestInitializers.add(
+        new RetryHttpInitializer(credentials, options.toRetryHttpInitializerOptions()));
+    if (storageOptions.getEventLogSink() == EventLogSink.CLOUD_LOGGING) {
+      checkNotNull(credentials, "credentials cannot be null when event logging enabled");
+      this.cloudLogger =
+          LoggingOptions.newBuilder()
+              .setProjectId(options.getProjectId())
+              .setCredentials(credentials)
+              .build()
+              .getService();
+      httpRequestInitializers.add(new EventLoggingHttpRequestInitializer(cloudLogger));
+    }
     HttpRequestInitializer retryHttpInitializer =
         new ChainingHttpRequestInitializer(
-            new StatisticsTrackingHttpRequestInitializer(statistics),
-            new RetryHttpInitializer(credentials, options.toRetryHttpInitializerOptions()));
+            httpRequestInitializers.toArray(
+                new HttpRequestInitializer[httpRequestInitializers.size()]));
 
     this.storage =
         checkNotNull(createStorage(options, retryHttpInitializer), "storage must not be null");
@@ -2053,6 +2071,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         if (watchdog != null) {
           watchdog.shutdown();
         }
+        closeCloudLogging();
       } finally {
         backgroundTasksThreadPool.shutdown();
         manualBatchingThreadPool.shutdown();
@@ -2062,6 +2081,17 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       manualBatchingThreadPool = null;
       storageStubProvider = null;
       watchdog = null;
+    }
+  }
+
+  private void closeCloudLogging() {
+    if (cloudLogger != null) {
+      try {
+        cloudLogger.flush();
+        cloudLogger.close();
+      } catch (Exception e) {
+        logger.atWarning().withCause(e).log("Exception while closing cloud logging instance ");
+      }
     }
   }
 
