@@ -215,6 +215,7 @@
                   <include>com.google.auth</include>
                   <include>com.google.cloud</include>
                   <include>com.google.cloud.bigdataoss</include>
+                  <include>com.google.cloud.logging</include>
                   <include>com.google.flogger</include>
                   <include>com.google.code.gson</include>
                   <include>com.google.guava</include>
@@ -241,6 +242,7 @@
                     <include>com.google.cloud.audit.**</include>
                     <include>com.google.cloud.hadoop.gcsio.**</include>
                     <include>com.google.cloud.hadoop.util.**</include>
+                    <include>com.google.cloud.logging.**</include>
                     <include>com.google.common.**</include>
                     <include>com.google.geo.**</include>
                     <include>com.google.gson.**</include>
