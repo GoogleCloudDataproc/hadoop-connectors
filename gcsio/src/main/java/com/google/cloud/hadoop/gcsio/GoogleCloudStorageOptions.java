@@ -100,7 +100,7 @@ public abstract class GoogleCloudStorageOptions {
     CLOUD_MONITORING,
   }
 
-  public enum EventLogSink {
+  public enum TraceLogSink {
     NONE,
     CLOUD_LOGGING
   }
@@ -131,7 +131,7 @@ public abstract class GoogleCloudStorageOptions {
         .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT)
         .setGrpcMessageTimeoutCheckInterval(GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL)
         .setMetricsSink(MetricsSink.NONE)
-        .setEventLogSink(EventLogSink.NONE);
+        .setTraceLogSink(TraceLogSink.NONE);
   }
 
   public abstract Builder toBuilder();
@@ -204,7 +204,7 @@ public abstract class GoogleCloudStorageOptions {
 
   public abstract MetricsSink getMetricsSink();
 
-  public abstract EventLogSink getEventLogSink();
+  public abstract TraceLogSink getTraceLogSink();
 
   public RetryHttpInitializerOptions toRetryHttpInitializerOptions() {
     return RetryHttpInitializerOptions.builder()
@@ -287,7 +287,7 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setMetricsSink(MetricsSink metricsSink);
 
-    public abstract Builder setEventLogSink(EventLogSink eventLogSink);
+    public abstract Builder setTraceLogSink(TraceLogSink traceLogSink);
 
     abstract GoogleCloudStorageOptions autoBuild();
 

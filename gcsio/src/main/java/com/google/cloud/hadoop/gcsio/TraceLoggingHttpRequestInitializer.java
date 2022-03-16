@@ -19,12 +19,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class EventLoggingHttpRequestInitializer implements HttpRequestInitializer {
+class TraceLoggingHttpRequestInitializer implements HttpRequestInitializer {
 
   private final Map<HttpRequest, Stopwatch> requestTracker = new ConcurrentHashMap<>();
   private final Logging logging;
 
-  public EventLoggingHttpRequestInitializer(Logging logging) {
+  public TraceLoggingHttpRequestInitializer(Logging logging) {
     this.logging = logging;
   }
 

@@ -11,8 +11,8 @@ import static org.junit.Assert.assertThrows;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.EventLogSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.TraceLogSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
@@ -146,7 +146,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     GoogleCloudStorage rawStorage =
         new GoogleCloudStorageImpl(
             GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-                .setEventLogSink(EventLogSink.CLOUD_LOGGING)
+                .setTraceLogSink(TraceLogSink.CLOUD_LOGGING)
                 .build(),
             GoogleCloudStorageTestHelper.getCredentials());
     StorageResourceId objectToCreate =

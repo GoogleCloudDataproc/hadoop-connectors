@@ -54,8 +54,8 @@ import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.RewriteResponse;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.auth.Credentials;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.EventLogSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.TraceLogSink;
 import com.google.cloud.hadoop.util.AbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
@@ -341,7 +341,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     httpRequestInitializers.add(new StatisticsTrackingHttpRequestInitializer(statistics));
     httpRequestInitializers.add(
         new RetryHttpInitializer(credentials, options.toRetryHttpInitializerOptions()));
-    if (storageOptions.getEventLogSink() == EventLogSink.CLOUD_LOGGING) {
+    if (storageOptions.getTraceLogSink() == TraceLogSink.CLOUD_LOGGING) {
       checkNotNull(credentials, "credentials cannot be null when event logging enabled");
       this.cloudLogger =
           LoggingOptions.newBuilder()
@@ -349,7 +349,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               .setCredentials(credentials)
               .build()
               .getService();
-      httpRequestInitializers.add(new EventLoggingHttpRequestInitializer(cloudLogger));
+      httpRequestInitializers.add(new TraceLoggingHttpRequestInitializer(cloudLogger));
     }
     HttpRequestInitializer retryHttpInitializer =
         new ChainingHttpRequestInitializer(

@@ -27,8 +27,8 @@ import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.EventLogSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.TraceLogSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
@@ -421,8 +421,8 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>("fs.gs.metrics.sink", MetricsSink.NONE);
 
   /** Configuration key to enable publishing event logs to Google cloud logging. */
-  public static final HadoopConfigurationProperty<EventLogSink> GCS_EVENT_LOG_SINK =
-      new HadoopConfigurationProperty<>("fs.gs.eventlog.sink", EventLogSink.NONE);
+  public static final HadoopConfigurationProperty<TraceLogSink> GCS_TRACE_LOG_SINK =
+      new HadoopConfigurationProperty<>("fs.gs.tracelog.sink", TraceLogSink.NONE);
 
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
@@ -479,7 +479,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setDirectPathPreferred(GCS_GRPC_DIRECTPATH_ENABLE.get(config, config::getBoolean))
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
         .setMetricsSink(GCS_METRICS_SINK.get(config, config::getEnum))
-        .setEventLogSink(GCS_EVENT_LOG_SINK.get(config, config::getEnum));
+        .setTraceLogSink(GCS_TRACE_LOG_SINK.get(config, config::getEnum));
   }
 
   private static PerformanceCachingGoogleCloudStorageOptions getPerformanceCachingOptions(
