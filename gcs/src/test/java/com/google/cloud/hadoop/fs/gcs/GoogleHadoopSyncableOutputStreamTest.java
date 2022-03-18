@@ -138,9 +138,9 @@ public class GoogleHadoopSyncableOutputStreamTest {
     byte[] data2 = {0x0b, 0x0e, 0x0e, 0x0f};
 
     fout.write(data1, 0, data1.length);
-    fout.sync(); // This one commits straight into destination.
+    fout.hsync(); // This one commits straight into destination.
     fout.write(data2, 0, data2.length);
-    fout.sync(); // This one enqueues the delete, but doesn't propagate exception yet.
+    fout.hsync(); // This one enqueues the delete, but doesn't propagate exception yet.
 
     verify(mockExecutorService).submit(any(Callable.class));
 
@@ -248,11 +248,11 @@ public class GoogleHadoopSyncableOutputStreamTest {
     byte[] data2 = {0x0b, 0x0d, 0x0e, 0x0e, 0x0f};
 
     fout.write(data1, 0, data1.length);
-    fout.sync();
+    fout.hsync();
     assertThat(statistics.getBytesWritten()).isEqualTo(4);
     assertThat(statistics.getWriteOps()).isEqualTo(1);
     fout.write(data2, 0, data2.length);
-    fout.sync();
+    fout.hsync();
     assertThat(statistics.getBytesWritten()).isEqualTo(9);
     assertThat(statistics.getWriteOps()).isEqualTo(2);
 
