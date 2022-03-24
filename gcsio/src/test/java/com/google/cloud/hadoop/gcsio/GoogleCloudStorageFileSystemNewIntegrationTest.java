@@ -647,7 +647,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
   }
 
   @Test
-  public void listFileInfo_directory_increased_batch_size() throws Exception {
+  public void listFileInfo_directory_increased_page_size() throws Exception {
     TrackingHttpRequestInitializer gcsRequestsTracker =
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
     GoogleCloudStorageOptions gcsOptions =
