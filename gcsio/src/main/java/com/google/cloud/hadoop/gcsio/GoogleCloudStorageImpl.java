@@ -849,12 +849,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       return seekableByteChannel;
     } catch (IOException e) {
       recordErrorMetric(
-          metricsRecorder,
-          LATENCY_MS,
-          stopwatch.elapsed(MILLISECONDS),
-          "open",
-          PROTOCOL_JSON,
-          e);
+          metricsRecorder, LATENCY_MS, stopwatch.elapsed(MILLISECONDS), "open", PROTOCOL_JSON, e);
       throw e;
     }
   }
@@ -1260,12 +1255,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           metricsRecorder, LATENCY_MS, stopwatch.elapsed(MILLISECONDS), "copy", PROTOCOL_JSON);
     } catch (IOException e) {
       recordErrorMetric(
-          metricsRecorder,
-          LATENCY_MS,
-          stopwatch.elapsed(MILLISECONDS),
-          "copy",
-          PROTOCOL_JSON,
-          e);
+          metricsRecorder, LATENCY_MS, stopwatch.elapsed(MILLISECONDS), "copy", PROTOCOL_JSON, e);
       throw e;
     }
   }
