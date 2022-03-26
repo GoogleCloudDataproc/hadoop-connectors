@@ -94,13 +94,12 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
       int numRead = channel.read(ByteBuffer.wrap(singleReadBuf));
       if (numRead == -1) {
         response = -1;
+      } else if (numRead != 1) {
+        throw new IOException(
+            String.format(
+                "Read %d bytes using single-byte buffer for path %s ending in position %d!",
+                numRead, gcsPath, channel.position()));
       } else {
-        if (numRead != 1) {
-          throw new IOException(
-              String.format(
-                  "Read %d bytes using single-byte buffer for path %s ending in position %d!",
-                  numRead, gcsPath, channel.position()));
-        }
         totalBytesRead++;
         statistics.incrementBytesRead(1);
         statistics.incrementReadOps(1);
