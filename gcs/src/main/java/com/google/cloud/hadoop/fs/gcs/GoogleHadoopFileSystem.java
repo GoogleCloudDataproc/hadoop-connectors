@@ -47,7 +47,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.ListFileOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
@@ -506,10 +505,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
     logger.atFiner().log("open(hadoopPath: %s, bufferSize: %d [ignored])", hadoopPath, bufferSize);
     URI gcsPath = getGcsPath(hadoopPath);
-    GoogleCloudStorageReadOptions readChannelOptions =
-        getGcsFs().getOptions().getCloudStorageOptions().getReadChannelOptions();
-    return new FSDataInputStream(
-        new GoogleHadoopFSInputStream(this, gcsPath, readChannelOptions, statistics));
+    return new FSDataInputStream(GoogleHadoopFSInputStream.create(this, gcsPath, statistics));
   }
 
   @Override
@@ -1096,7 +1092,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                 result,
                 () ->
                     new FSDataInputStream(
-                        new GoogleHadoopFSInputStream(this, fileInfo, statistics))));
+                        GoogleHadoopFSInputStream.create(this, fileInfo, statistics))));
     return result;
   }
 
