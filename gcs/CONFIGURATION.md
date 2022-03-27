@@ -309,34 +309,14 @@ default service account impersonation.
 
     Enables Cloud Storage direct uploads.
 
-*   `fs.gs.outputstream.type` (default: `BASIC`)
-
-    Output stream type to use; different options may have different degrees of
-    support for advanced features like `hsync()` and different performance
-    characteristics.
-
-    Valid values:
-
-    *   `BASIC` - stream is the closest analogue to direct wrapper around the
-        low-level HTTP stream into Google Cloud Storage.
-
-    *   `SYNCABLE_COMPOSITE` - stream behaves similarly to `BASIC` when used
-        with basic create/write/close patterns, but supports `hsync()` by
-        creating discrete temporary Google Cloud Storage objects which are
-        composed onto the destination object.
-
-    *   `FLUSHABLE_COMPOSITE` - stream behaves similarly to
-        `SYNCABLE_COMPOSITE`, except `hflush()` is also supported. It will use
-        the same implementation as `hsync()`.
-
 *   `fs.gs.outputstream.sync.min.interval.ms` (default: `0`)
 
-    `SYNCABLE_COMPOSITE` and `FLUSHABLE_COMPOSITE` streams configuration that
-    controls the minimum interval (milliseconds) between consecutive syncs. This
-    is to avoid getting rate-limited by Google Cloud Storage. Default is `0` -
-    no wait between syncs. Note that `hflush()` for `FLUSHABLE_COMPOSITE` stream
-    will be no-op if called more frequently than minimum sync interval and
-    `hsync()` will block for both streams until an end of a min sync interval.
+    Output stream configuration that controls the minimum interval
+    (milliseconds) between consecutive syncs. This allows to avoid getting
+    rate-limited by Google Cloud Storage. Default is `0` - no wait between
+    syncs. Note that `hflush()` will be no-op if called more frequently than
+    minimum sync interval and `hsync()` will block until an end of a min sync
+    interval.
 
 ### HTTP transport configuration
 
