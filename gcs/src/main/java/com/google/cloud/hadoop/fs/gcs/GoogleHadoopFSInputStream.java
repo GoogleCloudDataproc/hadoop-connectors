@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Math.max;
 
 import com.google.cloud.hadoop.gcsio.FileInfo;
@@ -86,43 +87,27 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   @Override
   public synchronized int read() throws IOException {
-    streamStatistics.readOperationStarted(getPos(), /* len= */ 1);
-    int response;
-    try {
-      // TODO(user): Wrap this in a while-loop if we ever introduce a non-blocking mode for the
-      // underlying channel.
-      int numRead = channel.read(ByteBuffer.wrap(singleReadBuf));
-      if (numRead == -1) {
-        response = -1;
-      } else if (numRead != 1) {
-        throw new IOException(
-            String.format(
-                "Read %d bytes using single-byte buffer for path %s ending in position %d!",
-                numRead, gcsPath, channel.position()));
-      } else {
-        totalBytesRead++;
-        statistics.incrementBytesRead(1);
-        statistics.incrementReadOps(1);
-        response = (singleReadBuf[0] & 0xff);
-      }
-    } catch (IOException e) {
-      streamStatistics.readException();
-      throw e;
-    }
-    streamStatistics.bytesRead(response == -1 ? 0 : 1);
-    streamStatistics.readOperationCompleted(/* requested= */ 1, response == -1 ? 0 : 1);
-    return response;
+    int numRead = read(singleReadBuf, /* offset= */ 0, /* length= */ 1);
+    checkState(
+        numRead == -1 || numRead == 1,
+        "Read %s bytes using single-byte buffer for path %s ending in position %s",
+        numRead,
+        gcsPath,
+        channel.position());
+    return numRead > 0 ? singleReadBuf[0] & 0xff : numRead;
   }
 
   @Override
   public synchronized int read(@Nonnull byte[] buf, int offset, int length) throws IOException {
+    checkNotNull(buf, "buf must not be null");
+    if (offset < 0 || length < 0 || length > buf.length - offset) {
+      throw new IndexOutOfBoundsException();
+    }
     streamStatistics.readOperationStarted(getPos(), length);
     int response = 0;
     try {
-      checkNotNull(buf, "buf must not be null");
-      if (offset < 0 || length < 0 || length > buf.length - offset) {
-        throw new IndexOutOfBoundsException();
-      }
+      // TODO(user): Wrap this in a while-loop if we ever introduce a non-blocking mode for the
+      // underlying channel.
       int numRead = channel.read(ByteBuffer.wrap(buf, offset, length));
       if (numRead > 0) {
         // -1 means we actually read 0 bytes, but requested at least one byte.
