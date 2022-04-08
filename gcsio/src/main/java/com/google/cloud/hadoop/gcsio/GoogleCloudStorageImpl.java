@@ -756,17 +756,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     Preconditions.checkArgument(
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
 
-    if (storageOptions.isGrpcEnabled()) {
-      return new GoogleCloudStorageGrpcReadChannel(
-          storageStubProvider,
-          storage,
-          resourceId,
-          watchdog,
-          metricsRecorder,
-          readOptions,
-          BackOffFactory.DEFAULT);
-    }
-
     // The underlying channel doesn't initially read data, which means that we won't see a
     // FileNotFoundException until read is called. As a result, in order to find out if the
     // object
@@ -783,6 +772,25 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       info = null;
     }
 
+    if (storageOptions.isGrpcEnabled()) {
+      if (info != null) {
+        return new GoogleCloudStorageGrpcReadChannel(
+            storageStubProvider,
+            info,
+            watchdog,
+            metricsRecorder,
+            readOptions,
+            BackOffFactory.DEFAULT);
+      }
+      return new GoogleCloudStorageGrpcReadChannel(
+          storageStubProvider,
+          storage,
+          resourceId,
+          watchdog,
+          metricsRecorder,
+          readOptions,
+          BackOffFactory.DEFAULT);
+    }
     return new GoogleCloudStorageReadChannel(
         storage, resourceId, errorExtractor, clientRequestHelper, readOptions) {
 
