@@ -187,8 +187,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
       // Try-with-resource will close this end of the pipe so that
       // the writer at the other end will not hang indefinitely.
       // Send the initial StartResumableWrite request to get an uploadId.
-      uploadId = startResumableUploadWithRetries();
       try (InputStream ignore = pipeSource) {
+        uploadId = startResumableUploadWithRetries();
         return ResilientOperation.retry(
             this::doResumableUpload,
             backOffFactory.newBackOff(),
@@ -217,7 +217,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     private WriteObjectResponse doResumableUpload() throws IOException {
       // Only request committed size for the first insert request.
       if (writeOffset > 0) {
-        writeOffset = getCommittedWriteSize(uploadId);
+        writeOffset = getCommittedWriteSizeWithRetries(uploadId);
       }
       StorageStub storageStub =
           stub.withDeadlineAfter(channelOptions.getGrpcWriteTimeout(), MILLISECONDS);
@@ -513,31 +513,12 @@ public final class GoogleCloudStorageGrpcWriteChannel
     }
 
     // TODO(b/150892988): Call this to find resume point after a transient error.
-    private long getCommittedWriteSize(String uploadId) throws IOException {
+    private long getCommittedWriteSizeWithRetries(String uploadId) throws IOException {
       QueryWriteStatusRequest request =
           QueryWriteStatusRequest.newBuilder().setUploadId(uploadId).build();
-
-      SimpleResponseObserver<QueryWriteStatusResponse> responseObserver =
-          new SimpleResponseObserver<>();
       try {
-        ResilientOperation.retry(
-            () -> {
-              stub.withDeadlineAfter(QUERY_WRITE_STATUS_TIMEOUT.toMillis(), MILLISECONDS)
-                  .queryWriteStatus(request, responseObserver);
-              try {
-                responseObserver.done.await();
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IOException(
-                    String.format(
-                        "Interrupted while awaiting response during upload of '%s'", resourceId),
-                    e);
-              }
-              if (responseObserver.hasError()) {
-                throw new IOException(responseObserver.getError());
-              }
-              return null;
-            },
+        return ResilientOperation.retry(
+            () -> getCommittedWriteSize(request),
             backOffFactory.newBackOff(),
             RetryDeterminer.ALL_ERRORS,
             IOException.class);
@@ -546,7 +527,24 @@ public final class GoogleCloudStorageGrpcWriteChannel
         throw new IOException(
             String.format("Failed to get committed write size for '%s'", resourceId), e);
       }
+    }
 
+    private long getCommittedWriteSize(QueryWriteStatusRequest request) throws IOException {
+      SimpleResponseObserver<QueryWriteStatusResponse> responseObserver =
+          new SimpleResponseObserver<>();
+      stub.withDeadlineAfter(QUERY_WRITE_STATUS_TIMEOUT.toMillis(), MILLISECONDS)
+          .queryWriteStatus(request, responseObserver);
+      try {
+        responseObserver.done.await();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IOException(
+            String.format("Interrupted while awaiting response during upload of '%s'", resourceId),
+            e);
+      }
+      if (responseObserver.hasError()) {
+        throw new IOException(responseObserver.getError());
+      }
       return responseObserver.getResponse().getPersistedSize();
     }
 
