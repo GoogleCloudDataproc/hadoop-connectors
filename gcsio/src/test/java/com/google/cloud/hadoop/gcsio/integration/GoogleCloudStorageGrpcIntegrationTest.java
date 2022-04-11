@@ -135,7 +135,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
             .setTrafficDirectorEnabled(true)
             .build();
     GoogleCloudStorage rawStorage =
-        new GoogleCloudStorageImpl(storageOptions, GoogleCloudStorageTestHelper.getCredentials());
+        new GoogleCloudStorageImpl(storageOptions, GoogleCloudStorageTestHelper.getCredential());
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testOpen_Object_TD_Enabled");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
