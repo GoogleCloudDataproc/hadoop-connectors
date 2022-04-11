@@ -76,22 +76,6 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   }
 
   @Test
-  public void testReadWriteObjectWithTDEnabled() throws IOException {
-    GoogleCloudStorageOptions storageOptions =
-        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-            .setGrpcEnabled(true)
-            .setTrafficDirectorEnabled(true)
-            .build();
-    GoogleCloudStorage rawStorage =
-        new GoogleCloudStorageImpl(storageOptions, GoogleCloudStorageTestHelper.getCredentials());
-    StorageResourceId objectToCreate =
-        new StorageResourceId(BUCKET_NAME, "testCreateObject_Object_TD_Enabled");
-    byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
-
-    assertObjectContent(rawStorage, objectToCreate, objectBytes);
-  }
-
-  @Test
   public void testCreateExistingObject() throws IOException {
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId objectToCreate =
@@ -139,6 +123,22 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME, "testOpen_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
+
+    assertObjectContent(rawStorage, objectToCreate, objectBytes);
+  }
+
+  @Test
+  public void testOpenWithTDEnabled() throws IOException {
+    GoogleCloudStorageOptions storageOptions =
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setGrpcEnabled(true)
+            .setTrafficDirectorEnabled(true)
+            .build();
+    GoogleCloudStorage rawStorage =
+        new GoogleCloudStorageImpl(storageOptions, GoogleCloudStorageTestHelper.getCredentials());
+    StorageResourceId objectToCreate =
+        new StorageResourceId(BUCKET_NAME, "testOpen_Object_TD_Enabled");
+    byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
 
     assertObjectContent(rawStorage, objectToCreate, objectBytes);
   }
