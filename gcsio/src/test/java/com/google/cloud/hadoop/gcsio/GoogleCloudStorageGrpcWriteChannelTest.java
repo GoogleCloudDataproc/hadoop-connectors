@@ -360,6 +360,16 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   }
 
   @Test
+  public void writeHandlesErrorOnStartRequestFailure() throws Exception {
+    GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
+    fakeService.setStartRequestException(new IOException("Error"));
+
+    ByteString data = createTestData(1024 * 1024 * 2);
+    writeChannel.initialize();
+    assertThrows(IOException.class, () -> writeChannel.write(data.asReadOnlyByteBuffer()));
+  }
+
+  @Test
   public void writeOneChunkWithSingleErrorAndResume() throws Exception {
     AsyncWriteChannelOptions options =
         AsyncWriteChannelOptions.builder().setUploadChunkSize(GCS_MINIMUM_CHUNK_SIZE).build();
