@@ -11,6 +11,7 @@ import static org.junit.Assert.assertThrows;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
@@ -122,6 +123,22 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME, "testOpen_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
+
+    assertObjectContent(rawStorage, objectToCreate, objectBytes);
+  }
+
+  @Test
+  public void testOpenWithTDEnabled() throws IOException {
+    GoogleCloudStorageOptions storageOptions =
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setGrpcEnabled(true)
+            .setTrafficDirectorEnabled(true)
+            .build();
+    GoogleCloudStorage rawStorage =
+        new GoogleCloudStorageImpl(storageOptions, GoogleCloudStorageTestHelper.getCredential());
+    StorageResourceId objectToCreate =
+        new StorageResourceId(BUCKET_NAME, "testOpen_Object_TD_Enabled");
+    byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
 
     assertObjectContent(rawStorage, objectToCreate, objectBytes);
   }
