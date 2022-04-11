@@ -187,8 +187,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
       // Try-with-resource will close this end of the pipe so that
       // the writer at the other end will not hang indefinitely.
       // Send the initial StartResumableWrite request to get an uploadId.
-      uploadId = startResumableUploadWithRetries();
       try (InputStream ignore = pipeSource) {
+        uploadId = startResumableUploadWithRetries();
         return ResilientOperation.retry(
             this::doResumableUpload,
             backOffFactory.newBackOff(),
