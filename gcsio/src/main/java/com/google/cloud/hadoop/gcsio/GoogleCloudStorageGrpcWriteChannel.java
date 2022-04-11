@@ -196,13 +196,26 @@ public final class GoogleCloudStorageGrpcWriteChannel
         return ResilientOperation.retry(
             this::doResumableUpload,
             backOffFactory.newBackOff(),
-            RetryDeterminer.ALL_ERRORS,
+            this::isRetriableError,
             IOException.class);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         throw new IOException(
             String.format("Interrupted resumable upload failed for '%s'", resourceId), e);
       }
+    }
+
+    class OutOfBufferedDataException extends IOException {
+      public OutOfBufferedDataException(String message) {
+        super(message);
+      }
+    }
+
+    boolean isRetriableError(Throwable throwable) {
+      if (throwable instanceof OutOfBufferedDataException) return false;
+      Throwable cause = throwable.getCause();
+      if (cause == null) return true;
+      return isRetriableError(cause);
     }
 
     private WriteObjectResponse doResumableUpload() throws IOException {
@@ -348,12 +361,14 @@ public final class GoogleCloudStorageGrpcWriteChannel
         }
       }
       if (request == null) {
-        throw new IOException(
-            String.format(
-                "Didn't have enough data buffered for attempt to resume upload for"
-                    + " uploadID %s: last committed offset=%s, earliest buffered"
-                    + " offset=%s. Upload must be restarted from the beginning.",
-                uploadId, writeOffset, dataChunkMap.firstKey()));
+        OutOfBufferedDataException outOfBufferedDataException =
+            new OutOfBufferedDataException(
+                String.format(
+                    "Didn't have enough data buffered for attempt to resume upload for"
+                        + " uploadID %s: last committed offset=%s, earliest buffered"
+                        + " offset=%s. Upload must be restarted from the beginning.",
+                    uploadId, writeOffset, dataChunkMap.firstKey()));
+        throw new IOException(outOfBufferedDataException);
       }
       return request;
     }
