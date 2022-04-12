@@ -18,6 +18,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
@@ -28,6 +29,8 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class GoogleCloudStorageGrpcIntegrationTest {
+
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Prefix this name with the prefix used in other gcs io integrate tests once it's whitelisted by
   // GCS to access gRPC API.
@@ -129,18 +132,14 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testOpenWithTDEnabled() throws IOException {
-    String storageServicePath = System.getenv("GCS_TEST_STORAGE_SERVICE_PATH");
     String grpcServerAddress = System.getenv("GCS_TEST_GRPC_SERVER_ADDRESS");
-    String storageRootUrl = System.getenv("GCS_TEST_STORAGE_ROOT_URL");
-    System.err.println(
-        "Printing env vars " + storageServicePath + grpcServerAddress + storageRootUrl);
+    logger.atInfo().log("Printing env var for grpcServerAddress: " + grpcServerAddress);
+
     GoogleCloudStorageOptions.Builder optionsBuilder =
         GoogleCloudStorageTestHelper.getStandardOptionBuilder()
             .setGrpcEnabled(true)
             .setTrafficDirectorEnabled(true);
-    if (storageServicePath != null) optionsBuilder.setStorageServicePath(storageServicePath);
     if (grpcServerAddress != null) optionsBuilder.setGrpcServerAddress(grpcServerAddress);
-    if (storageRootUrl != null) optionsBuilder.setStorageRootUrl(storageRootUrl);
 
     GoogleCloudStorage rawStorage =
         new GoogleCloudStorageImpl(
