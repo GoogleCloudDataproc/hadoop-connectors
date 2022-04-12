@@ -300,6 +300,7 @@
                     <include>com.google.storage.**</include>
                     <include>com.google.thirdparty.**</include>
                     <include>com.google.type.**</include>
+                    <include>com.lmax.disruptor.**</include>
                   </includes>
                   <excludes>
                     <exclude>com.google.cloud.hadoop.gcsio.authorization.AuthorizationHandler</exclude>
