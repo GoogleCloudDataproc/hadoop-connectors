@@ -129,13 +129,22 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testOpenWithTDEnabled() throws IOException {
-    GoogleCloudStorageOptions storageOptions =
+    String storageServicePath = System.getenv("GCS_TEST_STORAGE_SERVICE_PATH");
+    String grpcServerAddress = System.getenv("GCS_TEST_GRPC_SERVER_ADDRESS");
+    String storageRootUrl = System.getenv("GCS_TEST_STORAGE_ROOT_URL");
+    System.err.println(
+        "Printing env vars " + storageServicePath + grpcServerAddress + storageRootUrl);
+    GoogleCloudStorageOptions.Builder optionsBuilder =
         GoogleCloudStorageTestHelper.getStandardOptionBuilder()
             .setGrpcEnabled(true)
-            .setTrafficDirectorEnabled(true)
-            .build();
+            .setTrafficDirectorEnabled(true);
+    if (storageServicePath != null) optionsBuilder.setStorageServicePath(storageServicePath);
+    if (grpcServerAddress != null) optionsBuilder.setGrpcServerAddress(grpcServerAddress);
+    if (storageRootUrl != null) optionsBuilder.setStorageRootUrl(storageRootUrl);
+
     GoogleCloudStorage rawStorage =
-        new GoogleCloudStorageImpl(storageOptions, GoogleCloudStorageTestHelper.getCredentials());
+        new GoogleCloudStorageImpl(
+            optionsBuilder.build(), GoogleCloudStorageTestHelper.getCredentials());
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testOpen_Object_TD_Enabled");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
