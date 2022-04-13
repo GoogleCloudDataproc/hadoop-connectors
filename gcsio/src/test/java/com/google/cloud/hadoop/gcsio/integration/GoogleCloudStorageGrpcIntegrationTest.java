@@ -27,7 +27,11 @@ import java.util.Arrays;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
+@RunWith(Parameterized.class)
 public class GoogleCloudStorageGrpcIntegrationTest {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
@@ -40,31 +44,58 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   private static final String BUCKET_NAME = BUCKET_HELPER.getUniqueBucketName("shared");
 
-  private static GoogleCloudStorage createGoogleCloudStorage() throws IOException {
-    return new GoogleCloudStorageImpl(
-        GoogleCloudStorageTestHelper.getStandardOptionBuilder().setGrpcEnabled(true).build(),
-        GoogleCloudStorageTestHelper.getCredentials());
+  private final boolean tdEnabled;
+
+  @Parameters
+  // We want to test this entire class with both gRPC-LB and Traffic Director
+  public static Iterable<Boolean> tdEnabled() {
+    return Arrays.asList(false, true);
   }
 
-  private static GoogleCloudStorage createGoogleCloudStorage(
+  public GoogleCloudStorageGrpcIntegrationTest(boolean tdEnabled) {
+    this.tdEnabled = tdEnabled;
+  }
+
+  private GoogleCloudStorageOptions.Builder configureOptions() {
+    GoogleCloudStorageOptions.Builder optionsBuilder =
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+            .setGrpcEnabled(true)
+            .setTrafficDirectorEnabled(this.tdEnabled);
+    boolean runningTestsFromGCP = Boolean.parseBoolean(System.getenv("RUNNING_TESTS_FROM_GCP"));
+    if (this.tdEnabled && runningTestsFromGCP) {
+      optionsBuilder.setGrpcServerAddress("storage-force-dp.googleusercontent.com");
+      logger.atInfo().log("Overriding gRPC server address to force-dp endpoint");
+    }
+    return optionsBuilder;
+  }
+
+  private GoogleCloudStorage createGoogleCloudStorage() throws IOException {
+    return new GoogleCloudStorageImpl(
+        configureOptions().build(), GoogleCloudStorageTestHelper.getCredentials());
+  }
+
+  private GoogleCloudStorage createGoogleCloudStorage(
       AsyncWriteChannelOptions asyncWriteChannelOptions) throws IOException {
     return new GoogleCloudStorageImpl(
-        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-            .setWriteChannelOptions(asyncWriteChannelOptions)
-            .setGrpcEnabled(true)
-            .build(),
+        configureOptions().setWriteChannelOptions(asyncWriteChannelOptions).build(),
         GoogleCloudStorageTestHelper.getCredentials());
   }
 
   @BeforeClass
   public static void createBuckets() throws IOException {
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
+    GoogleCloudStorage rawStorage =
+        new GoogleCloudStorageImpl(
+            GoogleCloudStorageTestHelper.getStandardOptionBuilder().setGrpcEnabled(true).build(),
+            GoogleCloudStorageTestHelper.getCredentials());
     rawStorage.createBucket(BUCKET_NAME);
   }
 
   @AfterClass
   public static void cleanupBuckets() throws IOException {
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
+    GoogleCloudStorage rawStorage =
+        new GoogleCloudStorageImpl(
+            GoogleCloudStorageTestHelper.getStandardOptionBuilder().setGrpcEnabled(true).build(),
+            GoogleCloudStorageTestHelper.getCredentials());
     BUCKET_HELPER.cleanup(rawStorage);
   }
 
@@ -126,27 +157,6 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME, "testOpen_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
-
-    assertObjectContent(rawStorage, objectToCreate, objectBytes);
-  }
-
-  @Test
-  public void testOpenWithTDEnabled() throws IOException {
-    String grpcServerAddress = System.getenv("GCS_TEST_GRPC_SERVER_ADDRESS");
-    logger.atInfo().log("Printing env var for grpcServerAddress: " + grpcServerAddress);
-
-    GoogleCloudStorageOptions.Builder optionsBuilder =
-        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-            .setGrpcEnabled(true)
-            .setTrafficDirectorEnabled(true);
-    if (grpcServerAddress != null) optionsBuilder.setGrpcServerAddress(grpcServerAddress);
-
-    GoogleCloudStorage rawStorage =
-        new GoogleCloudStorageImpl(
-            optionsBuilder.build(), GoogleCloudStorageTestHelper.getCredentials());
-    StorageResourceId objectToCreate =
-        new StorageResourceId(BUCKET_NAME, "testOpen_Object_TD_Enabled");
-    byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
 
     assertObjectContent(rawStorage, objectToCreate, objectBytes);
   }
