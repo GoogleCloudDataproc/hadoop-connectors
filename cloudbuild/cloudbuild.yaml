@@ -24,7 +24,6 @@ steps:
     entrypoint: 'bash'
     args: ['/hadoop-connectors/cloudbuild/presubmit.sh', 'integrationtest']
     env:
-      - 'RUNNING_TESTS_FROM_GCP=true'
       - 'GCS_TEST_PROJECT_ID=$PROJECT_ID'
       - 'CODECOV_TOKEN=$_CODECOV_TOKEN'
       - 'VCS_BRANCH_NAME=$BRANCH_NAME'

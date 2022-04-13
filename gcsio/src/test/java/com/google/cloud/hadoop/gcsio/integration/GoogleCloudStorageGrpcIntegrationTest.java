@@ -61,7 +61,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
         GoogleCloudStorageTestHelper.getStandardOptionBuilder()
             .setGrpcEnabled(true)
             .setTrafficDirectorEnabled(this.tdEnabled);
-    boolean runningTestsFromGCP = Boolean.parseBoolean(System.getenv("RUNNING_TESTS_FROM_GCP"));
+    boolean runningTestsFromGCP = Boolean.parseBoolean(System.getenv("RUNNING_TESTS_FROM_GCP_VM"));
     if (this.tdEnabled && runningTestsFromGCP) {
       optionsBuilder.setGrpcServerAddress("storage-force-dp.googleusercontent.com");
       logger.atInfo().log("Overriding gRPC server address to force-dp endpoint");
