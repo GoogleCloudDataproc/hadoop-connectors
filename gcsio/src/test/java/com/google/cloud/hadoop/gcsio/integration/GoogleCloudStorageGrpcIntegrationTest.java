@@ -56,28 +56,31 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     this.tdEnabled = tdEnabled;
   }
 
-  private GoogleCloudStorageOptions.Builder configureOptions() {
+  private static GoogleCloudStorageOptions.Builder configureDefaultOptions() {
     GoogleCloudStorageOptions.Builder optionsBuilder =
-        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-            .setGrpcEnabled(true)
-            .setTrafficDirectorEnabled(this.tdEnabled);
-    boolean runningTestsFromGCP = Boolean.parseBoolean(System.getenv("RUNNING_TESTS_FROM_GCP_VM"));
-    if (this.tdEnabled && runningTestsFromGCP) {
-      optionsBuilder.setGrpcServerAddress("storage-force-dp.googleusercontent.com");
-      logger.atInfo().log("Overriding gRPC server address to force-dp endpoint");
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder().setGrpcEnabled(true);
+    String grpcServerAddress = System.getenv("GRPC_SERVER_ADDRESS_OVERRIDE");
+    if (grpcServerAddress != null) {
+      optionsBuilder.setGrpcServerAddress(grpcServerAddress);
+      logger.atInfo().log("Overriding gRPC server address to %s", grpcServerAddress);
     }
     return optionsBuilder;
   }
 
+  private GoogleCloudStorageOptions.Builder configureOptionsWithTD() {
+    logger.atInfo().log("Creating client with tdEnabled %s", this.tdEnabled);
+    return configureDefaultOptions().setTrafficDirectorEnabled(this.tdEnabled);
+  }
+
   private GoogleCloudStorage createGoogleCloudStorage() throws IOException {
     return new GoogleCloudStorageImpl(
-        configureOptions().build(), GoogleCloudStorageTestHelper.getCredentials());
+        configureOptionsWithTD().build(), GoogleCloudStorageTestHelper.getCredentials());
   }
 
   private GoogleCloudStorage createGoogleCloudStorage(
       AsyncWriteChannelOptions asyncWriteChannelOptions) throws IOException {
     return new GoogleCloudStorageImpl(
-        configureOptions().setWriteChannelOptions(asyncWriteChannelOptions).build(),
+        configureOptionsWithTD().setWriteChannelOptions(asyncWriteChannelOptions).build(),
         GoogleCloudStorageTestHelper.getCredentials());
   }
 
@@ -85,8 +88,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   public static void createBuckets() throws IOException {
     GoogleCloudStorage rawStorage =
         new GoogleCloudStorageImpl(
-            GoogleCloudStorageTestHelper.getStandardOptionBuilder().setGrpcEnabled(true).build(),
-            GoogleCloudStorageTestHelper.getCredentials());
+            configureDefaultOptions().build(), GoogleCloudStorageTestHelper.getCredentials());
     rawStorage.createBucket(BUCKET_NAME);
   }
 
@@ -94,8 +96,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   public static void cleanupBuckets() throws IOException {
     GoogleCloudStorage rawStorage =
         new GoogleCloudStorageImpl(
-            GoogleCloudStorageTestHelper.getStandardOptionBuilder().setGrpcEnabled(true).build(),
-            GoogleCloudStorageTestHelper.getCredentials());
+            configureDefaultOptions().build(), GoogleCloudStorageTestHelper.getCredentials());
     BUCKET_HELPER.cleanup(rawStorage);
   }
 
