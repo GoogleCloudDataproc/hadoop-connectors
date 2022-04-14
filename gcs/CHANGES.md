@@ -1,4 +1,8 @@
-### 2.2.6 - 2022-XX-XX
+### 2.2.6 - 2022-04-14
+
+1. Improve trace logging for gRPC channels.
+
+2. Bug fixes.
 
 ### 2.2.5 - 2022-01-31
 

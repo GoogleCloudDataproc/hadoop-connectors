@@ -1,4 +1,4 @@
-### 1.2.1 - 2021-XX-XX
+### 1.2.1 - 2021-04-14
 
 1.  Update all dependencies to latest versions.
 
