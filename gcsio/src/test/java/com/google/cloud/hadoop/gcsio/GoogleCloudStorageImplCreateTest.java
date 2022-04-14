@@ -63,7 +63,11 @@ public class GoogleCloudStorageImplCreateTest {
   public void create_grpcAndVmComputeEngineCredentials_useDirectpath() throws IOException {
     GoogleCloudStorageImpl gcs =
         new GoogleCloudStorageImpl(
-            GoogleCloudStorageOptions.builder().setAppName("app").setGrpcEnabled(true).build(),
+            GoogleCloudStorageOptions.builder()
+                .setAppName("app")
+                .setGrpcEnabled(true)
+                .setTrafficDirectorEnabled(false)
+                .build(),
             createStorage(),
             ComputeEngineCredentials.newBuilder().build());
     assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
@@ -78,6 +82,7 @@ public class GoogleCloudStorageImplCreateTest {
                 .setAppName("app")
                 .setGrpcEnabled(true)
                 .setDirectPathPreferred(false)
+                .setTrafficDirectorEnabled(false)
                 .build(),
             createStorage(),
             ComputeEngineCredentials.newBuilder().build(),
@@ -90,11 +95,7 @@ public class GoogleCloudStorageImplCreateTest {
   public void create_grpcAndTrafficDirector_useTrafficDirector() throws IOException {
     GoogleCloudStorageImpl gcs =
         new GoogleCloudStorageImpl(
-            GoogleCloudStorageOptions.builder()
-                .setAppName("app")
-                .setGrpcEnabled(true)
-                .setTrafficDirectorEnabled(true)
-                .build(),
+            GoogleCloudStorageOptions.builder().setAppName("app").setGrpcEnabled(true).build(),
             createStorage(),
             ComputeEngineCredentials.newBuilder().build(),
             null);
