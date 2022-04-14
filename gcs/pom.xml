@@ -286,15 +286,19 @@
                     <include>com.google.api.**</include>
                     <include>com.google.api.gax.**</include>
                     <include>com.google.auth.**</include>
+                    <include>com.google.cloud.*</include>
                     <include>com.google.cloud.audit.**</include>
                     <include>com.google.cloud.hadoop.gcsio.**</include>
                     <include>com.google.cloud.hadoop.util.**</include>
+                    <include>com.google.cloud.monitoring.**</include>
+                    <include>com.google.cloud.spi.**</include>
                     <include>com.google.common.**</include>
                     <include>com.google.geo.**</include>
                     <include>com.google.google.storage.**</include>
                     <include>com.google.iam.**</include>
                     <include>com.google.logging.**</include>
                     <include>com.google.longrunning.**</include>
+                    <include>com.google.monitoring.**</include>
                     <include>com.google.protobuf.**</include>
                     <include>com.google.rpc.**</include>
                     <include>com.google.storage.**</include>
@@ -318,6 +322,7 @@
                   <includes>
                     <include>org.apache.commons.codec.**</include>
                     <include>org.apache.http.**</include>
+                    <include>org.threeten.**</include>
                   </includes>
                 </relocation>
                 <!-- Take special care of grpc-netty-shaded, it uses the package
