@@ -400,7 +400,7 @@ public class GoogleHadoopFileSystemConfiguration {
 
   /** Configuration key for enabling use of traffic director gRPC API for read/write. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_TRAFFICDIRECTOR_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.grpc.trafficdirector.enable", false);
+      new HadoopConfigurationProperty<>("fs.gs.grpc.trafficdirector.enable", true);
 
   /**
    * Configuration key for using cooperative locking to achieve a directory mutation operations
