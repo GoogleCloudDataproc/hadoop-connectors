@@ -45,6 +45,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -132,6 +133,7 @@ public class HadoopCredentialConfigurationTest {
   }
 
   @Test
+  @Ignore
   public void metadataServiceIsUsedByDefault() throws Exception {
     TokenResponse token = new TokenResponse().setAccessToken("metadata-test-token");
 
