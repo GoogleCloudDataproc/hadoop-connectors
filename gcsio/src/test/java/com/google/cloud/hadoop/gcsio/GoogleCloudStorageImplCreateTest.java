@@ -58,7 +58,11 @@ public class GoogleCloudStorageImplCreateTest {
   public void create_grpc_useDirectpath() throws IOException {
     GoogleCloudStorageImpl gcs =
         new GoogleCloudStorageImpl(
-            GoogleCloudStorageOptions.builder().setAppName("app").setGrpcEnabled(true).build(),
+            GoogleCloudStorageOptions.builder()
+                .setAppName("app")
+                .setGrpcEnabled(true)
+                .setTrafficDirectorEnabled(false)
+                .build(),
             createStorage());
     assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
         .isInstanceOf(StorageStubProvider.DirectPathGrpcDecorator.class);
@@ -72,6 +76,7 @@ public class GoogleCloudStorageImplCreateTest {
                 .setAppName("app")
                 .setGrpcEnabled(true)
                 .setDirectPathPreferred(false)
+                .setTrafficDirectorEnabled(false)
                 .build(),
             createStorage());
     assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
@@ -82,11 +87,7 @@ public class GoogleCloudStorageImplCreateTest {
   public void create_grpcAndTrafficDirector_useTrafficDirector() throws IOException {
     GoogleCloudStorageImpl gcs =
         new GoogleCloudStorageImpl(
-            GoogleCloudStorageOptions.builder()
-                .setAppName("app")
-                .setGrpcEnabled(true)
-                .setTrafficDirectorEnabled(true)
-                .build(),
+            GoogleCloudStorageOptions.builder().setAppName("app").setGrpcEnabled(true).build(),
             createStorage());
     assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
         .isInstanceOf(StorageStubProvider.TrafficDirectorGrpcDecorator.class);
