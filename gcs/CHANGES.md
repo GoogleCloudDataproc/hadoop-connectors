@@ -2,7 +2,7 @@
 
 1. Improve trace logging for gRPC channels.
 
-2. Bug fixes.
+1. Traffic Director is enabled by default.
 
 ### 2.2.5 - 2022-01-31
 
