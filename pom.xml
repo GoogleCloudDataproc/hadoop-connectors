@@ -92,7 +92,7 @@
     <google.auth.version>1.2.1</google.auth.version>
     <google.auto-value.version>1.8.2</google.auto-value.version>
     <google.cloud-bigquerystorage.version>1.22.5</google.cloud-bigquerystorage.version>
-    <google.cloud-core.verion>2.5.4</google.cloud-core.verion>
+    <google.cloud-core.version>2.5.4</google.cloud-core.version>
     <google.cloud-storage.grpc.version>2.2.2-alpha</google.cloud-storage.grpc.version>
     <google.flogger.version>0.7.1</google.flogger.version>
     <google.gax.version>2.7.1</google.gax.version>
@@ -473,7 +473,7 @@
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>google-cloud-core</artifactId>
-        <version>${google.cloud-core.verion}</version>
+        <version>${google.cloud-core.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.api</groupId>
