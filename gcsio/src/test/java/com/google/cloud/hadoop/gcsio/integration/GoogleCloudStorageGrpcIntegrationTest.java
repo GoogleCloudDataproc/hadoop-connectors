@@ -51,8 +51,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   // We want to test this entire class with both gRPC-LB and Traffic Director
   // Some of our internal endpoints only work with TD
   public static Iterable<Boolean> tdEnabled() {
-    return Boolean.parseBoolean(System.getenv("GCS_TEST_ONLY_RUN_WITH_TD_ENABLED")) ?
-        List.of(true) : List.of(false, true);
+    return Boolean.parseBoolean(System.getenv("GCS_TEST_ONLY_RUN_WITH_TD_ENABLED"))
+        ? List.of(true)
+        : List.of(false, true);
   }
 
   public GoogleCloudStorageGrpcIntegrationTest(boolean tdEnabled) {
