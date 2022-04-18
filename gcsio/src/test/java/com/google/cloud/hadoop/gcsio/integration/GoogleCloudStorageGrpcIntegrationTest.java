@@ -24,6 +24,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.util.Arrays;
+import java.util.List;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -48,8 +49,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Parameters
   // We want to test this entire class with both gRPC-LB and Traffic Director
+  // Some of our internal endpoints only work with TD
   public static Iterable<Boolean> tdEnabled() {
-    return Arrays.asList(false, true);
+    return Boolean.parseBoolean(System.getenv("GCS_TEST_ONLY_RUN_WITH_TD_ENABLED")) ?
+        List.of(true) : List.of(false, true);
   }
 
   public GoogleCloudStorageGrpcIntegrationTest(boolean tdEnabled) {
