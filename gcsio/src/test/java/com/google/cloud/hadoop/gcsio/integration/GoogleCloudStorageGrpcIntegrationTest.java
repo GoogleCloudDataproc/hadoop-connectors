@@ -18,6 +18,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -48,8 +49,11 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Parameters
   // We want to test this entire class with both gRPC-LB and Traffic Director
+  // Some of our internal endpoints only work with TD
   public static Iterable<Boolean> tdEnabled() {
-    return Arrays.asList(false, true);
+    return Boolean.parseBoolean(System.getenv("GCS_TEST_ONLY_RUN_WITH_TD_ENABLED"))
+        ? ImmutableList.of(true)
+        : ImmutableList.of(false, true);
   }
 
   public GoogleCloudStorageGrpcIntegrationTest(boolean tdEnabled) {
