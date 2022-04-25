@@ -52,7 +52,7 @@ public class GoogleCloudStorageFileSystemOptionsTest {
             .setAppName("foo-app")
             .build();
     GoogleCloudStorageFileSystem gcsfs =
-        new GoogleCloudStorageFileSystem(
+        new GoogleCloudStorageFileSystemImpl(
             InMemoryGoogleCloudStorage::new,
             GoogleCloudStorageFileSystemOptions.builder()
                 .setCloudStorageOptions(gcsOptions)
@@ -92,7 +92,7 @@ public class GoogleCloudStorageFileSystemOptionsTest {
 
     // We need different GCSFS options for our test.
     GoogleCloudStorageFileSystem gcsfs =
-        new GoogleCloudStorageFileSystem(
+        new GoogleCloudStorageFileSystemImpl(
             InMemoryGoogleCloudStorage::new,
             GoogleCloudStorageFileSystemOptions.builder()
                 .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())

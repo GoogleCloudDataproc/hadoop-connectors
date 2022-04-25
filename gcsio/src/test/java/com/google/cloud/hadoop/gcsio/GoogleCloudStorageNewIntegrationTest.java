@@ -91,7 +91,7 @@ public class GoogleCloudStorageNewIntegrationTest {
         new RetryHttpInitializer(credentials, gcsOptions.toRetryHttpInitializerOptions());
 
     GoogleCloudStorageFileSystem gcsfs =
-        new GoogleCloudStorageFileSystem(
+        new GoogleCloudStorageFileSystemImpl(
             credentials,
             GoogleCloudStorageFileSystemOptions.builder()
                 .setBucketDeleteEnabled(true)

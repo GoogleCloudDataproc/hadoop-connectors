@@ -52,7 +52,7 @@ import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/** Integration tests for {@link GoogleCloudStorageFileSystem} class. */
+/** Integration tests for {@link GoogleCloudStorageFileSystemImpl} class. */
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageFileSystemNewIntegrationTest {
 
@@ -72,7 +72,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
         new RetryHttpInitializer(credentials, gcsOptions.toRetryHttpInitializerOptions());
 
     GoogleCloudStorageFileSystem gcsfs =
-        new GoogleCloudStorageFileSystem(
+        new GoogleCloudStorageFileSystemImpl(
             credentials,
             GoogleCloudStorageFileSystemOptions.builder()
                 .setBucketDeleteEnabled(true)
@@ -1350,7 +1350,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
       GoogleCloudStorageFileSystemOptions gcsfsOptions,
       TrackingHttpRequestInitializer gcsRequestsTracker)
       throws IOException {
-    return new GoogleCloudStorageFileSystem(
+    return new GoogleCloudStorageFileSystemImpl(
         o -> new GoogleCloudStorageImpl(o, gcsRequestsTracker), gcsfsOptions);
   }
 }

@@ -37,7 +37,7 @@ public class GoogleCloudStorageFileSystemIntegrationHelper
             .setCopyWithRewriteEnabled(true)
             .build();
 
-    return new GoogleCloudStorageFileSystem(
+    return new GoogleCloudStorageFileSystemImpl(
         GoogleCloudStorageTestHelper.getCredentials(),
         GoogleCloudStorageFileSystemOptions.builder()
             .setBucketDeleteEnabled(true)
@@ -184,6 +184,6 @@ public class GoogleCloudStorageFileSystemIntegrationHelper
   }
 
   public String getItemName(URI src) {
-    return gcsfs.getItemName(src);
+    return GoogleCloudStorageFileSystemImpl.getItemName(src);
   }
 }
