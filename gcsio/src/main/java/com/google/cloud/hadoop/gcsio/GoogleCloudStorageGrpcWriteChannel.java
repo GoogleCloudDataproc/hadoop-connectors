@@ -26,6 +26,7 @@ import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.flogger.GoogleLogger;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
 import com.google.common.io.BaseEncoding;
@@ -70,6 +71,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
   private static final Duration START_RESUMABLE_WRITE_TIMEOUT = Duration.ofMinutes(1);
   private static final Duration QUERY_WRITE_STATUS_TIMEOUT = Duration.ofMinutes(1);
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // A set that defines all transient errors on which retry can be attempted.
   private static final ImmutableSet<Status.Code> TRANSIENT_ERRORS =
@@ -219,9 +221,11 @@ public final class GoogleCloudStorageGrpcWriteChannel
     }
 
     private WriteObjectResponse doResumableUpload() throws IOException {
+      long committedWriteOffset = 0;
       // Only request committed size for the first insert request.
       if (writeOffset > 0) {
         writeOffset = getCommittedWriteSizeWithRetries(uploadId);
+        committedWriteOffset = writeOffset;
       }
       StorageStub storageStub =
           stub.withDeadlineAfter(channelOptions.getGrpcWriteTimeout(), MILLISECONDS);
@@ -252,24 +256,50 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       boolean objectFinalized = false;
       while (!objectFinalized) {
-        WriteObjectRequest insertRequest;
+        WriteObjectRequest insertRequest = null;
         if (dataChunkMap.size() > 0 && dataChunkMap.lastKey() >= writeOffset) {
           insertRequest = buildRequestFromBufferedDataChunk(dataChunkMap, writeOffset);
           writeOffset += insertRequest.getChecksummedData().getContent().size();
         } else {
-          ByteString data =
-              ByteString.readFrom(
-                  ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE), MAX_BYTES_PER_MESSAGE);
-          dataChunkMap.put(writeOffset, data);
           if (dataChunkMap.size() >= channelOptions.getNumberOfBufferedRequests()) {
-            dataChunkMap.remove(dataChunkMap.firstKey());
-          }
-          insertRequest = buildInsertRequest(writeOffset, data, false);
-          writeOffset += data.size();
-        }
-        requestStreamObserver.onNext(insertRequest);
-        objectFinalized = insertRequest.getFinishWrite();
+            /*
+             If dataChunkMap is full, get the committedWriteOffset. This will make a API call to the
+             server and add latency in this path/context. The upload is happening asynchronously in
+             a different context. So this API will not add latency to overall upload. It will only
+             throttle the upstream write call, which is fine.
+            */
+            committedWriteOffset = getCommittedWriteSizeWithRetries(uploadId);
+            logger.atFinest().log(
+                "Fetched committedWriteOffset: size:%d, numBuffers:%d, writeOffset:%d, committedWriteOffset:%d",
+                dataChunkMap.size(),
+                channelOptions.getNumberOfBufferedRequests(),
+                this.writeOffset,
+                committedWriteOffset);
 
+            // check and remove chunks from dataChunkMap
+            while (dataChunkMap.size() > 0 && dataChunkMap.firstKey() < committedWriteOffset) {
+              logger.atFinest().log(
+                  "clearing dataChunkMap one buffer at a time, size: %d, firstKey:%d, committedwriteOffset:%d",
+                  dataChunkMap.size(), dataChunkMap.firstKey(), committedWriteOffset);
+              dataChunkMap.remove(dataChunkMap.firstKey());
+            }
+          }
+
+          // Pick up a chunk to write only if dataChunkMap has space. Else continue after looking
+          // for errors.
+          if (dataChunkMap.size() < channelOptions.getNumberOfBufferedRequests()) {
+            ByteString data =
+                ByteString.readFrom(
+                    ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE), MAX_BYTES_PER_MESSAGE);
+            dataChunkMap.put(writeOffset, data);
+            insertRequest = buildInsertRequest(writeOffset, data, false);
+            writeOffset += data.size();
+          }
+        }
+        if (insertRequest != null) {
+          requestStreamObserver.onNext(insertRequest);
+          objectFinalized = insertRequest.getFinishWrite();
+        }
         if (responseObserver.hasTransientError() || responseObserver.hasNonTransientError()) {
           requestStreamObserver.onError(
               responseObserver.hasTransientError()
