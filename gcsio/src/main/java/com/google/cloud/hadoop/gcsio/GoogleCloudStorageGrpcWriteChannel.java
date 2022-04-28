@@ -175,7 +175,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     private long writeOffset = 0;
     // Holds list of most recent number of NUMBER_OF_REQUESTS_TO_RETAIN requests, so upload can
     // be rewound and re-sent upon transient errors.
-    private final TreeMap<Long, ByteString> dataChunkMap = new TreeMap<>();
+    private final TreeMap<Long, WriteObjectRequest> dataChunkMap = new TreeMap<>();
 
     UploadOperation(InputStream pipeSource) {
       this.pipeSource = new BufferedInputStream(pipeSource, MAX_BYTES_PER_MESSAGE);
@@ -287,8 +287,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
             ByteString data =
                 ByteString.readFrom(
                     ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE), MAX_BYTES_PER_MESSAGE);
-            dataChunkMap.put(writeOffset, data);
             insertRequest = buildInsertRequest(writeOffset, data, false);
+            dataChunkMap.put(writeOffset, insertRequest);
             writeOffset += data.size();
           }
         }
@@ -371,17 +371,17 @@ public final class GoogleCloudStorageGrpcWriteChannel
     // This happens if a transient failure happens while uploading, and can be resumed by
     // querying the current committed offset.
     private WriteObjectRequest buildRequestFromBufferedDataChunk(
-        TreeMap<Long, ByteString> dataChunkMap, long writeOffset) throws IOException {
+        TreeMap<Long, WriteObjectRequest> dataChunkMap, long writeOffset) throws IOException {
       // Resume will only work if the first request builder in the cache carries an offset
       // not greater than the current writeOffset.
       WriteObjectRequest request = null;
       if (dataChunkMap.size() > 0 && dataChunkMap.firstKey() <= writeOffset) {
-        for (Map.Entry<Long, ByteString> entry : dataChunkMap.entrySet()) {
-          if (entry.getKey() + entry.getValue().size() > writeOffset
+        for (Map.Entry<Long, WriteObjectRequest> entry : dataChunkMap.entrySet()) {
+          if (entry.getKey() + entry.getValue().getChecksummedData().getContent().size()
+                  > writeOffset
               || entry.getKey() == writeOffset) {
             Long writeOffsetToResume = entry.getKey();
-            ByteString chunkData = entry.getValue();
-            request = buildInsertRequest(writeOffsetToResume, chunkData, true);
+            request = entry.getValue();
             break;
           }
         }
