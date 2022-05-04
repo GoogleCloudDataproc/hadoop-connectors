@@ -66,15 +66,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 /**
- * Provides a POSIX like file system layered on top of Google Cloud Storage (GCS).
- *
- * <p>All file system aspects (eg, path) are encapsulated in this class, they are not exposed to the
- * underlying layer. That is, all interactions with the underlying layer are strictly in terms of
- * buckets and objects.
- *
- * @see <a
- *     href="https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/filesystem/index.html">Hadoop
- *     FileSystem specification.</a>
+ * Provides FS semantics over GCS based on Objects API
  */
 public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileSystem {
 

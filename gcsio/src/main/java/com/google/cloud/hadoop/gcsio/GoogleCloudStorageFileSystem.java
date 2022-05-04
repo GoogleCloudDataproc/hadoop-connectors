@@ -24,6 +24,17 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.List;
 
+/**
+ * Provides a POSIX like file system layered on top of Google Cloud Storage (GCS).
+ *
+ * <p>All file system aspects (eg, path) are encapsulated in this class, they are not exposed to the
+ * underlying layer. That is, all interactions with the underlying layer are strictly in terms of
+ * buckets and objects.
+ *
+ * @see <a
+ *     href="https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/filesystem/index.html">Hadoop
+ *     FileSystem specification.</a>
+ */
 public interface GoogleCloudStorageFileSystem {
 
   // URI scheme for GCS.
