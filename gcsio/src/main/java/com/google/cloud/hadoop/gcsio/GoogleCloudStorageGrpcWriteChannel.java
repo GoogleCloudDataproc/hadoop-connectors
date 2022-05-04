@@ -68,9 +68,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
     extends AbstractGoogleAsyncWriteChannel<WriteObjectResponse>
     implements GoogleCloudStorageItemInfo.Provider {
 
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private static final Duration START_RESUMABLE_WRITE_TIMEOUT = Duration.ofMinutes(1);
   private static final Duration QUERY_WRITE_STATUS_TIMEOUT = Duration.ofMinutes(1);
-  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // A set that defines all transient errors on which retry can be attempted.
   private static final ImmutableSet<Status.Code> TRANSIENT_ERRORS =
