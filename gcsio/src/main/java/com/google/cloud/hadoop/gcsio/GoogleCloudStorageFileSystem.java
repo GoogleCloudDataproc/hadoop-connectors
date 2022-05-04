@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
+import com.google.common.flogger.GoogleLogger;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
@@ -37,6 +38,8 @@ import java.util.List;
  */
 public interface GoogleCloudStorageFileSystem {
 
+  GoogleLogger logger = GoogleLogger.forEnclosingClass();
+
   // URI scheme for GCS.
   String SCHEME = "gs";
 
@@ -49,7 +52,10 @@ public interface GoogleCloudStorageFileSystem {
    * @param path Object full path of the form gs://bucket/object-path.
    * @return A channel for writing to the given object.
    */
-  WritableByteChannel create(URI path) throws IOException;
+  default WritableByteChannel create(URI path) throws IOException  {
+    logger.atFiner().log("create(path: %s)", path);
+    return create(path, CreateFileOptions.DEFAULT_OVERWRITE);
+  }
 
   /**
    * Creates and opens an object for writing.
@@ -67,7 +73,9 @@ public interface GoogleCloudStorageFileSystem {
    * @throws FileNotFoundException if the given path does not exist.
    * @throws IOException if object exists but cannot be opened.
    */
-  SeekableByteChannel open(URI path) throws IOException;
+  default SeekableByteChannel open(URI path) throws IOException {
+    return open(path, GoogleCloudStorageReadOptions.DEFAULT);
+  }
 
   /**
    * Opens an object for reading.

@@ -210,12 +210,6 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   }
 
   @Override
-  public WritableByteChannel create(URI path) throws IOException {
-    logger.atFiner().log("create(path: %s)", path);
-    return create(path, CreateFileOptions.DEFAULT_OVERWRITE);
-  }
-
-  @Override
   public WritableByteChannel create(URI path, CreateFileOptions createOptions) throws IOException {
     logger.atFiner().log("create(path: %s, createOptions: %s)", path, createOptions);
     checkNotNull(path, "path could not be null");
@@ -262,11 +256,6 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     }
 
     return gcs.create(resourceId, objectOptionsFromFileOptions(createOptions));
-  }
-
-  @Override
-  public SeekableByteChannel open(URI path) throws IOException {
-    return open(path, GoogleCloudStorageReadOptions.DEFAULT);
   }
 
   @Override
