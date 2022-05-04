@@ -218,6 +218,11 @@ public final class GoogleCloudStorageGrpcWriteChannel
       long committedWriteOffset = 0;
       // Only request committed size for the first insert request.
       if (writeOffset > 0) {
+        /*
+        TODO: writeOffset has to be multiple of MAX_BYTES_PER_MESSAGE. If not, we cannot upload
+        a partial chunk for multiple reasons. we should raise an exception here so that we can
+        re-upload the entire file again.
+         */
         writeOffset = getCommittedWriteSizeWithRetries(uploadId);
         committedWriteOffset = writeOffset;
       }
