@@ -76,6 +76,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
   // A set that defines all transient errors on which retry can be attempted.
   private static final ImmutableSet<Status.Code> TRANSIENT_ERRORS =
       ImmutableSet.of(
+          Status.Code.INVALID_ARGUMENT,
           Status.Code.DEADLINE_EXCEEDED,
           Status.Code.INTERNAL,
           Status.Code.RESOURCE_EXHAUSTED,
@@ -207,17 +208,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
     }
 
-    class OutOfBufferedDataException extends IOException {
-      public OutOfBufferedDataException(String message) {
-        super(message);
-      }
-    }
-
     boolean isRetriableError(Throwable throwable) {
-      if (throwable instanceof OutOfBufferedDataException) return false;
-      Throwable cause = throwable.getCause();
-      if (cause == null) return true;
-      return isRetriableError(cause);
+      Status status = Status.fromThrowable(throwable);
+      Status.Code statusCode = status.getCode();
+      return (TRANSIENT_ERRORS.contains(statusCode));
     }
 
     private WriteObjectResponse doResumableUpload() throws IOException {
@@ -264,9 +258,11 @@ public final class GoogleCloudStorageGrpcWriteChannel
           if (dataChunkMap.size() >= channelOptions.getNumberOfBufferedRequests()) {
             /*
              If dataChunkMap is full, get the committedWriteOffset. This will make a API call to the
-             server and add latency in this path/context. The upload is happening asynchronously in
-             a different context. So this API will not add latency to overall upload. It will only
-             throttle the upstream write call, which is fine.
+             server and add latency in this path/context. Since there are already chunks in flight,
+             calling this API will not reduce overall throughput. It will throttle the upstream
+             write call now rather than onFinalize, which is fine. This will also increase QPS to
+             the GCS backend. The increase will be linear to number of chunks written, so that
+             should also be fine.
             */
             committedWriteOffset = getCommittedWriteSizeWithRetries(uploadId);
             logger.atFinest().log(
@@ -390,17 +386,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
           }
         }
       }
-      if (request == null) {
-        OutOfBufferedDataException outOfBufferedDataException =
-            new OutOfBufferedDataException(
-                String.format(
-                    "Didn't have enough data buffered for attempt to resume upload for"
-                        + " uploadID %s: last committed offset=%s, earliest buffered"
-                        + " offset=%s. Upload must be restarted from the beginning.",
-                    uploadId, writeOffset, dataChunkMap.firstKey()));
-        throw new IOException(outOfBufferedDataException);
-      }
-      return request;
+      return checkNotNull(request, "Request chunk not found for '%s'", resourceId);
     }
 
     /** Handler for responses from the Insert streaming RPC. */
@@ -455,16 +441,18 @@ public final class GoogleCloudStorageGrpcWriteChannel
         Status status = Status.fromThrowable(t);
         Status.Code statusCode = status.getCode();
         if (TRANSIENT_ERRORS.contains(statusCode)) {
+          logger.atWarning().log(
+              "Caught transient exception for '%s', while uploading to uploadId %s at writeOffset %d."
+                  + " Status: %s",
+              resourceId, uploadId, writeOffset, status.getDescription());
           transientError = t;
         }
         if (transientError == null) {
-          nonTransientError =
-              new IOException(
-                  String.format(
-                      "Caught exception for '%s', while uploading to uploadId %s at writeOffset %d."
-                          + " Status: %s",
-                      resourceId, uploadId, writeOffset, status.getDescription()),
-                  t);
+          nonTransientError = t;
+          logger.atSevere().log(
+              "Caught exception for '%s', while uploading to uploadId %s at writeOffset %d."
+                  + " Status: %s",
+              resourceId, uploadId, writeOffset, status.getDescription());
         }
         done.countDown();
       }
