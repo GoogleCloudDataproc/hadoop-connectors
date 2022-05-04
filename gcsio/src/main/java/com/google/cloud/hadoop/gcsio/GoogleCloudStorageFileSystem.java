@@ -178,7 +178,9 @@ public interface GoogleCloudStorageFileSystem {
    *
    * @param prefix the prefix to use to list all matching objects.
    */
-  List<FileInfo> listFileInfoForPrefix(URI prefix) throws IOException;
+  default List<FileInfo> listFileInfoForPrefix(URI prefix) throws IOException {
+    return listFileInfoForPrefix(prefix, ListFileOptions.DEFAULT);
+  }
 
   /**
    * Equivalent to a recursive listing of {@code prefix}, except that {@code prefix} doesn't have to
@@ -197,7 +199,9 @@ public interface GoogleCloudStorageFileSystem {
    * @param prefix the prefix to use to list all matching objects.
    * @param pageToken the page token to list
    */
-  ListPage<FileInfo> listFileInfoForPrefixPage(URI prefix, String pageToken) throws IOException;
+  default ListPage<FileInfo> listFileInfoForPrefixPage(URI prefix, String pageToken) throws IOException {
+    return listFileInfoForPrefixPage(prefix, ListFileOptions.DEFAULT, pageToken);
+}
 
   /**
    * Equivalent to {@link #listFileInfoForPrefix} but returns {@link FileInfo}s listed by single
@@ -217,7 +221,9 @@ public interface GoogleCloudStorageFileSystem {
    * @return Information about a file or children of a directory.
    * @throws FileNotFoundException if the given path does not exist.
    */
-  List<FileInfo> listFileInfo(URI path) throws IOException;
+  default List<FileInfo> listFileInfo(URI path) throws IOException {
+    return listFileInfo(path, ListFileOptions.DEFAULT);
+  }
 
   /**
    * If the given path points to a directory then the information about its children is returned,

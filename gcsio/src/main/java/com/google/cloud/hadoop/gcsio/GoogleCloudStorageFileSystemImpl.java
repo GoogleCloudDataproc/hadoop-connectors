@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Google Inc. All Rights Reserved.
+ * Copyright 2022 Google Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -736,11 +736,6 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   }
 
   @Override
-  public List<FileInfo> listFileInfoForPrefix(URI prefix) throws IOException {
-    return listFileInfoForPrefix(prefix, ListFileOptions.DEFAULT);
-  }
-
-  @Override
   public List<FileInfo> listFileInfoForPrefix(URI prefix, ListFileOptions listOptions)
       throws IOException {
     logger.atFiner().log("listAllFileInfoForPrefix(prefix: %s)", prefix);
@@ -753,12 +748,6 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     List<FileInfo> fileInfos = FileInfo.fromItemInfos(itemInfos);
     fileInfos.sort(FILE_INFO_PATH_COMPARATOR);
     return fileInfos;
-  }
-
-  @Override
-  public ListPage<FileInfo> listFileInfoForPrefixPage(URI prefix, String pageToken)
-      throws IOException {
-    return listFileInfoForPrefixPage(prefix, ListFileOptions.DEFAULT, pageToken);
   }
 
   @Override
@@ -785,11 +774,6 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     checkArgument(!prefixId.isRoot(), "prefix must not be global root, got '%s'", prefix);
 
     return prefixId;
-  }
-
-  @Override
-  public List<FileInfo> listFileInfo(URI path) throws IOException {
-    return listFileInfo(path, ListFileOptions.DEFAULT);
   }
 
   @Override
