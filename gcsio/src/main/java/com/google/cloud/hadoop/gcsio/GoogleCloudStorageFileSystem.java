@@ -52,7 +52,7 @@ public interface GoogleCloudStorageFileSystem {
    * @param path Object full path of the form gs://bucket/object-path.
    * @return A channel for writing to the given object.
    */
-  default WritableByteChannel create(URI path) throws IOException  {
+  default WritableByteChannel create(URI path) throws IOException {
     logger.atFiner().log("create(path: %s)", path);
     return create(path, CreateFileOptions.DEFAULT_OVERWRITE);
   }
@@ -218,9 +218,10 @@ public interface GoogleCloudStorageFileSystem {
    * @param prefix the prefix to use to list all matching objects.
    * @param pageToken the page token to list
    */
-  default ListPage<FileInfo> listFileInfoForPrefixPage(URI prefix, String pageToken) throws IOException {
+  default ListPage<FileInfo> listFileInfoForPrefixPage(URI prefix, String pageToken)
+      throws IOException {
     return listFileInfoForPrefixPage(prefix, ListFileOptions.DEFAULT, pageToken);
-}
+  }
 
   /**
    * Equivalent to {@link #listFileInfoForPrefix} but returns {@link FileInfo}s listed by single

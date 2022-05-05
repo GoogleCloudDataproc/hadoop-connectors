@@ -65,9 +65,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
-/**
- * Provides FS semantics over GCS based on Objects API
- */
+/** Provides FS semantics over GCS based on Objects API */
 public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileSystem {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
