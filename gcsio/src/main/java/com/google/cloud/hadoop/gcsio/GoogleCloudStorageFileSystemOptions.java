@@ -24,6 +24,12 @@ public abstract class GoogleCloudStorageFileSystemOptions {
 
   public static GoogleCloudStorageFileSystemOptions DEFAULT = builder().build();
 
+  public enum FilesystemAPI {
+    OBJECT,
+    DIRECTORY,
+    AUTO
+  }
+
   public static Builder builder() {
     return new AutoValue_GoogleCloudStorageFileSystemOptions.Builder()
         .setBucketDeleteEnabled(false)
@@ -32,6 +38,7 @@ public abstract class GoogleCloudStorageFileSystemOptions {
         .setMarkerFilePattern((String) null)
         .setPerformanceCacheEnabled(false)
         .setPerformanceCacheOptions(PerformanceCachingGoogleCloudStorageOptions.DEFAULT)
+        .setFilesystemApi(FilesystemAPI.OBJECT)
         .setStatusParallelEnabled(true);
   }
 
@@ -51,6 +58,8 @@ public abstract class GoogleCloudStorageFileSystemOptions {
   public abstract boolean isStatusParallelEnabled();
 
   public abstract boolean isEnsureNoConflictingItems();
+
+  public abstract FilesystemAPI getFilesystemApi();
 
   public void throwIfNotValid() {
     getCloudStorageOptions().throwIfNotValid();
@@ -85,5 +94,7 @@ public abstract class GoogleCloudStorageFileSystemOptions {
     public abstract Builder setEnsureNoConflictingItems(boolean ensureNoConflictingItems);
 
     public abstract GoogleCloudStorageFileSystemOptions build();
+
+    public abstract Builder setFilesystemApi(FilesystemAPI filesystemApi);
   }
 }

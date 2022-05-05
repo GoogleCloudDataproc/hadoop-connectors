@@ -45,8 +45,8 @@ import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemProvider;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.ListFileOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
@@ -347,11 +347,11 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
             : null;
     return accessTokenProvider != null
             && accessTokenProvider.getAccessTokenType() == AccessTokenType.DOWNSCOPED
-        ? new GoogleCloudStorageFileSystemImpl(
+        ? GoogleCloudStorageFileSystemProvider.newInstance(
             /* credentials= */ null,
             accessBoundaries -> accessTokenProvider.getAccessToken(accessBoundaries).getToken(),
             gcsFsOptions)
-        : new GoogleCloudStorageFileSystemImpl(
+        : GoogleCloudStorageFileSystemProvider.newInstance(
             credentials, /* downscopedAccessTokenFn= */ null, gcsFsOptions);
   }
 
