@@ -135,7 +135,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   Fadvise readStrategy;
 
-  private final byte[] footerBuffer;
+  private byte[] footerBuffer = null;
 
   private final long footerStartOffsetInBytes;
 
@@ -175,8 +175,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     int prefetchSizeInBytes = readOptions.getMinRangeRequestSize() / 2;
     this.gRPCReadMessageTimeout = readOptions.getGrpcReadMessageTimeoutMillis();
     this.footerStartOffsetInBytes = max(0, (objectSize - prefetchSizeInBytes));
-    int footerSize = Math.toIntExact(min(prefetchSizeInBytes, objectSize));
-    this.footerBuffer = getFooterContent(footerStartOffsetInBytes, footerSize);
   }
 
   private void validate(GoogleCloudStorageItemInfo itemInfo) throws IOException {
@@ -233,8 +231,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     int prefetchSizeInBytes = readOptions.getMinRangeRequestSize() / 2;
     this.gRPCReadMessageTimeout = readOptions.getGrpcReadMessageTimeoutMillis();
     this.footerStartOffsetInBytes = max(0, (objectSize - prefetchSizeInBytes));
-    int footerSize = Math.toIntExact(min(prefetchSizeInBytes, objectSize));
-    this.footerBuffer = getFooterContent(footerStartOffsetInBytes, footerSize);
   }
 
   private GoogleCloudStorageItemInfo getObjectMetadata(StorageResourceId resourceId, Storage gcs)
@@ -729,6 +725,11 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     // Reset any ongoing read operations or local data caches.
     cancelCurrentRequest();
     invalidateBufferedContent();
+
+    if (footerBuffer == null && newPosition > 0 && newPosition >= footerStartOffsetInBytes) {
+      this.footerBuffer =
+          getFooterContent(footerStartOffsetInBytes, (int) (objectSize - footerStartOffsetInBytes));
+    }
 
     positionInGrpcStream = newPosition;
     return this;
