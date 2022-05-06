@@ -17,7 +17,6 @@
 package com.google.cloud.hadoop.gcsio;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
-import com.google.common.flogger.GoogleLogger;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
@@ -38,8 +37,6 @@ import java.util.List;
  */
 public interface GoogleCloudStorageFileSystem {
 
-  GoogleLogger logger = GoogleLogger.forEnclosingClass();
-
   // URI scheme for GCS.
   String SCHEME = "gs";
 
@@ -53,7 +50,6 @@ public interface GoogleCloudStorageFileSystem {
    * @return A channel for writing to the given object.
    */
   default WritableByteChannel create(URI path) throws IOException {
-    logger.atFiner().log("create(path: %s)", path);
     return create(path, CreateFileOptions.DEFAULT_OVERWRITE);
   }
 
