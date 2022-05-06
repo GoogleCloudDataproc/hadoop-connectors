@@ -175,7 +175,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     private long writeOffset = 0;
     // Holds list of most recent number of NUMBER_OF_REQUESTS_TO_RETAIN requests, so upload can
     // be rewound and re-sent upon transient errors.
-    private final TreeMap<Long, WriteObjectRequest> dataChunkMap = new TreeMap<>();
+    private final TreeMap<Long, WriteObjectRequest> requestChunkMap = new TreeMap<>();
 
     UploadOperation(InputStream pipeSource) {
       this.pipeSource = new BufferedInputStream(pipeSource, MAX_BYTES_PER_MESSAGE);
@@ -253,11 +253,11 @@ public final class GoogleCloudStorageGrpcWriteChannel
       boolean objectFinalized = false;
       while (!objectFinalized) {
         WriteObjectRequest insertRequest = null;
-        if (dataChunkMap.size() > 0 && dataChunkMap.lastKey() >= writeOffset) {
-          insertRequest = buildRequestFromBufferedDataChunk(dataChunkMap, writeOffset);
+        if (requestChunkMap.size() > 0 && requestChunkMap.lastKey() >= writeOffset) {
+          insertRequest = fetchRequestFromBufferedDataChunk(requestChunkMap, writeOffset);
           writeOffset += insertRequest.getChecksummedData().getContent().size();
         } else {
-          if (dataChunkMap.size() >= channelOptions.getNumberOfBufferedRequests()) {
+          if (requestChunkMap.size() >= channelOptions.getNumberOfBufferedRequests()) {
             /*
              If dataChunkMap is full, get the committedWriteOffset. This will make a API call to the
              server and add latency in this path/context. The upload is happening asynchronously in
@@ -267,28 +267,26 @@ public final class GoogleCloudStorageGrpcWriteChannel
             committedWriteOffset = getCommittedWriteSizeWithRetries(uploadId);
             logger.atFinest().log(
                 "Fetched committedWriteOffset: size:%d, numBuffers:%d, writeOffset:%d, committedWriteOffset:%d",
-                dataChunkMap.size(),
+                requestChunkMap.size(),
                 channelOptions.getNumberOfBufferedRequests(),
                 this.writeOffset,
                 committedWriteOffset);
 
             // check and remove chunks from dataChunkMap
-            while (dataChunkMap.size() > 0 && dataChunkMap.firstKey() < committedWriteOffset) {
+            while (requestChunkMap.size() > 0 && requestChunkMap.firstKey() < committedWriteOffset) {
               logger.atFinest().log(
                   "clearing dataChunkMap one buffer at a time, size: %d, firstKey:%d, committedwriteOffset:%d",
-                  dataChunkMap.size(), dataChunkMap.firstKey(), committedWriteOffset);
-              dataChunkMap.remove(dataChunkMap.firstKey());
+                  requestChunkMap.size(), requestChunkMap.firstKey(), committedWriteOffset);
+              requestChunkMap.remove(requestChunkMap.firstKey());
             }
-          }
-
-          // Pick up a chunk to write only if dataChunkMap has space. Else continue after looking
-          // for errors.
-          if (dataChunkMap.size() < channelOptions.getNumberOfBufferedRequests()) {
+          } else {
+            // Pick up a chunk to write only if dataChunkMap has space. Else continue after looking
+            // for errors.
             ByteString data =
                 ByteString.readFrom(
                     ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE), MAX_BYTES_PER_MESSAGE);
             insertRequest = buildInsertRequest(writeOffset, data, false);
-            dataChunkMap.put(writeOffset, insertRequest);
+            requestChunkMap.put(writeOffset, insertRequest);
             writeOffset += data.size();
           }
         }
@@ -369,14 +367,12 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
     // Handles the case when a writeOffset of data read previously is being processed.
     // This happens if a transient failure happens while uploading, and can be resumed by
-    // querying the current committed offset.
-    private WriteObjectRequest buildRequestFromBufferedDataChunk(
-        TreeMap<Long, WriteObjectRequest> dataChunkMap, long writeOffset) throws IOException {
-      // Resume will only work if the first request builder in the cache carries an offset
-      // not greater than the current writeOffset.
+    // querying the writeRequest object at the current committed offset.
+    private WriteObjectRequest fetchRequestFromBufferedDataChunk(
+        TreeMap<Long, WriteObjectRequest> requestChunkMap, long writeOffset) {
       WriteObjectRequest request = null;
-      if (dataChunkMap.size() > 0 && dataChunkMap.firstKey() <= writeOffset) {
-        for (Map.Entry<Long, WriteObjectRequest> entry : dataChunkMap.entrySet()) {
+      if (requestChunkMap.size() > 0 && requestChunkMap.firstKey() <= writeOffset) {
+        for (Map.Entry<Long, WriteObjectRequest> entry : requestChunkMap.entrySet()) {
           if (entry.getKey() + entry.getValue().getChecksummedData().getContent().size()
                   > writeOffset
               || entry.getKey() == writeOffset) {
@@ -386,17 +382,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
           }
         }
       }
-      if (request == null) {
-        OutOfBufferedDataException outOfBufferedDataException =
-            new OutOfBufferedDataException(
-                String.format(
-                    "Didn't have enough data buffered for attempt to resume upload for"
-                        + " uploadID %s: last committed offset=%s, earliest buffered"
-                        + " offset=%s. Upload must be restarted from the beginning.",
-                    uploadId, writeOffset, dataChunkMap.firstKey()));
-        throw new IOException(outOfBufferedDataException);
-      }
-      return request;
+      return checkNotNull(request, "Request chunk not found for '%s'", resourceId);
     }
 
     /** Handler for responses from the Insert streaming RPC. */
