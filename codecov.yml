@@ -1,2 +1,3 @@
 ignore:
   - ".*/generated-sources/.*"
+  - ".*/api/services/storage/preprod/.*"
