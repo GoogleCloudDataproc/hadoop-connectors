@@ -217,11 +217,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
     }
 
     private WriteObjectResponse doResumableUpload() throws IOException {
-      long committedWriteOffset = 0;
       // Only request committed size for the first insert request.
       if (writeOffset > 0) {
         writeOffset = getCommittedWriteSizeWithRetries(uploadId);
-        committedWriteOffset = writeOffset;
       }
       StorageStub storageStub =
           stub.withDeadlineAfter(channelOptions.getGrpcWriteTimeout(), MILLISECONDS);
@@ -264,7 +262,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
              a different context. So this API will not add latency to overall upload. It will only
              throttle the upstream write call, which is fine.
             */
-            committedWriteOffset = getCommittedWriteSizeWithRetries(uploadId);
+            long committedWriteOffset = getCommittedWriteSizeWithRetries(uploadId);
             logger.atFinest().log(
                 "Fetched committedWriteOffset: size:%d, numBuffers:%d, writeOffset:%d, committedWriteOffset:%d",
                 requestChunkMap.size(),
@@ -273,7 +271,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
                 committedWriteOffset);
 
             // check and remove chunks from dataChunkMap
-            while (requestChunkMap.size() > 0 && requestChunkMap.firstKey() < committedWriteOffset) {
+            while (requestChunkMap.size() > 0
+                && requestChunkMap.firstKey() < committedWriteOffset) {
               logger.atFinest().log(
                   "clearing dataChunkMap one buffer at a time, size: %d, firstKey:%d, committedwriteOffset:%d",
                   requestChunkMap.size(), requestChunkMap.firstKey(), committedWriteOffset);
