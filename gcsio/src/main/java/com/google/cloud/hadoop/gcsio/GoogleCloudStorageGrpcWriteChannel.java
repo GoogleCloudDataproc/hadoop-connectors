@@ -254,19 +254,17 @@ public final class GoogleCloudStorageGrpcWriteChannel
         if (requestChunkMap.size() > 0 && requestChunkMap.lastKey() >= writeOffset) {
           insertRequest = getCachedRequest(requestChunkMap, writeOffset);
           writeOffset += insertRequest.getChecksummedData().getContent().size();
+        } else if (requestChunkMap.size() >= channelOptions.getNumberOfBufferedRequests()) {
+          freeUpCommittedRequests(requestChunkMap, writeOffset);
         } else {
-          if (requestChunkMap.size() >= channelOptions.getNumberOfBufferedRequests()) {
-            freeUpCommittedRequests(requestChunkMap, writeOffset);
-          } else {
-            // Pick up a chunk to write only if dataChunkMap has space. Else continue after looking
-            // for errors.
-            ByteString data =
-                ByteString.readFrom(
-                    ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE), MAX_BYTES_PER_MESSAGE);
-            insertRequest = buildInsertRequest(writeOffset, data, false);
-            requestChunkMap.put(writeOffset, insertRequest);
-            writeOffset += data.size();
-          }
+          // Pick up a chunk to write only if dataChunkMap has space. Else continue after looking
+          // for errors.
+          ByteString data =
+              ByteString.readFrom(
+                  ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE), MAX_BYTES_PER_MESSAGE);
+          insertRequest = buildInsertRequest(writeOffset, data, false);
+          requestChunkMap.put(writeOffset, insertRequest);
+          writeOffset += data.size();
         }
         if (insertRequest != null) {
           requestStreamObserver.onNext(insertRequest);
