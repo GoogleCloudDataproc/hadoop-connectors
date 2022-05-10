@@ -17,6 +17,7 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import java.io.IOException;
@@ -40,7 +41,7 @@ public class GoogleHadoopFileSystemTestHelper {
    */
   public static GoogleHadoopFileSystem createInMemoryGoogleHadoopFileSystem() throws IOException {
     GoogleCloudStorageFileSystem memoryGcsFs =
-        new GoogleCloudStorageFileSystem(
+        new GoogleCloudStorageFileSystemImpl(
             InMemoryGoogleCloudStorage::new,
             GoogleCloudStorageFileSystemOptions.builder()
                 .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())

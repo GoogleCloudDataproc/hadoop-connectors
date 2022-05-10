@@ -24,7 +24,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.auth.Credentials;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
@@ -165,7 +165,7 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
       throws IOException {
     GoogleHadoopFileSystem ghfs =
         new GoogleHadoopFileSystem(
-            new GoogleCloudStorageFileSystem(
+            new GoogleCloudStorageFileSystemImpl(
                 new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker),
                 GoogleCloudStorageFileSystemOptions.builder()
                     .setCloudStorageOptions(gcsOptions)

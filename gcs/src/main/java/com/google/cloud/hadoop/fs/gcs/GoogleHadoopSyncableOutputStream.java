@@ -20,7 +20,7 @@ import static com.google.common.base.Preconditions.checkState;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.common.annotations.VisibleForTesting;
@@ -304,7 +304,7 @@ class GoogleHadoopSyncableOutputStream extends OutputStream implements Syncable 
           finalGcsPath,
           curGcsPath);
       CreateObjectOptions objectOptions =
-          GoogleCloudStorageFileSystem.objectOptionsFromFileOptions(fileOptions);
+          GoogleCloudStorageFileSystemImpl.objectOptionsFromFileOptions(fileOptions);
       GoogleCloudStorage gcs = ghfs.getGcsFs().getGcs();
       GoogleCloudStorageItemInfo composedObject =
           gcs.composeObjects(ImmutableList.of(dstId, tempId), dstId, objectOptions);
