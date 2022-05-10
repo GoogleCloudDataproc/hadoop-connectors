@@ -16,7 +16,7 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.common.annotations.VisibleForTesting;
@@ -337,7 +337,7 @@ public class GoogleHadoopSyncableOutputStream extends OutputStream implements Sy
               .composeObjects(
                   ImmutableList.of(destResourceId, tempResourceId),
                   destResourceId,
-                  GoogleCloudStorageFileSystem.objectOptionsFromFileOptions(fileOptions));
+                  GoogleCloudStorageFileSystemImpl.objectOptionsFromFileOptions(fileOptions));
       curDestGenerationId = composedObject.getContentGeneration();
       deletionFutures.add(
           cleanupThreadpool.submit(

@@ -51,6 +51,7 @@ import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
@@ -1499,7 +1500,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       throw new RuntimeException(e);
     }
 
-    return new GoogleCloudStorageFileSystem(
+    return new GoogleCloudStorageFileSystemImpl(
         credential,
         accessTokenProvider != null
                 && accessTokenProvider.getAccessTokenType() == AccessTokenType.DOWNSCOPED

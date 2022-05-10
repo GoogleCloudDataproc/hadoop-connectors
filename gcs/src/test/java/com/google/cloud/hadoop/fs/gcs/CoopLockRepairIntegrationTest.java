@@ -42,6 +42,7 @@ import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
@@ -96,7 +97,7 @@ public class CoopLockRepairIntegrationTest {
         new RetryHttpInitializer(credential, gcsOptions.toRetryHttpInitializerOptions());
 
     GoogleCloudStorageFileSystem gcsfs =
-        new GoogleCloudStorageFileSystem(
+        new GoogleCloudStorageFileSystemImpl(
             credential,
             GoogleCloudStorageFileSystemOptions.builder()
                 .setBucketDeleteEnabled(true)
@@ -785,7 +786,7 @@ public class CoopLockRepairIntegrationTest {
   private static GoogleCloudStorageFileSystem newGcsFs(
       GoogleCloudStorageFileSystemOptions gcsFsOptions, HttpRequestInitializer requestInitializer)
       throws IOException {
-    return new GoogleCloudStorageFileSystem(
+    return new GoogleCloudStorageFileSystemImpl(
         o -> new GoogleCloudStorageImpl(o, requestInitializer), gcsFsOptions);
   }
 }

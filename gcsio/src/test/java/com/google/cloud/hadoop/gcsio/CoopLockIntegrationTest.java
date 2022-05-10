@@ -81,7 +81,7 @@ public class CoopLockIntegrationTest {
         new RetryHttpInitializer(credential, gcsOptions.toRetryHttpInitializerOptions());
 
     GoogleCloudStorageFileSystem gcsfs =
-        new GoogleCloudStorageFileSystem(
+        new GoogleCloudStorageFileSystemImpl(
             credential,
             GoogleCloudStorageFileSystemOptions.builder()
                 .setBucketDeleteEnabled(true)
@@ -288,7 +288,7 @@ public class CoopLockIntegrationTest {
   private static GoogleCloudStorageFileSystem newGcsFs(
       GoogleCloudStorageFileSystemOptions gcsfsOptions, HttpRequestInitializer requestInitializer)
       throws IOException {
-    return new GoogleCloudStorageFileSystem(
+    return new GoogleCloudStorageFileSystemImpl(
         o -> new GoogleCloudStorageImpl(o, requestInitializer), gcsfsOptions);
   }
 

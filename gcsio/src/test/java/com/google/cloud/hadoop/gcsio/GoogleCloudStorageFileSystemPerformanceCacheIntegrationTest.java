@@ -32,7 +32,9 @@ import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/** Integration tests for {@link GoogleCloudStorageFileSystem} with enabled performance cache. */
+/**
+ * Integration tests for {@link GoogleCloudStorageFileSystemImpl} with enabled performance cache.
+ */
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageFileSystemPerformanceCacheIntegrationTest {
 
@@ -271,7 +273,7 @@ public class GoogleCloudStorageFileSystemPerformanceCacheIntegrationTest {
     return new TrackingStorageWrapper<>(
         gcsfsOptions.getCloudStorageOptions(),
         httpRequestInitializer ->
-            new GoogleCloudStorageFileSystem(
+            new GoogleCloudStorageFileSystemImpl(
                 gcsOptions ->
                     new PerformanceCachingGoogleCloudStorage(
                         new GoogleCloudStorageImpl(gcsOptions, httpRequestInitializer),
