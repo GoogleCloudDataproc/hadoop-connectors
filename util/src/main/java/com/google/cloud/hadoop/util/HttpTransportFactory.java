@@ -34,6 +34,8 @@ import java.net.SocketException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.GeneralSecurityException;
+import java.security.KeyStore;
+import java.security.cert.Certificate;
 import javax.annotation.Nullable;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLSocketFactory;
@@ -125,18 +127,25 @@ public class HttpTransportFactory {
             }
           });
     }
+    NetHttpTransport.Builder builder = prepareNetHttpTransportBuilder(GoogleUtils.getCertificateTrustStore(), proxyUri);
+    return builder.build();
+  }
 
-    SslKeepAliveSocketFactory sslSocketFactory =
-        new SslKeepAliveSocketFactory(HttpsURLConnection.getDefaultSSLSocketFactory());
-    return new NetHttpTransport.Builder()
-        .trustCertificates(GoogleUtils.getCertificateTrustStore())
-        .setSslSocketFactory(sslSocketFactory)
-        .setProxy(
-            proxyUri == null
-                ? null
-                : new Proxy(
-                    Proxy.Type.HTTP, new InetSocketAddress(proxyUri.getHost(), proxyUri.getPort())))
-        .build();
+  @VisibleForTesting
+  static NetHttpTransport.Builder prepareNetHttpTransportBuilder(KeyStore keyStore, @Nullable URI proxyUri) throws GeneralSecurityException {
+    NetHttpTransport.Builder builder = new NetHttpTransport.Builder()
+            .trustCertificates(keyStore);
+    SSLSocketFactory socketFactory = builder.getSslSocketFactory();
+    if (socketFactory == null) {
+      socketFactory = HttpsURLConnection.getDefaultSSLSocketFactory();
+    }
+    return builder
+            .setSslSocketFactory(new SslKeepAliveSocketFactory(socketFactory))
+            .setProxy(
+                    proxyUri == null
+                            ? null
+                            : new Proxy(
+                            Proxy.Type.HTTP, new InetSocketAddress(proxyUri.getHost(), proxyUri.getPort())));
   }
 
   /**

@@ -17,6 +17,8 @@ package com.google.cloud.hadoop.util;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
+import com.google.api.client.googleapis.GoogleUtils;
+import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.cloud.hadoop.util.HttpTransportFactory.SslKeepAliveSocketFactory;
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,6 +27,7 @@ import java.net.Socket;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
+import java.security.GeneralSecurityException;
 import javax.net.ssl.SSLSocketFactory;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -132,6 +135,12 @@ public class HttpTransportFactoryTest {
 
     assertThat(sslKeepAliveSocketFactory.getSupportedCipherSuites())
         .isEqualTo(SUPPORTED_TEST_SUITES);
+  }
+
+  @Test
+  public void testKeepAliveSettingIsNotCorrupted() throws GeneralSecurityException, IOException {
+    NetHttpTransport.Builder builder = HttpTransportFactory.prepareNetHttpTransportBuilder(GoogleUtils.getCertificateTrustStore(), null);
+    assertThat(builder.getSslSocketFactory()).isInstanceOf(SslKeepAliveSocketFactory.class);
   }
 
   @Test
