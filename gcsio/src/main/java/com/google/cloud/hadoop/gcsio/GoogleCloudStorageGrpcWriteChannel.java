@@ -247,6 +247,12 @@ public final class GoogleCloudStorageGrpcWriteChannel
                 "Interrupted while awaiting ready on responseObserver for '%s' with UploadID '%s'",
                 resourceId, responseObserver.uploadId));
       }
+      if (responseObserver.hasError()) {
+        throw new IOException(
+            String.format(
+                "Exception while awaiting ready on responseObserver for '%s' with UploadID '%s'",
+                resourceId, responseObserver.uploadId));
+      }
 
       boolean objectFinalized = false;
       while (!objectFinalized) {
@@ -270,7 +276,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
           requestStreamObserver.onNext(insertRequest);
           objectFinalized = insertRequest.getFinishWrite();
         }
-        if (responseObserver.hasTransientError() || responseObserver.hasNonTransientError()) {
+        if (responseObserver.hasError()) {
           requestStreamObserver.onError(
               responseObserver.hasTransientError()
                   ? responseObserver.transientError
@@ -429,6 +435,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
         return response == null && nonTransientError != null;
       }
 
+      boolean hasError() {
+        return hasTransientError() || hasNonTransientError();
+      }
+
       @Override
       public void onNext(WriteObjectResponse response) {
         this.response = response;
@@ -451,6 +461,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
                   t);
         }
         done.countDown();
+        ready.countDown(); // In case we receive error even before we start writing
       }
 
       @Override
