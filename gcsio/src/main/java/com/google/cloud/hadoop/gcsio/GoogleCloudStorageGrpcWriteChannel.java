@@ -220,6 +220,13 @@ public final class GoogleCloudStorageGrpcWriteChannel
       // Only request committed size for the first insert request.
       if (writeOffset > 0) {
         writeOffset = getCommittedWriteSizeWithRetries(uploadId);
+        if (writeOffset % MAX_BYTES_PER_MESSAGE != 0) {
+          throw new IOException(
+              String.format(
+                  "Upstream requested data from a non chunk boundary for resource '%s'"
+                      + "offset:%d, chunkSize:%d",
+                  resourceId, writeOffset, MAX_BYTES_PER_MESSAGE));
+        }
       }
       StorageStub storageStub =
           stub.withDeadlineAfter(channelOptions.getGrpcWriteTimeout(), MILLISECONDS);
