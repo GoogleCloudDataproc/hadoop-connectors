@@ -17,7 +17,6 @@ package com.google.cloud.hadoop.util;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
-import com.google.api.client.googleapis.GoogleUtils;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.cloud.hadoop.util.HttpTransportFactory.SslKeepAliveSocketFactory;
 import java.io.IOException;
@@ -139,7 +138,9 @@ public class HttpTransportFactoryTest {
 
   @Test
   public void testKeepAliveSettingIsNotCorrupted() throws GeneralSecurityException, IOException {
-    NetHttpTransport.Builder builder = HttpTransportFactory.prepareNetHttpTransportBuilder(GoogleUtils.getCertificateTrustStore(), null);
+    NetHttpTransport.Builder builder =
+        HttpTransportFactory.createNetHttpTransportBuilder(/* proxyUri= */ null);
+
     assertThat(builder.getSslSocketFactory()).isInstanceOf(SslKeepAliveSocketFactory.class);
   }
 

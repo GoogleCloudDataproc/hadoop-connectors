@@ -16,6 +16,7 @@ package com.google.cloud.hadoop.util;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
+import static java.util.Objects.requireNonNullElseGet;
 
 import com.google.api.client.googleapis.GoogleUtils;
 import com.google.api.client.http.HttpTransport;
@@ -34,8 +35,6 @@ import java.net.SocketException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.GeneralSecurityException;
-import java.security.KeyStore;
-import java.security.cert.Certificate;
 import javax.annotation.Nullable;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLSocketFactory;
@@ -57,7 +56,7 @@ public class HttpTransportFactory {
   }
 
   /**
-   * Create an {@link HttpTransport} based on an type class and an optional HTTP proxy.
+   * Create an {@link HttpTransport} based on a type class and an optional HTTP proxy.
    *
    * @param proxyAddress The HTTP proxy to use with the transport. Of the form hostname:port. If
    *     empty no proxy will be used.
@@ -127,25 +126,25 @@ public class HttpTransportFactory {
             }
           });
     }
-    NetHttpTransport.Builder builder = prepareNetHttpTransportBuilder(GoogleUtils.getCertificateTrustStore(), proxyUri);
-    return builder.build();
+    return createNetHttpTransportBuilder(proxyUri).build();
   }
 
   @VisibleForTesting
-  static NetHttpTransport.Builder prepareNetHttpTransportBuilder(KeyStore keyStore, @Nullable URI proxyUri) throws GeneralSecurityException {
-    NetHttpTransport.Builder builder = new NetHttpTransport.Builder()
-            .trustCertificates(keyStore);
-    SSLSocketFactory socketFactory = builder.getSslSocketFactory();
-    if (socketFactory == null) {
-      socketFactory = HttpsURLConnection.getDefaultSSLSocketFactory();
-    }
+  static NetHttpTransport.Builder createNetHttpTransportBuilder(@Nullable URI proxyUri)
+      throws IOException, GeneralSecurityException {
+    NetHttpTransport.Builder builder =
+        new NetHttpTransport.Builder().trustCertificates(GoogleUtils.getCertificateTrustStore());
     return builder
-            .setSslSocketFactory(new SslKeepAliveSocketFactory(socketFactory))
-            .setProxy(
-                    proxyUri == null
-                            ? null
-                            : new Proxy(
-                            Proxy.Type.HTTP, new InetSocketAddress(proxyUri.getHost(), proxyUri.getPort())));
+        .setSslSocketFactory(
+            new SslKeepAliveSocketFactory(
+                requireNonNullElseGet(
+                    builder.getSslSocketFactory(), HttpsURLConnection::getDefaultSSLSocketFactory)))
+        .setProxy(
+            proxyUri == null
+                ? null
+                : new Proxy(
+                    Proxy.Type.HTTP,
+                    new InetSocketAddress(proxyUri.getHost(), proxyUri.getPort())));
   }
 
   /**
