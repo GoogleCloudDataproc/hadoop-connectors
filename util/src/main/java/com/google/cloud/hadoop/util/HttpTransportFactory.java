@@ -16,6 +16,7 @@ package com.google.cloud.hadoop.util;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
+import static java.util.Objects.requireNonNullElseGet;
 
 import com.google.api.client.googleapis.GoogleUtils;
 import com.google.api.client.http.HttpTransport;
@@ -55,7 +56,7 @@ public class HttpTransportFactory {
   }
 
   /**
-   * Create an {@link HttpTransport} based on an type class and an optional HTTP proxy.
+   * Create an {@link HttpTransport} based on a type class and an optional HTTP proxy.
    *
    * @param proxyAddress The HTTP proxy to use with the transport. Of the form hostname:port. If
    *     empty no proxy will be used.
@@ -125,18 +126,25 @@ public class HttpTransportFactory {
             }
           });
     }
+    return createNetHttpTransportBuilder(proxyUri).build();
+  }
 
-    SslKeepAliveSocketFactory sslSocketFactory =
-        new SslKeepAliveSocketFactory(HttpsURLConnection.getDefaultSSLSocketFactory());
-    return new NetHttpTransport.Builder()
-        .trustCertificates(GoogleUtils.getCertificateTrustStore())
-        .setSslSocketFactory(sslSocketFactory)
+  @VisibleForTesting
+  static NetHttpTransport.Builder createNetHttpTransportBuilder(@Nullable URI proxyUri)
+      throws IOException, GeneralSecurityException {
+    NetHttpTransport.Builder builder =
+        new NetHttpTransport.Builder().trustCertificates(GoogleUtils.getCertificateTrustStore());
+    return builder
+        .setSslSocketFactory(
+            new SslKeepAliveSocketFactory(
+                requireNonNullElseGet(
+                    builder.getSslSocketFactory(), HttpsURLConnection::getDefaultSSLSocketFactory)))
         .setProxy(
             proxyUri == null
                 ? null
                 : new Proxy(
-                    Proxy.Type.HTTP, new InetSocketAddress(proxyUri.getHost(), proxyUri.getPort())))
-        .build();
+                    Proxy.Type.HTTP,
+                    new InetSocketAddress(proxyUri.getHost(), proxyUri.getPort())));
   }
 
   /**
