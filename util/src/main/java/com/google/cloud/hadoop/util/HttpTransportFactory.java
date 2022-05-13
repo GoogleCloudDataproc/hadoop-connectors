@@ -36,6 +36,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.security.GeneralSecurityException;
+import java.security.KeyStore;
 import javax.annotation.Nullable;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLSocketFactory;
@@ -43,7 +44,6 @@ import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.Credentials;
 import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.conn.ssl.SSLContexts;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.params.HttpParams;
 import org.apache.http.protocol.HttpContext;
@@ -150,8 +150,7 @@ public class HttpTransportFactory {
 
     ApacheHttpTransport transport =
         new ApacheHttpTransport.Builder()
-            .trustCertificates(GoogleUtils.getCertificateTrustStore())
-            .setSocketFactory(new ApacheSslKeepAliveSocketFactory())
+            .setSocketFactory(new ApacheSslKeepAliveSocketFactory(GoogleUtils.getCertificateTrustStore()))
             .setProxy(
                 proxyUri == null ? null : new HttpHost(proxyUri.getHost(), proxyUri.getPort()))
             .build();
@@ -198,17 +197,27 @@ public class HttpTransportFactory {
           });
     }
 
-    JavaxSslKeepAliveSocketFactory sslSocketFactory =
-        new JavaxSslKeepAliveSocketFactory(HttpsURLConnection.getDefaultSSLSocketFactory());
-    return new NetHttpTransport.Builder()
-        .trustCertificates(GoogleUtils.getCertificateTrustStore())
-        .setSslSocketFactory(sslSocketFactory)
+    NetHttpTransport.Builder builder =
+        prepareNetHttpTransportBuilder(GoogleUtils.getCertificateTrustStore(), proxyUri);
+    return builder.build();
+  }
+
+  @VisibleForTesting
+  static NetHttpTransport.Builder prepareNetHttpTransportBuilder(
+      KeyStore keyStore, @Nullable URI proxyUri) throws GeneralSecurityException {
+    NetHttpTransport.Builder builder = new NetHttpTransport.Builder().trustCertificates(keyStore);
+    SSLSocketFactory socketFactory = builder.getSslSocketFactory();
+    if (socketFactory == null) {
+      socketFactory = HttpsURLConnection.getDefaultSSLSocketFactory();
+    }
+    return builder
+        .setSslSocketFactory(new JavaxSslKeepAliveSocketFactory(socketFactory))
         .setProxy(
             proxyUri == null
                 ? null
                 : new Proxy(
-                    Proxy.Type.HTTP, new InetSocketAddress(proxyUri.getHost(), proxyUri.getPort())))
-        .build();
+                    Proxy.Type.HTTP,
+                    new InetSocketAddress(proxyUri.getHost(), proxyUri.getPort())));
   }
 
   /**
@@ -246,8 +255,8 @@ public class HttpTransportFactory {
   @VisibleForTesting
   static class ApacheSslKeepAliveSocketFactory extends org.apache.http.conn.ssl.SSLSocketFactory {
 
-    public ApacheSslKeepAliveSocketFactory() {
-      super(SSLContexts.createDefault(), BROWSER_COMPATIBLE_HOSTNAME_VERIFIER);
+    public ApacheSslKeepAliveSocketFactory(KeyStore keyStore) throws GeneralSecurityException {
+      super(keyStore);
     }
 
     @Override
