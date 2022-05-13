@@ -62,6 +62,7 @@ import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /** Implements WritableByteChannel to provide write access to GCS via gRPC. */
 public final class GoogleCloudStorageGrpcWriteChannel
@@ -239,18 +240,13 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       // Wait for streaming RPC to become ready for upload.
       try {
-        responseObserver.ready.await();
+        // wait for 1 min for the channel to be ready. Else bail out
+        responseObserver.ready.await(60*1000, MILLISECONDS);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         throw new IOException(
             String.format(
                 "Interrupted while awaiting ready on responseObserver for '%s' with UploadID '%s'",
-                resourceId, responseObserver.uploadId));
-      }
-      if (responseObserver.hasError()) {
-        throw new IOException(
-            String.format(
-                "Exception while awaiting ready on responseObserver for '%s' with UploadID '%s'",
                 resourceId, responseObserver.uploadId));
       }
 
@@ -276,7 +272,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
           requestStreamObserver.onNext(insertRequest);
           objectFinalized = insertRequest.getFinishWrite();
         }
-        if (responseObserver.hasError()) {
+        if (responseObserver.hasTransientError() || responseObserver.hasNonTransientError()) {
           requestStreamObserver.onError(
               responseObserver.hasTransientError()
                   ? responseObserver.transientError
@@ -435,10 +431,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
         return response == null && nonTransientError != null;
       }
 
-      boolean hasError() {
-        return hasTransientError() || hasNonTransientError();
-      }
-
       @Override
       public void onNext(WriteObjectResponse response) {
         this.response = response;
@@ -461,7 +453,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
                   t);
         }
         done.countDown();
-        ready.countDown(); // In case we receive error even before we start writing
       }
 
       @Override
