@@ -18,18 +18,35 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Arrays.stream;
+import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.toMap;
 
+import com.google.api.client.http.HttpRequestInitializer;
+import com.google.api.client.http.HttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.services.storage.preprod.Storage;
+import com.google.api.services.storage.preprod.Storage.Directories.Insert;
+import com.google.api.services.storage.preprod.model.Directory;
 import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.util.AccessBoundary;
+import com.google.cloud.hadoop.util.ApiErrorExtractor;
+import com.google.cloud.hadoop.util.ChainingHttpRequestInitializer;
 import com.google.cloud.hadoop.util.CheckedFunction;
+import com.google.cloud.hadoop.util.HttpTransportFactory;
+import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.nio.file.FileAlreadyExistsException;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
 /** File system implementation for GCS based on Directory APIs */
@@ -39,6 +56,9 @@ public class GoogleCloudStorageNativeFileSystem implements GoogleCloudStorageFil
 
   // GCS access instance.
   private final GoogleCloudStorage gcs;
+
+  // Storage instance with directory support
+  private final Storage nativeStorage;
 
   // FS options
   private final GoogleCloudStorageFileSystemOptions options;
@@ -56,6 +76,7 @@ public class GoogleCloudStorageNativeFileSystem implements GoogleCloudStorageFil
   public GoogleCloudStorageNativeFileSystem(
       Credentials credentials, GoogleCloudStorageFileSystemOptions options) throws IOException {
     this(
+        credentials,
         new GoogleCloudStorageImpl(
             checkNotNull(options, "options must not be null").getCloudStorageOptions(),
             credentials),
@@ -77,6 +98,7 @@ public class GoogleCloudStorageNativeFileSystem implements GoogleCloudStorageFil
       GoogleCloudStorageFileSystemOptions options)
       throws IOException {
     this(
+        credentials,
         new GoogleCloudStorageImpl(
             checkNotNull(options, "options must not be null").getCloudStorageOptions(),
             credentials,
@@ -91,15 +113,17 @@ public class GoogleCloudStorageNativeFileSystem implements GoogleCloudStorageFil
    */
   @VisibleForTesting
   public GoogleCloudStorageNativeFileSystem(
+      Credentials credentials,
       CheckedFunction<GoogleCloudStorageOptions, GoogleCloudStorage, IOException> gcsFn,
       GoogleCloudStorageFileSystemOptions options)
       throws IOException {
-    this(gcsFn.apply(options.getCloudStorageOptions()), options);
+    this(credentials, gcsFn.apply(options.getCloudStorageOptions()), options);
   }
 
   @VisibleForTesting
   public GoogleCloudStorageNativeFileSystem(
-      GoogleCloudStorage gcs, GoogleCloudStorageFileSystemOptions options) {
+      Credentials credentials, GoogleCloudStorage gcs, GoogleCloudStorageFileSystemOptions options)
+      throws IOException {
     checkArgument(
         gcs.getOptions() == options.getCloudStorageOptions(),
         "gcs and gcsfs should use the same options");
@@ -109,7 +133,41 @@ public class GoogleCloudStorageNativeFileSystem implements GoogleCloudStorageFil
             ? new PerformanceCachingGoogleCloudStorage(gcs, options.getPerformanceCacheOptions())
             : gcs;
     this.options = options;
+    HttpRequestInitializer retryHttpInitializer =
+        new ChainingHttpRequestInitializer(
+            new StatisticsTrackingHttpRequestInitializer(statistics),
+            new RetryHttpInitializer(
+                credentials, options.getCloudStorageOptions().toRetryHttpInitializerOptions()));
+    this.nativeStorage = createStorage(options.getCloudStorageOptions(), retryHttpInitializer);
     this.legacyGcsFs = new GoogleCloudStorageFileSystemImpl(gcs, options);
+  }
+
+  private final ImmutableMap<GoogleCloudStorageStatistics, AtomicLong> statistics =
+      ImmutableMap.copyOf(
+          stream(GoogleCloudStorageStatistics.values())
+              .collect(
+                  toMap(
+                      identity(),
+                      k -> new AtomicLong(0),
+                      (u, v) -> {
+                        throw new IllegalStateException(
+                            String.format(
+                                "Duplicate key (attempted merging values %s and %s)", u, u));
+                      },
+                      () -> new EnumMap<>(GoogleCloudStorageStatistics.class))));
+
+  private static Storage createStorage(
+      GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer)
+      throws IOException {
+    HttpTransport httpTransport =
+        HttpTransportFactory.createHttpTransport(
+            options.getProxyAddress(), options.getProxyUsername(), options.getProxyPassword());
+    return new Storage.Builder(
+            httpTransport, GsonFactory.getDefaultInstance(), httpRequestInitializer)
+        .setRootUrl(options.getStorageRootUrl())
+        .setServicePath(options.getStorageServicePath())
+        .setApplicationName(options.getAppName())
+        .build();
   }
 
   @Override
@@ -188,7 +246,36 @@ public class GoogleCloudStorageNativeFileSystem implements GoogleCloudStorageFil
 
   @Override
   public void mkdir(URI path) throws IOException {
-    legacyGcsFs.mkdir(path);
+    checkNotNull(path);
+    logger.atFiner().log("mkdir(path: %s)", path);
+    checkArgument(!path.equals(GCS_ROOT), "Cannot create root directory.");
+
+    StorageResourceId resourceId = StorageResourceId.fromUriPath(path, true);
+
+    // If this is a top level directory, create the corresponding bucket.
+    if (resourceId.isBucket()) {
+      gcs.createBucket(resourceId.getBucketName());
+      return;
+    }
+
+    // Ensure that the path looks like a directory path.
+    resourceId = resourceId.toDirectoryId();
+
+    Insert insertDir =
+        nativeStorage
+            .directories()
+            .insert(
+                resourceId.getBucketName(), new Directory().setName(resourceId.getObjectName()));
+    try {
+      insertDir.execute();
+    } catch (IOException e) {
+      if (ApiErrorExtractor.INSTANCE.itemAlreadyExists(e)) {
+        throw (FileAlreadyExistsException)
+            new FileAlreadyExistsException(String.format("Object '%s' already exists.", resourceId))
+                .initCause(e);
+      }
+      throw e;
+    }
   }
 
   @Override
