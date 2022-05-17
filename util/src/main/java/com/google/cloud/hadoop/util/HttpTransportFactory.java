@@ -74,7 +74,7 @@ public class HttpTransportFactory {
   }
 
   /**
-   * Create an {@link HttpTransport} based on an type class and an optional HTTP proxy.
+   * Create an {@link HttpTransport} based on a type class and an optional HTTP proxy.
    *
    * @param type The type of HttpTransport to use.
    * @param proxyAddress The HTTP proxy to use with the transport. Of the form hostname:port. If
@@ -197,18 +197,26 @@ public class HttpTransportFactory {
             }
           });
     }
+    return createNetHttpTransportBuilder(proxyUri).build();
+  }
 
-    SslKeepAliveSocketFactory sslSocketFactory =
-        new SslKeepAliveSocketFactory(HttpsURLConnection.getDefaultSSLSocketFactory());
-    return new NetHttpTransport.Builder()
-        .trustCertificates(GoogleUtils.getCertificateTrustStore())
-        .setSslSocketFactory(sslSocketFactory)
+  @VisibleForTesting
+  static NetHttpTransport.Builder createNetHttpTransportBuilder(@Nullable URI proxyUri)
+      throws IOException, GeneralSecurityException {
+    NetHttpTransport.Builder builder =
+        new NetHttpTransport.Builder().trustCertificates(GoogleUtils.getCertificateTrustStore());
+    return builder
+        .setSslSocketFactory(
+            new SslKeepAliveSocketFactory(
+                builder.getSslSocketFactory() != null
+                    ? builder.getSslSocketFactory()
+                    : HttpsURLConnection.getDefaultSSLSocketFactory()))
         .setProxy(
             proxyUri == null
                 ? null
                 : new Proxy(
-                    Proxy.Type.HTTP, new InetSocketAddress(proxyUri.getHost(), proxyUri.getPort())))
-        .build();
+                    Proxy.Type.HTTP,
+                    new InetSocketAddress(proxyUri.getHost(), proxyUri.getPort())));
   }
 
   /**
