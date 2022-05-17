@@ -26,6 +26,7 @@ import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GcsFileChecksumType
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.FilesystemAPI;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
@@ -419,6 +420,10 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<MetricsSink> GCS_METRICS_SINK =
       new HadoopConfigurationProperty<>("fs.gs.metrics.sink", MetricsSink.NONE);
 
+  /** Configuration key to enable publishing metrics to Google cloud monitoring. */
+  public static final HadoopConfigurationProperty<FilesystemAPI> GCS_FILESYSTEM_API =
+      new HadoopConfigurationProperty<>("fs.gs.filesystem.api", FilesystemAPI.OBJECT);
+
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
   // @VisibleForTesting
@@ -431,7 +436,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setMarkerFilePattern(GCS_MARKER_FILE_PATTERN.get(config, config::get))
         .setPerformanceCacheEnabled(GCS_PERFORMANCE_CACHE_ENABLE.get(config, config::getBoolean))
         .setPerformanceCacheOptions(getPerformanceCachingOptions(config))
-        .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean));
+        .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean))
+        .setFilesystemApi(GCS_FILESYSTEM_API.get(config, config::getEnum));
   }
 
   @VisibleForTesting
