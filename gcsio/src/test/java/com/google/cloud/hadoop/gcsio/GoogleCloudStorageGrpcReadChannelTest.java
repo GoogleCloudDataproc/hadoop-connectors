@@ -860,7 +860,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
     verify(get).setFields(METADATA_FIELDS);
     verify(get).execute();
-    // footerSize is bigger than object size, only the content is read
+    /* footerSize is bigger than object size, only the content is read */
     verify(fakeService, times(1))
         .readObject(
             eq(

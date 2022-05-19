@@ -134,7 +134,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   Fadvise readStrategy;
 
-  private byte[] footerBuffer = null;
+  private byte[] footerBuffer;
 
   private final long footerStartOffsetInBytes;
 
@@ -415,6 +415,18 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     }
 
     long effectivePosition = positionInGrpcStream + bytesToSkipBeforeReading;
+
+    /* resIterator is null on the first read (position = 0) or when a seek is performed (and when
+      there are exceptions). So if footerBuffer is null and we are trying to read into footer
+      region, we may just cache the footer
+    */
+    if ((resIterator == null)
+        && (footerBuffer == null)
+        && (effectivePosition >= footerStartOffsetInBytes)) {
+      this.footerBuffer =
+          getFooterContent(footerStartOffsetInBytes, (int) (objectSize - footerStartOffsetInBytes));
+    }
+
     if ((footerBuffer == null) || (effectivePosition < footerStartOffsetInBytes)) {
       OptionalLong bytesToRead = getBytesToRead(byteBuffer);
       bytesRead += readFromGCS(byteBuffer, bytesToRead);
@@ -722,11 +734,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     // Reset any ongoing read operations or local data caches.
     cancelCurrentRequest();
     invalidateBufferedContent();
-
-    if (footerBuffer == null && newPosition > 0 && newPosition >= footerStartOffsetInBytes) {
-      this.footerBuffer =
-          getFooterContent(footerStartOffsetInBytes, (int) (objectSize - footerStartOffsetInBytes));
-    }
 
     positionInGrpcStream = newPosition;
     return this;
