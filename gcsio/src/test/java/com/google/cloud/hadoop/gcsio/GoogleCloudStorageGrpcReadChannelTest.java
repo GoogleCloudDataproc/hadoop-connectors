@@ -868,7 +868,6 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
                     .setBucket(BUCKET_NAME)
                     .setObject(OBJECT_NAME)
                     .setGeneration(OBJECT_GENERATION)
-                    .setReadOffset(80)
                     .build()),
             any());
     assertArrayEquals(fakeService.data.substring(80).toByteArray(), buffer.array());
