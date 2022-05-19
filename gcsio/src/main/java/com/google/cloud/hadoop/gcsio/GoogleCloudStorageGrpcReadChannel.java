@@ -311,9 +311,10 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private byte[] getFooterContent(long footerOffset, int footerSize) throws IOException {
     ByteBuffer buffer = ByteBuffer.allocate(footerSize);
+    long oldPositionInGrpcStream = this.positionInGrpcStream;
     this.positionInGrpcStream = footerOffset;
     readFromGCS(buffer, OptionalLong.empty());
-    this.positionInGrpcStream = 0; // reset position to start
+    this.positionInGrpcStream = oldPositionInGrpcStream; // reset position to start
     cancelCurrentRequest();
     return buffer.array();
   }
@@ -424,7 +425,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         && (footerBuffer == null)
         && (effectivePosition >= footerStartOffsetInBytes)) {
       this.footerBuffer =
-          getFooterContent(footerStartOffsetInBytes, (int) (objectSize - footerStartOffsetInBytes));
+          getFooterContent(
+              footerStartOffsetInBytes, Math.toIntExact(objectSize - footerStartOffsetInBytes));
     }
 
     if ((footerBuffer == null) || (effectivePosition < footerStartOffsetInBytes)) {
