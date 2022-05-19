@@ -312,9 +312,15 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   private byte[] getFooterContent(long footerOffset, int footerSize) throws IOException {
     ByteBuffer buffer = ByteBuffer.allocate(footerSize);
     long oldPositionInGrpcStream = this.positionInGrpcStream;
+    long oldBytesToSkipBeforeReading = bytesToSkipBeforeReading;
     this.positionInGrpcStream = footerOffset;
+    this.bytesToSkipBeforeReading = 0;
+
     readFromGCS(buffer, OptionalLong.empty());
+
+    // restore the original values of these variables
     this.positionInGrpcStream = oldPositionInGrpcStream; // reset position to start
+    this.bytesToSkipBeforeReading = oldBytesToSkipBeforeReading;
     cancelCurrentRequest();
     return buffer.array();
   }
