@@ -196,7 +196,7 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
     }
   }
 
-  private void closeInternal() {
+  protected void closeInternal() {
     pipeSink = null;
     if (uploadOperation != null && !uploadOperation.isDone()) {
       uploadOperation.cancel(/* mayInterruptIfRunning= */ true);
@@ -242,7 +242,7 @@ public abstract class BaseAbstractGoogleAsyncWriteChannel<T> implements Writable
    *
    * @throws IOException on IO error
    */
-  private T waitForCompletionAndThrowIfUploadFailed() throws IOException {
+  protected T waitForCompletionAndThrowIfUploadFailed() throws IOException {
     try {
       return uploadOperation.get();
     } catch (InterruptedException e) {
