@@ -311,6 +311,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private byte[] getFooterContent(long footerOffset, int footerSize) throws IOException {
     ByteBuffer buffer = ByteBuffer.allocate(footerSize);
+
+    // snapshot these variables because readFromGCS clobbers them
     long oldPositionInGrpcStream = this.positionInGrpcStream;
     long oldBytesToSkipBeforeReading = bytesToSkipBeforeReading;
     this.positionInGrpcStream = footerOffset;
@@ -318,9 +320,10 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
     readFromGCS(buffer, OptionalLong.empty());
 
-    // restore the original values of these variables
+    // restore the last know values of these variables
     this.positionInGrpcStream = oldPositionInGrpcStream; // reset position to start
     this.bytesToSkipBeforeReading = oldBytesToSkipBeforeReading;
+
     cancelCurrentRequest();
     return buffer.array();
   }

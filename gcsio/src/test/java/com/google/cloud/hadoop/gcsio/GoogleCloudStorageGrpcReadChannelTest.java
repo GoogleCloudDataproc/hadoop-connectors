@@ -999,6 +999,74 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   }
 
   @Test
+  public void testSeekBeforeFooterAndSequentialRead() throws Exception {
+    int objectSize = 4 * 1024;
+    fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(objectSize).build());
+    storageObject.setSize(BigInteger.valueOf(objectSize));
+    verify(fakeService, times(1)).setObject(any());
+    int minRangeRequestSize = 4 * 1024;
+    int readOffset = 1 * 1024;
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder()
+            .setMinRangeRequestSize(minRangeRequestSize)
+            .setInplaceSeekLimit(2 * 1024)
+            .build();
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
+    ByteBuffer buffer = ByteBuffer.allocate(2 * 1024);
+
+    readChannel.position(readOffset);
+    readChannel.read(buffer);
+    // Only one ReadObjectRequest is sent and there is no separate request to prefetch footer
+    verify(fakeService, times(1))
+        .readObject(
+            eq(
+                ReadObjectRequest.newBuilder()
+                    .setBucket(BUCKET_NAME)
+                    .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
+                    .setReadOffset(readOffset)
+                    .build()),
+            any());
+
+    verifyNoMoreInteractions(fakeService);
+  }
+
+  @Test
+  public void testFooterNotCachedInSequentialRead() throws Exception {
+    int objectSize = 4 * 1024;
+    fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(objectSize).build());
+    storageObject.setSize(BigInteger.valueOf(objectSize));
+    verify(fakeService, times(1)).setObject(any());
+    int minRangeRequestSize = 4 * 1024;
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder()
+            .setMinRangeRequestSize(minRangeRequestSize)
+            .setInplaceSeekLimit(2 * 1024)
+            .build();
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
+    ByteBuffer buffer = ByteBuffer.allocate(2 * 1024);
+
+    readChannel.read(buffer);
+    buffer.clear();
+
+    readChannel.read(buffer);
+    buffer.clear();
+
+    // Only one ReadObjectRequest is sent and there is no separate request to prefetch footer
+    verify(fakeService, times(1))
+        .readObject(
+            eq(
+                ReadObjectRequest.newBuilder()
+                    .setBucket(BUCKET_NAME)
+                    .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
+                    .build()),
+            any());
+
+    verifyNoMoreInteractions(fakeService);
+  }
+
+  @Test
   public void testReadCachedFooterPartiallyWithInplaceSeek() throws Exception {
     int objectSize = 16 * 1024;
     fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(objectSize).build());
@@ -1017,7 +1085,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     verify(get).setFields(METADATA_FIELDS);
     verify(get).execute();
 
-    int footerOffset = 14 * 1024;
+    // This should just issue a read from offset 0
     verify(fakeService, times(1))
         .readObject(
             eq(
@@ -1033,6 +1101,8 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     readChannel.position(readOffset);
     readChannel.read(buffer);
 
+    // This should just issue a read from given offset. Note that we are not
+    // yet prefetching the footer
     verify(fakeService, times(1))
         .readObject(
             eq(
@@ -1047,10 +1117,11 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         fakeService.data.substring(readOffset, readOffset + (2 * 1024)).toByteArray(),
         buffer.array());
 
-    // reading the footer twice to ensure there are no additional calls to GCS
+    int footerOffset = 14 * 1024;
     buffer.clear();
     readChannel.position(footerOffset);
     readChannel.read(buffer);
+    // This is when the footer is read
     verify(fakeService, times(1))
         .readObject(
             eq(
