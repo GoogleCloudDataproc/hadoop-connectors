@@ -135,7 +135,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   Fadvise readStrategy;
 
-  private final byte[] footerBuffer;
+  private byte[] footerBuffer;
 
   private final long footerStartOffsetInBytes;
 
@@ -175,8 +175,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     int prefetchSizeInBytes = readOptions.getMinRangeRequestSize() / 2;
     this.gRPCReadMessageTimeout = readOptions.getGrpcReadMessageTimeoutMillis();
     this.footerStartOffsetInBytes = max(0, (objectSize - prefetchSizeInBytes));
-    int footerSize = Math.toIntExact(min(prefetchSizeInBytes, objectSize));
-    this.footerBuffer = getFooterContent(footerStartOffsetInBytes, footerSize);
   }
 
   private void validate(GoogleCloudStorageItemInfo itemInfo) throws IOException {
@@ -233,8 +231,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     int prefetchSizeInBytes = readOptions.getMinRangeRequestSize() / 2;
     this.gRPCReadMessageTimeout = readOptions.getGrpcReadMessageTimeoutMillis();
     this.footerStartOffsetInBytes = max(0, (objectSize - prefetchSizeInBytes));
-    int footerSize = Math.toIntExact(min(prefetchSizeInBytes, objectSize));
-    this.footerBuffer = getFooterContent(footerStartOffsetInBytes, footerSize);
   }
 
   private GoogleCloudStorageItemInfo getObjectMetadata(StorageResourceId resourceId, Storage gcs)
@@ -317,9 +313,19 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private byte[] getFooterContent(long footerOffset, int footerSize) throws IOException {
     ByteBuffer buffer = ByteBuffer.allocate(footerSize);
+
+    // snapshot these variables because readFromGCS clobbers them
+    long oldPositionInGrpcStream = this.positionInGrpcStream;
+    long oldBytesToSkipBeforeReading = bytesToSkipBeforeReading;
     this.positionInGrpcStream = footerOffset;
+    this.bytesToSkipBeforeReading = 0;
+
     readFromGCS(buffer, OptionalLong.empty());
-    this.positionInGrpcStream = 0; // reset position to start
+
+    // restore the last know values of these variables
+    this.positionInGrpcStream = oldPositionInGrpcStream; // reset position to start
+    this.bytesToSkipBeforeReading = oldBytesToSkipBeforeReading;
+
     cancelCurrentRequest();
     return buffer.array();
   }
@@ -421,6 +427,19 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     }
 
     long effectivePosition = positionInGrpcStream + bytesToSkipBeforeReading;
+
+    /* resIterator is null on the first read (position = 0) or when a seek is performed (and when
+      there are exceptions). So if footerBuffer is null and we are trying to read into footer
+      region, we may just cache the footer
+    */
+    if ((resIterator == null)
+        && (footerBuffer == null)
+        && (effectivePosition >= footerStartOffsetInBytes)) {
+      this.footerBuffer =
+          getFooterContent(
+              footerStartOffsetInBytes, Math.toIntExact(objectSize - footerStartOffsetInBytes));
+    }
+
     if ((footerBuffer == null) || (effectivePosition < footerStartOffsetInBytes)) {
       OptionalLong bytesToRead = getBytesToRead(byteBuffer);
       bytesRead += readFromGCS(byteBuffer, bytesToRead);
