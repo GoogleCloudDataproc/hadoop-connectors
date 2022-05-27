@@ -508,7 +508,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     ReadObjectResponse res = resIterator.next();
 
     // When zero-copy marshaller is used, the stream that backs GetObjectMediaResponse
-    // should be closed when the message is no longed needed so that all buffers in the
+    // should be closed when the message is no longer needed so that all buffers in the
     // stream can be reclaimed. If zero-copy is not used, stream will be null.
     InputStream stream = getObjectMediaResponseMarshaller.popStream(res);
     try {
