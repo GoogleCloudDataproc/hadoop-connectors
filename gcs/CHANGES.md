@@ -1,5 +1,9 @@
 ### 2.1.7 - 2022-02-03
 
+1.  prevent clobbering of SSL trustCertificates
+
+### 2.1.7 - 2022-02-03
+
 1.  Enable TCP keep alive by default.
 
 ### 2.1.6 - 2020-11-06
