@@ -1,4 +1,4 @@
-### 2.1.7 - 2022-02-03
+### 2.1.8 - 2022-05-30
 
 1.  prevent clobbering of SSL trustCertificates
 
