@@ -1,3 +1,9 @@
+### 2.2.7 - 2022-06-01
+
+1. Fix: Prevent clobbering of SSL trustCertificates
+
+1. Lazy footer prefetch optimizations
+
 ### 2.2.6 - 2022-04-14
 
 1. Improve trace logging for gRPC channels.
