@@ -164,6 +164,11 @@ public final class GoogleCloudStorageGrpcWriteChannel
   }
 
   @Override
+  public void startUpload(InputStream pipeSource) throws IOException {
+    return;
+  }
+
+  @Override
   public boolean isOpen() {
     return (writeBuffer != null);
   }
@@ -183,6 +188,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
     while (buffer.remaining() > 0) {
       int bytesToWrite = 0;
+      // create chunks of MAX_BYTES_PER_MESSAGE and push them into writeBuffer
       if (lastChunk != null) {
         bytesToWrite = min(buffer.remaining(), MAX_BYTES_PER_MESSAGE - lastChunk.size());
         lastChunk = lastChunk.concat(ByteString.copyFrom(buffer, bytesToWrite));
@@ -204,13 +210,11 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
     }
 
-    if (uploadOperation.isDone()) {
-      waitForCompletionAndThrowIfUploadFailed();
-    }
     return bytesWritten;
   }
 
   /** Initialize this channel object for writing. */
+  @Override
   public void initialize() throws IOException {
     writeBuffer =
         new LinkedBlockingQueue<ByteString>(
@@ -221,10 +225,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
       throw new RuntimeException(String.format("Failed to start upload for '%s'", resourceId), e);
     }
     initialized = true;
-  }
-
-  public void startUpload(InputStream pipeSource) throws IOException {
-    return;
   }
 
   @Override
@@ -662,6 +662,12 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
     }
 
+    /*
+      This function keeps track of any outstanding request to get the committed write offset.
+      If there are no outstanding request, it issues a request. For an outstanding request, it
+      checks if we have a response and returns it. Otherwise, it returns -1.
+      If block is true, this request becomes a blocking call instead of async.
+     */
     private long getCommittedWriteSizeAsync(String uploadId, boolean block) {
       long offset = -1;
 
@@ -688,6 +694,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
       if (writeStatusResponseObserver.done.getCount() <= 0) {
         if (!writeStatusResponseObserver.hasError()) {
           offset = writeStatusResponseObserver.getResponse().getPersistedSize();
+          logger.atFinest().log(
+              "Fetched committed write offset: offset:%d, resource:%s, time:%d",
+              offset, resourceId, writeStatusStopWatch.elapsed(MILLISECONDS));
         }
         writeStatusResponseObserver = null;
       }
