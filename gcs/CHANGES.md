@@ -4,6 +4,8 @@
 
 1. Lazy footer prefetch optimizations
 
+1. Make writes via GCS gRPC API resilient
+
 ### 2.2.6 - 2022-04-14
 
 1. Improve trace logging for gRPC channels.
