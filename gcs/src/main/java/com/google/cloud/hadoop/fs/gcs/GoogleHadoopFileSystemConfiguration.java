@@ -424,6 +424,10 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<FilesystemAPI> GCS_FILESYSTEM_API =
       new HadoopConfigurationProperty<>("fs.gs.filesystem.api", FilesystemAPI.OBJECT);
 
+  /** Configuration key to enable logging of additional trace details. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_TRACE_LOG_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.tracelog.enable", false);
+
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
   // @VisibleForTesting
@@ -479,7 +483,8 @@ public class GoogleHadoopFileSystemConfiguration {
             GCS_GRPC_CHECK_INTERVAL_TIMEOUT_MS.get(config, config::getLong))
         .setDirectPathPreferred(GCS_GRPC_DIRECTPATH_ENABLE.get(config, config::getBoolean))
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
-        .setMetricsSink(GCS_METRICS_SINK.get(config, config::getEnum));
+        .setMetricsSink(GCS_METRICS_SINK.get(config, config::getEnum))
+        .setTraceLogEnable(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean));
   }
 
   private static PerformanceCachingGoogleCloudStorageOptions getPerformanceCachingOptions(

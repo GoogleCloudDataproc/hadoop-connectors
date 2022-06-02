@@ -129,6 +129,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.storage.http.headers.", ImmutableMap.of());
           put("fs.gs.storage.root.url", "https://storage.googleapis.com/");
           put("fs.gs.storage.service.path", "storage/v1/");
+          put("fs.gs.tracelog.enable", false);
           put("fs.gs.working.dir", "/");
         }
       };
