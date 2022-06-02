@@ -49,8 +49,11 @@ import org.apache.hadoop.util.ToolRunner;
  *
  * <pre>{@code
  * hadoop jar /usr/lib/hadoop/lib/gcs-connector.jar com.google.cloud.hadoop.fs.gcs.FsBenchmark \
- *     {read,random-read} --file=gs://<bucket_name> [--no-warmup] [--verbose]
+ *     {read,random-read,write} --file=gs://<bucket_name> [--no-warmup] [--verbose]
  * }</pre>
+ *
+ * for write benchmark, the --file parameter takes a GCS directory location where temp files will
+ * be created. Please clean up the dir after the test
  */
 public class FsBenchmark extends Configured implements Tool {
 
@@ -148,8 +151,8 @@ public class FsBenchmark extends Configured implements Tool {
   private int benchmarkWrite(FileSystem fs, Map<String, String> args) {
     if (args.size() < 1) {
       System.err.println(
-          "Usage: read"
-              + " --dir=gs://${BUCKET}/path/to/test/dir/"
+          "Usage: write"
+              + " --file=gs://${BUCKET}/path/to/test/dir/"
               + " [--total-size=<file size to write in bytes>]"
               + " [--write-size=<write buffer size in bytes>]"
               + " [--num-writes=<number of times to fully write test file>]"
@@ -166,7 +169,7 @@ public class FsBenchmark extends Configured implements Tool {
         parseInt(args.getOrDefault("--write-size", String.valueOf(1024))),
         parseInt(args.getOrDefault("--num-writes", String.valueOf(1))),
         parseInt(args.getOrDefault("--num-threads", String.valueOf(1))),
-        parseInt(args.getOrDefault("--total-size", String.valueOf(10 * 1024))));
+        parseLong(args.getOrDefault("--total-size", String.valueOf(10 * 1024))));
 
     return 0;
   }
@@ -215,11 +218,11 @@ public class FsBenchmark extends Configured implements Tool {
       int readSize,
       int numReads,
       int numThreads,
-      int totalSize) {
+      long totalSize) {
     String operation = benchmarkRead ? "Read" : "Write";
     System.out.printf(
-        "Running %s test using %d bytes reads to fully read '%s' file %d times in %d threads%n",
-        operation, readSize, testFile, numReads, numThreads);
+        "Running %s test using %d bytes IO to fully %s '%s' file %d times in %d threads%n",
+        operation, readSize, operation, testFile, numReads, numThreads);
 
     Set<LongSummaryStatistics> readFileBytesList = newSetFromMap(new ConcurrentHashMap<>());
     Set<LongSummaryStatistics> readFileTimeNsList = newSetFromMap(new ConcurrentHashMap<>());
