@@ -52,10 +52,15 @@ import org.apache.hadoop.util.ToolRunner;
  *     {read,random-read,write} --file=gs://<bucket_name> [--no-warmup] [--verbose]
  * }</pre>
  *
- * for write benchmark, the --file parameter takes a GCS directory location where temp files will
- * be created. Please clean up the dir after the test
+ * for write benchmark, the --file parameter takes a GCS directory location where temp files will be
+ * created. Please clean up the dir after the test
  */
 public class FsBenchmark extends Configured implements Tool {
+
+  private enum OperationType {
+    READ,
+    WRITE
+  }
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
@@ -165,7 +170,7 @@ public class FsBenchmark extends Configured implements Tool {
     benchmarkFileIO(
         fs,
         testFile,
-        false,
+        OperationType.WRITE,
         parseInt(args.getOrDefault("--write-size", String.valueOf(1024))),
         parseInt(args.getOrDefault("--num-writes", String.valueOf(1))),
         parseInt(args.getOrDefault("--num-threads", String.valueOf(1))),
@@ -193,16 +198,16 @@ public class FsBenchmark extends Configured implements Tool {
             benchmarkFileIO(
                 fs,
                 testFile,
-                true,
+                OperationType.READ,
                 /* readSize= */ 1024,
                 /* numReads= */ 1,
                 /* numThreads= */ 2,
-                0));
+                /* totalFileSize */ 0));
 
     benchmarkFileIO(
         fs,
         testFile,
-        true,
+        OperationType.READ,
         parseInt(args.getOrDefault("--read-size", String.valueOf(1024))),
         parseInt(args.getOrDefault("--num-reads", String.valueOf(1))),
         parseInt(args.getOrDefault("--num-threads", String.valueOf(1))),
@@ -214,12 +219,11 @@ public class FsBenchmark extends Configured implements Tool {
   private void benchmarkFileIO(
       FileSystem fs,
       Path testFile,
-      boolean benchmarkRead,
+      OperationType operation,
       int readSize,
       int numReads,
       int numThreads,
       long totalSize) {
-    String operation = benchmarkRead ? "Read" : "Write";
     System.out.printf(
         "Running %s test using %d bytes IO to fully %s '%s' file %d times in %d threads%n",
         operation, readSize, operation, testFile, numReads, numThreads);
@@ -234,7 +238,7 @@ public class FsBenchmark extends Configured implements Tool {
     CountDownLatch startLatch = new CountDownLatch(1);
     CountDownLatch stopLatch = new CountDownLatch(numThreads);
     List<Future<?>> futures = new ArrayList<>(numThreads);
-    String random_id = UUID.randomUUID().toString().substring(0, 6);
+    String tempFilenameKey = UUID.randomUUID().toString().substring(0, 6);
 
     for (int i = 0; i < numThreads; i++) {
       int file_counter = i;
@@ -247,13 +251,14 @@ public class FsBenchmark extends Configured implements Tool {
                 LongSummaryStatistics readCallTimeNs = newLongSummaryStatistics(readCallTimeNsList);
 
                 byte[] readBuffer = new byte[readSize];
-                Path file_to_io = testFile;
+                Path testFileToIO = testFile;
 
-                if (!benchmarkRead) {
+                if (operation == OperationType.WRITE) {
                   Random r = new Random();
                   r.nextBytes(readBuffer);
-                  String random_file = String.format("/test-%s-%03d.bin", random_id, file_counter);
-                  file_to_io = new Path(testFile.toString() + random_file);
+                  String random_file =
+                      String.format("/test-%s-%03d.bin", tempFilenameKey, file_counter);
+                  testFileToIO = new Path(testFile.toString() + random_file);
                 }
 
                 initLatch.countDown();
@@ -262,30 +267,36 @@ public class FsBenchmark extends Configured implements Tool {
                   for (int j = 0; j < numReads; j++) {
                     long readStart = System.nanoTime();
                     long fileBytesRead = 0;
-                    if (benchmarkRead) {
-                      try (FSDataInputStream input = fs.open(file_to_io)) {
-                        int bytesRead;
-                        do {
-                          long readCallStart = System.nanoTime();
-                          bytesRead = input.read(readBuffer);
-                          if (bytesRead > 0) {
-                            fileBytesRead += bytesRead;
-                            readCallBytes.accept(bytesRead);
-                          }
-                          readCallTimeNs.accept(System.nanoTime() - readCallStart);
-                        } while (bytesRead >= 0);
-                      }
-                    } else {
-                      try (FSDataOutputStream output = fs.create(file_to_io)) {
-                        int bytesRead;
-                        do {
-                          long readCallStart = System.nanoTime();
-                          output.write(readBuffer);
-                          fileBytesRead += readSize;
-                          readCallBytes.accept(readSize);
-                          readCallTimeNs.accept(System.nanoTime() - readCallStart);
-                        } while (fileBytesRead < totalSize);
-                      }
+
+                    switch (operation) {
+                      case READ:
+                        /* Open the file and read it till the end */
+                        try (FSDataInputStream input = fs.open(testFileToIO)) {
+                          int bytesRead;
+                          do {
+                            long readCallStart = System.nanoTime();
+                            bytesRead = input.read(readBuffer);
+                            if (bytesRead > 0) {
+                              fileBytesRead += bytesRead;
+                              readCallBytes.accept(bytesRead);
+                            }
+                            readCallTimeNs.accept(System.nanoTime() - readCallStart);
+                          } while (bytesRead >= 0);
+                        }
+                        break;
+
+                      case WRITE:
+                        /* Open the file and write random string till min of totalSize */
+                        try (FSDataOutputStream output = fs.create(testFileToIO)) {
+                          do {
+                            long readCallStart = System.nanoTime();
+                            output.write(readBuffer);
+                            fileBytesRead += readSize;
+                            readCallBytes.accept(readSize);
+                            readCallTimeNs.accept(System.nanoTime() - readCallStart);
+                          } while (fileBytesRead < totalSize);
+                        }
+                        break;
                     }
                     readFileBytes.accept(fileBytesRead);
                     readFileTimeNs.accept(System.nanoTime() - readStart);
