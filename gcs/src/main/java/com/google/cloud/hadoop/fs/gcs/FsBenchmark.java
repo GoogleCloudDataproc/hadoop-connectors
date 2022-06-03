@@ -161,7 +161,7 @@ public class FsBenchmark extends Configured implements Tool {
       return 1;
     }
 
-    Path testFile = new Path(args.get("--dir"));
+    Path testFile = new Path(args.get("--file"));
 
     benchmarkWrite(
         fs,
