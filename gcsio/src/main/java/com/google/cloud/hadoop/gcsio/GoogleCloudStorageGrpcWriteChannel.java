@@ -663,11 +663,11 @@ public final class GoogleCloudStorageGrpcWriteChannel
     }
 
     /*
-      This function keeps track of any outstanding request to get the committed write offset.
-      If there are no outstanding request, it issues a request. For an outstanding request, it
-      checks if we have a response and returns it. Otherwise, it returns -1.
-      If block is true, this request becomes a blocking call instead of async.
-     */
+     This function keeps track of any outstanding request to get the committed write offset.
+     If there are no outstanding request, it issues a request. For an outstanding request, it
+     checks if we have a response and returns it. Otherwise, it returns -1.
+     If block is true, this request becomes a blocking call instead of async.
+    */
     private long getCommittedWriteSizeAsync(String uploadId, boolean block) {
       long offset = -1;
 
