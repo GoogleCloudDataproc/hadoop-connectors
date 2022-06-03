@@ -175,15 +175,15 @@ public class FsBenchmark extends Configured implements Tool {
   }
 
   private void benchmarkWrite(
-      FileSystem fs, Path testFile, int readSize, int numReads, int numThreads, long totalSize) {
+      FileSystem fs, Path testFile, int writeSize, int numWrites, int numThreads, long totalSize) {
     System.out.printf(
         "Running write test using %d bytes writes to fully write '%s' file %d times in %d threads%n",
-        readSize, testFile, numReads, numThreads);
+        writeSize, testFile, numWrites, numThreads);
 
-    Set<LongSummaryStatistics> readFileBytesList = newSetFromMap(new ConcurrentHashMap<>());
-    Set<LongSummaryStatistics> readFileTimeNsList = newSetFromMap(new ConcurrentHashMap<>());
-    Set<LongSummaryStatistics> readCallBytesList = newSetFromMap(new ConcurrentHashMap<>());
-    Set<LongSummaryStatistics> readCallTimeNsList = newSetFromMap(new ConcurrentHashMap<>());
+    Set<LongSummaryStatistics> writeFileBytesList = newSetFromMap(new ConcurrentHashMap<>());
+    Set<LongSummaryStatistics> writeFileTimeNsList = newSetFromMap(new ConcurrentHashMap<>());
+    Set<LongSummaryStatistics> writeCallBytesList = newSetFromMap(new ConcurrentHashMap<>());
+    Set<LongSummaryStatistics> writeCallTimeNsList = newSetFromMap(new ConcurrentHashMap<>());
 
     String tempFilenameKey = UUID.randomUUID().toString().substring(0, 6);
 
@@ -198,12 +198,14 @@ public class FsBenchmark extends Configured implements Tool {
       futures.add(
           executor.submit(
               () -> {
-                LongSummaryStatistics readFileBytes = newLongSummaryStatistics(readFileBytesList);
-                LongSummaryStatistics readFileTimeNs = newLongSummaryStatistics(readFileTimeNsList);
-                LongSummaryStatistics readCallBytes = newLongSummaryStatistics(readCallBytesList);
-                LongSummaryStatistics readCallTimeNs = newLongSummaryStatistics(readCallTimeNsList);
+                LongSummaryStatistics writeFileBytes = newLongSummaryStatistics(writeFileBytesList);
+                LongSummaryStatistics writeFileTimeNs =
+                    newLongSummaryStatistics(writeFileTimeNsList);
+                LongSummaryStatistics writeCallBytes = newLongSummaryStatistics(writeCallBytesList);
+                LongSummaryStatistics writeCallTimeNs =
+                    newLongSummaryStatistics(writeCallTimeNsList);
 
-                byte[] writeBuffer = new byte[readSize];
+                byte[] writeBuffer = new byte[writeSize];
 
                 Random r = new Random();
                 r.nextBytes(writeBuffer);
@@ -214,20 +216,20 @@ public class FsBenchmark extends Configured implements Tool {
                 initLatch.countDown();
                 startLatch.await();
                 try {
-                  for (int j = 0; j < numReads; j++) {
+                  for (int j = 0; j < numWrites; j++) {
                     try (FSDataOutputStream output = fs.create(testFileToIO)) {
                       long writeStart = System.nanoTime();
-                      long fileBytesRead = 0;
+                      long fileBytesWrite = 0;
                       do {
                         long writeCallStart = System.nanoTime();
                         output.write(writeBuffer);
-                        fileBytesRead += readSize;
-                        readCallBytes.accept(readSize);
-                        readCallTimeNs.accept(System.nanoTime() - writeCallStart);
-                      } while (fileBytesRead < totalSize);
+                        fileBytesWrite += writeSize;
+                        writeCallBytes.accept(writeSize);
+                        writeCallTimeNs.accept(System.nanoTime() - writeCallStart);
+                      } while (fileBytesWrite < totalSize);
 
-                      readFileBytes.accept(fileBytesRead);
-                      readFileTimeNs.accept(System.nanoTime() - writeStart);
+                      writeFileBytes.accept(fileBytesWrite);
+                      writeFileTimeNs.accept(System.nanoTime() - writeStart);
                     }
                   }
                 } finally {
@@ -247,17 +249,17 @@ public class FsBenchmark extends Configured implements Tool {
     // Verify that all threads completed without errors
     futures.forEach(Futures::getUnchecked);
 
-    printTimeStats("Write call time", readCallTimeNsList);
-    printSizeStats("Write call data", readCallBytesList);
-    printThroughputStats("Write call throughput", readCallTimeNsList, readCallBytesList);
+    printTimeStats("Write call time", writeCallTimeNsList);
+    printSizeStats("Write call data", writeCallBytesList);
+    printThroughputStats("Write call throughput", writeCallTimeNsList, writeCallBytesList);
 
-    printTimeStats("Write file time", readFileTimeNsList);
-    printSizeStats("Write file data", readFileBytesList);
-    printThroughputStats("Write file throughput", readFileTimeNsList, readFileBytesList);
+    printTimeStats("Write file time", writeFileTimeNsList);
+    printSizeStats("Write file data", writeFileBytesList);
+    printThroughputStats("Write file throughput", writeFileTimeNsList, writeFileBytesList);
 
     System.out.printf(
         "Write average throughput (MiB/s): %.3f%n",
-        bytesToMebibytes(combineStats(readFileBytesList).getSum()) / nanosToSeconds(runtimeNs));
+        bytesToMebibytes(combineStats(writeFileBytesList).getSum()) / nanosToSeconds(runtimeNs));
   }
 
   private int benchmarkRead(FileSystem fs, Map<String, String> args) {
