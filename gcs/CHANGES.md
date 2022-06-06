@@ -1,3 +1,5 @@
+### 2.2.8 - 2022-XX-XX
+
 ### 2.2.7 - 2022-06-01
 
 1. Fix: Prevent clobbering of SSL trustCertificates
