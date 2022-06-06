@@ -99,11 +99,11 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   @Override
   public synchronized int read(@Nonnull byte[] buf, int offset, int length) throws IOException {
+    streamStatistics.readOperationStarted(getPos(), length);
     checkNotNull(buf, "buf must not be null");
     if (offset < 0 || length < 0 || length > buf.length - offset) {
       throw new IndexOutOfBoundsException();
     }
-    streamStatistics.readOperationStarted(getPos(), length);
     int response = 0;
     try {
       // TODO(user): Wrap this in a while-loop if we ever introduce a non-blocking mode for the
