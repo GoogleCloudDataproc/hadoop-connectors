@@ -36,7 +36,6 @@ import java.net.URI;
 import java.nio.channels.Channels;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.WritableByteChannel;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -65,10 +64,7 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
   // the way we pick temp file names and already ensured directories for the destination file,
   // we can optimize tempfile creation by skipping various directory checks.
   private static final CreateFileOptions TMP_FILE_CREATE_OPTIONS =
-      CreateFileOptions.DEFAULT_NO_OVERWRITE.toBuilder()
-          .setEnsureNoDirectoryConflict(false)
-          .setOverwriteGenerationId(0)
-          .build();
+      CreateFileOptions.DEFAULT_CREATE_NEW.toBuilder().setEnsureNoDirectoryConflict(false).build();
 
   // Deletion of temporary files occurs asynchronously for performance reasons, but in-flight
   // deletions are awaited on close() so as long as all output streams are closed, there should
@@ -131,8 +127,6 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
       GoogleHadoopFileSystem ghfs,
       URI dstGcsPath,
       CreateFileOptions createFileOptions,
-      boolean append,
-      Duration minSyncInterval,
       FileSystem.Statistics statistics)
       throws IOException {
     logger.atFiner().log(
@@ -144,11 +138,14 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
     this.statistics = statistics;
     this.streamStatistics = ghfs.getInstrumentation().newOutputStreamStatistics(statistics);
     this.syncRateLimiter =
-        minSyncInterval.isNegative() || minSyncInterval.isZero()
+        createFileOptions.getMinSyncInterval().isNegative()
+                || createFileOptions.getMinSyncInterval().isZero()
             ? null
-            : RateLimiter.create(/* permitsPerSecond= */ 1_000.0 / minSyncInterval.toMillis());
+            : RateLimiter.create(
+                /* permitsPerSecond= */ 1_000.0
+                    / createFileOptions.getMinSyncInterval().toMillis());
 
-    if (append) {
+    if (createFileOptions.getWriteMode() == CreateFileOptions.WriteMode.APPEND) {
       // When appending first component has to go to new temporary file.
       this.tmpGcsPath = getNextTmpPath();
       this.tmpIndex = 1;

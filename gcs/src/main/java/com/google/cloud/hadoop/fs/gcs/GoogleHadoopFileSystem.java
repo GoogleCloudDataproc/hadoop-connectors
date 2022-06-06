@@ -532,10 +532,15 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
             new GoogleHadoopOutputStream(
                 this,
                 getGcsPath(hadoopPath),
-                CreateFileOptions.builder().setOverwriteExisting(overwrite).build(),
-                /* append= */ false,
-                /* minSyncInterval= */ Duration.ofMillis(
-                    GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)),
+                (overwrite
+                        ? CreateFileOptions.DEFAULT_OVERWRITE
+                        : CreateFileOptions.DEFAULT_CREATE_NEW)
+                    .toBuilder()
+                        .setMinSyncInterval(
+                            Duration.ofMillis(
+                                GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(
+                                    getConf(), getConf()::getInt)))
+                        .build(),
                 statistics),
             statistics);
     instrumentation.fileCreated();
@@ -1075,10 +1080,12 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         new GoogleHadoopOutputStream(
             this,
             filePath,
-            DEFAULT_OVERWRITE,
-            /* append= */ true,
-            /* minSyncInterval= */ Duration.ofMillis(
-                GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)),
+            DEFAULT_OVERWRITE.toBuilder()
+                .setWriteMode(CreateFileOptions.WriteMode.APPEND)
+                .setMinSyncInterval(
+                    Duration.ofMillis(
+                        GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)))
+                .build(),
             statistics),
         statistics);
   }

@@ -148,8 +148,11 @@ public abstract class GoogleCloudStorageIntegrationHelper {
       throws IOException {
     int totalBytesWritten = 0;
 
-    try (WritableByteChannel writeChannel =
-        create(path, CreateFileOptions.builder().setOverwriteExisting(overwriteExisting).build())) {
+    CreateFileOptions createOptions =
+        overwriteExisting
+            ? CreateFileOptions.DEFAULT_OVERWRITE
+            : CreateFileOptions.DEFAULT_CREATE_NEW;
+    try (WritableByteChannel writeChannel = create(path, createOptions)) {
       for (int i = 0; i < numWrites; i++) {
         int numBytesWritten = writeChannel.write(ByteBuffer.wrap(buffer));
         assertWithMessage("could not write the entire buffer")

@@ -67,7 +67,7 @@ public abstract class CreateObjectOptions {
   @Nullable
   public abstract String getKmsKeyName();
 
-  /** A metadata to apply to the create object. */
+  /** A metadata to apply to the created object. */
   public abstract ImmutableMap<String, byte[]> getMetadata();
 
   /** Whether to overwrite any existing objects with the same name */

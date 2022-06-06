@@ -25,20 +25,25 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class CreateFileOptionsTest {
   @Test
-  public void testChecksForContentTypeAttributes() {
+  public void validOptions() {
     CreateFileOptions.builder()
-        .setOverwriteExisting(true)
-        .setContentType("")
-        .setAttributes(ImmutableMap.of("Innocuous", "".getBytes(UTF_8)))
+        .setAttributes(ImmutableMap.of("Innocuous", "text".getBytes(UTF_8)))
+        .setContentType("text")
+        .setWriteMode(CreateFileOptions.WriteMode.CREATE_NEW)
+        .setWriteGenerationId(0)
         .build();
+  }
 
+  @Test
+  public void invalidOptions_contentType_setViaAttributes() {
     assertThrows(
         IllegalArgumentException.class,
         () ->
             CreateFileOptions.builder()
-                .setOverwriteExisting(true)
-                .setContentType("")
-                .setAttributes(ImmutableMap.of("Content-Type", "".getBytes(UTF_8)))
+                .setAttributes(ImmutableMap.of("Content-Type", "text".getBytes(UTF_8)))
+                .setContentType("text")
+                .setWriteMode(CreateFileOptions.WriteMode.CREATE_NEW)
+                .setWriteGenerationId(0)
                 .build());
   }
 }

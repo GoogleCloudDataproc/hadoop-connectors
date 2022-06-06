@@ -96,9 +96,7 @@ public class GoogleHadoopOutputStreamIntegrationTest {
         new GoogleHadoopOutputStream(
             ghfs,
             testFile,
-            CreateFileOptions.DEFAULT_OVERWRITE,
-            /* append= */ false,
-            /* minSyncInterval= */ Duration.ZERO,
+            CreateFileOptions.DEFAULT_CREATE_NEW,
             new FileSystem.Statistics(ghfs.getScheme()))) {
       out.write(1);
     }
