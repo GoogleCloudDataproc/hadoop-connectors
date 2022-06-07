@@ -1,3 +1,17 @@
+/*
+ * Copyright 2022 Google Inc. All Rights Reserved.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software distributed under the
+ * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.google.cloud.hadoop.gcsio;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -17,14 +31,17 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Implements a HttpRequestInitializer which adds a ResponseInterceptor to each HttpRequest and
+ * tracks the response time taken by the successful HttpRequests.
+ */
 class EventLoggingHttpRequestInitializer implements HttpRequestInitializer {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-  private static final Gson gson = new Gson();
+  private final Gson gson = new Gson();
 
   // Using a ConcurrentHashMap with weak key reference to avoid potential memory leak during failure
   // scenarios. We do not get an response interceptor callback if there is some failure while
-  // executing the
-  // HttpRequest.
+  // executing the HttpRequest.
   private final Map<HttpRequest, HttpRequestResponseTimeTracker> requestTracker =
       new MapMaker().weakKeys().makeMap();
 

@@ -484,7 +484,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setDirectPathPreferred(GCS_GRPC_DIRECTPATH_ENABLE.get(config, config::getBoolean))
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
         .setMetricsSink(GCS_METRICS_SINK.get(config, config::getEnum))
-        .setTraceLogEnable(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean));
+        .setTraceLogEnabled(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean));
   }
 
   private static PerformanceCachingGoogleCloudStorageOptions getPerformanceCachingOptions(

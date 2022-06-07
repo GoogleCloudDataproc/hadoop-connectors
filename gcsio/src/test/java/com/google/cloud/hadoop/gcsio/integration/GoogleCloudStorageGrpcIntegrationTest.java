@@ -183,7 +183,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   public void testOpenWithTracingLogEnabled() throws IOException {
     GoogleCloudStorage rawStorage =
         new GoogleCloudStorageImpl(
-            GoogleCloudStorageTestHelper.getStandardOptionBuilder().setTraceLogEnable(true).build(),
+            GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+                .setTraceLogEnabled(true)
+                .build(),
             GoogleCloudStorageTestHelper.getCredentials());
     StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME, "testOpen_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
