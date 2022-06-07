@@ -23,6 +23,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.HttpStatusCodes;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
@@ -228,9 +229,15 @@ public class GoogleHadoopOutputStreamIntegrationTest {
     FSDataOutputStream fsos = ghfs.append(hadoopPath, 20, /* progress= */ () -> {});
     fsos.write("_append-1".getBytes(UTF_8));
 
-    assertThrows(GoogleJsonResponseException.class, fsos::hsync);
+    GoogleJsonResponseException hsyncException =
+        assertThrows(GoogleJsonResponseException.class, fsos::hsync);
+    assertThat(hsyncException.getStatusCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_NOT_FOUND);
+    assertThat(hsyncException.getMessage()).contains(String.format(" %s ", hadoopPath.getName()));
 
-    assertThrows(NullPointerException.class, fsos::close);
+    GoogleJsonResponseException closeException =
+        assertThrows(GoogleJsonResponseException.class, fsos::close);
+    assertThat(closeException.getStatusCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_NOT_FOUND);
+    assertThat(closeException.getMessage()).contains(String.format(" %s ", hadoopPath.getName()));
 
     // Validate that file wasn't created
     assertThat(ghfs.exists(hadoopPath)).isFalse();
@@ -242,7 +249,6 @@ public class GoogleHadoopOutputStreamIntegrationTest {
     Path hadoopPath = new Path(path);
 
     Configuration config = getTestConfig();
-    //    config.setEnum(GCS_OUTPUT_STREAM_TYPE.getKey(), OutputStreamType.FLUSHABLE_COMPOSITE);
     FileSystem ghfs = GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, config);
 
     byte[] testData = new byte[5];
@@ -272,7 +278,6 @@ public class GoogleHadoopOutputStreamIntegrationTest {
     Path hadoopPath = new Path(path);
 
     Configuration config = getTestConfig();
-    //    config.setEnum(GCS_OUTPUT_STREAM_TYPE.getKey(), OutputStreamType.FLUSHABLE_COMPOSITE);
     config.setLong(GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.getKey(), Duration.ofDays(1).toMillis());
     FileSystem ghfs = GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, config);
 

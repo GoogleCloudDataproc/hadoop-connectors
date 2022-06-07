@@ -64,6 +64,13 @@
     fs.gs.auth.refresh.token
     ```
 
+1.  Merge all output stream types functionality in the default output stream,
+    and remove obsolete property:
+
+    ```properties
+    fs.gs.outputstream.type
+    ```
+
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.
