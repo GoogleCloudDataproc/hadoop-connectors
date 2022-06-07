@@ -36,6 +36,7 @@ import java.net.URI;
 import java.nio.channels.Channels;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.WritableByteChannel;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -127,6 +128,7 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
       GoogleHadoopFileSystem ghfs,
       URI dstGcsPath,
       CreateFileOptions createFileOptions,
+      Duration minSyncInterval,
       FileSystem.Statistics statistics)
       throws IOException {
     logger.atFiner().log(
@@ -138,12 +140,9 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
     this.statistics = statistics;
     this.streamStatistics = ghfs.getInstrumentation().newOutputStreamStatistics(statistics);
     this.syncRateLimiter =
-        createFileOptions.getMinSyncInterval().isNegative()
-                || createFileOptions.getMinSyncInterval().isZero()
+        minSyncInterval.isNegative() || minSyncInterval.isZero()
             ? null
-            : RateLimiter.create(
-                /* permitsPerSecond= */ 1_000.0
-                    / createFileOptions.getMinSyncInterval().toMillis());
+            : RateLimiter.create(/* permitsPerSecond= */ 1_000.0 / minSyncInterval.toMillis());
 
     if (createFileOptions.getWriteMode() == CreateFileOptions.WriteMode.APPEND) {
       // When appending first component has to go to new temporary file.
