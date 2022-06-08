@@ -25,6 +25,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT;
+import static com.google.cloud.hadoop.gcsio.CreateFileOptions.DEFAULT_APPEND;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.CLOUD_PLATFORM_SCOPE;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -531,11 +532,15 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
             new GoogleHadoopOutputStream(
                 this,
                 getGcsPath(hadoopPath),
-                overwrite
-                    ? CreateFileOptions.DEFAULT_OVERWRITE
-                    : CreateFileOptions.DEFAULT_CREATE_NEW,
-                Duration.ofMillis(
-                    GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)),
+                (overwrite
+                        ? CreateFileOptions.DEFAULT_OVERWRITE
+                        : CreateFileOptions.DEFAULT_CREATE_NEW)
+                    .toBuilder()
+                        .setMinSyncInterval(
+                            Duration.ofMillis(
+                                GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(
+                                    getConf(), getConf()::getInt)))
+                        .build(),
                 statistics),
             statistics);
     instrumentation.fileCreated();
@@ -1075,9 +1080,11 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         new GoogleHadoopOutputStream(
             this,
             filePath,
-            CreateFileOptions.DEFAULT_APPEND,
-            Duration.ofMillis(
-                GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)),
+            DEFAULT_APPEND.toBuilder()
+                .setMinSyncInterval(
+                    Duration.ofMillis(
+                        GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)))
+                .build(),
             statistics),
         statistics);
   }

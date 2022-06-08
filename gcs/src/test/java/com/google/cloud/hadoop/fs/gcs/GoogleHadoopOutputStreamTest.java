@@ -121,8 +121,9 @@ public class GoogleHadoopOutputStreamTest {
         new GoogleHadoopOutputStream(
             ghfs,
             ghfs.getGcsPath(objectPath),
-            CreateFileOptions.DEFAULT_OVERWRITE,
-            /* minSyncInterval= */ Duration.ofMillis(1),
+            CreateFileOptions.DEFAULT_OVERWRITE.toBuilder()
+                .setMinSyncInterval(Duration.ofMillis(1))
+                .build(),
             new FileSystem.Statistics(ghfs.getScheme()));
 
     byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};

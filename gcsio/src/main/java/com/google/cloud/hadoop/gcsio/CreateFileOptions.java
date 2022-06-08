@@ -20,6 +20,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableMap;
+import java.time.Duration;
 import java.util.Map;
 import javax.annotation.Nullable;
 
@@ -55,6 +56,7 @@ public abstract class CreateFileOptions {
         .setAttributes(ImmutableMap.of())
         .setContentType(CreateObjectOptions.CONTENT_TYPE_DEFAULT)
         .setEnsureNoDirectoryConflict(true)
+        .setMinSyncInterval(Duration.ofSeconds(10))
         .setWriteMode(WriteMode.CREATE_NEW)
         .setWriteGenerationId(0);
   }
@@ -67,6 +69,9 @@ public abstract class CreateFileOptions {
   /** Content-type to set when creating a file. */
   @Nullable
   public abstract String getContentType();
+
+  /** Configures the minimum time interval (milliseconds) between consecutive sync/flush calls */
+  public abstract Duration getMinSyncInterval();
 
   /**
    * If true, makes sure there isn't already a directory object of the same name. If false, you run
@@ -96,6 +101,8 @@ public abstract class CreateFileOptions {
     public abstract Builder setContentType(String contentType);
 
     public abstract Builder setEnsureNoDirectoryConflict(boolean ensureNoDirectoryConflict);
+
+    public abstract Builder setMinSyncInterval(Duration interval);
 
     public abstract Builder setWriteGenerationId(long generationId);
 
