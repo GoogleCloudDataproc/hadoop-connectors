@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.MapMaker;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.flogger.LazyArgs;
 import com.google.gson.Gson;
 import java.io.IOException;
 import java.time.ZoneOffset;
@@ -79,9 +80,8 @@ class EventLoggingHttpRequestInitializer implements HttpRequestInitializer {
     logDetails(jsonMap);
   }
 
-  @VisibleForTesting
-  void logDetails(Map<String, Object> jsonMap) {
-    logger.atInfo().log(gson.toJson(jsonMap));
+  private void logDetails(Map<String, Object> jsonMap) {
+    logger.atInfo().log("%s", LazyArgs.lazy(() -> gson.toJson(jsonMap)));
   }
 
   private static class HttpRequestResponseTimeTracker {

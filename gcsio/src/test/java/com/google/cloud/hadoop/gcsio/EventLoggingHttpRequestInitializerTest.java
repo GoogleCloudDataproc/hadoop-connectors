@@ -16,96 +16,141 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.truth.Truth.assertThat;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
+import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpResponse;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import java.io.IOException;
-import java.util.HashMap;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.ArgumentCaptor;
 
 public class EventLoggingHttpRequestInitializerTest {
-  private static final String requestUrl = "http://google.com";
+  private static final String REQUEST_URL = "http://google.com";
+  private static final Logger JDK_LOGGER =
+      Logger.getLogger(EventLoggingHttpRequestInitializer.class.getName());
 
   private EventLoggingHttpRequestInitializer requestInitializer;
-  private EventLoggingHttpRequestInitializer requestInitializerSpy;
-  private ArgumentCaptor<HashMap<String, Object>> logDetailsCaptor;
+  private AssertingHandler assertingHandler;
 
   @Before
   public void setUp() throws IOException {
-    this.requestInitializer = new EventLoggingHttpRequestInitializer();
-    this.requestInitializerSpy = spy(requestInitializer);
-    this.logDetailsCaptor = ArgumentCaptor.forClass(HashMap.class);
+    assertingHandler = new AssertingHandler();
+    JDK_LOGGER.setUseParentHandlers(false);
+    JDK_LOGGER.addHandler(assertingHandler);
+    JDK_LOGGER.setLevel(Level.INFO);
+
+    requestInitializer = new EventLoggingHttpRequestInitializer();
+  }
+
+  @After
+  public void verifyAndRemoveAssertingHandler() {
+    JDK_LOGGER.removeHandler(assertingHandler);
   }
 
   @Test
-  public void testBasicOperation() throws IOException {
+  public void testTracingDetailsSetOnSuccess() throws IOException {
+    int expectedStatusCode = 201;
     HttpRequest httpRequest =
-        getHttpRequestWithResponse(MockHttpTransportHelper.emptyResponse(201));
+        getHttpRequestWithResponse(MockHttpTransportHelper.emptyResponse(expectedStatusCode));
     requestInitializer.initialize(httpRequest);
+
     HttpResponse res = httpRequest.execute();
 
     assertThat(res).isNotNull();
-    assertThat(res.getStatusCode()).isEqualTo(201);
-  }
+    assertThat(res.getStatusCode()).isEqualTo(expectedStatusCode);
 
-  @Test
-  public void testTracingDetailsSet() throws IOException {
-    HttpRequest httpRequest =
-        getHttpRequestWithResponse(MockHttpTransportHelper.emptyResponse(200));
-    requestInitializerSpy.initialize(httpRequest);
-    httpRequest.execute();
-
-    verify(requestInitializerSpy).logDetails(logDetailsCaptor.capture());
-    verify(requestInitializerSpy, times(1)).logDetails(any());
-    Map<String, Object> captured = logDetailsCaptor.getValue();
-
-    assertThat(captured.get("response_time")).isNotNull();
-    assertThat(captured.get("request_url")).isEqualTo(requestUrl);
-    assertThat(captured.get("response_status_code")).isEqualTo(200);
+    assertingHandler.assertLogCount(1);
+    Map<String, Object> logRecord = assertingHandler.getLogRecordAtIndex(0);
+    verifyFields(logRecord, expectedStatusCode);
+    assertThat(logRecord.get("request_start_time_utc")).isNotNull();
+    assertThat(logRecord.get("request_finish_time_utc")).isNotNull();
+    assertThat(logRecord.get("unexpected_error")).isNull();
   }
 
   @Test
   public void testIOExceptionNoCallback() throws IOException {
     HttpRequest httpRequest = getHttpRequestWithResponse(new IOException("test IOException"));
-    requestInitializerSpy.initialize(httpRequest);
+    requestInitializer.initialize(httpRequest);
 
-    try {
-      httpRequest.execute();
-    } catch (IOException ioe) {
-    }
+    assertThrows(IOException.class, () -> httpRequest.execute());
 
-    verify(requestInitializerSpy, times(0)).logDetails(any());
+    assertingHandler.assertLogCount(0);
   }
 
   @Test
   public void testZombieRequestDoesNotCrash() throws IOException {
     HttpResponse httpResponse =
         getHttpRequestWithResponse(MockHttpTransportHelper.emptyResponse(200)).execute();
-    requestInitializerSpy.logAndRemoveRequestFromTracking(httpResponse);
 
-    verify(requestInitializerSpy).logDetails(logDetailsCaptor.capture());
-    verify(requestInitializerSpy, times(1)).logDetails(any());
+    requestInitializer.logAndRemoveRequestFromTracking(httpResponse);
 
-    Map<String, Object> captured = logDetailsCaptor.getValue();
+    assertingHandler.assertLogCount(1);
+    Map<String, Object> logRecord = assertingHandler.getLogRecordAtIndex(0);
+    verifyFields(logRecord, 200);
+    assertThat(logRecord.get("unexpected_error")).isEqualTo("Zombie request. This is unexpected.");
+  }
 
-    assertThat(captured.get("response_time")).isEqualTo(Integer.MAX_VALUE);
-    assertThat(captured.get("request_url")).isEqualTo(requestUrl);
-    assertThat(captured.get("response_status_code")).isEqualTo(200);
-    assertThat(captured.get("unexpected_error")).isEqualTo("Zombie request. This is unexpected.");
+  private static void verifyFields(Map<String, Object> logRecord, int expectedStatusCode) {
+    assertThat(logRecord.get("response_time")).isNotNull();
+    assertThat(logRecord.get("response_headers")).isNotNull();
+    assertThat(logRecord.get("request_headers")).isNotNull();
+    assertThat(logRecord.get("request_method")).isNotNull();
+    assertThat(logRecord.get("request_url")).isEqualTo(REQUEST_URL);
+    assertThat(logRecord.get("response_status_code")).isEqualTo(expectedStatusCode);
   }
 
   private static HttpRequest getHttpRequestWithResponse(Object response) throws IOException {
     return mockTransport(response)
         .createRequestFactory()
-        .buildGetRequest(new GenericUrl(requestUrl));
+        .buildGetRequest(new GenericUrl(REQUEST_URL));
+  }
+
+  private static class AssertingHandler extends Handler {
+    private static final Gson GSON = new Gson();
+    private static final Type LOG_RECORD_TYPE = new TypeToken<Map<String, Object>>() {}.getType();
+
+    private List<Map<String, Object>> logRecords = new ArrayList<>();
+
+    @Override
+    public void publish(LogRecord record) {
+      if (isLoggable(record)) {
+        logRecords.add(logRecordToMap(record));
+      }
+    }
+
+    @Override
+    public void flush() {
+      logRecords.clear();
+    }
+
+    @Override
+    public void close() {
+      logRecords = null;
+    }
+
+    void assertLogCount(int n) {
+      assertThat(logRecords).hasSize(n);
+    }
+
+    Map<String, Object> getLogRecordAtIndex(int index) {
+      return logRecords.get(index);
+    }
+
+    private static Map<String, Object> logRecordToMap(LogRecord logRecord) {
+      return GSON.fromJson(logRecord.getMessage(), LOG_RECORD_TYPE);
+    }
   }
 }
