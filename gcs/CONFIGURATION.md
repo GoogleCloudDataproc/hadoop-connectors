@@ -309,7 +309,7 @@ default service account impersonation.
 
     Enables Cloud Storage direct uploads.
 
-*   `fs.gs.outputstream.sync.min.interval.ms` (default: `0`)
+*   `fs.gs.outputstream.sync.min.interval.ms` (default: `10,000`)
 
     Output stream configuration that controls the minimum interval
     (milliseconds) between consecutive syncs. This allows to avoid getting
