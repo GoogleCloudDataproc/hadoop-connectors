@@ -23,8 +23,8 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.util.stream.Collectors.toList;
 
-import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.http.HttpRequestInitializer;
+import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import java.io.FileNotFoundException;
@@ -53,7 +53,7 @@ public class CoopLockLoadIntegrationTest {
 
   @BeforeClass
   public static void before() throws Throwable {
-    Credential credential =
+    Credentials credential =
         checkNotNull(GoogleCloudStorageTestHelper.getCredential(), "credential must not be null");
 
     gcsOptions = getStandardOptionBuilder().build();

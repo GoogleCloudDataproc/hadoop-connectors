@@ -18,7 +18,6 @@ package com.google.cloud.hadoop.util;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
-import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.http.HttpBackOffIOExceptionHandler;
 import com.google.api.client.http.HttpBackOffUnsuccessfulResponseHandler;
 import com.google.api.client.http.HttpIOExceptionHandler;
@@ -30,6 +29,8 @@ import com.google.api.client.http.HttpUnsuccessfulResponseHandler;
 import com.google.api.client.util.BackOff;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.Sleeper;
+import com.google.auth.Credentials;
+import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
@@ -54,7 +55,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
   // To be used as a request interceptor for filling in the "Authorization" header field, as well
   // as a response handler for certain unsuccessful error codes wherein the Credential must refresh
   // its token for a retry.
-  private final Credential credential;
+  private final HttpCredentialsAdapter credential;
 
   private final RetryHttpInitializerOptions options;
 
@@ -200,7 +201,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
    * @param defaultUserAgent A String to set as the user-agent when initializing an HttpRequest if
    *     the HttpRequest doesn't already have a user-agent header.
    */
-  public RetryHttpInitializer(Credential credential, String defaultUserAgent) {
+  public RetryHttpInitializer(Credentials credential, String defaultUserAgent) {
     this(
         credential,
         RetryHttpInitializerOptions.DEFAULT
@@ -214,16 +215,19 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
    *     delegate for a CredentialOrBackoffResponseHandler.
    * @param options An options that configure {@link RetryHttpInitializer} instance behaviour.
    */
-  public RetryHttpInitializer(Credential credential, RetryHttpInitializerOptions options) {
-    this.credential = credential;
+  public RetryHttpInitializer(Credentials credential, RetryHttpInitializerOptions options) {
+    this.credential = credential == null ? null : new HttpCredentialsAdapter(credential);
     this.options = options;
     this.sleeperOverride = null;
   }
 
   @Override
-  public void initialize(HttpRequest request) {
-    // Credential must be the interceptor to fill in accessToken fields.
-    request.setInterceptor(credential);
+  public void initialize(HttpRequest request) throws IOException {
+    // Initialize request with credentials and let CredentialsOrBackoffResponseHandler
+    // to refresh credentials later if necessary
+    if (credential != null) {
+      credential.initialize(request);
+    }
 
     // Request will be retried if server errors (5XX) or I/O errors are encountered.
     request.setNumberOfRetries(options.getMaxRequestRetries());
@@ -263,8 +267,8 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     request.getHeaders().putAll(options.getHttpHeaders());
   }
 
-  public Credential getCredential() {
-    return credential;
+  public Credentials getCredential() {
+    return credential == null ? null : credential.getCredentials();
   }
 
   private static BackOff getDefaultBackOff() {

@@ -36,9 +36,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
-import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.StorageObject;
+import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.collect.ImmutableList;
@@ -82,7 +82,7 @@ public class GoogleCloudStorageNewIntegrationTest {
 
   @BeforeClass
   public static void beforeClass() throws Throwable {
-    Credential credential =
+    Credentials credential =
         checkNotNull(GoogleCloudStorageTestHelper.getCredential(), "credential must not be null");
 
     gcsOptions = getStandardOptionBuilder().build();

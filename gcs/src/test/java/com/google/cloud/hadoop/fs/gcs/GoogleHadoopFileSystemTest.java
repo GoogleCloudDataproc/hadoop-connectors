@@ -23,9 +23,10 @@ import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.USER_IM
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.HttpResponseException;
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
+import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -205,12 +206,14 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
     config.set(
         GCS_CONFIG_PREFIX + IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey(), "test-service-account");
 
-    URI gsUri = new URI("gs://foobar/");
+    Path gcsPath = new Path("gs://foobar/");
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+    ghfs.initialize(gcsPath.toUri(), config);
 
-    Exception exception =
-        assertThrows(GoogleJsonResponseException.class, () -> ghfs.initialize(gsUri, config));
-    assertThat(exception).hasMessageThat().startsWith("401 Unauthorized");
+    IOException thrown = assertThrows(IOException.class, () -> ghfs.listStatus(gcsPath));
+
+    HttpResponseException httpException = ApiErrorExtractor.getHttpResponseException(thrown);
+    assertThat(httpException).hasMessageThat().startsWith("401 Unauthorized");
   }
 
   @Test
@@ -226,16 +229,14 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
             + UserGroupInformation.getCurrentUser().getShortUserName(),
         "test-service-account");
 
-    URI gsUri = new URI("gs://foobar/");
+    Path gcsPath = new Path("gs://foobar/");
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+    ghfs.initialize(gcsPath.toUri(), config);
 
-    Exception exception =
-        assertThrows(
-            GoogleJsonResponseException.class,
-            () -> {
-              ghfs.initialize(gsUri, config);
-            });
-    assertThat(exception).hasMessageThat().startsWith("401 Unauthorized");
+    IOException thrown = assertThrows(IOException.class, () -> ghfs.listStatus(gcsPath));
+
+    HttpResponseException httpException = ApiErrorExtractor.getHttpResponseException(thrown);
+    assertThat(httpException).hasMessageThat().startsWith("401 Unauthorized");
   }
 
   @Test
@@ -251,16 +252,14 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
             + UserGroupInformation.getCurrentUser().getGroupNames()[0],
         "test-service-account");
 
-    URI gsUri = new URI("gs://foobar/");
+    Path gcsPath = new Path("gs://foobar/");
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+    ghfs.initialize(gcsPath.toUri(), config);
 
-    Exception exception =
-        assertThrows(
-            GoogleJsonResponseException.class,
-            () -> {
-              ghfs.initialize(gsUri, config);
-            });
-    assertThat(exception).hasMessageThat().startsWith("401 Unauthorized");
+    IOException thrown = assertThrows(IOException.class, () -> ghfs.listStatus(gcsPath));
+
+    HttpResponseException httpException = ApiErrorExtractor.getHttpResponseException(thrown);
+    assertThat(httpException).hasMessageThat().startsWith("401 Unauthorized");
   }
 
   @Test
@@ -281,16 +280,14 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
             + UserGroupInformation.getCurrentUser().getGroupNames()[0],
         "test-service-account2");
 
-    URI gsUri = new URI("gs://foobar/");
+    Path gcsPath = new Path("gs://foobar/");
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+    ghfs.initialize(gcsPath.toUri(), config);
 
-    Exception exception =
-        assertThrows(
-            GoogleJsonResponseException.class,
-            () -> {
-              ghfs.initialize(gsUri, config);
-            });
-    assertThat(exception).hasMessageThat().startsWith("401 Unauthorized");
+    IOException thrown = assertThrows(IOException.class, () -> ghfs.listStatus(gcsPath));
+
+    HttpResponseException httpException = ApiErrorExtractor.getHttpResponseException(thrown);
+    assertThat(httpException).hasMessageThat().startsWith("401 Unauthorized");
   }
 
   @Test
@@ -313,16 +310,14 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
             + UserGroupInformation.getCurrentUser().getGroupNames()[0],
         "test-service-account3");
 
-    URI gsUri = new URI("gs://foobar/");
+    Path gcsPath = new Path("gs://foobar/");
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
+    ghfs.initialize(gcsPath.toUri(), config);
 
-    Exception exception =
-        assertThrows(
-            GoogleJsonResponseException.class,
-            () -> {
-              ghfs.initialize(gsUri, config);
-            });
-    assertThat(exception).hasMessageThat().startsWith("401 Unauthorized");
+    IOException thrown = assertThrows(IOException.class, () -> ghfs.listStatus(gcsPath));
+
+    HttpResponseException httpException = ApiErrorExtractor.getHttpResponseException(thrown);
+    assertThat(httpException).hasMessageThat().startsWith("401 Unauthorized");
   }
 
   @Test

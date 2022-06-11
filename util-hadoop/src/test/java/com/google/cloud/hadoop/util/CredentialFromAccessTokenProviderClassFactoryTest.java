@@ -17,14 +17,16 @@ package com.google.cloud.hadoop.util;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ACCESS_TOKEN_PROVIDER_IMPL_SUFFIX;
 import static com.google.common.truth.Truth.assertThat;
 
-import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.util.Clock;
-import com.google.cloud.hadoop.util.CredentialFromAccessTokenProviderClassFactory.GoogleCredentialWithAccessTokenProvider;
+import com.google.auth.oauth2.AccessToken;
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.hadoop.util.CredentialFromAccessTokenProviderClassFactory.AccessTokenProviderCredentials;
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.time.Instant;
+import java.util.Date;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.Before;
 import org.junit.Test;
@@ -54,23 +56,32 @@ public class CredentialFromAccessTokenProviderClassFactoryTest {
   @Test
   public void testCreateCredentialFromProviderClassFactory()
       throws IOException, GeneralSecurityException {
-    Credential credential =
+    GoogleCredentials credential =
         CredentialFromAccessTokenProviderClassFactory.credential(
-            config, ImmutableList.of(TEST_PROPERTY_PREFIX), ImmutableList.of());
+            config, ImmutableList.of(TEST_PROPERTY_PREFIX));
 
-    assertThat(credential.getAccessToken()).isEqualTo(TestingAccessTokenProvider.FAKE_ACCESS_TOKEN);
-    assertThat(credential.getExpirationTimeMilliseconds())
-        .isEqualTo(TestingAccessTokenProvider.EXPIRATION_TIME_MILLISECONDS);
+    AccessToken accessToken = credential.getAccessToken();
+
+    assertThat(accessToken).isNotNull();
+    assertThat(accessToken.getTokenValue()).isEqualTo(TestingAccessTokenProvider.FAKE_ACCESS_TOKEN);
+    assertThat(accessToken.getExpirationTime())
+        .isEqualTo(
+            Date.from(
+                Instant.ofEpochMilli(TestingAccessTokenProvider.EXPIRATION_TIME_MILLISECONDS)));
   }
 
   @Test
   public void testCreateCredentialFromAccessTokenProvider() {
     AccessTokenProvider accessTokenProvider = new TestingAccessTokenProvider();
-    GoogleCredential credential =
-        GoogleCredentialWithAccessTokenProvider.fromAccessTokenProvider(clock, accessTokenProvider);
+    GoogleCredentials credential = new AccessTokenProviderCredentials(accessTokenProvider);
 
-    assertThat(credential.getAccessToken()).isEqualTo(TestingAccessTokenProvider.FAKE_ACCESS_TOKEN);
-    assertThat(credential.getExpirationTimeMilliseconds())
-        .isEqualTo(TestingAccessTokenProvider.EXPIRATION_TIME_MILLISECONDS);
+    AccessToken accessToken = credential.getAccessToken();
+
+    assertThat(accessToken).isNotNull();
+    assertThat(accessToken.getTokenValue()).isEqualTo(TestingAccessTokenProvider.FAKE_ACCESS_TOKEN);
+    assertThat(accessToken.getExpirationTime())
+        .isEqualTo(
+            Date.from(
+                Instant.ofEpochMilli(TestingAccessTokenProvider.EXPIRATION_TIME_MILLISECONDS)));
   }
 }

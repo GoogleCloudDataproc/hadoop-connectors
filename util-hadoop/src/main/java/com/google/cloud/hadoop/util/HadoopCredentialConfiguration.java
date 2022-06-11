@@ -53,35 +53,6 @@ public class HadoopCredentialConfiguration {
           ".enable.service.account.auth");
 
   /**
-   * Key suffix specifying the email address associated with the service account with which to
-   * authenticate. Only required if {@link #ENABLE_SERVICE_ACCOUNTS_SUFFIX} is {@code true} and
-   * we're using {@link #SERVICE_ACCOUNT_KEYFILE_SUFFIX} to authenticate with a private keyfile.
-   */
-  public static final HadoopConfigurationProperty<String> SERVICE_ACCOUNT_EMAIL_SUFFIX =
-      new HadoopConfigurationProperty<>(
-          ".auth.service.account.email", /* defaultValue= */ null, ".service.account.auth.email");
-
-  /** Key suffix used to specify private key id for the service account. */
-  public static final HadoopConfigurationProperty<String> SERVICE_ACCOUNT_PRIVATE_KEY_ID_SUFFIX =
-      new HadoopConfigurationProperty<>(".auth.service.account.private.key.id");
-
-  /** Key suffix used to specify private key for the service account. */
-  public static final HadoopConfigurationProperty<String> SERVICE_ACCOUNT_PRIVATE_KEY_SUFFIX =
-      new HadoopConfigurationProperty<>(".auth.service.account.private.key");
-
-  /**
-   * Key suffix specifying local file containing a service account private {@code .p12} keyfile.
-   * Only used if {@link #SERVICE_ACCOUNT_EMAIL_SUFFIX} is {@code true}; if provided, triggers
-   * private keyfile service account authentication. The file will be required to be present on all
-   * nodes and at the same location on all nodes.
-   */
-  public static final HadoopConfigurationProperty<String> SERVICE_ACCOUNT_KEYFILE_SUFFIX =
-      new HadoopConfigurationProperty<>(
-          ".auth.service.account.keyfile",
-          /* defaultValue= */ null,
-          ".service.account.auth.keyfile");
-
-  /**
    * Key suffix used to indicate the path to a JSON file containing a Service Account key and
    * identifier (email). Technically, this could be a JSON containing a non-service account user,
    * but this setting is only used in the service account flow and is namespaced as such.
@@ -99,8 +70,7 @@ public class HadoopCredentialConfiguration {
 
   /** Configuration key for setting a token server URL to use to refresh OAuth token. */
   public static final HadoopConfigurationProperty<String> TOKEN_SERVER_URL_SUFFIX =
-      new HadoopConfigurationProperty<>(
-          ".token.server.url", CredentialOptions.TOKEN_SERVER_URL_DEFAULT);
+      new HadoopConfigurationProperty<>(".token.server.url");
 
   /**
    * Configuration key for setting a proxy for the connector to use to connect to GCS. The proxy
@@ -163,49 +133,32 @@ public class HadoopCredentialConfiguration {
 
   public static CredentialFactory getCredentialFactory(
       Configuration config, String... keyPrefixesVararg) {
+    return new CredentialFactory(getCredentialOptions(config, keyPrefixesVararg));
+  }
+
+  static CredentialOptions getCredentialOptions(Configuration config, String... keyPrefixesVararg) {
     List<String> keyPrefixes = getConfigKeyPrefixes(keyPrefixesVararg);
-    CredentialOptions credentialOptions =
-        CredentialOptions.builder()
-            .setServiceAccountEnabled(
-                ENABLE_SERVICE_ACCOUNTS_SUFFIX
-                    .withPrefixes(keyPrefixes)
-                    .get(config, config::getBoolean))
-            .setServiceAccountPrivateKeyId(
-                RedactedString.create(
-                    SERVICE_ACCOUNT_PRIVATE_KEY_ID_SUFFIX
-                        .withPrefixes(keyPrefixes)
-                        .getPassword(config)))
-            .setServiceAccountPrivateKey(
-                RedactedString.create(
-                    SERVICE_ACCOUNT_PRIVATE_KEY_SUFFIX
-                        .withPrefixes(keyPrefixes)
-                        .getPassword(config)))
-            .setServiceAccountEmail(
-                SERVICE_ACCOUNT_EMAIL_SUFFIX.withPrefixes(keyPrefixes).getPassword(config))
-            .setServiceAccountKeyFile(
-                SERVICE_ACCOUNT_KEYFILE_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
-            .setServiceAccountJsonKeyFile(
-                SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX
-                    .withPrefixes(keyPrefixes)
-                    .get(config, config::get))
-            .setNullCredentialEnabled(
-                ENABLE_NULL_CREDENTIAL_SUFFIX
-                    .withPrefixes(keyPrefixes)
-                    .get(config, config::getBoolean))
-            .setTransportType(
-                HTTP_TRANSPORT_SUFFIX.withPrefixes(keyPrefixes).get(config, config::getEnum))
-            .setTokenServerUrl(
-                TOKEN_SERVER_URL_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
-            .setProxyAddress(
-                PROXY_ADDRESS_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
-            .setProxyUsername(
-                RedactedString.create(
-                    PROXY_USERNAME_SUFFIX.withPrefixes(keyPrefixes).getPassword(config)))
-            .setProxyPassword(
-                RedactedString.create(
-                    PROXY_PASSWORD_SUFFIX.withPrefixes(keyPrefixes).getPassword(config)))
-            .build();
-    return new CredentialFactory(credentialOptions);
+    return CredentialOptions.builder()
+        .setServiceAccountEnabled(
+            ENABLE_SERVICE_ACCOUNTS_SUFFIX
+                .withPrefixes(keyPrefixes)
+                .get(config, config::getBoolean))
+        .setServiceAccountJsonKeyFile(
+            SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
+        .setNullCredentialEnabled(
+            ENABLE_NULL_CREDENTIAL_SUFFIX.withPrefixes(keyPrefixes).get(config, config::getBoolean))
+        .setTransportType(
+            HTTP_TRANSPORT_SUFFIX.withPrefixes(keyPrefixes).get(config, config::getEnum))
+        .setTokenServerUrl(
+            TOKEN_SERVER_URL_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
+        .setProxyAddress(PROXY_ADDRESS_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
+        .setProxyUsername(
+            RedactedString.create(
+                PROXY_USERNAME_SUFFIX.withPrefixes(keyPrefixes).getPassword(config)))
+        .setProxyPassword(
+            RedactedString.create(
+                PROXY_PASSWORD_SUFFIX.withPrefixes(keyPrefixes).getPassword(config)))
+        .build();
   }
 
   /** Creates an {@link AccessTokenProvider} based on the configuration. */

@@ -14,99 +14,66 @@
 
 package com.google.cloud.hadoop.util;
 
-import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.auth.oauth2.TokenResponse;
-import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
-import com.google.api.client.util.Clock;
-import com.google.cloud.hadoop.util.AccessTokenProvider.AccessToken;
-import com.google.common.base.Preconditions;
+import static com.google.cloud.hadoop.util.CredentialFactory.CLOUD_PLATFORM_SCOPE;
+import static com.google.common.base.Preconditions.checkNotNull;
+
+import com.google.auth.oauth2.AccessToken;
+import com.google.auth.oauth2.GoogleCredentials;
 import java.io.IOException;
-import java.util.Collection;
+import java.time.Instant;
+import java.util.Date;
 import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 
 /**
  * Given an {@link HadoopCredentialConfiguration#getAccessTokenProviderImplClass(Configuration,
- * String...)} and a Hadoop {@link Configuration}, generate a {@link Credential}.
+ * String...)} and a Hadoop {@link Configuration}, generate a {@link GoogleCredentials}.
  */
 public final class CredentialFromAccessTokenProviderClassFactory {
 
   /**
-   * A wrapper class that exposes a {@link GoogleCredential} interface using an {@link
+   * A wrapper class that exposes a {@link GoogleCredentials} interface using an {@link
    * AccessTokenProvider}.
    */
-  static final class GoogleCredentialWithAccessTokenProvider extends GoogleCredential {
-    private final Clock clock;
+  static final class AccessTokenProviderCredentials extends GoogleCredentials {
     private final AccessTokenProvider accessTokenProvider;
 
-    private GoogleCredentialWithAccessTokenProvider(
-        Clock clock, AccessTokenProvider accessTokenProvider) {
-      this.clock = clock;
+    AccessTokenProviderCredentials(AccessTokenProvider accessTokenProvider) {
+      super(convertAccessToken(accessTokenProvider.getAccessToken()));
       this.accessTokenProvider = accessTokenProvider;
     }
 
-    static GoogleCredential fromAccessTokenProvider(
-        Clock clock, AccessTokenProvider accessTokenProvider) {
-      AccessToken accessToken =
-          Preconditions.checkNotNull(
-              accessTokenProvider.getAccessToken(), "Access Token cannot be null!");
-
-      // TODO: This should be setting the refresh token as well.
-      return new GoogleCredentialWithAccessTokenProvider(clock, accessTokenProvider)
-          .setAccessToken(accessToken.getToken())
-          .setExpirationTimeMilliseconds(accessToken.getExpirationTimeMilliSeconds());
+    private static AccessToken convertAccessToken(AccessTokenProvider.AccessToken accessToken) {
+      checkNotNull(accessToken, "AccessToken cannot be null!");
+      String token = checkNotNull(accessToken.getToken(), "AccessToken value cannot be null!");
+      Long expirationTimeMs = accessToken.getExpirationTimeMilliSeconds();
+      return new AccessToken(
+          token,
+          expirationTimeMs == null ? null : Date.from(Instant.ofEpochMilli(expirationTimeMs)));
     }
 
     @Override
-    protected TokenResponse executeRefreshToken() throws IOException {
+    public AccessToken refreshAccessToken() throws IOException {
       accessTokenProvider.refresh();
-      AccessToken accessToken =
-          Preconditions.checkNotNull(
-              accessTokenProvider.getAccessToken(), "Access Token cannot be null!");
-
-      String token =
-          Preconditions.checkNotNull(accessToken.getToken(), "Access Token cannot be null!");
-      Long expirationTimeMilliSeconds = accessToken.getExpirationTimeMilliSeconds();
-      return new TokenResponse()
-          .setAccessToken(token)
-          .setExpiresInSeconds(
-              expirationTimeMilliSeconds == null
-                  ? null
-                  : (expirationTimeMilliSeconds - clock.currentTimeMillis()) / 1000);
+      return convertAccessToken(accessTokenProvider.getAccessToken());
     }
   }
 
-  /** Generate the credential from the {@link AccessTokenProvider}. */
-  public static Credential credential(
-      AccessTokenProvider accessTokenProvider, Collection<String> scopes) {
-    if (accessTokenProvider != null) {
-      return getCredentialFromAccessTokenProvider(accessTokenProvider, scopes);
-    }
-    return null;
+  /** Generate the credentials from the {@link AccessTokenProvider}. */
+  public static GoogleCredentials credential(AccessTokenProvider provider) {
+    return provider == null
+        ? null
+        : new AccessTokenProviderCredentials(provider).createScoped(CLOUD_PLATFORM_SCOPE);
   }
 
   /**
-   * Generate the credential.
+   * Generate the credentials.
    *
-   * <p>If the {@link HadoopCredentialConfiguration#getAccessTokenProviderImplClass(Configuration,
+   * <p>If the {@link HadoopCredentialsConfiguration#getAccessTokenProviderImplClass(Configuration,
    * String...)} generates no Class for the provider, return {@code null}.
    */
-  public static Credential credential(
-      Configuration config, List<String> keyPrefixes, Collection<String> scopes)
+  public static GoogleCredentials credential(Configuration config, List<String> keyPrefixes)
       throws IOException {
-    AccessTokenProvider accessTokenProvider =
-        HadoopCredentialConfiguration.getAccessTokenProvider(config, keyPrefixes);
-    return credential(accessTokenProvider, scopes);
-  }
-
-  /** Creates a {@link Credential} based on information from the access token provider. */
-  private static Credential getCredentialFromAccessTokenProvider(
-      AccessTokenProvider accessTokenProvider, Collection<String> scopes) {
-    Preconditions.checkArgument(
-        accessTokenProvider.getAccessToken() != null, "Access Token cannot be null!");
-    GoogleCredential credential =
-        GoogleCredentialWithAccessTokenProvider.fromAccessTokenProvider(
-            Clock.SYSTEM, accessTokenProvider);
-    return credential.createScoped(scopes);
+    return credential(HadoopCredentialConfiguration.getAccessTokenProvider(config, keyPrefixes));
   }
 }

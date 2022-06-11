@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.util;
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonError.ErrorInfo;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.HttpResponseException;
 import com.google.api.client.http.HttpStatusCodes;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -307,6 +308,18 @@ public class ApiErrorExtractor {
     while (cause != null) {
       if (cause instanceof GoogleJsonResponseException) {
         return (GoogleJsonResponseException) cause;
+      }
+      cause = cause.getCause();
+    }
+    return null;
+  }
+
+  @Nullable
+  public static HttpResponseException getHttpResponseException(Throwable throwable) {
+    Throwable cause = throwable;
+    while (cause != null) {
+      if (cause instanceof HttpResponseException) {
+        return (HttpResponseException) cause;
       }
       cause = cause.getCause();
     }

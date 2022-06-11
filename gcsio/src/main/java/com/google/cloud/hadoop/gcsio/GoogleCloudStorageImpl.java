@@ -27,7 +27,6 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static java.lang.Math.toIntExact;
 
-import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.batch.json.JsonBatchCallback;
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
@@ -62,7 +61,6 @@ import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
-import com.google.cloud.hadoop.util.CredentialAdapter;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryBoundedBackOff;
@@ -283,7 +281,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param credential OAuth2 credential that allows access to GCS
    * @throws IOException on IO error
    */
-  public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Credential credential)
+  public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Credentials credential)
       throws IOException {
     this(
         options,
@@ -300,7 +298,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    */
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options,
-      Credential credential,
+      Credentials credential,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
     this(
@@ -312,11 +310,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer)
       throws IOException {
-    this(
-        options,
-        createStorage(options, httpRequestInitializer),
-        /* credentials= */ null,
-        /* accessTokenProvider= */ null);
+    this(options, createStorage(options, httpRequestInitializer), /* accessTokenProvider= */ null);
   }
 
   public GoogleCloudStorageImpl(
@@ -324,11 +318,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       HttpRequestInitializer httpRequestInitializer,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
-    this(
-        options,
-        createStorage(options, httpRequestInitializer),
-        /* credentials= */ null,
-        downscopedAccessTokenFn);
+    this(options, createStorage(options, httpRequestInitializer), downscopedAccessTokenFn);
   }
 
   /**
@@ -337,7 +327,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param storage {@link Storage} to use for I/O.
    */
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage storage) {
-    this(options, storage, /* credentials= */ null, /* downscopedAccessTokenFn= */ null);
+    this(options, storage, /* downscopedAccessTokenFn= */ null);
   }
 
   /**
@@ -345,25 +335,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    *
    * @param options {@link GoogleCloudStorageOptions} to use to initialize the object.
    * @param storage {@link Storage} to use for I/O.
-   * @param credentials OAuth2 credentials that allows access to GCS
-   */
-  public GoogleCloudStorageImpl(
-      GoogleCloudStorageOptions options, Storage storage, Credentials credentials) {
-    this(options, storage, credentials, /* downscopedAccessTokenFn= */ null);
-  }
-
-  /**
-   * Constructs an instance of GoogleCloudStorageImpl.
-   *
-   * @param options {@link GoogleCloudStorageOptions} to use to initialize the object.
-   * @param storage {@link Storage} to use for I/O.
-   * @param credentials OAuth2 credentials that allows access to GCS
    * @param downscopedAccessTokenFn Function that generates downscoped access token.
    */
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options,
       Storage storage,
-      Credentials credentials,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
     logger.atFiner().log("GCS(options: %s)", options);
 
@@ -379,28 +355,21 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         MetricsSink.CLOUD_MONITORING == this.storageOptions.getMetricsSink()
             ? CloudMonitoringMetricsRecorder.create(
                 options.getProjectId(),
-                new CredentialAdapter(
-                    ((RetryHttpInitializer) httpRequestInitializer).getCredential()))
+                ((RetryHttpInitializer) httpRequestInitializer).getCredential())
             : new NoOpMetricsRecorder();
 
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
       this.watchdog =
           Watchdog.create(Duration.ofMillis(options.getGrpcMessageTimeoutCheckInterval()));
-      if (credentials != null) {
-        this.storageStubProvider =
-            StorageStubProvider.newInstance(
-                this.storageOptions, this.backgroundTasksThreadPool, credentials);
-      } else {
-        checkArgument(
-            httpRequestInitializer instanceof RetryHttpInitializer,
-            "request initializer must be an instance of the RetryHttpInitializer class"
-                + " when gRPC API enabled");
-        Credential credential = ((RetryHttpInitializer) httpRequestInitializer).getCredential();
-        this.storageStubProvider =
-            StorageStubProvider.newInstance(
-                this.storageOptions, this.backgroundTasksThreadPool, credential);
-      }
+      checkArgument(
+          httpRequestInitializer instanceof RetryHttpInitializer,
+          "request initializer must be an instance of the RetryHttpInitializer class"
+              + " when gRPC API enabled");
+      Credentials credential = ((RetryHttpInitializer) httpRequestInitializer).getCredential();
+      this.storageStubProvider =
+          StorageStubProvider.newInstance(
+              this.storageOptions, this.backgroundTasksThreadPool, credential);
     }
 
     this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);

@@ -441,7 +441,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   /** Validates that we correctly build our Options object from a Hadoop config. */
   @Test
   public void testBuildOptionsFromConfig() {
-    Configuration config = loadConfig("projectId", "serviceAccount", "priveKeyFile");
+    Configuration config = loadConfig("projectId", "path/to/serviceAccountKeyFile.json");
 
     GoogleCloudStorageFileSystemOptions.Builder optionsBuilder =
         GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config);

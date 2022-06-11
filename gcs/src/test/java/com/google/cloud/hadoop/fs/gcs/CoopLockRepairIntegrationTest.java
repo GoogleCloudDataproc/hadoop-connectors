@@ -25,8 +25,7 @@ import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao.LOCK_DIR
 import static com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao.LOCK_PATH;
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getStandardOptionBuilder;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_KEYFILE_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
@@ -36,10 +35,10 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
-import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.http.HttpExecuteInterceptor;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
+import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
@@ -88,7 +87,7 @@ public class CoopLockRepairIntegrationTest {
 
   @BeforeClass
   public static void before() throws Throwable {
-    Credential credential =
+    Credentials credential =
         checkNotNull(GoogleCloudStorageTestHelper.getCredential(), "credential must not be null");
 
     gcsOptions = getStandardOptionBuilder().build();
@@ -735,10 +734,12 @@ public class CoopLockRepairIntegrationTest {
       Predicate<HttpRequest> failurePredicate) {
     return request -> {
       httpRequestInitializer.initialize(request);
-      HttpExecuteInterceptor executeInterceptor = checkNotNull(request.getInterceptor());
+      HttpExecuteInterceptor executeInterceptor = request.getInterceptor();
       request.setInterceptor(
           interceptedRequest -> {
-            executeInterceptor.intercept(interceptedRequest);
+            if (executeInterceptor != null) {
+              executeInterceptor.intercept(interceptedRequest);
+            }
             if (failurePredicate.test(interceptedRequest)) {
               throw new RuntimeException("Injected failure");
             }
@@ -756,12 +757,10 @@ public class CoopLockRepairIntegrationTest {
     // Configure test authentication
     TestConfiguration testConf = TestConfiguration.getInstance();
     conf.set(GCS_PROJECT_ID.getKey(), testConf.getProjectId());
-    if (testConf.getServiceAccount() != null && testConf.getPrivateKeyFile() != null) {
+    if (testConf.getServiceAccountJsonKeyFile() != null) {
       conf.set(
-          GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_EMAIL_SUFFIX.getKey(), testConf.getServiceAccount());
-      conf.set(
-          GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_KEYFILE_SUFFIX.getKey(),
-          testConf.getPrivateKeyFile());
+          GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.getKey(),
+          testConf.getServiceAccountJsonKeyFile());
     }
     return conf;
   }

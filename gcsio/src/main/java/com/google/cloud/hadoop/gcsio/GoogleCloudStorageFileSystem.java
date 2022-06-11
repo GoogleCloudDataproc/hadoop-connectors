@@ -28,7 +28,7 @@ import static java.lang.Math.min;
 import static java.util.Comparator.comparing;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
-import com.google.api.client.auth.oauth2.Credential;
+import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationDelete;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockOperationRename;
@@ -144,7 +144,7 @@ public class GoogleCloudStorageFileSystem {
    * @throws IOException
    */
   public GoogleCloudStorageFileSystem(
-      Credential credential, GoogleCloudStorageFileSystemOptions options) throws IOException {
+      Credentials credential, GoogleCloudStorageFileSystemOptions options) throws IOException {
     this(
         new GoogleCloudStorageImpl(
             checkNotNull(options, "options must not be null").getCloudStorageOptions(), credential),
@@ -162,7 +162,7 @@ public class GoogleCloudStorageFileSystem {
    * @throws IOException
    */
   public GoogleCloudStorageFileSystem(
-      Credential credential,
+      Credentials credential,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
       GoogleCloudStorageFileSystemOptions options)
       throws IOException {

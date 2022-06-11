@@ -30,10 +30,10 @@ import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterrup
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.toList;
 
-import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.http.HttpExecuteInterceptor;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
+import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.cooplock.CoopLockRecordsDao;
 import com.google.cloud.hadoop.gcsio.cooplock.CooperativeLockingOptions;
 import com.google.cloud.hadoop.gcsio.cooplock.DeleteOperation;
@@ -73,7 +73,7 @@ public class CoopLockIntegrationTest {
 
   @BeforeClass
   public static void before() throws Throwable {
-    Credential credential =
+    Credentials credential =
         checkNotNull(GoogleCloudStorageTestHelper.getCredential(), "credential must not be null");
 
     gcsOptions = getStandardOptionBuilder().build();
@@ -296,10 +296,12 @@ public class CoopLockIntegrationTest {
       Consumer<HttpRequest> interceptFn) {
     return request -> {
       httpRequestInitializer.initialize(request);
-      HttpExecuteInterceptor executeInterceptor = checkNotNull(request.getInterceptor());
+      HttpExecuteInterceptor executeInterceptor = request.getInterceptor();
       request.setInterceptor(
           interceptedRequest -> {
-            executeInterceptor.intercept(interceptedRequest);
+            if (executeInterceptor != null) {
+              executeInterceptor.intercept(interceptedRequest);
+            }
             interceptFn.accept(interceptedRequest);
           });
     };

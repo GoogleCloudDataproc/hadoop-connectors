@@ -31,7 +31,7 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
-import com.google.api.client.auth.oauth2.Credential;
+import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.collect.ImmutableList;
@@ -64,7 +64,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
 
   @BeforeClass
   public static void before() throws Throwable {
-    Credential credential =
+    Credentials credential =
         checkNotNull(GoogleCloudStorageTestHelper.getCredential(), "credential must not be null");
 
     gcsOptions = getStandardOptionBuilder().build();

@@ -2,9 +2,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import com.google.api.client.auth.oauth2.Credential;
 import com.google.auth.Credentials;
-import com.google.cloud.hadoop.util.CredentialAdapter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -158,22 +156,6 @@ class StorageStubProvider {
     public AbstractStub<?> applyCallOption(AbstractStub<?> stub) {
       return stub;
     }
-  }
-
-  public static StorageStubProvider newInstance(
-      GoogleCloudStorageOptions options,
-      ExecutorService backgroundTasksThreadPool,
-      Credential credential) {
-    Credentials credentials = new CredentialAdapter(credential);
-    GrpcDecorator decorator;
-    if (options.isTrafficDirectorEnabled()) {
-      decorator = new TrafficDirectorGrpcDecorator(credentials);
-    } else if (options.isDirectPathPreferred()) {
-      decorator = new DirectPathGrpcDecorator(credentials);
-    } else {
-      decorator = new CloudPathGrpcDecorator(credentials);
-    }
-    return new StorageStubProvider(options, backgroundTasksThreadPool, decorator);
   }
 
   public static StorageStubProvider newInstance(

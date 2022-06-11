@@ -16,13 +16,13 @@ package com.google.cloud.hadoop.io.bigquery;
 import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.BIGQUERY_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration.BQ_ROOT_URL;
 
-import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.bigquery.Bigquery;
 import com.google.api.services.bigquery.BigqueryScopes;
+import com.google.auth.Credentials;
 import com.google.cloud.hadoop.util.CredentialFromAccessTokenProviderClassFactory;
 import com.google.cloud.hadoop.util.HadoopCredentialConfiguration;
 import com.google.cloud.hadoop.util.PropertyUtil;
@@ -42,11 +42,8 @@ public class BigQueryFactory {
       ImmutableList.of(BigqueryScopes.BIGQUERY);
 
   // Service account environment variable name for BigQuery Authentication.
-  public static final String BIGQUERY_SERVICE_ACCOUNT = "BIGQUERY_SERVICE_ACCOUNT";
-
-  // Environment variable name for variable specifying path of private key file for BigQuery
-  // Authentication.
-  public static final String BIGQUERY_PRIVATE_KEY_FILE = "BIGQUERY_PRIVATE_KEY_FILE";
+  public static final String BIGQUERY_SERVICE_ACCOUNT_JSON_KEYFILE =
+      "BIGQUERY_SERVICE_ACCOUNT_JSON_KEYFILE";
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
@@ -86,17 +83,17 @@ public class BigQueryFactory {
    * @throws IOException on IO Error.
    * @throws GeneralSecurityException on General Security Error.
    */
-  public Credential createBigQueryCredential(Configuration config)
+  public Credentials createBigQueryCredential(Configuration config)
       throws GeneralSecurityException, IOException {
-    Credential credential =
+    Credentials credential =
         CredentialFromAccessTokenProviderClassFactory.credential(
-            config, ImmutableList.of(BIGQUERY_CONFIG_PREFIX), BIGQUERY_OAUTH_SCOPES);
+            config, ImmutableList.of(BIGQUERY_CONFIG_PREFIX));
     if (credential != null) {
       return credential;
     }
 
     return HadoopCredentialConfiguration.getCredentialFactory(config, BIGQUERY_CONFIG_PREFIX)
-        .getCredential(BIGQUERY_OAUTH_SCOPES);
+        .getCredential();
   }
 
   /** Constructs a BigQueryHelper from a raw Bigquery constructed with {@link #getBigQuery}. */
@@ -113,14 +110,14 @@ public class BigQueryFactory {
    */
   public Bigquery getBigQuery(Configuration config) throws GeneralSecurityException, IOException {
     logger.atInfo().log("Creating BigQuery from default credential.");
-    Credential credential = createBigQueryCredential(config);
+    Credentials credential = createBigQueryCredential(config);
     // Use the credential to create an authorized BigQuery client
     return getBigQueryFromCredential(config, credential, BQC_ID);
   }
 
   /** Constructs a BigQuery from a given Credential. */
   public Bigquery getBigQueryFromCredential(
-      Configuration config, Credential credential, String appName) {
+      Configuration config, Credentials credential, String appName) {
     logger.atInfo().log("Creating BigQuery from given credential.");
     // Use the credential to create an authorized BigQuery client
     if (credential != null) {

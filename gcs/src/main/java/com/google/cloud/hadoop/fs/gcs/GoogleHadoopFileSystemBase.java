@@ -41,9 +41,10 @@ import static com.google.common.flogger.LazyArgs.lazy;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
-import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.http.HttpTransport;
+import com.google.auth.Credentials;
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.oauth2.ImpersonatedCredentials;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
@@ -63,9 +64,7 @@ import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.cloud.hadoop.util.AccessTokenProvider.AccessTokenType;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.CredentialFactory;
-import com.google.cloud.hadoop.util.CredentialFactory.CredentialHttpRetryInitializer;
 import com.google.cloud.hadoop.util.CredentialFromAccessTokenProviderClassFactory;
-import com.google.cloud.hadoop.util.GoogleCredentialWithIamAccessToken;
 import com.google.cloud.hadoop.util.HadoopCredentialConfiguration;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.PropertyUtil;
@@ -1318,12 +1317,12 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
    * build a credential with access token provided by this provider; Otherwise obtain credential
    * through {@link HadoopCredentialConfiguration#getCredentialFactory(Configuration, String...)}.
    */
-  private Credential getCredential(
+  private GoogleCredentials getCredential(
       Configuration config,
       GoogleCloudStorageFileSystemOptions gcsFsOptions,
       AccessTokenProvider accessTokenProvider)
       throws IOException, GeneralSecurityException {
-    Credential credential;
+    GoogleCredentials credential;
 
     if (accessTokenProvider == null) {
       // If delegation token support is not configured, check if a
@@ -1331,14 +1330,14 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
       // to acquire the Google credentials using it
       credential =
           CredentialFromAccessTokenProviderClassFactory.credential(
-              config, ImmutableList.of(GCS_CONFIG_PREFIX), CredentialFactory.DEFAULT_SCOPES);
+              config, ImmutableList.of(GCS_CONFIG_PREFIX));
 
       if (credential == null) {
         // Finally, if no credentials have been acquired at this point, employ
         // the default mechanism.
         credential =
             HadoopCredentialConfiguration.getCredentialFactory(config, GCS_CONFIG_PREFIX)
-                .getCredential(CredentialFactory.DEFAULT_SCOPES);
+                .getCredential();
       }
     } else {
       switch (accessTokenProvider.getAccessTokenType()) {
@@ -1346,8 +1345,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
           // check if an AccessTokenProvider is configured
           // if so, try to get the credentials through the access token provider
           credential =
-              CredentialFromAccessTokenProviderClassFactory.credential(
-                  accessTokenProvider, CredentialFactory.DEFAULT_SCOPES);
+              CredentialFromAccessTokenProviderClassFactory.credential(accessTokenProvider);
           break;
         case DOWNSCOPED:
           // If the AccessTokenType is set to DOWNSCOPED`, Credential will be generated
@@ -1367,11 +1365,13 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
   }
 
   /**
-   * Generate a {@link Credential} from the internal access token provider based on the service
+   * Generate a {@link Credentials} from the internal access token provider based on the service
    * account to impersonate.
    */
-  private static Optional<Credential> getImpersonatedCredential(
-      Configuration config, GoogleCloudStorageFileSystemOptions gcsFsOptions, Credential credential)
+  private static Optional<GoogleCredentials> getImpersonatedCredential(
+      Configuration config,
+      GoogleCloudStorageFileSystemOptions gcsFsOptions,
+      GoogleCredentials credential)
       throws IOException {
     Map<String, String> userImpersonationServiceAccounts =
         USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
@@ -1419,16 +1419,17 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
               options.getProxyAddress(),
               options.getProxyUsername(),
               options.getProxyPassword());
-      GoogleCredential impersonatedCredential =
-          new GoogleCredentialWithIamAccessToken(
-              httpTransport,
-              new CredentialHttpRetryInitializer(credential),
-              serviceAccountToImpersonate.get(),
-              CredentialFactory.DEFAULT_SCOPES);
+      ImpersonatedCredentials impersonatedCredentials =
+          ImpersonatedCredentials.newBuilder()
+              .setSourceCredentials(credential)
+              .setTargetPrincipal(serviceAccountToImpersonate.get())
+              .setScopes(ImmutableList.of(CredentialFactory.CLOUD_PLATFORM_SCOPE))
+              .setHttpTransportFactory(() -> httpTransport)
+              .build();
       logger.atFine().log(
           "Impersonating '%s' service account for '%s' user",
           serviceAccountToImpersonate.get(), currentUser);
-      return Optional.of(impersonatedCredential.createScoped(CredentialFactory.DEFAULT_SCOPES));
+      return Optional.of(impersonatedCredentials);
     }
 
     return Optional.empty();
@@ -1492,7 +1493,7 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
     AccessTokenProvider accessTokenProvider = getAccessTokenProvider(config);
 
-    Credential credential;
+    Credentials credential;
     try {
       credential = getCredential(config, gcsFsOptions, accessTokenProvider);
     } catch (GeneralSecurityException e) {

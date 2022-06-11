@@ -28,10 +28,10 @@ import static org.junit.Assert.fail;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.services.storage.Storage;
-import com.google.auth.oauth2.ComputeEngineCredentials;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
+import com.google.cloud.hadoop.util.testing.ThrowingInputStream;
 import java.io.IOException;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.WritableByteChannel;
@@ -68,8 +68,7 @@ public class GoogleCloudStorageImplCreateTest {
                 .setGrpcEnabled(true)
                 .setTrafficDirectorEnabled(false)
                 .build(),
-            createStorage(),
-            ComputeEngineCredentials.newBuilder().build());
+            createStorage());
     assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
         .isInstanceOf(StorageStubProvider.DirectPathGrpcDecorator.class);
   }
@@ -85,7 +84,6 @@ public class GoogleCloudStorageImplCreateTest {
                 .setTrafficDirectorEnabled(false)
                 .build(),
             createStorage(),
-            ComputeEngineCredentials.newBuilder().build(),
             null);
     assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
         .isInstanceOf(StorageStubProvider.CloudPathGrpcDecorator.class);
@@ -97,7 +95,6 @@ public class GoogleCloudStorageImplCreateTest {
         new GoogleCloudStorageImpl(
             GoogleCloudStorageOptions.builder().setAppName("app").setGrpcEnabled(true).build(),
             createStorage(),
-            ComputeEngineCredentials.newBuilder().build(),
             null);
     assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
         .isInstanceOf(StorageStubProvider.TrafficDirectorGrpcDecorator.class);
