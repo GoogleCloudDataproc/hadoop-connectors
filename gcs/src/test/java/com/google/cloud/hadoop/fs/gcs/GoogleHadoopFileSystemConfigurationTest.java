@@ -43,6 +43,7 @@ import static org.junit.Assert.assertThrows;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GcsFileChecksumType;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GlobAlgorithm;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.OutputStreamType;
+import com.google.cloud.hadoop.fs.gcs.auth.DelegationTokenInstantiationStrategy;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.FilesystemAPI;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
@@ -75,6 +76,9 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.copy.with.rewrite.enable", true);
           put("fs.gs.create.items.conflict.check.enable", true);
           put("fs.gs.delegation.token.binding", null);
+          put(
+              "fs.gs.delegation.token.instantiation.strategy",
+              DelegationTokenInstantiationStrategy.INSTANCE_PER_SERVICE);
           put("fs.gs.encryption.algorithm", null);
           put("fs.gs.encryption.key.hash", null);
           put("fs.gs.encryption.key", null);
