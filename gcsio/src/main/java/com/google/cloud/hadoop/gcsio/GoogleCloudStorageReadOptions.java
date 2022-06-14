@@ -103,7 +103,7 @@ public abstract class GoogleCloudStorageReadOptions {
   public abstract Fadvise getFadvise();
 
   /** See {@link Builder#setMinRangeRequestSize}. */
-  public abstract int getMinRangeRequestSize();
+  public abstract long getMinRangeRequestSize();
 
   /** See {@link Builder#setGrpcChecksumsEnabled}. */
   public abstract boolean isGrpcChecksumsEnabled();
@@ -198,7 +198,7 @@ public abstract class GoogleCloudStorageReadOptions {
      * Sets the minimum size of the HTTP Range header that could be set in GCS request when opening
      * new stream to read an object.
      */
-    public abstract Builder setMinRangeRequestSize(int size);
+    public abstract Builder setMinRangeRequestSize(long size);
 
     /**
      * Sets whether to validate checksums when doing gRPC reads. If enabled, for sequential reads of

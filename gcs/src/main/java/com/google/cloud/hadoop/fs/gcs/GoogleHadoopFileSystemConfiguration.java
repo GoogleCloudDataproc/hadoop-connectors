@@ -337,10 +337,10 @@ public class GoogleHadoopFileSystemConfiguration {
    * Minimum size in bytes of the HTTP Range header set in GCS request when opening new stream to
    * read an object.
    */
-  public static final HadoopConfigurationProperty<Integer> GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE =
+  public static final HadoopConfigurationProperty<Long> GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE =
       new HadoopConfigurationProperty<>(
           "fs.gs.inputstream.min.range.request.size",
-          GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE);
+          (long) GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE);
 
   /** Configuration key for enabling use of the gRPC API for read/write. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_ENABLE =
@@ -505,7 +505,8 @@ public class GoogleHadoopFileSystemConfiguration {
             GCS_INPUT_STREAM_SUPPORT_GZIP_ENCODING_ENABLE.get(config, config::getBoolean))
         .setInplaceSeekLimit(GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.get(config, config::getLong))
         .setFadvise(GCS_INPUT_STREAM_FADVISE.get(config, config::getEnum))
-        .setMinRangeRequestSize(GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getInt))
+        .setMinRangeRequestSize(
+            GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getLongBytes))
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
         .setGrpcReadTimeoutMillis(GCS_GRPC_READ_TIMEOUT_MS.get(config, config::getLong))
         .setGrpcReadMessageTimeoutMillis(

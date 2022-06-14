@@ -171,7 +171,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     this.watchdog = watchdog;
     this.readOptions = readOptions;
     this.readStrategy = readOptions.getFadvise();
-    int prefetchSizeInBytes = readOptions.getMinRangeRequestSize() / 2;
+    long prefetchSizeInBytes = readOptions.getMinRangeRequestSize() / 2;
     this.gRPCReadMessageTimeout = readOptions.getGrpcReadMessageTimeoutMillis();
     this.footerStartOffsetInBytes = max(0, (objectSize - prefetchSizeInBytes));
   }
@@ -226,7 +226,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     this.readOptions = readOptions;
     this.backOffFactory = backOffFactory;
     this.readStrategy = readOptions.getFadvise();
-    int prefetchSizeInBytes = readOptions.getMinRangeRequestSize() / 2;
+    long prefetchSizeInBytes = readOptions.getMinRangeRequestSize() / 2;
     this.gRPCReadMessageTimeout = readOptions.getGrpcReadMessageTimeoutMillis();
     this.footerStartOffsetInBytes = max(0, (objectSize - prefetchSizeInBytes));
   }

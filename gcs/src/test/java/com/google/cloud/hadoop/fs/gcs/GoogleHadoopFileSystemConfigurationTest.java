@@ -29,6 +29,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_MESSAGE_TIMEOUT_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_TIMEOUT_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_HTTP_HEADERS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ROOT_URL;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_SERVICE_PATH;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
@@ -353,5 +354,16 @@ public class GoogleHadoopFileSystemConfigurationTest {
         .isEqualTo(grpcReadMessageTimeout);
     assertThat(options.getWriteChannelOptions().getGrpcWriteMessageTimeoutMillis())
         .isEqualTo(grpcWriteMessageTimeout);
+  }
+
+  @Test
+  public void testMinRangeRequestSize() {
+    Configuration config = new Configuration();
+    config.set(GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.getKey(), "300K");
+
+    GoogleCloudStorageOptions options =
+        GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
+
+    assertThat(options.getReadChannelOptions().getMinRangeRequestSize()).isEqualTo(307200);
   }
 }
