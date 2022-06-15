@@ -39,7 +39,7 @@ import org.junit.Test;
 
 public class EventLoggingHttpRequestInitializerTest {
   private static final String REQUEST_URL = "http://google.com";
-  private static final Logger JDK_LOGGER =
+  private static final Logger LOGGER =
       Logger.getLogger(EventLoggingHttpRequestInitializer.class.getName());
 
   private EventLoggingHttpRequestInitializer requestInitializer;
@@ -48,16 +48,16 @@ public class EventLoggingHttpRequestInitializerTest {
   @Before
   public void setUp() throws IOException {
     assertingHandler = new AssertingHandler();
-    JDK_LOGGER.setUseParentHandlers(false);
-    JDK_LOGGER.addHandler(assertingHandler);
-    JDK_LOGGER.setLevel(Level.INFO);
+    LOGGER.setUseParentHandlers(false);
+    LOGGER.addHandler(assertingHandler);
+    LOGGER.setLevel(Level.INFO);
 
     requestInitializer = new EventLoggingHttpRequestInitializer();
   }
 
   @After
   public void verifyAndRemoveAssertingHandler() {
-    JDK_LOGGER.removeHandler(assertingHandler);
+    LOGGER.removeHandler(assertingHandler);
   }
 
   @Test
