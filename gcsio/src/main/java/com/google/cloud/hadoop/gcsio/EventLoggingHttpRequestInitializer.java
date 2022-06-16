@@ -41,7 +41,7 @@ class EventLoggingHttpRequestInitializer implements HttpRequestInitializer {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private final Gson gson = new Gson();
 
-  // Using a ConcurrentHashMap with weak key reference to avoid potential memory leak during failure
+  // Using a ConcurrentMap with weak key reference to avoid potential memory leak during failure
   // scenarios. We do not get an response interceptor callback if there is some failure while
   // executing the HttpRequest.
   private final ConcurrentMap<HttpRequest, HttpRequestResponseTimeTracker> requestTracker =
