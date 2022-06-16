@@ -64,6 +64,14 @@
     fs.gs.auth.refresh.token
     ```
 
+1.  Merge all output stream types functionality in the default output stream
+    that behaves similarly to the `FLUSHABLE_COMPOSITE` stream, and remove
+    obsolete property:
+
+    ```properties
+    fs.gs.outputstream.type
+    ```
+
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.
@@ -1213,11 +1221,11 @@
 1.  The new inferImplicitDirectories option to `GoogleCloudStorage` tells it to
     infer the existence of a directory (such as `foo`) when that directory node
     does not exist in GCS but there are GCS files that start with that path
-    (such as `foo/bar`). This allows the GCS connector to be used on
-    read-only filesystems where those intermediate directory nodes can not be
-    created by the connector. The value of this option can be controlled by the
-    Hadoop boolean config option `fs.gs.implicit.dir.infer.enable`. The default
-    value is true.
+    (such as `foo/bar`). This allows the GCS connector to be used on read-only
+    filesystems where those intermediate directory nodes can not be created by
+    the connector. The value of this option can be controlled by the Hadoop
+    boolean config option `fs.gs.implicit.dir.infer.enable`. The default value
+    is true.
 
 1.  Increased Hadoop dependency version to 2.6.0.
 

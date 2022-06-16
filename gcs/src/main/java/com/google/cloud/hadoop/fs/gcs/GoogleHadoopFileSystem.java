@@ -16,7 +16,6 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.OutputStreamType.FLUSHABLE_COMPOSITE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
@@ -24,7 +23,6 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GLOB_ALGORITHM;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_LAZY_INITIALIZATION_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_TYPE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT;
 import static com.google.cloud.hadoop.gcsio.CreateFileOptions.DEFAULT_OVERWRITE;
@@ -72,7 +70,6 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.URI;
 import java.nio.file.DirectoryNotEmptyException;
 import java.time.Duration;
@@ -530,57 +527,17 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         "create(hadoopPath: %s, overwrite: %b, bufferSize: %d [ignored])",
         hadoopPath, overwrite, bufferSize);
 
-    URI gcsPath = getGcsPath(hadoopPath);
-
-    OutputStreamType type = GCS_OUTPUT_STREAM_TYPE.get(getConf(), getConf()::getEnum);
-    OutputStream out;
-    switch (type) {
-      case BASIC:
-        out =
+    FSDataOutputStream response =
+        new FSDataOutputStream(
             new GoogleHadoopOutputStream(
                 this,
-                gcsPath,
-                statistics,
-                CreateFileOptions.builder().setOverwriteExisting(overwrite).build());
-        break;
-      case FLUSHABLE_COMPOSITE:
-        SyncableOutputStreamOptions flushableOutputStreamOptions =
-            SyncableOutputStreamOptions.builder()
-                .setMinSyncInterval(
-                    Duration.ofMillis(
-                        GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)))
-                .setSyncOnFlushEnabled(true)
-                .build();
-        out =
-            new GoogleHadoopSyncableOutputStream(
-                this,
-                gcsPath,
-                statistics,
+                getGcsPath(hadoopPath),
                 CreateFileOptions.builder().setOverwriteExisting(overwrite).build(),
-                flushableOutputStreamOptions);
-        break;
-      case SYNCABLE_COMPOSITE:
-        SyncableOutputStreamOptions syncableOutputStreamOptions =
-            SyncableOutputStreamOptions.builder()
-                .setMinSyncInterval(
-                    Duration.ofMillis(
-                        GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)))
-                .build();
-        out =
-            new GoogleHadoopSyncableOutputStream(
-                this,
-                gcsPath,
-                statistics,
-                CreateFileOptions.builder().setOverwriteExisting(overwrite).build(),
-                syncableOutputStreamOptions);
-        break;
-      default:
-        throw new IOException(
-            String.format(
-                "Unsupported output stream type given for key '%s': '%s'",
-                GCS_OUTPUT_STREAM_TYPE.getKey(), type));
-    }
-    FSDataOutputStream response = new FSDataOutputStream(out, /* stats= */ null);
+                /* append= */ false,
+                /* minSyncInterval= */ Duration.ofMillis(
+                    GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)),
+                statistics),
+            statistics);
     instrumentation.fileCreated();
     return response;
   }
@@ -1110,24 +1067,18 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   public FSDataOutputStream append(Path hadoopPath, int bufferSize, Progressable progress)
       throws IOException {
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
-
     logger.atFiner().log(
         "append(hadoopPath: %s, bufferSize: %d [ignored])", hadoopPath, bufferSize);
-
     URI filePath = getGcsPath(hadoopPath);
-    SyncableOutputStreamOptions syncableOutputStreamOptions =
-        SyncableOutputStreamOptions.builder()
-            .setAppendEnabled(true)
-            .setMinSyncInterval(
-                Duration.ofMillis(
-                    GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)))
-            .setSyncOnFlushEnabled(
-                GCS_OUTPUT_STREAM_TYPE.get(getConf(), getConf()::getEnum) == FLUSHABLE_COMPOSITE)
-            .build();
-
     return new FSDataOutputStream(
-        new GoogleHadoopSyncableOutputStream(
-            this, filePath, statistics, DEFAULT_OVERWRITE, syncableOutputStreamOptions),
+        new GoogleHadoopOutputStream(
+            this,
+            filePath,
+            DEFAULT_OVERWRITE,
+            /* append= */ true,
+            /* minSyncInterval= */ Duration.ofMillis(
+                GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)),
+            statistics),
         statistics);
   }
 
@@ -1643,16 +1594,6 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   private byte[] getXAttrValue(byte[] value) {
     return value == null ? XATTR_NULL_VALUE : value;
-  }
-
-  /**
-   * Available types for use with {@link
-   * GoogleHadoopFileSystemConfiguration#GCS_OUTPUT_STREAM_TYPE}.
-   */
-  public enum OutputStreamType {
-    BASIC,
-    FLUSHABLE_COMPOSITE,
-    SYNCABLE_COMPOSITE
   }
 
   /**
