@@ -16,9 +16,19 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.common.base.Preconditions.checkState;
+
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
+import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
+import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.util.concurrent.RateLimiter;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -26,20 +36,81 @@ import java.net.URI;
 import java.nio.channels.Channels;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.WritableByteChannel;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 
-class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSource {
+class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSource, Syncable {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
+  // Prefix used for all temporary files created by this stream.
+  public static final String TMP_FILE_PREFIX = "_GHFS_SYNC_TMP_FILE_";
+
+  // Temporary files don't need to contain the desired attributes of the final destination file
+  // since metadata settings get clobbered on final compose() anyways; additionally, due to
+  // the way we pick temp file names and already ensured directories for the destination file,
+  // we can optimize tempfile creation by skipping various directory checks.
+  private static final CreateFileOptions TMP_FILE_CREATE_OPTIONS =
+      CreateFileOptions.DEFAULT_NO_OVERWRITE.toBuilder()
+          .setEnsureNoDirectoryConflict(false)
+          .setOverwriteGenerationId(0)
+          .build();
+
+  // Deletion of temporary files occurs asynchronously for performance reasons, but in-flight
+  // deletions are awaited on close() so as long as all output streams are closed, there should
+  // be no remaining in-flight work occurring inside this threadpool.
+  private static final ExecutorService TMP_FILE_CLEANUP_THREADPOOL =
+      Executors.newCachedThreadPool(
+          new ThreadFactoryBuilder()
+              .setNameFormat("ghfs-output-stream-sync-cleanup-%d")
+              .setDaemon(true)
+              .build());
+
+  private final GoogleHadoopFileSystem ghfs;
+
+  private final CreateFileOptions createFileOptions;
+
   // Path of the file to write to.
-  private final URI gcsPath;
-  // Output stream corresponding to channel.
-  private OutputStream outputStream;
+  private final URI dstGcsPath;
+
+  /**
+   * The last known generationId of the {@link #dstGcsPath} file, or possibly {@link
+   * StorageResourceId#UNKNOWN_GENERATION_ID} if unknown.
+   */
+  private long dstGenerationId;
+
+  // GCS path pointing at the "tail" file which will be appended to the destination
+  // on hflush()/hsync() call.
+  private URI tmpGcsPath;
+
+  /**
+   * Stores the component index corresponding to {@link #tmpGcsPath}. If close() is called, the
+   * total number of components in the {@link #dstGcsPath} will be {@code tmpIndex + 1}.
+   */
+  private int tmpIndex;
+
+  // OutputStream pointing at the "tail" file which will be appended to the destination
+  // on hflush()/hsync() call.
+  private OutputStream tmpOut;
+
+  private final RateLimiter syncRateLimiter;
+
+  // List of temporary file-deletion futures accrued during the lifetime of this output stream.
+  private final List<Future<Void>> tmpDeletionFutures = new ArrayList<>();
 
   // Statistics tracker provided by the parent GoogleHadoopFileSystem for recording
   // numbers of bytes written.
@@ -51,23 +122,46 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
    * Constructs an instance of GoogleHadoopOutputStream object.
    *
    * @param ghfs Instance of {@link GoogleHadoopFileSystem}.
-   * @param gcsPath Path of the file to write to.
+   * @param dstGcsPath Path of the file to write to.
    * @param statistics File system statistics object.
    * @param createFileOptions options for file creation
    * @throws IOException if an IO error occurs.
    */
-  GoogleHadoopOutputStream(
+  public GoogleHadoopOutputStream(
       GoogleHadoopFileSystem ghfs,
-      URI gcsPath,
-      FileSystem.Statistics statistics,
-      CreateFileOptions createFileOptions)
+      URI dstGcsPath,
+      CreateFileOptions createFileOptions,
+      boolean append,
+      Duration minSyncInterval,
+      FileSystem.Statistics statistics)
       throws IOException {
     logger.atFiner().log(
-        "GoogleHadoopOutputStream(gcsPath: %s, createFileOptions: %s)", gcsPath, createFileOptions);
-    this.gcsPath = gcsPath;
-    this.outputStream = createOutputStream(ghfs.getGcsFs(), gcsPath, createFileOptions);
+        "GoogleHadoopOutputStream(gcsPath: %s, createFileOptions: %s)",
+        dstGcsPath, createFileOptions);
+    this.ghfs = ghfs;
+    this.dstGcsPath = dstGcsPath;
+    this.createFileOptions = createFileOptions;
     this.statistics = statistics;
     this.streamStatistics = ghfs.getInstrumentation().newOutputStreamStatistics(statistics);
+    this.syncRateLimiter =
+        minSyncInterval.isNegative() || minSyncInterval.isZero()
+            ? null
+            : RateLimiter.create(/* permitsPerSecond= */ 1_000.0 / minSyncInterval.toMillis());
+
+    if (append) {
+      // When appending first component has to go to new temporary file.
+      this.tmpGcsPath = getNextTmpPath();
+      this.tmpIndex = 1;
+    } else {
+      // The first component of the stream will go straight to the destination filename to optimize
+      // the case where no hsync() or a single hsync() is called during the lifetime of the stream;
+      // committing the first component thus doesn't require any compose() call under the hood.
+      this.tmpGcsPath = dstGcsPath;
+      this.tmpIndex = 0;
+    }
+
+    this.tmpOut = createOutputStream(ghfs.getGcsFs(), tmpGcsPath, createFileOptions);
+    this.dstGenerationId = StorageResourceId.UNKNOWN_GENERATION_ID;
   }
 
   private static OutputStream createOutputStream(
@@ -90,8 +184,8 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
   @Override
   public void write(int b) throws IOException {
     throwIfNotOpen();
+    tmpOut.write(b);
     streamStatistics.writeBytes(1);
-    outputStream.write(b);
     statistics.incrementBytesWritten(1);
     statistics.incrementWriteOps(1);
   }
@@ -99,37 +193,167 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
   @Override
   public void write(@Nonnull byte[] b, int offset, int len) throws IOException {
     throwIfNotOpen();
+    tmpOut.write(b, offset, len);
     streamStatistics.writeBytes(len);
-    outputStream.write(b, offset, len);
     statistics.incrementBytesWritten(len);
     statistics.incrementWriteOps(1);
   }
 
+  /**
+   * There is no way to flush data to become available for readers without a full-fledged hsync(),
+   * If the output stream is only syncable, this method is a no-op. If the output stream is also
+   * flushable, this method will simply use the same implementation of hsync().
+   *
+   * <p>If it is rate limited, unlike hsync(), which will try to acquire the permits and block, it
+   * will do nothing.
+   */
+  @Override
+  public void hflush() throws IOException {
+    logger.atFiner().log("hflush(): %s", dstGcsPath);
+    long startMs = System.currentTimeMillis();
+    throwIfNotOpen();
+    streamStatistics.hflushInvoked();
+    // If rate limit not set or permit acquired than use hsync()
+    if (syncRateLimiter == null || syncRateLimiter.tryAcquire()) {
+      logger.atFine().log("hflush() uses hsyncInternal() for %s", dstGcsPath);
+      hsyncInternal(startMs);
+      return;
+    }
+    logger.atInfo().atMostEvery(1, TimeUnit.MINUTES).log(
+        "hflush(): No-op due to rate limit (%s): readers will *not* yet see flushed data for %s",
+        syncRateLimiter, dstGcsPath);
+  }
+
+  @Override
+  public void hsync() throws IOException {
+    logger.atFiner().log("hsync(): %s", dstGcsPath);
+    long startMs = System.currentTimeMillis();
+    throwIfNotOpen();
+    streamStatistics.hsyncInvoked();
+    if (syncRateLimiter != null) {
+      logger.atFiner().log(
+          "hsync(): Rate limited (%s) with blocking permit acquisition for %s",
+          syncRateLimiter, dstGcsPath);
+      syncRateLimiter.acquire();
+    }
+    hsyncInternal(startMs);
+  }
+
+  /** Internal implementation of hsync, can be reused by hflush() as well. */
+  private void hsyncInternal(long startMs) throws IOException {
+    logger.atFiner().log(
+        "hsyncInternal(): Committing tail file %s to final destination %s", tmpGcsPath, dstGcsPath);
+    commitTempFile();
+
+    // Use a different temporary path for each temporary component to reduce the possible avenues of
+    // race conditions in the face of low-level retries, etc.
+    ++tmpIndex;
+    tmpGcsPath = getNextTmpPath();
+
+    logger.atFiner().log(
+        "hsync(): Opening next temporary tail file %s at %d index", tmpGcsPath, tmpIndex);
+    tmpOut = createOutputStream(ghfs.getGcsFs(), tmpGcsPath, TMP_FILE_CREATE_OPTIONS);
+
+    long finishMs = System.currentTimeMillis();
+    logger.atFiner().log("Took %dms to sync() for %s", finishMs - startMs, dstGcsPath);
+  }
+
+  private void commitTempFile() throws IOException {
+    // TODO(user): return early when 0 bytes have been written in the temp files
+    tmpOut.close();
+
+    long tmpGenerationId =
+        tmpOut instanceof GoogleCloudStorageItemInfo.Provider
+            ? ((GoogleCloudStorageItemInfo.Provider) tmpOut).getItemInfo().getContentGeneration()
+            : StorageResourceId.UNKNOWN_GENERATION_ID;
+    logger.atFiner().log(
+        "tmpOut is an instance of %s; expected generationId %d.",
+        tmpOut.getClass(), tmpGenerationId);
+
+    // On the first component, tmpGcsPath will equal finalGcsPath, and no compose() call is
+    // necessary. Otherwise, we compose in-place into the destination object and then delete
+    // the temporary object.
+    if (dstGcsPath.equals(tmpGcsPath)) {
+      // First commit was direct to the destination; the generationId of the object we just
+      // committed will be used as the destination generation id for future compose calls.
+      dstGenerationId = tmpGenerationId;
+    } else {
+      StorageResourceId dstId =
+          StorageResourceId.fromUriPath(dstGcsPath, /* allowEmptyPath= */ false, dstGenerationId);
+      StorageResourceId tmpId =
+          StorageResourceId.fromUriPath(tmpGcsPath, /* allowEmptyPath= */ false, tmpGenerationId);
+      checkState(
+          dstId.getBucketName().equals(tmpId.getBucketName()),
+          "Destination bucket in path '%s' doesn't match temp file bucket in path '%s'",
+          dstGcsPath,
+          tmpGcsPath);
+      CreateObjectOptions createObjectOptions =
+          GoogleCloudStorageFileSystemImpl.objectOptionsFromFileOptions(createFileOptions);
+      GoogleCloudStorage gcs = ghfs.getGcsFs().getGcs();
+      GoogleCloudStorageItemInfo composedObject =
+          gcs.composeObjects(ImmutableList.of(dstId, tmpId), dstId, createObjectOptions);
+      dstGenerationId = composedObject.getContentGeneration();
+      tmpDeletionFutures.add(
+          TMP_FILE_CLEANUP_THREADPOOL.submit(
+              () -> {
+                gcs.deleteObjects(ImmutableList.of(tmpId));
+                return null;
+              }));
+    }
+  }
+
+  /** Returns URI to be used for the next temp "tail" file in the series. */
+  private URI getNextTmpPath() {
+    Path basePath = ghfs.getHadoopPath(dstGcsPath);
+    Path tempPath =
+        new Path(
+            basePath.getParent(),
+            String.format(
+                "%s%s.%d.%s", TMP_FILE_PREFIX, basePath.getName(), tmpIndex, UUID.randomUUID()));
+    return ghfs.getGcsPath(tempPath);
+  }
+
   @Override
   public void close() throws IOException {
-    logger.atFiner().log("close(%s)", gcsPath);
-    if (outputStream != null) {
-      try {
-        outputStream.close();
-      } finally {
-        outputStream = null;
-      }
+    logger.atFiner().log(
+        "close(): temp tail file: %s final destination: %s", tmpGcsPath, dstGcsPath);
+    if (tmpOut == null) {
+      logger.atFiner().log("close(): Ignoring; stream already closed.");
+      return;
     }
     streamStatistics.close();
+    commitTempFile();
+
+    try {
+      tmpOut.close();
+    } finally {
+      tmpOut = null;
+    }
+    tmpGcsPath = null;
+    tmpIndex = -1;
+
+    logger.atFiner().log("close(): Awaiting %s deletionFutures", tmpDeletionFutures.size());
+    for (Future<?> deletion : tmpDeletionFutures) {
+      try {
+        deletion.get();
+      } catch (ExecutionException | InterruptedException e) {
+        if (e instanceof InterruptedException) {
+          Thread.currentThread().interrupt();
+        }
+        throw new IOException(
+            String.format(
+                "Failed to delete temporary files while closing stream: '%s'", dstGcsPath),
+            e);
+      }
+    }
+
+    // TODO: do we need make a `cleanerThreadpool` an object field and close it here?
   }
 
   private void throwIfNotOpen() throws IOException {
-    if (outputStream == null) {
+    if (tmpOut == null) {
       throw new ClosedChannelException();
     }
-  }
-
-  OutputStream getInternalOutputStream() {
-    return outputStream;
-  }
-
-  public GhfsOutputStreamStatistics getStreamStatistics() {
-    return streamStatistics;
   }
 
   /** Get the current IOStatistics from output stream */
