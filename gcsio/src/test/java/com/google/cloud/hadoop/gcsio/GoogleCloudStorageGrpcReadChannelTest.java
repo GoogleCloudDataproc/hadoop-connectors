@@ -7,6 +7,7 @@ import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonE
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.truth.Truth.assertThat;
 import static java.lang.Math.min;
+import static java.lang.Math.toIntExact;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -75,7 +76,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   private static final String OBJECT_NAME = "object-name";
   private static final long OBJECT_GENERATION = 7;
   private static final int OBJECT_SIZE =
-      GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE + 10;
+      toIntExact(GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE + 10);
   private static final int DEFAULT_OBJECT_CRC32C = 185327488;
   private static final Object DEFAULT_OBJECT =
       Object.newBuilder()
@@ -190,7 +191,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
   @Test
   public void readAfterRepositioningAfterSkippingSucceeds() throws Exception {
-    int objectSize = GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE * 10;
+    int objectSize = toIntExact(GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE * 10);
     storageObject.setSize(BigInteger.valueOf(objectSize));
     fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(objectSize).build());
     verify(fakeService, times(1)).setObject(any());
@@ -243,7 +244,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
   @Test
   public void multipleSequentialReads() throws Exception {
-    int objectSize = GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE * 10;
+    int objectSize = toIntExact(GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE * 10);
     storageObject.setSize(BigInteger.valueOf(objectSize));
     fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(objectSize).build());
     verify(fakeService, times(1)).setObject(any());
@@ -274,7 +275,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
   @Test
   public void randomReadRequestsExactBytes() throws Exception {
-    int objectSize = GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE * 10;
+    int objectSize = toIntExact(GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE * 10);
     storageObject.setSize(BigInteger.valueOf(objectSize));
     fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(objectSize).build());
     verify(fakeService, times(1)).setObject(any());
@@ -307,7 +308,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
   @Test
   public void repeatedRandomReadsWorkAsExpected() throws Exception {
-    int objectSize = GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE * 10;
+    int objectSize = toIntExact(GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE * 10);
     storageObject.setSize(BigInteger.valueOf(objectSize));
     fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(objectSize).build());
     verify(fakeService, times(1)).setObject(any());
@@ -355,7 +356,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
   @Test
   public void randomReadRequestsExpectedBytes() throws Exception {
-    int objectSize = GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE * 10;
+    int objectSize = toIntExact(GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE * 10);
     storageObject.setSize(BigInteger.valueOf(objectSize));
     fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(objectSize).build());
     verify(fakeService, times(1)).setObject(any());
@@ -374,15 +375,11 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     assertArrayEquals(fakeService.data.substring(10, 60).toByteArray(), buffer.array());
 
     // Request bytes larger than minimum request size.
-    buffer = ByteBuffer.allocate(GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE + 1);
+    int bufferSize = toIntExact(GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE + 1);
+    buffer = ByteBuffer.allocate(bufferSize);
     readChannel.position(0);
     readChannel.read(buffer);
-    assertArrayEquals(
-        fakeService
-            .data
-            .substring(0, GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE + 1)
-            .toByteArray(),
-        buffer.array());
+    assertArrayEquals(fakeService.data.substring(0, bufferSize).toByteArray(), buffer.array());
 
     ReadObjectRequest firstExpectedRequest =
         ReadObjectRequest.newBuilder()

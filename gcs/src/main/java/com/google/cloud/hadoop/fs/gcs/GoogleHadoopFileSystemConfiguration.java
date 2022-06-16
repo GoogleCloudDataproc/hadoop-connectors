@@ -340,7 +340,7 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Long> GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE =
       new HadoopConfigurationProperty<>(
           "fs.gs.inputstream.min.range.request.size",
-          (long) GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE);
+          GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE);
 
   /** Configuration key for enabling use of the gRPC API for read/write. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_ENABLE =
