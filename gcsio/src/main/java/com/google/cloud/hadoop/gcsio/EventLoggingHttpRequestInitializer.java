@@ -26,11 +26,12 @@ import com.google.common.flogger.GoogleLogger;
 import com.google.common.flogger.LazyArgs;
 import com.google.gson.Gson;
 import java.io.IOException;
+import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * Implements a HttpRequestInitializer which adds a ResponseInterceptor to each HttpRequest and
@@ -43,7 +44,7 @@ class EventLoggingHttpRequestInitializer implements HttpRequestInitializer {
   // Using a ConcurrentHashMap with weak key reference to avoid potential memory leak during failure
   // scenarios. We do not get an response interceptor callback if there is some failure while
   // executing the HttpRequest.
-  private final Map<HttpRequest, HttpRequestResponseTimeTracker> requestTracker =
+  private final ConcurrentMap<HttpRequest, HttpRequestResponseTimeTracker> requestTracker =
       new MapMaker().weakKeys().makeMap();
 
   @Override
@@ -66,15 +67,14 @@ class EventLoggingHttpRequestInitializer implements HttpRequestInitializer {
     jsonMap.put("response_status_message", httpResponse.getStatusMessage());
     jsonMap.put("thread_name", Thread.currentThread().getName());
 
-    HttpRequestResponseTimeTracker tracker = requestTracker.get(request);
+    HttpRequestResponseTimeTracker tracker = requestTracker.remove(request);
     if (tracker != null) {
-      requestTracker.remove(request);
       jsonMap.put("response_time", tracker.getResponseTime());
       jsonMap.put("request_start_time_utc", tracker.getStartTimeUtc());
       jsonMap.put("request_finish_time_utc", tracker.getCurrentTimeUtc());
     } else {
       jsonMap.put("response_time", Integer.MAX_VALUE);
-      jsonMap.put("unexpected_error", "Zombie request. This is unexpected.");
+      jsonMap.put("unexpected_error", "Unknown request. This is unexpected.");
     }
 
     logDetails(jsonMap);
@@ -89,18 +89,18 @@ class EventLoggingHttpRequestInitializer implements HttpRequestInitializer {
         DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSXXX").withZone(ZoneOffset.UTC);
 
     private final Stopwatch stopwatch = Stopwatch.createStarted();
-    private final Date startTime = new Date();
+    private final Instant startTime = Instant.now();
 
     long getResponseTime() {
       return stopwatch.elapsed(MILLISECONDS);
     }
 
     String getStartTimeUtc() {
-      return dateTimeFormatter.format(startTime.toInstant());
+      return dateTimeFormatter.format(startTime);
     }
 
     String getCurrentTimeUtc() {
-      return dateTimeFormatter.format(new Date().toInstant());
+      return dateTimeFormatter.format(Instant.now());
     }
   }
 }

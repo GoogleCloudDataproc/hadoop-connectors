@@ -100,7 +100,7 @@ public class EventLoggingHttpRequestInitializerTest {
     assertingHandler.assertLogCount(1);
     Map<String, Object> logRecord = assertingHandler.getLogRecordAtIndex(0);
     verifyFields(logRecord, 200);
-    assertThat(logRecord.get("unexpected_error")).isEqualTo("Zombie request. This is unexpected.");
+    assertThat(logRecord.get("unexpected_error")).isEqualTo("Unknown request. This is unexpected.");
   }
 
   private static void verifyFields(Map<String, Object> logRecord, int expectedStatusCode) {
