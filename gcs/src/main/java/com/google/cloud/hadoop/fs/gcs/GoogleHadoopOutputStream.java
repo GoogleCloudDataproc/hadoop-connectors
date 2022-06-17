@@ -78,7 +78,7 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
 
   private final GoogleHadoopFileSystem ghfs;
 
-  private final CreateFileOptions createFileOptions;
+  private final CreateObjectOptions composeObjectOptions;
 
   // Path of the file to write to.
   private final URI dstGcsPath;
@@ -134,7 +134,6 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
         dstGcsPath, createFileOptions);
     this.ghfs = ghfs;
     this.dstGcsPath = dstGcsPath;
-    this.createFileOptions = createFileOptions;
     this.statistics = statistics;
     this.streamStatistics = ghfs.getInstrumentation().newOutputStreamStatistics(statistics);
     this.syncRateLimiter =
@@ -146,10 +145,19 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
                     / createFileOptions.getMinSyncInterval().toMillis());
 
     if (createFileOptions.getWriteMode() == CreateFileOptions.WriteMode.APPEND) {
+      // Set write mode to CREATE_NEW because objectOptionsFromFileOptions method
+      // does not support APPEND mode
+      this.composeObjectOptions =
+          GoogleCloudStorageFileSystemImpl.objectOptionsFromFileOptions(
+              createFileOptions.toBuilder()
+                  .setWriteMode(CreateFileOptions.WriteMode.CREATE_NEW)
+                  .build());
       // When appending first component has to go to new temporary file.
       this.tmpGcsPath = getNextTmpPath();
       this.tmpIndex = 1;
     } else {
+      this.composeObjectOptions =
+          GoogleCloudStorageFileSystemImpl.objectOptionsFromFileOptions(createFileOptions);
       // The first component of the stream will go straight to the destination filename to optimize
       // the case where no hsync() or a single hsync() is called during the lifetime of the stream;
       // committing the first component thus doesn't require any compose() call under the hood.
@@ -157,7 +165,11 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
       this.tmpIndex = 0;
     }
 
-    this.tmpOut = createOutputStream(ghfs.getGcsFs(), tmpGcsPath, createFileOptions);
+    this.tmpOut =
+        createOutputStream(
+            ghfs.getGcsFs(),
+            tmpGcsPath,
+            tmpIndex == 0 ? createFileOptions : TMP_FILE_CREATE_OPTIONS);
     this.dstGenerationId = StorageResourceId.UNKNOWN_GENERATION_ID;
   }
 
@@ -286,11 +298,9 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
           "Destination bucket in path '%s' doesn't match temp file bucket in path '%s'",
           dstGcsPath,
           tmpGcsPath);
-      CreateObjectOptions createObjectOptions =
-          GoogleCloudStorageFileSystemImpl.objectOptionsFromFileOptions(createFileOptions);
       GoogleCloudStorage gcs = ghfs.getGcsFs().getGcs();
       GoogleCloudStorageItemInfo composedObject =
-          gcs.composeObjects(ImmutableList.of(dstId, tmpId), dstId, createObjectOptions);
+          gcs.composeObjects(ImmutableList.of(dstId, tmpId), dstId, composeObjectOptions);
       dstGenerationId = composedObject.getContentGeneration();
       tmpDeletionFutures.add(
           TMP_FILE_CLEANUP_THREADPOOL.submit(
