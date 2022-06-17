@@ -16,7 +16,6 @@ package com.google.cloud.hadoop.gcsio.testing;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.api.client.util.Clock;
@@ -523,10 +522,8 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
         sources.size() <= MAX_COMPOSE_OBJECTS,
         "Can not compose more than %s sources",
         MAX_COMPOSE_OBJECTS);
-    checkState(getItemInfo(destination).exists(), "compose destination %s must exist", destination);
     ByteArrayOutputStream tempOutput = new ByteArrayOutputStream();
-    for (StorageResourceId sourceId :
-        ImmutableList.<StorageResourceId>builder().add(destination).addAll(sources).build()) {
+    for (StorageResourceId sourceId : sources) {
       // TODO(user): If we change to also set generationIds for source objects in the base
       // GoogleCloudStorageImpl, make sure to also add a generationId check here.
       try (SeekableByteChannel sourceChannel = open(sourceId)) {
@@ -539,7 +536,6 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
         } while (bytesRead >= 0);
       }
     }
-
     deleteObjects(ImmutableList.of(destination));
     try (WritableByteChannel destChannel = create(destination, options)) {
       destChannel.write(ByteBuffer.wrap(tempOutput.toByteArray()));
