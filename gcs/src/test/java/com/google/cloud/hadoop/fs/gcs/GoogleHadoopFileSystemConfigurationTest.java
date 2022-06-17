@@ -42,7 +42,6 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GcsFileChecksumType;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GlobAlgorithm;
-import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.FilesystemAPI;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
@@ -114,7 +113,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.outputstream.pipe.buffer.size", 1024 * 1024);
           put("fs.gs.outputstream.pipe.type", PipeType.IO_STREAM_PIPE);
           put("fs.gs.outputstream.sync.min.interval.ms", 0);
-          put("fs.gs.outputstream.type", OutputStreamType.BASIC);
           put("fs.gs.outputstream.upload.cache.size", 0);
           put("fs.gs.outputstream.upload.chunk.size", 64 * 1024 * 1024);
           put("fs.gs.performance.cache.enable", false);
@@ -216,7 +214,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
     GoogleCloudStorageOptions.Builder optionsBuilder =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config);
 
-    // Building configuration using deprecated key (in eg. proxy password) should fail.
+    // Building configuration using deprecated key (in e.g. proxy password) should fail.
     assertThrows(IllegalArgumentException.class, optionsBuilder::build);
   }
 

@@ -24,7 +24,6 @@ import static com.google.common.base.Strings.nullToEmpty;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GcsFileChecksumType;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GlobAlgorithm;
-import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.FilesystemAPI;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
@@ -244,23 +243,6 @@ public class GoogleHadoopFileSystemConfiguration {
    */
   public static final HadoopConfigurationProperty<Integer> GCS_MAX_WAIT_MILLIS_EMPTY_OBJECT_CREATE =
       new HadoopConfigurationProperty<>("fs.gs.max.wait.for.empty.object.creation.ms", 3_000);
-
-  /**
-   * Configuration key for which type of output stream to use; different options may have different
-   * degrees of support for advanced features like {@code hsync()} and different performance
-   * characteristics. Options:
-   *
-   * <p>BASIC: Stream is closest analogue to direct wrapper around low-level HTTP stream into GCS.
-   *
-   * <p>SYNCABLE_COMPOSITE: Stream behaves similarly to BASIC when used with basic
-   * create/write/close patterns, but supports hsync() by creating discrete temporary GCS objects
-   * which are composed onto the destination object.
-   *
-   * <p>FLUSHABLE_COMPOSITE: Stream behaves similarly to SYNCABLE_COMPOSITE, except hflush() is also
-   * supported. It will use the same implementation of hsync().
-   */
-  public static final HadoopConfigurationProperty<OutputStreamType> GCS_OUTPUT_STREAM_TYPE =
-      new HadoopConfigurationProperty<>("fs.gs.outputstream.type", OutputStreamType.BASIC);
 
   /** Configuration key for setting write buffer size. */
   public static final HadoopConfigurationProperty<Integer> GCS_OUTPUT_STREAM_BUFFER_SIZE =
