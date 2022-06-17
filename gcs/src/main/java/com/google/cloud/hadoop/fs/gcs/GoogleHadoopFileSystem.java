@@ -25,7 +25,6 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT;
-import static com.google.cloud.hadoop.gcsio.CreateFileOptions.DEFAULT_APPEND;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.CLOUD_PLATFORM_SCOPE;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -532,15 +531,16 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
             new GoogleHadoopOutputStream(
                 this,
                 getGcsPath(hadoopPath),
-                (overwrite
-                        ? CreateFileOptions.DEFAULT_OVERWRITE
-                        : CreateFileOptions.DEFAULT_CREATE_NEW)
-                    .toBuilder()
-                        .setMinSyncInterval(
-                            Duration.ofMillis(
-                                GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(
-                                    getConf(), getConf()::getInt)))
-                        .build(),
+                CreateFileOptions.builder()
+                    .setWriteMode(
+                        overwrite
+                            ? CreateFileOptions.WriteMode.OVERWRITE
+                            : CreateFileOptions.WriteMode.CREATE_NEW)
+                    .setMinSyncInterval(
+                        Duration.ofMillis(
+                            GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(
+                                getConf(), getConf()::getInt)))
+                    .build(),
                 statistics),
             statistics);
     instrumentation.fileCreated();
@@ -1080,7 +1080,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         new GoogleHadoopOutputStream(
             this,
             filePath,
-            DEFAULT_APPEND.toBuilder()
+            CreateFileOptions.builder()
+                .setWriteMode(CreateFileOptions.WriteMode.APPEND)
                 .setMinSyncInterval(
                     Duration.ofMillis(
                         GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)))

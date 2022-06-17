@@ -250,12 +250,12 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       }
     }
 
-    if (createOptions.getWriteGenerationId() != StorageResourceId.UNKNOWN_GENERATION_ID) {
+    if (createOptions.getOverwriteGenerationId() != StorageResourceId.UNKNOWN_GENERATION_ID) {
       resourceId =
           new StorageResourceId(
               resourceId.getBucketName(),
               resourceId.getObjectName(),
-              createOptions.getWriteGenerationId());
+              createOptions.getOverwriteGenerationId());
     }
 
     return gcs.create(resourceId, objectOptionsFromFileOptions(createOptions));

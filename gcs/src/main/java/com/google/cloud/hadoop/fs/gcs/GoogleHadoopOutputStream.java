@@ -64,7 +64,7 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
   // the way we pick temp file names and already ensured directories for the destination file,
   // we can optimize tempfile creation by skipping various directory checks.
   private static final CreateFileOptions TMP_FILE_CREATE_OPTIONS =
-      CreateFileOptions.DEFAULT_CREATE_NEW.toBuilder().setEnsureNoDirectoryConflict(false).build();
+      CreateFileOptions.builder().setEnsureNoDirectoryConflict(false).build();
 
   // Deletion of temporary files occurs asynchronously for performance reasons, but in-flight
   // deletions are awaited on close() so as long as all output streams are closed, there should

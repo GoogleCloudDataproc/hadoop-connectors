@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertThrows;
 
@@ -29,21 +30,40 @@ public class CreateFileOptionsTest {
     CreateFileOptions.builder()
         .setAttributes(ImmutableMap.of("Innocuous", "text".getBytes(UTF_8)))
         .setContentType("text")
-        .setWriteMode(CreateFileOptions.WriteMode.CREATE_NEW)
-        .setWriteGenerationId(0)
+        .setWriteMode(CreateFileOptions.WriteMode.OVERWRITE)
+        .setOverwriteGenerationId(0)
         .build();
   }
 
   @Test
   public void invalidOptions_contentType_setViaAttributes() {
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            CreateFileOptions.builder()
-                .setAttributes(ImmutableMap.of("Content-Type", "text".getBytes(UTF_8)))
-                .setContentType("text")
-                .setWriteMode(CreateFileOptions.WriteMode.CREATE_NEW)
-                .setWriteGenerationId(0)
-                .build());
+    IllegalArgumentException thrown =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                CreateFileOptions.builder()
+                    .setAttributes(ImmutableMap.of("Content-Type", "text".getBytes(UTF_8)))
+                    .setContentType("text")
+                    .build());
+
+    assertThat(thrown)
+        .hasMessageThat()
+        .isEqualTo("The Content-Type attribute must be set via the contentType option");
+  }
+
+  @Test
+  public void invalidOptions_createNewWithOverwriteGeneration() {
+    IllegalArgumentException thrown =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                CreateFileOptions.builder()
+                    .setWriteMode(CreateFileOptions.WriteMode.CREATE_NEW)
+                    .setOverwriteGenerationId(0)
+                    .build());
+
+    assertThat(thrown)
+        .hasMessageThat()
+        .isEqualTo("overwriteGenerationId is set to 0 but it can be sed only in OVERWRITE mode");
   }
 }

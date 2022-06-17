@@ -30,17 +30,7 @@ import javax.annotation.Nullable;
 @AutoValue
 public abstract class CreateFileOptions {
 
-  public static final CreateFileOptions DEFAULT_APPEND =
-      builder()
-          .setWriteMode(WriteMode.APPEND)
-          .setWriteGenerationId(StorageResourceId.UNKNOWN_GENERATION_ID)
-          .build();
-  public static final CreateFileOptions DEFAULT_CREATE_NEW = builder().build();
-  public static final CreateFileOptions DEFAULT_OVERWRITE =
-      builder()
-          .setWriteMode(WriteMode.OVERWRITE)
-          .setWriteGenerationId(StorageResourceId.UNKNOWN_GENERATION_ID)
-          .build();
+  public static final CreateFileOptions DEFAULT = builder().build();
 
   public enum WriteMode {
     /** Write new bytes to the end of the existing file rather than the beginning. */
@@ -57,8 +47,8 @@ public abstract class CreateFileOptions {
         .setContentType(CreateObjectOptions.CONTENT_TYPE_DEFAULT)
         .setEnsureNoDirectoryConflict(true)
         .setMinSyncInterval(Duration.ofSeconds(10))
-        .setWriteMode(WriteMode.CREATE_NEW)
-        .setWriteGenerationId(0);
+        .setOverwriteGenerationId(StorageResourceId.UNKNOWN_GENERATION_ID)
+        .setWriteMode(WriteMode.CREATE_NEW);
   }
 
   public abstract Builder toBuilder();
@@ -90,7 +80,7 @@ public abstract class CreateFileOptions {
    * only be overwritten by the newly created file if its generation matches this provided
    * generationId.
    */
-  public abstract long getWriteGenerationId();
+  public abstract long getOverwriteGenerationId();
 
   /** Builder for {@link CreateFileOptions} */
   @AutoValue.Builder
@@ -104,7 +94,7 @@ public abstract class CreateFileOptions {
 
     public abstract Builder setMinSyncInterval(Duration interval);
 
-    public abstract Builder setWriteGenerationId(long generationId);
+    public abstract Builder setOverwriteGenerationId(long overwriteGenerationId);
 
     public abstract Builder setWriteMode(WriteMode mode);
 
@@ -114,17 +104,14 @@ public abstract class CreateFileOptions {
       CreateFileOptions options = autoBuild();
       checkArgument(
           !options.getAttributes().containsKey("Content-Type"),
-          "The Content-Type attribute must be provided explicitly via the 'contentType' parameter");
+          "The Content-Type attribute must be set via the contentType option");
       switch (options.getWriteMode()) {
         case APPEND:
-          checkArgument(options.getWriteGenerationId() == StorageResourceId.UNKNOWN_GENERATION_ID);
-          break;
         case CREATE_NEW:
-          checkArgument(options.getWriteGenerationId() == 0);
-          break;
-        case OVERWRITE:
-          checkArgument(options.getWriteGenerationId() != 0);
-          break;
+          checkArgument(
+              options.getOverwriteGenerationId() == StorageResourceId.UNKNOWN_GENERATION_ID,
+              "overwriteGenerationId is set to %s but it can be sed only in OVERWRITE mode",
+              options.getOverwriteGenerationId());
       }
       return options;
     }

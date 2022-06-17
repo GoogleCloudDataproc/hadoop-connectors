@@ -149,9 +149,12 @@ public abstract class GoogleCloudStorageIntegrationHelper {
     int totalBytesWritten = 0;
 
     CreateFileOptions createOptions =
-        overwriteExisting
-            ? CreateFileOptions.DEFAULT_OVERWRITE
-            : CreateFileOptions.DEFAULT_CREATE_NEW;
+        CreateFileOptions.builder()
+            .setWriteMode(
+                overwriteExisting
+                    ? CreateFileOptions.WriteMode.OVERWRITE
+                    : CreateFileOptions.WriteMode.CREATE_NEW)
+            .build();
     try (WritableByteChannel writeChannel = create(path, createOptions)) {
       for (int i = 0; i < numWrites; i++) {
         int numBytesWritten = writeChannel.write(ByteBuffer.wrap(buffer));
@@ -276,7 +279,9 @@ public abstract class GoogleCloudStorageIntegrationHelper {
 
   /** Opens the given object for writing. */
   protected WritableByteChannel create(URI path) throws IOException {
-    return create(path, CreateFileOptions.DEFAULT_OVERWRITE);
+    return create(
+        path,
+        CreateFileOptions.builder().setWriteMode(CreateFileOptions.WriteMode.OVERWRITE).build());
   }
 
   /** Opens the given object for writing. */
