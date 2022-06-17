@@ -140,7 +140,8 @@ public abstract class GoogleCloudStorageOptions {
         .setGrpcMessageTimeoutCheckInterval(GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL)
         .setAuthorizationHandlerImplClass(AUTHORIZATION_HANDLER_IMPL_CLASS_DEFAULT)
         .setAuthorizationHandlerProperties(AUTHORIZATION_HANDLER_PROPERTIES_DEFAULT)
-        .setMetricsSink(MetricsSink.NONE);
+        .setMetricsSink(MetricsSink.NONE)
+        .setTraceLogEnabled(false);
   }
 
   public abstract Builder toBuilder();
@@ -216,6 +217,8 @@ public abstract class GoogleCloudStorageOptions {
   public abstract long getGrpcMessageTimeoutCheckInterval();
 
   public abstract MetricsSink getMetricsSink();
+
+  public abstract boolean isTraceLogEnabled();
 
   public RetryHttpInitializerOptions toRetryHttpInitializerOptions() {
     return RetryHttpInitializerOptions.builder()
@@ -312,6 +315,8 @@ public abstract class GoogleCloudStorageOptions {
         long grpcMessageTimeoutInMillisCheckInterval);
 
     public abstract Builder setMetricsSink(MetricsSink metricsSink);
+
+    public abstract Builder setTraceLogEnabled(Boolean enable);
 
     abstract GoogleCloudStorageOptions autoBuild();
 
