@@ -387,7 +387,7 @@ default service account impersonation.
 
         To avoid sending too small range requests (couple bytes) - could happen
         if `fs.gs.io.buffer` is 0 and client passes very small read buffer,
-        minimum range request size is limited to 1 MiB by default configurable
+        minimum range request size is limited to 2 MB by default configurable
         through `fs.gs.inputstream.min.range.request.size` property
 
     *   `AUTO` - in this mode (adaptive range reads) connector starts to send

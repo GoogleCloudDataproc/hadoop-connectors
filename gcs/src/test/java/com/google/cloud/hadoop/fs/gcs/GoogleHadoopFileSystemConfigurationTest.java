@@ -29,6 +29,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_MESSAGE_TIMEOUT_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_TIMEOUT_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_HTTP_HEADERS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ROOT_URL;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_SERVICE_PATH;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
@@ -99,7 +100,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.inputstream.fadvise", Fadvise.AUTO);
           put("fs.gs.inputstream.fast.fail.on.not.found.enable", true);
           put("fs.gs.inputstream.inplace.seek.limit", 8 * 1024 * 1024L);
-          put("fs.gs.inputstream.min.range.request.size", 2 * 1024 * 1024);
+          put("fs.gs.inputstream.min.range.request.size", 2 * 1024 * 1024L);
           put("fs.gs.inputstream.support.gzip.encoding.enable", false);
           put("fs.gs.io.buffersize.write", 64 * 1024 * 1024);
           put("fs.gs.lazy.init.enable", false);
@@ -352,5 +353,16 @@ public class GoogleHadoopFileSystemConfigurationTest {
         .isEqualTo(grpcReadMessageTimeout);
     assertThat(options.getWriteChannelOptions().getGrpcWriteMessageTimeoutMillis())
         .isEqualTo(grpcWriteMessageTimeout);
+  }
+
+  @Test
+  public void testMinRangeRequestSize() {
+    Configuration config = new Configuration();
+    config.set(GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.getKey(), "300K");
+
+    GoogleCloudStorageOptions options =
+        GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
+
+    assertThat(options.getReadChannelOptions().getMinRangeRequestSize()).isEqualTo(307200);
   }
 }
