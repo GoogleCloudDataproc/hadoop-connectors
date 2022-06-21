@@ -1313,11 +1313,11 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     int minRangeRequestSize = 4 * 1024;
     int inplaceSeekLimit = 6 * 1024;
     GoogleCloudStorageReadOptions options =
-            GoogleCloudStorageReadOptions.builder()
-                    .setMinRangeRequestSize(minRangeRequestSize)
-                    .setFadvise(Fadvise.AUTO)
-                    .setInplaceSeekLimit(inplaceSeekLimit)
-                    .build();
+        GoogleCloudStorageReadOptions.builder()
+            .setMinRangeRequestSize(minRangeRequestSize)
+            .setFadvise(Fadvise.AUTO)
+            .setInplaceSeekLimit(inplaceSeekLimit)
+            .build();
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
     ByteBuffer buffer = ByteBuffer.allocate(2 * 1024);
     readChannel.read(buffer);
@@ -1326,14 +1326,14 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     verify(get).execute();
 
     verify(fakeService, times(1))
-            .readObject(
-                    eq(
-                            ReadObjectRequest.newBuilder()
-                                    .setBucket(BUCKET_NAME)
-                                    .setObject(OBJECT_NAME)
-                                    .setGeneration(OBJECT_GENERATION)
-                                    .build()),
-                    any());
+        .readObject(
+            eq(
+                ReadObjectRequest.newBuilder()
+                    .setBucket(BUCKET_NAME)
+                    .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
+                    .build()),
+            any());
 
     buffer.clear();
     readChannel.position(0);
@@ -1344,8 +1344,8 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     readChannel.read(buffer);
 
     assertArrayEquals(
-            fakeService.data.substring(readOffset, readOffset + (capacity)).toByteArray(),
-            buffer.array());
+        fakeService.data.substring(readOffset, readOffset + (capacity)).toByteArray(),
+        buffer.array());
 
     verifyNoMoreInteractions(fakeService);
   }
