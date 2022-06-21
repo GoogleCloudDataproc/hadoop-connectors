@@ -308,7 +308,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   }
 
   private byte[] getFooterContent() throws IOException {
-    int footerSize =  Math.toIntExact(objectSize - footerStartOffsetInBytes);
+    int footerSize = Math.toIntExact(objectSize - footerStartOffsetInBytes);
     ByteBuffer buffer = ByteBuffer.allocate(footerSize);
 
     // snapshot these variables because readFromGCS clobbers them
@@ -358,8 +358,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   private int readBufferedContentInto(ByteBuffer byteBuffer) {
     // Handle skipping forward through the buffer for a seek.
     long bytesToSkip = positionForNextRead - positionInGrpcStream;
-    long bufferSkip =
-        min(bufferedContent.size() - bufferedContentReadOffset, bytesToSkip);
+    long bufferSkip = min(bufferedContent.size() - bufferedContentReadOffset, bytesToSkip);
     bufferSkip = max(0, bufferSkip);
     bufferedContentReadOffset += bufferSkip;
     positionInGrpcStream += bufferSkip;
@@ -435,7 +434,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       return bytesRead > 0 ? bytesRead : -1;
     }
 
-
     /* resIterator is null on the first read (position = 0) or when a seek is performed (and when
       there are exceptions). So if footerBuffer is null and we are trying to read into footer
       region, we may just cache the footer
@@ -443,8 +441,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     if ((resIterator == null)
         && (footerBuffer == null)
         && (positionForNextRead >= footerStartOffsetInBytes)) {
-      this.footerBuffer =
-          getFooterContent();
+      this.footerBuffer = getFooterContent();
     }
 
     if ((footerBuffer == null) || (positionForNextRead < footerStartOffsetInBytes)) {
@@ -735,11 +732,10 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     return this;
   }
 
-
   private void updateReadStrategy() {
     if (readStrategy == Fadvise.AUTO) {
-      if (positionForNextRead < positionInGrpcStream ||
-              positionForNextRead - positionInGrpcStream > readOptions.getInplaceSeekLimit()) {
+      if (positionForNextRead < positionInGrpcStream
+          || positionForNextRead - positionInGrpcStream > readOptions.getInplaceSeekLimit()) {
         readStrategy = Fadvise.RANDOM;
       }
     }
