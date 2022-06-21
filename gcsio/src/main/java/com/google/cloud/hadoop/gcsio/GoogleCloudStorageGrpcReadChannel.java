@@ -735,6 +735,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     return this;
   }
 
+
   private void updateReadStrategy() {
     if (readStrategy == Fadvise.AUTO) {
       if (positionForNextRead < positionInGrpcStream ||
