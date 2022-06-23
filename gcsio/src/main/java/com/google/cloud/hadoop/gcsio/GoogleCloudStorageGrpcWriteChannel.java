@@ -98,7 +98,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
   private GoogleCloudStorageItemInfo completedItemInfo = null;
   private LinkedBlockingQueue<ByteString> writeBuffer;
   private ByteString lastChunk;
-  private boolean initialized = false;
+  private boolean initialized;
 
   GoogleCloudStorageGrpcWriteChannel(
       StorageStubProvider stubProvider,
@@ -216,6 +216,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
   /** Initialize this channel object for writing. */
   @Override
   public void initialize() throws IOException {
+    checkState(!initialized, "initialize() must be invoked only once.");
     writeBuffer =
         new LinkedBlockingQueue<ByteString>(
             Math.toIntExact(channelOptions.getNumberOfBufferedRequests()));
@@ -364,11 +365,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
             // for errors.
             ByteString data = null;
             try {
-              if (writeBuffer == null) {
-                data = ByteString.EMPTY;
-              } else {
-                data = writeBuffer.take();
-              }
+              data = (writeBuffer == null) ? ByteString.EMPTY : writeBuffer.take();
             } catch (InterruptedException e) {
               // FIXME: handle the exception
               e.printStackTrace();
