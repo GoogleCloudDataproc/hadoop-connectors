@@ -783,6 +783,29 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   }
 
   @Test
+  public void consecutiveSeekBackToSamePosition() throws Exception {
+    int objectSize = 100;
+    fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(objectSize).build());
+    storageObject.setSize(BigInteger.valueOf(objectSize));
+    verify(fakeService, times(1)).setObject(any());
+
+    int minRangeRequestSize = 10;
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder()
+            .setMinRangeRequestSize(minRangeRequestSize)
+            .setInplaceSeekLimit(10)
+            .build();
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
+    assertEquals(readChannel.position(), 0);
+
+    readChannel.position(5);
+    assertEquals(readChannel.position(), 5);
+
+    readChannel.position(0);
+    assertEquals(readChannel.position(), 0);
+  }
+
+  @Test
   public void seekUnderInplaceSeekLimitReadsCorrectDataWithSomeBuffered() throws Exception {
     fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(FakeService.CHUNK_SIZE * 4).build());
     GoogleCloudStorageReadOptions options =
