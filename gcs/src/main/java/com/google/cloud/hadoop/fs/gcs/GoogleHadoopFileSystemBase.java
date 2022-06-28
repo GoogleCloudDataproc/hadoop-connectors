@@ -20,6 +20,8 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.OutputSt
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.CONFIG_KEY_PREFIXES;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.ESTIMATED_CLUSTER_SIZE_FOR_OPTIMAL_SPLITS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.ESTIMATE_OPTIMAL_SPLITS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GLOB_ALGORITHM;
@@ -107,6 +109,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -1856,5 +1859,46 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
 
   private byte[] getXAttrValue(byte[] value) {
     return value == null ? XATTR_NULL_VALUE : value;
+  }
+
+  @Override
+  public BlockLocation[] getFileBlockLocations(FileStatus file, long start, long len)
+      throws IOException {
+    Configuration config = getConf();
+    if (!ESTIMATE_OPTIMAL_SPLITS.get(config, config::getBoolean)) {
+      return super.getFileBlockLocations(file, start, len);
+    }
+    if (file == null) {
+      return null;
+    }
+    if (start < 0 || len < 0) {
+      throw new IllegalArgumentException("Invalid start or len parameter");
+    }
+    if (file.getLen() <= start) {
+      return new BlockLocation[0];
+    }
+    long blockSize = file.getBlockSize();
+    int clusterSize = ESTIMATED_CLUSTER_SIZE_FOR_OPTIMAL_SPLITS.get(config, config::getInt);
+    List<BlockLocation> blockLocations = new ArrayList<BlockLocation>();
+    len = Math.min(len, file.getLen() - start);
+    long end = start + len - 1;
+    for (long i = (start / blockSize) * blockSize,
+            nodeStartIdx = Math.abs(file.getPath().toString().hashCode()) % clusterSize;
+        i <= (end / blockSize) * blockSize;
+        i += blockSize, nodeStartIdx = (nodeStartIdx + 1) % clusterSize) {
+      long offset = Math.max(start, i);
+      long length = Math.min(i + blockSize, end + 1) - offset;
+      String nodeHost = // TODO: Why not "node-" + nodeStartIdx; ?
+          "10."
+              + ((nodeStartIdx % 1000000) / 10000)
+              + "."
+              + ((nodeStartIdx % 10000) / 100)
+              + "."
+              + ((nodeStartIdx % 100) / 1);
+      String nodeName = nodeHost + ":9866";
+      blockLocations.add(
+          new BlockLocation(new String[] {nodeName}, new String[] {nodeHost}, offset, length));
+    }
+    return blockLocations.toArray(new BlockLocation[blockLocations.size()]);
   }
 }
