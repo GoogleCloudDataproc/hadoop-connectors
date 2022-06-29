@@ -96,7 +96,11 @@ public final class GoogleCloudStorageGrpcWriteChannel
   private final int MAX_BYTES_PER_MESSAGE = MAX_WRITE_CHUNK_BYTES.getNumber();
 
   private GoogleCloudStorageItemInfo completedItemInfo = null;
+  // writeBuffer stores (buffers) data between the upstream write api and downstream thread
+  // pushing the data to GCS
   private LinkedBlockingQueue<ByteString> writeBuffer;
+  // lastChunk holds on to the data written by upstream write API which is less than 2MB. We do this
+  // to accumulate 2MB ByteString buffers in the writeBuffer.
   private ByteString lastChunk;
   private boolean initialized;
 
@@ -189,9 +193,11 @@ public final class GoogleCloudStorageGrpcWriteChannel
       waitForCompletionAndThrowIfUploadFailed();
     }
 
+    // create chunks of MAX_BYTES_PER_MESSAGE and push them into writeBuffer. If the loop ends up
+    // in a scenario where the lastChunk size is less than MAX_BYTES_PER_MESSAGE, then we hold on
+    // to it until next write or close.
     while (buffer.remaining() > 0) {
       int bytesToWrite = 0;
-      // create chunks of MAX_BYTES_PER_MESSAGE and push them into writeBuffer
       if (lastChunk != null) {
         bytesToWrite = min(buffer.remaining(), MAX_BYTES_PER_MESSAGE - lastChunk.size());
         lastChunk = lastChunk.concat(ByteString.copyFrom(buffer, bytesToWrite));
@@ -237,6 +243,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
     if (!isOpen()) {
       return;
     }
+    // The way we signal close (EOF) to downstream thread is by appending a ByteString of size less
+    // than 2MB. If the uploaded file size is multiple of 2MB, then we end up appending an empty
+    // ByteString buffer. The lastChunk carries the data written by upstream not amounting to 2MB
     if (lastChunk == null) {
       lastChunk = ByteString.EMPTY;
     }
@@ -244,8 +253,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
       writeBuffer.put(lastChunk);
       lastChunk = null;
       handleResponse(waitForCompletionAndThrowIfUploadFailed());
-    } catch (IOException e) {
-      throw e;
     } catch (InterruptedException e) {
       throw new IOException(String.format("Interrupted on close for '%s'", resourceId), e);
     } finally {
