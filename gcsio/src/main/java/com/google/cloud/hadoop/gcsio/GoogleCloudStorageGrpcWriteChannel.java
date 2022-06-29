@@ -163,6 +163,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
             new VerificationAttributes(md5Hash, crc32c));
   }
 
+  // The parent class implements this function with the assumption that the data is communicated
+  // via an input stream. This is not true for GRPC implementation. Hence, we do not implement this
+  // function.
   @Override
   public void startUpload(InputStream pipeSource) throws IOException {
     return;
@@ -244,8 +247,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     } catch (IOException e) {
       throw e;
     } catch (InterruptedException e) {
-      // FIXME: handle the exception
-      e.printStackTrace();
+      throw new IOException(String.format("Interrupted on close for '%s'", resourceId), e);
     } finally {
       writeBuffer = null;
       closeInternal();
@@ -261,8 +263,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
     private String uploadId;
     private long writeOffset = 0;
     private LinkedBlockingQueue<ByteString> writeBuffer;
-    SimpleResponseObserver<QueryWriteStatusResponse> writeStatusResponseObserver;
-    Stopwatch writeStatusStopWatch;
+    private SimpleResponseObserver<QueryWriteStatusResponse> writeStatusResponseObserver;
+    private Stopwatch writeStatusStopWatch;
 
     // Holds list of most recent number of NUMBER_OF_REQUESTS_TO_RETAIN requests, so upload can
     // be rewound and re-sent upon transient errors.
@@ -346,6 +348,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
 
       long numberOfBufferedRequests = channelOptions.getNumberOfBufferedRequests();
+      // setting the threshold at which getCommittedOffset should be called to free up buffers in
+      // requestChunkMap. Setting this value to be max of 5 remaining buffers. Which means while we
+      // have atleast 10MB of space to fill up, enqueue getCommittedOffset request to GCS so that
+      // we should have a response by the time requestChunkMap fills up.
       long freeBufferThreshold =
           Math.max(numberOfBufferedRequests - 5, numberOfBufferedRequests / 2);
 
@@ -367,8 +373,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
             try {
               data = (writeBuffer == null) ? ByteString.EMPTY : writeBuffer.take();
             } catch (InterruptedException e) {
-              // FIXME: handle the exception
-              e.printStackTrace();
+              Thread.currentThread().interrupt();
+              throw new IOException(
+                  String.format(
+                      "Interrupted while reading from blocking queue for '%s'", resourceId));
             }
             insertRequest = buildInsertRequest(writeOffset, data, false);
             requestChunkMap.put(writeOffset, insertRequest);
