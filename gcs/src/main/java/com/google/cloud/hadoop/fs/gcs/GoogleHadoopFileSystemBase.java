@@ -1861,10 +1861,32 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     return value == null ? XATTR_NULL_VALUE : value;
   }
 
+  /**
+   * Uses {@link GoogleHadoopFileSystemConfiguration#ESTIMATE_OPTIMAL_SPLITS} and {@link
+   * GoogleHadoopFileSystemConfiguration#ESTIMATED_CLUSTER_SIZE_FOR_OPTIMAL_SPLITS} to estimate
+   * block locations for the given "file, start, len" input across a simulated / virtual cluster
+   * with an expected size.
+   *
+   * <p>The default implementation tries to lay out the cluster nodes in a circular arrangement. It
+   * chooses a start node index based on the file path and block offset, then does a round-robin
+   * distribution across the virtual nodes in the circular fashion
+   *
+   * <p>TODO: The current implementation tries to refer virtual nodes as random and possibly
+   * invalid IPs, this needs to be fixed
+   *
+   * <p>TODO: There is scope for making the distribution logic pluggable / extensible
+   *
+   * @param file Status of the file
+   * @param start Start offset into the file
+   * @param len Length of the file from offset under consideration
+   * @return Estimated block locations based on deterministic distribution if configured, else
+   *     delegate to super
+   * @throws IOException For reasons thrown by the super
+   */
   @Override
-  public BlockLocation[] getFileBlockLocations(FileStatus file, long start, long len)
-      throws IOException {
-    Configuration config = getConf();
+  public BlockLocation[] getFileBlockLocations(
+      final FileStatus file, final long start, final long len) throws IOException {
+    final Configuration config = getConf();
     if (!ESTIMATE_OPTIMAL_SPLITS.get(config, config::getBoolean)) {
       return super.getFileBlockLocations(file, start, len);
     }
@@ -1877,25 +1899,25 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     if (file.getLen() <= start) {
       return new BlockLocation[0];
     }
-    long blockSize = file.getBlockSize();
-    int clusterSize = ESTIMATED_CLUSTER_SIZE_FOR_OPTIMAL_SPLITS.get(config, config::getInt);
-    List<BlockLocation> blockLocations = new ArrayList<BlockLocation>();
-    len = Math.min(len, file.getLen() - start);
-    long end = start + len - 1;
+    final long blockSize = file.getBlockSize();
+    final int clusterSize = ESTIMATED_CLUSTER_SIZE_FOR_OPTIMAL_SPLITS.get(config, config::getInt);
+    final List<BlockLocation> blockLocations = new ArrayList<>();
+    final long end = start + len - 1;
     for (long i = (start / blockSize) * blockSize,
-            nodeStartIdx = Math.abs(file.getPath().toString().hashCode()) % clusterSize;
+            node = (i + Math.abs(file.getPath().toString().hashCode())) % clusterSize;
         i <= (end / blockSize) * blockSize;
-        i += blockSize, nodeStartIdx = (nodeStartIdx + 1) % clusterSize) {
-      long offset = Math.max(start, i);
-      long length = Math.min(i + blockSize, end + 1) - offset;
-      String nodeHost = // TODO: Why not "node-" + nodeStartIdx; ?
+        i += blockSize, node = (node + 1) % clusterSize) {
+      final long offset = Math.max(start, i);
+      final long length = Math.min(i + blockSize, end + 1) - offset;
+      // TODO: Fix me!
+      final String nodeHost =
           "10."
-              + ((nodeStartIdx % 1000000) / 10000)
+              + ((node % 1000000) / 10000)
               + "."
-              + ((nodeStartIdx % 10000) / 100)
+              + ((node % 10000) / 100)
               + "."
-              + ((nodeStartIdx % 100) / 1);
-      String nodeName = nodeHost + ":9866";
+              + ((node % 100) / 1);
+      final String nodeName = nodeHost + ":9866";
       blockLocations.add(
           new BlockLocation(new String[] {nodeName}, new String[] {nodeHost}, offset, length));
     }
