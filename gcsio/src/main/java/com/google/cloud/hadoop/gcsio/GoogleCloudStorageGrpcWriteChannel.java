@@ -379,41 +379,29 @@ public final class GoogleCloudStorageGrpcWriteChannel
                 resourceId, responseObserver.uploadId));
       }
 
-      long numberOfBufferedRequests = channelOptions.getNumberOfBufferedRequests();
-      // setting the threshold at which getCommittedOffset should be called to free up buffers in
-      // requestChunkMap. Setting this value to be max of 5 remaining buffers. Which means while we
-      // have atleast 10MB of space to fill up, enqueue getCommittedOffset request to GCS so that
-      // we should have a response by the time requestChunkMap fills up.
-      long freeBufferThreshold =
-          Math.max(numberOfBufferedRequests - 5, numberOfBufferedRequests / 2);
-
       boolean objectFinalized = false;
       while (!objectFinalized) {
         WriteObjectRequest insertRequest = null;
         if (requestChunkMap.size() > 0 && requestChunkMap.lastKey() >= writeOffset) {
           insertRequest = getCachedRequest(requestChunkMap, writeOffset);
           writeOffset += insertRequest.getChecksummedData().getContent().size();
+        } else if (requestChunkMap.size() >= channelOptions.getNumberOfBufferedRequests()) {
+          freeUpCommittedRequests(requestChunkMap, writeOffset);
         } else {
-          if (requestChunkMap.size() >= freeBufferThreshold) {
-            freeUpCommittedRequests(
-                requestChunkMap, writeOffset, requestChunkMap.size() >= numberOfBufferedRequests);
+          // Pick up a chunk to write only if dataChunkMap has space. Else continue after looking
+          // for errors.
+          ByteString data = null;
+          try {
+            data = (writeBuffer == null) ? ByteString.EMPTY : writeBuffer.take();
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException(
+                String.format(
+                    "Interrupted while reading from blocking queue for '%s'", resourceId));
           }
-          if (requestChunkMap.size() < numberOfBufferedRequests) {
-            // Pick up a chunk to write only if dataChunkMap has space. Else continue after looking
-            // for errors.
-            ByteString data = null;
-            try {
-              data = (writeBuffer == null) ? ByteString.EMPTY : writeBuffer.take();
-            } catch (InterruptedException e) {
-              Thread.currentThread().interrupt();
-              throw new IOException(
-                  String.format(
-                      "Interrupted while reading from blocking queue for '%s'", resourceId));
-            }
-            insertRequest = buildInsertRequest(writeOffset, data, false);
-            requestChunkMap.put(writeOffset, insertRequest);
-            writeOffset += data.size();
-          }
+          insertRequest = buildInsertRequest(writeOffset, data, false);
+          requestChunkMap.put(writeOffset, insertRequest);
+          writeOffset += data.size();
         }
         if (insertRequest != null) {
           requestStreamObserver.onNext(insertRequest);
@@ -520,25 +508,23 @@ public final class GoogleCloudStorageGrpcWriteChannel
     the GCS backend. The increase will be linear to number of chunks written, so that
     should also be fine.    */
     private void freeUpCommittedRequests(
-        TreeMap<Long, WriteObjectRequest> requestChunkMap, long writeOffset, boolean block)
-        throws IOException {
+        TreeMap<Long, WriteObjectRequest> requestChunkMap, long writeOffset) throws IOException {
 
-      long committedWriteOffset = getCommittedWriteSizeAsync(uploadId, block);
+      long committedWriteOffset = getCommittedWriteSizeWithRetries(uploadId);
 
       logger.atFinest().log(
-          "Fetched committedWriteOffset: size:%d, writeOffset:%d, committedWriteOffset:%d, block:%b",
-          requestChunkMap.size(), writeOffset, committedWriteOffset, block);
+          "Fetched committedWriteOffset: size:%d, writeOffset:%d, committedWriteOffset:%d",
+          requestChunkMap.size(), writeOffset, committedWriteOffset);
 
-      if (committedWriteOffset >= 0) {
-        // check and remove chunks from dataChunkMap
-        long buffersFreed = 0;
-        while (requestChunkMap.size() > 0 && requestChunkMap.firstKey() < committedWriteOffset) {
-          requestChunkMap.remove(requestChunkMap.firstKey());
-          buffersFreed++;
-        }
-        logger.atFinest().log("Freed up %d buffers, resource:%s", buffersFreed, resourceId);
+      // check and remove chunks from dataChunkMap
+      long buffersFreed = 0;
+      while (requestChunkMap.size() > 0 && requestChunkMap.firstKey() < committedWriteOffset) {
+        requestChunkMap.remove(requestChunkMap.firstKey());
+        buffersFreed++;
       }
+      logger.atFinest().log("Freed up %d buffers, resource:%s", buffersFreed, resourceId);
     }
+
     /** Handler for responses from the Insert streaming RPC. */
     private class InsertChunkResponseObserver
         implements ClientResponseObserver<WriteObjectRequest, WriteObjectResponse> {
@@ -697,47 +683,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
         throw new IOException(
             String.format("Failed to get committed write size for '%s'", resourceId), e);
       }
-    }
-
-    /*
-     This function keeps track of any outstanding request to get the committed write offset.
-     If there are no outstanding request, it issues a request. For an outstanding request, it
-     checks if we have a response and returns it. Otherwise, it returns -1.
-     If block is true, this request becomes a blocking call instead of async.
-    */
-    private long getCommittedWriteSizeAsync(String uploadId, boolean block) {
-      long offset = -1;
-
-      if (writeStatusResponseObserver == null) {
-        QueryWriteStatusRequest request =
-            QueryWriteStatusRequest.newBuilder().setUploadId(uploadId).build();
-
-        writeStatusResponseObserver = new SimpleResponseObserver<>();
-        stub.withDeadlineAfter(QUERY_WRITE_STATUS_TIMEOUT.toMillis(), MILLISECONDS)
-            .queryWriteStatus(request, writeStatusResponseObserver);
-        writeStatusStopWatch = Stopwatch.createStarted();
-      }
-
-      if (block) {
-        try {
-          writeStatusResponseObserver.done.await();
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          writeStatusResponseObserver = null;
-          return offset;
-        }
-      }
-
-      if (writeStatusResponseObserver.done.getCount() <= 0) {
-        if (!writeStatusResponseObserver.hasError()) {
-          offset = writeStatusResponseObserver.getResponse().getPersistedSize();
-          logger.atFinest().log(
-              "Fetched committed write offset: offset:%d, resource:%s, time:%d",
-              offset, resourceId, writeStatusStopWatch.elapsed(MILLISECONDS));
-        }
-        writeStatusResponseObserver = null;
-      }
-      return offset;
     }
 
     private long getCommittedWriteSize(QueryWriteStatusRequest request) throws IOException {
