@@ -1,6 +1,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.storage.v2.ServiceConstants.Values.MAX_WRITE_CHUNK_BYTES;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
@@ -13,6 +14,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.google.api.client.util.BackOff;
+import com.google.api.client.util.Sleeper;
 import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.BackOffFactory;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
@@ -357,6 +359,21 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     writeChannel.write(data.asReadOnlyByteBuffer());
 
     assertThrows(IOException.class, writeChannel::close);
+  }
+
+  @Test
+  public void writeHandlesErrorOnStartRequestFailure() throws Exception {
+    int MAX_BYTES_PER_MESSAGE = MAX_WRITE_CHUNK_BYTES.getNumber();
+    Sleeper sleeper = Sleeper.DEFAULT;
+
+    GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
+    fakeService.setInsertRequestException(new IOException("Error"));
+    // test data has to be larger than PIPE_BUFFER_SIZE_DEFAULT in order to trigger a blocking call
+    ByteString data = createTestData(MAX_BYTES_PER_MESSAGE);
+    writeChannel.initialize();
+    writeChannel.write(data.asReadOnlyByteBuffer());
+    sleeper.sleep(1000); // give the upload thread time to run
+    assertThrows(IOException.class, () -> writeChannel.write(data.asReadOnlyByteBuffer()));
   }
 
   @Test
