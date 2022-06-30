@@ -24,7 +24,6 @@ import static java.util.stream.Collectors.toMap;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.BackOffFactory;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
-import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.common.base.Stopwatch;
@@ -56,21 +55,23 @@ import io.grpc.stub.ClientCalls;
 import io.grpc.stub.ClientResponseObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
+import java.nio.channels.WritableByteChannel;
 import java.time.Duration;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 
 /** Implements WritableByteChannel to provide write access to GCS via gRPC. */
 public final class GoogleCloudStorageGrpcWriteChannel
-    extends BaseAbstractGoogleAsyncWriteChannel<WriteObjectResponse>
-    implements GoogleCloudStorageItemInfo.Provider {
+    implements GoogleCloudStorageItemInfo.Provider, WritableByteChannel {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private static final Duration START_RESUMABLE_WRITE_TIMEOUT = Duration.ofMinutes(1);
@@ -95,6 +96,13 @@ public final class GoogleCloudStorageGrpcWriteChannel
   private final Watchdog watchdog;
   private final int MAX_BYTES_PER_MESSAGE = MAX_WRITE_CHUNK_BYTES.getNumber();
 
+  private final ExecutorService threadPool;
+
+  private final AsyncWriteChannelOptions channelOptions;
+
+  // Upload operation that takes place on a separate thread.
+  private Future<WriteObjectResponse> uploadOperation;
+
   private GoogleCloudStorageItemInfo completedItemInfo = null;
   // writeBuffer stores (buffers) data between the upstream write api and downstream thread
   // pushing the data to GCS
@@ -114,7 +122,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
       ObjectWriteConditions writeConditions,
       String requesterPaysProject,
       BackOffFactory backOffFactory) {
-    super(threadPool, channelOptions);
     this.stubProvider = stubProvider;
     this.stub = stubProvider.newAsyncStub();
     this.resourceId = resourceId;
@@ -123,14 +130,14 @@ public final class GoogleCloudStorageGrpcWriteChannel
     this.requesterPaysProject = requesterPaysProject;
     this.backOffFactory = backOffFactory;
     this.watchdog = watchdog;
+    this.threadPool = threadPool;
+    this.channelOptions = channelOptions;
   }
 
-  @Override
-  protected String getResourceString() {
+  private String getResourceString() {
     return resourceId.toString();
   }
 
-  @Override
   public void handleResponse(WriteObjectResponse response) {
     Object resource = response.getResource();
     Map<String, byte[]> metadata =
@@ -167,20 +174,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
             new VerificationAttributes(md5Hash, crc32c));
   }
 
-  // The parent class implements this function with the assumption that the data is communicated
-  // via an input stream. This is not true for GRPC implementation. Hence, we do not implement this
-  // function.
-  @Override
-  public void startUpload(InputStream pipeSource) throws IOException {
-    return;
-  }
-
-  @Override
   public boolean isOpen() {
     return (writeBuffer != null);
   }
 
-  @Override
   public synchronized int write(ByteBuffer buffer) throws IOException {
     checkState(initialized, "initialize() must be invoked before use.");
     int bytesWritten = 0;
@@ -223,7 +220,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
   }
 
   /** Initialize this channel object for writing. */
-  @Override
   public void initialize() throws IOException {
     checkState(!initialized, "initialize() must be invoked only once.");
     writeBuffer =
@@ -237,7 +233,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
     initialized = true;
   }
 
-  @Override
   public void close() throws IOException {
     checkState(initialized, "initialize() must be invoked before use.");
     if (!isOpen()) {
@@ -258,6 +253,36 @@ public final class GoogleCloudStorageGrpcWriteChannel
     } finally {
       writeBuffer = null;
       closeInternal();
+    }
+  }
+
+  private void closeInternal() {
+    if (uploadOperation != null && !uploadOperation.isDone()) {
+      uploadOperation.cancel(/* mayInterruptIfRunning= */ true);
+    }
+    uploadOperation = null;
+  }
+  /**
+   * Throws if upload operation failed. Propagates any errors.
+   *
+   * @throws IOException on IO error
+   */
+  private WriteObjectResponse waitForCompletionAndThrowIfUploadFailed() throws IOException {
+    try {
+      return uploadOperation.get();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      // If we were interrupted, we need to cancel the upload operation.
+      uploadOperation.cancel(true);
+      IOException exception = new ClosedByInterruptException();
+      exception.addSuppressed(e);
+      throw exception;
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof Error) {
+        throw (Error) e.getCause();
+      }
+      throw new IOException(
+          String.format("Upload failed for '%s'", getResourceString()), e.getCause());
     }
   }
 
