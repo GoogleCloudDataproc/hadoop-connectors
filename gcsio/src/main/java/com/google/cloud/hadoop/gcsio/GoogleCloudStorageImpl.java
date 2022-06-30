@@ -516,9 +516,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             .setContentGenerationMatch(writeGeneration.orElse(null))
             .build();
 
-    BaseAbstractGoogleAsyncWriteChannel<?> channel;
     if (storageOptions.isGrpcEnabled()) {
       String requesterPaysProjectId = null;
+      GoogleCloudStorageGrpcWriteChannel channel;
       if (requesterShouldPay(resourceId.getBucketName())) {
         requesterPaysProjectId = storageOptions.getRequesterPaysOptions().getProjectId();
       }
@@ -533,7 +533,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               writeConditions,
               requesterPaysProjectId,
               BackOffFactory.DEFAULT);
+      channel.initialize();
+      return channel;
     } else {
+      BaseAbstractGoogleAsyncWriteChannel<?> channel;
       channel =
           new GoogleCloudStorageWriteChannel(
               storage,
@@ -550,9 +553,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                   super.createRequest(inputStream), resourceId.getBucketName());
             }
           };
+      channel.initialize();
+      return channel;
     }
-    channel.initialize();
-    return channel;
   }
 
   /**
