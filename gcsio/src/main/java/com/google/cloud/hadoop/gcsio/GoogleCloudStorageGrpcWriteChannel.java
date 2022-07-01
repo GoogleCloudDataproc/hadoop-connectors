@@ -62,7 +62,6 @@ import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 
 /** Implements WritableByteChannel to provide write access to GCS via gRPC. */
 public final class GoogleCloudStorageGrpcWriteChannel
@@ -241,7 +240,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       // Wait for streaming RPC to become ready for upload.
       try {
         // wait for 1 min for the channel to be ready. Else bail out
-        if (!responseObserver.ready.await(60*1000, MILLISECONDS)) {
+        if (!responseObserver.ready.await(60 * 1000, MILLISECONDS)) {
           throw new IOException(
               String.format(
                   "Timed out while awaiting ready on responseObserver for '%s' with UploadID '%s'",
