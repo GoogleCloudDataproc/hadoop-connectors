@@ -239,7 +239,13 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       // Wait for streaming RPC to become ready for upload.
       try {
-        responseObserver.ready.await();
+        // wait for 1 min for the channel to be ready. Else bail out
+        if (!responseObserver.ready.await(60 * 1000, MILLISECONDS)) {
+          throw new IOException(
+              String.format(
+                  "Timed out while awaiting ready on responseObserver for '%s' with UploadID '%s'",
+                  resourceId, responseObserver.uploadId));
+        }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         throw new IOException(
