@@ -26,7 +26,9 @@ class TestServerHeaderInterceptor implements ServerInterceptor {
   void verifyAllRequestsHasGoogRequestParamsHeader(String bucket, int expectedCallCount) {
     assertEquals(expectedCallCount, allMeta.size());
     for (Metadata metadata : allMeta) {
-      assertEquals(bucket, metadata.get(StorageStubProvider.GOOG_REQUEST_PARAMS));
+      assertEquals(
+          String.format("bucket=%s", bucket),
+          metadata.get(StorageStubProvider.GOOG_REQUEST_PARAMS));
     }
   }
 }
