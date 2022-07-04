@@ -518,11 +518,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     if (storageOptions.isGrpcEnabled()) {
       String requesterPaysProjectId = null;
-      GoogleCloudStorageGrpcWriteChannel channel;
       if (requesterShouldPay(resourceId.getBucketName())) {
         requesterPaysProjectId = storageOptions.getRequesterPaysOptions().getProjectId();
       }
-      channel =
+      GoogleCloudStorageGrpcWriteChannel channel =
           new GoogleCloudStorageGrpcWriteChannel(
               storageStubProvider,
               backgroundTasksThreadPool,
@@ -536,8 +535,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       channel.initialize();
       return channel;
     } else {
-      BaseAbstractGoogleAsyncWriteChannel<?> channel;
-      channel =
+      BaseAbstractGoogleAsyncWriteChannel<?> channel =
           new GoogleCloudStorageWriteChannel(
               storage,
               clientRequestHelper,

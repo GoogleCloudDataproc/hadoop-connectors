@@ -324,8 +324,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
                 this::isRetriableError,
                 IOException.class);
         logger.atFinest().log(
-            "File upload complete: lastKnownOffset:%d, resource:%s, time:%d",
-            writeOffset, resourceId, stopwatch.elapsed(MILLISECONDS));
+            "File upload complete: resource:%s, time:%d",
+            resourceId, stopwatch.elapsed(MILLISECONDS));
         return response;
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
