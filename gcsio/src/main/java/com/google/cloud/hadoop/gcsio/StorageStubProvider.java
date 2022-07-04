@@ -77,7 +77,7 @@ class StorageStubProvider {
 
   private static Metadata getRequestHeaderMetadata(String bucketName) {
     Metadata metadata = new Metadata();
-    metadata.put(GOOG_REQUEST_PARAMS, bucketName);
+    metadata.put(GOOG_REQUEST_PARAMS, String.format("bucket=%s", bucketName));
     return metadata;
   }
 
