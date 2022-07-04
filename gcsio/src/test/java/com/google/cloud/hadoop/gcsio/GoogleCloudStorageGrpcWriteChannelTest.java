@@ -86,15 +86,18 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   private FakeService fakeService;
   private final ExecutorService executor = Executors.newCachedThreadPool();
   @Mock private Credentials mockCredentials;
+  private TestServerHeaderInterceptor headerInterceptor;
 
   @Before
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
     fakeService = spy(new FakeService());
     String serverName = InProcessServerBuilder.generateName();
+    headerInterceptor = new TestServerHeaderInterceptor();
     InProcessServerBuilder.forName(serverName)
         .directExecutor()
         .addService(fakeService)
+        .intercept(headerInterceptor)
         .build()
         .start();
     stub =
@@ -131,6 +134,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     verify(fakeService, times(1)).startResumableWrite(eq(START_REQUEST), any());
     verify(fakeService.insertRequestObserver, times(1)).onNext(expectedInsertRequest);
     verify(fakeService.insertRequestObserver, atLeast(1)).onCompleted();
+    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 2);
   }
 
   @Test
@@ -156,6 +160,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     verify(fakeService, times(1)).startResumableWrite(eq(START_REQUEST), any());
     verify(fakeService.insertRequestObserver, times(1)).onNext(expectedInsertRequest);
     verify(fakeService.insertRequestObserver, atLeast(1)).onCompleted();
+    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 2);
   }
 
   @Test
@@ -182,6 +187,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     verify(fakeService, times(1)).startResumableWrite(eq(START_REQUEST), any());
     verify(fakeService.insertRequestObserver, times(1)).onNext(requestCaptor.capture());
     verify(fakeService.insertRequestObserver, atLeast(1)).onCompleted();
+    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 2);
   }
 
   @Test
@@ -212,6 +218,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     verify(fakeService, times(1)).startResumableWrite(eq(START_REQUEST), any());
     verify(fakeService.insertRequestObserver, times(1)).onNext(requestCaptor.capture());
     verify(fakeService.insertRequestObserver, atLeast(1)).onCompleted();
+    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 2);
   }
 
   @Test
@@ -237,6 +244,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     // verify(fakeService, times(1)).queryWriteStatus(eq(WRITE_STATUS_REQUEST), any());
     verify(fakeService.insertRequestObserver, times(1)).onNext(requestCaptor.capture());
     verify(fakeService.insertRequestObserver, atLeast(1)).onCompleted();
+    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 2);
   }
 
   @Test
@@ -255,6 +263,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     StartResumableWriteRequest.Builder expectedRequestBuilder = START_REQUEST.toBuilder();
     expectedRequestBuilder.getWriteObjectSpecBuilder().setIfGenerationMatch(1L);
     verify(fakeService, times(1)).startResumableWrite(eq(expectedRequestBuilder.build()), any());
+    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 2);
   }
 
   @Test
@@ -273,6 +282,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     StartResumableWriteRequest.Builder expectedRequestBuilder = START_REQUEST.toBuilder();
     expectedRequestBuilder.getWriteObjectSpecBuilder().setIfMetagenerationMatch(1L);
     verify(fakeService, times(1)).startResumableWrite(eq(expectedRequestBuilder.build()), any());
+    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 2);
   }
 
   @Test
@@ -290,6 +300,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     StartResumableWriteRequest.Builder expectedRequestBuilder = START_REQUEST.toBuilder();
     expectedRequestBuilder.getCommonRequestParamsBuilder().setUserProject("project-id");
     verify(fakeService, times(1)).startResumableWrite(eq(expectedRequestBuilder.build()), any());
+    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 2);
   }
 
   @Test
@@ -301,6 +312,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     writeChannel.write(ByteBuffer.wrap("test data".getBytes()));
 
     assertThrows(IOException.class, writeChannel::close);
+    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 1);
   }
 
   @Test
@@ -312,6 +324,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     writeChannel.write(ByteBuffer.wrap("test data".getBytes()));
 
     assertThrows(IOException.class, writeChannel::close);
+    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 2);
   }
 
   @Test
@@ -322,6 +335,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
 
     writeChannel.initialize();
     writeChannel.write(data.asReadOnlyByteBuffer());
+    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 0);
   }
 
   @Test
@@ -340,6 +354,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     writeChannel.write(data.asReadOnlyByteBuffer());
 
     assertThrows(IOException.class, writeChannel::close);
+    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 2);
   }
 
   @Test
@@ -358,6 +373,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     writeChannel.write(data.asReadOnlyByteBuffer());
 
     assertThrows(IOException.class, writeChannel::close);
+    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 2);
   }
 
   @Test
@@ -368,6 +384,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     ByteString data = createTestData(PIPE_BUFFER_SIZE_DEFAULT * 2);
     writeChannel.initialize();
     assertThrows(IOException.class, () -> writeChannel.write(data.asReadOnlyByteBuffer()));
+    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 1);
   }
 
   @Test
@@ -397,6 +414,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     // TODO(hgong): Figure out a way to check the expected requests and actual reqeusts builder.
     // assertEquals(expectedRequests, requestCaptor.getAllValues());
     verify(fakeService.insertRequestObserver, atLeast(1)).onCompleted();
+    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 4);
   }
 
   @Test
@@ -416,6 +434,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     writeChannel.initialize();
     writeChannel.write(chunk.asReadOnlyByteBuffer());
     assertThrows(IOException.class, writeChannel::close);
+    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 2);
   }
 
   @Test
@@ -447,6 +466,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     assertThrows(IOException.class, writeChannel::close);
 
     // TODO: assert number of retires;
+    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 2);
   }
 
   @Test
@@ -634,7 +654,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     }
 
     @Override
-    public StorageStub newAsyncStub() {
+    protected StorageStub newAsyncStubInternal() {
       return stub;
     }
   }

@@ -102,7 +102,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       String requesterPaysProject,
       BackOffFactory backOffFactory) {
     super(threadPool, channelOptions);
-    this.stub = stubProvider.newAsyncStub();
+    this.stub = stubProvider.newAsyncStub(resourceId.getBucketName());
     this.resourceId = resourceId;
     this.createOptions = createOptions;
     this.writeConditions = writeConditions;
