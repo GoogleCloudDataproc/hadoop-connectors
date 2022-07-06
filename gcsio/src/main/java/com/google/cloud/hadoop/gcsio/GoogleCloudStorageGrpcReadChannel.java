@@ -160,7 +160,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     this.useZeroCopyMarshaller =
         ZeroCopyReadinessChecker.isReady() && readOptions.isGrpcReadZeroCopyEnabled();
     this.metricsRecorder = metricsRecorder;
-    this.stub = stubProvider.newBlockingStub();
+    this.stub = stubProvider.newBlockingStub(resourceId.getBucketName());
     this.backOffFactory = backOffFactory;
     GoogleCloudStorageItemInfo itemInfo = getObjectMetadata(resourceId, storage);
     validate(itemInfo);
@@ -218,8 +218,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     this.useZeroCopyMarshaller =
         ZeroCopyReadinessChecker.isReady() && readOptions.isGrpcReadZeroCopyEnabled();
     this.metricsRecorder = metricsRecorder;
-    this.stub = stubProvider.newBlockingStub();
     this.resourceId = itemInfo.getResourceId();
+    this.stub = stubProvider.newBlockingStub(resourceId.getBucketName());
     this.objectGeneration = itemInfo.getContentGeneration();
     this.objectSize = itemInfo.getSize();
     this.watchdog = watchdog;
