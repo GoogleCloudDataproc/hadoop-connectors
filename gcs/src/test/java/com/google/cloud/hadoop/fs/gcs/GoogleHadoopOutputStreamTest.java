@@ -15,6 +15,7 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HFLUSH;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HSYNC;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS;
 import static com.google.common.truth.Truth.assertThat;
 import static java.lang.Math.toIntExact;
@@ -252,6 +253,40 @@ public class GoogleHadoopOutputStreamTest {
     fout.hsync();
     assertThat(statistics.getBytesWritten()).isEqualTo(9);
     assertThat(statistics.getWriteOps()).isEqualTo(2);
+  }
+
+  @Test
+  public void time_statistics() throws IOException {
+    Path objectPath = new Path(ghfs.getUri().resolve("/dir/object2.txt"));
+    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
+    GoogleHadoopOutputStream fout =
+        new GoogleHadoopOutputStream(
+            ghfs,
+            ghfs.getGcsPath(objectPath),
+            CreateFileOptions.DEFAULT_OVERWRITE,
+            /* append= */ false,
+            /* minSyncInterval= */ Duration.ZERO,
+            statistics);
+
+    byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
+    byte[] data2 = {0x0b, 0x0d, 0x0e, 0x0e, 0x0f};
+
+    fout.write(data1, 0, data1.length);
+    fout.write(data2, 0, data2.length);
+
+    fout.hsync();
+    assertThat(fout.getIOStatistics().counters().get(INVOCATION_HSYNC.getSymbol())).isEqualTo(1);
+    assertThat(fout.getIOStatistics().counters().get(GhfsTimeStatistic.HSYNC.getSymbol())).isNotEqualTo(0);
+
+    fout.write(data1, 0, data1.length);
+    fout.write(data2, 0, data2.length);
+
+    fout.hflush();
+    assertThat(fout.getIOStatistics().counters().get(INVOCATION_HFLUSH.getSymbol())).isEqualTo(1);
+    assertThat(fout.getIOStatistics().counters().get(GhfsTimeStatistic.HFLUSH.getSymbol())).isNotEqualTo(0);
+
+    fout.close();
+    assertThat(fout.getIOStatistics().counters().get(GhfsTimeStatistic.CLOSE.getSymbol())).isNotEqualTo(0);
   }
 
   @Test

@@ -32,6 +32,10 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_RENAME;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_XATTR_GET_MAP;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_XATTR_GET_NAMED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_XATTR_GET_NAMED_MAP;
+import static com.google.cloud.hadoop.fs.gcs.GhfsTimeStatistic.CREATE;
+import static com.google.cloud.hadoop.fs.gcs.GhfsTimeStatistic.DELETE;
+import static com.google.cloud.hadoop.fs.gcs.GhfsTimeStatistic.OPEN;
+import static com.google.cloud.hadoop.fs.gcs.GhfsTimeStatistic.RENAME;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE;
@@ -321,7 +325,24 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
       fout.writeBytes("Test Content");
     }
     assertThat(myGhfs.getIOStatistics().counters().get(INVOCATION_CREATE.getSymbol())).isEqualTo(1);
+    assertThat(myGhfs.getIOStatistics().counters().get(CREATE.getSymbol())).isNotEqualTo(0);
     assertThat(myGhfs.getIOStatistics().counters().get(FILES_CREATED.getSymbol())).isEqualTo(1);
+    assertThat(myGhfs.delete(new Path("/file1"))).isTrue();
+  }
+
+  @Test
+  public void create_increment_timeStatistics() throws IOException {
+    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
+
+    long previousValue = GhfsTimeStatistic.getValue(CREATE);
+    try (FSDataOutputStream fout = myGhfs.create(new Path("/file1"))) {
+      fout.writeBytes("Test Content");
+    }
+    long currentValue = GhfsTimeStatistic.getValue(CREATE);
+
+    assertThat(myGhfs.getIOStatistics().counters().get(INVOCATION_CREATE.getSymbol())).isEqualTo(1);
+    assertThat(myGhfs.getIOStatistics().counters().get(FILES_CREATED.getSymbol())).isEqualTo(1);
+    assertThat(currentValue).isNotEqualTo(previousValue);
     assertThat(myGhfs.delete(new Path("/file1"))).isTrue();
   }
 
@@ -393,6 +414,25 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     fout.close();
     myGhfs.open(new Path("/directory1/file1"));
     assertThat(myGhfs.getIOStatistics().counters().get(INVOCATION_OPEN.getSymbol())).isEqualTo(1);
+    assertThat(myGhfs.getIOStatistics().counters().get(OPEN.getSymbol())).isNotEqualTo(0);
+    assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
+  }
+
+  @Test
+  public void open_increment_timeStatistics() throws IOException {
+    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
+    Path testRoot = new Path("/directory1/");
+    myGhfs.mkdirs(testRoot);
+    FSDataOutputStream fout = myGhfs.create(new Path("/directory1/file1"));
+    fout.writeBytes("data");
+    fout.close();
+
+    long previousValue = GhfsTimeStatistic.getValue(OPEN);
+    myGhfs.open(new Path("/directory1/file1"));
+    long currentValue = GhfsTimeStatistic.getValue(OPEN);
+
+    assertThat(myGhfs.getIOStatistics().counters().get(INVOCATION_OPEN.getSymbol())).isEqualTo(1);
+    assertThat(currentValue).isNotEqualTo(previousValue);
     assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
   }
 
@@ -403,6 +443,22 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     fout.writeBytes("data");
     fout.close();
     myGhfs.delete(new Path("/file1"));
+    assertThat(myGhfs.getIOStatistics().counters().get(INVOCATION_DELETE.getSymbol())).isEqualTo(1);
+    assertThat(myGhfs.getIOStatistics().counters().get(DELETE.getSymbol())).isNotEqualTo(0);
+  }
+
+  @Test
+  public void delete_increment_timeStatistics() throws IOException {
+    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
+    FSDataOutputStream fout = myGhfs.create(new Path("/file1"));
+    fout.writeBytes("data");
+    fout.close();
+
+    long previousValue = GhfsTimeStatistic.getValue(DELETE);
+    myGhfs.delete(new Path("/file1"));
+    long currentValue = GhfsTimeStatistic.getValue(DELETE);
+
+    assertThat(currentValue).isNotEqualTo(previousValue);
     assertThat(myGhfs.getIOStatistics().counters().get(INVOCATION_DELETE.getSymbol())).isEqualTo(1);
   }
 
@@ -1280,6 +1336,25 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     Path dest = new Path("/directory1/file2");
     myGhfs.rename(source, dest);
     assertThat(myGhfs.getIOStatistics().counters().get(INVOCATION_RENAME.getSymbol())).isEqualTo(1);
+    assertThat(myGhfs.getIOStatistics().counters().get(RENAME.getSymbol())).isNotEqualTo(0);
+    assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
+  }
+
+  @Test
+  public void rename_increment_timeStatistics() throws IOException {
+    GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
+    Path testRoot = new Path("/directory1/");
+    myGhfs.mkdirs(testRoot);
+    Path source = new Path("/directory1/file1");
+    myGhfs.create(source).writeBytes("data");
+    Path dest = new Path("/directory1/file2");
+
+    long previousValue = GhfsTimeStatistic.getValue(RENAME);
+    myGhfs.rename(source, dest);
+    long currentValue = GhfsTimeStatistic.getValue(RENAME);
+
+    assertThat(myGhfs.getIOStatistics().counters().get(INVOCATION_RENAME.getSymbol())).isEqualTo(1);
+    assertThat(currentValue).isNotEqualTo(previousValue);
     assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
   }
 
@@ -1338,6 +1413,10 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
                 .counters()
                 .get(INVOCATION_CREATE.getSymbol()))
         .isEqualTo(1);
+
+    assertThat(((GoogleHadoopFileSystem) ghfs).getIOStatistics().counters().get(CREATE.getSymbol()))
+        .isNotEqualTo(0);
+
     // The create and write methods are expected to trigger requests of types GET, PUT and PATCH
     assertThat(
             ((GoogleHadoopFileSystem) ghfs)

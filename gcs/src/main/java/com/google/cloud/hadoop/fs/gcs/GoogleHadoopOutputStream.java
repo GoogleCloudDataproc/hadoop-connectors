@@ -16,7 +16,11 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GhfsTimeStatistic.CLOSE;
+import static com.google.cloud.hadoop.fs.gcs.GhfsTimeStatistic.HFLUSH;
+import static com.google.cloud.hadoop.fs.gcs.GhfsTimeStatistic.HSYNC;
 import static com.google.common.base.Preconditions.checkState;
+import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
@@ -25,6 +29,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.RateLimiter;
@@ -117,6 +122,8 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
   private final FileSystem.Statistics statistics;
   // Statistics tracker for output stream related statistics
   private final GhfsOutputStreamStatistics streamStatistics;
+  // Instrumentation to track Statistics
+  private GhfsInstrumentation instrumentation;
 
   /**
    * Constructs an instance of GoogleHadoopOutputStream object.
@@ -143,6 +150,7 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
     this.createFileOptions = createFileOptions;
     this.statistics = statistics;
     this.streamStatistics = ghfs.getInstrumentation().newOutputStreamStatistics(statistics);
+    this.instrumentation = ghfs.getInstrumentation();
     this.syncRateLimiter =
         minSyncInterval.isNegative() || minSyncInterval.isZero()
             ? null
@@ -209,34 +217,49 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
    */
   @Override
   public void hflush() throws IOException {
-    logger.atFiner().log("hflush(): %s", dstGcsPath);
-    long startMs = System.currentTimeMillis();
-    throwIfNotOpen();
-    streamStatistics.hflushInvoked();
-    // If rate limit not set or permit acquired than use hsync()
-    if (syncRateLimiter == null || syncRateLimiter.tryAcquire()) {
-      logger.atFine().log("hflush() uses hsyncInternal() for %s", dstGcsPath);
-      hsyncInternal(startMs);
-      return;
-    }
-    logger.atInfo().atMostEvery(1, TimeUnit.MINUTES).log(
-        "hflush(): No-op due to rate limit (%s): readers will *not* yet see flushed data for %s",
-        syncRateLimiter, dstGcsPath);
+    trackDuration(
+        instrumentation,
+        GhfsTimeStatistic.HFLUSH.getSymbol(),
+        () -> {
+          logger.atFiner().log("hflush(): %s", dstGcsPath);
+
+          long startMs = System.currentTimeMillis();
+          throwIfNotOpen();
+          streamStatistics.hflushInvoked();
+          // If rate limit not set or permit acquired than use hsync()
+          if (syncRateLimiter == null || syncRateLimiter.tryAcquire()) {
+            logger.atFine().log("hflush() uses hsyncInternal() for %s", dstGcsPath);
+            hsyncInternal(startMs);
+            return null;
+          }
+          logger.atInfo().atMostEvery(1, TimeUnit.MINUTES).log(
+              "hflush(): No-op due to rate limit (%s): readers will *not* yet see flushed data for %s",
+              syncRateLimiter, dstGcsPath);
+
+          return null;
+        });
   }
 
   @Override
   public void hsync() throws IOException {
-    logger.atFiner().log("hsync(): %s", dstGcsPath);
-    long startMs = System.currentTimeMillis();
-    throwIfNotOpen();
-    streamStatistics.hsyncInvoked();
-    if (syncRateLimiter != null) {
-      logger.atFiner().log(
-          "hsync(): Rate limited (%s) with blocking permit acquisition for %s",
-          syncRateLimiter, dstGcsPath);
-      syncRateLimiter.acquire();
-    }
-    hsyncInternal(startMs);
+    trackDuration(
+        instrumentation,
+        GhfsTimeStatistic.HSYNC.getSymbol(),
+        () -> {
+          logger.atFiner().log("hsync(): %s", dstGcsPath);
+
+          long startMs = System.currentTimeMillis();
+          throwIfNotOpen();
+          streamStatistics.hsyncInvoked();
+          if (syncRateLimiter != null) {
+            logger.atFiner().log(
+                "hsync(): Rate limited (%s) with blocking permit acquisition for %s",
+                syncRateLimiter, dstGcsPath);
+            syncRateLimiter.acquire();
+          }
+          hsyncInternal(startMs);
+          return null;
+        });
   }
 
   /** Internal implementation of hsync, can be reused by hflush() as well. */
@@ -315,38 +338,44 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
 
   @Override
   public void close() throws IOException {
-    logger.atFiner().log(
-        "close(): temp tail file: %s final destination: %s", tmpGcsPath, dstGcsPath);
-    if (tmpOut == null) {
-      logger.atFiner().log("close(): Ignoring; stream already closed.");
-      return;
-    }
-    streamStatistics.close();
-    commitTempFile();
+    trackDuration(
+        instrumentation,
+        GhfsTimeStatistic.CLOSE.getSymbol(),
+        () -> {
+          logger.atFiner().log(
+              "close(): temp tail file: %s final destination: %s", tmpGcsPath, dstGcsPath);
 
-    try {
-      tmpOut.close();
-    } finally {
-      tmpOut = null;
-    }
-    tmpGcsPath = null;
-    tmpIndex = -1;
+          if (tmpOut == null) {
+            logger.atFiner().log("close(): Ignoring; stream already closed.");
+            return null;
+          }
+          streamStatistics.close();
+          commitTempFile();
 
-    logger.atFiner().log("close(): Awaiting %s deletionFutures", tmpDeletionFutures.size());
-    for (Future<?> deletion : tmpDeletionFutures) {
-      try {
-        deletion.get();
-      } catch (ExecutionException | InterruptedException e) {
-        if (e instanceof InterruptedException) {
-          Thread.currentThread().interrupt();
-        }
-        throw new IOException(
-            String.format(
-                "Failed to delete temporary files while closing stream: '%s'", dstGcsPath),
-            e);
-      }
-    }
+          try {
+            tmpOut.close();
+          } finally {
+            tmpOut = null;
+          }
+          tmpGcsPath = null;
+          tmpIndex = -1;
 
+          logger.atFiner().log("close(): Awaiting %s deletionFutures", tmpDeletionFutures.size());
+          for (Future<?> deletion : tmpDeletionFutures) {
+            try {
+              deletion.get();
+            } catch (ExecutionException | InterruptedException e) {
+              if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+              }
+              throw new IOException(
+                  String.format(
+                      "Failed to delete temporary files while closing stream: '%s'", dstGcsPath),
+                  e);
+            }
+          }
+          return null;
+        });
     // TODO: do we need make a `cleanerThreadpool` an object field and close it here?
   }
 

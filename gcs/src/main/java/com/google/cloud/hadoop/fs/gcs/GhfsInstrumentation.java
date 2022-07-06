@@ -66,6 +66,7 @@ import org.apache.hadoop.metrics2.lib.MutableMetric;
  */
 public class GhfsInstrumentation
     implements Closeable, MetricsSource, IOStatisticsSource, DurationTrackerFactory {
+
   private static final String METRICS_SOURCE_BASENAME = "GCSMetrics";
 
   /**
@@ -137,7 +138,7 @@ public class GhfsInstrumentation
     // duration track metrics (Success/failure) and IOStatistics.
     durationTrackerFactory =
         IOStatisticsBinding.pairedTrackerFactory(
-            instanceIOStatistics, new MetricDurationTrackerFactory());
+            new MetricDurationTrackerFactory(), instanceIOStatistics);
   }
 
   /**
@@ -244,6 +245,16 @@ public class GhfsInstrumentation
   }
 
   /**
+   * Registering a duration adds the success and failure counters.
+   *
+   * @param op statistic to track
+   */
+  protected final void duration(GhfsTimeStatistic op) {
+    counter(op.getSymbol(), op.getDescription());
+    counter(op.getSymbol() + SUFFIX_FAILURES, op.getDescription());
+  }
+
+  /**
    * Create a gauge in the registry.
    *
    * @param name name gauge name
@@ -324,6 +335,7 @@ public class GhfsInstrumentation
    * the count on start; after a failure the failures count is incremented by one.
    */
   private final class MetricUpdatingDurationTracker implements DurationTracker {
+
     /** Name of the statistics value to be updated */
     private final String symbol;
 
@@ -771,6 +783,7 @@ public class GhfsInstrumentation
    */
   private final class OutputStreamStatistics extends AbstractGhfsStatisticsSource
       implements GhfsOutputStreamStatistics {
+
     private final AtomicLong bytesWritten;
     private final AtomicLong writeExceptions;
     private final FileSystem.Statistics filesystemStatistics;
@@ -956,6 +969,14 @@ public class GhfsInstrumentation
                 duration(stat);
                 storeBuilder.withDurationTracking(stat.getSymbol());
               }
+            });
+
+    EnumSet.allOf(GhfsTimeStatistic.class)
+        .forEach(
+            stat -> {
+              // declare all durations
+              duration(stat);
+              storeBuilder.withDurationTracking(stat.getSymbol());
             });
     return storeBuilder;
   }

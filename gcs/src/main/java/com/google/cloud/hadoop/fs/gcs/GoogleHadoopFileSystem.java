@@ -496,14 +496,18 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public FSDataInputStream open(Path hadoopPath, int bufferSize) throws IOException {
-    incrementStatistic(GhfsStatistic.INVOCATION_OPEN);
-    checkArgument(hadoopPath != null, "hadoopPath must not be null");
-
-    checkOpen();
-
-    logger.atFiner().log("open(hadoopPath: %s, bufferSize: %d [ignored])", hadoopPath, bufferSize);
-    URI gcsPath = getGcsPath(hadoopPath);
-    return new FSDataInputStream(GoogleHadoopFSInputStream.create(this, gcsPath, statistics));
+    return trackDuration(
+        instrumentation,
+        GhfsTimeStatistic.OPEN.getSymbol(),
+        () -> {
+          incrementStatistic(GhfsStatistic.INVOCATION_OPEN);
+          checkArgument(hadoopPath != null, "hadoopPath must not be null");
+          checkOpen();
+          logger.atFiner().log(
+              "open(hadoopPath: %s, bufferSize: %d [ignored])", hadoopPath, bufferSize);
+          URI gcsPath = getGcsPath(hadoopPath);
+          return new FSDataInputStream(GoogleHadoopFSInputStream.create(this, gcsPath, statistics));
+        });
   }
 
   @Override
@@ -516,30 +520,35 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       long blockSize,
       Progressable progress)
       throws IOException {
-    incrementStatistic(GhfsStatistic.INVOCATION_CREATE);
-    checkArgument(hadoopPath != null, "hadoopPath must not be null");
-    checkArgument(replication > 0, "replication must be a positive integer: %s", replication);
-    checkArgument(blockSize > 0, "blockSize must be a positive integer: %s", blockSize);
+    return trackDuration(
+        instrumentation,
+        GhfsTimeStatistic.CREATE.getSymbol(),
+        () -> {
+          incrementStatistic(GhfsStatistic.INVOCATION_CREATE);
+          checkArgument(hadoopPath != null, "hadoopPath must not be null");
+          checkArgument(replication > 0, "replication must be a positive integer: %s", replication);
+          checkArgument(blockSize > 0, "blockSize must be a positive integer: %s", blockSize);
 
-    checkOpen();
+          checkOpen();
 
-    logger.atFiner().log(
-        "create(hadoopPath: %s, overwrite: %b, bufferSize: %d [ignored])",
-        hadoopPath, overwrite, bufferSize);
+          logger.atFiner().log(
+              "create(hadoopPath: %s, overwrite: %b, bufferSize: %d [ignored])",
+              hadoopPath, overwrite, bufferSize);
 
-    FSDataOutputStream response =
-        new FSDataOutputStream(
-            new GoogleHadoopOutputStream(
-                this,
-                getGcsPath(hadoopPath),
-                CreateFileOptions.builder().setOverwriteExisting(overwrite).build(),
-                /* append= */ false,
-                /* minSyncInterval= */ Duration.ofMillis(
-                    GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)),
-                statistics),
-            statistics);
-    instrumentation.fileCreated();
-    return response;
+          FSDataOutputStream response =
+              new FSDataOutputStream(
+                  new GoogleHadoopOutputStream(
+                      this,
+                      getGcsPath(hadoopPath),
+                      CreateFileOptions.builder().setOverwriteExisting(overwrite).build(),
+                      /* append= */ false,
+                      /* minSyncInterval= */ Duration.ofMillis(
+                          GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)),
+                      statistics),
+                  statistics);
+          instrumentation.fileCreated();
+          return response;
+        });
   }
 
   @Override
@@ -575,62 +584,76 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
-    incrementStatistic(GhfsStatistic.INVOCATION_RENAME);
-    checkArgument(src != null, "src must not be null");
-    checkArgument(dst != null, "dst must not be null");
+    return trackDuration(
+        instrumentation,
+        GhfsTimeStatistic.RENAME.getSymbol(),
+        () -> {
+          incrementStatistic(GhfsStatistic.INVOCATION_RENAME);
 
-    // Even though the underlying GCSFS will also throw an IAE if src is root, since our filesystem
-    // root happens to equal the global root, we want to explicitly check it here since derived
-    // classes may not have filesystem roots equal to the global root.
-    if (this.makeQualified(src).equals(fsRoot)) {
-      logger.atFiner().log("rename(src: %s, dst: %s): false [src is a root]", src, dst);
-      return false;
-    }
-    try {
-      renameInternal(src, dst);
-    } catch (IOException e) {
-      if (ApiErrorExtractor.INSTANCE.requestFailure(e)) {
-        throw e;
-      }
-      logger.atFiner().withCause(e).log("rename(src: %s, dst: %s): false [failed]", src, dst);
-      return false;
-    }
-    return true;
+          checkArgument(src != null, "src must not be null");
+          checkArgument(dst != null, "dst must not be null");
+
+          // Even though the underlying GCSFS will also throw an IAE if src is root, since our
+          // filesystem
+          // root happens to equal the global root, we want to explicitly check it here since
+          // derived
+          // classes may not have filesystem roots equal to the global root.
+          if (this.makeQualified(src).equals(fsRoot)) {
+            logger.atFiner().log("rename(src: %s, dst: %s): false [src is a root]", src, dst);
+            return false;
+          }
+          try {
+            renameInternal(src, dst);
+          } catch (IOException e) {
+            if (ApiErrorExtractor.INSTANCE.requestFailure(e)) {
+              throw e;
+            }
+            logger.atFiner().withCause(e).log("rename(src: %s, dst: %s): false [failed]", src, dst);
+            return false;
+          }
+          return true;
+        });
   }
 
   @Override
   public boolean delete(Path hadoopPath, boolean recursive) throws IOException {
-    incrementStatistic(GhfsStatistic.INVOCATION_DELETE);
-    boolean response;
-    try {
-      boolean result = true;
-      checkArgument(hadoopPath != null, "hadoopPath must not be null");
+    return trackDuration(
+        instrumentation,
+        GhfsTimeStatistic.DELETE.getSymbol(),
+        () -> {
+          incrementStatistic(GhfsStatistic.INVOCATION_DELETE);
+          boolean response;
+          try {
+            boolean result = true;
+            checkArgument(hadoopPath != null, "hadoopPath must not be null");
 
-      checkOpen();
+            checkOpen();
 
-      URI gcsPath = getGcsPath(hadoopPath);
-      try {
-        getGcsFs().delete(gcsPath, recursive);
-      } catch (DirectoryNotEmptyException e) {
-        throw e;
-      } catch (IOException e) {
-        if (ApiErrorExtractor.INSTANCE.requestFailure(e)) {
-          throw e;
-        }
-        logger.atFiner().withCause(e).log(
-            "delete(hadoopPath: %s, recursive: %b): false [failed]", hadoopPath, recursive);
-        result = false;
-      }
-      if (result) {
-        logger.atFiner().log("delete(hadoopPath: %s, recursive: %b): true", hadoopPath, recursive);
-      }
-      response = result;
-      instrumentation.fileDeleted(1);
-    } catch (IOException e) {
-      incrementStatistic(GhfsStatistic.FILES_DELETE_REJECTED);
-      throw e;
-    }
-    return response;
+            URI gcsPath = getGcsPath(hadoopPath);
+            try {
+              getGcsFs().delete(gcsPath, recursive);
+            } catch (DirectoryNotEmptyException e) {
+              throw e;
+            } catch (IOException e) {
+              if (ApiErrorExtractor.INSTANCE.requestFailure(e)) {
+                throw e;
+              }
+              logger.atFiner().withCause(e).log(
+                  "delete(hadoopPath: %s, recursive: %b): false [failed]", hadoopPath, recursive);
+              result = false;
+            }
+            if (result) {
+              logger.atFiner().log(
+                  "delete(hadoopPath: %s, recursive: %b): true", hadoopPath, recursive);
+            }
+            response = result;
+            instrumentation.fileDeleted(1);
+          } catch (IOException e) {
+            incrementStatistic(GhfsStatistic.FILES_DELETE_REJECTED);
+            throw e;
+          }
+          return response;
+        });
   }
 
   @Override
@@ -1637,6 +1660,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
    * various abstract methods of {@link FileChecksum}.
    */
   private static class GcsFileChecksum extends FileChecksum {
+
     private final GcsFileChecksumType checksumType;
     private final byte[] bytes;
 

@@ -16,18 +16,22 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GhfsTimeStatistic.SEEK;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Math.max;
+import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.common.base.Stopwatch;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -35,6 +39,7 @@ import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 
 class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSource {
+
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Used for single-byte reads.
@@ -52,6 +57,8 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   private final FileSystem.Statistics statistics;
   // Statistic tracker of the Input stream
   private final GhfsInputStreamStatistics streamStatistics;
+  // Instrumentation to track Statistics
+  private GhfsInstrumentation instrumentation;
 
   static GoogleHadoopFSInputStream create(
       GoogleHadoopFileSystem ghfs, URI gcsPath, FileSystem.Statistics statistics)
@@ -83,6 +90,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     this.channel = channel;
     this.statistics = statistics;
     this.streamStatistics = ghfs.getInstrumentation().newInputStreamStatistics(statistics);
+    this.instrumentation = ghfs.getInstrumentation();
   }
 
   @Override
@@ -126,19 +134,25 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   @Override
   public synchronized void seek(long pos) throws IOException {
-    logger.atFiner().log("seek(%d)", pos);
-    long curPos = getPos();
-    long diff = pos - curPos;
-    if (diff > 0) {
-      streamStatistics.seekForwards(diff);
-    } else {
-      streamStatistics.seekBackwards(diff);
-    }
-    try {
-      channel.position(pos);
-    } catch (IllegalArgumentException e) {
-      throw new IOException(e);
-    }
+    trackDuration(
+        instrumentation,
+        GhfsTimeStatistic.SEEK.getSymbol(),
+        () -> {
+          logger.atFiner().log("seek(%d)", pos);
+          long curPos = getPos();
+          long diff = pos - curPos;
+          if (diff > 0) {
+            streamStatistics.seekForwards(diff);
+          } else {
+            streamStatistics.seekBackwards(diff);
+          }
+          try {
+            channel.position(pos);
+          } catch (IllegalArgumentException e) {
+            throw new IOException(e);
+          }
+          return null;
+        });
   }
 
   @Override

@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GhfsTimeStatistic.SEEK;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
@@ -62,6 +63,23 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
 
     Throwable exception = assertThrows(EOFException.class, () -> in.seek(testContent.length()));
     assertThat(exception).hasMessageThat().contains("Invalid seek offset");
+  }
+
+  @Test
+  public void seek_increment_timeStatistics() throws Exception {
+    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "seek_illegalArgument");
+
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+            path, GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
+
+    String testContent = "test content";
+    gcsFsIHelper.writeTextFile(path, testContent);
+
+    GoogleHadoopFSInputStream in = createGhfsInputStream(ghfs, path);
+
+    Throwable exception = assertThrows(EOFException.class, () -> in.seek(testContent.length()));
+    assertThat(in.getIOStatistics().counters().get(GhfsTimeStatistic.SEEK.getSymbol())).isNotEqualTo(0);
   }
 
   @Test
