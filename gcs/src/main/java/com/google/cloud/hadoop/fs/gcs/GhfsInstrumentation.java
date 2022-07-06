@@ -24,7 +24,9 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_DELETED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HFLUSH;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HSYNC;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_BYTES;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_CLOSE_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_EXCEPTIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_OPERATIONS;
 import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStatistics;
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.SUFFIX_FAILURES;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.iostatisticsStore;
@@ -66,6 +68,7 @@ import org.apache.hadoop.metrics2.lib.MutableMetric;
  */
 public class GhfsInstrumentation
     implements Closeable, MetricsSource, IOStatisticsSource, DurationTrackerFactory {
+
   private static final String METRICS_SOURCE_BASENAME = "GCSMetrics";
 
   /**
@@ -137,7 +140,7 @@ public class GhfsInstrumentation
     // duration track metrics (Success/failure) and IOStatistics.
     durationTrackerFactory =
         IOStatisticsBinding.pairedTrackerFactory(
-            instanceIOStatistics, new MetricDurationTrackerFactory());
+            new MetricDurationTrackerFactory(), instanceIOStatistics);
   }
 
   /**
@@ -324,6 +327,7 @@ public class GhfsInstrumentation
    * the count on start; after a failure the failures count is incremented by one.
    */
   private final class MetricUpdatingDurationTracker implements DurationTracker {
+
     /** Name of the statistics value to be updated */
     private final String symbol;
 
@@ -485,17 +489,18 @@ public class GhfsInstrumentation
       IOStatisticsStore st =
           iostatisticsStore()
               .withCounters(
-                  StreamStatisticNames.STREAM_READ_CLOSE_OPERATIONS,
                   StreamStatisticNames.STREAM_READ_BYTES,
                   StreamStatisticNames.STREAM_READ_EXCEPTIONS,
-                  StreamStatisticNames.STREAM_READ_OPERATIONS,
                   StreamStatisticNames.STREAM_READ_OPERATIONS_INCOMPLETE,
-                  StreamStatisticNames.STREAM_READ_SEEK_OPERATIONS,
                   StreamStatisticNames.STREAM_READ_SEEK_BACKWARD_OPERATIONS,
                   StreamStatisticNames.STREAM_READ_SEEK_FORWARD_OPERATIONS,
                   StreamStatisticNames.STREAM_READ_SEEK_BYTES_BACKWARDS,
                   StreamStatisticNames.STREAM_READ_SEEK_BYTES_SKIPPED,
                   StreamStatisticNames.STREAM_READ_TOTAL_BYTES)
+              .withDurationTracking(
+                  GhfsStatistic.STREAM_READ_SEEK_OPERATIONS.getSymbol(),
+                  GhfsStatistic.STREAM_READ_CLOSE_OPERATIONS.getSymbol(),
+                  GhfsStatistic.STREAM_READ_OPERATIONS.getSymbol())
               .build();
       setIOStatistics(st);
       backwardSeekOperations =
@@ -555,7 +560,6 @@ public class GhfsInstrumentation
      */
     @Override
     public void seekBackwards(long negativeOffset) {
-      seekOperations.incrementAndGet();
       backwardSeekOperations.incrementAndGet();
       bytesBackwardsOnSeek.addAndGet(-negativeOffset);
     }
@@ -569,7 +573,6 @@ public class GhfsInstrumentation
       if (skipped > 0) {
         bytesSkippedOnSeek.addAndGet(skipped);
       }
-      seekOperations.incrementAndGet();
       forwardSeekOperations.incrementAndGet();
     }
 
@@ -617,8 +620,6 @@ public class GhfsInstrumentation
      */
     @Override
     public void close() {
-      increment(StreamStatisticNames.STREAM_READ_CLOSE_OPERATIONS);
-
       IOStatisticsStore ioStatistics = localIOStatistics();
       promoteInputStreamCountersToMetrics();
       mergedStats = snapshotIOStatistics(localIOStatistics());
@@ -771,6 +772,7 @@ public class GhfsInstrumentation
    */
   private final class OutputStreamStatistics extends AbstractGhfsStatisticsSource
       implements GhfsOutputStreamStatistics {
+
     private final AtomicLong bytesWritten;
     private final AtomicLong writeExceptions;
     private final FileSystem.Statistics filesystemStatistics;
@@ -784,9 +786,10 @@ public class GhfsInstrumentation
       this.filesystemStatistics = filesystemStatistics;
       IOStatisticsStore st =
           iostatisticsStore()
-              .withCounters(
-                  STREAM_WRITE_BYTES.getSymbol(),
-                  STREAM_WRITE_EXCEPTIONS.getSymbol(),
+              .withCounters(STREAM_WRITE_BYTES.getSymbol(), STREAM_WRITE_EXCEPTIONS.getSymbol())
+              .withDurationTracking(
+                  STREAM_WRITE_CLOSE_OPERATIONS.getSymbol(),
+                  STREAM_WRITE_OPERATIONS.getSymbol(),
                   INVOCATION_HFLUSH.getSymbol(),
                   INVOCATION_HSYNC.getSymbol())
               .build();
@@ -957,6 +960,7 @@ public class GhfsInstrumentation
                 storeBuilder.withDurationTracking(stat.getSymbol());
               }
             });
+
     return storeBuilder;
   }
 }
