@@ -15,15 +15,19 @@ import com.google.storage.v2.StorageGrpc.StorageStub;
 import io.grpc.Grpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.alts.GoogleDefaultChannelCredentials;
 import io.grpc.auth.MoreCallCredentials;
 import io.grpc.stub.AbstractStub;
+import io.grpc.stub.MetadataUtils;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 
 /** Provides gRPC stubs for accessing the Storage gRPC API. */
 class StorageStubProvider {
+  static final Metadata.Key<String> GOOG_REQUEST_PARAMS =
+      Metadata.Key.of("x-goog-request-params", Metadata.ASCII_STRING_MARSHALLER);
 
   // The maximum number of times to automatically retry gRPC requests.
   private static final double GRPC_MAX_RETRY_ATTEMPTS = 10;
@@ -63,15 +67,33 @@ class StorageStubProvider {
     return STUB_BROKEN_ERROR_CODES.contains(statusCode);
   }
 
-  public StorageBlockingStub newBlockingStub() {
+  public final StorageBlockingStub newBlockingStub(String bucketName) {
+    return newBlockingStubInternal()
+        .withInterceptors(
+            MetadataUtils.newAttachHeadersInterceptor(getRequestHeaderMetadata(bucketName)));
+  }
+
+  public final StorageStub newAsyncStub(String bucketName) {
+    return newAsyncStubInternal()
+        .withInterceptors(
+            MetadataUtils.newAttachHeadersInterceptor(getRequestHeaderMetadata(bucketName)));
+  }
+
+  protected StorageBlockingStub newBlockingStubInternal() {
     StorageBlockingStub stub = StorageGrpc.newBlockingStub(getManagedChannel());
     return (StorageBlockingStub) grpcDecorator.applyCallOption(stub);
   }
 
-  public StorageStub newAsyncStub() {
+  protected StorageStub newAsyncStubInternal() {
     StorageStub stub =
         StorageGrpc.newStub(getManagedChannel()).withExecutor(backgroundTasksThreadPool);
     return (StorageStub) grpcDecorator.applyCallOption(stub);
+  }
+
+  private static Metadata getRequestHeaderMetadata(String bucketName) {
+    Metadata metadata = new Metadata();
+    metadata.put(GOOG_REQUEST_PARAMS, String.format("bucket=%s", bucketName));
+    return metadata;
   }
 
   private synchronized ManagedChannel getManagedChannel() {
