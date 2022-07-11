@@ -138,6 +138,7 @@ public class FileInfo {
   }
 
   /** Gets string representation of this instance. */
+  @Override
   public String toString() {
     return getPath() + (exists() ? ": created on: " + new Date(getCreationTime()) : ": exists: no");
   }

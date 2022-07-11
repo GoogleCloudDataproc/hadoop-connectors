@@ -152,6 +152,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     return bytes == null ? Data.NULL_STRING : BaseEncoding.base64().encode(bytes);
   }
 
+  @Nullable
   private static byte[] decodeMetadataValues(String value) {
     try {
       return BaseEncoding.base64().decode(value);
@@ -1454,6 +1455,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         && getMaxRemainingResults(listOptions.getMaxResults(), listedPrefixes, listedObjects) > 0);
   }
 
+  @Nullable
   private String listStorageObjectsAndPrefixesPage(
       Storage.Objects.List listObject,
       ListObjectOptions listOptions,
@@ -2074,6 +2076,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @return the bucket with the given name or null if bucket not found
    * @throws IOException if the bucket exists but cannot be accessed
    */
+  @Nullable
   private Bucket getBucket(String bucketName) throws IOException {
     logger.atFiner().log("getBucket(%s)", bucketName);
     checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
@@ -2120,6 +2123,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @return the object with the given name or null if object not found
    * @throws IOException if the object exists but cannot be accessed
    */
+  @Nullable
   private StorageObject getObject(StorageResourceId resourceId) throws IOException {
     logger.atFiner().log("getObject(%s)", resourceId);
     checkArgument(
