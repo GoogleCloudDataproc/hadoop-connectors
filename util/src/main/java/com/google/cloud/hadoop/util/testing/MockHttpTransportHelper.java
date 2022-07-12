@@ -224,6 +224,10 @@ public final class MockHttpTransportHelper {
     return inputStreamResponse(ImmutableMap.of(header, headerValue), content);
   }
 
+  public static MockLowLevelHttpResponse inputStreamResponse(InputStream content) {
+    return inputStreamResponse(ImmutableMap.of(), content);
+  }
+
   public static MockLowLevelHttpResponse inputStreamResponse(
       Map<String, Object> headers, InputStream content) {
     return setHeaders(new MockLowLevelHttpResponse(), headers, UNKNOWN_CONTENT_LENGTH)
