@@ -279,9 +279,13 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
       dstGenerationId = tmpGenerationId;
     } else {
       StorageResourceId dstId =
-          StorageResourceId.fromUriPath(dstGcsPath, /* allowEmptyPath= */ false, dstGenerationId);
+          StorageResourceId.fromUriPath(dstGcsPath,
+              /* allowEmptyObjectName= */ false,
+              dstGenerationId);
       StorageResourceId tmpId =
-          StorageResourceId.fromUriPath(tmpGcsPath, /* allowEmptyPath= */ false, tmpGenerationId);
+          StorageResourceId.fromUriPath(tmpGcsPath,
+              /* allowEmptyObjectName= */ false,
+              tmpGenerationId);
       checkState(
           dstId.getBucketName().equals(tmpId.getBucketName()),
           "Destination bucket in path '%s' doesn't match temp file bucket in path '%s'",
