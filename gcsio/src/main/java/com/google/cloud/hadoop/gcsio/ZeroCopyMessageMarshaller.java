@@ -50,6 +50,7 @@ class ZeroCopyMessageMarshaller<T extends MessageLite> implements PrototypeMarsh
   private final Parser<T> parser;
   private final PrototypeMarshaller<T> marshaller;
 
+  @SuppressWarnings("unchecked")
   ZeroCopyMessageMarshaller(T defaultInstance) {
     parser = (Parser<T>) defaultInstance.getParserForType();
     marshaller = (PrototypeMarshaller<T>) ProtoLiteUtils.marshaller(defaultInstance);
