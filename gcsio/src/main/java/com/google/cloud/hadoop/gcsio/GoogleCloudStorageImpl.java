@@ -297,7 +297,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer)
       throws IOException {
-    this(options,
+    this(
+        options,
         createStorage(options, httpRequestInitializer),
         /* downscopedAccessTokenFn= */ null);
   }

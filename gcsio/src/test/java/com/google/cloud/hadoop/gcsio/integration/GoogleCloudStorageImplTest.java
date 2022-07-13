@@ -284,12 +284,12 @@ public class GoogleCloudStorageImplTest {
                 resourceId.getBucketName(),
                 resourceId.getObjectName(),
                 /* generationId= */ 3,
-                /* replaceGenerationId= */ 1),
+                /* uploadId= */ 1),
             resumableUploadChunkRequestString(
                 resourceId.getBucketName(),
                 resourceId.getObjectName(),
                 /* generationId= */ 4,
-                /* replaceGenerationId= */ 2));
+                /* uploadId= */ 2));
   }
 
   @Test

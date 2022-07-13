@@ -450,7 +450,7 @@ public class AssertingHandler extends Handler {
    * Automatically generated throwable by AssertingHandler. The throwable is used to provide a stack
    * trace for log messages that don't have their own throwables, as a debugging aid.
    */
-  private static class AutomaticallyGeneratedThrowable extends Throwable {
+  private static class AutomaticallyGeneratedThrowable extends Exception {
 
     private static final long serialVersionUID = 1L;
   }
