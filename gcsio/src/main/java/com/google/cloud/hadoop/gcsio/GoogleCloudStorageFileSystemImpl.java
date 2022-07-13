@@ -122,6 +122,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
    * @param options Options for how this filesystem should operate and configure its underlying
    *     storage.
    */
+  @SuppressWarnings("CheckReturnValue")
   public GoogleCloudStorageFileSystemImpl(
       Credentials credentials, GoogleCloudStorageFileSystemOptions options) throws IOException {
     this(

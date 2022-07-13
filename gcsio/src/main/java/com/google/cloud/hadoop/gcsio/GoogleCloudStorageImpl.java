@@ -316,6 +316,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    *
    * @param storage {@link Storage} to use for I/O.
    */
+  @SuppressWarnings("CheckReturnValue")
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage storage) {
     this(options, storage, /* downscopedAccessTokenFn= */ null);
   }
