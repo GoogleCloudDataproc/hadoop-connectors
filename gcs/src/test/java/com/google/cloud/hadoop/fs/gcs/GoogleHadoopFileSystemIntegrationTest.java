@@ -496,6 +496,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
   /** Verify that default constructor does not throw. */
   @Test
+  @SuppressWarnings("CheckReturnValue")
   public void testDefaultConstructor() {
     new GoogleHadoopFileSystem();
   }

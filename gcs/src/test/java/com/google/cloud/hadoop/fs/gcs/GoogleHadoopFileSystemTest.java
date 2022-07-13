@@ -72,6 +72,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   }
 
   @Test
+  @SuppressWarnings("CheckReturnValue")
   public void lazyInitialization_succeeds_withInvalidCredentialsConfiguration() throws Exception {
     new GoogleHadoopFileSystem();
     Configuration lazyConf = new Configuration();
@@ -116,6 +117,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   }
 
   @Test
+  @SuppressWarnings("CheckReturnValue")
   public void eagerInitialization_fails_withInvalidCredentialsConfiguration() {
     new GoogleHadoopFileSystem();
     Configuration eagerConf = new Configuration();

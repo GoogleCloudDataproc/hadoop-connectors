@@ -19,11 +19,14 @@ import java.io.IOException;
 import org.apache.hadoop.fs.FileSystemContractBaseTest;
 import org.apache.hadoop.fs.Path;
 import org.junit.Before;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
 
 /**
  * Runs the Hadoop tests in FileSystemContractBaseTest over the GoogleHadoopFileSystem. Tests that
  * the GoogleHadoopFileSystem obeys the file system contract specified for Hadoop.
  */
+@RunWith(JUnit4.class)
 public class GoogleHadoopFileSystemContractTest extends FileSystemContractBaseTest {
 
   @Before
