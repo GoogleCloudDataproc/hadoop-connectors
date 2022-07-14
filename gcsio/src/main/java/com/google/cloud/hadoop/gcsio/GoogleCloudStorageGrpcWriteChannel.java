@@ -22,7 +22,6 @@ import static java.util.stream.Collectors.toMap;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.BackOffFactory;
 import com.google.cloud.hadoop.util.AbstractGoogleAsyncWriteChannel;
-import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.common.collect.ImmutableSet;
@@ -88,20 +87,22 @@ public final class GoogleCloudStorageGrpcWriteChannel
   private final String requesterPaysProject;
   private final BackOffFactory backOffFactory;
   private final Watchdog watchdog;
+  private final GoogleCloudStorageOptions storageOptions;
 
   private GoogleCloudStorageItemInfo completedItemInfo = null;
 
   GoogleCloudStorageGrpcWriteChannel(
       StorageStubProvider stubProvider,
       ExecutorService threadPool,
-      AsyncWriteChannelOptions channelOptions,
+      GoogleCloudStorageOptions storageOptions,
       StorageResourceId resourceId,
       CreateObjectOptions createOptions,
       Watchdog watchdog,
       ObjectWriteConditions writeConditions,
       String requesterPaysProject,
       BackOffFactory backOffFactory) {
-    super(threadPool, channelOptions);
+    super(threadPool, storageOptions.getWriteChannelOptions());
+    this.storageOptions = storageOptions;
     this.stub = stubProvider.newAsyncStub(resourceId.getBucketName());
     this.resourceId = resourceId;
     this.createOptions = createOptions;
@@ -158,7 +159,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
     // Given that the two ends of the pipe must operate asynchronous relative
     // to each other, we need to start the upload operation on a separate thread.
     try {
-      uploadOperation = threadPool.submit(new UploadOperation(pipeSource));
+      uploadOperation =
+          threadPool.submit(
+              new UploadOperation(
+                  pipeSource, this.resourceId, this.storageOptions.isTraceLogEnabled()));
     } catch (Exception e) {
       throw new RuntimeException(String.format("Failed to start upload for '%s'", resourceId), e);
     }
@@ -169,6 +173,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
     // Read end of the pipe.
     private final BufferedInputStream pipeSource;
     private final int MAX_BYTES_PER_MESSAGE = MAX_WRITE_CHUNK_BYTES.getNumber();
+    private final StorageResourceId resourceId;
+    private final boolean tracingEnabled;
 
     private Hasher objectHasher;
     private String uploadId;
@@ -177,7 +183,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
     // be rewound and re-sent upon transient errors.
     private final TreeMap<Long, WriteObjectRequest> requestChunkMap = new TreeMap<>();
 
-    UploadOperation(InputStream pipeSource) {
+    UploadOperation(InputStream pipeSource, StorageResourceId resourceId, boolean tracingEnabled) {
+      this.resourceId = resourceId;
+      this.tracingEnabled = tracingEnabled;
       this.pipeSource = new BufferedInputStream(pipeSource, MAX_BYTES_PER_MESSAGE);
       if (channelOptions.isGrpcChecksumsEnabled()) {
         objectHasher = Hashing.crc32c().newHasher();
@@ -216,13 +224,25 @@ public final class GoogleCloudStorageGrpcWriteChannel
       return isRetriableError(cause);
     }
 
+    private StorageStub getStorageStubWithTracking(long grpcWriteTimeoutMilliSeconds) {
+      StorageStub stubWithDeadline =
+          stub.withDeadlineAfter(grpcWriteTimeoutMilliSeconds, MILLISECONDS);
+
+      if (!this.tracingEnabled) {
+        return stubWithDeadline;
+      }
+
+      return stubWithDeadline.withInterceptors(
+          new GoogleCloudStorageGrpcTracingInterceptor(
+              GrpcRequestTracingInfo.getWriteRequestTraceInfo(this.resourceId.getObjectName())));
+    }
+
     private WriteObjectResponse doResumableUpload() throws IOException {
       // Only request committed size for the first insert request.
       if (writeOffset > 0) {
         writeOffset = getCommittedWriteSizeWithRetries(uploadId);
       }
-      StorageStub storageStub =
-          stub.withDeadlineAfter(channelOptions.getGrpcWriteTimeout(), MILLISECONDS);
+      StorageStub storageStub = getStorageStubWithTracking(channelOptions.getGrpcWriteTimeout());
       InsertChunkResponseObserver responseObserver =
           new InsertChunkResponseObserver(uploadId, writeOffset);
       ClientCall<WriteObjectRequest, WriteObjectResponse> call =
@@ -520,7 +540,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       // re-used and we wait for the actual response instead of returning the last response/error
       SimpleResponseObserver<StartResumableWriteResponse> responseObserver =
           new SimpleResponseObserver<>();
-      stub.withDeadlineAfter(START_RESUMABLE_WRITE_TIMEOUT.toMillis(), MILLISECONDS)
+      getStorageStubWithTracking(START_RESUMABLE_WRITE_TIMEOUT.toMillis())
           .startResumableWrite(request, responseObserver);
       try {
         responseObserver.done.await();
@@ -556,7 +576,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     private long getCommittedWriteSize(QueryWriteStatusRequest request) throws IOException {
       SimpleResponseObserver<QueryWriteStatusResponse> responseObserver =
           new SimpleResponseObserver<>();
-      stub.withDeadlineAfter(QUERY_WRITE_STATUS_TIMEOUT.toMillis(), MILLISECONDS)
+      getStorageStubWithTracking(QUERY_WRITE_STATUS_TIMEOUT.toMillis())
           .queryWriteStatus(request, responseObserver);
       try {
         responseObserver.done.await();
