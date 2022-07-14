@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertTrue;
 
+import com.google.common.flogger.GoogleLogger;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import java.lang.reflect.Type;
@@ -29,6 +30,7 @@ import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 
 public class AssertingLogHandler extends Handler {
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private static final Gson GSON = new Gson();
   private static final Type LOG_RECORD_TYPE = new TypeToken<Map<String, Object>>() {}.getType();
 
@@ -40,6 +42,9 @@ public class AssertingLogHandler extends Handler {
     if (isLoggable(record)) {
       logRecords.add(logRecordToMap(record));
       methods.add(record.getSourceMethodName());
+
+      logger.atInfo().log(
+          String.format("Message %d: %s", logRecords.size(), GSON.toJson(logRecordToMap(record))));
     }
   }
 
