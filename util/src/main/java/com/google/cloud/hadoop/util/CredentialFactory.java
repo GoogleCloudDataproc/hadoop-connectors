@@ -103,6 +103,9 @@ public class CredentialFactory {
 
     private static final int DEFAULT_TOKEN_EXPIRATION_SECONDS = 3600;
 
+    private static final String GOOGLE_OAUTH2_TOKEN_AUDIENCE =
+        "https://oauth2.googleapis.com/token";
+
     private static final Joiner WHITESPACE_JOINER = Joiner.on(' ');
 
     /** Create a new GoogleCredentialWithRetry from a GoogleCredential. */
@@ -149,7 +152,7 @@ public class CredentialFactory {
       JsonWebToken.Payload payload =
           new JsonWebToken.Payload()
               .setIssuer(getServiceAccountId())
-              .setAudience(getTokenServerEncodedUrl())
+              .setAudience(GOOGLE_OAUTH2_TOKEN_AUDIENCE)
               .setIssuedAtTimeSeconds(currentTime / 1000)
               .setExpirationTimeSeconds(currentTime / 1000 + DEFAULT_TOKEN_EXPIRATION_SECONDS)
               .setSubject(getServiceAccountUser());
