@@ -53,7 +53,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -618,7 +617,7 @@ public class GoogleCloudStorageReadChannelTest {
     assertThat(byte3).isEqualTo(new byte[] {testData[3]});
   }
 
-  @Ignore
+  @Test
   public void read_gzipped_withExceptionThrownDuringRead() throws IOException {
     byte[] testDataBatch = new byte[1024];
     new Random().nextBytes(testDataBatch);
@@ -701,7 +700,8 @@ public class GoogleCloudStorageReadChannelTest {
         requests.stream().map(r -> r.getRequestMethod() + ":" + r.getUrl()).collect(toList());
     assertThat(requestStrings)
         .containsExactly(
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            getRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* fields= */ "contentEncoding,generation,size"),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, generation),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, generation))
         .inOrder();
