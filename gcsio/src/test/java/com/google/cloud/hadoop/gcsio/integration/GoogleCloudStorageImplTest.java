@@ -264,7 +264,7 @@ public class GoogleCloudStorageImplTest {
     Throwable thrown = assertThrows(Throwable.class, channel2::close);
     assertThat(thrown).hasCauseThat().hasMessageThat().contains("412 Precondition Failed");
 
-    assertObjectContent(helperGcs, resourceId, bytesToWrite, /* partitionsCount= */ 1);
+    assertObjectContent(helperGcs, resourceId, bytesToWrite, /* expectedBytesCount= */ 1);
 
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactly(
@@ -284,12 +284,12 @@ public class GoogleCloudStorageImplTest {
                 resourceId.getBucketName(),
                 resourceId.getObjectName(),
                 /* generationId= */ 3,
-                /* replaceGenerationId= */ 1),
+                /* uploadId= */ 1),
             resumableUploadChunkRequestString(
                 resourceId.getBucketName(),
                 resourceId.getObjectName(),
                 /* generationId= */ 4,
-                /* replaceGenerationId= */ 2));
+                /* uploadId= */ 2));
   }
 
   @Test

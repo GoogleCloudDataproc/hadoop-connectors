@@ -989,6 +989,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   }
 
   /** Gets the leaf item of the given path. */
+  @Nullable
   static String getItemName(URI path) {
     checkNotNull(path, "path can not be null");
 

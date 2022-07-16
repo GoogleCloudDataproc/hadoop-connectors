@@ -3144,6 +3144,7 @@ public class GoogleCloudStorageTest {
 
   /** Test validation of Storage passing constructor. */
   @Test
+  @SuppressWarnings("CheckReturnValue")
   public void testStoragePassedConstructor() {
     GoogleCloudStorageOptions.Builder optionsBuilder =
         GoogleCloudStorageOptions.builder().setAppName("appName").setProjectId("projectId");

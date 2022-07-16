@@ -21,6 +21,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
@@ -53,6 +54,7 @@ public class HadoopConfigurationProperty<T> {
     this.defaultValue = defaultValue;
   }
 
+  @CanIgnoreReturnValue
   public HadoopConfigurationProperty<T> withPrefixes(List<String> keyPrefixes) {
     this.keyPrefixes = ImmutableList.copyOf(keyPrefixes);
     return this;
