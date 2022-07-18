@@ -535,9 +535,6 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
         } while (bytesRead >= 0);
       }
     }
-
-    // If destination.hasGenerationId(), it'll automatically get enforced here by the create()
-    // implementation.
     try (WritableByteChannel destChannel = create(destination, options)) {
       destChannel.write(ByteBuffer.wrap(tempOutput.toByteArray()));
     }

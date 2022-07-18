@@ -121,7 +121,7 @@ public class GoogleHadoopOutputStreamTest {
         new GoogleHadoopOutputStream(
             ghfs,
             ghfs.getGcsPath(objectPath),
-            CreateFileOptions.DEFAULT,
+            CreateFileOptions.builder().setMinSyncInterval(Duration.ZERO).build(),
             new FileSystem.Statistics(ghfs.getScheme()));
 
     byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
@@ -183,9 +183,12 @@ public class GoogleHadoopOutputStreamTest {
 
   @Test
   public void hsync_largeNumberOfComposeComponents() throws Exception {
+    // Set an extremely low min sync interval as we need to perform many syncs in this test
+    ghfs.getConf().setInt(GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.getKey(), 1);
+
     Path objectPath = new Path(ghfs.getUri().resolve("/hsync_largeNumberOfComposeComponents.bin"));
 
-    // number of compose components should be greater than 1024 (previous limit for GCS compose API)
+    // Number of compose components should be greater than 1024 (previous limit for GCS compose API)
     byte[] expected = new byte[1536];
     new Random().nextBytes(expected);
 
@@ -232,7 +235,10 @@ public class GoogleHadoopOutputStreamTest {
     FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
     GoogleHadoopOutputStream fout =
         new GoogleHadoopOutputStream(
-            ghfs, ghfs.getGcsPath(objectPath), CreateFileOptions.DEFAULT, statistics);
+            ghfs,
+            ghfs.getGcsPath(objectPath),
+            CreateFileOptions.builder().setMinSyncInterval(Duration.ZERO).build(),
+            statistics);
 
     byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
     byte[] data2 = {0x0b, 0x0d, 0x0e, 0x0e, 0x0f};
@@ -253,7 +259,10 @@ public class GoogleHadoopOutputStreamTest {
     FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
     GoogleHadoopOutputStream fout =
         new GoogleHadoopOutputStream(
-            ghfs, ghfs.getGcsPath(objectPath), CreateFileOptions.DEFAULT, statistics);
+            ghfs,
+            ghfs.getGcsPath(objectPath),
+            CreateFileOptions.builder().setMinSyncInterval(Duration.ZERO).build(),
+            statistics);
 
     byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
     byte[] data2 = {0x0b, 0x0d, 0x0e, 0x0e, 0x0f};
