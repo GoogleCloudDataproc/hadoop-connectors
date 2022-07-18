@@ -113,7 +113,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.outputstream.direct.upload.enable", false);
           put("fs.gs.outputstream.pipe.buffer.size", 1024 * 1024);
           put("fs.gs.outputstream.pipe.type", PipeType.IO_STREAM_PIPE);
-          put("fs.gs.outputstream.sync.min.interval.ms", 10_000);
+          put("fs.gs.outputstream.sync.min.interval.ms", 0);
           put("fs.gs.outputstream.upload.cache.size", 0);
           put("fs.gs.outputstream.upload.chunk.size", 64 * 1024 * 1024);
           put("fs.gs.performance.cache.enable", false);

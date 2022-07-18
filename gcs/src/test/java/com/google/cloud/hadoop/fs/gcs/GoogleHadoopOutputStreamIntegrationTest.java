@@ -272,7 +272,7 @@ public class GoogleHadoopOutputStreamIntegrationTest {
 
   @Test
   public void hflush_rateLimited_writesEverything() throws Exception {
-    URI path = gcsFsIHelper.getUniqueObjectUri("hflush_syncsEverything");
+    URI path = gcsFsIHelper.getUniqueObjectUri("hflush_rateLimited_writesEverything");
     Path hadoopPath = new Path(path);
 
     Configuration config = getTestConfig();

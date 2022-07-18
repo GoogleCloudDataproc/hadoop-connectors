@@ -36,7 +36,7 @@ public class CreateFileOptionsTest {
   }
 
   @Test
-  public void invalidOptions_contentType_setViaAttributes() {
+  public void invalidOptions_contentType_shouldNotBeSetViaAttributes() {
     IllegalArgumentException thrown =
         assertThrows(
             IllegalArgumentException.class,
@@ -52,7 +52,7 @@ public class CreateFileOptionsTest {
   }
 
   @Test
-  public void invalidOptions_createNewWithOverwriteGeneration() {
+  public void invalidOptions_createNew_overwriteGenerationShouldNotBeSet() {
     IllegalArgumentException thrown =
         assertThrows(
             IllegalArgumentException.class,

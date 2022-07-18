@@ -92,7 +92,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonPathCapabilities;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -365,6 +364,12 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
             HadoopCredentialsConfiguration.getImpersonatedCredentials(
                 config, credentials, GCS_CONFIG_PREFIX))
         .orElse(credentials);
+  }
+
+  private static String validatePathCapabilityArgs(Path path, String capability) {
+    checkNotNull(path);
+    checkArgument(!isNullOrEmpty(capability), "capability parameter is empty string");
+    return Ascii.toLowerCase(capability);
   }
 
   private static boolean isImplicitDirectory(FileStatus curr) {
@@ -1003,11 +1008,11 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public boolean hasPathCapability(Path path, String capability) {
-    checkNotNull(path, "path must not be null");
-    checkArgument(!isNullOrEmpty(capability), "capability must not be null or empty string");
-    switch (Ascii.toLowerCase(capability)) {
-      case CommonPathCapabilities.FS_APPEND:
-      case CommonPathCapabilities.FS_CONCAT:
+    switch (validatePathCapabilityArgs(path, capability)) {
+        // TODO: remove string literals in favor of Constants in CommonPathCapabilities.java
+        // from Hadoop 3 when Hadoop 2 is no longer supported
+      case "fs.capability.paths.append":
+      case "fs.capability.paths.concat":
         return true;
       default:
         return false;

@@ -38,7 +38,7 @@ public abstract class CreateFileOptions {
     /** Creates a new file for write and fails if file already exists. */
     CREATE_NEW,
     /** Creates a new file for write or overwrites an existing file if it already exists. */
-    OVERWRITE;
+    OVERWRITE
   }
 
   public static Builder builder() {

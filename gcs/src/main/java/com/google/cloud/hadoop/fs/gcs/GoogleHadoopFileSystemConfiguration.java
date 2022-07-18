@@ -275,7 +275,7 @@ public class GoogleHadoopFileSystemConfiguration {
    * Configuration key for the minimal time interval between consecutive sync/hsync/hflush calls.
    */
   public static final HadoopConfigurationProperty<Integer> GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS =
-      new HadoopConfigurationProperty<>("fs.gs.outputstream.sync.min.interval.ms", 10_000);
+      new HadoopConfigurationProperty<>("fs.gs.outputstream.sync.min.interval.ms", 0);
 
   /**
    * If {@code true}, on opening a file we will proactively perform a metadata {@code GET} to check

@@ -98,14 +98,4 @@
     <name>fs.contract.rename-overwrites-dest</name>
     <value>false</value>
   </property>
-
-  <property>
-    <name>fs.contract.supports-hsync</name>
-    <value>true</value>
-  </property>
-
-  <property>
-    <name>fs.contract.supports-hflush</name>
-    <value>true</value>
-  </property>
 </configuration>
