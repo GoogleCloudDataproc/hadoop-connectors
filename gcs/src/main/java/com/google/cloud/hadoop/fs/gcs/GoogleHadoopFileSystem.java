@@ -1023,6 +1023,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
    * @throws IOException failure to resolve the link.
    * @throws IllegalArgumentException unknown mandatory key
    */
+  @SuppressWarnings("FutureReturnValueIgnored")
   @Override
   public CompletableFuture<FSDataInputStream> openFileWithOptions(
       Path hadoopPath, OpenFileParameters parameters) throws IOException {

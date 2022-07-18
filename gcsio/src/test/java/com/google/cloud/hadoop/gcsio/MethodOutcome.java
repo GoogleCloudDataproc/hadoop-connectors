@@ -44,6 +44,7 @@ public class MethodOutcome {
     this.expectedExceptionClass = expectedExceptionClass;
   }
 
+  @Override
   public String toString() {
     switch (expectedOutcome) {
       case RETURNS_TRUE:

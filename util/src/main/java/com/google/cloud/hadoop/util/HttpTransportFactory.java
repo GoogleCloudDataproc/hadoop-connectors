@@ -115,6 +115,7 @@ public class HttpTransportFactory {
       System.setProperty("jdk.http.auth.tunneling.disabledSchemes", "");
       Authenticator.setDefault(
           new Authenticator() {
+            @Nullable
             @Override
             protected PasswordAuthentication getPasswordAuthentication() {
               if (getRequestorType() == RequestorType.PROXY

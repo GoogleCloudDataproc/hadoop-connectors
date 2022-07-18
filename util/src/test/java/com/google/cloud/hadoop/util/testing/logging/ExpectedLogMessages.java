@@ -20,7 +20,6 @@ import static com.google.common.base.Preconditions.checkState;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.errorprone.annotations.CheckReturnValue;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -151,7 +150,6 @@ import org.junit.runners.model.Statement;
  * {@code com.google.my.package} is configured to only print messages at, say, {@code Level.SEVERE},
  * any messages issued against that Logger with a lower level will not be seen by this class.
  */
-@CanIgnoreReturnValue
 public final class ExpectedLogMessages implements TestRule {
 
   private static final Logger GOOGLE_LOGGER = Logger.getLogger("com.google");

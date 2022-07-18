@@ -92,6 +92,7 @@ public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSyst
 
   /** Validates constructor. */
   @Test
+  @SuppressWarnings("CheckReturnValue")
   public void testConstructor() throws IOException {
     GoogleCredentials cred = GoogleCredentials.create(/* accessToken= */ null);
     GoogleCloudStorageFileSystemOptions.Builder optionsBuilder =
