@@ -65,10 +65,7 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
   // the way we pick temp file names and already ensured directories for the destination file,
   // we can optimize tempfile creation by skipping various directory checks.
   private static final CreateFileOptions TMP_FILE_CREATE_OPTIONS =
-      CreateFileOptions.DEFAULT_NO_OVERWRITE.toBuilder()
-          .setEnsureNoDirectoryConflict(false)
-          .setOverwriteGenerationId(0)
-          .build();
+      CreateFileOptions.builder().setEnsureNoDirectoryConflict(false).build();
 
   // Deletion of temporary files occurs asynchronously for performance reasons, but in-flight
   // deletions are awaited on close() so as long as all output streams are closed, there should
@@ -82,7 +79,7 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
 
   private final GoogleHadoopFileSystem ghfs;
 
-  private final CreateFileOptions createFileOptions;
+  private final CreateObjectOptions composeObjectOptions;
 
   // Path of the file to write to.
   private final URI dstGcsPath;
@@ -131,8 +128,6 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
       GoogleHadoopFileSystem ghfs,
       URI dstGcsPath,
       CreateFileOptions createFileOptions,
-      boolean append,
-      Duration minSyncInterval,
       FileSystem.Statistics statistics)
       throws IOException {
     logger.atFiner().log(
@@ -140,15 +135,22 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
         dstGcsPath, createFileOptions);
     this.ghfs = ghfs;
     this.dstGcsPath = dstGcsPath;
-    this.createFileOptions = createFileOptions;
     this.statistics = statistics;
     this.streamStatistics = ghfs.getInstrumentation().newOutputStreamStatistics(statistics);
+    Duration minSyncInterval = createFileOptions.getMinSyncInterval();
     this.syncRateLimiter =
         minSyncInterval.isNegative() || minSyncInterval.isZero()
             ? null
             : RateLimiter.create(/* permitsPerSecond= */ 1_000.0 / minSyncInterval.toMillis());
+    this.composeObjectOptions =
+        GoogleCloudStorageFileSystemImpl.objectOptionsFromFileOptions(
+            createFileOptions.toBuilder()
+                // Set write mode to OVERWRITE because we use compose operation to append new data
+                // to an existing object
+                .setWriteMode(CreateFileOptions.WriteMode.OVERWRITE)
+                .build());
 
-    if (append) {
+    if (createFileOptions.getWriteMode() == CreateFileOptions.WriteMode.APPEND) {
       // When appending first component has to go to new temporary file.
       this.tmpGcsPath = getNextTmpPath();
       this.tmpIndex = 1;
@@ -160,7 +162,11 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
       this.tmpIndex = 0;
     }
 
-    this.tmpOut = createOutputStream(ghfs.getGcsFs(), tmpGcsPath, createFileOptions);
+    this.tmpOut =
+        createOutputStream(
+            ghfs.getGcsFs(),
+            tmpGcsPath,
+            tmpIndex == 0 ? createFileOptions : TMP_FILE_CREATE_OPTIONS);
     this.dstGenerationId = StorageResourceId.UNKNOWN_GENERATION_ID;
   }
 
@@ -289,11 +295,9 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
           "Destination bucket in path '%s' doesn't match temp file bucket in path '%s'",
           dstGcsPath,
           tmpGcsPath);
-      CreateObjectOptions createObjectOptions =
-          GoogleCloudStorageFileSystemImpl.objectOptionsFromFileOptions(createFileOptions);
       GoogleCloudStorage gcs = ghfs.getGcsFs().getGcs();
       GoogleCloudStorageItemInfo composedObject =
-          gcs.composeObjects(ImmutableList.of(dstId, tmpId), dstId, createObjectOptions);
+          gcs.composeObjects(ImmutableList.of(dstId, tmpId), dstId, composeObjectOptions);
       dstGenerationId = composedObject.getContentGeneration();
       tmpDeletionFutures.add(
           TMP_FILE_CLEANUP_THREADPOOL.submit(

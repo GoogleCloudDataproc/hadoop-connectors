@@ -44,13 +44,15 @@ public interface GoogleCloudStorageFileSystem {
   URI GCS_ROOT = URI.create(SCHEME + ":/");
 
   /**
-   * Creates and opens an object for writing. If the object already exists, it is deleted.
+   * Creates and opens an object for writing. If the object already exists, it is overwritten.
    *
    * @param path Object full path of the form gs://bucket/object-path.
    * @return A channel for writing to the given object.
    */
   default WritableByteChannel create(URI path) throws IOException {
-    return create(path, CreateFileOptions.DEFAULT_OVERWRITE);
+    return create(
+        path,
+        CreateFileOptions.builder().setWriteMode(CreateFileOptions.WriteMode.OVERWRITE).build());
   }
 
   /**

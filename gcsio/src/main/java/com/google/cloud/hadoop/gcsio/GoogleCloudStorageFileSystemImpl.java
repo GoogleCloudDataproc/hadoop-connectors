@@ -200,10 +200,15 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
 
   /** Convert {@code CreateFileOptions} to {@code CreateObjectOptions}. */
   public static CreateObjectOptions objectOptionsFromFileOptions(CreateFileOptions options) {
+    checkArgument(
+        options.getWriteMode() == CreateFileOptions.WriteMode.CREATE_NEW
+            || options.getWriteMode() == CreateFileOptions.WriteMode.OVERWRITE,
+        "unsupported write mode: %s",
+        options.getWriteMode());
     return CreateObjectOptions.builder()
         .setContentType(options.getContentType())
         .setMetadata(options.getAttributes())
-        .setOverwriteExisting(options.isOverwriteExisting())
+        .setOverwriteExisting(options.getWriteMode() == CreateFileOptions.WriteMode.OVERWRITE)
         .build();
   }
 

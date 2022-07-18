@@ -121,9 +121,7 @@ public class GoogleHadoopOutputStreamTest {
         new GoogleHadoopOutputStream(
             ghfs,
             ghfs.getGcsPath(objectPath),
-            CreateFileOptions.DEFAULT_OVERWRITE,
-            /* append= */ false,
-            /* minSyncInterval= */ Duration.ofMillis(1),
+            CreateFileOptions.DEFAULT,
             new FileSystem.Statistics(ghfs.getScheme()));
 
     byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
@@ -234,12 +232,7 @@ public class GoogleHadoopOutputStreamTest {
     FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
     GoogleHadoopOutputStream fout =
         new GoogleHadoopOutputStream(
-            ghfs,
-            ghfs.getGcsPath(objectPath),
-            CreateFileOptions.DEFAULT_OVERWRITE,
-            /* append= */ false,
-            /* minSyncInterval= */ Duration.ZERO,
-            statistics);
+            ghfs, ghfs.getGcsPath(objectPath), CreateFileOptions.DEFAULT, statistics);
 
     byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
     byte[] data2 = {0x0b, 0x0d, 0x0e, 0x0e, 0x0f};
@@ -260,12 +253,7 @@ public class GoogleHadoopOutputStreamTest {
     FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
     GoogleHadoopOutputStream fout =
         new GoogleHadoopOutputStream(
-            ghfs,
-            ghfs.getGcsPath(objectPath),
-            CreateFileOptions.DEFAULT_OVERWRITE,
-            /* append= */ false,
-            /* minSyncInterval= */ Duration.ZERO,
-            statistics);
+            ghfs, ghfs.getGcsPath(objectPath), CreateFileOptions.DEFAULT, statistics);
 
     byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
     byte[] data2 = {0x0b, 0x0d, 0x0e, 0x0e, 0x0f};
