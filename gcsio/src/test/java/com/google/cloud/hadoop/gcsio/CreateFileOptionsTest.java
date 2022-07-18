@@ -64,6 +64,6 @@ public class CreateFileOptionsTest {
 
     assertThat(thrown)
         .hasMessageThat()
-        .isEqualTo("overwriteGenerationId is set to 0 but it can be sed only in OVERWRITE mode");
+        .isEqualTo("overwriteGenerationId is set to 0 but it can be set only in OVERWRITE mode");
   }
 }

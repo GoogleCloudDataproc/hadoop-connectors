@@ -110,7 +110,7 @@ public abstract class CreateFileOptions {
         case CREATE_NEW:
           checkArgument(
               options.getOverwriteGenerationId() == StorageResourceId.UNKNOWN_GENERATION_ID,
-              "overwriteGenerationId is set to %s but it can be sed only in OVERWRITE mode",
+              "overwriteGenerationId is set to %s but it can be set only in OVERWRITE mode",
               options.getOverwriteGenerationId());
       }
       return options;

@@ -31,7 +31,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStrings;
 import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
-import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -536,7 +535,6 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
         } while (bytesRead >= 0);
       }
     }
-    deleteObjects(ImmutableList.of(destination));
     try (WritableByteChannel destChannel = create(destination, options)) {
       destChannel.write(ByteBuffer.wrap(tempOutput.toByteArray()));
     }

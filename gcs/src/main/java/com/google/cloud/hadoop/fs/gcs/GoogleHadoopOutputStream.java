@@ -16,7 +16,9 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
@@ -25,6 +27,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.RateLimiter;
@@ -48,11 +51,13 @@ import javax.annotation.Nonnull;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 
-class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSource, Syncable {
+class GoogleHadoopOutputStream extends OutputStream
+    implements IOStatisticsSource, StreamCapabilities, Syncable {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
@@ -143,21 +148,19 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
             : RateLimiter.create(
                 /* permitsPerSecond= */ 1_000.0
                     / createFileOptions.getMinSyncInterval().toMillis());
+    this.composeObjectOptions =
+        GoogleCloudStorageFileSystemImpl.objectOptionsFromFileOptions(
+            createFileOptions.toBuilder()
+                // Set write mode to OVERWRITE because we use compose operation to append new data
+                // to an existing object
+                .setWriteMode(CreateFileOptions.WriteMode.OVERWRITE)
+                .build());
 
     if (createFileOptions.getWriteMode() == CreateFileOptions.WriteMode.APPEND) {
-      // Set write mode to CREATE_NEW because objectOptionsFromFileOptions method
-      // does not support APPEND mode
-      this.composeObjectOptions =
-          GoogleCloudStorageFileSystemImpl.objectOptionsFromFileOptions(
-              createFileOptions.toBuilder()
-                  .setWriteMode(CreateFileOptions.WriteMode.CREATE_NEW)
-                  .build());
       // When appending first component has to go to new temporary file.
       this.tmpGcsPath = getNextTmpPath();
       this.tmpIndex = 1;
     } else {
-      this.composeObjectOptions =
-          GoogleCloudStorageFileSystemImpl.objectOptionsFromFileOptions(createFileOptions);
       // The first component of the stream will go straight to the destination filename to optimize
       // the case where no hsync() or a single hsync() is called during the lifetime of the stream;
       // committing the first component thus doesn't require any compose() call under the hood.
@@ -369,5 +372,18 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
   @Override
   public IOStatistics getIOStatistics() {
     return streamStatistics.getIOStatistics();
+  }
+
+  @Override
+  public boolean hasCapability(String capability) {
+    checkArgument(!isNullOrEmpty(capability), "capability must not be null or empty string");
+    switch (Ascii.toLowerCase(capability)) {
+      case StreamCapabilities.HFLUSH:
+      case StreamCapabilities.HSYNC:
+      case StreamCapabilities.IOSTATISTICS:
+        return true;
+      default:
+        return false;
+    }
   }
 }
