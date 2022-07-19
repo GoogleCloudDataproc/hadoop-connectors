@@ -28,9 +28,6 @@ import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
-import static java.util.Arrays.stream;
-import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.toMap;
 
 import com.google.api.client.googleapis.batch.json.JsonBatchCallback;
 import com.google.api.client.googleapis.json.GoogleJsonError;
@@ -70,7 +67,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.flogger.GoogleLogger;
@@ -86,7 +82,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -94,6 +89,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -194,19 +190,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     BackOff newBackOff();
   }
 
-  private final ImmutableMap<GoogleCloudStorageStatistics, AtomicLong> statistics =
-      ImmutableMap.copyOf(
-          stream(GoogleCloudStorageStatistics.values())
-              .collect(
-                  toMap(
-                      identity(),
-                      k -> new AtomicLong(0),
-                      (u, v) -> {
-                        throw new IllegalStateException(
-                            String.format(
-                                "Duplicate key (attempted merging values %s and %s)", u, u));
-                      },
-                      () -> new EnumMap<>(GoogleCloudStorageStatistics.class))));
+  private final ConcurrentMap<String, AtomicLong> statistics = new ConcurrentHashMap<>();
 
   private final LoadingCache<String, Boolean> autoBuckets =
       CacheBuilder.newBuilder()
@@ -2399,6 +2383,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @Override
   public Map<String, Long> getStatistics() {
     return statistics.entrySet().stream()
-        .collect(toImmutableMap(e -> e.getKey().name(), e -> e.getValue().get()));
+        .collect(toImmutableMap(Map.Entry::getKey, e -> e.getValue().get()));
   }
 }
