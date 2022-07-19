@@ -416,6 +416,9 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     String testBucket = gcsiHelper.createUniqueBucket("list");
     gcsiHelper.createObjectsWithSubdirs(testBucket, objectNames);
 
+    // adding a sleep to overcome any cock skew b/217682193
+    Thread.sleep(1000);
+
     // -------------------------------------------------------
     // Tests for getItemInfo().
     // -------------------------------------------------------

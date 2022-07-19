@@ -246,6 +246,8 @@ public class GoogleCloudStorageImplTest {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
     TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
+    TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs2 =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
 
     byte[] bytesToWrite = new byte[1024];
     GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
@@ -256,7 +258,7 @@ public class GoogleCloudStorageImplTest {
 
     // Creating this channel should succeed. Only when we close will an error bubble up.
     WritableByteChannel channel2 =
-        trackingGcs.delegate.create(resourceId, CreateObjectOptions.DEFAULT_NO_OVERWRITE);
+        trackingGcs2.delegate.create(resourceId, CreateObjectOptions.DEFAULT_NO_OVERWRITE);
 
     channel1.close();
 
@@ -269,27 +271,30 @@ public class GoogleCloudStorageImplTest {
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactly(
             getRequestString(resourceId.getBucketName(), resourceId.getObjectName()),
+            resumableUploadRequestString(
+                resourceId.getBucketName(),
+                resourceId.getObjectName(),
+                /* generationId= */ 1,
+                /* replaceGenerationId= */ true),
+            resumableUploadChunkRequestString(
+                resourceId.getBucketName(),
+                resourceId.getObjectName(),
+                /* generationId= */ 2,
+                /* replaceGenerationId= */ 1));
+
+    assertThat(trackingGcs2.requestsTracker.getAllRequestStrings())
+        .containsExactly(
             getRequestString(resourceId.getBucketName(), resourceId.getObjectName()),
             resumableUploadRequestString(
                 resourceId.getBucketName(),
                 resourceId.getObjectName(),
                 /* generationId= */ 1,
                 /* replaceGenerationId= */ true),
-            resumableUploadRequestString(
+            resumableUploadChunkRequestString(
                 resourceId.getBucketName(),
                 resourceId.getObjectName(),
                 /* generationId= */ 2,
-                /* replaceGenerationId= */ true),
-            resumableUploadChunkRequestString(
-                resourceId.getBucketName(),
-                resourceId.getObjectName(),
-                /* generationId= */ 3,
-                /* uploadId= */ 1),
-            resumableUploadChunkRequestString(
-                resourceId.getBucketName(),
-                resourceId.getObjectName(),
-                /* generationId= */ 4,
-                /* uploadId= */ 2));
+                /* replaceGenerationId= */ 1));
   }
 
   @Test
