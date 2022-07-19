@@ -45,10 +45,6 @@ public abstract class CreateBucketOptions {
   @Nullable
   public abstract Duration getTtl();
 
-  /** Returns the bucket UBLA status. */
-  @Nullable
-  public abstract Boolean getUBLAEnabled();
-
   /** Builder for {@link CreateBucketOptions} */
   @AutoValue.Builder
   public abstract static class Builder {
@@ -57,8 +53,6 @@ public abstract class CreateBucketOptions {
     public abstract Builder setStorageClass(String storageClass);
 
     public abstract Builder setTtl(Duration ttl);
-
-    public abstract Builder setUBLAEnabled(Boolean uBLAEnabled);
 
     public abstract CreateBucketOptions build();
   }

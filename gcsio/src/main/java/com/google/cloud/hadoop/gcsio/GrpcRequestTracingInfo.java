@@ -14,8 +14,10 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.OptionalLong;
 
+@VisibleForTesting
 public class GrpcRequestTracingInfo {
   final String api = "grpc";
   final String objectName;

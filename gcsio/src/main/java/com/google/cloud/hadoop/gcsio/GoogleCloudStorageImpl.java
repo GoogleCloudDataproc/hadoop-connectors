@@ -737,7 +737,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // object exists, we'll need to do an RPC (metadata or data). A metadata check should be a less
     // expensive operation than a read data operation.
     GoogleCloudStorageItemInfo itemInfo =
-        readOptions.getFastFailOnNotFound() ? getItemInfo(resourceId) : null;
+        readOptions.isFastFailOnNotFoundEnabled() ? getItemInfo(resourceId) : null;
 
     return open(resourceId, itemInfo, readOptions);
   }

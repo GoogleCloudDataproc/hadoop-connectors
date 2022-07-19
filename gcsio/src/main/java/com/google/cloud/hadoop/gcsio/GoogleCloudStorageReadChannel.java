@@ -213,18 +213,18 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         .setRandomizationFactor(readOptions.getBackoffRandomizationFactor())
         .setMultiplier(readOptions.getBackoffMultiplier())
         .setMaxIntervalMillis(readOptions.getBackoffMaxIntervalMillis())
-        .setMaxElapsedTimeMillis(readOptions.getBackoffMaxElapsedTimeMillis())
         .setNanoClock(clock)
         .build();
   }
 
   /**
    * Returns {@link GoogleCloudStorageItemInfo} used to initialize metadata in constructor or {@code
-   * null} if {@link GoogleCloudStorageReadOptions#getFastFailOnNotFound()} is set to {@code false}.
+   * null} if {@link GoogleCloudStorageReadOptions#isFastFailOnNotFoundEnabled()} is set to {@code
+   * false}.
    */
   @Nullable
   protected GoogleCloudStorageItemInfo getInitialMetadata() throws IOException {
-    return readOptions.getFastFailOnNotFound() ? fetchInitialMetadata() : null;
+    return readOptions.isFastFailOnNotFoundEnabled() ? fetchInitialMetadata() : null;
   }
 
   /** Returns {@link GoogleCloudStorageItemInfo} used to initialize metadata in constructor. */
@@ -786,7 +786,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         generation,
         resourceId);
     gzipEncoded = nullToEmpty(encoding).contains(GZIP_ENCODING);
-    if (gzipEncoded && !readOptions.getSupportGzipEncoding()) {
+    if (gzipEncoded && !readOptions.isGzipEncodingSupportEnabled()) {
       throw new IOException(
           "Cannot read GZIP encoded files - content encoding support is disabled.");
     }

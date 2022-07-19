@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.flogger.GoogleLogger;
@@ -34,6 +35,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 
 /** Interceptor to create a trace of the lifecycle of GRPC api calls. */
+@VisibleForTesting
 public class GoogleCloudStorageGrpcTracingInterceptor implements io.grpc.ClientInterceptor {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private final GrpcRequestTracingInfo requestInfo;
