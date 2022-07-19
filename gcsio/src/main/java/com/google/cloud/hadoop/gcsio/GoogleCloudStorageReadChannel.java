@@ -213,6 +213,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         .setRandomizationFactor(readOptions.getBackoffRandomizationFactor())
         .setMultiplier(readOptions.getBackoffMultiplier())
         .setMaxIntervalMillis(readOptions.getBackoffMaxIntervalMillis())
+        .setMaxElapsedTimeMillis(readOptions.getBackoffMaxElapsedTimeMillis())
         .setNanoClock(clock)
         .build();
   }
