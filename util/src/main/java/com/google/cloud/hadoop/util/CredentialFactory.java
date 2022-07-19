@@ -84,8 +84,7 @@ public class CredentialFactory {
     logger.atFine().log(
         "getCredentialsFromJsonKeyFile() from '%s'", options.getServiceAccountJsonKeyFile());
     try (FileInputStream fis = new FileInputStream(options.getServiceAccountJsonKeyFile())) {
-      return ServiceAccountCredentials.fromStream(fis, transport::get)
-          .createScoped(CLOUD_PLATFORM_SCOPE);
+      return ServiceAccountCredentials.fromStream(fis, transport::get);
     }
   }
 
@@ -158,6 +157,7 @@ public class CredentialFactory {
   }
 
   private GoogleCredentials configureCredentials(GoogleCredentials credentials) {
+    credentials = credentials.createScoped(CLOUD_PLATFORM_SCOPE);
     if (options.getTokenServerUrl() == null) {
       return credentials;
     }
