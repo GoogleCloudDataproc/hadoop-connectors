@@ -21,13 +21,16 @@ import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.client.testing.http.MockLowLevelHttpResponse;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.StorageObject;
+import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
+import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.UUID;
 
 /** Utility class with helper methods for GCS IO tests. */
 public final class GoogleCloudStorageTestUtils {
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   public static final HttpTransport HTTP_TRANSPORT = new NetHttpTransport();
   public static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
@@ -71,5 +74,16 @@ public final class GoogleCloudStorageTestUtils {
     return new MockLowLevelHttpResponse()
         .addHeader(
             "location", String.format(RESUMABLE_UPLOAD_LOCATION_FORMAT, bucket, object, uploadId));
+  }
+
+  public static GoogleCloudStorageOptions.Builder configureDefaultOptions() {
+    GoogleCloudStorageOptions.Builder optionsBuilder =
+        GoogleCloudStorageTestHelper.getStandardOptionBuilder().setGrpcEnabled(true);
+    String grpcServerAddress = System.getenv("GCS_TEST_GRPC_SERVER_ADDRESS_OVERRIDE");
+    if (grpcServerAddress != null) {
+      optionsBuilder.setGrpcServerAddress(grpcServerAddress);
+      logger.atInfo().log("Overriding gRPC server address to %s", grpcServerAddress);
+    }
+    return optionsBuilder;
   }
 }
