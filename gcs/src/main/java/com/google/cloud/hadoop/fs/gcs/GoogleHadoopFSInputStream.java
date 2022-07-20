@@ -23,12 +23,14 @@ import static java.lang.Math.max;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.common.flogger.GoogleLogger;
+import java.io.EOFException;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import javax.annotation.Nonnull;
+import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.statistics.IOStatistics;
@@ -101,9 +103,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   public synchronized int read(@Nonnull byte[] buf, int offset, int length) throws IOException {
     streamStatistics.readOperationStarted(getPos(), length);
     checkNotNull(buf, "buf must not be null");
-    if (offset < 0 || length < 0 || length > buf.length - offset) {
-      throw new IndexOutOfBoundsException();
-    }
+    validatePositionedReadArgs(getPos(), buf, offset, length);
     int response = 0;
     try {
       // TODO(user): Wrap this in a while-loop if we ever introduce a non-blocking mode for the
@@ -122,6 +122,32 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     streamStatistics.bytesRead(max(response, 0));
     streamStatistics.readOperationCompleted(length, max(response, 0));
     return response;
+  }
+
+  @Override
+  public void readFully(long position, byte[] buffer, int offset, int length) throws IOException {
+    streamStatistics.readFullyOperationStarted(position, length);
+    checkNotNull(buffer, "buf must not be null");
+    validatePositionedReadArgs(position, buffer, offset, length);
+    if (length == 0) {
+      return;
+    }
+    int nread = 0;
+    synchronized (this) {
+      long oldPos = getPos();
+      try {
+        seek(position);
+        while (nread < length) {
+          int nbytes = read(buffer, offset + nread, length - nread);
+          if (nbytes < 0) {
+            throw new EOFException(FSExceptionMessages.EOF_IN_READ_FULLY);
+          }
+          nread += nbytes;
+        }
+      } finally {
+        seek(oldPos);
+      }
+    }
   }
 
   @Override
