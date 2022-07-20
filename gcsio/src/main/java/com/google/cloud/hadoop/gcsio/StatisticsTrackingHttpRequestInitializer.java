@@ -15,33 +15,20 @@
  */
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.HTTP_DELETE_REQUEST;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.HTTP_DELETE_REQUEST_FAILURE;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.HTTP_GET_REQUEST;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.HTTP_GET_REQUEST_FAILURE;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.HTTP_HEAD_REQUEST;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.HTTP_HEAD_REQUEST_FAILURE;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.HTTP_PATCH_REQUEST;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.HTTP_PATCH_REQUEST_FAILURE;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.HTTP_POST_REQUEST;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.HTTP_POST_REQUEST_FAILURE;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.HTTP_PUT_REQUEST;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageStatistics.HTTP_PUT_REQUEST_FAILURE;
-
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpResponse;
-import com.google.common.collect.ImmutableMap;
+import com.google.common.base.Ascii;
 import java.io.IOException;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /** To track and update the statistics related to http requests */
 class StatisticsTrackingHttpRequestInitializer implements HttpRequestInitializer {
 
-  private final ImmutableMap<GoogleCloudStorageStatistics, AtomicLong> statistics;
+  private final ConcurrentMap<String, AtomicLong> statistics;
 
-  public StatisticsTrackingHttpRequestInitializer(
-      ImmutableMap<GoogleCloudStorageStatistics, AtomicLong> statistics) {
+  public StatisticsTrackingHttpRequestInitializer(ConcurrentMap<String, AtomicLong> statistics) {
     this.statistics = statistics;
   }
 
@@ -56,28 +43,8 @@ class StatisticsTrackingHttpRequestInitializer implements HttpRequestInitializer
 
   /** Set HTTP request stats */
   private void setHttpRequestStats(HttpRequest request) {
-    switch (request.getRequestMethod()) {
-      case "DELETE":
-        increment(HTTP_DELETE_REQUEST);
-        break;
-      case "GET":
-        increment(HTTP_GET_REQUEST);
-        break;
-      case "HEAD":
-        increment(HTTP_HEAD_REQUEST);
-        break;
-      case "PATCH":
-        increment(HTTP_PATCH_REQUEST);
-        break;
-      case "POST":
-        increment(HTTP_POST_REQUEST);
-        break;
-      case "PUT":
-        increment(HTTP_PUT_REQUEST);
-        break;
-      default:
-        throw new IllegalStateException("Unknown request method: " + request.getRequestMethod());
-    }
+    String requestMethod = Ascii.toUpperCase(request.getRequestMethod());
+    increment("HTTP_" + requestMethod + "_REQUEST");
   }
 
   /** Set stats for the HTTP request failures */
@@ -86,33 +53,12 @@ class StatisticsTrackingHttpRequestInitializer implements HttpRequestInitializer
       return;
     }
 
-    HttpRequest request = response.getRequest();
-    switch (request.getRequestMethod()) {
-      case "DELETE":
-        increment(HTTP_DELETE_REQUEST_FAILURE);
-        break;
-      case "GET":
-        increment(HTTP_GET_REQUEST_FAILURE);
-        break;
-      case "HEAD":
-        increment(HTTP_HEAD_REQUEST_FAILURE);
-        break;
-      case "PATCH":
-        increment(HTTP_PATCH_REQUEST_FAILURE);
-        break;
-      case "POST":
-        increment(HTTP_POST_REQUEST_FAILURE);
-        break;
-      case "PUT":
-        increment(HTTP_PUT_REQUEST_FAILURE);
-        break;
-      default:
-        throw new IllegalStateException("Unknown request method: " + request.getRequestMethod());
-    }
+    String requestMethod = Ascii.toUpperCase(response.getRequest().getRequestMethod());
+    increment("HTTP_" + requestMethod + "_REQUEST_FAILURE");
   }
 
   /** Increment the value for a given key. */
-  private void increment(GoogleCloudStorageStatistics key) {
-    statistics.get(key).incrementAndGet();
+  private void increment(String key) {
+    statistics.computeIfAbsent(key, __ -> new AtomicLong(0)).incrementAndGet();
   }
 }
