@@ -202,11 +202,9 @@ public class HadoopCredentialsConfiguration {
           throw new IOException("Can't instantiate " + clazz.getName(), e);
         }
         accessTokenProvider.setConf(config);
-        return new AccessTokenProviderCredentials(accessTokenProvider)
-            .createScoped(CLOUD_PLATFORM_SCOPE);
+        return new AccessTokenProviderCredentials(accessTokenProvider);
       case APPLICATION_DEFAULT:
-        return GoogleCredentials.getApplicationDefault(transport::get)
-            .createScoped(CLOUD_PLATFORM_SCOPE);
+        return GoogleCredentials.getApplicationDefault(transport::get);
       case COMPUTE_ENGINE:
         return ComputeEngineCredentials.newBuilder()
             .setHttpTransportFactory(transport::get)
@@ -215,8 +213,7 @@ public class HadoopCredentialsConfiguration {
         String keyFile =
             SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get);
         try (FileInputStream fis = new FileInputStream(keyFile)) {
-          return ServiceAccountCredentials.fromStream(fis, transport::get)
-              .createScoped(CLOUD_PLATFORM_SCOPE);
+          return ServiceAccountCredentials.fromStream(fis, transport::get);
         }
       case USER_CREDENTIALS:
         String clientId = AUTH_CLIENT_ID_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get);
@@ -230,8 +227,7 @@ public class HadoopCredentialsConfiguration {
             .setClientSecret(clientSecret.value())
             .setRefreshToken(refreshToken.value())
             .setHttpTransportFactory(transport::get)
-            .build()
-            .createScoped(CLOUD_PLATFORM_SCOPE);
+            .build();
       case UNAUTHENTICATED:
         return null;
       default:
@@ -326,6 +322,7 @@ public class HadoopCredentialsConfiguration {
 
   private static GoogleCredentials configureCredentials(
       Configuration config, List<String> keyPrefixes, GoogleCredentials credentials) {
+    credentials = credentials.createScoped(CLOUD_PLATFORM_SCOPE);
     String tokenServerUrl =
         TOKEN_SERVER_URL_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get);
     if (tokenServerUrl == null) {

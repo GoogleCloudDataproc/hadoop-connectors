@@ -25,7 +25,6 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT;
-import static com.google.cloud.hadoop.gcsio.CreateFileOptions.DEFAULT_OVERWRITE;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.CLOUD_PLATFORM_SCOPE;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -532,10 +531,16 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
             new GoogleHadoopOutputStream(
                 this,
                 getGcsPath(hadoopPath),
-                CreateFileOptions.builder().setOverwriteExisting(overwrite).build(),
-                /* append= */ false,
-                /* minSyncInterval= */ Duration.ofMillis(
-                    GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)),
+                CreateFileOptions.builder()
+                    .setWriteMode(
+                        overwrite
+                            ? CreateFileOptions.WriteMode.OVERWRITE
+                            : CreateFileOptions.WriteMode.CREATE_NEW)
+                    .setMinSyncInterval(
+                        Duration.ofMillis(
+                            GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(
+                                getConf(), getConf()::getInt)))
+                    .build(),
                 statistics),
             statistics);
     instrumentation.fileCreated();
@@ -1075,10 +1080,12 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         new GoogleHadoopOutputStream(
             this,
             filePath,
-            DEFAULT_OVERWRITE,
-            /* append= */ true,
-            /* minSyncInterval= */ Duration.ofMillis(
-                GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)),
+            CreateFileOptions.builder()
+                .setWriteMode(CreateFileOptions.WriteMode.APPEND)
+                .setMinSyncInterval(
+                    Duration.ofMillis(
+                        GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)))
+                .build(),
             statistics),
         statistics);
   }

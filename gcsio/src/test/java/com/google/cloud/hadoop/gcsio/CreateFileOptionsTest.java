@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertThrows;
 
@@ -25,20 +26,44 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class CreateFileOptionsTest {
   @Test
-  public void testChecksForContentTypeAttributes() {
+  public void validOptions() {
     CreateFileOptions.builder()
-        .setOverwriteExisting(true)
-        .setContentType("")
-        .setAttributes(ImmutableMap.of("Innocuous", "".getBytes(UTF_8)))
+        .setAttributes(ImmutableMap.of("Innocuous", "text".getBytes(UTF_8)))
+        .setContentType("text")
+        .setWriteMode(CreateFileOptions.WriteMode.OVERWRITE)
+        .setOverwriteGenerationId(0)
         .build();
+  }
 
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            CreateFileOptions.builder()
-                .setOverwriteExisting(true)
-                .setContentType("")
-                .setAttributes(ImmutableMap.of("Content-Type", "".getBytes(UTF_8)))
-                .build());
+  @Test
+  public void invalidOptions_contentType_shouldNotBeSetViaAttributes() {
+    IllegalArgumentException thrown =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                CreateFileOptions.builder()
+                    .setAttributes(ImmutableMap.of("Content-Type", "text".getBytes(UTF_8)))
+                    .setContentType("text")
+                    .build());
+
+    assertThat(thrown)
+        .hasMessageThat()
+        .isEqualTo("The Content-Type attribute must be set via the contentType option");
+  }
+
+  @Test
+  public void invalidOptions_createNew_overwriteGenerationShouldNotBeSet() {
+    IllegalArgumentException thrown =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                CreateFileOptions.builder()
+                    .setWriteMode(CreateFileOptions.WriteMode.CREATE_NEW)
+                    .setOverwriteGenerationId(0)
+                    .build());
+
+    assertThat(thrown)
+        .hasMessageThat()
+        .isEqualTo("overwriteGenerationId is set to 0 but it can be set only in OVERWRITE mode");
   }
 }
