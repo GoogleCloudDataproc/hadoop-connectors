@@ -653,7 +653,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
 
     IOException thrown = assertThrows(IOException.class, () -> newReadChannel(storage, options));
     assertThat(thrown).hasCauseThat().hasMessageThat().contains("backendError");
@@ -1495,7 +1495,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(true).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(true).build();
 
     Throwable throwable = assertThrows(IOException.class, () -> newReadChannel(storage, options));
     assertThat(throwable).hasMessageThat().contains("Item not found");
@@ -1510,7 +1510,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
 
     // If the user hasn't mandated fail fast, it is permissible for either open() or read() to
     // raise this exception.
@@ -1527,7 +1527,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
     StorageResourceId resourceId =
         StorageResourceId.fromStringPath("gs://" + BUCKET_NAME + "/" + OBJECT_NAME);
     GoogleCloudStorageItemInfo itemInfo = GoogleCloudStorageItemInfo.createNotFound(resourceId);

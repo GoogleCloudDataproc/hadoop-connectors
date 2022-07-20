@@ -208,7 +208,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
           createFileNotFoundException(
               itemInfo.getBucketName(), itemInfo.getObjectName(), /* cause= */ null);
 
-      if (readOptions.getFastFailOnNotFound()) {
+      if (readOptions.isFastFailOnNotFoundEnabled()) {
         throw notFoundException;
       }
 

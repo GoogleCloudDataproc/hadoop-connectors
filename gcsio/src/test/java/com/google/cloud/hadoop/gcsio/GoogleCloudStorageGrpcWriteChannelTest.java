@@ -675,12 +675,12 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
       ObjectWriteConditions writeConditions,
       String requesterPaysProject,
       BackOffFactory backOffFactory,
-      boolean traceEnabled) {
+      boolean tracingEnabled) {
     return new GoogleCloudStorageGrpcWriteChannel(
         new FakeStubProvider(mockCredentials),
         executor,
         GoogleCloudStorageOptions.builder()
-            .setTraceLogEnabled(traceEnabled)
+            .setTraceLogEnabled(tracingEnabled)
             .setWriteChannelOptions(options)
             .build(),
         new StorageResourceId(V1_BUCKET_NAME, OBJECT_NAME),
@@ -698,7 +698,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     return newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
   }
 
-  private GoogleCloudStorageGrpcWriteChannel newTraceEnabledWriteChannel(boolean isTracingEnabled) {
+  private GoogleCloudStorageGrpcWriteChannel newTraceEnabledWriteChannel(boolean tracingEnabled) {
     AsyncWriteChannelOptions options =
         AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(false).build();
     ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
@@ -708,7 +708,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
         writeConditions,
         /* requesterPaysProject= */ null,
         () -> BackOff.STOP_BACKOFF,
-        isTracingEnabled);
+        tracingEnabled);
   }
 
   /* Returns an int with the same bytes as the uint32 representation of value. */
