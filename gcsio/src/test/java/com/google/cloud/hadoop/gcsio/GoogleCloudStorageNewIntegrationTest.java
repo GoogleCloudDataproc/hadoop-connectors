@@ -91,7 +91,7 @@ public class GoogleCloudStorageNewIntegrationTest {
         new RetryHttpInitializer(credentials, gcsOptions.toRetryHttpInitializerOptions());
 
     GoogleCloudStorageFileSystem gcsfs =
-        new GoogleCloudStorageFileSystem(
+        new GoogleCloudStorageFileSystemImpl(
             credentials,
             GoogleCloudStorageFileSystemOptions.builder()
                 .setBucketDeleteEnabled(true)
@@ -1265,7 +1265,7 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     byte[] readContent = new byte[7];
     GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder().setSupportGzipEncoding(true).build();
+        GoogleCloudStorageReadOptions.builder().setGzipEncodingSupportEnabled(true).build();
     try (SeekableByteChannel channel = gcs.open(testFile, readOptions)) {
       channel.read(ByteBuffer.wrap(readContent));
     }
@@ -1297,7 +1297,7 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     byte[] readContent = new byte[7];
     GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder().setSupportGzipEncoding(true).build();
+        GoogleCloudStorageReadOptions.builder().setGzipEncodingSupportEnabled(true).build();
     try (SeekableByteChannel channel = gcs.open(itemInfo, readOptions)) {
       channel.read(ByteBuffer.wrap(readContent));
     }
@@ -1326,7 +1326,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
 
     GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder().setSupportGzipEncoding(false).build();
+        GoogleCloudStorageReadOptions.builder().setGzipEncodingSupportEnabled(false).build();
     IOException e = assertThrows(IOException.class, () -> gcs.open(testFile, readOptions));
     assertThat(e)
         .hasMessageThat()
@@ -1352,7 +1352,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
     GoogleCloudStorageItemInfo itemInfo = gcsfsIHelper.gcs.getItemInfo(testFile);
     GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder().setSupportGzipEncoding(false).build();
+        GoogleCloudStorageReadOptions.builder().setGzipEncodingSupportEnabled(false).build();
 
     IOException e = assertThrows(IOException.class, () -> gcs.open(itemInfo, readOptions));
     assertThat(e)

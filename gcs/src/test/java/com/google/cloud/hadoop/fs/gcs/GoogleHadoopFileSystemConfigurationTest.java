@@ -29,6 +29,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_MESSAGE_TIMEOUT_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_TIMEOUT_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_HTTP_HEADERS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ROOT_URL;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_SERVICE_PATH;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
@@ -42,9 +43,10 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GcsFileChecksumType;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GlobAlgorithm;
-import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.FilesystemAPI;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
 import com.google.cloud.hadoop.util.RedactedString;
@@ -63,7 +65,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
 
   @SuppressWarnings("DoubleBraceInitialization")
   private static final Map<String, Object> expectedDefaultConfiguration =
-      new HashMap<String, Object>() {
+      new HashMap<>() {
         {
           put("fs.gs.application.name.suffix", "");
           put("fs.gs.batch.threads", 15);
@@ -76,20 +78,21 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.encryption.algorithm", null);
           put("fs.gs.encryption.key.hash", null);
           put("fs.gs.encryption.key", null);
+          put("fs.gs.filesystem.api", FilesystemAPI.OBJECT);
           put("fs.gs.glob.algorithm", GlobAlgorithm.CONCURRENT);
           put("fs.gs.grpc.checksums.enable", false);
           put("fs.gs.grpc.enable", false);
-          put("fs.gs.grpc.checkinterval.timeout.ms", 1 * 1000L);
-          put("fs.gs.grpc.read.metadata.timeout.ms", 60 * 1000L);
-          put("fs.gs.grpc.read.timeout.ms", 30 * 1000L);
-          put("fs.gs.grpc.read.message.timeout.ms", 5 * 1000L);
+          put("fs.gs.grpc.checkinterval.timeout.ms", 1_000L);
+          put("fs.gs.grpc.read.metadata.timeout.ms", 60_000L);
+          put("fs.gs.grpc.read.timeout.ms", 30_000L);
+          put("fs.gs.grpc.read.message.timeout.ms", 3_000L);
           put("fs.gs.grpc.read.zerocopy.enable", true);
           put("fs.gs.grpc.directpath.enable", true);
           put("fs.gs.grpc.server.address", "storage.googleapis.com");
-          put("fs.gs.grpc.trafficdirector.enable", false);
+          put("fs.gs.grpc.trafficdirector.enable", true);
           put("fs.gs.grpc.write.buffered.requests", 20L);
-          put("fs.gs.grpc.write.timeout.ms", 10 * 60 * 1000L);
-          put("fs.gs.grpc.write.message.timeout.ms", 5 * 1000L);
+          put("fs.gs.grpc.write.timeout.ms", 10 * 60_000L);
+          put("fs.gs.grpc.write.message.timeout.ms", 3_000L);
           put("fs.gs.http.connect-timeout", 20_000);
           put("fs.gs.http.max.retry", 10);
           put("fs.gs.http.read-timeout", 20_000);
@@ -97,7 +100,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.inputstream.fadvise", Fadvise.AUTO);
           put("fs.gs.inputstream.fast.fail.on.not.found.enable", true);
           put("fs.gs.inputstream.inplace.seek.limit", 8 * 1024 * 1024L);
-          put("fs.gs.inputstream.min.range.request.size", 2 * 1024 * 1024);
+          put("fs.gs.inputstream.min.range.request.size", 2 * 1024 * 1024L);
           put("fs.gs.inputstream.support.gzip.encoding.enable", false);
           put("fs.gs.io.buffersize.write", 64 * 1024 * 1024);
           put("fs.gs.lazy.init.enable", false);
@@ -105,12 +108,12 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.marker.file.pattern", null);
           put("fs.gs.max.requests.per.batch", 15L);
           put("fs.gs.max.wait.for.empty.object.creation.ms", 3_000);
+          put("fs.gs.metrics.sink", MetricsSink.NONE);
           put("fs.gs.outputstream.buffer.size", 8 * 1024 * 1024);
           put("fs.gs.outputstream.direct.upload.enable", false);
           put("fs.gs.outputstream.pipe.buffer.size", 1024 * 1024);
           put("fs.gs.outputstream.pipe.type", PipeType.IO_STREAM_PIPE);
           put("fs.gs.outputstream.sync.min.interval.ms", 0);
-          put("fs.gs.outputstream.type", OutputStreamType.BASIC);
           put("fs.gs.outputstream.upload.cache.size", 0);
           put("fs.gs.outputstream.upload.chunk.size", 64 * 1024 * 1024);
           put("fs.gs.performance.cache.enable", false);
@@ -125,6 +128,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.storage.http.headers.", ImmutableMap.of());
           put("fs.gs.storage.root.url", "https://storage.googleapis.com/");
           put("fs.gs.storage.service.path", "storage/v1/");
+          put("fs.gs.tracelog.enable", false);
           put("fs.gs.working.dir", "/");
         }
       };
@@ -211,7 +215,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
     GoogleCloudStorageOptions.Builder optionsBuilder =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config);
 
-    // Building configuration using deprecated key (in eg. proxy password) should fail.
+    // Building configuration using deprecated key (in e.g. proxy password) should fail.
     assertThrows(IllegalArgumentException.class, optionsBuilder::build);
   }
 
@@ -349,5 +353,16 @@ public class GoogleHadoopFileSystemConfigurationTest {
         .isEqualTo(grpcReadMessageTimeout);
     assertThat(options.getWriteChannelOptions().getGrpcWriteMessageTimeoutMillis())
         .isEqualTo(grpcWriteMessageTimeout);
+  }
+
+  @Test
+  public void testMinRangeRequestSize() {
+    Configuration config = new Configuration();
+    config.set(GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.getKey(), "300K");
+
+    GoogleCloudStorageOptions options =
+        GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
+
+    assertThat(options.getReadChannelOptions().getMinRangeRequestSize()).isEqualTo(307200);
   }
 }

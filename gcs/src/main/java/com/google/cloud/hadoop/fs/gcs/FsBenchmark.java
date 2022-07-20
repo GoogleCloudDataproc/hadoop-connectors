@@ -1,3 +1,17 @@
+/*
+ * Copyright 2022 Google Inc. All Rights Reserved.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software distributed under the
+ * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.common.util.concurrent.Futures.immediateVoidFuture;
@@ -21,7 +35,9 @@ import java.util.List;
 import java.util.LongSummaryStatistics;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -33,8 +49,10 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
@@ -46,8 +64,11 @@ import org.apache.hadoop.util.ToolRunner;
  *
  * <pre>{@code
  * hadoop jar /usr/lib/hadoop/lib/gcs-connector.jar com.google.cloud.hadoop.fs.gcs.FsBenchmark \
- *     {read,random-read} --file=gs://<bucket_name> [--no-warmup] [--verbose]
+ *     {read,random-read,write} --file=gs://<bucket_name> [--no-warmup] [--verbose]
  * }</pre>
+ *
+ * for write benchmark, the --file parameter takes a GCS directory location where temp files will be
+ * created. Please clean up the dir after the test
  */
 public class FsBenchmark extends Configured implements Tool {
 
@@ -93,7 +114,7 @@ public class FsBenchmark extends Configured implements Tool {
 
   /** Helper to dispatch ToolRunner.run but with try/catch, progress-reporting, and statistics. */
   private int runWithInstrumentation(FileSystem fs, String cmd, Map<String, String> cmdArgs) {
-    FileSystem.Statistics statistics = FileSystem.getStatistics().get(fs.getScheme());
+    Statistics statistics = FileSystem.getStatistics().get(fs.getScheme());
 
     Optional<ScheduledExecutorService> progressReporter = Optional.empty();
     Future<?> statsFuture = immediateVoidFuture();
@@ -132,12 +153,127 @@ public class FsBenchmark extends Configured implements Tool {
    */
   private int runInternal(FileSystem fs, String cmd, Map<String, String> cmdArgs) {
     switch (cmd) {
+      case "write":
+        return benchmarkWrite(fs, cmdArgs);
       case "read":
         return benchmarkRead(fs, cmdArgs);
       case "random-read":
         return benchmarkRandomRead(fs, cmdArgs);
     }
     throw new IllegalArgumentException("Unknown command: " + cmd);
+  }
+
+  private int benchmarkWrite(FileSystem fs, Map<String, String> args) {
+    if (args.size() < 1) {
+      System.err.println(
+          "Usage: write"
+              + " --file=gs://${BUCKET}/path/to/test/dir/"
+              + " [--total-size=<file size to write in bytes>]"
+              + " [--write-size=<write buffer size in bytes>]"
+              + " [--num-writes=<number of times to fully write test file>]"
+              + " [--num-threads=<number of threads to run test>]");
+      return 1;
+    }
+
+    Path testFile = new Path(args.get("--file"));
+
+    benchmarkWrite(
+        fs,
+        testFile,
+        parseInt(args.getOrDefault("--write-size", String.valueOf(1024))),
+        parseInt(args.getOrDefault("--num-writes", String.valueOf(1))),
+        parseInt(args.getOrDefault("--num-threads", String.valueOf(1))),
+        parseLong(args.getOrDefault("--total-size", String.valueOf(10 * 1024))));
+
+    return 0;
+  }
+
+  private void benchmarkWrite(
+      FileSystem fs, Path testFile, int writeSize, int numWrites, int numThreads, long totalSize) {
+    System.out.printf(
+        "Running write test using %d bytes writes to fully write '%s' file %d times in %d threads%n",
+        writeSize, testFile, numWrites, numThreads);
+
+    Set<LongSummaryStatistics> writeFileBytesList = newSetFromMap(new ConcurrentHashMap<>());
+    Set<LongSummaryStatistics> writeFileTimeNsList = newSetFromMap(new ConcurrentHashMap<>());
+    Set<LongSummaryStatistics> writeCallBytesList = newSetFromMap(new ConcurrentHashMap<>());
+    Set<LongSummaryStatistics> writeCallTimeNsList = newSetFromMap(new ConcurrentHashMap<>());
+
+    String tempFilenameKey = UUID.randomUUID().toString().substring(0, 6);
+
+    ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+    CountDownLatch initLatch = new CountDownLatch(numThreads);
+    CountDownLatch startLatch = new CountDownLatch(1);
+    CountDownLatch stopLatch = new CountDownLatch(numThreads);
+    List<Future<?>> futures = new ArrayList<>(numThreads);
+
+    for (int i = 0; i < numThreads; i++) {
+      int fileCounter = i;
+      futures.add(
+          executor.submit(
+              () -> {
+                LongSummaryStatistics writeFileBytes = newLongSummaryStatistics(writeFileBytesList);
+                LongSummaryStatistics writeFileTimeNs =
+                    newLongSummaryStatistics(writeFileTimeNsList);
+                LongSummaryStatistics writeCallBytes = newLongSummaryStatistics(writeCallBytesList);
+                LongSummaryStatistics writeCallTimeNs =
+                    newLongSummaryStatistics(writeCallTimeNsList);
+
+                byte[] writeBuffer = new byte[writeSize];
+
+                Random r = new Random();
+                r.nextBytes(writeBuffer);
+                String random_file =
+                    String.format("/test-%s-%03d.bin", tempFilenameKey, fileCounter);
+                Path testFileToIO = new Path(testFile.toString() + random_file);
+
+                initLatch.countDown();
+                startLatch.await();
+                try {
+                  for (int j = 0; j < numWrites; j++) {
+                    try (FSDataOutputStream output = fs.create(testFileToIO)) {
+                      long writeStart = System.nanoTime();
+                      long fileBytesWrite = 0;
+                      do {
+                        long writeCallStart = System.nanoTime();
+                        output.write(writeBuffer);
+                        fileBytesWrite += writeSize;
+                        writeCallBytes.accept(writeSize);
+                        writeCallTimeNs.accept(System.nanoTime() - writeCallStart);
+                      } while (fileBytesWrite < totalSize);
+
+                      writeFileBytes.accept(fileBytesWrite);
+                      writeFileTimeNs.accept(System.nanoTime() - writeStart);
+                    }
+                  }
+                } finally {
+                  stopLatch.countDown();
+                }
+                return null;
+              }));
+    }
+    executor.shutdown();
+
+    awaitUnchecked(initLatch);
+    long startTimeNs = System.nanoTime();
+    startLatch.countDown();
+    awaitUnchecked(stopLatch);
+    long runtimeNs = System.nanoTime() - startTimeNs;
+
+    // Verify that all threads completed without errors
+    futures.forEach(Futures::getUnchecked);
+
+    printTimeStats("Write call time", writeCallTimeNsList);
+    printSizeStats("Write call data", writeCallBytesList);
+    printThroughputStats("Write call throughput", writeCallTimeNsList, writeCallBytesList);
+
+    printTimeStats("Write file time", writeFileTimeNsList);
+    printSizeStats("Write file data", writeFileBytesList);
+    printThroughputStats("Write file throughput", writeFileTimeNsList, writeFileBytesList);
+
+    System.out.printf(
+        "Write average throughput (MiB/s): %.3f%n",
+        bytesToMebibytes(combineStats(writeFileBytesList).getSum()) / nanosToSeconds(runtimeNs));
   }
 
   private int benchmarkRead(FileSystem fs, Map<String, String> args) {

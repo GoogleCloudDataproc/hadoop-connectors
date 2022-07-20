@@ -24,9 +24,10 @@ import static com.google.common.base.Strings.nullToEmpty;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GcsFileChecksumType;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GlobAlgorithm;
-import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.FilesystemAPI;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
@@ -243,23 +244,6 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Integer> GCS_MAX_WAIT_MILLIS_EMPTY_OBJECT_CREATE =
       new HadoopConfigurationProperty<>("fs.gs.max.wait.for.empty.object.creation.ms", 3_000);
 
-  /**
-   * Configuration key for which type of output stream to use; different options may have different
-   * degrees of support for advanced features like {@code hsync()} and different performance
-   * characteristics. Options:
-   *
-   * <p>BASIC: Stream is closest analogue to direct wrapper around low-level HTTP stream into GCS.
-   *
-   * <p>SYNCABLE_COMPOSITE: Stream behaves similarly to BASIC when used with basic
-   * create/write/close patterns, but supports hsync() by creating discrete temporary GCS objects
-   * which are composed onto the destination object.
-   *
-   * <p>FLUSHABLE_COMPOSITE: Stream behaves similarly to SYNCABLE_COMPOSITE, except hflush() is also
-   * supported. It will use the same implementation of hsync().
-   */
-  public static final HadoopConfigurationProperty<OutputStreamType> GCS_OUTPUT_STREAM_TYPE =
-      new HadoopConfigurationProperty<>("fs.gs.outputstream.type", OutputStreamType.BASIC);
-
   /** Configuration key for setting write buffer size. */
   public static final HadoopConfigurationProperty<Integer> GCS_OUTPUT_STREAM_BUFFER_SIZE =
       new HadoopConfigurationProperty<>("fs.gs.outputstream.buffer.size", 8 * 1024 * 1024);
@@ -335,7 +319,7 @@ public class GoogleHadoopFileSystemConfiguration {
    * Minimum size in bytes of the HTTP Range header set in GCS request when opening new stream to
    * read an object.
    */
-  public static final HadoopConfigurationProperty<Integer> GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE =
+  public static final HadoopConfigurationProperty<Long> GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE =
       new HadoopConfigurationProperty<>(
           "fs.gs.inputstream.min.range.request.size",
           GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE);
@@ -365,7 +349,7 @@ public class GoogleHadoopFileSystemConfiguration {
 
   /** Configuration key for the message timeout (in millisecond) for gRPC read requests to GCS. */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_MESSAGE_TIMEOUT_MS =
-      new HadoopConfigurationProperty<>("fs.gs.grpc.read.message.timeout.ms", 5 * 1_000L);
+      new HadoopConfigurationProperty<>("fs.gs.grpc.read.message.timeout.ms", 3 * 1_000L);
 
   /**
    * Configuration key for the connection timeout (in millisecond) for gRPC metadata requests to
@@ -388,7 +372,7 @@ public class GoogleHadoopFileSystemConfiguration {
 
   /** Configuration key for the message timeout (in millisecond) for gRPC write requests to GCS. */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_WRITE_MESSAGE_TIMEOUT_MS =
-      new HadoopConfigurationProperty<>("fs.gs.grpc.write.message.timeout.ms", 5 * 1_000L);
+      new HadoopConfigurationProperty<>("fs.gs.grpc.write.message.timeout.ms", 3 * 1_000L);
 
   /** Configuration key for enabling use of directpath gRPC API for read/write. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_DIRECTPATH_ENABLE =
@@ -396,7 +380,7 @@ public class GoogleHadoopFileSystemConfiguration {
 
   /** Configuration key for enabling use of traffic director gRPC API for read/write. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_TRAFFICDIRECTOR_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.grpc.trafficdirector.enable", false);
+      new HadoopConfigurationProperty<>("fs.gs.grpc.trafficdirector.enable", true);
 
   /** Configuration key for the headers for HTTP request to GCS. */
   public static final HadoopConfigurationProperty<Map<String, String>> GCS_HTTP_HEADERS =
@@ -414,6 +398,18 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<RedactedString> GCS_ENCRYPTION_KEY_HASH =
       new HadoopConfigurationProperty<>("fs.gs.encryption.key.hash");
 
+  /** Configuration key to enable publishing metrics to Google cloud monitoring. */
+  public static final HadoopConfigurationProperty<MetricsSink> GCS_METRICS_SINK =
+      new HadoopConfigurationProperty<>("fs.gs.metrics.sink", MetricsSink.NONE);
+
+  /** Configuration key to enable publishing metrics to Google cloud monitoring. */
+  public static final HadoopConfigurationProperty<FilesystemAPI> GCS_FILESYSTEM_API =
+      new HadoopConfigurationProperty<>("fs.gs.filesystem.api", FilesystemAPI.OBJECT);
+
+  /** Configuration key to enable logging of additional trace details. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_TRACE_LOG_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.tracelog.enable", false);
+
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
   // @VisibleForTesting
@@ -426,7 +422,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setMarkerFilePattern(GCS_MARKER_FILE_PATTERN.get(config, config::get))
         .setPerformanceCacheEnabled(GCS_PERFORMANCE_CACHE_ENABLE.get(config, config::getBoolean))
         .setPerformanceCacheOptions(getPerformanceCachingOptions(config))
-        .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean));
+        .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean))
+        .setFilesystemApi(GCS_FILESYSTEM_API.get(config, config::getEnum));
   }
 
   @VisibleForTesting
@@ -467,7 +464,9 @@ public class GoogleHadoopFileSystemConfiguration {
         .setGrpcMessageTimeoutCheckInterval(
             GCS_GRPC_CHECK_INTERVAL_TIMEOUT_MS.get(config, config::getLong))
         .setDirectPathPreferred(GCS_GRPC_DIRECTPATH_ENABLE.get(config, config::getBoolean))
-        .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean));
+        .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
+        .setMetricsSink(GCS_METRICS_SINK.get(config, config::getEnum))
+        .setTraceLogEnabled(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean));
   }
 
   private static PerformanceCachingGoogleCloudStorageOptions getPerformanceCachingOptions(
@@ -487,13 +486,14 @@ public class GoogleHadoopFileSystemConfiguration {
 
   private static GoogleCloudStorageReadOptions getReadChannelOptions(Configuration config) {
     return GoogleCloudStorageReadOptions.builder()
-        .setFastFailOnNotFound(
+        .setFastFailOnNotFoundEnabled(
             GCS_INPUT_STREAM_FAST_FAIL_ON_NOT_FOUND_ENABLE.get(config, config::getBoolean))
-        .setSupportGzipEncoding(
+        .setGzipEncodingSupportEnabled(
             GCS_INPUT_STREAM_SUPPORT_GZIP_ENCODING_ENABLE.get(config, config::getBoolean))
         .setInplaceSeekLimit(GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.get(config, config::getLong))
         .setFadvise(GCS_INPUT_STREAM_FADVISE.get(config, config::getEnum))
-        .setMinRangeRequestSize(GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getInt))
+        .setMinRangeRequestSize(
+            GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.get(config, config::getLongBytes))
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
         .setGrpcReadTimeoutMillis(GCS_GRPC_READ_TIMEOUT_MS.get(config, config::getLong))
         .setGrpcReadMessageTimeoutMillis(

@@ -52,7 +52,7 @@ public class ConfigurationUtil {
         values.put(property.getKey(), value);
       }
     }
-    if (missingKeys.size() > 0) {
+    if (!missingKeys.isEmpty()) {
       Joiner joiner = Joiner.on(", ");
       String message = "Must supply value for configuration settings: " + joiner.join(missingKeys);
       throw new IOException(message);

@@ -11,14 +11,14 @@
 
 1.  Remove an obsolete `AuthorizationHandler` and related properties:
 
-    ```
+    ```properties
     fs.gs.authorization.handler.impl
     fs.gs.authorization.handler.properties.<AUTHORIZATION_HANDLER_PROPERTY>
     ```
 
 1.  Remove support for Apache HTTP transport and related property:
 
-    ```
+    ```properties
     fs.gs.http.transport.type
     ```
 
@@ -29,7 +29,7 @@
 1.  Remove Cooperative Locking support for directory operations and related
     properties:
 
-    ```
+    ```properties
     fs.gs.cooperative.locking.enable
     fs.gs.cooperative.locking.expiration.timeout.ms
     fs.gs.cooperative.locking.max.concurrent.operations
@@ -38,7 +38,7 @@
 1.  Migrate authentication to `com.google.auth.Credentials` and remove obsolete
     properties:
 
-    ```
+    ```properties
     fs.gs.auth.service.account.email
     fs.gs.auth.service.account.keyfile
     fs.gs.auth.service.account.private.key
@@ -49,9 +49,27 @@
     enum property, instead of relying on inference of the authentication type
     based on the set configuration properties, and remove obsolete properties:
 
-    ```
+    ```properties
     fs.gs.auth.null.enable
     fs.gs.auth.service.account.enable
+    ```
+
+1.  Add support for a new `USER_CREDENTIALS` authentication type that retrieves
+    a refresh token using the authorisation code grant flow configured via the
+    following properties:
+
+    ```properties
+    fs.gs.auth.client.id
+    fs.gs.auth.client.secret
+    fs.gs.auth.refresh.token
+    ```
+
+1.  Merge all output stream types functionality in the default output stream
+    that behaves similarly to the `FLUSHABLE_COMPOSITE` stream, and remove
+    obsolete property:
+
+    ```properties
+    fs.gs.outputstream.type
     ```
 
 ### 2.2.2 - 2021-06-25
@@ -1203,11 +1221,11 @@
 1.  The new inferImplicitDirectories option to `GoogleCloudStorage` tells it to
     infer the existence of a directory (such as `foo`) when that directory node
     does not exist in GCS but there are GCS files that start with that path
-    (such as `foo/bar`). This allows the GCS connector to be used on
-    read-only filesystems where those intermediate directory nodes can not be
-    created by the connector. The value of this option can be controlled by the
-    Hadoop boolean config option `fs.gs.implicit.dir.infer.enable`. The default
-    value is true.
+    (such as `foo/bar`). This allows the GCS connector to be used on read-only
+    filesystems where those intermediate directory nodes can not be created by
+    the connector. The value of this option can be controlled by the Hadoop
+    boolean config option `fs.gs.implicit.dir.infer.enable`. The default value
+    is true.
 
 1.  Increased Hadoop dependency version to 2.6.0.
 

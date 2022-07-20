@@ -21,11 +21,11 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.stream.Collectors.toMap;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.BackOffFactory;
-import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
-import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
+import com.google.cloud.hadoop.util.AbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.flogger.GoogleLogger;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
 import com.google.common.io.BaseEncoding;
@@ -64,9 +64,10 @@ import java.util.concurrent.ExecutorService;
 
 /** Implements WritableByteChannel to provide write access to GCS via gRPC. */
 public final class GoogleCloudStorageGrpcWriteChannel
-    extends BaseAbstractGoogleAsyncWriteChannel<WriteObjectResponse>
+    extends AbstractGoogleAsyncWriteChannel<WriteObjectResponse>
     implements GoogleCloudStorageItemInfo.Provider {
 
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private static final Duration START_RESUMABLE_WRITE_TIMEOUT = Duration.ofMinutes(1);
   private static final Duration QUERY_WRITE_STATUS_TIMEOUT = Duration.ofMinutes(1);
 
@@ -86,21 +87,23 @@ public final class GoogleCloudStorageGrpcWriteChannel
   private final String requesterPaysProject;
   private final BackOffFactory backOffFactory;
   private final Watchdog watchdog;
+  private final GoogleCloudStorageOptions storageOptions;
 
   private GoogleCloudStorageItemInfo completedItemInfo = null;
 
   GoogleCloudStorageGrpcWriteChannel(
       StorageStubProvider stubProvider,
       ExecutorService threadPool,
-      AsyncWriteChannelOptions channelOptions,
+      GoogleCloudStorageOptions storageOptions,
       StorageResourceId resourceId,
       CreateObjectOptions createOptions,
       Watchdog watchdog,
       ObjectWriteConditions writeConditions,
       String requesterPaysProject,
       BackOffFactory backOffFactory) {
-    super(threadPool, channelOptions);
-    this.stub = stubProvider.newAsyncStub();
+    super(threadPool, storageOptions.getWriteChannelOptions());
+    this.storageOptions = storageOptions;
+    this.stub = stubProvider.newAsyncStub(resourceId.getBucketName());
     this.resourceId = resourceId;
     this.createOptions = createOptions;
     this.writeConditions = writeConditions;
@@ -156,7 +159,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
     // Given that the two ends of the pipe must operate asynchronous relative
     // to each other, we need to start the upload operation on a separate thread.
     try {
-      uploadOperation = threadPool.submit(new UploadOperation(pipeSource));
+      uploadOperation =
+          threadPool.submit(
+              new UploadOperation(
+                  pipeSource, this.resourceId, this.storageOptions.isTraceLogEnabled()));
     } catch (Exception e) {
       throw new RuntimeException(String.format("Failed to start upload for '%s'", resourceId), e);
     }
@@ -167,15 +173,19 @@ public final class GoogleCloudStorageGrpcWriteChannel
     // Read end of the pipe.
     private final BufferedInputStream pipeSource;
     private final int MAX_BYTES_PER_MESSAGE = MAX_WRITE_CHUNK_BYTES.getNumber();
+    private final StorageResourceId resourceId;
+    private final boolean tracingEnabled;
 
     private Hasher objectHasher;
     private String uploadId;
     private long writeOffset = 0;
     // Holds list of most recent number of NUMBER_OF_REQUESTS_TO_RETAIN requests, so upload can
     // be rewound and re-sent upon transient errors.
-    private final TreeMap<Long, ByteString> dataChunkMap = new TreeMap<>();
+    private final TreeMap<Long, WriteObjectRequest> requestChunkMap = new TreeMap<>();
 
-    UploadOperation(InputStream pipeSource) {
+    UploadOperation(InputStream pipeSource, StorageResourceId resourceId, boolean tracingEnabled) {
+      this.resourceId = resourceId;
+      this.tracingEnabled = tracingEnabled;
       this.pipeSource = new BufferedInputStream(pipeSource, MAX_BYTES_PER_MESSAGE);
       if (channelOptions.isGrpcChecksumsEnabled()) {
         objectHasher = Hashing.crc32c().newHasher();
@@ -187,12 +197,12 @@ public final class GoogleCloudStorageGrpcWriteChannel
       // Try-with-resource will close this end of the pipe so that
       // the writer at the other end will not hang indefinitely.
       // Send the initial StartResumableWrite request to get an uploadId.
-      uploadId = startResumableUpload();
       try (InputStream ignore = pipeSource) {
+        uploadId = startResumableUploadWithRetries();
         return ResilientOperation.retry(
             this::doResumableUpload,
             backOffFactory.newBackOff(),
-            RetryDeterminer.ALL_ERRORS,
+            this::isRetriableError,
             IOException.class);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
@@ -201,13 +211,38 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
     }
 
+    class OutOfBufferedDataException extends IOException {
+      public OutOfBufferedDataException(String message) {
+        super(message);
+      }
+    }
+
+    boolean isRetriableError(Throwable throwable) {
+      if (throwable instanceof OutOfBufferedDataException) return false;
+      Throwable cause = throwable.getCause();
+      if (cause == null) return true;
+      return isRetriableError(cause);
+    }
+
+    private StorageStub getStorageStubWithTracking(long grpcWriteTimeoutMilliSeconds) {
+      StorageStub stubWithDeadline =
+          stub.withDeadlineAfter(grpcWriteTimeoutMilliSeconds, MILLISECONDS);
+
+      if (!this.tracingEnabled) {
+        return stubWithDeadline;
+      }
+
+      return stubWithDeadline.withInterceptors(
+          new GoogleCloudStorageGrpcTracingInterceptor(
+              GrpcRequestTracingInfo.getWriteRequestTraceInfo(this.resourceId.getObjectName())));
+    }
+
     private WriteObjectResponse doResumableUpload() throws IOException {
       // Only request committed size for the first insert request.
       if (writeOffset > 0) {
-        writeOffset = getCommittedWriteSize(uploadId);
+        writeOffset = getCommittedWriteSizeWithRetries(uploadId);
       }
-      StorageStub storageStub =
-          stub.withDeadlineAfter(channelOptions.getGrpcWriteTimeout(), MILLISECONDS);
+      StorageStub storageStub = getStorageStubWithTracking(channelOptions.getGrpcWriteTimeout());
       InsertChunkResponseObserver responseObserver =
           new InsertChunkResponseObserver(uploadId, writeOffset);
       ClientCall<WriteObjectRequest, WriteObjectResponse> call =
@@ -224,35 +259,43 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       // Wait for streaming RPC to become ready for upload.
       try {
-        responseObserver.ready.await();
+        // wait for 1 min for the channel to be ready. Else bail out
+        if (!responseObserver.ready.await(60 * 1000, MILLISECONDS)) {
+          throw new IOException(
+              String.format(
+                  "Timed out while awaiting ready on responseObserver for '%s' with UploadID '%s'",
+                  resourceId, responseObserver.uploadId));
+        }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         throw new IOException(
             String.format(
-                "Streaming RPC failed to become ready for resumable upload for '%s'", resourceId),
-            e);
+                "Interrupted while awaiting ready on responseObserver for '%s' with UploadID '%s'",
+                resourceId, responseObserver.uploadId));
       }
 
       boolean objectFinalized = false;
       while (!objectFinalized) {
-        WriteObjectRequest insertRequest;
-        if (dataChunkMap.size() > 0 && dataChunkMap.lastKey() >= writeOffset) {
-          insertRequest = buildRequestFromBufferedDataChunk(dataChunkMap, writeOffset);
+        WriteObjectRequest insertRequest = null;
+        if (requestChunkMap.size() > 0 && requestChunkMap.lastKey() >= writeOffset) {
+          insertRequest = getCachedRequest(requestChunkMap, writeOffset);
           writeOffset += insertRequest.getChecksummedData().getContent().size();
+        } else if (requestChunkMap.size() >= channelOptions.getNumberOfBufferedRequests()) {
+          freeUpCommittedRequests(requestChunkMap, writeOffset);
         } else {
+          // Pick up a chunk to write only if dataChunkMap has space. Else continue after looking
+          // for errors.
           ByteString data =
               ByteString.readFrom(
                   ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE), MAX_BYTES_PER_MESSAGE);
-          dataChunkMap.put(writeOffset, data);
-          if (dataChunkMap.size() >= channelOptions.getNumberOfBufferedRequests()) {
-            dataChunkMap.remove(dataChunkMap.firstKey());
-          }
           insertRequest = buildInsertRequest(writeOffset, data, false);
+          requestChunkMap.put(writeOffset, insertRequest);
           writeOffset += data.size();
         }
-        requestStreamObserver.onNext(insertRequest);
-        objectFinalized = insertRequest.getFinishWrite();
-
+        if (insertRequest != null) {
+          requestStreamObserver.onNext(insertRequest);
+          objectFinalized = insertRequest.getFinishWrite();
+        }
         if (responseObserver.hasTransientError() || responseObserver.hasNonTransientError()) {
           requestStreamObserver.onError(
               responseObserver.hasTransientError()
@@ -269,11 +312,14 @@ public final class GoogleCloudStorageGrpcWriteChannel
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         throw new IOException(
-            String.format("Interrupted while awaiting response during upload of '%s'", resourceId),
-            e);
+            String.format(
+                "Interrupted while awaiting response during upload of '%s' with UploadID '%s'",
+                resourceId, responseObserver.uploadId));
       }
       if (responseObserver.hasTransientError()) {
-        throw new IOException(responseObserver.transientError);
+        throw new IOException(
+            String.format("Got transient error for UploadID '%s'", responseObserver.uploadId),
+            responseObserver.transientError);
       }
 
       return responseObserver.getResponseOrThrow();
@@ -323,34 +369,50 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
     // Handles the case when a writeOffset of data read previously is being processed.
     // This happens if a transient failure happens while uploading, and can be resumed by
-    // querying the current committed offset.
-    private WriteObjectRequest buildRequestFromBufferedDataChunk(
-        TreeMap<Long, ByteString> dataChunkMap, long writeOffset) throws IOException {
-      // Resume will only work if the first request builder in the cache carries an offset
-      // not greater than the current writeOffset.
+    // querying the writeRequest object at the current committed offset.
+    private WriteObjectRequest getCachedRequest(
+        TreeMap<Long, WriteObjectRequest> requestChunkMap, long writeOffset) {
       WriteObjectRequest request = null;
-      if (dataChunkMap.size() > 0 && dataChunkMap.firstKey() <= writeOffset) {
-        for (Map.Entry<Long, ByteString> entry : dataChunkMap.entrySet()) {
-          if (entry.getKey() + entry.getValue().size() > writeOffset
+      if (requestChunkMap.size() > 0 && requestChunkMap.firstKey() <= writeOffset) {
+        for (Map.Entry<Long, WriteObjectRequest> entry : requestChunkMap.entrySet()) {
+          if (entry.getKey() + entry.getValue().getChecksummedData().getContent().size()
+                  > writeOffset
               || entry.getKey() == writeOffset) {
             Long writeOffsetToResume = entry.getKey();
-            ByteString chunkData = entry.getValue();
-            request = buildInsertRequest(writeOffsetToResume, chunkData, true);
+            request = entry.getValue();
             break;
           }
         }
       }
-      if (request == null) {
-        throw new IOException(
-            String.format(
-                "Didn't have enough data buffered for attempt to resume upload for"
-                    + " uploadID %s: last committed offset=%s, earliest buffered"
-                    + " offset=%s. Upload must be restarted from the beginning.",
-                uploadId, writeOffset, dataChunkMap.firstKey()));
-      }
-      return request;
+      return checkNotNull(request, "Request chunk not found for '%s'", resourceId);
     }
 
+    /*
+    If dataChunkMap is full, get the committedWriteOffset. This will make a API call to the
+    server and add latency in this path/context. Since there are already chunks in flight,
+    calling this API will not reduce overall throughput. It will throttle the upstream
+    write call now rather than onFinalize, which is fine. This will also increase QPS to
+    the GCS backend. The increase will be linear to number of chunks written, so that
+    should also be fine.    */
+    private void freeUpCommittedRequests(
+        TreeMap<Long, WriteObjectRequest> requestChunkMap, long writeOffset) throws IOException {
+
+      long committedWriteOffset = getCommittedWriteSizeWithRetries(uploadId);
+      logger.atFinest().log(
+          "Fetched committedWriteOffset: size:%d, numBuffers:%d, writeOffset:%d, committedWriteOffset:%d",
+          requestChunkMap.size(),
+          channelOptions.getNumberOfBufferedRequests(),
+          writeOffset,
+          committedWriteOffset);
+
+      // check and remove chunks from dataChunkMap
+      while (requestChunkMap.size() > 0 && requestChunkMap.firstKey() < committedWriteOffset) {
+        logger.atFinest().log(
+            "clearing dataChunkMap one buffer at a time, size: %d, firstKey:%d, committedwriteOffset:%d",
+            requestChunkMap.size(), requestChunkMap.firstKey(), committedWriteOffset);
+        requestChunkMap.remove(requestChunkMap.firstKey());
+      }
+    }
     /** Handler for responses from the Insert streaming RPC. */
     private class InsertChunkResponseObserver
         implements ClientResponseObserver<WriteObjectRequest, WriteObjectResponse> {
@@ -378,7 +440,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
       public WriteObjectResponse getResponseOrThrow() throws IOException {
         if (hasNonTransientError()) {
           throw new IOException(
-              String.format("Resumable upload failed for '%s'", resourceId), nonTransientError);
+              String.format(
+                  "Resumable upload failed for '%s' , uploadId : %s ", resourceId, uploadId),
+              nonTransientError);
         }
         return checkNotNull(response, "Response not present for '%s'", resourceId);
       }
@@ -428,57 +492,39 @@ public final class GoogleCloudStorageGrpcWriteChannel
     }
 
     /** Send a StartResumableWriteRequest and return the uploadId of the resumable write. */
-    private String startResumableUpload() throws IOException {
-      WriteObjectSpec.Builder insertObjectSpecBuilder =
-          WriteObjectSpec.newBuilder()
-              .setResource(
-                  Object.newBuilder()
-                      .setBucket(GrpcChannelUtils.toV2BucketName(resourceId.getBucketName()))
-                      .setName(resourceId.getObjectName())
-                      .setContentType(createOptions.getContentType())
-                      .putAllMetadata(encodeMetadata(createOptions.getMetadata()))
-                      .build());
-      if (writeConditions.hasContentGenerationMatch()) {
-        insertObjectSpecBuilder.setIfGenerationMatch(writeConditions.getContentGenerationMatch());
-      }
-      if (writeConditions.hasMetaGenerationMatch()) {
-        insertObjectSpecBuilder.setIfMetagenerationMatch(writeConditions.getMetaGenerationMatch());
-      }
-
-      CommonRequestParams.Builder commonRequestParamsBuilder = null;
-      if (requesterPaysProject != null) {
-        commonRequestParamsBuilder =
-            CommonRequestParams.newBuilder().setUserProject(requesterPaysProject);
-      }
-
-      StartResumableWriteRequest.Builder startResumableWriteRequestBuilder =
-          StartResumableWriteRequest.newBuilder().setWriteObjectSpec(insertObjectSpecBuilder);
-      if (commonRequestParamsBuilder != null) {
-        startResumableWriteRequestBuilder.setCommonRequestParams(commonRequestParamsBuilder);
-      }
-      StartResumableWriteRequest request = startResumableWriteRequestBuilder.build();
-
-      SimpleResponseObserver<StartResumableWriteResponse> responseObserver =
-          new SimpleResponseObserver<>();
+    private String startResumableUploadWithRetries() throws IOException {
       try {
-        ResilientOperation.retry(
-            () -> {
-              stub.withDeadlineAfter(START_RESUMABLE_WRITE_TIMEOUT.toMillis(), MILLISECONDS)
-                  .startResumableWrite(request, responseObserver);
-              try {
-                responseObserver.done.await();
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IOException(
-                    String.format(
-                        "Interrupted while awaiting response during upload of '%s'", resourceId),
-                    e);
-              }
-              if (responseObserver.hasError()) {
-                throw new IOException(responseObserver.getError());
-              }
-              return null;
-            },
+        WriteObjectSpec.Builder insertObjectSpecBuilder =
+            WriteObjectSpec.newBuilder()
+                .setResource(
+                    Object.newBuilder()
+                        .setBucket(GrpcChannelUtils.toV2BucketName(resourceId.getBucketName()))
+                        .setName(resourceId.getObjectName())
+                        .setContentType(createOptions.getContentType())
+                        .putAllMetadata(encodeMetadata(createOptions.getMetadata()))
+                        .build());
+        if (writeConditions.hasContentGenerationMatch()) {
+          insertObjectSpecBuilder.setIfGenerationMatch(writeConditions.getContentGenerationMatch());
+        }
+        if (writeConditions.hasMetaGenerationMatch()) {
+          insertObjectSpecBuilder.setIfMetagenerationMatch(
+              writeConditions.getMetaGenerationMatch());
+        }
+
+        CommonRequestParams.Builder commonRequestParamsBuilder = null;
+        if (requesterPaysProject != null) {
+          commonRequestParamsBuilder =
+              CommonRequestParams.newBuilder().setUserProject(requesterPaysProject);
+        }
+
+        StartResumableWriteRequest.Builder startResumableWriteRequestBuilder =
+            StartResumableWriteRequest.newBuilder().setWriteObjectSpec(insertObjectSpecBuilder);
+        if (commonRequestParamsBuilder != null) {
+          startResumableWriteRequestBuilder.setCommonRequestParams(commonRequestParamsBuilder);
+        }
+        StartResumableWriteRequest request = startResumableWriteRequestBuilder.build();
+        return ResilientOperation.retry(
+            () -> startResumableUpload(request),
             backOffFactory.newBackOff(),
             RetryDeterminer.ALL_ERRORS,
             IOException.class);
@@ -487,36 +533,36 @@ public final class GoogleCloudStorageGrpcWriteChannel
         throw new IOException(
             String.format("Failed to start resumable upload for '%s'", resourceId), e);
       }
+    }
 
+    private String startResumableUpload(StartResumableWriteRequest request) throws IOException {
+      // It is essential to re-create the observer on retry, so that the CountDownLatch is not
+      // re-used and we wait for the actual response instead of returning the last response/error
+      SimpleResponseObserver<StartResumableWriteResponse> responseObserver =
+          new SimpleResponseObserver<>();
+      getStorageStubWithTracking(START_RESUMABLE_WRITE_TIMEOUT.toMillis())
+          .startResumableWrite(request, responseObserver);
+      try {
+        responseObserver.done.await();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IOException(
+            String.format("Interrupted while awaiting response during upload of '%s'", resourceId),
+            e);
+      }
+      if (responseObserver.hasError()) {
+        throw new IOException(responseObserver.getError());
+      }
       return responseObserver.getResponse().getUploadId();
     }
 
     // TODO(b/150892988): Call this to find resume point after a transient error.
-    private long getCommittedWriteSize(String uploadId) throws IOException {
+    private long getCommittedWriteSizeWithRetries(String uploadId) throws IOException {
       QueryWriteStatusRequest request =
           QueryWriteStatusRequest.newBuilder().setUploadId(uploadId).build();
-
-      SimpleResponseObserver<QueryWriteStatusResponse> responseObserver =
-          new SimpleResponseObserver<>();
       try {
-        ResilientOperation.retry(
-            () -> {
-              stub.withDeadlineAfter(QUERY_WRITE_STATUS_TIMEOUT.toMillis(), MILLISECONDS)
-                  .queryWriteStatus(request, responseObserver);
-              try {
-                responseObserver.done.await();
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IOException(
-                    String.format(
-                        "Interrupted while awaiting response during upload of '%s'", resourceId),
-                    e);
-              }
-              if (responseObserver.hasError()) {
-                throw new IOException(responseObserver.getError());
-              }
-              return null;
-            },
+        return ResilientOperation.retry(
+            () -> getCommittedWriteSize(request),
             backOffFactory.newBackOff(),
             RetryDeterminer.ALL_ERRORS,
             IOException.class);
@@ -525,7 +571,24 @@ public final class GoogleCloudStorageGrpcWriteChannel
         throw new IOException(
             String.format("Failed to get committed write size for '%s'", resourceId), e);
       }
+    }
 
+    private long getCommittedWriteSize(QueryWriteStatusRequest request) throws IOException {
+      SimpleResponseObserver<QueryWriteStatusResponse> responseObserver =
+          new SimpleResponseObserver<>();
+      getStorageStubWithTracking(QUERY_WRITE_STATUS_TIMEOUT.toMillis())
+          .queryWriteStatus(request, responseObserver);
+      try {
+        responseObserver.done.await();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IOException(
+            String.format("Interrupted while awaiting response during upload of '%s'", resourceId),
+            e);
+      }
+      if (responseObserver.hasError()) {
+        throw new IOException(responseObserver.getError());
+      }
       return responseObserver.getResponse().getPersistedSize();
     }
 

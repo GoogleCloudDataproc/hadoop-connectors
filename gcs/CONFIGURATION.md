@@ -167,6 +167,8 @@
 
     *   `UNAUTHENTICATED` - configures unauthenticated access
 
+    *   `USER_CREDENTIALS` - configure [[user credentials](#user-credentials)]
+
 *   `fs.gs.auth.service.account.json.keyfile` (not set by default)
 
     The path to the JSON keyfile for the service account when `fs.gs.auth.type`
@@ -182,6 +184,32 @@
 *   `fs.gs.token.server.url` (not set by default)
 
     Google Token Server root URL.
+
+#### User credentials
+
+User credentials allows you to access Google resources on behalf of a user, with
+the according permissions associated to this user.
+
+To achieve this the connector will use the
+[refresh token grant flow](https://oauth.net/2/grant-types/refresh-token/) to
+retrieve a new access tokens when necessary.
+
+In order to use this authentication type, you will first need to retrieve a
+refresh token using the
+[authorization code grant flow](https://oauth.net/2/grant-types/authorization-code)
+and pass it to the connector with OAuth client ID and secret:
+
+*   `fs.gs.auth.client.id` (not set by default)
+
+    The OAuth2 client ID.
+
+*   `fs.gs.auth.client.secret` (not set by default)
+
+    The OAuth2 client secret.
+
+*   `fs.gs.auth.refresh.token` (not set by default)
+
+    The refresh token.
 
 ### Service account impersonation
 
@@ -281,34 +309,14 @@ default service account impersonation.
 
     Enables Cloud Storage direct uploads.
 
-*   `fs.gs.outputstream.type` (default: `BASIC`)
-
-    Output stream type to use; different options may have different degrees of
-    support for advanced features like `hsync()` and different performance
-    characteristics.
-
-    Valid values:
-
-    *   `BASIC` - stream is the closest analogue to direct wrapper around the
-        low-level HTTP stream into Google Cloud Storage.
-
-    *   `SYNCABLE_COMPOSITE` - stream behaves similarly to `BASIC` when used
-        with basic create/write/close patterns, but supports `hsync()` by
-        creating discrete temporary Google Cloud Storage objects which are
-        composed onto the destination object.
-
-    *   `FLUSHABLE_COMPOSITE` - stream behaves similarly to
-        `SYNCABLE_COMPOSITE`, except `hflush()` is also supported. It will use
-        the same implementation as `hsync()`.
-
 *   `fs.gs.outputstream.sync.min.interval.ms` (default: `0`)
 
-    `SYNCABLE_COMPOSITE` and `FLUSHABLE_COMPOSITE` streams configuration that
-    controls the minimum interval (milliseconds) between consecutive syncs. This
-    is to avoid getting rate-limited by Google Cloud Storage. Default is `0` -
-    no wait between syncs. Note that `hflush()` for `FLUSHABLE_COMPOSITE` stream
-    will be no-op if called more frequently than minimum sync interval and
-    `hsync()` will block for both streams until an end of a min sync interval.
+    Output stream configuration that controls the minimum interval
+    (milliseconds) between consecutive syncs. This allows to avoid getting
+    rate-limited by Google Cloud Storage. Default is `0` - no wait between
+    syncs. Note that `hflush()` will be no-op if called more frequently than
+    minimum sync interval and `hsync()` will block until an end of a min sync
+    interval.
 
 ### HTTP transport configuration
 
@@ -379,7 +387,7 @@ default service account impersonation.
 
         To avoid sending too small range requests (couple bytes) - could happen
         if `fs.gs.io.buffer` is 0 and client passes very small read buffer,
-        minimum range request size is limited to 1 MiB by default configurable
+        minimum range request size is limited to 2 MB by default configurable
         through `fs.gs.inputstream.min.range.request.size` property
 
     *   `AUTO` - in this mode (adaptive range reads) connector starts to send

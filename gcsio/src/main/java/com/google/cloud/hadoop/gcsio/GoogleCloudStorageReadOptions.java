@@ -39,16 +39,16 @@ public abstract class GoogleCloudStorageReadOptions {
   public static final double DEFAULT_BACKOFF_MULTIPLIER = 1.5;
   public static final int DEFAULT_BACKOFF_MAX_INTERVAL_MILLIS = 10 * 1000;
   public static final int DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS = 2 * 60 * 1000;
-  public static final boolean DEFAULT_FAST_FAIL_ON_NOT_FOUND = true;
-  public static final boolean DEFAULT_SUPPORT_GZIP_ENCODING = true;
+  public static final boolean DEFAULT_FAST_FAIL_ON_NOT_FOUND_ENABLED = true;
+  public static final boolean DEFAULT_GZIP_ENCODING_SUPPORT_ENABLED = true;
   public static final long DEFAULT_INPLACE_SEEK_LIMIT = 8 * 1024 * 1024;
   public static final Fadvise DEFAULT_FADVISE = Fadvise.SEQUENTIAL;
-  public static final int DEFAULT_MIN_RANGE_REQUEST_SIZE = 2 * 1024 * 1024;
+  public static final long DEFAULT_MIN_RANGE_REQUEST_SIZE = 2 * 1024 * 1024;
   public static final boolean GRPC_CHECKSUMS_ENABLED_DEFAULT = false;
   public static final long DEFAULT_GRPC_READ_TIMEOUT_MILLIS = 20 * 60 * 1000;
   public static final long DEFAULT_GRPC_READ_METADATA_TIMEOUT_MILLIS = 60 * 1000;
   public static final boolean DEFAULT_GRPC_READ_ZEROCOPY_ENABLED = true;
-  public static final long DEFAULT_GRPC_READ_MESSAGE_TIMEOUT_MILLIS = 5 * 1000;
+  public static final long DEFAULT_GRPC_READ_MESSAGE_TIMEOUT_MILLIS = 3 * 1000;
 
   // Default builder should be initialized after default values,
   // otherwise it will access not initialized default values.
@@ -61,8 +61,8 @@ public abstract class GoogleCloudStorageReadOptions {
         .setBackoffMultiplier(DEFAULT_BACKOFF_MULTIPLIER)
         .setBackoffMaxIntervalMillis(DEFAULT_BACKOFF_MAX_INTERVAL_MILLIS)
         .setBackoffMaxElapsedTimeMillis(DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS)
-        .setFastFailOnNotFound(DEFAULT_FAST_FAIL_ON_NOT_FOUND)
-        .setSupportGzipEncoding(DEFAULT_SUPPORT_GZIP_ENCODING)
+        .setFastFailOnNotFoundEnabled(DEFAULT_FAST_FAIL_ON_NOT_FOUND_ENABLED)
+        .setGzipEncodingSupportEnabled(DEFAULT_GZIP_ENCODING_SUPPORT_ENABLED)
         .setInplaceSeekLimit(DEFAULT_INPLACE_SEEK_LIMIT)
         .setFadvise(DEFAULT_FADVISE)
         .setMinRangeRequestSize(DEFAULT_MIN_RANGE_REQUEST_SIZE)
@@ -90,11 +90,11 @@ public abstract class GoogleCloudStorageReadOptions {
   /** See {@link Builder#setBackoffMaxElapsedTimeMillis}. */
   public abstract int getBackoffMaxElapsedTimeMillis();
 
-  /** See {@link Builder#setFastFailOnNotFound}. */
-  public abstract boolean getFastFailOnNotFound();
+  /** See {@link Builder#setFastFailOnNotFoundEnabled}. */
+  public abstract boolean isFastFailOnNotFoundEnabled();
 
-  /** See {@link Builder#setSupportGzipEncoding}. */
-  public abstract boolean getSupportGzipEncoding();
+  /** See {@link Builder#setGzipEncodingSupportEnabled}. */
+  public abstract boolean isGzipEncodingSupportEnabled();
 
   /** See {@link Builder#setInplaceSeekLimit}. */
   public abstract long getInplaceSeekLimit();
@@ -103,7 +103,7 @@ public abstract class GoogleCloudStorageReadOptions {
   public abstract Fadvise getFadvise();
 
   /** See {@link Builder#setMinRangeRequestSize}. */
-  public abstract int getMinRangeRequestSize();
+  public abstract long getMinRangeRequestSize();
 
   /** See {@link Builder#setGrpcChecksumsEnabled}. */
   public abstract boolean isGrpcChecksumsEnabled();
@@ -163,14 +163,14 @@ public abstract class GoogleCloudStorageReadOptions {
      * sure the object being opened exists, it is recommended to set this to false to avoid doing
      * extraneous checks on open().
      */
-    public abstract Builder setFastFailOnNotFound(boolean fastFailOnNotFound);
+    public abstract Builder setFastFailOnNotFoundEnabled(boolean fastFailOnNotFound);
 
     /**
      * If false then reading a file with GZIP content encoding (HTTP header "Content-Encoding:
      * gzip") will result in failure (IOException is thrown). If true then GZIP-encoded files will
      * be read successfully.
      */
-    public abstract Builder setSupportGzipEncoding(boolean supportGzipEncoding);
+    public abstract Builder setGzipEncodingSupportEnabled(boolean gzipEncodingSupportEnabled);
 
     /**
      * If seeking to a new position which is within this number of bytes in front of the current
@@ -198,7 +198,7 @@ public abstract class GoogleCloudStorageReadOptions {
      * Sets the minimum size of the HTTP Range header that could be set in GCS request when opening
      * new stream to read an object.
      */
-    public abstract Builder setMinRangeRequestSize(int size);
+    public abstract Builder setMinRangeRequestSize(long size);
 
     /**
      * Sets whether to validate checksums when doing gRPC reads. If enabled, for sequential reads of

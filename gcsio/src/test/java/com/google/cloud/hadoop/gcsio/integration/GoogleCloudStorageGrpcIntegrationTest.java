@@ -1,3 +1,17 @@
+/*
+ * Copyright 2022 Google Inc. All Rights Reserved.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software distributed under the
+ * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.google.cloud.hadoop.gcsio.integration;
 
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.assertByteArrayEquals;
@@ -7,25 +21,45 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.hadoop.gcsio.AssertingLogHandler;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageGrpcTracingInterceptor;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils;
+import com.google.cloud.hadoop.gcsio.GrpcRequestTracingInfo;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.common.flogger.GoogleLogger;
+import com.google.gson.Gson;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
+@RunWith(Parameterized.class)
 public class GoogleCloudStorageGrpcIntegrationTest {
+
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Prefix this name with the prefix used in other gcs io integrate tests once it's whitelisted by
   // GCS to access gRPC API.
@@ -35,31 +69,54 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   private static final String BUCKET_NAME = BUCKET_HELPER.getUniqueBucketName("shared");
 
-  private static GoogleCloudStorage createGoogleCloudStorage() throws IOException {
-    return new GoogleCloudStorageImpl(
-        GoogleCloudStorageTestHelper.getStandardOptionBuilder().setGrpcEnabled(true).build(),
-        GoogleCloudStorageTestHelper.getCredentials());
+  private final boolean tdEnabled;
+
+  @Parameters
+  // We want to test this entire class with both gRPC-LB and Traffic Director
+  // Some of our internal endpoints only work with TD
+  public static Iterable<Boolean> tdEnabled() {
+    return Boolean.parseBoolean(System.getenv("GCS_TEST_ONLY_RUN_WITH_TD_ENABLED"))
+        ? List.of(true)
+        : List.of(false, true);
   }
 
-  private static GoogleCloudStorage createGoogleCloudStorage(
+  public GoogleCloudStorageGrpcIntegrationTest(boolean tdEnabled) {
+    this.tdEnabled = tdEnabled;
+  }
+
+  private GoogleCloudStorageOptions.Builder configureOptionsWithTD() {
+    logger.atInfo().log("Creating client with tdEnabled %s", this.tdEnabled);
+    return GoogleCloudStorageTestUtils.configureDefaultOptions()
+        .setTrafficDirectorEnabled(this.tdEnabled);
+  }
+
+  private GoogleCloudStorage createGoogleCloudStorage() throws IOException {
+    return new GoogleCloudStorageImpl(
+        configureOptionsWithTD().build(), GoogleCloudStorageTestHelper.getCredentials());
+  }
+
+  private GoogleCloudStorage createGoogleCloudStorage(
       AsyncWriteChannelOptions asyncWriteChannelOptions) throws IOException {
     return new GoogleCloudStorageImpl(
-        GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-            .setWriteChannelOptions(asyncWriteChannelOptions)
-            .setGrpcEnabled(true)
-            .build(),
+        configureOptionsWithTD().setWriteChannelOptions(asyncWriteChannelOptions).build(),
         GoogleCloudStorageTestHelper.getCredentials());
   }
 
   @BeforeClass
   public static void createBuckets() throws IOException {
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
+    GoogleCloudStorage rawStorage =
+        new GoogleCloudStorageImpl(
+            GoogleCloudStorageTestUtils.configureDefaultOptions().build(),
+            GoogleCloudStorageTestHelper.getCredentials());
     rawStorage.createBucket(BUCKET_NAME);
   }
 
   @AfterClass
   public static void cleanupBuckets() throws IOException {
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
+    GoogleCloudStorage rawStorage =
+        new GoogleCloudStorageImpl(
+            GoogleCloudStorageTestUtils.configureDefaultOptions().build(),
+            GoogleCloudStorageTestHelper.getCredentials());
     BUCKET_HELPER.cleanup(rawStorage);
   }
 
@@ -123,6 +180,148 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
 
     assertObjectContent(rawStorage, objectToCreate, objectBytes);
+  }
+
+  @Test
+  public void testOpenWithMetricsEnabled() throws IOException {
+    GoogleCloudStorage rawStorage =
+        new GoogleCloudStorageImpl(
+            GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+                .setMetricsSink(MetricsSink.CLOUD_MONITORING)
+                .build(),
+            GoogleCloudStorageTestHelper.getCredentials());
+    StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME, "testOpen_Object");
+    byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
+    assertObjectContent(rawStorage, objectToCreate, objectBytes);
+  }
+
+  @Test
+  public void testOpenWithTracingLogEnabled() throws IOException {
+    AssertingLogHandler assertingHandler = new AssertingLogHandler();
+    Logger grpcTracingLogger =
+        Logger.getLogger(GoogleCloudStorageGrpcTracingInterceptor.class.getName());
+    grpcTracingLogger.setUseParentHandlers(false);
+    grpcTracingLogger.addHandler(assertingHandler);
+    grpcTracingLogger.setLevel(Level.INFO);
+
+    try {
+      GoogleCloudStorage rawStorage =
+          new GoogleCloudStorageImpl(
+              GoogleCloudStorageTestUtils.configureDefaultOptions()
+                  .setTraceLogEnabled(true)
+                  .build(),
+              GoogleCloudStorageTestHelper.getCredentials());
+
+      StorageResourceId objectToCreate1 = new StorageResourceId(BUCKET_NAME, "testOpen_Object1");
+      StorageResourceId objectToCreate2 = new StorageResourceId(BUCKET_NAME, "testOpen_Object2");
+
+      int objectSize = 10000;
+      byte[] objectBytes1 = writeObject(rawStorage, objectToCreate1, /* objectSize= */ objectSize);
+      assertThat(getFilteredEvents(assertingHandler)).hasSize(6 * 2);
+
+      byte[] objectBytes2 =
+          writeObject(rawStorage, objectToCreate2, /* objectSize= */ objectSize * 2);
+      assertThat(getFilteredEvents(assertingHandler)).hasSize(6 * 4);
+
+      assertObjectContent(rawStorage, objectToCreate1, objectBytes1);
+      assertThat(getFilteredEvents(assertingHandler)).hasSize(6 * 5);
+
+      assertObjectContent(rawStorage, objectToCreate2, objectBytes2);
+      assertThat(getFilteredEvents(assertingHandler)).hasSize(6 * 6);
+
+      List<Map<String, Object>> traceEvents = getFilteredEvents(assertingHandler);
+      int outboundMessageSentIndex = 2;
+      int inboundMessageReadIndex = 4;
+
+      int getUploadId1StartIndex = 0;
+      int writeContent1StartIndex = 6;
+      int writeContent2StartIndex = 6 * 3;
+      int readContent1StartIndex = 6 * 4;
+      int readContent2StartIndex = 6 * 5;
+
+      int outboundMessageSentIndexUploadId1 = getUploadId1StartIndex + outboundMessageSentIndex;
+      int inboundMessageReadIndexUploadId1 = getUploadId1StartIndex + inboundMessageReadIndex;
+      int outboundMessageSentWriteContent1 = writeContent1StartIndex + outboundMessageSentIndex;
+      int outboundMessageSentWriteContent2 = writeContent2StartIndex + outboundMessageSentIndex;
+      int inboundMessageReadIndexWriteContent1 = writeContent1StartIndex + inboundMessageReadIndex;
+      int outboundMessageSentReadContent1 = readContent1StartIndex + outboundMessageSentIndex;
+      int inboundMessageReadIndexReadContent1 = readContent1StartIndex + inboundMessageReadIndex;
+      int outboundMessageSentReadContent2 = readContent2StartIndex + outboundMessageSentIndex;
+      int inboundMessageReadIndexReadContent2 = readContent2StartIndex + inboundMessageReadIndex;
+
+      Map<String, Object> outboundUploadId1Details =
+          traceEvents.get(outboundMessageSentIndexUploadId1);
+      Map<String, Object> outboundWriteContent1Details =
+          traceEvents.get(outboundMessageSentWriteContent1);
+      Map<String, Object> outboundWriteContent2Details =
+          traceEvents.get(outboundMessageSentWriteContent2);
+      Map<String, Object> inboundUploadId1Details =
+          traceEvents.get(inboundMessageReadIndexUploadId1);
+      Map<String, Object> inboundWriteContent1Details =
+          traceEvents.get(inboundMessageReadIndexWriteContent1);
+      Map<String, Object> outboundReadContent1Details =
+          traceEvents.get(outboundMessageSentReadContent1);
+      Map<String, Object> inboundReadContent1Details =
+          traceEvents.get(inboundMessageReadIndexReadContent1);
+      Map<String, Object> outboundReadContent2Details =
+          traceEvents.get(outboundMessageSentReadContent2);
+      Map<String, Object> inboundReadContent2Details =
+          traceEvents.get(inboundMessageReadIndexReadContent2);
+
+      verifyTrace(outboundUploadId1Details, "write", "testOpen_Object1", "outboundMessageSent()");
+      verifyTrace(
+          outboundWriteContent1Details, "write", "testOpen_Object1", "outboundMessageSent()");
+      verifyTrace(inboundUploadId1Details, "write", "testOpen_Object1", "inboundMessageRead()");
+      verifyTrace(inboundWriteContent1Details, "write", "testOpen_Object1", "inboundMessageRead()");
+      verifyTrace(outboundReadContent1Details, "read", "testOpen_Object1", "outboundMessageSent()");
+      verifyTrace(inboundReadContent1Details, "read", "testOpen_Object1", "inboundMessageRead()");
+      verifyTrace(outboundReadContent2Details, "read", "testOpen_Object2", "outboundMessageSent()");
+      verifyTrace(inboundReadContent2Details, "read", "testOpen_Object2", "inboundMessageRead()");
+
+      verifyWireSizeDifferenceWithinRange(
+          outboundWriteContent1Details, outboundWriteContent2Details, objectSize, 20);
+
+      verifyWireSizeDifferenceWithinRange(
+          inboundReadContent1Details, inboundReadContent2Details, objectSize, 20);
+
+      assertingHandler.verifyCommonTraceFields();
+    } finally {
+      grpcTracingLogger.removeHandler(assertingHandler);
+    }
+  }
+
+  // The wiresize is usually greater than the content size by a few bytes. Hence, checking that the
+  // actual wire
+  // size is within the range. Also checking the difference b/w wireSize b/w two calls is within a
+  // bound of few bytes of the expected value.
+  private void verifyWireSizeDifferenceWithinRange(
+      Map<String, Object> event1, Map<String, Object> event2, int sizeDifference, int range) {
+    double wireSize1 = (double) event1.get("optionalWireSize");
+    double wireSize2 = (double) event2.get("optionalWireSize");
+    double diff = wireSize2 - wireSize1;
+    assertThat(diff).isGreaterThan(sizeDifference - 1);
+    assertThat(diff).isLessThan(sizeDifference + range);
+  }
+
+  // inboundTrailers() event is missing in some scenarios. Hence, filtering it out to make the
+  // test non-flaky.
+  private List<Map<String, Object>> getFilteredEvents(AssertingLogHandler assertingHandler) {
+    return assertingHandler.getAllLogRecords().stream()
+        .filter((a) -> !a.get("details").equals("inboundTrailers()"))
+        .collect(Collectors.toList());
+  }
+
+  private void verifyTrace(
+      Map<String, Object> traceDetails, String requestType, String objectName, String methodName) {
+    Gson gson = new Gson();
+    assertEquals(methodName, traceDetails.get("details"));
+    assertTrue(traceDetails.containsKey("elapsedmillis"));
+
+    GrpcRequestTracingInfo requestTracingInfo =
+        gson.fromJson(traceDetails.get("requestinfo").toString(), GrpcRequestTracingInfo.class);
+    assertEquals("grpc", requestTracingInfo.getApi());
+    assertEquals(requestType, requestTracingInfo.getRequestType());
+    assertEquals(objectName, requestTracingInfo.getObjectName());
   }
 
   @Test

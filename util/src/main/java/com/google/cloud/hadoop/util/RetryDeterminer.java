@@ -31,7 +31,7 @@ public interface RetryDeterminer<X extends Exception> {
 
   /** Retries exception when either {@code SOCKET_ERRORS} or {@code SERVER_ERRORS} would retry. */
   RetryDeterminer<Exception> DEFAULT =
-      new RetryDeterminer<Exception>() {
+      new RetryDeterminer<>() {
         @Override
         public boolean shouldRetry(Exception e) {
           return e instanceof IOException

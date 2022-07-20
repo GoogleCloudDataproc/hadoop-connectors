@@ -20,6 +20,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableMap;
+import java.time.Duration;
 import java.util.Map;
 import javax.annotation.Nullable;
 
@@ -29,17 +30,25 @@ import javax.annotation.Nullable;
 @AutoValue
 public abstract class CreateFileOptions {
 
-  public static final CreateFileOptions DEFAULT_NO_OVERWRITE = builder().build();
-  public static final CreateFileOptions DEFAULT_OVERWRITE =
-      builder().setOverwriteExisting(true).build();
+  public static final CreateFileOptions DEFAULT = builder().build();
+
+  public enum WriteMode {
+    /** Write new bytes to the end of the existing file rather than the beginning. */
+    APPEND,
+    /** Creates a new file for write and fails if file already exists. */
+    CREATE_NEW,
+    /** Creates a new file for write or overwrites an existing file if it already exists. */
+    OVERWRITE
+  }
 
   public static Builder builder() {
     return new AutoValue_CreateFileOptions.Builder()
         .setAttributes(ImmutableMap.of())
         .setContentType(CreateObjectOptions.CONTENT_TYPE_DEFAULT)
         .setEnsureNoDirectoryConflict(true)
-        .setOverwriteExisting(false)
-        .setOverwriteGenerationId(StorageResourceId.UNKNOWN_GENERATION_ID);
+        .setMinSyncInterval(Duration.ofSeconds(10))
+        .setOverwriteGenerationId(StorageResourceId.UNKNOWN_GENERATION_ID)
+        .setWriteMode(WriteMode.CREATE_NEW);
   }
 
   public abstract Builder toBuilder();
@@ -51,6 +60,9 @@ public abstract class CreateFileOptions {
   @Nullable
   public abstract String getContentType();
 
+  /** Configures the minimum time interval (milliseconds) between consecutive sync/flush calls */
+  public abstract Duration getMinSyncInterval();
+
   /**
    * If true, makes sure there isn't already a directory object of the same name. If false, you run
    * the risk of creating hard-to-cleanup/access files whose names collide with directory names. If
@@ -59,7 +71,7 @@ public abstract class CreateFileOptions {
   public abstract boolean isEnsureNoDirectoryConflict();
 
   /** Whether to overwrite an existing file with the same name. */
-  public abstract boolean isOverwriteExisting();
+  public abstract WriteMode getWriteMode();
 
   /**
    * Generation of existing object to overwrite. Ignored if set to {@link
@@ -80,9 +92,11 @@ public abstract class CreateFileOptions {
 
     public abstract Builder setEnsureNoDirectoryConflict(boolean ensureNoDirectoryConflict);
 
+    public abstract Builder setMinSyncInterval(Duration interval);
+
     public abstract Builder setOverwriteGenerationId(long overwriteGenerationId);
 
-    public abstract Builder setOverwriteExisting(boolean overwriteExisting);
+    public abstract Builder setWriteMode(WriteMode mode);
 
     abstract CreateFileOptions autoBuild();
 
@@ -90,7 +104,15 @@ public abstract class CreateFileOptions {
       CreateFileOptions options = autoBuild();
       checkArgument(
           !options.getAttributes().containsKey("Content-Type"),
-          "The Content-Type attribute must be provided explicitly via the 'contentType' parameter");
+          "The Content-Type attribute must be set via the contentType option");
+      switch (options.getWriteMode()) {
+        case APPEND:
+        case CREATE_NEW:
+          checkArgument(
+              options.getOverwriteGenerationId() == StorageResourceId.UNKNOWN_GENERATION_ID,
+              "overwriteGenerationId is set to %s but it can be set only in OVERWRITE mode",
+              options.getOverwriteGenerationId());
+      }
       return options;
     }
   }

@@ -38,7 +38,7 @@ public abstract class GoogleCloudStorageOptions {
   public static final boolean ENABLE_GRPC_DEFAULT = false;
 
   /** Default setting for enabling use of the Traffic Director for GCS gRPC API. */
-  public static final boolean ENABLE_TRAFFIC_DIRECTOR_DEFAULT = false;
+  public static final boolean ENABLE_TRAFFIC_DIRECTOR_DEFAULT = true;
 
   /** Default setting to prefer DirectPath for gRPC. */
   public static final boolean DIRECT_PATH_PREFERRED_DEFAULT = true;
@@ -95,6 +95,11 @@ public abstract class GoogleCloudStorageOptions {
   /** Default setting for GCS HTTP request headers. */
   public static final ImmutableMap<String, String> HTTP_REQUEST_HEADERS_DEFAULT = ImmutableMap.of();
 
+  public enum MetricsSink {
+    NONE,
+    CLOUD_MONITORING,
+  }
+
   public static final GoogleCloudStorageOptions DEFAULT = builder().build();
 
   public static Builder builder() {
@@ -119,7 +124,9 @@ public abstract class GoogleCloudStorageOptions {
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
         .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
         .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT)
-        .setGrpcMessageTimeoutCheckInterval(GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL);
+        .setGrpcMessageTimeoutCheckInterval(GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL)
+        .setMetricsSink(MetricsSink.NONE)
+        .setTraceLogEnabled(false);
   }
 
   public abstract Builder toBuilder();
@@ -189,6 +196,10 @@ public abstract class GoogleCloudStorageOptions {
   public abstract RedactedString getEncryptionKeyHash();
 
   public abstract long getGrpcMessageTimeoutCheckInterval();
+
+  public abstract MetricsSink getMetricsSink();
+
+  public abstract boolean isTraceLogEnabled();
 
   public RetryHttpInitializerOptions toRetryHttpInitializerOptions() {
     return RetryHttpInitializerOptions.builder()
@@ -268,6 +279,10 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setGrpcMessageTimeoutCheckInterval(
         long grpcMessageTimeoutInMillisCheckInterval);
+
+    public abstract Builder setMetricsSink(MetricsSink metricsSink);
+
+    public abstract Builder setTraceLogEnabled(Boolean enable);
 
     abstract GoogleCloudStorageOptions autoBuild();
 

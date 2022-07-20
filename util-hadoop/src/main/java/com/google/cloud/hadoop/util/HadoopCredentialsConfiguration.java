@@ -127,15 +127,36 @@ public class HadoopCredentialsConfiguration {
    * Key suffix for setting a proxy username for the connector to use to authenticate with proxy
    * used to connect to GCS.
    */
-  public static final HadoopConfigurationProperty<String> PROXY_USERNAME_SUFFIX =
+  public static final HadoopConfigurationProperty<RedactedString> PROXY_USERNAME_SUFFIX =
       new HadoopConfigurationProperty<>(".proxy.username");
 
   /**
    * Key suffix for setting a proxy password for the connector to use to authenticate with proxy
    * used to connect to GCS.
    */
-  public static final HadoopConfigurationProperty<String> PROXY_PASSWORD_SUFFIX =
+  public static final HadoopConfigurationProperty<RedactedString> PROXY_PASSWORD_SUFFIX =
       new HadoopConfigurationProperty<>(".proxy.password");
+
+  /**
+   * Configuration key for defining the OAUth2 client ID. Required when the authentication type is
+   * USER_CREDENTIALS
+   */
+  public static final HadoopConfigurationProperty<String> AUTH_CLIENT_ID_SUFFIX =
+      new HadoopConfigurationProperty<>(".auth.client.id");
+
+  /**
+   * Configuration key for defining the OAUth2 client secret. Required when the authentication type
+   * is USER_CREDENTIALS
+   */
+  public static final HadoopConfigurationProperty<RedactedString> AUTH_CLIENT_SECRET_SUFFIX =
+      new HadoopConfigurationProperty<>(".auth.client.secret");
+
+  /**
+   * Configuration key for defining the OAuth2 refresh token. Required when the authentication type
+   * is USER_CREDENTIALS
+   */
+  public static final HadoopConfigurationProperty<RedactedString> AUTH_REFRESH_TOKEN_SUFFIX =
+      new HadoopConfigurationProperty<>(".auth.refresh.token");
 
   /**
    * Returns full list of config prefixes that will be resolved based on the order in returned list.
@@ -181,11 +202,9 @@ public class HadoopCredentialsConfiguration {
           throw new IOException("Can't instantiate " + clazz.getName(), e);
         }
         accessTokenProvider.setConf(config);
-        return new AccessTokenProviderCredentials(accessTokenProvider)
-            .createScoped(CLOUD_PLATFORM_SCOPE);
+        return new AccessTokenProviderCredentials(accessTokenProvider);
       case APPLICATION_DEFAULT:
-        return GoogleCredentials.getApplicationDefault(transport::get)
-            .createScoped(CLOUD_PLATFORM_SCOPE);
+        return GoogleCredentials.getApplicationDefault(transport::get);
       case COMPUTE_ENGINE:
         return ComputeEngineCredentials.newBuilder()
             .setHttpTransportFactory(transport::get)
@@ -194,9 +213,21 @@ public class HadoopCredentialsConfiguration {
         String keyFile =
             SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get);
         try (FileInputStream fis = new FileInputStream(keyFile)) {
-          return ServiceAccountCredentials.fromStream(fis, transport::get)
-              .createScoped(CLOUD_PLATFORM_SCOPE);
+          return ServiceAccountCredentials.fromStream(fis, transport::get);
         }
+      case USER_CREDENTIALS:
+        String clientId = AUTH_CLIENT_ID_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get);
+        RedactedString clientSecret =
+            AUTH_CLIENT_SECRET_SUFFIX.withPrefixes(keyPrefixes).getPassword(config);
+        RedactedString refreshToken =
+            AUTH_REFRESH_TOKEN_SUFFIX.withPrefixes(keyPrefixes).getPassword(config);
+
+        return UserCredentials.newBuilder()
+            .setClientId(clientId)
+            .setClientSecret(clientSecret.value())
+            .setRefreshToken(refreshToken.value())
+            .setHttpTransportFactory(transport::get)
+            .build();
       case UNAUTHENTICATED:
         return null;
       default:
@@ -291,6 +322,7 @@ public class HadoopCredentialsConfiguration {
 
   private static GoogleCredentials configureCredentials(
       Configuration config, List<String> keyPrefixes, GoogleCredentials credentials) {
+    credentials = credentials.createScoped(CLOUD_PLATFORM_SCOPE);
     String tokenServerUrl =
         TOKEN_SERVER_URL_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get);
     if (tokenServerUrl == null) {
@@ -345,6 +377,8 @@ public class HadoopCredentialsConfiguration {
     SERVICE_ACCOUNT_JSON_KEYFILE,
     /** Configures unauthenticated access */
     UNAUTHENTICATED,
+    /** Configures user credentials authentication */
+    USER_CREDENTIALS,
   }
 
   protected HadoopCredentialsConfiguration() {}

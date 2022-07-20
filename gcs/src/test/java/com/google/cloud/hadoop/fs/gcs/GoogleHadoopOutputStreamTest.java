@@ -16,27 +16,19 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HFLUSH;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_TYPE;
 import static com.google.common.truth.Truth.assertThat;
 import static java.lang.Math.toIntExact;
 import static org.junit.Assert.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
 
-import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.OutputStreamType;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
-import com.google.common.util.concurrent.Futures;
+import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
+import java.util.List;
 import java.util.Random;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -47,34 +39,26 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 
-/** Unittests for fine-grained edge cases in GoogleHadoopSyncableOutputStream. */
+/** Unittests for fine-grained edge cases in {@link GoogleHadoopOutputStream}. */
 @RunWith(JUnit4.class)
-public class GoogleHadoopSyncableOutputStreamTest {
-  @Mock private ExecutorService mockExecutorService;
+public class GoogleHadoopOutputStreamTest {
 
   private GoogleHadoopFileSystem ghfs;
 
   @Before
   public void setUp() throws IOException {
-    MockitoAnnotations.initMocks(this);
-
     ghfs = GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem();
-    ghfs.getConf().setEnum(GCS_OUTPUT_STREAM_TYPE.getKey(), OutputStreamType.SYNCABLE_COMPOSITE);
   }
 
   @After
   public void tearDown() throws IOException {
     ghfs.close();
-
-    verifyNoMoreInteractions(mockExecutorService);
   }
 
   @Test
-  public void testEndToEndHsync() throws Exception {
-    Path objectPath = new Path(ghfs.getUri().resolve("/dir/object.txt"));
+  public void hsync_e2e() throws Exception {
+    Path objectPath = new Path(ghfs.getUri().resolve("/hsync_e2e.txt"));
     FSDataOutputStream fout = ghfs.create(objectPath);
 
     byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
@@ -119,39 +103,42 @@ public class GoogleHadoopSyncableOutputStreamTest {
   }
 
   @Test
-  public void testExceptionOnDelete() throws IOException {
+  public void deleteTempFile_exception() throws IOException {
+    IOException closeIoException = new IOException("fake io exception");
+    ghfs =
+        GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem(
+            o ->
+                new InMemoryGoogleCloudStorage(o) {
+                  @Override
+                  public synchronized void deleteObjects(List<StorageResourceId> fullObjectNames)
+                      throws IOException {
+                    throw closeIoException;
+                  }
+                });
+
     Path objectPath = new Path(ghfs.getUri().resolve("/dir/object2.txt"));
-    GoogleHadoopSyncableOutputStream fout =
-        new GoogleHadoopSyncableOutputStream(
+    GoogleHadoopOutputStream fout =
+        new GoogleHadoopOutputStream(
             ghfs,
             ghfs.getGcsPath(objectPath),
-            new FileSystem.Statistics(ghfs.getScheme()),
-            CreateFileOptions.DEFAULT_OVERWRITE,
-            SyncableOutputStreamOptions.DEFAULT,
-            mockExecutorService);
-
-    IOException fakeIoException = new IOException("fake io exception");
-    when(mockExecutorService.submit(any(Callable.class)))
-        .thenReturn(Futures.immediateFailedFuture(new ExecutionException(fakeIoException)));
+            CreateFileOptions.DEFAULT,
+            new FileSystem.Statistics(ghfs.getScheme()));
 
     byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
     byte[] data2 = {0x0b, 0x0e, 0x0e, 0x0f};
 
     fout.write(data1, 0, data1.length);
-    fout.sync(); // This one commits straight into destination.
+    fout.hsync(); // This one commits straight into destination.
     fout.write(data2, 0, data2.length);
-    fout.sync(); // This one enqueues the delete, but doesn't propagate exception yet.
-
-    verify(mockExecutorService).submit(any(Callable.class));
+    fout.hsync(); // This one enqueues the delete, but doesn't propagate exception yet.
 
     IOException thrown = assertThrows(IOException.class, fout::close);
-    assertThat(thrown).hasCauseThat().hasMessageThat().contains(fakeIoException.getMessage());
-
-    verify(mockExecutorService, times(2)).submit(any(Callable.class));
+    assertThat(thrown).hasCauseThat().hasMessageThat().contains(closeIoException.getMessage());
+    assertThat(thrown).hasCauseThat().hasCauseThat().isSameInstanceAs(closeIoException);
   }
 
   @Test
-  public void testCloseTwice() throws IOException {
+  public void close_twiceSucceeds() throws IOException {
     Path objectPath = new Path(ghfs.getUri().resolve("/dir/object.txt"));
     FSDataOutputStream fout = ghfs.create(objectPath);
     fout.close();
@@ -159,7 +146,7 @@ public class GoogleHadoopSyncableOutputStreamTest {
   }
 
   @Test
-  public void testWrite1AfterClose() throws IOException {
+  public void writeByte_throwsExceptionAfterClose() throws IOException {
     Path objectPath = new Path(ghfs.getUri().resolve("/dir/object.txt"));
     FSDataOutputStream fout = ghfs.create(objectPath);
 
@@ -168,7 +155,7 @@ public class GoogleHadoopSyncableOutputStreamTest {
   }
 
   @Test
-  public void testWriteAfterClose() throws IOException {
+  public void write_throwsExceptionAfterClose() throws IOException {
     Path objectPath = new Path(ghfs.getUri().resolve("dir/object.txt"));
     FSDataOutputStream fout = ghfs.create(objectPath);
     fout.close();
@@ -177,7 +164,7 @@ public class GoogleHadoopSyncableOutputStreamTest {
   }
 
   @Test
-  public void testSyncAfterClose() throws IOException {
+  public void hsync_throwsExceptionAfterClose() throws IOException {
     Path objectPath = new Path(ghfs.getUri().resolve("/dir/object.txt"));
     FSDataOutputStream fout = ghfs.create(objectPath);
     fout.close();
@@ -186,10 +173,22 @@ public class GoogleHadoopSyncableOutputStreamTest {
   }
 
   @Test
-  public void testSyncComposite_withLargeNumberOfComposeComponents() throws Exception {
+  public void hflush_throwsExceptionAfterClose() throws IOException {
     Path objectPath = new Path(ghfs.getUri().resolve("/dir/object.txt"));
+    FSDataOutputStream fout = ghfs.create(objectPath);
+    fout.close();
 
-    // number of compose components should be greater than 1024 (previous limit for GCS compose API)
+    assertThrows(ClosedChannelException.class, fout::hflush);
+  }
+
+  @Test
+  public void hsync_largeNumberOfComposeComponents() throws Exception {
+    // Set an extremely low min sync interval as we need to perform many syncs in this test
+    ghfs.getConf().setInt(GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.getKey(), 1);
+
+    Path objectPath = new Path(ghfs.getUri().resolve("/hsync_largeNumberOfComposeComponents.bin"));
+
+    // Number of compose components should be greater than 1024 (previous limit for GCS compose API)
     byte[] expected = new byte[1536];
     new Random().nextBytes(expected);
 
@@ -205,7 +204,6 @@ public class GoogleHadoopSyncableOutputStreamTest {
 
   @Test
   public void hflush_rateLimited_writesEverything() throws Exception {
-    ghfs.getConf().setEnum(GCS_OUTPUT_STREAM_TYPE.getKey(), OutputStreamType.FLUSHABLE_COMPOSITE);
     ghfs.getConf()
         .setLong(GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.getKey(), Duration.ofDays(1).toMillis());
 
@@ -232,57 +230,43 @@ public class GoogleHadoopSyncableOutputStreamTest {
   }
 
   @Test
-  public void testWriteStatistics() throws IOException {
+  public void write_statistics() throws IOException {
     Path objectPath = new Path(ghfs.getUri().resolve("/dir/object2.txt"));
     FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
-    GoogleHadoopSyncableOutputStream fout =
-        new GoogleHadoopSyncableOutputStream(
-            ghfs,
-            ghfs.getGcsPath(objectPath),
-            statistics,
-            CreateFileOptions.DEFAULT_OVERWRITE,
-            SyncableOutputStreamOptions.DEFAULT,
-            mockExecutorService);
-
-    byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
-    byte[] data2 = {0x0b, 0x0d, 0x0e, 0x0e, 0x0f};
-
-    fout.write(data1, 0, data1.length);
-    fout.sync();
-    assertThat(statistics.getBytesWritten()).isEqualTo(4);
-    assertThat(statistics.getWriteOps()).isEqualTo(1);
-    fout.write(data2, 0, data2.length);
-    fout.sync();
-    assertThat(statistics.getBytesWritten()).isEqualTo(9);
-    assertThat(statistics.getWriteOps()).isEqualTo(2);
-
-    verify(mockExecutorService).submit(any(Callable.class));
-  }
-
-  @Test
-  public void testStatistics() throws IOException {
-    Path objectPath = new Path(ghfs.getUri().resolve("/dir/object2.txt"));
-    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
-    GoogleHadoopSyncableOutputStream fout =
-        new GoogleHadoopSyncableOutputStream(
-            ghfs,
-            ghfs.getGcsPath(objectPath),
-            statistics,
-            CreateFileOptions.DEFAULT_OVERWRITE,
-            SyncableOutputStreamOptions.DEFAULT,
-            mockExecutorService);
+    GoogleHadoopOutputStream fout =
+        new GoogleHadoopOutputStream(
+            ghfs, ghfs.getGcsPath(objectPath), CreateFileOptions.DEFAULT, statistics);
 
     byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
     byte[] data2 = {0x0b, 0x0d, 0x0e, 0x0e, 0x0f};
 
     fout.write(data1, 0, data1.length);
     fout.hsync();
-    assertThat(fout.getStatistics().getIOStatistics().counters().get(INVOCATION_HFLUSH.getSymbol()))
-        .isEqualTo(0);
+    assertThat(statistics.getBytesWritten()).isEqualTo(4);
+    assertThat(statistics.getWriteOps()).isEqualTo(1);
+    fout.write(data2, 0, data2.length);
+    fout.hsync();
+    assertThat(statistics.getBytesWritten()).isEqualTo(9);
+    assertThat(statistics.getWriteOps()).isEqualTo(2);
+  }
+
+  @Test
+  public void hsync_statistics() throws IOException {
+    Path objectPath = new Path(ghfs.getUri().resolve("/dir/object2.txt"));
+    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
+    GoogleHadoopOutputStream fout =
+        new GoogleHadoopOutputStream(
+            ghfs, ghfs.getGcsPath(objectPath), CreateFileOptions.DEFAULT, statistics);
+
+    byte[] data1 = {0x0f, 0x0e, 0x0e, 0x0d};
+    byte[] data2 = {0x0b, 0x0d, 0x0e, 0x0e, 0x0f};
+
+    fout.write(data1, 0, data1.length);
+    fout.hsync();
+    assertThat(fout.getIOStatistics().counters().get(INVOCATION_HFLUSH.getSymbol())).isEqualTo(0);
     fout.write(data2, 0, data2.length);
     fout.hflush();
-    assertThat(fout.getStatistics().getIOStatistics().counters().get(INVOCATION_HFLUSH.getSymbol()))
-        .isEqualTo(1);
+    assertThat(fout.getIOStatistics().counters().get(INVOCATION_HFLUSH.getSymbol())).isEqualTo(1);
   }
 
   private byte[] readFile(Path objectPath) throws IOException {

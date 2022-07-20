@@ -52,7 +52,7 @@ import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-/** Integration tests for {@link GoogleCloudStorageFileSystem} class. */
+/** Integration tests for {@link GoogleCloudStorageFileSystemImpl} class. */
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageFileSystemNewIntegrationTest {
 
@@ -72,7 +72,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
         new RetryHttpInitializer(credentials, gcsOptions.toRetryHttpInitializerOptions());
 
     GoogleCloudStorageFileSystem gcsfs =
-        new GoogleCloudStorageFileSystem(
+        new GoogleCloudStorageFileSystemImpl(
             credentials,
             GoogleCloudStorageFileSystemOptions.builder()
                 .setBucketDeleteEnabled(true)
@@ -644,6 +644,29 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     assertThat(fileInfos.stream().map(FileInfo::getPath).collect(toList()))
         .containsExactly(
             bucketUri.resolve(dirObject + "/file1"), bucketUri.resolve(dirObject + "/file2"));
+  }
+
+  @Test
+  public void listFileInfo_directory_increased_page_size() throws Exception {
+    TrackingHttpRequestInitializer gcsRequestsTracker =
+        new TrackingHttpRequestInitializer(httpRequestsInitializer);
+    GoogleCloudStorageOptions gcsOptions =
+        getStandardOptionBuilder().setMaxListItemsPerCall(5000).build();
+    GoogleCloudStorageFileSystemOptions gcsfsOptions =
+        newGcsFsOptions().setCloudStorageOptions(gcsOptions).build();
+    GoogleCloudStorageFileSystem gcsFs = newGcsFs(gcsfsOptions, gcsRequestsTracker);
+
+    String bucketName = "dataproc-enhanced-list-integ-tests";
+    URI bucketUri = new URI("gs://" + bucketName + "/");
+    String dirObject = "listFileInfo_directory";
+
+    List<FileInfo> fileInfos = gcsFs.listFileInfo(bucketUri.resolve(dirObject));
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(bucketName, dirObject),
+            listRequestWithTrailingDelimiter(
+                bucketName, dirObject + "/", /* maxResults= */ 5000, /* pageToken= */ null));
   }
 
   @Test
@@ -1327,7 +1350,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
       GoogleCloudStorageFileSystemOptions gcsfsOptions,
       TrackingHttpRequestInitializer gcsRequestsTracker)
       throws IOException {
-    return new GoogleCloudStorageFileSystem(
+    return new GoogleCloudStorageFileSystemImpl(
         o -> new GoogleCloudStorageImpl(o, gcsRequestsTracker), gcsfsOptions);
   }
 }

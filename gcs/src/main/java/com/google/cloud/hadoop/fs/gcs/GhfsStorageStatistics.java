@@ -24,11 +24,7 @@ public class GhfsStorageStatistics extends StorageStatisticsFromIOStatistics {
 
   public static final String NAME = "GhfsStorageStatistics";
 
-  /**
-   * Create the Storage Statistics instance from the IOStatistics
-   *
-   * @param ioStatistics
-   */
+  /** Create the Storage Statistics instance from the IOStatistics */
   public GhfsStorageStatistics(IOStatistics ioStatistics) {
     super(NAME, "Ghfs", ioStatistics);
   }

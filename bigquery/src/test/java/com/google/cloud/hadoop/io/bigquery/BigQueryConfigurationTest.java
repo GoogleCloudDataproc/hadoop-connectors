@@ -38,7 +38,7 @@ public class BigQueryConfigurationTest {
 
   @SuppressWarnings("DoubleBraceInitialization")
   private static final Map<String, Object> expectedDefaultConfiguration =
-      new HashMap<String, Object>() {
+      new HashMap<>() {
         {
           put("mapred.bq.bigquery.root.url", "https://bigquery.googleapis.com/");
           put("mapred.bq.dynamic.file.list.record.reader.poll.interval", 10000);

@@ -31,6 +31,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageStrings;
 import com.google.cloud.hadoop.gcsio.ListObjectOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -207,7 +208,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
           createFileNotFoundException(
               itemInfo.getBucketName(), itemInfo.getObjectName(), /* cause= */ null);
 
-      if (readOptions.getFastFailOnNotFound()) {
+      if (readOptions.isFastFailOnNotFoundEnabled()) {
         throw notFoundException;
       }
 
@@ -222,6 +223,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
           return position;
         }
 
+        @CanIgnoreReturnValue
         @Override
         public SeekableByteChannel position(long newPosition) {
           position = newPosition;
@@ -349,7 +351,7 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
           .add(srcObject.getShallowCopy(dstBucketName, dstObjectNames.get(i)));
     }
 
-    if (innerExceptions.size() > 0) {
+    if (!innerExceptions.isEmpty()) {
       throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
     }
   }
@@ -536,9 +538,9 @@ public class InMemoryGoogleCloudStorage implements GoogleCloudStorage {
 
     // If destination.hasGenerationId(), it'll automatically get enforced here by the create()
     // implementation.
-    WritableByteChannel destChannel = create(destination, options);
-    destChannel.write(ByteBuffer.wrap(tempOutput.toByteArray()));
-    destChannel.close();
+    try (WritableByteChannel destChannel = create(destination, options)) {
+      destChannel.write(ByteBuffer.wrap(tempOutput.toByteArray()));
+    }
     return getItemInfo(destination);
   }
 

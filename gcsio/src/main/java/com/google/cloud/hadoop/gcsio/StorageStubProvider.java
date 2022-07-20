@@ -1,9 +1,22 @@
+/*
+ * Copyright 2022 Google Inc. All Rights Reserved.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software distributed under the
+ * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.auth.Credentials;
-import com.google.auth.oauth2.ComputeEngineCredentials;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -13,14 +26,17 @@ import com.google.storage.v2.StorageGrpc.StorageStub;
 import io.grpc.Grpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
-import io.grpc.alts.GoogleDefaultChannelBuilder;
+import io.grpc.Metadata;
 import io.grpc.alts.GoogleDefaultChannelCredentials;
 import io.grpc.auth.MoreCallCredentials;
 import io.grpc.stub.AbstractStub;
+import io.grpc.stub.MetadataUtils;
 import java.util.concurrent.ExecutorService;
 
 /** Provides gRPC stubs for accessing the Storage gRPC API. */
 class StorageStubProvider {
+  static final Metadata.Key<String> GOOG_REQUEST_PARAMS =
+      Metadata.Key.of("x-goog-request-params", Metadata.ASCII_STRING_MARSHALLER);
 
   private final GoogleCloudStorageOptions options;
   private final ExecutorService backgroundTasksThreadPool;
@@ -50,15 +66,33 @@ class StorageStubProvider {
         .build();
   }
 
-  public StorageBlockingStub newBlockingStub() {
+  public final StorageBlockingStub newBlockingStub(String bucketName) {
+    return newBlockingStubInternal()
+        .withInterceptors(
+            MetadataUtils.newAttachHeadersInterceptor(getRequestHeaderMetadata(bucketName)));
+  }
+
+  public final StorageStub newAsyncStub(String bucketName) {
+    return newAsyncStubInternal()
+        .withInterceptors(
+            MetadataUtils.newAttachHeadersInterceptor(getRequestHeaderMetadata(bucketName)));
+  }
+
+  protected StorageBlockingStub newBlockingStubInternal() {
     StorageBlockingStub stub = StorageGrpc.newBlockingStub(getManagedChannel());
     return (StorageBlockingStub) grpcDecorator.applyCallOption(stub);
   }
 
-  public StorageStub newAsyncStub() {
+  protected StorageStub newAsyncStubInternal() {
     StorageStub stub =
         StorageGrpc.newStub(getManagedChannel()).withExecutor(backgroundTasksThreadPool);
     return (StorageStub) grpcDecorator.applyCallOption(stub);
+  }
+
+  private static Metadata getRequestHeaderMetadata(String bucketName) {
+    Metadata metadata = new Metadata();
+    metadata.put(GOOG_REQUEST_PARAMS, String.format("bucket=%s", bucketName));
+    return metadata;
   }
 
   private synchronized ManagedChannel getManagedChannel() {
@@ -95,7 +129,6 @@ class StorageStubProvider {
   }
 
   static class DirectPathGrpcDecorator implements GrpcDecorator {
-
     private static final ImmutableMap<String, Object> GRPC_SERVICE_CONFIG =
         ImmutableMap.of(
             "loadBalancingConfig",
@@ -106,8 +139,19 @@ class StorageStubProvider {
                         "childPolicy",
                         ImmutableList.of(ImmutableMap.of("round_robin", ImmutableMap.of()))))));
 
+    private final Credentials credentials;
+
+    DirectPathGrpcDecorator(Credentials credentials) {
+      this.credentials = credentials;
+    }
+
     public ManagedChannelBuilder<?> createChannelBuilder(String target) {
-      return GoogleDefaultChannelBuilder.forTarget(target)
+      GoogleDefaultChannelCredentials.Builder credentialsBuilder =
+          GoogleDefaultChannelCredentials.newBuilder();
+      if (credentials != null) {
+        credentialsBuilder.callCredentials(MoreCallCredentials.from(credentials));
+      }
+      return Grpc.newChannelBuilder(target, credentialsBuilder.build())
           .defaultServiceConfig(GRPC_SERVICE_CONFIG);
     }
 
@@ -117,12 +161,21 @@ class StorageStubProvider {
   }
 
   static class TrafficDirectorGrpcDecorator implements GrpcDecorator {
-    TrafficDirectorGrpcDecorator() {}
+    private final Credentials credentials;
+
+    TrafficDirectorGrpcDecorator(Credentials credentials) {
+      this.credentials = credentials;
+    }
 
     public ManagedChannelBuilder<?> createChannelBuilder(String target) {
+      GoogleDefaultChannelCredentials.Builder credentialsBuilder =
+          GoogleDefaultChannelCredentials.newBuilder();
+      if (credentialsBuilder != null) {
+        credentialsBuilder.callCredentials(MoreCallCredentials.from(credentials));
+      }
       return Grpc.newChannelBuilder(
           // TODO(veblush): Remove experimental suffix once this code is proven stable.
-          "google-c2p-experimental:///" + target, GoogleDefaultChannelCredentials.create());
+          "google-c2p-experimental:///" + target, credentialsBuilder.build());
     }
 
     public AbstractStub<?> applyCallOption(AbstractStub<?> stub) {
@@ -140,14 +193,12 @@ class StorageStubProvider {
 
   private static GrpcDecorator getGrpcDecorator(
       GoogleCloudStorageOptions options, Credentials credentials) {
-    if (credentials instanceof ComputeEngineCredentials) {
-      if (options.isTrafficDirectorEnabled()) {
-        return new TrafficDirectorGrpcDecorator();
-      }
-      if (options.isDirectPathPreferred()) {
-        return new DirectPathGrpcDecorator();
-      }
+    if (options.isTrafficDirectorEnabled()) {
+      return new TrafficDirectorGrpcDecorator(credentials);
+    } else if (options.isDirectPathPreferred()) {
+      return new DirectPathGrpcDecorator(credentials);
+    } else {
+      return new CloudPathGrpcDecorator(credentials);
     }
-    return new CloudPathGrpcDecorator(credentials);
   }
 }

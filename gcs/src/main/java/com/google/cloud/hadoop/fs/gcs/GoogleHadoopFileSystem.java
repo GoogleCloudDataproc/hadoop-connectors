@@ -16,7 +16,6 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.OutputStreamType.FLUSHABLE_COMPOSITE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
@@ -24,10 +23,8 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GLOB_ALGORITHM;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_LAZY_INITIALIZATION_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_TYPE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT;
-import static com.google.cloud.hadoop.gcsio.CreateFileOptions.DEFAULT_OVERWRITE;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.CLOUD_PLATFORM_SCOPE;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -46,8 +43,8 @@ import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemProvider;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.ListFileOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
@@ -72,7 +69,6 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.URI;
 import java.nio.file.DirectoryNotEmptyException;
 import java.time.Duration;
@@ -96,6 +92,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonPathCapabilities;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -347,11 +344,11 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
             : null;
     return accessTokenProvider != null
             && accessTokenProvider.getAccessTokenType() == AccessTokenType.DOWNSCOPED
-        ? new GoogleCloudStorageFileSystem(
+        ? GoogleCloudStorageFileSystemProvider.newInstance(
             /* credentials= */ null,
             accessBoundaries -> accessTokenProvider.getAccessToken(accessBoundaries).getToken(),
             gcsFsOptions)
-        : new GoogleCloudStorageFileSystem(
+        : GoogleCloudStorageFileSystemProvider.newInstance(
             credentials, /* downscopedAccessTokenFn= */ null, gcsFsOptions);
   }
 
@@ -368,12 +365,6 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
             HadoopCredentialsConfiguration.getImpersonatedCredentials(
                 config, credentials, GCS_CONFIG_PREFIX))
         .orElse(credentials);
-  }
-
-  private static String validatePathCapabilityArgs(Path path, String capability) {
-    checkNotNull(path);
-    checkArgument(!isNullOrEmpty(capability), "capability parameter is empty string");
-    return Ascii.toLowerCase(capability);
   }
 
   private static boolean isImplicitDirectory(FileStatus curr) {
@@ -506,12 +497,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
     logger.atFiner().log("open(hadoopPath: %s, bufferSize: %d [ignored])", hadoopPath, bufferSize);
     URI gcsPath = getGcsPath(hadoopPath);
-    GoogleCloudStorageReadOptions readChannelOptions =
-        getGcsFs().getOptions().getCloudStorageOptions().getReadChannelOptions();
-    GoogleHadoopFSInputStreamBase in =
-        new GoogleHadoopFSInputStream(this, gcsPath, readChannelOptions, statistics);
-
-    return new FSDataInputStream(in);
+    return new FSDataInputStream(GoogleHadoopFSInputStream.create(this, gcsPath, statistics));
   }
 
   @Override
@@ -535,57 +521,23 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         "create(hadoopPath: %s, overwrite: %b, bufferSize: %d [ignored])",
         hadoopPath, overwrite, bufferSize);
 
-    URI gcsPath = getGcsPath(hadoopPath);
-
-    OutputStreamType type = GCS_OUTPUT_STREAM_TYPE.get(getConf(), getConf()::getEnum);
-    OutputStream out;
-    switch (type) {
-      case BASIC:
-        out =
+    FSDataOutputStream response =
+        new FSDataOutputStream(
             new GoogleHadoopOutputStream(
                 this,
-                gcsPath,
-                statistics,
-                CreateFileOptions.builder().setOverwriteExisting(overwrite).build());
-        break;
-      case FLUSHABLE_COMPOSITE:
-        SyncableOutputStreamOptions flushableOutputStreamOptions =
-            SyncableOutputStreamOptions.builder()
-                .setMinSyncInterval(
-                    Duration.ofMillis(
-                        GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)))
-                .setSyncOnFlushEnabled(true)
-                .build();
-        out =
-            new GoogleHadoopSyncableOutputStream(
-                this,
-                gcsPath,
-                statistics,
-                CreateFileOptions.builder().setOverwriteExisting(overwrite).build(),
-                flushableOutputStreamOptions);
-        break;
-      case SYNCABLE_COMPOSITE:
-        SyncableOutputStreamOptions syncableOutputStreamOptions =
-            SyncableOutputStreamOptions.builder()
-                .setMinSyncInterval(
-                    Duration.ofMillis(
-                        GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)))
-                .build();
-        out =
-            new GoogleHadoopSyncableOutputStream(
-                this,
-                gcsPath,
-                statistics,
-                CreateFileOptions.builder().setOverwriteExisting(overwrite).build(),
-                syncableOutputStreamOptions);
-        break;
-      default:
-        throw new IOException(
-            String.format(
-                "Unsupported output stream type given for key '%s': '%s'",
-                GCS_OUTPUT_STREAM_TYPE.getKey(), type));
-    }
-    FSDataOutputStream response = new FSDataOutputStream(out, /* stats= */ null);
+                getGcsPath(hadoopPath),
+                CreateFileOptions.builder()
+                    .setWriteMode(
+                        overwrite
+                            ? CreateFileOptions.WriteMode.OVERWRITE
+                            : CreateFileOptions.WriteMode.CREATE_NEW)
+                    .setMinSyncInterval(
+                        Duration.ofMillis(
+                            GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(
+                                getConf(), getConf()::getInt)))
+                    .build(),
+                statistics),
+            statistics);
     instrumentation.fileCreated();
     return response;
   }
@@ -1051,11 +1003,12 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public boolean hasPathCapability(Path path, String capability) {
-    switch (validatePathCapabilityArgs(path, capability)) {
-        // TODO: remove string literals in favor of Constants in CommonPathCapabilities.java
-        // from Hadoop 3 when Hadoop 2 is no longer supported
-      case "fs.capability.paths.append":
-      case "fs.capability.paths.concat":
+    checkNotNull(path, "path must not be null");
+    checkArgument(
+        !isNullOrEmpty(capability), "capability must not be null or empty string for %s", path);
+    switch (Ascii.toLowerCase(capability)) {
+      case CommonPathCapabilities.FS_APPEND:
+      case CommonPathCapabilities.FS_CONCAT:
         return true;
       default:
         return false;
@@ -1071,6 +1024,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
    * @throws IOException failure to resolve the link.
    * @throws IllegalArgumentException unknown mandatory key
    */
+  @SuppressWarnings("FutureReturnValueIgnored")
   @Override
   public CompletableFuture<FSDataInputStream> openFileWithOptions(
       Path hadoopPath, OpenFileParameters parameters) throws IOException {
@@ -1098,7 +1052,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                 result,
                 () ->
                     new FSDataInputStream(
-                        new GoogleHadoopFSInputStream(this, fileInfo, statistics))));
+                        GoogleHadoopFSInputStream.create(this, fileInfo, statistics))));
     return result;
   }
 
@@ -1115,24 +1069,20 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   public FSDataOutputStream append(Path hadoopPath, int bufferSize, Progressable progress)
       throws IOException {
     checkArgument(hadoopPath != null, "hadoopPath must not be null");
-
     logger.atFiner().log(
         "append(hadoopPath: %s, bufferSize: %d [ignored])", hadoopPath, bufferSize);
-
     URI filePath = getGcsPath(hadoopPath);
-    SyncableOutputStreamOptions syncableOutputStreamOptions =
-        SyncableOutputStreamOptions.builder()
-            .setAppendEnabled(true)
-            .setMinSyncInterval(
-                Duration.ofMillis(
-                    GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)))
-            .setSyncOnFlushEnabled(
-                GCS_OUTPUT_STREAM_TYPE.get(getConf(), getConf()::getEnum) == FLUSHABLE_COMPOSITE)
-            .build();
-
     return new FSDataOutputStream(
-        new GoogleHadoopSyncableOutputStream(
-            this, filePath, statistics, DEFAULT_OVERWRITE, syncableOutputStreamOptions),
+        new GoogleHadoopOutputStream(
+            this,
+            filePath,
+            CreateFileOptions.builder()
+                .setWriteMode(CreateFileOptions.WriteMode.APPEND)
+                .setMinSyncInterval(
+                    Duration.ofMillis(
+                        GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)))
+                .build(),
+            statistics),
         statistics);
   }
 
@@ -1648,16 +1598,6 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   private byte[] getXAttrValue(byte[] value) {
     return value == null ? XATTR_NULL_VALUE : value;
-  }
-
-  /**
-   * Available types for use with {@link
-   * GoogleHadoopFileSystemConfiguration#GCS_OUTPUT_STREAM_TYPE}.
-   */
-  public enum OutputStreamType {
-    BASIC,
-    FLUSHABLE_COMPOSITE,
-    SYNCABLE_COMPOSITE
   }
 
   /**
