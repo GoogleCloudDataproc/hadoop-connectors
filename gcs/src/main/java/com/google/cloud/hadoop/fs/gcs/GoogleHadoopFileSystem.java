@@ -1004,7 +1004,8 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
   @Override
   public boolean hasPathCapability(Path path, String capability) {
     checkNotNull(path, "path must not be null");
-    checkArgument(!isNullOrEmpty(capability), "capability must not be null or empty string");
+    checkArgument(
+      !isNullOrEmpty(capability), "capability must not be null or empty string for %s", path);
     switch (Ascii.toLowerCase(capability)) {
       case CommonPathCapabilities.FS_APPEND:
       case CommonPathCapabilities.FS_CONCAT:
