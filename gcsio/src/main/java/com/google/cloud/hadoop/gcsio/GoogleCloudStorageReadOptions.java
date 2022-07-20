@@ -39,8 +39,8 @@ public abstract class GoogleCloudStorageReadOptions {
   public static final double DEFAULT_BACKOFF_MULTIPLIER = 1.5;
   public static final int DEFAULT_BACKOFF_MAX_INTERVAL_MILLIS = 10 * 1000;
   public static final int DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS = 2 * 60 * 1000;
-  public static final boolean DEFAULT_FAST_FAIL_ON_NOT_FOUND = true;
-  public static final boolean DEFAULT_SUPPORT_GZIP_ENCODING = true;
+  public static final boolean DEFAULT_FAST_FAIL_ON_NOT_FOUND_ENABLED = true;
+  public static final boolean DEFAULT_GZIP_ENCODING_SUPPORT_ENABLED = true;
   public static final long DEFAULT_INPLACE_SEEK_LIMIT = 8 * 1024 * 1024;
   public static final Fadvise DEFAULT_FADVISE = Fadvise.SEQUENTIAL;
   public static final long DEFAULT_MIN_RANGE_REQUEST_SIZE = 2 * 1024 * 1024;
@@ -61,8 +61,8 @@ public abstract class GoogleCloudStorageReadOptions {
         .setBackoffMultiplier(DEFAULT_BACKOFF_MULTIPLIER)
         .setBackoffMaxIntervalMillis(DEFAULT_BACKOFF_MAX_INTERVAL_MILLIS)
         .setBackoffMaxElapsedTimeMillis(DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS)
-        .setFastFailOnNotFound(DEFAULT_FAST_FAIL_ON_NOT_FOUND)
-        .setSupportGzipEncoding(DEFAULT_SUPPORT_GZIP_ENCODING)
+        .setFastFailOnNotFoundEnabled(DEFAULT_FAST_FAIL_ON_NOT_FOUND_ENABLED)
+        .setGzipEncodingSupportEnabled(DEFAULT_GZIP_ENCODING_SUPPORT_ENABLED)
         .setInplaceSeekLimit(DEFAULT_INPLACE_SEEK_LIMIT)
         .setFadvise(DEFAULT_FADVISE)
         .setMinRangeRequestSize(DEFAULT_MIN_RANGE_REQUEST_SIZE)
@@ -90,11 +90,11 @@ public abstract class GoogleCloudStorageReadOptions {
   /** See {@link Builder#setBackoffMaxElapsedTimeMillis}. */
   public abstract int getBackoffMaxElapsedTimeMillis();
 
-  /** See {@link Builder#setFastFailOnNotFound}. */
-  public abstract boolean getFastFailOnNotFound();
+  /** See {@link Builder#setFastFailOnNotFoundEnabled}. */
+  public abstract boolean isFastFailOnNotFoundEnabled();
 
-  /** See {@link Builder#setSupportGzipEncoding}. */
-  public abstract boolean getSupportGzipEncoding();
+  /** See {@link Builder#setGzipEncodingSupportEnabled}. */
+  public abstract boolean isGzipEncodingSupportEnabled();
 
   /** See {@link Builder#setInplaceSeekLimit}. */
   public abstract long getInplaceSeekLimit();
@@ -163,14 +163,14 @@ public abstract class GoogleCloudStorageReadOptions {
      * sure the object being opened exists, it is recommended to set this to false to avoid doing
      * extraneous checks on open().
      */
-    public abstract Builder setFastFailOnNotFound(boolean fastFailOnNotFound);
+    public abstract Builder setFastFailOnNotFoundEnabled(boolean fastFailOnNotFound);
 
     /**
      * If false then reading a file with GZIP content encoding (HTTP header "Content-Encoding:
      * gzip") will result in failure (IOException is thrown). If true then GZIP-encoded files will
      * be read successfully.
      */
-    public abstract Builder setSupportGzipEncoding(boolean supportGzipEncoding);
+    public abstract Builder setGzipEncodingSupportEnabled(boolean gzipEncodingSupportEnabled);
 
     /**
      * If seeking to a new position which is within this number of bytes in front of the current

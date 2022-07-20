@@ -253,7 +253,7 @@ public class InMemoryObjectEntry {
       @Nullable
       @Override
       protected GoogleCloudStorageItemInfo getInitialMetadata() throws IOException {
-        return readOptions.getFastFailOnNotFound() ? getInfo() : super.getInitialMetadata();
+        return readOptions.isFastFailOnNotFoundEnabled() ? getInfo() : super.getInitialMetadata();
       }
     };
   }
