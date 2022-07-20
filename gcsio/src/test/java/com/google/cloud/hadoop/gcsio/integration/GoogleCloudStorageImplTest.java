@@ -95,7 +95,7 @@ public class GoogleCloudStorageImplTest {
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
 
     GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
 
     try (SeekableByteChannel readChannel = trackingGcs.delegate.open(resourceId, readOptions)) {
       assertThat(readChannel.size()).isEqualTo(expectedSize);
@@ -166,16 +166,9 @@ public class GoogleCloudStorageImplTest {
     assertThat(gcs.getStatistics())
         .containsExactlyEntriesIn(
             ImmutableMap.<String, Long>builder()
-                .put("HTTP_DELETE_REQUEST", 0L)
-                .put("HTTP_DELETE_REQUEST_FAILURE", 0L)
                 .put("HTTP_GET_REQUEST", 1L)
                 .put("HTTP_GET_REQUEST_FAILURE", 1L)
-                .put("HTTP_HEAD_REQUEST", 0L)
-                .put("HTTP_HEAD_REQUEST_FAILURE", 0L)
-                .put("HTTP_PATCH_REQUEST", 0L)
-                .put("HTTP_PATCH_REQUEST_FAILURE", 0L)
                 .put("HTTP_POST_REQUEST", 1L)
-                .put("HTTP_POST_REQUEST_FAILURE", 0L)
                 .put("HTTP_PUT_REQUEST", 5L)
                 .put("HTTP_PUT_REQUEST_FAILURE", 4L)
                 .build());
@@ -185,16 +178,9 @@ public class GoogleCloudStorageImplTest {
     assertThat(gcs.getStatistics())
         .containsExactlyEntriesIn(
             ImmutableMap.<String, Long>builder()
-                .put("HTTP_DELETE_REQUEST", 0L)
-                .put("HTTP_DELETE_REQUEST_FAILURE", 0L)
                 .put("HTTP_GET_REQUEST", 3L)
                 .put("HTTP_GET_REQUEST_FAILURE", 1L)
-                .put("HTTP_HEAD_REQUEST", 0L)
-                .put("HTTP_HEAD_REQUEST_FAILURE", 0L)
-                .put("HTTP_PATCH_REQUEST", 0L)
-                .put("HTTP_PATCH_REQUEST_FAILURE", 0L)
                 .put("HTTP_POST_REQUEST", 1L)
-                .put("HTTP_POST_REQUEST_FAILURE", 0L)
                 .put("HTTP_PUT_REQUEST", 5L)
                 .put("HTTP_PUT_REQUEST_FAILURE", 4L)
                 .build());
@@ -205,15 +191,9 @@ public class GoogleCloudStorageImplTest {
         .containsExactlyEntriesIn(
             ImmutableMap.<String, Long>builder()
                 .put("HTTP_DELETE_REQUEST", 1L)
-                .put("HTTP_DELETE_REQUEST_FAILURE", 0L)
                 .put("HTTP_GET_REQUEST", 4L)
                 .put("HTTP_GET_REQUEST_FAILURE", 1L)
-                .put("HTTP_HEAD_REQUEST", 0L)
-                .put("HTTP_HEAD_REQUEST_FAILURE", 0L)
-                .put("HTTP_PATCH_REQUEST", 0L)
-                .put("HTTP_PATCH_REQUEST_FAILURE", 0L)
                 .put("HTTP_POST_REQUEST", 1L)
-                .put("HTTP_POST_REQUEST_FAILURE", 0L)
                 .put("HTTP_PUT_REQUEST", 5L)
                 .put("HTTP_PUT_REQUEST_FAILURE", 4L)
                 .build());

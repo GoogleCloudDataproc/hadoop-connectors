@@ -486,9 +486,9 @@ public class GoogleHadoopFileSystemConfiguration {
 
   private static GoogleCloudStorageReadOptions getReadChannelOptions(Configuration config) {
     return GoogleCloudStorageReadOptions.builder()
-        .setFastFailOnNotFound(
+        .setFastFailOnNotFoundEnabled(
             GCS_INPUT_STREAM_FAST_FAIL_ON_NOT_FOUND_ENABLE.get(config, config::getBoolean))
-        .setSupportGzipEncoding(
+        .setGzipEncodingSupportEnabled(
             GCS_INPUT_STREAM_SUPPORT_GZIP_ENCODING_ENABLE.get(config, config::getBoolean))
         .setInplaceSeekLimit(GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.get(config, config::getLong))
         .setFadvise(GCS_INPUT_STREAM_FADVISE.get(config, config::getEnum))
