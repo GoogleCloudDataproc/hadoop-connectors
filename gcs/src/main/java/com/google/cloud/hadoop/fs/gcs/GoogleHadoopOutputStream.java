@@ -16,7 +16,9 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
@@ -25,6 +27,7 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.RateLimiter;
@@ -49,11 +52,13 @@ import javax.annotation.Nonnull;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 
-class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSource, Syncable {
+class GoogleHadoopOutputStream extends OutputStream
+    implements IOStatisticsSource, StreamCapabilities, Syncable {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
@@ -366,5 +371,19 @@ class GoogleHadoopOutputStream extends OutputStream implements IOStatisticsSourc
   @Override
   public IOStatistics getIOStatistics() {
     return streamStatistics.getIOStatistics();
+  }
+
+  @Override
+  public boolean hasCapability(String capability) {
+    checkArgument(!isNullOrEmpty(capability), "capability must not be null or empty string");
+    switch (Ascii.toLowerCase(capability)) {
+      case StreamCapabilities.HFLUSH:
+      case StreamCapabilities.HSYNC:
+        return syncRateLimiter != null;
+      case StreamCapabilities.IOSTATISTICS:
+        return true;
+      default:
+        return false;
+    }
   }
 }

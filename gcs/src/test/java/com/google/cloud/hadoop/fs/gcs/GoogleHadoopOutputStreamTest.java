@@ -183,9 +183,12 @@ public class GoogleHadoopOutputStreamTest {
 
   @Test
   public void hsync_largeNumberOfComposeComponents() throws Exception {
+    // Set an extremely low min sync interval as we need to perform many syncs in this test
+    ghfs.getConf().setInt(GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.getKey(), 1);
+
     Path objectPath = new Path(ghfs.getUri().resolve("/hsync_largeNumberOfComposeComponents.bin"));
 
-    // number of compose components should be greater than 1024 (previous limit for GCS compose API)
+    // Number of compose components should be greater than 1024 (previous limit for GCS compose API)
     byte[] expected = new byte[1536];
     new Random().nextBytes(expected);
 
