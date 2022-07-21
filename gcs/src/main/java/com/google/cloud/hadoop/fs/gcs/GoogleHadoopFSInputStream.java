@@ -102,7 +102,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   @Override
   public synchronized int read(@Nonnull byte[] buf, int offset, int length) throws IOException {
     streamStatistics.readOperationStarted(getPos(), length);
-    checkNotNull(buf, "buf must not be null");
     validatePositionedReadArgs(getPos(), buf, offset, length);
     int response = 0;
     try {
@@ -127,7 +126,6 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   @Override
   public void readFully(long position, byte[] buffer, int offset, int length) throws IOException {
     streamStatistics.readFullyOperationStarted(position, length);
-    checkNotNull(buffer, "buf must not be null");
     validatePositionedReadArgs(position, buffer, offset, length);
     if (length == 0) {
       return;
