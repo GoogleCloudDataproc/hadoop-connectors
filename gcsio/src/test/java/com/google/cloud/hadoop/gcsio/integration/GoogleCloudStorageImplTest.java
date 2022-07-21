@@ -226,11 +226,9 @@ public class GoogleCloudStorageImplTest {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
     TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
-    TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs2 =
-        newTrackingGoogleCloudStorage(GCS_OPTIONS);
-
     // Have separate request tracker for channels as clubbing them into one will cause flakiness
-    // while asserting the order or requests. More info in b/217682193#comment6
+    // while asserting the order or requests. More info in issues#834
+
     TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs2 =
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
 

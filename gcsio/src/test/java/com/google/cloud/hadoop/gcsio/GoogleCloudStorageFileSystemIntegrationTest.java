@@ -63,9 +63,6 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  // buffer mill second to address clock skewness b/217682193
-  private static final long BUFFER_MILLS = 1000L;
-
   // hack to make tests pass until JUnit 4.13 regression will be fixed:
   // https://github.com/junit-team/junit4/issues/1509
   // TODO: refactor or delete this hack
@@ -203,7 +200,9 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
         .isEqualTo(expectedDirectory);
 
     if (expectedToExist) {
-      Instant currentTime = Instant.now().plusMillis(BUFFER_MILLS);
+      // adding extra buffer time to overcome the flakiness observed
+      // because of clock skewness observed from GCS side. issue#834
+      Instant expectedFinishTime = Instant.now().plusMillis(1000L);
       // Use modification time instead of creation time - by default creation time
       // not fetched because it's not exposed in HCFS FileSystem interface.
       Instant fileModificationTime = Instant.ofEpochMilli(fileInfo.getModificationTime());
@@ -215,7 +214,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
       assertWithMessage(
               "getModificationTime for bucketName '%s' objectName '%s'", bucketName, objectName)
           .that(fileModificationTime)
-          .isAtMost(currentTime);
+          .isAtMost(expectedFinishTime);
     } else {
       assertWithMessage(
               "getCreationTime for bucketName '%s' objectName '%s'", bucketName, objectName)
@@ -418,9 +417,6 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     // Create test objects.
     String testBucket = gcsiHelper.createUniqueBucket("list");
     gcsiHelper.createObjectsWithSubdirs(testBucket, objectNames);
-
-    // adding a sleep to overcome any cock skew b/217682193
-    Thread.sleep(1000);
 
     // -------------------------------------------------------
     // Tests for getItemInfo().
