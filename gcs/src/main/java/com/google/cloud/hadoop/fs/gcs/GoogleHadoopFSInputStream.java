@@ -145,7 +145,11 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
           nread += nbytes;
         }
       } finally {
-        seek(oldPos);
+        try {
+          seek(oldPos);
+        } catch (IOException ie) {
+          logger.atFiner().log("Ignoring IOE on seek to (%d): (%s)", oldPos, ie.getMessage());
+        }
       }
     }
   }

@@ -490,6 +490,7 @@ public class GhfsInstrumentation
                   StreamStatisticNames.STREAM_READ_BYTES,
                   StreamStatisticNames.STREAM_READ_EXCEPTIONS,
                   StreamStatisticNames.STREAM_READ_OPERATIONS,
+                  StreamStatisticNames.STREAM_READ_FULLY_OPERATIONS,
                   StreamStatisticNames.STREAM_READ_OPERATIONS_INCOMPLETE,
                   StreamStatisticNames.STREAM_READ_SEEK_OPERATIONS,
                   StreamStatisticNames.STREAM_READ_SEEK_BACKWARD_OPERATIONS,
