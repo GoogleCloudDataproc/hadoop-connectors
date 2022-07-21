@@ -16,7 +16,6 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Math.max;
 
@@ -146,7 +145,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
         try {
           seek(oldPos);
         } catch (IOException ie) {
-          logger.atFiner().log("Ignoring IOE on seek to (%d): (%s)", oldPos, ie.getMessage());
+          logger.atWarning().log("Ignoring IOE on seek to (%d): (%s)", oldPos, ie.getMessage());
         }
       }
     }
