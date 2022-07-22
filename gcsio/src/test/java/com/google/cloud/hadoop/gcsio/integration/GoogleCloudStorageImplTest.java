@@ -263,7 +263,8 @@ public class GoogleCloudStorageImplTest {
                 resourceId.getBucketName(),
                 resourceId.getObjectName(),
                 /* generationId= */ 2,
-                /* uploadId= */ 1)).inOrder();
+                /* uploadId= */ 1))
+        .inOrder();
 
     assertThat(trackingGcs2.requestsTracker.getAllRequestStrings())
         .containsExactly(
@@ -277,7 +278,8 @@ public class GoogleCloudStorageImplTest {
                 resourceId.getBucketName(),
                 resourceId.getObjectName(),
                 /* generationId= */ 2,
-                /* uploadId= */ 1)).inOrder();
+                /* uploadId= */ 1))
+        .inOrder();
   }
 
   @Test
