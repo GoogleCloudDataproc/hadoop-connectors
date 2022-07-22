@@ -227,7 +227,7 @@ public class GoogleCloudStorageImplTest {
     TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
     // Have separate request tracker for channels as clubbing them into one will cause flakiness
-    // while asserting the order or requests. More info in issues#834
+    // while asserting the order or requests.
 
     TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs2 =
         newTrackingGoogleCloudStorage(GCS_OPTIONS);

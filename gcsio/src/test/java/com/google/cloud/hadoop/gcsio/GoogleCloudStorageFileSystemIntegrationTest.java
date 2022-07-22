@@ -201,8 +201,8 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
 
     if (expectedToExist) {
       // adding extra buffer time to overcome the flakiness observed
-      // because of clock skewness observed from GCS side. issue#834
-      Instant expectedFinishTime = Instant.now().plusMillis(1000L);
+      // because of clock skewness observed from GCS side.
+      Instant expectedFileModificationTime = Instant.now().plusMillis(1000L);
       // Use modification time instead of creation time - by default creation time
       // not fetched because it's not exposed in HCFS FileSystem interface.
       Instant fileModificationTime = Instant.ofEpochMilli(fileInfo.getModificationTime());
@@ -214,7 +214,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
       assertWithMessage(
               "getModificationTime for bucketName '%s' objectName '%s'", bucketName, objectName)
           .that(fileModificationTime)
-          .isAtMost(expectedFinishTime);
+          .isAtMost(expectedFileModificationTime);
     } else {
       assertWithMessage(
               "getCreationTime for bucketName '%s' objectName '%s'", bucketName, objectName)
