@@ -483,7 +483,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
    * and a new connection will be needed. Especially SSLExceptions since the there's a high
    * probability that SSL connections would be broken in a way that causes {@link Channel#close()}
    * itself to throw an exception, even though underlying sockets have already been cleaned up;
-   * close() on an SSLSocketImpl requires a shutdown handshake in order to shutdown cleanly, and if
+   * close() on an SSLSocketImpl requires a shutdown handshake in order to shut down cleanly, and if
    * the connection has been broken already, then this is not possible, and the SSLSocketImpl was
    * already responsible for performing local cleanup at the time the exception was raised.
    */
@@ -861,7 +861,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
    * Opens the underlying stream, sets its position to the {@link #currentPosition}.
    *
    * <p>If the file encoding in GCS is gzip (and therefore the HTTP client will decompress it), the
-   * entire file is always requested and we seek to the position requested. If the file encoding is
+   * entire file is always requested, and we seek to the position requested. If the file encoding is
    * not gzip, only the remaining bytes to be read are requested from GCS.
    *
    * @param bytesToRead number of bytes to read from new stream. Ignored if {@link
@@ -946,8 +946,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     } catch (IOException e) {
       if (!metadataInitialized && errorExtractor.rangeNotSatisfiable(e) && currentPosition == 0) {
         // We don't know the size yet (metadataInitialized == false) and we're seeking to
-        // byte 0,
-        // but got 'range not satisfiable'; the object must be empty.
+        // byte 0, but got 'range not satisfiable'; the object must be empty.
         logger.atInfo().log(
             "Got 'range not satisfiable' for reading '%s' at position 0; assuming empty.",
             resourceId);
@@ -966,11 +965,9 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         return new ByteArrayInputStream(new byte[0]);
       }
       if (gzipEncoded) {
-        // Initialize `contentChannelEnd` to `size` (initialized to Long.MAX_VALUE in
-        // `initMetadata`
-        // method for gzipped objetcs) because value of HTTP Content-Length header is
-        // usually
-        // smaller than decompressed object size.
+        // Initialize `contentChannelEnd` to `size` (initialized to Long.MAX_VALUE
+        // in `initMetadata` method for gzipped objects) because value of HTTP Content-Length
+        // header is usually smaller than decompressed object size.
         if (currentPosition == 0) {
           contentChannelEnd = size;
         } else {

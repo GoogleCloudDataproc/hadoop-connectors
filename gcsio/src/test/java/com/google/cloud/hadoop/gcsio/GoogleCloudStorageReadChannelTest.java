@@ -189,9 +189,9 @@ public class GoogleCloudStorageReadChannelTest {
 
   @Test
   public void footerPrefetch_reused() throws IOException {
-    int footeSize = 2;
+    int footerSize = 2;
     byte[] testData = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
-    int footerStart = testData.length - footeSize;
+    int footerStart = testData.length - footerSize;
     byte[] footer = Arrays.copyOfRange(testData, footerStart, testData.length);
 
     MockHttpTransport transport =
@@ -208,7 +208,7 @@ public class GoogleCloudStorageReadChannelTest {
     GoogleCloudStorageReadOptions options =
         newLazyReadOptionsBuilder()
             .setFadvise(Fadvise.RANDOM)
-            .setMinRangeRequestSize(footeSize)
+            .setMinRangeRequestSize(footerSize)
             .build();
 
     GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
