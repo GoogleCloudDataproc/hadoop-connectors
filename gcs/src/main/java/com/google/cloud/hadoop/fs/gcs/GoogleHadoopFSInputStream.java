@@ -26,9 +26,10 @@ import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import javax.annotation.Nonnull;
+
+import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.statistics.IOStatistics;
@@ -46,6 +47,13 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   private final SeekableByteChannel channel;
   // Number of bytes read through this channel.
   private long totalBytesRead = 0;
+
+  /**
+   * Closed bit. Volatile so reads are non-blocking.
+   * Updates must be in a synchronized block to guarantee an atomic check and
+   * set
+   */
+  private volatile boolean closed;
 
   // Statistics tracker provided by the parent GoogleHadoopFileSystem for recording
   // numbers of bytes read.
@@ -87,6 +95,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   @Override
   public synchronized int read() throws IOException {
+    checkNotClosed();
     int numRead = read(singleReadBuf, /* offset= */ 0, /* length= */ 1);
     checkState(
         numRead == -1 || numRead == 1,
@@ -99,6 +108,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   @Override
   public synchronized int read(@Nonnull byte[] buf, int offset, int length) throws IOException {
+    checkNotClosed();
     streamStatistics.readOperationStarted(getPos(), length);
     checkNotNull(buf, "buf must not be null");
     if (offset < 0 || length < 0 || length > buf.length - offset) {
@@ -126,6 +136,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   @Override
   public synchronized void seek(long pos) throws IOException {
+    checkNotClosed();
     logger.atFiner().log("seek(%d)", pos);
     long curPos = getPos();
     long diff = pos - curPos;
@@ -143,11 +154,14 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   @Override
   public synchronized void close() throws IOException {
-    logger.atFiner().log("close(): %s", gcsPath);
-    streamStatistics.close();
-    if (channel != null) {
-      logger.atFiner().log("Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
-      channel.close();
+    if (!closed) {
+      closed = true;
+      logger.atFiner().log("close(): %s", gcsPath);
+      streamStatistics.close();
+      if (channel != null) {
+        logger.atFiner().log("Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
+        channel.close();
+      }
     }
   }
 
@@ -178,9 +192,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   @Override
   public int available() throws IOException {
     logger.atFiner().log("available()");
-    if (!channel.isOpen()) {
-      throw new ClosedChannelException();
-    }
+    checkNotClosed();
     return 0;
   }
 
@@ -192,5 +204,16 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   @Override
   public IOStatistics getIOStatistics() {
     return streamStatistics.getIOStatistics();
+  }
+
+  /**
+   * Verify that the input stream is open. Non blocking; this gives
+   * the last state of the volatile {@link #closed} field.
+   * @throws IOException if the connection is closed.
+   */
+  private void checkNotClosed() throws IOException {
+    if (closed) {
+      throw new IOException(gcsPath + ": " + FSExceptionMessages.STREAM_IS_CLOSED);
+    }
   }
 }
