@@ -215,7 +215,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
       StorageResourceId objectToCreate1 = new StorageResourceId(BUCKET_NAME, "testOpen_Object1");
       StorageResourceId objectToCreate2 = new StorageResourceId(BUCKET_NAME, "testOpen_Object2");
 
-      int objectSize = 10000;
+      int objectSize = 100000;
       byte[] objectBytes1 = writeObject(rawStorage, objectToCreate1, /* objectSize= */ objectSize);
       assertThat(getFilteredEvents(assertingHandler)).hasSize(6 * 2);
 
@@ -279,10 +279,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
       verifyTrace(inboundReadContent2Details, "read", "testOpen_Object2", "inboundMessageRead()");
 
       verifyWireSizeDifferenceWithinRange(
-          outboundWriteContent1Details, outboundWriteContent2Details, objectSize, 20);
+          outboundWriteContent1Details, outboundWriteContent2Details, objectSize, 50);
 
       verifyWireSizeDifferenceWithinRange(
-          inboundReadContent1Details, inboundReadContent2Details, objectSize, 20);
+          inboundReadContent1Details, inboundReadContent2Details, objectSize, 50);
 
       assertingHandler.verifyCommonTraceFields();
     } finally {
@@ -299,7 +299,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     double wireSize1 = (double) event1.get("optionalWireSize");
     double wireSize2 = (double) event2.get("optionalWireSize");
     double diff = wireSize2 - wireSize1;
-    assertThat(diff).isGreaterThan(sizeDifference - 1);
+    assertThat(diff).isGreaterThan(sizeDifference - range);
     assertThat(diff).isLessThan(sizeDifference + range);
   }
 

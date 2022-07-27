@@ -17,6 +17,10 @@ package com.google.cloud.hadoop.gcsio;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.OptionalLong;
 
+/**
+ * Additional gRPC request specific information that will be emitted in {@link
+ * GoogleCloudStorageGrpcTracingInterceptor}.
+ */
 @VisibleForTesting
 public class GrpcRequestTracingInfo {
   final String api = "grpc";
