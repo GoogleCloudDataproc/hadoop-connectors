@@ -36,6 +36,7 @@ import com.google.common.flogger.GoogleLogger;
 import com.google.common.flogger.LogContext;
 import java.io.IOException;
 
+/** An implementation of {@link HttpRequestInitializer} with retries. */
 public class RetryHttpInitializer implements HttpRequestInitializer {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();

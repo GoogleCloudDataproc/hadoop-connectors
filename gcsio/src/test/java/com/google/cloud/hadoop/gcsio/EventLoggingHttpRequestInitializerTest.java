@@ -22,32 +22,28 @@ import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpResponse;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import java.io.IOException;
-import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
-import java.util.logging.Handler;
 import java.util.logging.Level;
-import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
 
+@RunWith(JUnit4.class)
 public class EventLoggingHttpRequestInitializerTest {
   private static final String REQUEST_URL = "http://google.com";
   private static final Logger LOGGER =
       Logger.getLogger(EventLoggingHttpRequestInitializer.class.getName());
 
   private EventLoggingHttpRequestInitializer requestInitializer;
-  private AssertingHandler assertingHandler;
+  private AssertingLogHandler assertingHandler;
 
   @Before
   public void setUp() throws IOException {
-    assertingHandler = new AssertingHandler();
+    assertingHandler = new AssertingLogHandler();
     LOGGER.setUseParentHandlers(false);
     LOGGER.addHandler(assertingHandler);
     LOGGER.setLevel(Level.INFO);
@@ -116,41 +112,5 @@ public class EventLoggingHttpRequestInitializerTest {
     return mockTransport(response)
         .createRequestFactory()
         .buildGetRequest(new GenericUrl(REQUEST_URL));
-  }
-
-  private static class AssertingHandler extends Handler {
-    private static final Gson GSON = new Gson();
-    private static final Type LOG_RECORD_TYPE = new TypeToken<Map<String, Object>>() {}.getType();
-
-    private List<Map<String, Object>> logRecords = new ArrayList<>();
-
-    @Override
-    public void publish(LogRecord record) {
-      if (isLoggable(record)) {
-        logRecords.add(logRecordToMap(record));
-      }
-    }
-
-    @Override
-    public void flush() {
-      logRecords.clear();
-    }
-
-    @Override
-    public void close() {
-      logRecords = null;
-    }
-
-    void assertLogCount(int n) {
-      assertThat(logRecords).hasSize(n);
-    }
-
-    Map<String, Object> getLogRecordAtIndex(int index) {
-      return logRecords.get(index);
-    }
-
-    private static Map<String, Object> logRecordToMap(LogRecord logRecord) {
-      return GSON.fromJson(logRecord.getMessage(), LOG_RECORD_TYPE);
-    }
   }
 }

@@ -68,6 +68,7 @@ public class PrefixMappedItemCache {
    * @return the cached item associated with the given resource id, null if the item isn't cached or
    *     it has expired in the cache.
    */
+  @Nullable
   public synchronized GoogleCloudStorageItemInfo getItem(StorageResourceId id) {
     PrefixKey key = new PrefixKey(id.getBucketName(), id.getObjectName());
     CacheValue<GoogleCloudStorageItemInfo> value = itemMap.get(key);
@@ -91,6 +92,7 @@ public class PrefixMappedItemCache {
    * @param item the item to insert. The item must have a valid resource id.
    * @return the overwritten item, null if no item was overwritten.
    */
+  @Nullable
   public synchronized GoogleCloudStorageItemInfo putItem(GoogleCloudStorageItemInfo item) {
     if (!item.exists()) {
       return null;
@@ -109,6 +111,7 @@ public class PrefixMappedItemCache {
    * @param id the resource id of the item to remove.
    * @return the removed item, null if no item was removed.
    */
+  @Nullable
   public synchronized GoogleCloudStorageItemInfo removeItem(StorageResourceId id) {
     PrefixKey key = new PrefixKey(id.getBucketName(), id.getObjectName());
     CacheValue<GoogleCloudStorageItemInfo> value = itemMap.remove(key);

@@ -98,6 +98,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   private final long objectSize;
 
   private final MetricsRecorder metricsRecorder;
+  private final GoogleCloudStorageOptions storageOptions;
 
   // True if this channel is open, false otherwise.
   private boolean channelIsOpen = true;
@@ -153,12 +154,14 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       Watchdog watchdog,
       MetricsRecorder metricsRecorder,
       GoogleCloudStorageReadOptions readOptions,
-      BackOffFactory backOffFactory)
+      BackOffFactory backOffFactory,
+      GoogleCloudStorageOptions storageOptions)
       throws IOException {
     checkArgument(storage != null, "GCS json client cannot be null");
     this.useZeroCopyMarshaller =
         ZeroCopyReadinessChecker.isReady() && readOptions.isGrpcReadZeroCopyEnabled();
     this.metricsRecorder = metricsRecorder;
+    this.storageOptions = storageOptions;
     this.stub = stubProvider.newBlockingStub(resourceId.getBucketName());
     this.backOffFactory = backOffFactory;
     GoogleCloudStorageItemInfo itemInfo = getObjectMetadata(resourceId, storage);
@@ -210,12 +213,14 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       Watchdog watchdog,
       MetricsRecorder metricsRecorder,
       GoogleCloudStorageReadOptions readOptions,
-      BackOffFactory backOffFactory)
+      BackOffFactory backOffFactory,
+      GoogleCloudStorageOptions storageOptions)
       throws IOException {
     validate(itemInfo);
     this.useZeroCopyMarshaller =
         ZeroCopyReadinessChecker.isReady() && readOptions.isGrpcReadZeroCopyEnabled();
     this.metricsRecorder = metricsRecorder;
+    this.storageOptions = storageOptions;
     this.resourceId = itemInfo.getResourceId();
     this.stub = stubProvider.newBlockingStub(resourceId.getBucketName());
     this.objectGeneration = itemInfo.getContentGeneration();
@@ -617,7 +622,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     requestContext = Context.current().withCancellation();
     Context toReattach = requestContext.attach();
     StorageBlockingStub blockingStub =
-        stub.withDeadlineAfter(readOptions.getGrpcReadTimeoutMillis(), MILLISECONDS);
+        getStubWithDeadlineAndTracing(objectName, objectGeneration, offset, bytesToRead);
+
     Iterator<ReadObjectResponse> readObjectResponseIterator;
     try {
       if (useZeroCopyMarshaller) {
@@ -641,6 +647,20 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       requestContext.detach(toReattach);
     }
     return readObjectResponseIterator;
+  }
+
+  private StorageBlockingStub getStubWithDeadlineAndTracing(
+      String objectName, long objectGeneration, long offset, OptionalLong bytesToRead) {
+    StorageBlockingStub blockingStub =
+        stub.withDeadlineAfter(readOptions.getGrpcReadTimeoutMillis(), MILLISECONDS);
+
+    if (!this.storageOptions.isTraceLogEnabled()) {
+      return blockingStub;
+    }
+    return blockingStub.withInterceptors(
+        new GoogleCloudStorageGrpcTracingInterceptor(
+            GrpcRequestTracingInfo.getReadRequestTraceInfo(
+                objectName, objectGeneration, offset, bytesToRead)));
   }
 
   private void cancelCurrentRequest() {
@@ -722,14 +742,26 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     if (!isOpen()) {
       throw new ClosedChannelException();
     }
-    checkArgument(newPosition >= 0, "Read position must be non-negative, but was %s", newPosition);
-    checkArgument(
-        newPosition < size(),
-        "Read position must be before end of file (%s), but was %s",
-        size(),
-        newPosition);
+    validatePosition(newPosition, size());
     positionForNextRead = newPosition;
     return this;
+  }
+
+  /** Validates that the given position is valid for this channel. */
+  protected void validatePosition(long position, long size) throws IOException {
+    if (position < 0) {
+      throw new EOFException(
+          String.format(
+              "Invalid seek offset: position value (%d) must be >= 0 for '%s'",
+              position, resourceId));
+    }
+
+    if (size >= 0 && position >= size) {
+      throw new EOFException(
+          String.format(
+              "Invalid seek offset: position value (%d) must be between 0 and %d for '%s'",
+              position, size, resourceId));
+    }
   }
 
   private void updateReadStrategy() {

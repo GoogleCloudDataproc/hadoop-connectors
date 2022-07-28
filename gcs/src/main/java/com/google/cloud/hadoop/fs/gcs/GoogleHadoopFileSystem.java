@@ -25,7 +25,6 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT;
-import static com.google.cloud.hadoop.gcsio.CreateFileOptions.DEFAULT_OVERWRITE;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.CLOUD_PLATFORM_SCOPE;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -93,6 +92,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonPathCapabilities;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -365,12 +365,6 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
             HadoopCredentialsConfiguration.getImpersonatedCredentials(
                 config, credentials, GCS_CONFIG_PREFIX))
         .orElse(credentials);
-  }
-
-  private static String validatePathCapabilityArgs(Path path, String capability) {
-    checkNotNull(path);
-    checkArgument(!isNullOrEmpty(capability), "capability parameter is empty string");
-    return Ascii.toLowerCase(capability);
   }
 
   private static boolean isImplicitDirectory(FileStatus curr) {
@@ -1026,11 +1020,12 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
 
   @Override
   public boolean hasPathCapability(Path path, String capability) {
-    switch (validatePathCapabilityArgs(path, capability)) {
-        // TODO: remove string literals in favor of Constants in CommonPathCapabilities.java
-        // from Hadoop 3 when Hadoop 2 is no longer supported
-      case "fs.capability.paths.append":
-      case "fs.capability.paths.concat":
+    checkNotNull(path, "path must not be null");
+    checkArgument(
+        !isNullOrEmpty(capability), "capability must not be null or empty string for %s", path);
+    switch (Ascii.toLowerCase(capability)) {
+      case CommonPathCapabilities.FS_APPEND:
+      case CommonPathCapabilities.FS_CONCAT:
         return true;
       default:
         return false;
@@ -1046,6 +1041,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
    * @throws IOException failure to resolve the link.
    * @throws IllegalArgumentException unknown mandatory key
    */
+  @SuppressWarnings("FutureReturnValueIgnored")
   @Override
   public CompletableFuture<FSDataInputStream> openFileWithOptions(
       Path hadoopPath, OpenFileParameters parameters) throws IOException {
@@ -1097,10 +1093,12 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
         new GoogleHadoopOutputStream(
             this,
             filePath,
-            DEFAULT_OVERWRITE,
-            /* append= */ true,
-            /* minSyncInterval= */ Duration.ofMillis(
-                GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)),
+            CreateFileOptions.builder()
+                .setWriteMode(CreateFileOptions.WriteMode.APPEND)
+                .setMinSyncInterval(
+                    Duration.ofMillis(
+                        GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)))
+                .build(),
             statistics),
         statistics);
   }

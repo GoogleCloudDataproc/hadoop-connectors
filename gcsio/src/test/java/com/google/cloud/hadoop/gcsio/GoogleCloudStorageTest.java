@@ -1222,8 +1222,8 @@ public class GoogleCloudStorageTest {
 
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder()
-            .setSupportGzipEncoding(false)
-            .setFastFailOnNotFound(false)
+            .setGzipEncodingSupportEnabled(false)
+            .setFastFailOnNotFoundEnabled(false)
             .build();
 
     GoogleCloudStorageReadChannel readChannel =
@@ -1250,8 +1250,8 @@ public class GoogleCloudStorageTest {
 
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder()
-            .setSupportGzipEncoding(false)
-            .setFastFailOnNotFound(false)
+            .setGzipEncodingSupportEnabled(false)
+            .setFastFailOnNotFoundEnabled(false)
             .build();
     StorageObject storageObject = newStorageObject(BUCKET_NAME, OBJECT_NAME);
     GoogleCloudStorageItemInfo itemInfo =
@@ -1282,7 +1282,7 @@ public class GoogleCloudStorageTest {
             gcs.open(
                 RESOURCE_ID,
                 GoogleCloudStorageReadOptions.builder()
-                    .setFastFailOnNotFound(false)
+                    .setFastFailOnNotFoundEnabled(false)
                     .setInplaceSeekLimit(2)
                     .build());
 
@@ -1319,7 +1319,7 @@ public class GoogleCloudStorageTest {
 
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder()
-            .setFastFailOnNotFound(false)
+            .setFastFailOnNotFoundEnabled(false)
             .setInplaceSeekLimit(testData.length)
             .build();
 
@@ -3144,6 +3144,7 @@ public class GoogleCloudStorageTest {
 
   /** Test validation of Storage passing constructor. */
   @Test
+  @SuppressWarnings("CheckReturnValue")
   public void testStoragePassedConstructor() {
     GoogleCloudStorageOptions.Builder optionsBuilder =
         GoogleCloudStorageOptions.builder().setAppName("appName").setProjectId("projectId");

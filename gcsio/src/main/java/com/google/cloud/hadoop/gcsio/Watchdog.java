@@ -73,6 +73,7 @@ final class Watchdog implements Runnable {
     this.scheduleInterval = scheduleInterval;
   }
 
+  @SuppressWarnings("FutureReturnValueIgnored")
   private void start() {
     executor.scheduleAtFixedRate(
         this, /* initialDelay= */ 0, scheduleInterval.toMillis(), MILLISECONDS);

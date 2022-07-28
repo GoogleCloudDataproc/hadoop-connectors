@@ -95,7 +95,7 @@ public class GoogleCloudStorageImplTest {
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
 
     GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
 
     try (SeekableByteChannel readChannel = trackingGcs.delegate.open(resourceId, readOptions)) {
       assertThat(readChannel.size()).isEqualTo(expectedSize);
@@ -166,16 +166,9 @@ public class GoogleCloudStorageImplTest {
     assertThat(gcs.getStatistics())
         .containsExactlyEntriesIn(
             ImmutableMap.<String, Long>builder()
-                .put("HTTP_DELETE_REQUEST", 0L)
-                .put("HTTP_DELETE_REQUEST_FAILURE", 0L)
                 .put("HTTP_GET_REQUEST", 1L)
                 .put("HTTP_GET_REQUEST_FAILURE", 1L)
-                .put("HTTP_HEAD_REQUEST", 0L)
-                .put("HTTP_HEAD_REQUEST_FAILURE", 0L)
-                .put("HTTP_PATCH_REQUEST", 0L)
-                .put("HTTP_PATCH_REQUEST_FAILURE", 0L)
                 .put("HTTP_POST_REQUEST", 1L)
-                .put("HTTP_POST_REQUEST_FAILURE", 0L)
                 .put("HTTP_PUT_REQUEST", 5L)
                 .put("HTTP_PUT_REQUEST_FAILURE", 4L)
                 .build());
@@ -185,16 +178,9 @@ public class GoogleCloudStorageImplTest {
     assertThat(gcs.getStatistics())
         .containsExactlyEntriesIn(
             ImmutableMap.<String, Long>builder()
-                .put("HTTP_DELETE_REQUEST", 0L)
-                .put("HTTP_DELETE_REQUEST_FAILURE", 0L)
                 .put("HTTP_GET_REQUEST", 3L)
                 .put("HTTP_GET_REQUEST_FAILURE", 1L)
-                .put("HTTP_HEAD_REQUEST", 0L)
-                .put("HTTP_HEAD_REQUEST_FAILURE", 0L)
-                .put("HTTP_PATCH_REQUEST", 0L)
-                .put("HTTP_PATCH_REQUEST_FAILURE", 0L)
                 .put("HTTP_POST_REQUEST", 1L)
-                .put("HTTP_POST_REQUEST_FAILURE", 0L)
                 .put("HTTP_PUT_REQUEST", 5L)
                 .put("HTTP_PUT_REQUEST_FAILURE", 4L)
                 .build());
@@ -205,15 +191,9 @@ public class GoogleCloudStorageImplTest {
         .containsExactlyEntriesIn(
             ImmutableMap.<String, Long>builder()
                 .put("HTTP_DELETE_REQUEST", 1L)
-                .put("HTTP_DELETE_REQUEST_FAILURE", 0L)
                 .put("HTTP_GET_REQUEST", 4L)
                 .put("HTTP_GET_REQUEST_FAILURE", 1L)
-                .put("HTTP_HEAD_REQUEST", 0L)
-                .put("HTTP_HEAD_REQUEST_FAILURE", 0L)
-                .put("HTTP_PATCH_REQUEST", 0L)
-                .put("HTTP_PATCH_REQUEST_FAILURE", 0L)
                 .put("HTTP_POST_REQUEST", 1L)
-                .put("HTTP_POST_REQUEST_FAILURE", 0L)
                 .put("HTTP_PUT_REQUEST", 5L)
                 .put("HTTP_PUT_REQUEST_FAILURE", 4L)
                 .build());
@@ -246,6 +226,11 @@ public class GoogleCloudStorageImplTest {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
     TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
+    // Have separate request tracker for channels as clubbing them into one will cause flakiness
+    // while asserting the order or requests.
+
+    TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs2 =
+        newTrackingGoogleCloudStorage(GCS_OPTIONS);
 
     byte[] bytesToWrite = new byte[1024];
     GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
@@ -256,7 +241,7 @@ public class GoogleCloudStorageImplTest {
 
     // Creating this channel should succeed. Only when we close will an error bubble up.
     WritableByteChannel channel2 =
-        trackingGcs.delegate.create(resourceId, CreateObjectOptions.DEFAULT_NO_OVERWRITE);
+        trackingGcs2.delegate.create(resourceId, CreateObjectOptions.DEFAULT_NO_OVERWRITE);
 
     channel1.close();
 
@@ -264,32 +249,37 @@ public class GoogleCloudStorageImplTest {
     Throwable thrown = assertThrows(Throwable.class, channel2::close);
     assertThat(thrown).hasCauseThat().hasMessageThat().contains("412 Precondition Failed");
 
-    assertObjectContent(helperGcs, resourceId, bytesToWrite, /* partitionsCount= */ 1);
+    assertObjectContent(helperGcs, resourceId, bytesToWrite, /* expectedBytesCount= */ 1);
 
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactly(
-            getRequestString(resourceId.getBucketName(), resourceId.getObjectName()),
             getRequestString(resourceId.getBucketName(), resourceId.getObjectName()),
             resumableUploadRequestString(
                 resourceId.getBucketName(),
                 resourceId.getObjectName(),
                 /* generationId= */ 1,
                 /* replaceGenerationId= */ true),
-            resumableUploadRequestString(
+            resumableUploadChunkRequestString(
                 resourceId.getBucketName(),
                 resourceId.getObjectName(),
                 /* generationId= */ 2,
+                /* uploadId= */ 1))
+        .inOrder();
+
+    assertThat(trackingGcs2.requestsTracker.getAllRequestStrings())
+        .containsExactly(
+            getRequestString(resourceId.getBucketName(), resourceId.getObjectName()),
+            resumableUploadRequestString(
+                resourceId.getBucketName(),
+                resourceId.getObjectName(),
+                /* generationId= */ 1,
                 /* replaceGenerationId= */ true),
             resumableUploadChunkRequestString(
                 resourceId.getBucketName(),
                 resourceId.getObjectName(),
-                /* generationId= */ 3,
-                /* replaceGenerationId= */ 1),
-            resumableUploadChunkRequestString(
-                resourceId.getBucketName(),
-                resourceId.getObjectName(),
-                /* generationId= */ 4,
-                /* replaceGenerationId= */ 2));
+                /* generationId= */ 2,
+                /* uploadId= */ 1))
+        .inOrder();
   }
 
   @Test

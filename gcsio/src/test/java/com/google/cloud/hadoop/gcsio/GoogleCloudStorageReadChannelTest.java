@@ -20,6 +20,8 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.HTTP_TRA
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.OBJECT_NAME;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.createReadChannel;
 import static com.google.cloud.hadoop.gcsio.StorageResourceId.UNKNOWN_GENERATION_ID;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getMediaRequestString;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.testing.MockGoogleCloudStorageImplFactory.mockedGcs;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.dataRangeResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.dataResponse;
@@ -49,6 +51,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -69,7 +72,7 @@ public class GoogleCloudStorageReadChannelTest {
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(true).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(true).build();
 
     GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
 
@@ -88,7 +91,7 @@ public class GoogleCloudStorageReadChannelTest {
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
 
     GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
 
@@ -313,7 +316,7 @@ public class GoogleCloudStorageReadChannelTest {
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
 
     GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
     // initialize metadata
@@ -332,7 +335,7 @@ public class GoogleCloudStorageReadChannelTest {
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
 
     GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
     // initialize metadata
@@ -354,7 +357,7 @@ public class GoogleCloudStorageReadChannelTest {
         new Storage(transport, GsonFactory.getDefaultInstance(), new ArrayList<>()::add);
 
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
 
     GoogleCloudStorageReadChannel readChannel =
         createReadChannel(storage, options, requestedGeneration);
@@ -383,7 +386,7 @@ public class GoogleCloudStorageReadChannelTest {
         new Storage(transport, GsonFactory.getDefaultInstance(), new ArrayList<>()::add);
 
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(true).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(true).build();
 
     IllegalStateException exception =
         assertThrows(
@@ -411,7 +414,7 @@ public class GoogleCloudStorageReadChannelTest {
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
 
     GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options, generation);
     // initialize metadata
@@ -432,7 +435,7 @@ public class GoogleCloudStorageReadChannelTest {
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(true).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(true).build();
 
     GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options, generation);
     assertThat(readChannel.generation()).isEqualTo(generation);
@@ -449,7 +452,7 @@ public class GoogleCloudStorageReadChannelTest {
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
     GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options, generation);
     assertThrows(FileNotFoundException.class, readChannel::size);
   }
@@ -465,7 +468,7 @@ public class GoogleCloudStorageReadChannelTest {
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(true).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(true).build();
     assertThrows(
         FileNotFoundException.class, () -> createReadChannel(storage, options, generation));
   }
@@ -482,7 +485,7 @@ public class GoogleCloudStorageReadChannelTest {
         new Storage(transport, GsonFactory.getDefaultInstance(), new ArrayList<>()::add);
 
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
     GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options, generation);
 
     assertThrows(FileNotFoundException.class, readChannel::size);
@@ -521,7 +524,7 @@ public class GoogleCloudStorageReadChannelTest {
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), r -> {});
 
     GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder().setSupportGzipEncoding(true).build();
+        GoogleCloudStorageReadOptions.builder().setGzipEncodingSupportEnabled(true).build();
 
     try (GoogleCloudStorageReadChannel channel = createReadChannel(storage, readOptions)) {
       channel.position();
@@ -539,7 +542,7 @@ public class GoogleCloudStorageReadChannelTest {
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), r -> {});
 
     GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder().setSupportGzipEncoding(false).build();
+        GoogleCloudStorageReadOptions.builder().setGzipEncodingSupportEnabled(false).build();
 
     IOException e = assertThrows(IOException.class, () -> createReadChannel(storage, readOptions));
     assertThat(e)
@@ -613,7 +616,97 @@ public class GoogleCloudStorageReadChannelTest {
     assertThat(byte3).isEqualTo(new byte[] {testData[3]});
   }
 
+  @Test
+  public void read_gzipped_withExceptionThrownDuringRead() throws IOException {
+    byte[] testDataBatch = new byte[1024];
+    new Random().nextBytes(testDataBatch);
+    // Throw exception after 2GiB byte that caused data duplication before
+    long exceptionByte = 2L * 1024 * 1024 * 1024 + testDataBatch.length;
+    long maxLength = exceptionByte + testDataBatch.length;
+
+    long generation = 3419;
+
+    MockHttpTransport transport =
+        mockTransport(
+            jsonDataResponse(
+                newStorageObject(BUCKET_NAME, OBJECT_NAME)
+                    .setContentEncoding("gzip")
+                    // gzipped object size is smaller than uncompressed data
+                    .setSize(BigInteger.valueOf(maxLength / 2))
+                    .setGeneration(generation)),
+            inputStreamResponse(
+                    new InputStream() {
+                      long bytesRead = 0;
+                      boolean streamFailed;
+
+                      @Override
+                      public int read() throws IOException {
+                        if (streamFailed) {
+                          return -1;
+                        }
+                        if (bytesRead == exceptionByte) {
+                          throw new IOException(
+                              String.format("Read exception at %d byte", exceptionByte));
+                        }
+                        return testDataBatch[(int) (bytesRead++ % testDataBatch.length)] & 255;
+                      }
+                    })
+                .addHeader("Content-Encoding", "gzip")
+                // gzipped object size is smaller than uncompressed data
+                .addHeader("Content-Length", String.valueOf(maxLength / 2)),
+            inputStreamResponse(
+                    new InputStream() {
+                      long bytesRead = 0;
+
+                      @Override
+                      public int read() {
+                        return bytesRead < maxLength
+                            ? testDataBatch[(int) (bytesRead++ % testDataBatch.length)] & 255
+                            : -1;
+                      }
+                    })
+                .addHeader("Content-Encoding", "gzip")
+                // gzipped object size is smaller than uncompressed data
+                .addHeader("Content-Length", String.valueOf(maxLength / 2)));
+
+    List<HttpRequest> requests = new ArrayList<>();
+
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
+
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder().setFadvise(Fadvise.SEQUENTIAL).build();
+
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
+
+    assertThat(readChannel.size()).isEqualTo(Long.MAX_VALUE);
+
+    byte[] readBytes = new byte[testDataBatch.length];
+    long totalBytesRead = 0;
+    long bytesRead;
+    while ((bytesRead = readChannel.read(ByteBuffer.wrap(readBytes))) > 0) {
+      totalBytesRead += bytesRead;
+      assertThat(bytesRead).isEqualTo(testDataBatch.length);
+      assertThat(readBytes).isEqualTo(testDataBatch);
+      readBytes = new byte[testDataBatch.length];
+    }
+    assertThat(totalBytesRead).isEqualTo(maxLength);
+
+    List<String> rangeHeaders =
+        requests.stream().map(r -> r.getHeaders().getRange()).collect(toList());
+    assertThat(rangeHeaders).containsExactly(null, null, null).inOrder();
+
+    List<String> requestStrings =
+        requests.stream().map(r -> r.getRequestMethod() + ":" + r.getUrl()).collect(toList());
+    assertThat(requestStrings)
+        .containsExactly(
+            getRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* fields= */ "contentEncoding,generation,size"),
+            getMediaRequestString(BUCKET_NAME, OBJECT_NAME, generation),
+            getMediaRequestString(BUCKET_NAME, OBJECT_NAME, generation))
+        .inOrder();
+  }
+
   private static GoogleCloudStorageReadOptions.Builder newLazyReadOptionsBuilder() {
-    return GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false);
+    return GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false);
   }
 }

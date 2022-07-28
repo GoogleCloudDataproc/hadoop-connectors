@@ -1,3 +1,17 @@
+/*
+ * Copyright 2022 Google Inc. All Rights Reserved.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software distributed under the
+ * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageGrpcReadChannel.METADATA_FIELDS;
@@ -52,6 +66,7 @@ import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.AbstractStub;
 import io.grpc.stub.StreamObserver;
 import io.grpc.testing.GrpcCleanupRule;
+import java.io.EOFException;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -59,6 +74,8 @@ import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -637,7 +654,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
 
     IOException thrown = assertThrows(IOException.class, () -> newReadChannel(storage, options));
     assertThat(thrown).hasCauseThat().hasMessageThat().contains("backendError");
@@ -1429,7 +1446,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   public void seekFailsOnNegative() throws Exception {
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel();
 
-    assertThrows(IllegalArgumentException.class, () -> readChannel.position(-1));
+    assertThrows(EOFException.class, () -> readChannel.position(-1));
   }
 
   @Test
@@ -1479,7 +1496,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(true).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(true).build();
 
     Throwable throwable = assertThrows(IOException.class, () -> newReadChannel(storage, options));
     assertThat(throwable).hasMessageThat().contains("Item not found");
@@ -1494,7 +1511,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
 
     // If the user hasn't mandated fail fast, it is permissible for either open() or read() to
     // raise this exception.
@@ -1511,7 +1528,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
     StorageResourceId resourceId =
         StorageResourceId.fromStringPath("gs://" + BUCKET_NAME + "/" + OBJECT_NAME);
     GoogleCloudStorageItemInfo itemInfo = GoogleCloudStorageItemInfo.createNotFound(resourceId);
@@ -1569,6 +1586,100 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     assertFalse(readChannel.isOpen());
   }
 
+  @Test
+  public void traceLogEnabledGrpcTest() throws Exception {
+    AssertingLogHandler assertingHandler = new AssertingLogHandler();
+    Logger grpcTracingLogger =
+        Logger.getLogger(GoogleCloudStorageGrpcTracingInterceptor.class.getName());
+    grpcTracingLogger.setUseParentHandlers(false);
+    grpcTracingLogger.addHandler(assertingHandler);
+    grpcTracingLogger.setLevel(Level.INFO);
+
+    try {
+      readObjectAndVerify(GoogleCloudStorageOptions.builder().setTraceLogEnabled(true).build());
+      assertingHandler.assertLogCount(7);
+      assertingHandler.verifyCommonTraceFields();
+
+      verifyMethodsName(0, "streamCreated", assertingHandler);
+      verifyMethodsName(1, "outboundMessage", assertingHandler);
+      // InProcessTransport is not reporting the correct size
+      // (https://github.com/grpc/grpc-java/blob/master/core/src/main/java/io/grpc/inprocess/InProcessTransport.java#L519).
+      // Hence only validating that the relevant methods are called.
+      verifyMethodsName(2, "outboundMessageSent", assertingHandler);
+      verifyMethodsName(3, "inboundMessage", assertingHandler);
+      verifyMethodsName(4, "inboundMessageRead", assertingHandler);
+      verifyMethodsName(5, "inboundTrailers", assertingHandler);
+      verifyMethodsName(6, "streamClosed", assertingHandler);
+    } finally {
+      grpcTracingLogger.removeHandler(assertingHandler);
+    }
+  }
+
+  @Test
+  public void traceLogDisabledGrpcTest() throws Exception {
+    AssertingLogHandler assertingHandler = new AssertingLogHandler();
+    Logger grpcTracingLogger =
+        Logger.getLogger(GoogleCloudStorageGrpcTracingInterceptor.class.getName());
+    grpcTracingLogger.setUseParentHandlers(false);
+    grpcTracingLogger.addHandler(assertingHandler);
+    grpcTracingLogger.setLevel(Level.INFO);
+
+    try {
+      readObjectAndVerify(GoogleCloudStorageOptions.builder().setTraceLogEnabled(false).build());
+      assertingHandler.assertLogCount(0);
+    } finally {
+      grpcTracingLogger.removeHandler(assertingHandler);
+    }
+  }
+
+  private void readObjectAndVerify(GoogleCloudStorageOptions storageOptions) throws IOException {
+    int objectSize = FakeService.CHUNK_SIZE;
+    fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(objectSize).build());
+    storageObject.setSize(BigInteger.valueOf(objectSize));
+    verify(fakeService, times(1)).setObject(any());
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(4).build();
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options, storageOptions);
+
+    ByteBuffer buffer = ByteBuffer.allocate(100);
+    readChannel.read(buffer);
+
+    verify(get).setFields(METADATA_FIELDS);
+    verify(get).execute();
+    verify(fakeService, times(1))
+        .readObject(
+            eq(
+                ReadObjectRequest.newBuilder()
+                    .setBucket(BUCKET_NAME)
+                    .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
+                    .build()),
+            any());
+    assertArrayEquals(fakeService.data.substring(0, 100).toByteArray(), buffer.array());
+    verifyNoMoreInteractions(fakeService);
+
+    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 1);
+  }
+
+  private void verifyMethodsName(
+      int index, String methodName, AssertingLogHandler assertingHandler) {
+    assertEquals(assertingHandler.getMethodAtIndex(index), methodName);
+  }
+
+  private GoogleCloudStorageGrpcReadChannel newReadChannel(
+      GoogleCloudStorageReadOptions options, GoogleCloudStorageOptions storageOptions)
+      throws IOException {
+    return new GoogleCloudStorageGrpcReadChannel(
+        new FakeStubProvider(mockCredentials),
+        storage,
+        new StorageResourceId(V1_BUCKET_NAME, OBJECT_NAME),
+        watchdog,
+        new NoOpMetricsRecorder(),
+        options,
+        () -> BackOff.STOP_BACKOFF,
+        storageOptions);
+  }
+
   private GoogleCloudStorageGrpcReadChannel newReadChannel() throws IOException {
     return newReadChannel(GoogleCloudStorageReadOptions.DEFAULT);
   }
@@ -1582,7 +1693,8 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         watchdog,
         new NoOpMetricsRecorder(),
         options,
-        () -> BackOff.STOP_BACKOFF);
+        () -> BackOff.STOP_BACKOFF,
+        GoogleCloudStorageOptions.DEFAULT);
   }
 
   private GoogleCloudStorageGrpcReadChannel newReadChannel(GoogleCloudStorageReadOptions options)
@@ -1594,7 +1706,8 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         watchdog,
         new NoOpMetricsRecorder(),
         options,
-        () -> BackOff.STOP_BACKOFF);
+        () -> BackOff.STOP_BACKOFF,
+        GoogleCloudStorageOptions.DEFAULT);
   }
 
   private GoogleCloudStorageGrpcReadChannel newReadChannel(
@@ -1607,7 +1720,8 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         watchdog,
         new NoOpMetricsRecorder(),
         options,
-        () -> BackOff.STOP_BACKOFF);
+        () -> BackOff.STOP_BACKOFF,
+        GoogleCloudStorageOptions.DEFAULT);
   }
 
   private GoogleCloudStorageGrpcReadChannel newReadChannel(
@@ -1619,7 +1733,8 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
         watchdog,
         new NoOpMetricsRecorder(),
         options,
-        () -> BackOff.STOP_BACKOFF);
+        () -> BackOff.STOP_BACKOFF,
+        GoogleCloudStorageOptions.DEFAULT);
   }
 
   private static class FakeGrpcDecorator implements StorageStubProvider.GrpcDecorator {

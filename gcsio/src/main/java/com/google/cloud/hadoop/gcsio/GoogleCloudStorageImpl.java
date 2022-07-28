@@ -28,9 +28,6 @@ import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
-import static java.util.Arrays.stream;
-import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.toMap;
 
 import com.google.api.client.googleapis.batch.json.JsonBatchCallback;
 import com.google.api.client.googleapis.json.GoogleJsonError;
@@ -70,7 +67,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.flogger.GoogleLogger;
@@ -86,7 +82,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -94,6 +89,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -152,6 +148,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     return bytes == null ? Data.NULL_STRING : BaseEncoding.base64().encode(bytes);
   }
 
+  @Nullable
   private static byte[] decodeMetadataValues(String value) {
     try {
       return BaseEncoding.base64().decode(value);
@@ -193,19 +190,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     BackOff newBackOff();
   }
 
-  private final ImmutableMap<GoogleCloudStorageStatistics, AtomicLong> statistics =
-      ImmutableMap.copyOf(
-          stream(GoogleCloudStorageStatistics.values())
-              .collect(
-                  toMap(
-                      identity(),
-                      k -> new AtomicLong(0),
-                      (u, v) -> {
-                        throw new IllegalStateException(
-                            String.format(
-                                "Duplicate key (attempted merging values %s and %s)", u, u));
-                      },
-                      () -> new EnumMap<>(GoogleCloudStorageStatistics.class))));
+  private final ConcurrentMap<String, AtomicLong> statistics = new ConcurrentHashMap<>();
 
   private final LoadingCache<String, Boolean> autoBuckets =
       CacheBuilder.newBuilder()
@@ -296,7 +281,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer)
       throws IOException {
-    this(options, createStorage(options, httpRequestInitializer), /* accessTokenProvider= */ null);
+    this(
+        options,
+        createStorage(options, httpRequestInitializer),
+        /* downscopedAccessTokenFn= */ null);
   }
 
   public GoogleCloudStorageImpl(
@@ -312,6 +300,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    *
    * @param storage {@link Storage} to use for I/O.
    */
+  @SuppressWarnings("CheckReturnValue")
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage storage) {
     this(options, storage, /* downscopedAccessTokenFn= */ null);
   }
@@ -513,7 +502,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           new GoogleCloudStorageGrpcWriteChannel(
               storageStubProvider,
               backgroundTasksThreadPool,
-              storageOptions.getWriteChannelOptions(),
+              storageOptions,
               resourceId,
               options,
               watchdog,
@@ -732,7 +721,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // object exists, we'll need to do an RPC (metadata or data). A metadata check should be a less
     // expensive operation than a read data operation.
     GoogleCloudStorageItemInfo itemInfo =
-        readOptions.getFastFailOnNotFound() ? getItemInfo(resourceId) : null;
+        readOptions.isFastFailOnNotFoundEnabled() ? getItemInfo(resourceId) : null;
 
     return open(resourceId, itemInfo, readOptions);
   }
@@ -772,14 +761,16 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               watchdog,
               metricsRecorder,
               readOptions,
-              BackOffFactory.DEFAULT)
+              BackOffFactory.DEFAULT,
+              this.storageOptions)
           : new GoogleCloudStorageGrpcReadChannel(
               storageStubProvider,
               itemInfo,
               watchdog,
               metricsRecorder,
               readOptions,
-              BackOffFactory.DEFAULT);
+              BackOffFactory.DEFAULT,
+              this.storageOptions);
     }
 
     return new GoogleCloudStorageReadChannel(
@@ -1452,6 +1443,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         && getMaxRemainingResults(listOptions.getMaxResults(), listedPrefixes, listedObjects) > 0);
   }
 
+  @Nullable
   private String listStorageObjectsAndPrefixesPage(
       Storage.Objects.List listObject,
       ListObjectOptions listOptions,
@@ -2072,6 +2064,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @return the bucket with the given name or null if bucket not found
    * @throws IOException if the bucket exists but cannot be accessed
    */
+  @Nullable
   private Bucket getBucket(String bucketName) throws IOException {
     logger.atFiner().log("getBucket(%s)", bucketName);
     checkArgument(!isNullOrEmpty(bucketName), "bucketName must not be null or empty");
@@ -2118,6 +2111,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @return the object with the given name or null if object not found
    * @throws IOException if the object exists but cannot be accessed
    */
+  @Nullable
   private StorageObject getObject(StorageResourceId resourceId) throws IOException {
     logger.atFiner().log("getObject(%s)", resourceId);
     checkArgument(
@@ -2389,6 +2383,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @Override
   public Map<String, Long> getStatistics() {
     return statistics.entrySet().stream()
-        .collect(toImmutableMap(e -> e.getKey().name(), e -> e.getValue().get()));
+        .collect(toImmutableMap(Map.Entry::getKey, e -> e.getValue().get()));
   }
 }
