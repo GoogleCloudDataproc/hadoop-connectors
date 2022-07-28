@@ -66,6 +66,7 @@ import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.AbstractStub;
 import io.grpc.stub.StreamObserver;
 import io.grpc.testing.GrpcCleanupRule;
+import java.io.EOFException;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -1445,7 +1446,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   public void seekFailsOnNegative() throws Exception {
     GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel();
 
-    assertThrows(IllegalArgumentException.class, () -> readChannel.position(-1));
+    assertThrows(EOFException.class, () -> readChannel.position(-1));
   }
 
   @Test
