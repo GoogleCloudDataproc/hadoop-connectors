@@ -21,7 +21,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelp
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.channels.ClosedChannelException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import org.apache.hadoop.fs.FileSystem;
@@ -104,7 +103,24 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
       assertThat(in.available()).isEqualTo(0);
     }
 
-    assertThrows(ClosedChannelException.class, in::available);
+    assertThrows(IOException.class, in::available);
+  }
+
+  @Test
+  public void testReadAfterClosed() throws Exception {
+    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "read_after_closed");
+
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+            path, GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
+
+    String testContent = "test content";
+    gcsFsIHelper.writeTextFile(path, testContent);
+
+    FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
+    GoogleHadoopFSInputStream in = GoogleHadoopFSInputStream.create(ghfs, path, statistics);
+    in.close();
+    assertThrows(IOException.class, in::read);
   }
 
   private static GoogleHadoopFSInputStream createGhfsInputStream(

@@ -28,7 +28,6 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import javax.annotation.Nonnull;
-
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -49,9 +48,8 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   private long totalBytesRead = 0;
 
   /**
-   * Closed bit. Volatile so reads are non-blocking.
-   * Updates must be in a synchronized block to guarantee an atomic check and
-   * set
+   * Closed bit. Volatile so reads are non-blocking. Updates must be in a synchronized block to
+   * guarantee an atomic check and set
    */
   private volatile boolean closed;
 
@@ -207,8 +205,9 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   }
 
   /**
-   * Verify that the input stream is open. Non blocking; this gives
-   * the last state of the volatile {@link #closed} field.
+   * Verify that the input stream is open. Non blocking; this gives the last state of the volatile
+   * {@link #closed} field.
+   *
    * @throws IOException if the connection is closed.
    */
   private void checkNotClosed() throws IOException {
