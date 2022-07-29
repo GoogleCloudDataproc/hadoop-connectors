@@ -171,6 +171,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
    */
   @Override
   public synchronized long getPos() throws IOException {
+    checkNotClosed();
     long pos = channel.position();
     logger.atFiner().log("getPos(): %d", pos);
     return pos;
