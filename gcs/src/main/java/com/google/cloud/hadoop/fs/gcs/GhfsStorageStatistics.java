@@ -44,33 +44,6 @@ public class GhfsStorageStatistics extends StorageStatisticsFromIOStatistics {
   }
 
   /**
-   * Map of minimums
-   *
-   * @return current map of minimums
-   */
-  private Map<String, Long> minimums() {
-    return this.ioStatistics.minimums();
-  }
-
-  /**
-   * Map of maximums
-   *
-   * @return current map of maximums
-   */
-  private Map<String, Long> maximums() {
-    return this.ioStatistics.maximums();
-  }
-
-  /**
-   * Map of meanStatistics
-   *
-   * @return current map of MeanStatistic statistics
-   */
-  private Map<String, MeanStatistic> meanStatistics() {
-    return this.ioStatistics.meanStatistics();
-  }
-
-  /**
    * To get the minimum value which is stored with MINIMUM extension
    *
    * @param symbol
@@ -98,5 +71,32 @@ public class GhfsStorageStatistics extends StorageStatisticsFromIOStatistics {
    */
   public double getMean(String symbol) {
     return this.meanStatistics().get(symbol + MEAN).mean();
+  }
+
+  /**
+   * Map of minimums
+   *
+   * @return current map of minimums
+   */
+  private Map<String, Long> minimums() {
+    return this.ioStatistics.minimums();
+  }
+
+  /**
+   * Map of maximums
+   *
+   * @return current map of maximums
+   */
+  private Map<String, Long> maximums() {
+    return this.ioStatistics.maximums();
+  }
+
+  /**
+   * Map of meanStatistics
+   *
+   * @return current map of MeanStatistic statistics
+   */
+  private Map<String, MeanStatistic> meanStatistics() {
+    return this.ioStatistics.meanStatistics();
   }
 }
