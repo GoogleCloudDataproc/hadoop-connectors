@@ -27,7 +27,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 
 /** 
  * Time Statistics which are collected in GCS. 
- * TODO : {@link https://b.corp.google.com/issues/240645618} 
+ * TODO(b/238191725)
 */
 @InterfaceStability.Unstable
 public enum GhfsTimeStatistic {
