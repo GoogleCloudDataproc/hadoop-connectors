@@ -290,10 +290,11 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     }
   }
 
-  // The wiresize is usually greater than the content size by a few bytes. Hence, checking that the
-  // actual wire
-  // size is within the range. Also checking the difference b/w wireSize b/w two calls is within a
-  // bound of few bytes of the expected value.
+  /**
+   * The wire size is usually greater than the content size by a few bytes. Hence, checking that the
+   * actual wire size is within the range. Also checking the difference b/w wireSize b/w two calls
+   * is within a bound of few bytes of the expected value.
+   */
   private void verifyWireSizeDifferenceWithinRange(
       Map<String, Object> event1, Map<String, Object> event2, int sizeDifference, int range) {
     double wireSize1 = (double) event1.get("optionalWireSize");
@@ -330,7 +331,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     StorageResourceId resourceId =
         new StorageResourceId(BUCKET_NAME, "testOpenNonExistentItem_Object");
     IOException exception = assertThrows(IOException.class, () -> rawStorage.open(resourceId));
-    assertThat(exception).hasMessageThat().contains("Item not found");
+    assertThat(exception).hasMessageThat().contains("File not found");
   }
 
   @Test
