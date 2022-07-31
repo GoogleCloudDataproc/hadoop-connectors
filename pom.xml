@@ -635,39 +635,6 @@
           </annotationProcessorPaths>
         </configuration>
       </plugin>
-      <plugin>
-        <groupId>com.diffplug.spotless</groupId>
-        <artifactId>spotless-maven-plugin</artifactId>
-        <configuration>
-          <formats>
-            <format>
-              <includes>
-                <include>*.md</include>
-                <include>.gitignore</include>
-              </includes>
-              <trimTrailingWhitespace/>
-              <endWithNewline/>
-            </format>
-          </formats>
-          <java>
-            <toggleOffOn>
-              <off>fmt:off</off>
-              <on>fmt:on</on>
-            </toggleOffOn>
-            <googleJavaFormat>
-              <version>1.13.0</version>
-            </googleJavaFormat>
-          </java>
-        </configuration>
-        <executions>
-          <execution>
-            <goals>
-              <goal>check</goal>
-            </goals>
-            <phase>compile</phase>
-          </execution>
-        </executions>
-      </plugin>
     </plugins>
   </build>
 </project>

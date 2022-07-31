@@ -17,6 +17,7 @@ package com.google.cloud.hadoop.util;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.api.client.http.HttpTransport;
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.ComputeEngineCredentials;
@@ -29,19 +30,18 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.flogger.GoogleLogger;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.UncheckedIOException;
+
+import java.io.*;
 import java.net.URI;
 import java.time.Instant;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
+import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
+import software.amazon.awssdk.services.secretsmanager.model.*;
+import software.amazon.awssdk.regions.Region;
 
 /**
  * The Hadoop credentials configuration.
@@ -212,8 +212,18 @@ public class HadoopCredentialsConfiguration {
       case SERVICE_ACCOUNT_JSON_KEYFILE:
         String keyFile =
             SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get);
-        try (FileInputStream fis = new FileInputStream(keyFile)) {
-          return ServiceAccountCredentials.fromStream(fis, transport::get);
+        if (keyFile.contains("aws_secrets://")) {
+          // expected input is aws_secret://secretName:regionName
+          String payload = keyFile.replace("aws_secrets://", "");
+          String[] splits = payload.split(":");
+          String secret = getAWSSecret(splits[0], splits[1]);
+          Map<String,String> result = new ObjectMapper().readValue(secret, HashMap.class);
+          InputStream is = new ByteArrayInputStream(result.get(secret).getBytes());
+          return ServiceAccountCredentials.fromStream(is);
+        } else {
+          try (FileInputStream fis = new FileInputStream(keyFile)) {
+            return ServiceAccountCredentials.fromStream(fis, transport::get);
+          }
         }
       case USER_CREDENTIALS:
         String clientId = AUTH_CLIENT_ID_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get);
@@ -375,11 +385,53 @@ public class HadoopCredentialsConfiguration {
     COMPUTE_ENGINE,
     /** Configures JSON keyfile service account authentication */
     SERVICE_ACCOUNT_JSON_KEYFILE,
-    /** Configures unauthenticated access */
+
     UNAUTHENTICATED,
     /** Configures user credentials authentication */
     USER_CREDENTIALS,
+
+    AWS_SECRETS_MANAGER_KEY
   }
 
+  public static String getAWSSecret(String secretName, String regionName) {
+
+    Region region = Region.of(regionName);
+
+    // Create a Secrets Manager client
+    SecretsManagerClient client = SecretsManagerClient.builder()
+            .region(region)
+            .build();
+
+    GetSecretValueRequest getSecretValueRequest = GetSecretValueRequest.builder()
+            .secretId(secretName)
+            .build();
+    GetSecretValueResponse getSecretValueResponse = null;
+
+    try {
+      getSecretValueResponse = client.getSecretValue(getSecretValueRequest);
+    } catch (DecryptionFailureException e) {
+      throw e;
+    } catch (InternalServiceErrorException e) {
+      // An error occurred on the server side.
+      // Deal with the exception here, and/or rethrow at your discretion.
+      throw e;
+    } catch (InvalidParameterException e) {
+      // You provided an invalid value for a parameter.
+      // Deal with the exception here, and/or rethrow at your discretion.
+      throw e;
+    } catch (InvalidRequestException e) {
+      // You provided a parameter value that is not valid for the current state of the resource.
+      // Deal with the exception here, and/or rethrow at your discretion.
+      throw e;
+    } catch (ResourceNotFoundException e) {
+      // We can't find the resource that you asked for.
+      // Deal with the exception here, and/or rethrow at your discretion.
+      throw e;
+    }
+
+    return getSecretValueResponse.secretString();
+
+  }
   protected HadoopCredentialsConfiguration() {}
+
 }

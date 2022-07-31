@@ -99,5 +99,11 @@
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
     </dependency>
+      <dependency>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>secretsmanager</artifactId>
+          <version>2.16.60</version>
+          <scope>compile</scope>
+      </dependency>
   </dependencies>
 </project>
