@@ -29,7 +29,6 @@ import com.google.api.client.http.HttpResponse;
 import com.google.api.client.util.BackOff;
 import com.google.api.client.util.BackOffUtils;
 import com.google.api.client.util.ExponentialBackOff;
-import com.google.api.client.util.NanoClock;
 import com.google.api.client.util.Sleeper;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.StorageObject;
@@ -128,10 +127,6 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   // Sleeper used for waiting between retries.
   private Sleeper sleeper = Sleeper.DEFAULT;
 
-  // The clock used by ExponentialBackOff to determine when the maximum total elapsed time has
-  // passed doing a series of retries.
-  private NanoClock clock = NanoClock.SYSTEM;
-
   // read operation gets its own Exponential Backoff Strategy,
   // to avoid interference with other operations in nested retries.
   private Supplier<BackOff> readBackOff = Suppliers.memoize(this::createBackOff);
@@ -177,8 +172,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
     // Initialize metadata if available.
     GoogleCloudStorageItemInfo info = getInitialMetadata();
-    if (info != null) {
-      initMetadata(info);
+    if (info != null || readOptions.isFastFailOnNotFoundEnabled()) {
+      initMetadata(info == null ? fetchInitialMetadata() : info);
     }
   }
 
@@ -187,13 +182,6 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   void setSleeper(Sleeper sleeper) {
     checkArgument(sleeper != null, "sleeper must not be null!");
     this.sleeper = sleeper;
-  }
-
-  /** Sets the clock to be used for determining when max total time has elapsed doing retries. */
-  @VisibleForTesting
-  void setNanoClock(NanoClock clock) {
-    checkArgument(clock != null, "clock must not be null!");
-    this.clock = clock;
   }
 
   /**
@@ -214,7 +202,6 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         .setMultiplier(readOptions.getBackoffMultiplier())
         .setMaxIntervalMillis(readOptions.getBackoffMaxIntervalMillis())
         .setMaxElapsedTimeMillis(readOptions.getBackoffMaxElapsedTimeMillis())
-        .setNanoClock(clock)
         .build();
   }
 
@@ -225,7 +212,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
    */
   @Nullable
   protected GoogleCloudStorageItemInfo getInitialMetadata() throws IOException {
-    return readOptions.isFastFailOnNotFoundEnabled() ? fetchInitialMetadata() : null;
+    return null;
   }
 
   /** Returns {@link GoogleCloudStorageItemInfo} used to initialize metadata in constructor. */
