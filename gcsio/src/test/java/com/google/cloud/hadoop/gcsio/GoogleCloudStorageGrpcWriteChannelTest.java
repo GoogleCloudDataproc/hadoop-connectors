@@ -493,8 +493,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
             false);
     fakeService.setInsertObjectExceptions(
         ImmutableList.of(
-            new StatusException(Status.DEADLINE_EXCEEDED),
-            new StatusException(Status.INTERNAL)));
+            new StatusException(Status.DEADLINE_EXCEEDED), new StatusException(Status.INTERNAL)));
     fakeService.setQueryWriteStatusResponses(
         ImmutableList.of(QueryWriteStatusResponse.newBuilder().setPersistedSize(1).build())
             .iterator());
