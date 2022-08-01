@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertEquals;
 
 import io.grpc.Metadata;
@@ -43,6 +44,13 @@ class TestServerHeaderInterceptor implements ServerInterceptor {
       assertEquals(
           String.format("bucket=%s", bucket),
           metadata.get(StorageStubProvider.GOOG_REQUEST_PARAMS));
+    }
+  }
+
+  void verifyAllRequestsHasInvocationId() {
+    for (Metadata metadata : allMeta) {
+      assertThat(metadata.get(InvocationIdGrpcChannelInterceptor.GOOG_API_CLIENT))
+          .contains(InvocationIdGrpcChannelInterceptor.GCCL_INVOCATION_ID);
     }
   }
 }
