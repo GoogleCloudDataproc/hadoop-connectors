@@ -27,7 +27,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Handler;
+import java.util.logging.Level;
 import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 public class AssertingLogHandler extends Handler {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
@@ -81,6 +83,28 @@ public class AssertingLogHandler extends Handler {
       assertTrue(event.containsKey("requestinfo"));
       assertTrue(event.containsKey("eventtime"));
       assertTrue(event.containsKey("details"));
+    }
+  }
+
+  public Logger getLoggerForClass(String className) {
+    Logger grpcTracingLogger = Logger.getLogger(className);
+    grpcTracingLogger.setUseParentHandlers(false);
+    grpcTracingLogger.addHandler(this);
+    grpcTracingLogger.setLevel(Level.INFO);
+    return grpcTracingLogger;
+  }
+
+  public void verifyJsonLogFields(String bucketName, String objectPrefix) {
+    for (Map<String, Object> logRecord : logRecords) {
+      assertThat(logRecord.get("response_time")).isNotNull();
+      assertThat(logRecord.get("response_headers")).isNotNull();
+      assertThat(logRecord.get("request_headers")).isNotNull();
+      assertThat(logRecord.get("request_method")).isNotNull();
+      assertThat(logRecord.get("request_url").toString())
+          .startsWith("https://storage.googleapis.com/");
+      assertThat(logRecord.get("request_url").toString()).contains(bucketName);
+      assertThat(logRecord.get("request_url").toString()).contains(objectPrefix);
+      assertThat(logRecord.get("response_status_code")).isNotNull();
     }
   }
 
