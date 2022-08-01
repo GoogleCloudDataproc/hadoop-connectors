@@ -63,6 +63,7 @@ class StorageStubProvider {
         .createChannelBuilder(target)
         .enableRetry()
         .userAgent(options.getAppName())
+        .intercept(new GrpcChannelInvocationIdInterceptor())
         .build();
   }
 
