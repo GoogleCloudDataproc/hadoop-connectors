@@ -937,6 +937,43 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   }
 
   @Test
+  public void firstReadBeyondInPlaceSeekLimit() throws Exception {
+    int objectSize = 100;
+    fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(objectSize).build());
+    storageObject.setSize(BigInteger.valueOf(objectSize));
+    verify(fakeService, times(1)).setObject(any());
+    int inplaceSeekLimit = 10;
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder()
+            .setInplaceSeekLimit(inplaceSeekLimit)
+            .setFadvise(Fadvise.AUTO)
+            .setMinRangeRequestSize(inplaceSeekLimit)
+            .build();
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
+
+    ByteBuffer buffer = ByteBuffer.allocate(20);
+    readChannel.position(inplaceSeekLimit * 2);
+    readChannel.read(buffer);
+
+    verify(get).setFields(METADATA_FIELDS);
+    verify(get).execute();
+    verify(fakeService, times(1))
+        .readObject(
+            eq(
+                ReadObjectRequest.newBuilder()
+                    .setBucket(BUCKET_NAME)
+                    .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
+                    .setReadOffset(inplaceSeekLimit * 2)
+                    .build()),
+            any());
+
+    verifyNoMoreInteractions(fakeService);
+
+    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 1);
+  }
+
+  @Test
   public void testFooterSizeBiggerThanContent() throws Exception {
     int objectSize = 100;
     storageObject.setSize(BigInteger.valueOf(objectSize));

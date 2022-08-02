@@ -104,7 +104,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   private boolean channelIsOpen = true;
 
   // Current position in the object.
-  private long positionInGrpcStream;
+  private long positionInGrpcStream = -1;
 
   // the position from which next read should happen
   private long positionForNextRead;
@@ -765,7 +765,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   }
 
   private void updateReadStrategy() {
-    if (readStrategy == Fadvise.AUTO) {
+    if (readStrategy == Fadvise.AUTO && positionInGrpcStream != -1) {
       if (positionForNextRead < positionInGrpcStream
           || positionForNextRead - positionInGrpcStream > readOptions.getInplaceSeekLimit()) {
         readStrategy = Fadvise.RANDOM;
