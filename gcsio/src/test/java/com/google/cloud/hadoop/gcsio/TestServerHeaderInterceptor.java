@@ -50,7 +50,7 @@ class TestServerHeaderInterceptor implements ServerInterceptor {
   void verifyAllRequestsHasInvocationId() {
     for (Metadata metadata : allMeta) {
       assertThat(metadata.get(InvocationIdGrpcChannelInterceptor.GOOG_API_CLIENT))
-          .contains(InvocationIdGrpcChannelInterceptor.GCCL_INVOCATION_ID);
+          .contains(InvocationIdGrpcChannelInterceptor.GCCL_INVOCATION_ID_PREFIX);
     }
   }
 }
