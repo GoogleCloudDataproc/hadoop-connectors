@@ -110,5 +110,4 @@ public class EventLoggingHttpRequestInitializerTest {
         .createRequestFactory()
         .buildGetRequest(new GenericUrl(REQUEST_URL));
   }
-
 }

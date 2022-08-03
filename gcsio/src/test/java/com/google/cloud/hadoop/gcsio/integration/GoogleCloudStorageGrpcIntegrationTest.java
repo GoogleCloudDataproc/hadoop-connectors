@@ -309,7 +309,6 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     assertEquals("grpc", requestTracingInfo.getApi());
     assertEquals(requestType, requestTracingInfo.getRequestType());
     assertEquals(objectName, requestTracingInfo.getObjectName());
->>>>>>> cb6998b995350de6b2682e479518559b02790046
   }
 
   @Test

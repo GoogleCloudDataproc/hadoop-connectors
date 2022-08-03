@@ -1,6 +1,5 @@
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PIPE_BUFFER_SIZE_DEFAULT;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.storage.v2.ServiceConstants.Values.MAX_WRITE_CHUNK_BYTES;
 import static org.junit.Assert.assertFalse;
@@ -393,7 +392,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     writeChannel.write(data.asReadOnlyByteBuffer());
     sleeper.sleep(1000); // give the upload thread time to run
     assertThrows(IOException.class, () -> writeChannel.write(data.asReadOnlyByteBuffer()));
-    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 1);
+    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 2);
   }
 
   @Test
