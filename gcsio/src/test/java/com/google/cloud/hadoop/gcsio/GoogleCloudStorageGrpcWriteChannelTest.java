@@ -1,5 +1,6 @@
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PIPE_BUFFER_SIZE_DEFAULT;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.storage.v2.ServiceConstants.Values.MAX_WRITE_CHUNK_BYTES;
 import static org.junit.Assert.assertFalse;
@@ -52,6 +53,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -400,7 +403,11 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
     GoogleCloudStorageGrpcWriteChannel writeChannel =
         newWriteChannel(
-            options, writeConditions, /* requesterPaysProject= */ null, () -> BackOff.ZERO_BACKOFF);
+            options,
+            writeConditions,
+            /* requesterPaysProject= */ null,
+            () -> BackOff.ZERO_BACKOFF,
+            false);
     fakeService.setInsertObjectExceptions(
         ImmutableList.of(new StatusException(Status.DEADLINE_EXCEEDED)));
     fakeService.setQueryWriteStatusResponses(
@@ -590,23 +597,86 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     assertFalse(writeChannel.isOpen());
   }
 
+  @Test
+  public void testTraceLogEnabled() throws Exception {
+    AssertingLogHandler assertingHandler = new AssertingLogHandler();
+    Logger grpcTracingLogger =
+        Logger.getLogger(GoogleCloudStorageGrpcTracingInterceptor.class.getName());
+    grpcTracingLogger.setUseParentHandlers(false);
+    grpcTracingLogger.addHandler(assertingHandler);
+    grpcTracingLogger.setLevel(Level.INFO);
+
+    try {
+      writeDataAndVerify(true);
+      assertingHandler.assertLogCount(14);
+      assertingHandler.verifyCommonTraceFields();
+    } finally {
+      grpcTracingLogger.removeHandler(assertingHandler);
+    }
+  }
+
+  @Test
+  public void testTraceLogDisabled() throws Exception {
+    AssertingLogHandler assertingHandler = new AssertingLogHandler();
+    Logger grpcTracingLogger =
+        Logger.getLogger(GoogleCloudStorageGrpcTracingInterceptor.class.getName());
+    grpcTracingLogger.setUseParentHandlers(false);
+    grpcTracingLogger.addHandler(assertingHandler);
+    grpcTracingLogger.setLevel(Level.INFO);
+
+    try {
+      writeDataAndVerify(false);
+      assertingHandler.assertLogCount(0);
+    } finally {
+      grpcTracingLogger.removeHandler(assertingHandler);
+    }
+  }
+
+  private void writeDataAndVerify(boolean isTracingEnabled) throws IOException {
+    AsyncWriteChannelOptions options =
+        AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(false).build();
+    ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
+    GoogleCloudStorageGrpcWriteChannel writeChannel = newTraceEnabledWriteChannel(isTracingEnabled);
+
+    ByteString data = ByteString.copyFromUtf8("test data");
+    writeChannel.initialize();
+    writeChannel.write(data.asReadOnlyByteBuffer());
+    writeChannel.close();
+
+    WriteObjectRequest expectedInsertRequest =
+        WriteObjectRequest.newBuilder()
+            .setUploadId(UPLOAD_ID)
+            .setChecksummedData(ChecksummedData.newBuilder().setContent(data))
+            .setFinishWrite(true)
+            .build();
+
+    verify(fakeService, times(1)).startResumableWrite(eq(START_REQUEST), any());
+    verify(fakeService.insertRequestObserver, times(1)).onNext(expectedInsertRequest);
+    verify(fakeService.insertRequestObserver, atLeast(1)).onCompleted();
+    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 2);
+  }
+
   private GoogleCloudStorageGrpcWriteChannel newWriteChannel(
       AsyncWriteChannelOptions options,
       ObjectWriteConditions writeConditions,
       String requesterPaysProject) {
     return newWriteChannel(
-        options, writeConditions, requesterPaysProject, () -> BackOff.STOP_BACKOFF);
+        options, writeConditions, requesterPaysProject, () -> BackOff.STOP_BACKOFF, false);
   }
 
   private GoogleCloudStorageGrpcWriteChannel newWriteChannel(
       AsyncWriteChannelOptions options,
       ObjectWriteConditions writeConditions,
       String requesterPaysProject,
-      BackOffFactory backOffFactory) {
+      BackOffFactory backOffFactory,
+      boolean traceEnabled) {
     return new GoogleCloudStorageGrpcWriteChannel(
         new FakeStubProvider(mockCredentials),
         executor,
-        options,
+        GoogleCloudStorageOptions.builder()
+            .setTraceLogEnabled(traceEnabled)
+            .setWriteChannelOptions(options)
+            .build(),
         new StorageResourceId(V1_BUCKET_NAME, OBJECT_NAME),
         CreateObjectOptions.DEFAULT_NO_OVERWRITE.toBuilder().setContentType(CONTENT_TYPE).build(),
         watchdog,
@@ -620,6 +690,19 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
 
     return newWriteChannel(options, writeConditions, /* requesterPaysProject= */ null);
+  }
+
+  private GoogleCloudStorageGrpcWriteChannel newTraceEnabledWriteChannel(boolean isTracingEnabled) {
+    AsyncWriteChannelOptions options =
+        AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(false).build();
+    ObjectWriteConditions writeConditions = ObjectWriteConditions.NONE;
+
+    return newWriteChannel(
+        options,
+        writeConditions,
+        /* requesterPaysProject= */ null,
+        () -> BackOff.STOP_BACKOFF,
+        isTracingEnabled);
   }
 
   /* Returns an int with the same bytes as the uint32 representation of value. */
