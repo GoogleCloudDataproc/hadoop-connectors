@@ -2170,8 +2170,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             // Request only fields used in GoogleCloudStorageItemInfo:
             // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
             .setFields(OBJECT_FIELDS);
+    Stopwatch stopwatch = Stopwatch.createStarted();
     try {
-      Stopwatch stopwatch = Stopwatch.createStarted();
       StorageObject object = getObject.execute();
 
       logger.atFinest().log(
