@@ -235,7 +235,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       // Request only fields that are used for metadata initialization
       Stopwatch metadataStopwatch = Stopwatch.createStarted();
       Storage.Objects.Get getObject =
-              createMetadataRequest().setFields("contentEncoding,generation,size");
+          createMetadataRequest().setFields("contentEncoding,generation,size");
       object =
           ResilientOperation.retry(
               getObject::execute,

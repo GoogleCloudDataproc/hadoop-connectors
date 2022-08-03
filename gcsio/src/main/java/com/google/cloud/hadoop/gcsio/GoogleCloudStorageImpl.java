@@ -525,7 +525,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           new GoogleCloudStorageGrpcWriteChannel(
               storageStubProvider,
               backgroundTasksThreadPool,
-              storageOptions.getWriteChannelOptions(),
+              storageOptions,
               resourceId,
               options,
               watchdog,
@@ -783,7 +783,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               watchdog,
               metricsRecorder,
               readOptions,
-              BackOffFactory.DEFAULT)
+              BackOffFactory.DEFAULT,
+              this.storageOptions)
           : new GoogleCloudStorageGrpcReadChannel(
               storageStubProvider,
               storage,
@@ -791,7 +792,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               watchdog,
               metricsRecorder,
               readOptions,
-              BackOffFactory.DEFAULT);
+              BackOffFactory.DEFAULT,
+              this.storageOptions);
     }
     return new GoogleCloudStorageReadChannel(
         storage, resourceId, errorExtractor, clientRequestHelper, readOptions) {
