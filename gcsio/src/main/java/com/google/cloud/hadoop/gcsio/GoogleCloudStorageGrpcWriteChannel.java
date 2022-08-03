@@ -16,20 +16,22 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.encodeMetadata;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.storage.v2.ServiceConstants.Values.MAX_WRITE_CHUNK_BYTES;
+import static java.lang.Math.min;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.stream.Collectors.toMap;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.BackOffFactory;
-import com.google.cloud.hadoop.util.BaseAbstractGoogleAsyncWriteChannel;
+import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
 import com.google.common.io.BaseEncoding;
-import com.google.common.io.ByteStreams;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.util.Timestamps;
 import com.google.storage.v2.ChecksummedData;
@@ -52,21 +54,24 @@ import io.grpc.stub.ClientCallStreamObserver;
 import io.grpc.stub.ClientCalls;
 import io.grpc.stub.ClientResponseObserver;
 import io.grpc.stub.StreamObserver;
-import java.io.BufferedInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedByInterruptException;
+import java.nio.channels.ClosedChannelException;
+import java.nio.channels.WritableByteChannel;
 import java.time.Duration;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /** Implements WritableByteChannel to provide write access to GCS via gRPC. */
 public final class GoogleCloudStorageGrpcWriteChannel
-    extends BaseAbstractGoogleAsyncWriteChannel<WriteObjectResponse>
-    implements GoogleCloudStorageItemInfo.Provider {
+    implements GoogleCloudStorageItemInfo.Provider, WritableByteChannel {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private static final Duration START_RESUMABLE_WRITE_TIMEOUT = Duration.ofMinutes(1);
@@ -89,9 +94,24 @@ public final class GoogleCloudStorageGrpcWriteChannel
   private final String requesterPaysProject;
   private final BackOffFactory backOffFactory;
   private final Watchdog watchdog;
+  private final int MAX_BYTES_PER_MESSAGE = MAX_WRITE_CHUNK_BYTES.getNumber();
+
+  private final ExecutorService threadPool;
+
+  private final AsyncWriteChannelOptions channelOptions;
+
+  // Upload operation that takes place on a separate thread.
+  private Future<WriteObjectResponse> uploadOperation;
   private final GoogleCloudStorageOptions storageOptions;
 
   private GoogleCloudStorageItemInfo completedItemInfo = null;
+  // writeBuffer stores (buffers) data between the upstream write api and downstream thread
+  // pushing the data to GCS
+  private LinkedBlockingQueue<ByteString> writeBuffer;
+  // lastChunk holds on to the data written by upstream write API which is less than 2MB. We do this
+  // to accumulate 2MB ByteString buffers in the writeBuffer.
+  private ByteString lastChunk;
+  private boolean initialized;
 
   GoogleCloudStorageGrpcWriteChannel(
       StorageStubProvider stubProvider,
@@ -103,7 +123,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
       ObjectWriteConditions writeConditions,
       String requesterPaysProject,
       BackOffFactory backOffFactory) {
-    super(threadPool, storageOptions.getWriteChannelOptions());
     this.stubProvider = stubProvider;
     this.storageOptions = storageOptions;
     this.stub = stubProvider.newAsyncStub(resourceId.getBucketName());
@@ -113,14 +132,14 @@ public final class GoogleCloudStorageGrpcWriteChannel
     this.requesterPaysProject = requesterPaysProject;
     this.backOffFactory = backOffFactory;
     this.watchdog = watchdog;
+    this.threadPool = threadPool;
+    this.channelOptions = storageOptions.getWriteChannelOptions();
   }
 
-  @Override
-  protected String getResourceString() {
+  private String getResourceString() {
     return resourceId.toString();
   }
 
-  @Override
   public void handleResponse(WriteObjectResponse response) {
     Object resource = response.getResource();
     Map<String, byte[]> metadata =
@@ -157,24 +176,124 @@ public final class GoogleCloudStorageGrpcWriteChannel
             new VerificationAttributes(md5Hash, crc32c));
   }
 
-  @Override
-  public void startUpload(InputStream pipeSource) {
-    // Given that the two ends of the pipe must operate asynchronous relative
-    // to each other, we need to start the upload operation on a separate thread.
+  public boolean isOpen() {
+    return (writeBuffer != null);
+  }
+
+  public synchronized int write(ByteBuffer buffer) throws IOException {
+    checkState(initialized, "initialize() must be invoked before use.");
+    int bytesWritten = 0;
+    if (!isOpen()) {
+      throw new ClosedChannelException();
+    }
+
+    // No point in writing further if upload failed on another thread.
+    if (uploadOperation.isDone()) {
+      waitForCompletionAndThrowIfUploadFailed();
+    }
+
+    // create chunks of MAX_BYTES_PER_MESSAGE and push them into writeBuffer. If the loop ends up
+    // in a scenario where the lastChunk size is less than MAX_BYTES_PER_MESSAGE, then we hold on
+    // to it until next write or close.
+    while (buffer.remaining() > 0) {
+      int bytesToWrite = 0;
+      if (lastChunk != null) {
+        bytesToWrite = min(buffer.remaining(), MAX_BYTES_PER_MESSAGE - lastChunk.size());
+        lastChunk = lastChunk.concat(ByteString.copyFrom(buffer, bytesToWrite));
+      } else {
+        bytesToWrite = min(buffer.remaining(), MAX_BYTES_PER_MESSAGE);
+        lastChunk = ByteString.copyFrom(buffer, bytesToWrite);
+      }
+      bytesWritten += bytesToWrite;
+      if (lastChunk.size() == MAX_BYTES_PER_MESSAGE) {
+        try {
+          writeBuffer.put(lastChunk);
+          lastChunk = null;
+        } catch (InterruptedException e) {
+          throw new IOException(
+              String.format(
+                  "Failed to write %d bytes in '%s'", buffer.remaining(), getResourceString()),
+              e);
+        }
+      }
+    }
+
+    return bytesWritten;
+  }
+
+  /** Initialize this channel object for writing. */
+  public void initialize() throws IOException {
+    checkState(!initialized, "initialize() must be invoked only once.");
+    writeBuffer =
+        new LinkedBlockingQueue<ByteString>(
+            Math.toIntExact(channelOptions.getNumberOfBufferedRequests()));
     try {
       uploadOperation =
           threadPool.submit(
               new UploadOperation(
-                  pipeSource, this.resourceId, this.storageOptions.isTraceLogEnabled()));
+                  writeBuffer, this.resourceId, this.storageOptions.isTraceLogEnabled()));
     } catch (Exception e) {
       throw new RuntimeException(String.format("Failed to start upload for '%s'", resourceId), e);
+    }
+    initialized = true;
+  }
+
+  public void close() throws IOException {
+    checkState(initialized, "initialize() must be invoked before use.");
+    if (!isOpen()) {
+      return;
+    }
+    // The way we signal close (EOF) to downstream thread is by appending a ByteString of size less
+    // than 2MB. If the uploaded file size is multiple of 2MB, then we end up appending an empty
+    // ByteString buffer. The lastChunk carries the data written by upstream not amounting to 2MB
+    if (lastChunk == null) {
+      lastChunk = ByteString.EMPTY;
+    }
+    try {
+      writeBuffer.put(lastChunk);
+      lastChunk = null;
+      handleResponse(waitForCompletionAndThrowIfUploadFailed());
+    } catch (InterruptedException e) {
+      throw new IOException(String.format("Interrupted on close for '%s'", resourceId), e);
+    } finally {
+      writeBuffer = null;
+      closeInternal();
+    }
+  }
+
+  private void closeInternal() {
+    if (uploadOperation != null && !uploadOperation.isDone()) {
+      uploadOperation.cancel(/* mayInterruptIfRunning= */ true);
+    }
+    uploadOperation = null;
+  }
+  /**
+   * Throws if upload operation failed. Propagates any errors.
+   *
+   * @throws IOException on IO error
+   */
+  private WriteObjectResponse waitForCompletionAndThrowIfUploadFailed() throws IOException {
+    try {
+      return uploadOperation.get();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      // If we were interrupted, we need to cancel the upload operation.
+      uploadOperation.cancel(true);
+      IOException exception = new ClosedByInterruptException();
+      exception.addSuppressed(e);
+      throw exception;
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof Error) {
+        throw (Error) e.getCause();
+      }
+      throw new IOException(
+          String.format("Upload failed for '%s'", getResourceString()), e.getCause());
     }
   }
 
   private class UploadOperation implements Callable<WriteObjectResponse> {
 
     // Read end of the pipe.
-    private final BufferedInputStream pipeSource;
     private final int MAX_BYTES_PER_MESSAGE = MAX_WRITE_CHUNK_BYTES.getNumber();
     private final StorageResourceId resourceId;
     private final boolean tracingEnabled;
@@ -182,15 +301,21 @@ public final class GoogleCloudStorageGrpcWriteChannel
     private Hasher objectHasher;
     private String uploadId;
     private long writeOffset = 0;
-    private InsertChunkResponseObserver responseObserver;
+    private LinkedBlockingQueue<ByteString> writeBuffer;
+    private SimpleResponseObserver<QueryWriteStatusResponse> writeStatusResponseObserver;
+    private Stopwatch writeStatusStopWatch;
+
     // Holds list of most recent number of NUMBER_OF_REQUESTS_TO_RETAIN requests, so upload can
     // be rewound and re-sent upon transient errors.
     private final TreeMap<Long, WriteObjectRequest> requestChunkMap = new TreeMap<>();
 
-    UploadOperation(InputStream pipeSource, StorageResourceId resourceId, boolean tracingEnabled) {
+    UploadOperation(
+        LinkedBlockingQueue<ByteString> writeBuffer,
+        StorageResourceId resourceId,
+        boolean tracingEnabled) {
       this.resourceId = resourceId;
       this.tracingEnabled = tracingEnabled;
-      this.pipeSource = new BufferedInputStream(pipeSource, MAX_BYTES_PER_MESSAGE);
+      this.writeBuffer = writeBuffer;
       if (channelOptions.isGrpcChecksumsEnabled()) {
         objectHasher = Hashing.crc32c().newHasher();
       }
@@ -201,13 +326,19 @@ public final class GoogleCloudStorageGrpcWriteChannel
       // Try-with-resource will close this end of the pipe so that
       // the writer at the other end will not hang indefinitely.
       // Send the initial StartResumableWrite request to get an uploadId.
-      try (InputStream ignore = pipeSource) {
+      try {
+        Stopwatch stopwatch = Stopwatch.createStarted();
         uploadId = startResumableUploadWithRetries();
-        return ResilientOperation.retry(
-            this::doResumableUpload,
-            backOffFactory.newBackOff(),
-            this::isRetriableError,
-            IOException.class);
+        WriteObjectResponse response =
+            ResilientOperation.retry(
+                this::doResumableUpload,
+                backOffFactory.newBackOff(),
+                this::isRetriableError,
+                IOException.class);
+        logger.atFinest().log(
+            "File upload complete: resource:%s, time:%d",
+            resourceId, stopwatch.elapsed(MILLISECONDS));
+        return response;
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         throw new IOException(
@@ -289,9 +420,15 @@ public final class GoogleCloudStorageGrpcWriteChannel
         } else {
           // Pick up a chunk to write only if dataChunkMap has space. Else continue after looking
           // for errors.
-          ByteString data =
-              ByteString.readFrom(
-                  ByteStreams.limit(pipeSource, MAX_BYTES_PER_MESSAGE), MAX_BYTES_PER_MESSAGE);
+          ByteString data = null;
+          try {
+            data = (writeBuffer == null) ? ByteString.EMPTY : writeBuffer.take();
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException(
+                String.format(
+                    "Interrupted while reading from blocking queue for '%s'", resourceId));
+          }
           insertRequest = buildInsertRequest(writeOffset, data, false);
           requestChunkMap.put(writeOffset, insertRequest);
           writeOffset += data.size();
@@ -299,6 +436,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
         if (insertRequest != null) {
           requestStreamObserver.onNext(insertRequest);
           objectFinalized = insertRequest.getFinishWrite();
+          if (objectFinalized) {
+            writeBuffer = null;
+          }
         }
         if (responseObserver.hasTransientError() || responseObserver.hasNonTransientError()) {
           requestStreamObserver.onError(
@@ -382,7 +522,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
           if (entry.getKey() + entry.getValue().getChecksummedData().getContent().size()
                   > writeOffset
               || entry.getKey() == writeOffset) {
-            Long writeOffsetToResume = entry.getKey();
             request = entry.getValue();
             break;
           }
@@ -402,21 +541,20 @@ public final class GoogleCloudStorageGrpcWriteChannel
         TreeMap<Long, WriteObjectRequest> requestChunkMap, long writeOffset) throws IOException {
 
       long committedWriteOffset = getCommittedWriteSizeWithRetries(uploadId);
+
       logger.atFinest().log(
-          "Fetched committedWriteOffset: size:%d, numBuffers:%d, writeOffset:%d, committedWriteOffset:%d",
-          requestChunkMap.size(),
-          channelOptions.getNumberOfBufferedRequests(),
-          writeOffset,
-          committedWriteOffset);
+          "Fetched committedWriteOffset: size:%d, writeOffset:%d, committedWriteOffset:%d",
+          requestChunkMap.size(), writeOffset, committedWriteOffset);
 
       // check and remove chunks from dataChunkMap
+      long buffersFreed = 0;
       while (requestChunkMap.size() > 0 && requestChunkMap.firstKey() < committedWriteOffset) {
-        logger.atFinest().log(
-            "clearing dataChunkMap one buffer at a time, size: %d, firstKey:%d, committedwriteOffset:%d",
-            requestChunkMap.size(), requestChunkMap.firstKey(), committedWriteOffset);
         requestChunkMap.remove(requestChunkMap.firstKey());
+        buffersFreed++;
       }
+      logger.atFinest().log("Freed up %d buffers, resource:%s", buffersFreed, resourceId);
     }
+
     /** Handler for responses from the Insert streaming RPC. */
     private class InsertChunkResponseObserver
         implements ClientResponseObserver<WriteObjectRequest, WriteObjectResponse> {

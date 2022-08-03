@@ -21,6 +21,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.nullToEmpty;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpResponse;
@@ -39,6 +40,7 @@ import com.google.cloud.hadoop.util.ResilientOperation;
 import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.flogger.GoogleLogger;
@@ -101,6 +103,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
   // Size of the contentChannel.
   private long contentChannelEnd = -1;
+
+  private Stopwatch stopwatch;
 
   // Whether to use bounded range requests or streaming requests.
   @VisibleForTesting boolean randomAccess;
@@ -229,6 +233,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     StorageObject object;
     try {
       // Request only fields that are used for metadata initialization
+      Stopwatch metadataStopwatch = Stopwatch.createStarted();
       Storage.Objects.Get getObject =
           createMetadataRequest().setFields("contentEncoding,generation,size");
       object =
@@ -238,6 +243,13 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
               RetryDeterminer.SOCKET_ERRORS,
               IOException.class,
               sleeper);
+
+      logger.atFinest().log(
+          "GoogleCloudStorageReadChannel:getMetadata complete context:%d,time:%d,resource:%s,requestId:%s",
+          Thread.currentThread().getId(),
+          metadataStopwatch.elapsed(MILLISECONDS),
+          resourceId,
+          getObject.getLastResponseHeaders().getFirstHeaderStringValue("x-guploader-uploadid"));
     } catch (IOException e) {
       throw errorExtractor.itemNotFound(e)
           ? createFileNotFoundException(resourceId, e)
@@ -397,8 +409,12 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
         ++retriesAttempted;
         logger.atWarning().withCause(ioe).log(
-            "Failed read retry #%s/%s for '%s'. Sleeping...",
-            retriesAttempted, maxRetries, resourceId);
+            "Failed read context:%d,retry:%s/%s,time:%d,resource:%s",
+            Thread.currentThread().getId(),
+            retriesAttempted,
+            maxRetries,
+            stopwatch.elapsed(MILLISECONDS),
+            resourceId);
         try {
           boolean backOffSuccessful = BackOffUtils.next(sleeper, readBackOff.get());
           if (!backOffSuccessful) {
@@ -930,7 +946,17 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     Get getObject = createDataRequest(rangeHeader);
     HttpResponse response;
     try {
+      stopwatch = Stopwatch.createStarted();
       response = getObject.executeMedia();
+
+      logger.atFinest().log(
+          "openStream complete context:%d,time:%d,bytesToRead:%d,rangeSize:%d,resource:%s,requestId:%s",
+          Thread.currentThread().getId(),
+          stopwatch.elapsed(MILLISECONDS),
+          bytesToRead,
+          contentChannelEnd - contentChannelPosition,
+          resourceId,
+          response.getHeaders().getFirstHeaderStringValue("x-guploader-uploadid"));
       // TODO(b/110832992): validate response range header against expected/request range
     } catch (IOException e) {
       if (!metadataInitialized && errorExtractor.rangeNotSatisfiable(e) && currentPosition == 0) {
@@ -995,13 +1021,21 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
           cacheFooter(response);
           if (retriesCount != 0) {
             logger.atInfo().log(
-                "Successfully cached footer after %s retries for '%s'", retriesCount, resourceId);
+                "Successfully cached footer context:%d,retries:%s,time:%d,resource:%s",
+                Thread.currentThread().getId(),
+                retriesCount,
+                stopwatch.elapsed(MILLISECONDS),
+                resourceId);
           }
           break;
         } catch (IOException footerException) {
-          logger.atInfo().withCause(footerException).log(
-              "Failed to prefetch footer (retry #%s/%s) for '%s'",
-              retriesCount + 1, maxRetries, resourceId);
+          logger.atWarning().withCause(footerException).log(
+              "Failed to prefetch footer context:%d,retry:%s/%s,time:%d,resource:%s",
+              Thread.currentThread().getId(),
+              retriesCount + 1,
+              maxRetries,
+              stopwatch.elapsed(MILLISECONDS),
+              resourceId);
           if (retriesCount == 0) {
             readBackOff.get().reset();
           }

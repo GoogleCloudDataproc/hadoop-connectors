@@ -26,6 +26,7 @@ import static com.google.common.base.Strings.emptyToNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static java.lang.Math.toIntExact;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.batch.json.JsonBatchCallback;
@@ -70,6 +71,7 @@ import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -514,13 +516,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             .setContentGenerationMatch(writeGeneration.orElse(null))
             .build();
 
-    BaseAbstractGoogleAsyncWriteChannel<?> channel;
     if (storageOptions.isGrpcEnabled()) {
       String requesterPaysProjectId = null;
       if (requesterShouldPay(resourceId.getBucketName())) {
         requesterPaysProjectId = storageOptions.getRequesterPaysOptions().getProjectId();
       }
-      channel =
+      GoogleCloudStorageGrpcWriteChannel channel =
           new GoogleCloudStorageGrpcWriteChannel(
               storageStubProvider,
               backgroundTasksThreadPool,
@@ -531,8 +532,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               writeConditions,
               requesterPaysProjectId,
               BackOffFactory.DEFAULT);
+      channel.initialize();
+      return channel;
     } else {
-      channel =
+      BaseAbstractGoogleAsyncWriteChannel<?> channel =
           new GoogleCloudStorageWriteChannel(
               storage,
               clientRequestHelper,
@@ -548,9 +551,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                   super.createRequest(inputStream), resourceId.getBucketName());
             }
           };
+      channel.initialize();
+      return channel;
     }
-    channel.initialize();
-    return channel;
   }
 
   /**
@@ -2167,11 +2170,22 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             // Request only fields used in GoogleCloudStorageItemInfo:
             // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
             .setFields(OBJECT_FIELDS);
+    Stopwatch stopwatch = Stopwatch.createStarted();
     try {
-      return getObject.execute();
+      StorageObject object = getObject.execute();
+
+      logger.atFinest().log(
+          "GoogleCloudStorageImpl:getMetadata complete context:%d,time:%d,resource:%s,requestId:%s",
+          Thread.currentThread().getId(),
+          stopwatch.elapsed(MILLISECONDS),
+          resourceId,
+          getObject.getLastResponseHeaders().getFirstHeaderStringValue("x-guploader-uploadid"));
+      return object;
     } catch (IOException e) {
       if (errorExtractor.itemNotFound(e)) {
-        logger.atFiner().withCause(e).log("getObject(%s): not found", resourceId);
+        logger.atFiner().withCause(e).log(
+            "getObject(%s): not found, context:%d,time:%d",
+            resourceId, Thread.currentThread().getId(), stopwatch.elapsed(MILLISECONDS));
         return null;
       }
       throw new IOException("Error accessing " + resourceId, e);
