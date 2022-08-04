@@ -69,10 +69,10 @@ public abstract class GoogleCloudStorageOptions {
   public static final long MAX_LIST_ITEMS_PER_CALL_DEFAULT = 1024;
 
   /** Default setting for maximum number of requests per GCS batch. */
-  public static final long MAX_REQUESTS_PER_BATCH_DEFAULT = 30;
+  public static final long MAX_REQUESTS_PER_BATCH_DEFAULT = 15;
 
   /** Default setting for number of threads to execute GCS batch requests. */
-  public static final int BATCH_THREADS_DEFAULT = 0;
+  public static final int BATCH_THREADS_DEFAULT = 15;
 
   /** Default setting for maximum number of GCS HTTP request retires. */
   public static final int MAX_HTTP_REQUEST_RETRIES = 10;
@@ -84,10 +84,10 @@ public abstract class GoogleCloudStorageOptions {
   public static final int HTTP_REQUEST_READ_TIMEOUT = 20 * 1000;
 
   /** Default setting for whether or not to use rewrite request for copy operation. */
-  public static final boolean COPY_WITH_REWRITE_DEFAULT = false;
+  public static final boolean COPY_WITH_REWRITE_DEFAULT = true;
 
   /** Default setting for max number of bytes rewritten per rewrite request/call. */
-  public static final int MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT = 0;
+  public static final long MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT = 512 * 1024 * 1024L;
 
   /** Default setting for grpc message timeout check interval (in milliseconds) */
   public static final long GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL = 1000;
