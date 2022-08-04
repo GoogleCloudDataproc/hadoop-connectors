@@ -104,7 +104,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   private boolean channelIsOpen = true;
 
   // Current position in the object.
-  private long positionInGrpcStream;
+  private long positionInGrpcStream = -1;
 
   // the position from which next read should happen
   private long positionForNextRead;
@@ -423,6 +423,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       invalidateBufferedContent();
     }
 
+    checkArgument(positionInGrpcStream >= 0, "Read should always happen from positive offset");
     // The server responds in 2MB chunks, but the client can ask for less than that. We
     // store the remainder in bufferedContent and return pieces of that on the next read call (and
     // flush that buffer if there is a seek).
@@ -765,7 +766,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   }
 
   private void updateReadStrategy() {
-    if (readStrategy == Fadvise.AUTO) {
+    if (readStrategy == Fadvise.AUTO && positionInGrpcStream != -1) {
       if (positionForNextRead < positionInGrpcStream
           || positionForNextRead - positionInGrpcStream > readOptions.getInplaceSeekLimit()) {
         readStrategy = Fadvise.RANDOM;
