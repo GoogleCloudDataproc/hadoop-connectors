@@ -1706,7 +1706,10 @@ public class GoogleCloudStorageTest {
     assertThrows(FileNotFoundException.class, () -> gcs.open(objectId));
 
     // Second time is the rangeNotSatisfiableException.
-    SeekableByteChannel readChannel2 = gcs.open(objectId);
+    SeekableByteChannel readChannel2 =
+        gcs.open(
+            objectId, GoogleCloudStorageReadOptions.builder().setMinRangeRequestSize(0).build());
+    //    readChannel2.read(ByteBuffer.allocate(1));
     EOFException thrown2 =
         assertThrows(EOFException.class, () -> readChannel2.read(ByteBuffer.allocate(1)));
 

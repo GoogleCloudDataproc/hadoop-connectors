@@ -35,8 +35,6 @@ import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.ClientRequestHelper;
-import com.google.cloud.hadoop.util.ResilientOperation;
-import com.google.cloud.hadoop.util.RetryDeterminer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Suppliers;
 import com.google.common.flogger.GoogleLogger;
@@ -174,6 +172,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     GoogleCloudStorageItemInfo info = getInitialMetadata();
     if (info != null || readOptions.isFastFailOnNotFoundEnabled()) {
       initMetadata(info == null ? fetchInitialMetadata() : info);
+    } else if (readOptions.isFastFailOnNotFoundEnabled()) {
+      prefetchFooterAndInitMetadata();
     }
   }
 
@@ -207,47 +207,45 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
   /**
    * Returns {@link GoogleCloudStorageItemInfo} used to initialize metadata in constructor or {@code
-   * null} if {@link GoogleCloudStorageReadOptions#isFastFailOnNotFoundEnabled()} is set to {@code
-   * false}.
+   * null} if {@link GoogleCloudStorageReadOptions#isFastFailOnNotFound()} is set to {@code false}.
    */
   @Nullable
   protected GoogleCloudStorageItemInfo getInitialMetadata() throws IOException {
     return null;
   }
 
-  /** Returns {@link GoogleCloudStorageItemInfo} used to initialize metadata in constructor. */
-  private GoogleCloudStorageItemInfo fetchInitialMetadata() throws IOException {
-    StorageObject object;
+  /** Method used to cache footer and initializes metadata in constructor. */
+  private void prefetchFooterAndInitMetadata() throws IOException {
+    checkState(!metadataInitialized, "metadata should not be initialized yet for '%s'", resourceId);
+
+    // TODO: use metadata request if `readOptions.getMinRangeRequestSize()` is 0.
+    Storage.Objects.Get getObject =
+        createDataRequest(/* rangeHeader= */ "bytes=-" + readOptions.getMinRangeRequestSize());
+    HttpResponse response;
     try {
-      // Request only fields that are used for metadata initialization
-      Storage.Objects.Get getObject =
-          createMetadataRequest().setFields("contentEncoding,generation,size");
-      object =
-          ResilientOperation.retry(
-              getObject::execute,
-              readBackOff.get(),
-              RetryDeterminer.SOCKET_ERRORS,
-              IOException.class,
-              sleeper);
+      response = getObject.executeMedia();
+      // TODO(b/110832992): validate response range header against expected/request range
     } catch (IOException e) {
-      throw errorExtractor.itemNotFound(e)
-          ? createFileNotFoundException(resourceId, e)
-          : new IOException("Error reading " + resourceId, e);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IOException("Thread interrupt received.", e);
+      if (errorExtractor.rangeNotSatisfiable(e)) {
+        // We don't know the size yet (metadata not yet initialized) and we're reading footer,
+        // but got 'range not satisfiable'; the object must be empty.
+        logger.atInfo().log(
+            "Got 'range not satisfiable' during pre-fetching footer for '%s'.", resourceId);
+        size = 0;
+        return;
+      }
+      response = handleExecuteMediaException(e);
     }
-    return GoogleCloudStorageItemInfo.createObject(
-        resourceId,
-        /* creationTime= */ 0,
-        /* modificationTime= */ 0,
-        checkNotNull(object.getSize(), "size can not be null for '%s'", resourceId).longValue(),
-        /* contentType= */ null,
-        object.getContentEncoding(),
-        /* metadata= */ null,
-        checkNotNull(object.getGeneration(), "generation can not be null for '%s'", resourceId),
-        /* metaGeneration= */ 0,
-        /* verificationAttributes= */ null);
+
+    initMetadata(response.getHeaders());
+    checkState(metadataInitialized, "metadata should be initialized already for '%s'", resourceId);
+
+    // Do not cache footer for empty and gzip-encoded files
+    if (size == 0 || gzipEncoded) {
+      return;
+    }
+
+    cacheFooterWithRetries(getObject, response);
   }
 
   /**
@@ -622,7 +620,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   public long size() throws IOException {
     throwIfNotOpen();
     if (!metadataInitialized) {
-      initMetadata(fetchInitialMetadata());
+      prefetchFooterAndInitMetadata();
     }
     return size;
   }
@@ -1058,6 +1056,42 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
       }
       throw e;
     }
+  }
+
+  private void cacheFooterWithRetries(Storage.Objects.Get getObject, HttpResponse response)
+      throws IOException {
+    for (int retriesCount = 0; retriesCount < maxRetries; retriesCount++) {
+      try {
+        cacheFooter(response);
+        if (retriesCount != 0) {
+          logger.atInfo().log(
+              "Successfully cached footer after %s retries for '%s'", retriesCount, resourceId);
+        }
+        break;
+      } catch (IOException footerException) {
+        logger.atInfo().withCause(footerException).log(
+            "Failed to prefetch footer (retry #%s/%s) for '%s'",
+            retriesCount + 1, maxRetries, resourceId);
+        if (retriesCount == 0) {
+          readBackOff.get().reset();
+        }
+        if (retriesCount == maxRetries) {
+          resetContentChannel();
+          throw footerException;
+        }
+        try {
+          response = getObject.executeMedia();
+          // TODO(b/110832992): validate response range header against expected/request range.
+        } catch (IOException e) {
+          response = handleExecuteMediaException(e);
+        }
+      }
+    }
+    checkState(
+        footerContent != null,
+        "footerContent should not be null after successful footer prefetch for '%s'",
+        resourceId);
+    resetContentChannel();
   }
 
   private boolean isFooterRead() {
