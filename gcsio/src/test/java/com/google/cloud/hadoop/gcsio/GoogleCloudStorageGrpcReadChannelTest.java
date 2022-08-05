@@ -831,9 +831,8 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
 
   @Test
   public void firstReadBeyondInPlaceSeekLimit() throws Exception {
-    int objectSize = 100;
+    objectSize = 100;
     fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(objectSize).build());
-    storageObject.setSize(BigInteger.valueOf(objectSize));
     verify(fakeService, times(1)).setObject(any());
     int inplaceSeekLimit = 10;
     GoogleCloudStorageReadOptions options =
@@ -848,8 +847,6 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     readChannel.position(inplaceSeekLimit * 2);
     readChannel.read(buffer);
 
-    verify(get).setFields(METADATA_FIELDS);
-    verify(get).execute();
     verify(fakeService, times(1))
         .readObject(
             eq(
