@@ -109,7 +109,11 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
     CompletableFuture<FSDataInputStream> isFuture = ghfs.openFile(filePath).build();
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(getRequestString(testBucketName, name.getMethodName()));
+        .containsExactly(
+            getRequestString(
+                testBucketName,
+                name.getMethodName(),
+                /* fields= */ "contentEncoding,generation,size"));
 
     String fileContent;
     try (FSDataInputStream is = isFuture.get()) {
@@ -119,7 +123,10 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
     assertThat(fileContent).isEqualTo(expectedContent);
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
-            getRequestString(testBucketName, name.getMethodName()),
+            getRequestString(
+                testBucketName,
+                name.getMethodName(),
+                /* fields= */ "contentEncoding,generation,size"),
             getMediaRequestString(
                 testBucketName, name.getMethodName(), itemInfo.getContentGeneration()))
         .inOrder();

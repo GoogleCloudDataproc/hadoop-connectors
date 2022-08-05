@@ -1274,7 +1274,10 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
-            getRequestString(testBucket, testFile.getObjectName()),
+            getRequestString(
+                testBucket,
+                testFile.getObjectName(),
+                /* fields= */ "contentEncoding,generation,size"),
             getMediaRequestString(testBucket, testFile.getObjectName(), generationId))
         .inOrder();
   }
@@ -1333,7 +1336,11 @@ public class GoogleCloudStorageNewIntegrationTest {
         .isEqualTo("Cannot read GZIP encoded files - content encoding support is disabled.");
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(getRequestString(testBucket, testFile.getObjectName()));
+        .containsExactly(
+            getRequestString(
+                testBucket,
+                testFile.getObjectName(),
+                /* fields= */ "contentEncoding,generation,size"));
   }
 
   @Test
@@ -1377,6 +1384,8 @@ public class GoogleCloudStorageNewIntegrationTest {
         assertThrows(FileNotFoundException.class, () -> gcs.open(itemInfo, readOptions));
 
     assertThat(e).hasMessageThat().startsWith("Item not found");
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings()).isEmpty();
   }
 
   private static List<String> getObjectNames(List<GoogleCloudStorageItemInfo> listedObjects) {

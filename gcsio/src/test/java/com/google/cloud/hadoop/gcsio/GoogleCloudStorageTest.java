@@ -44,10 +44,6 @@ import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockT
 import static com.google.common.net.HttpHeaders.CONTENT_LENGTH;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.when;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.googleapis.media.MediaHttpUploader;
@@ -59,6 +55,7 @@ import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.util.BackOff;
 import com.google.api.client.util.DateTime;
+import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.NanoClock;
 import com.google.api.client.util.Sleeper;
 import com.google.api.services.storage.Storage;
@@ -103,6 +100,7 @@ import java.util.Random;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.zip.GZIPOutputStream;
 import javax.net.ssl.SSLException;
@@ -680,7 +678,9 @@ public class GoogleCloudStorageTest {
     assertThrows(ClosedChannelException.class, channel::position);
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
-        .containsExactly(getRequestString(BUCKET_NAME, OBJECT_NAME))
+        .containsExactly(
+            getRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* fields= */ "contentEncoding,generation,size"))
         .inOrder();
   }
 
@@ -719,7 +719,8 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            getRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* fields= */ "contentEncoding,generation,size"),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
@@ -758,7 +759,8 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            getRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* fields= */ "contentEncoding,generation,size"),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()))
         .inOrder();
@@ -799,7 +801,8 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            getRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* fields= */ "contentEncoding,generation,size"),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()))
         .inOrder();
   }
@@ -831,7 +834,8 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            getRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* fields= */ "contentEncoding,generation,size"),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()))
         .inOrder();
   }
@@ -881,7 +885,8 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            getRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* fields= */ "contentEncoding,generation,size"),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()))
@@ -933,7 +938,8 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            getRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* fields= */ "contentEncoding,generation,size"),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()))
@@ -941,18 +947,29 @@ public class GoogleCloudStorageTest {
   }
 
   @Test
-  public void testOpenExceptionsDuringReadTotalElapsedTimeTooGreat() throws Exception {
+  public void open_exceptionsDuringRead_totalElapsedTimeTooGreat() throws Exception {
     IOException readException1 = new IOException("read IOException #1");
     IOException readException2 = new IOException("read IOException #2");
 
-    NanoClock spyNanoClock = spy(NanoClock.class);
+    NanoClock fakeNanoClock =
+        new NanoClock() {
 
-    when(spyNanoClock.nanoTime())
-        .thenReturn(
-            Duration.ofMillis(1).toNanos(),
-            Duration.ofMillis(2).toNanos(),
-            Duration.ofMillis(3).toNanos(),
-            Duration.ofMillis(3).plusMillis(DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS).toNanos());
+          private final ImmutableList<Long> fakeValues =
+              ImmutableList.of(
+                  Duration.ofMillis(1).toNanos(),
+                  Duration.ofMillis(2).toNanos(),
+                  Duration.ofMillis(3).toNanos(),
+                  Duration.ofMillis(3)
+                      .plusMillis(DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS)
+                      .toNanos());
+
+          private final AtomicInteger fakeValueIndex = new AtomicInteger(0);
+
+          @Override
+          public long nanoTime() {
+            return fakeValues.get(fakeValueIndex.getAndIncrement());
+          }
+        };
 
     StorageObject storageObject = newStorageObject(BUCKET_NAME, OBJECT_NAME);
 
@@ -966,29 +983,35 @@ public class GoogleCloudStorageTest {
 
     GoogleCloudStorageReadChannel readChannel =
         (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
-    readChannel.setNanoClock(spyNanoClock);
+    readChannel.setReadBackOff(
+        new ExponentialBackOff.Builder()
+            .setMaxElapsedTimeMillis(DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS)
+            .setNanoClock(fakeNanoClock)
+            .build());
     assertThat(readChannel.isOpen()).isTrue();
     assertThat(readChannel.position()).isEqualTo(0);
 
     IOException thrown =
         assertThrows(IOException.class, () -> readChannel.read(ByteBuffer.allocate(1)));
-    assertThat(thrown).hasMessageThat().isEqualTo("read IOException #2");
+    assertThat(thrown).isSameInstanceAs(readException2);
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            getRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* fields= */ "contentEncoding,generation,size"),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()))
         .inOrder();
   }
 
   @Test
-  public void testOpenExceptionsDuringReadInterruptedDuringSleep() throws Exception {
-    Sleeper spySleeper = spy(Sleeper.class);
-
+  public void open_exceptionsDuringRead_interruptedDuringSleep() throws Exception {
     InterruptedException sleepException = new InterruptedException("sleep InterruptedException");
 
-    doThrow(sleepException).when(spySleeper).sleep(anyLong());
+    Sleeper throwingSleeper =
+        millis -> {
+          throw sleepException;
+        };
 
     StorageObject storageObject = newStorageObject(BUCKET_NAME, OBJECT_NAME);
 
@@ -1002,7 +1025,7 @@ public class GoogleCloudStorageTest {
 
     GoogleCloudStorageReadChannel readChannel =
         (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
-    readChannel.setSleeper(spySleeper);
+    readChannel.setSleeper(throwingSleeper);
     assertThat(readChannel.isOpen()).isTrue();
     assertThat(readChannel.position()).isEqualTo(0);
 
@@ -1013,7 +1036,8 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            getRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* fields= */ "contentEncoding,generation,size"),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()))
         .inOrder();
   }
@@ -1047,7 +1071,8 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            getRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* fields= */ "contentEncoding,generation,size"),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()))
@@ -1114,7 +1139,8 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            getRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* fields= */ "contentEncoding,generation,size"),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()))
@@ -1201,7 +1227,8 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            getRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* fields= */ "contentEncoding,generation,size"),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()))
@@ -1402,7 +1429,8 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            getRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* fields= */ "contentEncoding,generation,size"),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()))
         .inOrder();
@@ -1457,7 +1485,8 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            getRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* fields= */ "contentEncoding,generation,size"),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()))
@@ -1529,7 +1558,8 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            getRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* fields= */ "contentEncoding,generation,size"),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()))
         .inOrder();
@@ -1578,10 +1608,13 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            getRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* fields= */ "contentEncoding,generation,size"),
+            getRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* fields= */ "contentEncoding,generation,size"),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject1.getGeneration()),
-            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            getRequestString(
+                BUCKET_NAME, OBJECT_NAME, /* fields= */ "contentEncoding,generation,size"),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject2.getGeneration()))
         .inOrder();
   }
