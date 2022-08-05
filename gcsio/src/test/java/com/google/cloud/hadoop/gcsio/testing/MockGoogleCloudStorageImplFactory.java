@@ -48,4 +48,20 @@ public class MockGoogleCloudStorageImplFactory {
         storage,
         null);
   }
+
+  public static GoogleCloudStorageImpl mockedGcs(
+      GoogleCloudStorageOptions options, HttpTransport transport) {
+    Storage storage =
+        new Storage(
+            transport,
+            GsonFactory.getDefaultInstance(),
+            new TrackingHttpRequestInitializer(
+                new RetryHttpInitializer(
+                    new FakeCredentials(),
+                    RetryHttpInitializerOptions.builder()
+                        .setDefaultUserAgent("gcs-io-unit-test")
+                        .build()),
+                false));
+    return new GoogleCloudStorageImpl(options, storage, null);
+  }
 }

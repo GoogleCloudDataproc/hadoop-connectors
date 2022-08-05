@@ -18,10 +18,10 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.BATCH_THREADS_DEFAULT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.COPY_WITH_REWRITE_DEFAULT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.DEFAULT_GRPC_ENABLED;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.DEFAULT_GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL_MILLIS;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.DEFAULT_TRAFFIC_DIRECTOR_ENABLED;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.DIRECT_PATH_PREFERRED_DEFAULT;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.ENABLE_GRPC_DEFAULT;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.ENABLE_TRAFFIC_DIRECTOR_DEFAULT;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.HTTP_REQUEST_CONNECT_TIMEOUT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.HTTP_REQUEST_READ_TIMEOUT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT;
@@ -356,7 +356,7 @@ public class GoogleHadoopFileSystemConfiguration {
 
   /** Configuration key for enabling use of the gRPC API for read/write. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.grpc.enable", ENABLE_GRPC_DEFAULT);
+      new HadoopConfigurationProperty<>("fs.gs.grpc.enable", DEFAULT_GRPC_ENABLED);
 
   /** Configuration key for enabling checksum validation for the gRPC API. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_CHECKSUMS_ENABLE =
@@ -371,7 +371,8 @@ public class GoogleHadoopFileSystemConfiguration {
   /** Configuration key for check interval (in millisecond) for gRPC request timeout to GCS. */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_CHECK_INTERVAL_TIMEOUT_MS =
       new HadoopConfigurationProperty<>(
-          "fs.gs.grpc.checkinterval.timeout.ms", GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL);
+          "fs.gs.grpc.checkinterval.timeout.ms",
+          DEFAULT_GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL_MILLIS);
 
   /**
    * Configuration key for the connection timeout (in millisecond) for gRPC read requests to GCS.
@@ -418,7 +419,7 @@ public class GoogleHadoopFileSystemConfiguration {
   /** Configuration key for enabling use of traffic director gRPC API for read/write. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_TRAFFICDIRECTOR_ENABLE =
       new HadoopConfigurationProperty<>(
-          "fs.gs.grpc.trafficdirector.enable", ENABLE_TRAFFIC_DIRECTOR_DEFAULT);
+          "fs.gs.grpc.trafficdirector.enable", DEFAULT_TRAFFIC_DIRECTOR_ENABLED);
 
   /** Configuration key for the headers for HTTP request to GCS. */
   public static final HadoopConfigurationProperty<Map<String, String>> GCS_HTTP_HEADERS =

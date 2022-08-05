@@ -1122,6 +1122,7 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
                     .setObject(OBJECT_NAME)
                     .setGeneration(OBJECT_GENERATION)
                     .setReadOffset(readOffset)
+                    .setReadLimit(minRangeRequestSize)
                     .build()),
             any());
     assertThat(buffer.array())

@@ -602,7 +602,10 @@ public class GoogleCloudStorageReadChannelTest {
         (GoogleCloudStorageReadChannel)
             gcs.open(
                 new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
-                GoogleCloudStorageReadOptions.builder().setInplaceSeekLimit(3).build());
+                GoogleCloudStorageReadOptions.builder()
+                    .setInplaceSeekLimit(3)
+                    .setFadvise(Fadvise.SEQUENTIAL)
+                    .build());
 
     setUpAndValidateReadChannelMocksAndSetMaxRetries(readChannel, 3);
 

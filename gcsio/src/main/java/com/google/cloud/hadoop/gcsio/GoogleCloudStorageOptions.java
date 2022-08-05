@@ -35,10 +35,10 @@ import javax.annotation.Nullable;
 public abstract class GoogleCloudStorageOptions {
 
   /** Default setting for enabling use of GCS gRPC API. */
-  public static final boolean ENABLE_GRPC_DEFAULT = false;
+  public static final boolean DEFAULT_GRPC_ENABLED = false;
 
   /** Default setting for enabling use of the Traffic Director for GCS gRPC API. */
-  public static final boolean ENABLE_TRAFFIC_DIRECTOR_DEFAULT = true;
+  public static final boolean DEFAULT_TRAFFIC_DIRECTOR_ENABLED = true;
 
   /** Default setting to prefer DirectPath for gRPC. */
   public static final boolean DIRECT_PATH_PREFERRED_DEFAULT = true;
@@ -90,7 +90,7 @@ public abstract class GoogleCloudStorageOptions {
   public static final long MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT = 512 * 1024 * 1024L;
 
   /** Default setting for grpc message timeout check interval (in milliseconds) */
-  public static final long GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL = 1000;
+  public static final long DEFAULT_GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL_MILLIS = 1000;
 
   /** Default setting for GCS HTTP request headers. */
   public static final ImmutableMap<String, String> HTTP_REQUEST_HEADERS_DEFAULT = ImmutableMap.of();
@@ -104,8 +104,8 @@ public abstract class GoogleCloudStorageOptions {
 
   public static Builder builder() {
     return new AutoValue_GoogleCloudStorageOptions.Builder()
-        .setGrpcEnabled(ENABLE_GRPC_DEFAULT)
-        .setTrafficDirectorEnabled(ENABLE_TRAFFIC_DIRECTOR_DEFAULT)
+        .setGrpcEnabled(DEFAULT_GRPC_ENABLED)
+        .setTrafficDirectorEnabled(DEFAULT_TRAFFIC_DIRECTOR_ENABLED)
         .setDirectPathPreferred(DIRECT_PATH_PREFERRED_DEFAULT)
         .setStorageRootUrl(STORAGE_ROOT_URL_DEFAULT)
         .setStorageServicePath(STORAGE_SERVICE_PATH_DEFAULT)
@@ -124,7 +124,7 @@ public abstract class GoogleCloudStorageOptions {
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
         .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
         .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT)
-        .setGrpcMessageTimeoutCheckInterval(GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL)
+        .setGrpcMessageTimeoutCheckInterval(DEFAULT_GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL_MILLIS)
         .setMetricsSink(MetricsSink.NONE)
         .setTraceLogEnabled(false);
   }

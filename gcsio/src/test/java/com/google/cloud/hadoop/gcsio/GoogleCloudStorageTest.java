@@ -136,6 +136,8 @@ public class GoogleCloudStorageTest {
       GoogleCloudStorageOptions.builder()
           .setAppName("gcsio-unit-test")
           .setProjectId(PROJECT_ID)
+          .setBatchThreads(0)
+          .setCopyWithRewriteEnabled(false)
           .build();
 
   private static final ImmutableMap<String, byte[]> EMPTY_METADATA = ImmutableMap.of();
@@ -1560,7 +1562,6 @@ public class GoogleCloudStorageTest {
         .containsExactly(
             getRequestString(
                 BUCKET_NAME, OBJECT_NAME, /* fields= */ "contentEncoding,generation,size"),
-            getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()))
         .inOrder();
   }
