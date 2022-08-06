@@ -1172,9 +1172,11 @@ public class GoogleCloudStorageTest {
             dataResponse(responseHeaders, compressedData));
 
     GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setGzipEncodingSupportEnabled(true).build();
 
     GoogleCloudStorageReadChannel readChannel =
-        (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
+        (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID, readOptions);
     assertThat(readChannel.isOpen()).isTrue();
     assertThat(readChannel.position()).isEqualTo(0);
     assertThat(readChannel.size()).isEqualTo(Long.MAX_VALUE);
@@ -1471,8 +1473,11 @@ public class GoogleCloudStorageTest {
 
     GoogleCloudStorage gcs = mockedGcs(transport);
 
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setGzipEncodingSupportEnabled(true).build();
+
     GoogleCloudStorageReadChannel readChannel =
-        (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
+        (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID, readOptions);
     readChannel.setReadBackOff(BackOff.ZERO_BACKOFF);
 
     assertThat(readChannel.isOpen()).isTrue();
