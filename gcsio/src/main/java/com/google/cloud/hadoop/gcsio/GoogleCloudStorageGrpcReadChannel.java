@@ -23,6 +23,7 @@ import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsRecorder.STATU
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -325,7 +326,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       invalidateBufferedContent();
     }
 
-    checkArgument(positionInGrpcStream >= 0, "Read should always happen from positive offset");
+    checkState(positionInGrpcStream >= 0, "Read should always happen from positive offset");
     // The server responds in 2MB chunks, but the client can ask for less than that. We
     // store the remainder in bufferedContent and return pieces of that on the next read call (and
     // flush that buffer if there is a seek).
