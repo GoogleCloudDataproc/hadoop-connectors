@@ -86,7 +86,8 @@ public class GoogleCloudStorageNewIntegrationTest {
     Credentials credentials =
         checkNotNull(GoogleCloudStorageTestHelper.getCredentials(), "credentials must not be null");
 
-    gcsOptions = getStandardOptionBuilder().build();
+    gcsOptions =
+        getStandardOptionBuilder().setBatchThreads(0).setCopyWithRewriteEnabled(false).build();
     httpRequestsInitializer =
         new RetryHttpInitializer(credentials, gcsOptions.toRetryHttpInitializerOptions());
 
@@ -1118,7 +1119,12 @@ public class GoogleCloudStorageNewIntegrationTest {
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
     GoogleCloudStorage gcs =
         new GoogleCloudStorageImpl(
-            gcsOptions.toBuilder().setCopyWithRewriteEnabled(true).build(), gcsRequestsTracker);
+            gcsOptions.toBuilder()
+                .setBatchThreads(0)
+                .setCopyWithRewriteEnabled(true)
+                .setMaxBytesRewrittenPerCall(0)
+                .build(),
+            gcsRequestsTracker);
 
     String testBucket1 = gcsfsIHelper.sharedBucketName1;
     String testBucket2 = gcsfsIHelper.sharedBucketName2;

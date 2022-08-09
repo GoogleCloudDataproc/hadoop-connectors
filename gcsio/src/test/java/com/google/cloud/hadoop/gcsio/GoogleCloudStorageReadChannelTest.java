@@ -270,8 +270,9 @@ public class GoogleCloudStorageReadChannelTest {
                 newStorageObject(BUCKET_NAME, OBJECT_NAME).setContentEncoding("gzip")));
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), r -> {});
 
-    GoogleCloudStorageReadChannel readChannel =
-        createReadChannel(storage, GoogleCloudStorageReadOptions.DEFAULT);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setGzipEncodingSupportEnabled(true).build();
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, readOptions);
 
     assertThat(readChannel.size()).isEqualTo(Long.MAX_VALUE);
   }
@@ -299,7 +300,8 @@ public class GoogleCloudStorageReadChannelTest {
       throws IOException {
     Storage storage = new Storage(HTTP_TRANSPORT, GsonFactory.getDefaultInstance(), r -> {});
 
-    GoogleCloudStorageReadOptions options = newLazyReadOptionsBuilder().build();
+    GoogleCloudStorageReadOptions options =
+        newLazyReadOptionsBuilder().setGzipEncodingSupportEnabled(true).build();
 
     GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
 
@@ -505,8 +507,10 @@ public class GoogleCloudStorageReadChannelTest {
 
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), r -> {});
 
-    GoogleCloudStorageReadChannel readChannel =
-        createReadChannel(storage, GoogleCloudStorageReadOptions.DEFAULT);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setGzipEncodingSupportEnabled(true).build();
+
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, readOptions);
 
     assertThat(readChannel.size()).isEqualTo(Long.MAX_VALUE);
     assertThat(readChannel.read(ByteBuffer.wrap(new byte[testData.length + 1])))
@@ -602,7 +606,10 @@ public class GoogleCloudStorageReadChannelTest {
         (GoogleCloudStorageReadChannel)
             gcs.open(
                 new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
-                GoogleCloudStorageReadOptions.builder().setInplaceSeekLimit(3).build());
+                GoogleCloudStorageReadOptions.builder()
+                    .setInplaceSeekLimit(3)
+                    .setFadvise(Fadvise.SEQUENTIAL)
+                    .build());
 
     setUpAndValidateReadChannelMocksAndSetMaxRetries(readChannel, 3);
 
@@ -674,7 +681,10 @@ public class GoogleCloudStorageReadChannelTest {
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setFadvise(Fadvise.SEQUENTIAL).build();
+        GoogleCloudStorageReadOptions.builder()
+            .setFadvise(Fadvise.SEQUENTIAL)
+            .setGzipEncodingSupportEnabled(true)
+            .build();
 
     GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
 

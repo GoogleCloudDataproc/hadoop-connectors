@@ -136,6 +136,8 @@ public class GoogleCloudStorageTest {
       GoogleCloudStorageOptions.builder()
           .setAppName("gcsio-unit-test")
           .setProjectId(PROJECT_ID)
+          .setBatchThreads(0)
+          .setCopyWithRewriteEnabled(false)
           .build();
 
   private static final ImmutableMap<String, byte[]> EMPTY_METADATA = ImmutableMap.of();
@@ -1170,9 +1172,11 @@ public class GoogleCloudStorageTest {
             dataResponse(responseHeaders, compressedData));
 
     GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setGzipEncodingSupportEnabled(true).build();
 
     GoogleCloudStorageReadChannel readChannel =
-        (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
+        (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID, readOptions);
     assertThat(readChannel.isOpen()).isTrue();
     assertThat(readChannel.position()).isEqualTo(0);
     assertThat(readChannel.size()).isEqualTo(Long.MAX_VALUE);
@@ -1469,8 +1473,11 @@ public class GoogleCloudStorageTest {
 
     GoogleCloudStorage gcs = mockedGcs(transport);
 
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setGzipEncodingSupportEnabled(true).build();
+
     GoogleCloudStorageReadChannel readChannel =
-        (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
+        (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID, readOptions);
     readChannel.setReadBackOff(BackOff.ZERO_BACKOFF);
 
     assertThat(readChannel.isOpen()).isTrue();
@@ -1560,7 +1567,6 @@ public class GoogleCloudStorageTest {
         .containsExactly(
             getRequestString(
                 BUCKET_NAME, OBJECT_NAME, /* fields= */ "contentEncoding,generation,size"),
-            getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()),
             getMediaRequestString(BUCKET_NAME, OBJECT_NAME, storageObject.getGeneration()))
         .inOrder();
   }

@@ -67,7 +67,8 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     Credentials credentials =
         checkNotNull(GoogleCloudStorageTestHelper.getCredentials(), "credentials must not be null");
 
-    gcsOptions = getStandardOptionBuilder().build();
+    gcsOptions =
+        getStandardOptionBuilder().setBatchThreads(0).setCopyWithRewriteEnabled(false).build();
     httpRequestsInitializer =
         new RetryHttpInitializer(credentials, gcsOptions.toRetryHttpInitializerOptions());
 

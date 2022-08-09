@@ -16,6 +16,28 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.BATCH_THREADS_DEFAULT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.COPY_WITH_REWRITE_DEFAULT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.DEFAULT_DIRECT_PATH_PREFERRED;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.DEFAULT_GRPC_ENABLED;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.DEFAULT_GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL_MILLIS;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.DEFAULT_TRAFFIC_DIRECTOR_ENABLED;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.HTTP_REQUEST_CONNECT_TIMEOUT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.HTTP_REQUEST_READ_TIMEOUT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MAX_HTTP_REQUEST_RETRIES;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MAX_LIST_ITEMS_PER_CALL_DEFAULT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MAX_REQUESTS_PER_BATCH_DEFAULT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MAX_WAIT_MILLIS_FOR_EMPTY_OBJECT_CREATION;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_FADVISE;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_FAST_FAIL_ON_NOT_FOUND_ENABLED;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_GRPC_CHECKSUMS_ENABLED;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_GRPC_READ_MESSAGE_TIMEOUT_MILLIS;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_GRPC_READ_METADATA_TIMEOUT_MILLIS;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_GRPC_READ_TIMEOUT_MILLIS;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_GRPC_READ_ZEROCOPY_ENABLED;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_GZIP_ENCODING_SUPPORT_ENABLED;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_INPLACE_SEEK_LIMIT;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_ADDRESS_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_PASSWORD_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_USERNAME_SUFFIX;
@@ -190,11 +212,12 @@ public class GoogleHadoopFileSystemConfiguration {
 
   /** Configuration key for a max number of GCS RPCs in batch request. */
   public static final HadoopConfigurationProperty<Long> GCS_MAX_REQUESTS_PER_BATCH =
-      new HadoopConfigurationProperty<>("fs.gs.max.requests.per.batch", 15L);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.max.requests.per.batch", MAX_REQUESTS_PER_BATCH_DEFAULT);
 
   /** Configuration key for a number of threads to execute batch requests. */
   public static final HadoopConfigurationProperty<Integer> GCS_BATCH_THREADS =
-      new HadoopConfigurationProperty<>("fs.gs.batch.threads", 15);
+      new HadoopConfigurationProperty<>("fs.gs.batch.threads", BATCH_THREADS_DEFAULT);
 
   /**
    * Configuration key for enabling the use of Rewrite requests for copy operations. Rewrite request
@@ -202,18 +225,21 @@ public class GoogleHadoopFileSystemConfiguration {
    * potentially timeout a Copy request.
    */
   public static final HadoopConfigurationProperty<Boolean> GCS_COPY_WITH_REWRITE_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.copy.with.rewrite.enable", true);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.copy.with.rewrite.enable", COPY_WITH_REWRITE_DEFAULT);
 
   /**
    * Configuration key for specifying max number of bytes rewritten in a single rewrite request when
    * fs.gs.copy.with.rewrite.enable is set to 'true'.
    */
   public static final HadoopConfigurationProperty<Long> GCS_REWRITE_MAX_BYTES_PER_CALL =
-      new HadoopConfigurationProperty<>("fs.gs.rewrite.max.bytes.per.call", 512 * 1024 * 1024L);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.rewrite.max.bytes.per.call", MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT);
 
   /** Configuration key for number of items to return per call to the list* GCS RPCs. */
   public static final HadoopConfigurationProperty<Long> GCS_MAX_LIST_ITEMS_PER_CALL =
-      new HadoopConfigurationProperty<>("fs.gs.list.max.items.per.call", 1024L);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.list.max.items.per.call", MAX_LIST_ITEMS_PER_CALL_DEFAULT);
 
   /**
    * Configuration key for the max number of retries for failed HTTP request to GCS. Note that the
@@ -224,15 +250,15 @@ public class GoogleHadoopFileSystemConfiguration {
    * request implementation.
    */
   public static final HadoopConfigurationProperty<Integer> GCS_HTTP_MAX_RETRY =
-      new HadoopConfigurationProperty<>("fs.gs.http.max.retry", 10);
+      new HadoopConfigurationProperty<>("fs.gs.http.max.retry", MAX_HTTP_REQUEST_RETRIES);
 
   /** Configuration key for the connect timeout (in millisecond) for HTTP request to GCS. */
   public static final HadoopConfigurationProperty<Integer> GCS_HTTP_CONNECT_TIMEOUT =
-      new HadoopConfigurationProperty<>("fs.gs.http.connect-timeout", 20 * 1000);
+      new HadoopConfigurationProperty<>("fs.gs.http.connect-timeout", HTTP_REQUEST_CONNECT_TIMEOUT);
 
   /** Configuration key for the connect timeout (in millisecond) for HTTP request to GCS. */
   public static final HadoopConfigurationProperty<Integer> GCS_HTTP_READ_TIMEOUT =
-      new HadoopConfigurationProperty<>("fs.gs.http.read-timeout", 20 * 1000);
+      new HadoopConfigurationProperty<>("fs.gs.http.read-timeout", HTTP_REQUEST_READ_TIMEOUT);
 
   /** Configuration key for adding a suffix to the GHFS application name sent to GCS. */
   public static final HadoopConfigurationProperty<String> GCS_APPLICATION_NAME_SUFFIX =
@@ -242,7 +268,8 @@ public class GoogleHadoopFileSystemConfiguration {
    * Configuration key for modifying the maximum amount of time to wait for empty object creation.
    */
   public static final HadoopConfigurationProperty<Integer> GCS_MAX_WAIT_MILLIS_EMPTY_OBJECT_CREATE =
-      new HadoopConfigurationProperty<>("fs.gs.max.wait.for.empty.object.creation.ms", 3_000);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.max.wait.for.empty.object.creation.ms", MAX_WAIT_MILLIS_FOR_EMPTY_OBJECT_CREATION);
 
   /** Configuration key for setting write buffer size. */
   public static final HadoopConfigurationProperty<Integer> GCS_OUTPUT_STREAM_BUFFER_SIZE =
@@ -293,27 +320,30 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean>
       GCS_INPUT_STREAM_FAST_FAIL_ON_NOT_FOUND_ENABLE =
           new HadoopConfigurationProperty<>(
-              "fs.gs.inputstream.fast.fail.on.not.found.enable", true);
+              "fs.gs.inputstream.fast.fail.on.not.found.enable",
+              DEFAULT_FAST_FAIL_ON_NOT_FOUND_ENABLED);
 
   /**
-   * If true, reading a file with GZIP content encoding (HTTP header "Content-Encoding: gzip") will
+   * If false, reading a file with GZIP content encoding (HTTP header "Content-Encoding: gzip") will
    * result in failure (IOException is thrown).
    */
   public static final HadoopConfigurationProperty<Boolean>
       GCS_INPUT_STREAM_SUPPORT_GZIP_ENCODING_ENABLE =
           new HadoopConfigurationProperty<>(
-              "fs.gs.inputstream.support.gzip.encoding.enable", false);
+              "fs.gs.inputstream.support.gzip.encoding.enable",
+              DEFAULT_GZIP_ENCODING_SUPPORT_ENABLED);
 
   /**
    * If forward seeks are within this many bytes of the current position, seeks are performed by
    * reading and discarding bytes in-place rather than opening a new underlying stream.
    */
   public static final HadoopConfigurationProperty<Long> GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT =
-      new HadoopConfigurationProperty<>("fs.gs.inputstream.inplace.seek.limit", 8 * 1024 * 1024L);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.inputstream.inplace.seek.limit", DEFAULT_INPLACE_SEEK_LIMIT);
 
   /** Tunes reading objects behavior to optimize HTTP GET requests for various use cases. */
   public static final HadoopConfigurationProperty<Fadvise> GCS_INPUT_STREAM_FADVISE =
-      new HadoopConfigurationProperty<>("fs.gs.inputstream.fadvise", Fadvise.AUTO);
+      new HadoopConfigurationProperty<>("fs.gs.inputstream.fadvise", DEFAULT_FADVISE);
 
   /**
    * Minimum size in bytes of the HTTP Range header set in GCS request when opening new stream to
@@ -326,11 +356,12 @@ public class GoogleHadoopFileSystemConfiguration {
 
   /** Configuration key for enabling use of the gRPC API for read/write. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.grpc.enable", false);
+      new HadoopConfigurationProperty<>("fs.gs.grpc.enable", DEFAULT_GRPC_ENABLED);
 
   /** Configuration key for enabling checksum validation for the gRPC API. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_CHECKSUMS_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.grpc.checksums.enable", false);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.grpc.checksums.enable", DEFAULT_GRPC_CHECKSUMS_ENABLED);
 
   /** Configuration key for the Cloud Storage gRPC server address. */
   public static final HadoopConfigurationProperty<String> GCS_GRPC_SERVER_ADDRESS =
@@ -339,28 +370,34 @@ public class GoogleHadoopFileSystemConfiguration {
 
   /** Configuration key for check interval (in millisecond) for gRPC request timeout to GCS. */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_CHECK_INTERVAL_TIMEOUT_MS =
-      new HadoopConfigurationProperty<>("fs.gs.grpc.checkinterval.timeout.ms", 1_000L);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.grpc.checkinterval.timeout.ms",
+          DEFAULT_GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL_MILLIS);
 
   /**
    * Configuration key for the connection timeout (in millisecond) for gRPC read requests to GCS.
    */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_TIMEOUT_MS =
-      new HadoopConfigurationProperty<>("fs.gs.grpc.read.timeout.ms", 30 * 1000L);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.grpc.read.timeout.ms", DEFAULT_GRPC_READ_TIMEOUT_MILLIS);
 
   /** Configuration key for the message timeout (in millisecond) for gRPC read requests to GCS. */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_MESSAGE_TIMEOUT_MS =
-      new HadoopConfigurationProperty<>("fs.gs.grpc.read.message.timeout.ms", 3 * 1_000L);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.grpc.read.message.timeout.ms", DEFAULT_GRPC_READ_MESSAGE_TIMEOUT_MILLIS);
 
   /**
    * Configuration key for the connection timeout (in millisecond) for gRPC metadata requests to
    * GCS.
    */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_METADATA_TIMEOUT_MS =
-      new HadoopConfigurationProperty<>("fs.gs.grpc.read.metadata.timeout.ms", 60 * 1000L);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.grpc.read.metadata.timeout.ms", DEFAULT_GRPC_READ_METADATA_TIMEOUT_MILLIS);
 
   /** Configuration key for enabling the zero-copy deserializer for the gRPC API. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_READ_ZEROCOPY_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.grpc.read.zerocopy.enable", true);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.grpc.read.zerocopy.enable", DEFAULT_GRPC_READ_ZEROCOPY_ENABLED);
 
   /** Configuration key for the number of requests to be buffered for uploads to GCS. */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_UPLOAD_BUFFERED_REQUESTS =
@@ -376,11 +413,13 @@ public class GoogleHadoopFileSystemConfiguration {
 
   /** Configuration key for enabling use of directpath gRPC API for read/write. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_DIRECTPATH_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.grpc.directpath.enable", true);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.grpc.directpath.enable", DEFAULT_DIRECT_PATH_PREFERRED);
 
   /** Configuration key for enabling use of traffic director gRPC API for read/write. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_TRAFFICDIRECTOR_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.grpc.trafficdirector.enable", true);
+      new HadoopConfigurationProperty<>(
+          "fs.gs.grpc.trafficdirector.enable", DEFAULT_TRAFFIC_DIRECTOR_ENABLED);
 
   /** Configuration key for the headers for HTTP request to GCS. */
   public static final HadoopConfigurationProperty<Map<String, String>> GCS_HTTP_HEADERS =

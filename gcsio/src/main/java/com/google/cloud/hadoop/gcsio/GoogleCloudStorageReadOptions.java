@@ -40,12 +40,12 @@ public abstract class GoogleCloudStorageReadOptions {
   public static final int DEFAULT_BACKOFF_MAX_INTERVAL_MILLIS = 10 * 1000;
   public static final int DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS = 2 * 60 * 1000;
   public static final boolean DEFAULT_FAST_FAIL_ON_NOT_FOUND_ENABLED = true;
-  public static final boolean DEFAULT_GZIP_ENCODING_SUPPORT_ENABLED = true;
+  public static final boolean DEFAULT_GZIP_ENCODING_SUPPORT_ENABLED = false;
   public static final long DEFAULT_INPLACE_SEEK_LIMIT = 8 * 1024 * 1024;
-  public static final Fadvise DEFAULT_FADVISE = Fadvise.SEQUENTIAL;
+  public static final Fadvise DEFAULT_FADVISE = Fadvise.AUTO;
   public static final long DEFAULT_MIN_RANGE_REQUEST_SIZE = 2 * 1024 * 1024;
   public static final boolean DEFAULT_GRPC_CHECKSUMS_ENABLED = false;
-  public static final long DEFAULT_GRPC_READ_TIMEOUT_MILLIS = 20 * 60 * 1000;
+  public static final long DEFAULT_GRPC_READ_TIMEOUT_MILLIS = 30 * 1000;
   public static final long DEFAULT_GRPC_READ_METADATA_TIMEOUT_MILLIS = 60 * 1000;
   public static final boolean DEFAULT_GRPC_READ_ZEROCOPY_ENABLED = true;
   public static final long DEFAULT_GRPC_READ_MESSAGE_TIMEOUT_MILLIS = 3 * 1000;
