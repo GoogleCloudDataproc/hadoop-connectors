@@ -33,7 +33,6 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAUL
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_FAST_FAIL_ON_NOT_FOUND_ENABLED;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_GRPC_CHECKSUMS_ENABLED;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_GRPC_READ_MESSAGE_TIMEOUT_MILLIS;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_GRPC_READ_METADATA_TIMEOUT_MILLIS;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_GRPC_READ_TIMEOUT_MILLIS;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_GRPC_READ_ZEROCOPY_ENABLED;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_GZIP_ENCODING_SUPPORT_ENABLED;
