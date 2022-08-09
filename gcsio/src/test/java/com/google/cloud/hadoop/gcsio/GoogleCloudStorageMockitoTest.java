@@ -77,7 +77,13 @@ public class GoogleCloudStorageMockitoTest {
     MockitoAnnotations.initMocks(this);
 
     MockHttpTransport transport = mockTransport();
-    gcs = mockedGcs(transport);
+    GoogleCloudStorageOptions gcsOptions =
+        GoogleCloudStorageOptions.builder()
+            .setAppName("gcsio-unit-test")
+            .setProjectId(PROJECT_ID)
+            .setCopyWithRewriteEnabled(false)
+            .build();
+    gcs = mockedGcs(gcsOptions, transport);
     gcs.setBatchFactory(mockBatchFactory);
     gcs.setErrorExtractor(mockErrorExtractor);
 

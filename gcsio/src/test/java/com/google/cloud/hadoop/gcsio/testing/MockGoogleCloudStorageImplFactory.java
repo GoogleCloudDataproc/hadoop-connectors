@@ -29,6 +29,16 @@ public class MockGoogleCloudStorageImplFactory {
   private static final String PROJECT_ID = "google.com:foo-project";
 
   public static GoogleCloudStorageImpl mockedGcs(HttpTransport transport) {
+    return mockedGcs(
+        GoogleCloudStorageOptions.builder()
+            .setAppName("gcsio-unit-test")
+            .setProjectId(PROJECT_ID)
+            .build(),
+        transport);
+  }
+
+  public static GoogleCloudStorageImpl mockedGcs(
+      GoogleCloudStorageOptions options, HttpTransport transport) {
     Storage storage =
         new Storage(
             transport,
@@ -40,12 +50,6 @@ public class MockGoogleCloudStorageImplFactory {
                         .setDefaultUserAgent("gcs-io-unit-test")
                         .build()),
                 false));
-    return new GoogleCloudStorageImpl(
-        GoogleCloudStorageOptions.builder()
-            .setAppName("gcsio-unit-test")
-            .setProjectId(PROJECT_ID)
-            .build(),
-        storage,
-        null);
+    return new GoogleCloudStorageImpl(options, storage, null);
   }
 }
