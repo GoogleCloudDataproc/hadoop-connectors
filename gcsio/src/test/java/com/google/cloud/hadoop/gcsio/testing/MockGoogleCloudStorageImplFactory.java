@@ -29,24 +29,12 @@ public class MockGoogleCloudStorageImplFactory {
   private static final String PROJECT_ID = "google.com:foo-project";
 
   public static GoogleCloudStorageImpl mockedGcs(HttpTransport transport) {
-    Storage storage =
-        new Storage(
-            transport,
-            GsonFactory.getDefaultInstance(),
-            new TrackingHttpRequestInitializer(
-                new RetryHttpInitializer(
-                    new FakeCredentials(),
-                    RetryHttpInitializerOptions.builder()
-                        .setDefaultUserAgent("gcs-io-unit-test")
-                        .build()),
-                false));
-    return new GoogleCloudStorageImpl(
+    return mockedGcs(
         GoogleCloudStorageOptions.builder()
             .setAppName("gcsio-unit-test")
             .setProjectId(PROJECT_ID)
             .build(),
-        storage,
-        null);
+        transport);
   }
 
   public static GoogleCloudStorageImpl mockedGcs(

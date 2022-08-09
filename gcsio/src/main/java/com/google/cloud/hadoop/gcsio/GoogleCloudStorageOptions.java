@@ -41,7 +41,7 @@ public abstract class GoogleCloudStorageOptions {
   public static final boolean DEFAULT_TRAFFIC_DIRECTOR_ENABLED = true;
 
   /** Default setting to prefer DirectPath for gRPC. */
-  public static final boolean DIRECT_PATH_PREFERRED_DEFAULT = true;
+  public static final boolean DEFAULT_DIRECT_PATH_PREFERRED = true;
 
   /** Default root URL for Cloud Storage API endpoint. */
   public static final String STORAGE_ROOT_URL_DEFAULT = Storage.DEFAULT_ROOT_URL;
@@ -106,7 +106,7 @@ public abstract class GoogleCloudStorageOptions {
     return new AutoValue_GoogleCloudStorageOptions.Builder()
         .setGrpcEnabled(DEFAULT_GRPC_ENABLED)
         .setTrafficDirectorEnabled(DEFAULT_TRAFFIC_DIRECTOR_ENABLED)
-        .setDirectPathPreferred(DIRECT_PATH_PREFERRED_DEFAULT)
+        .setDirectPathPreferred(DEFAULT_DIRECT_PATH_PREFERRED)
         .setStorageRootUrl(STORAGE_ROOT_URL_DEFAULT)
         .setStorageServicePath(STORAGE_SERVICE_PATH_DEFAULT)
         .setGrpcServerAddress(DEFAULT_GCS_GRPC_SERVER_ADDRESS)

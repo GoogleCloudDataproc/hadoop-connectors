@@ -18,10 +18,10 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.BATCH_THREADS_DEFAULT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.COPY_WITH_REWRITE_DEFAULT;
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.DEFAULT_DIRECT_PATH_PREFERRED;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.DEFAULT_GRPC_ENABLED;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.DEFAULT_GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL_MILLIS;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.DEFAULT_TRAFFIC_DIRECTOR_ENABLED;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.DIRECT_PATH_PREFERRED_DEFAULT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.HTTP_REQUEST_CONNECT_TIMEOUT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.HTTP_REQUEST_READ_TIMEOUT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT;
@@ -414,7 +414,7 @@ public class GoogleHadoopFileSystemConfiguration {
   /** Configuration key for enabling use of directpath gRPC API for read/write. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_DIRECTPATH_ENABLE =
       new HadoopConfigurationProperty<>(
-          "fs.gs.grpc.directpath.enable", DIRECT_PATH_PREFERRED_DEFAULT);
+          "fs.gs.grpc.directpath.enable", DEFAULT_DIRECT_PATH_PREFERRED);
 
   /** Configuration key for enabling use of traffic director gRPC API for read/write. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_TRAFFICDIRECTOR_ENABLE =
