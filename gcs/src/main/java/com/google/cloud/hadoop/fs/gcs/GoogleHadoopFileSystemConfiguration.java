@@ -33,7 +33,6 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAUL
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_FAST_FAIL_ON_NOT_FOUND_ENABLED;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_GRPC_CHECKSUMS_ENABLED;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_GRPC_READ_MESSAGE_TIMEOUT_MILLIS;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_GRPC_READ_METADATA_TIMEOUT_MILLIS;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_GRPC_READ_TIMEOUT_MILLIS;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_GRPC_READ_ZEROCOPY_ENABLED;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_GZIP_ENCODING_SUPPORT_ENABLED;
@@ -386,14 +385,6 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>(
           "fs.gs.grpc.read.message.timeout.ms", DEFAULT_GRPC_READ_MESSAGE_TIMEOUT_MILLIS);
 
-  /**
-   * Configuration key for the connection timeout (in millisecond) for gRPC metadata requests to
-   * GCS.
-   */
-  public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_METADATA_TIMEOUT_MS =
-      new HadoopConfigurationProperty<>(
-          "fs.gs.grpc.read.metadata.timeout.ms", DEFAULT_GRPC_READ_METADATA_TIMEOUT_MILLIS);
-
   /** Configuration key for enabling the zero-copy deserializer for the gRPC API. */
   public static final HadoopConfigurationProperty<Boolean> GCS_GRPC_READ_ZEROCOPY_ENABLE =
       new HadoopConfigurationProperty<>(
@@ -537,8 +528,6 @@ public class GoogleHadoopFileSystemConfiguration {
         .setGrpcReadTimeoutMillis(GCS_GRPC_READ_TIMEOUT_MS.get(config, config::getLong))
         .setGrpcReadMessageTimeoutMillis(
             GCS_GRPC_READ_MESSAGE_TIMEOUT_MS.get(config, config::getLong))
-        .setGrpcReadMetadataTimeoutMillis(
-            GCS_GRPC_READ_METADATA_TIMEOUT_MS.get(config, config::getLong))
         .setGrpcReadZeroCopyEnabled(GCS_GRPC_READ_ZEROCOPY_ENABLE.get(config, config::getBoolean))
         .build();
   }
