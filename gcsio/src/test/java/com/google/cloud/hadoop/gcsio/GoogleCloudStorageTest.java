@@ -34,7 +34,6 @@ import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listR
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.resumableUploadChunkRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.resumableUploadRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.uploadRequestString;
-import static com.google.cloud.hadoop.util.RetryHttpInitializer.HTTP_REQUEST_TIMEOUT;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.dataResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.emptyResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.inputStreamResponse;
@@ -432,7 +431,7 @@ public class GoogleCloudStorageTest {
         mockTransport(
             emptyResponse(HttpStatusCodes.STATUS_CODE_NOT_FOUND),
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
-            emptyResponse(HTTP_REQUEST_TIMEOUT),
+            emptyResponse(408), // HTTP 408 Request Timeout
             jsonDataResponse(
                 newStorageObject(BUCKET_NAME, OBJECT_NAME)
                     .setSize(BigInteger.valueOf(testData.length))));

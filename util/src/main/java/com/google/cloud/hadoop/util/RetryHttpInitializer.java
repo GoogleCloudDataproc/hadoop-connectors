@@ -35,6 +35,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.flogger.LogContext;
 import java.io.IOException;
+import java.util.Set;
 
 /** An implementation of {@link HttpRequestInitializer} with retries. */
 public class RetryHttpInitializer implements HttpRequestInitializer {
@@ -116,6 +117,15 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     /** HTTP status code indicating too many requests in a given amount of time. */
     private static final int HTTP_SC_TOO_MANY_REQUESTS = 429;
 
+    /**
+     * HTTP status code indicating that the server has decided to close the connection rather than
+     * continue waiting
+     */
+    private static final int HTTP_REQUEST_TIMEOUT = 408;
+
+    private static final Set<Integer> RETRYABLE_CODES =
+        ImmutableSet.of(HTTP_SC_TOO_MANY_REQUESTS, HTTP_REQUEST_TIMEOUT);
+
     // The set of response codes to log URLs for with a rate limit.
     private static final ImmutableSet<Integer> RESPONSE_CODES_TO_LOG_WITH_RATE_LIMIT =
         ImmutableSet.of(HTTP_SC_TOO_MANY_REQUESTS);
@@ -132,7 +142,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     // of the bases cases defined by this instance.
     private static final HttpBackOffUnsuccessfulResponseHandler.BackOffRequired BACK_OFF_REQUIRED =
         response ->
-            response.getStatusCode() == HTTP_SC_TOO_MANY_REQUESTS
+            RETRYABLE_CODES.contains(response.getStatusCode())
                 || HttpBackOffUnsuccessfulResponseHandler.BackOffRequired.ON_SERVER_ERROR
                     .isRequired(response);
 
