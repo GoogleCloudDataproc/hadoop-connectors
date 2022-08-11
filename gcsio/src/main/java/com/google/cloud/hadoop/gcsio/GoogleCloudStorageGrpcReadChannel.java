@@ -379,7 +379,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
             : remainingBufferedBytes;
     put(bufferedContent, bufferedContentReadOffset, bytesToWrite, byteBuffer);
     positionInGrpcStream += bytesToWrite;
-    positionForNextRead = positionInGrpcStream;
+    positionForNextRead += bytesToWrite;
     if (remainingBufferedContentLargerThanByteBuffer) {
       bufferedContentReadOffset += bytesToWrite;
     } else {
@@ -528,10 +528,9 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       int skipBytes = Math.toIntExact(positionForNextRead - positionInGrpcStream);
       if (skipBytes >= 0 && skipBytes < content.size()) {
         content = content.substring(skipBytes);
-        positionInGrpcStream = positionForNextRead;
+        positionInGrpcStream += skipBytes;
       } else if (skipBytes >= content.size()) {
         positionInGrpcStream += content.size();
-        positionForNextRead = positionInGrpcStream;
         return bytesRead;
       }
 
@@ -544,8 +543,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
           responseSizeLargerThanRemainingBuffer ? byteBuffer.remaining() : content.size();
       put(content, 0, bytesToWrite, byteBuffer);
       bytesRead += bytesToWrite;
-      positionInGrpcStream += bytesToWrite;
-      positionForNextRead = positionInGrpcStream;
+      positionInGrpcStream += bytesRead;
+      positionForNextRead += bytesRead;
       if (responseSizeLargerThanRemainingBuffer) {
         invalidateBufferedContent();
         bufferedContent = content;

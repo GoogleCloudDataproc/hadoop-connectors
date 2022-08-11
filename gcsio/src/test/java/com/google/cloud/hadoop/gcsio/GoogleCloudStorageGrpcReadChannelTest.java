@@ -286,6 +286,48 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   }
 
   @Test
+  public void multipleReadsWithSkips() throws Exception {
+    int minRangeRequestSize = FakeService.CHUNK_SIZE * 4;
+    int objectSize = minRangeRequestSize * 10;
+    storageObject.setSize(BigInteger.valueOf(objectSize));
+    fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(objectSize).build());
+    verify(fakeService, times(1)).setObject(any());
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder()
+            .setInplaceSeekLimit(minRangeRequestSize)
+            .setMinRangeRequestSize(minRangeRequestSize)
+            .build();
+    GoogleCloudStorageGrpcReadChannel readChannel = newReadChannel(options);
+
+    ByteBuffer first_buffer = ByteBuffer.allocate(10);
+    ByteBuffer second_buffer = ByteBuffer.allocate(10);
+    readChannel.read(first_buffer);
+    readChannel.position(FakeService.CHUNK_SIZE * 2 + 30);
+    readChannel.read(second_buffer);
+    verify(get).setFields(METADATA_FIELDS);
+    verify(get).execute();
+    assertArrayEquals(fakeService.data.substring(0, 10).toByteArray(), first_buffer.array());
+    assertArrayEquals(
+        fakeService
+            .data
+            .substring(FakeService.CHUNK_SIZE * 2 + 30, FakeService.CHUNK_SIZE * 2 + 40)
+            .toByteArray(),
+        second_buffer.array());
+    verify(fakeService, times(1))
+        .readObject(
+            eq(
+                ReadObjectRequest.newBuilder()
+                    .setBucket(BUCKET_NAME)
+                    .setObject(OBJECT_NAME)
+                    .setGeneration(OBJECT_GENERATION)
+                    .build()),
+            any());
+    verifyNoMoreInteractions(fakeService);
+
+    headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 1);
+  }
+
+  @Test
   public void randomReadRequestsExactBytes() throws Exception {
     int objectSize = GoogleCloudStorageReadOptions.DEFAULT_MIN_RANGE_REQUEST_SIZE * 10;
     storageObject.setSize(BigInteger.valueOf(objectSize));
