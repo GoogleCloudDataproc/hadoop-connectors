@@ -516,7 +516,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   }
 
   private int readObjectContentFromGCS(ByteBuffer byteBuffer) throws IOException {
-    int bytesRead = 0;
     ReadObjectResponse res = resIterator.next();
 
     // When zero-copy marshaller is used, the stream that backs GetObjectMediaResponse
@@ -531,7 +530,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         positionInGrpcStream += skipBytes;
       } else if (skipBytes >= content.size()) {
         positionInGrpcStream += content.size();
-        return bytesRead;
+        return 0;
       }
 
       if (readOptions.isGrpcChecksumsEnabled() && res.getChecksummedData().hasCrc32C()) {
@@ -542,9 +541,10 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       int bytesToWrite =
           responseSizeLargerThanRemainingBuffer ? byteBuffer.remaining() : content.size();
       put(content, 0, bytesToWrite, byteBuffer);
-      bytesRead += bytesToWrite;
-      positionInGrpcStream += bytesRead;
-      positionForNextRead += bytesRead;
+
+      // Update the current position in stream and the position for next read.
+      positionInGrpcStream += bytesToWrite;
+      positionForNextRead += bytesToWrite;
       if (responseSizeLargerThanRemainingBuffer) {
         invalidateBufferedContent();
         bufferedContent = content;
@@ -553,12 +553,12 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         streamForBufferedContent = stream;
         stream = null;
       }
+      return bytesToWrite;
     } finally {
       if (stream != null) {
         stream.close();
       }
     }
-    return bytesRead;
   }
 
   private void validateChecksum(ReadObjectResponse res) throws IOException {
