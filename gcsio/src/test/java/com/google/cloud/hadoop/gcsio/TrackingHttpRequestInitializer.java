@@ -21,8 +21,10 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.api.client.http.HttpExecuteInterceptor;
+import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
+import com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -169,10 +171,31 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         .collect(toImmutableList());
   }
 
+  public ImmutableList<String> getAllRequestInvocationIds() {
+    return requests.stream()
+        .map(r -> getInvocationId(r.getHeaders()))
+        .filter(id -> id != null && !id.isEmpty())
+        .collect(toImmutableList());
+  }
+
   public ImmutableList<String> getAllRawRequestStrings() {
     return requests.stream()
         .map(GoogleCloudStorageIntegrationHelper::requestToString)
         .collect(toImmutableList());
+  }
+
+  private String getInvocationId(HttpHeaders header) {
+    String apiClientHeader = (String) header.get(InvocationIdInterceptor.GOOG_API_CLIENT);
+    int beginIndex = apiClientHeader.indexOf(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
+    if (beginIndex >= 0) {
+      beginIndex = beginIndex + InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX.length();
+      int endIndex =
+          Math.max(
+              apiClientHeader.indexOf(" ", beginIndex), apiClientHeader.indexOf(",", beginIndex));
+      endIndex = endIndex == -1 ? apiClientHeader.length() : endIndex;
+      return apiClientHeader.substring(beginIndex, endIndex);
+    }
+    return null;
   }
 
   private String replacePageTokenWithId(String request, AtomicLong pageTokenId) {
