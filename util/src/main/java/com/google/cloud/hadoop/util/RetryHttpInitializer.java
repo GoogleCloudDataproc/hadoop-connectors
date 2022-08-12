@@ -44,6 +44,15 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
   /** HTTP status code indicating too many requests in a given amount of time. */
   private static final int HTTP_SC_TOO_MANY_REQUESTS = 429;
 
+  /**
+   * HTTP status code indicating that the server has decided to close the connection rather than
+   * continue waiting
+   */
+  private static final int HTTP_REQUEST_TIMEOUT = 408;
+
+  private static final Set<Integer> RETRYABLE_CODES =
+      ImmutableSet.of(HTTP_SC_TOO_MANY_REQUESTS, HTTP_REQUEST_TIMEOUT);
+
   // Base impl of BackOffRequired determining the default set of cases where we'll retry on
   // unsuccessful HTTP responses; we'll mix in additional retryable response cases on top
   // of the bases cases defined by this instance.
@@ -150,7 +159,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
       errorCodeHandler.setBackOffRequired(
           response ->
               BASE_HTTP_BACKOFF_REQUIRED.isRequired(response)
-                  || response.getStatusCode() == HTTP_SC_TOO_MANY_REQUESTS);
+                  || RETRYABLE_CODES.contains(response.getStatusCode()));
       if (sleeperOverride != null) {
         errorCodeHandler.setSleeper(sleeperOverride);
       }
