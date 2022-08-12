@@ -256,7 +256,6 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
   public void multipleReadsWithSkips() throws Exception {
     int minRangeRequestSize = FakeService.CHUNK_SIZE * 4;
     int objectSize = minRangeRequestSize * 10;
-    storageObject.setSize(BigInteger.valueOf(objectSize));
     fakeService.setObject(DEFAULT_OBJECT.toBuilder().setSize(objectSize).build());
     verify(fakeService, times(1)).setObject(any());
     GoogleCloudStorageReadOptions options =
@@ -271,15 +270,13 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     readChannel.read(first_buffer);
     readChannel.position(FakeService.CHUNK_SIZE * 2 + 30);
     readChannel.read(second_buffer);
-    verify(get).setFields(METADATA_FIELDS);
-    verify(get).execute();
-    assertArrayEquals(fakeService.data.substring(0, 10).toByteArray(), first_buffer.array());
-    assertArrayEquals(
-        fakeService
-            .data
-            .substring(FakeService.CHUNK_SIZE * 2 + 30, FakeService.CHUNK_SIZE * 2 + 40)
-            .toByteArray(),
-        second_buffer.array());
+    assertThat(first_buffer.array()).isEqualTo(fakeService.data.substring(0, 10).toByteArray());
+    assertThat(second_buffer.array())
+        .isEqualTo(
+            fakeService
+                .data
+                .substring(FakeService.CHUNK_SIZE * 2 + 30, FakeService.CHUNK_SIZE * 2 + 40)
+                .toByteArray());
     verify(fakeService, times(1))
         .readObject(
             eq(
