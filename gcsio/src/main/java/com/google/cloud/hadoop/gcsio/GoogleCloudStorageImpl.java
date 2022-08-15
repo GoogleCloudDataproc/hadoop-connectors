@@ -390,7 +390,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                     : ((RetryHttpInitializer) httpRequestInitializer).getCredentials())
             : new NoOpMetricsRecorder();
 
-    createGrpcStubIfEnabled(options, credentials);
+    createGrpcStubAndWatchdogIfEnabled(options, credentials);
 
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
   }
@@ -870,8 +870,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
   }
 
-  private void createGrpcStubIfEnabled(GoogleCloudStorageOptions options, Credentials credentials) {
-    if (!this.storageOptions.isGrpcEnabled()) {
+  private void createGrpcStubAndWatchdogIfEnabled(
+      GoogleCloudStorageOptions options, Credentials credentials) {
+    if (!options.isGrpcEnabled()) {
       return;
     }
 
@@ -887,8 +888,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
 
     this.storageStubProvider =
-        StorageStubProvider.newInstance(
-            this.storageOptions, this.backgroundTasksThreadPool, theCredentials);
+        StorageStubProvider.newInstance(options, backgroundTasksThreadPool, theCredentials);
   }
 
   private ChainingHttpRequestInitializer getHttpRequestInitializers(
