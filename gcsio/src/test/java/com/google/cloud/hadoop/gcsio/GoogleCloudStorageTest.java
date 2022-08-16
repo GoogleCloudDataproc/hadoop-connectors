@@ -3497,7 +3497,7 @@ public class GoogleCloudStorageTest {
             jsonErrorResponse(ErrorResponses.RATE_LIMITED),
             // 429 Response for Metadata call
             jsonErrorResponse(ErrorResponses.RATE_LIMITED),
-            // 200 Response for Metadata call
+            // 200 Response for retried Metadata call
             jsonDataResponse(getStorageObjectForEmptyObjectWithMetadata(EMPTY_METADATA)));
 
     TrackingHttpRequestInitializer retryOnceStrategy =
