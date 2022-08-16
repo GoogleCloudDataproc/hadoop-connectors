@@ -3491,17 +3491,31 @@ public class GoogleCloudStorageTest {
   public void testIgnoreExceptionsOnCreateEmptyObjectsWithMultipleRetries() throws Exception {
     MockHttpTransport transport =
         mockTransport(
+            // 429 Response for insertObject
             jsonErrorResponse(ErrorResponses.RATE_LIMITED),
-            jsonErrorResponse(ErrorResponses.NOT_FOUND),
+            // 429 Response for retried insertObject Request
+            jsonErrorResponse(ErrorResponses.RATE_LIMITED),
+            // 429 Response for Metadata call
+            jsonErrorResponse(ErrorResponses.RATE_LIMITED),
+            // 200 Response for Metadata call
             jsonDataResponse(getStorageObjectForEmptyObjectWithMetadata(EMPTY_METADATA)));
 
-    GoogleCloudStorage gcs =
-        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithoutRetries);
+    TrackingHttpRequestInitializer retryOnceStrategy =
+        new TrackingHttpRequestInitializer(
+            new RetryHttpInitializer(
+                new FakeCredentials(),
+                RetryHttpInitializerOptions.builder()
+                    .setDefaultUserAgent("gcs-io-unit-test")
+                    .setMaxRequestRetries(1)
+                    .build()),
+            /* replaceRequestParams= */ false);
+    GoogleCloudStorage gcs = mockedGcs(GCS_OPTIONS, transport, retryOnceStrategy);
 
     gcs.createEmptyObjects(ImmutableList.of(RESOURCE_ID));
 
-    assertThat(trackingRequestInitializerWithoutRetries.getAllRequestStrings())
+    assertThat(retryOnceStrategy.getAllRequestStrings())
         .containsExactly(
+            uploadRequestString(BUCKET_NAME, OBJECT_NAME, null),
             uploadRequestString(BUCKET_NAME, OBJECT_NAME, null),
             getRequestString(BUCKET_NAME, OBJECT_NAME),
             getRequestString(BUCKET_NAME, OBJECT_NAME))

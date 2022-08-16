@@ -2213,33 +2213,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       // incorrect
       // assumption and this being a scenario other than the multiple workers racing
       // situation.
-      GoogleCloudStorageItemInfo existingInfo;
-      int maxWaitMillis = storageOptions.getMaxWaitMillisForEmptyObjectCreation();
-      BackOff backOff =
-          maxWaitMillis > 0
-              ? new ExponentialBackOff.Builder()
-                  .setMaxElapsedTimeMillis(maxWaitMillis)
-                  .setMaxIntervalMillis(500)
-                  .setInitialIntervalMillis(100)
-                  .setMultiplier(1.5)
-                  .setRandomizationFactor(0.15)
-                  .build()
-              : BackOff.STOP_BACKOFF;
-      long nextSleep = 0L;
-      do {
-        if (nextSleep > 0) {
-          try {
-            sleeper.sleep(nextSleep);
-          } catch (InterruptedException e) {
-            // We caught an InterruptedException, we should set the interrupted bit on
-            // this thread.
-            Thread.currentThread().interrupt();
-            nextSleep = BackOff.STOP;
-          }
-        }
-        existingInfo = getItemInfo(resourceId);
-        nextSleep = nextSleep == BackOff.STOP ? BackOff.STOP : backOff.nextBackOffMillis();
-      } while (!existingInfo.exists() && nextSleep != BackOff.STOP);
+
+      GoogleCloudStorageItemInfo existingInfo = getItemInfo(resourceId);
 
       // Compare existence, size, and metadata; for 429 errors creating an empty object,
       // we don't care about metaGeneration/contentGeneration as long as the metadata
