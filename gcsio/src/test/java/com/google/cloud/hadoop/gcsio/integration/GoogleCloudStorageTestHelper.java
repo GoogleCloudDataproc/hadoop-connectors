@@ -246,22 +246,44 @@ public class GoogleCloudStorageTestHelper {
     private final String bucketPrefix;
     private final String uniqueBucketPrefix;
 
+    /**
+     * Create a Helper to handle bucket with specified prefix. <br>
+     * A Unique string of 13 chars will be generated as below.<br>
+     * [Max 8 chars of username]_[min 4 chars of random UUID]. Unique prefix will be created by
+     * appending this unique string to provided bucketPrefix.
+     *
+     * @param bucketPrefix Prefix for bucket name. Cumulative Max length of bucketPrefix and suffix
+     *     provided in getUniqueBucketName(suffix) will be 48 chars.
+     */
     public TestBucketHelper(String bucketPrefix) {
       this.bucketPrefix = bucketPrefix + DELIMITER;
-      this.uniqueBucketPrefix = makeBucketName(bucketPrefix);
+      this.uniqueBucketPrefix = makeUniqueBucketNamePrefix(bucketPrefix);
       checkState(
           this.uniqueBucketPrefix.startsWith(this.bucketPrefix),
           "uniqueBucketPrefix should start with bucketPrefix");
     }
 
-    private static String makeBucketName(String prefix) {
+    private static String makeUniqueBucketNamePrefix(String prefix) {
       String username = System.getProperty("user.name", "unknown").replaceAll("[-.]", "");
-      username = username.substring(0, min(username.length(), 9));
-      String uuidSuffix = UUID.randomUUID().toString().substring(0, 6);
+      // Total 13 characters of unique string will be created.
+      // Maximum only first 8 characters of username is considered. Remaining characters will be
+      // taken from UUID.
+      // Leaving room of 48 characters for bucketPrefix and suffix (excluding delimiters)
+      int usernamePrefixLen = min(username.length(), 8);
+      username = username.substring(0, usernamePrefixLen);
+      String uuidSuffix = UUID.randomUUID().toString().substring(0, 12 - usernamePrefixLen);
       return prefix + DELIMITER + username + DELIMITER + uuidSuffix;
     }
 
+    /**
+     * @param suffix Suffix to be added to the bucket name. Max cumulative length of bucketPrefix
+     *     and suffix is 48 chars.
+     * @return An unique bucket name with specified prefix and suffix.
+     */
     public String getUniqueBucketName(String suffix) {
+      checkArgument(
+          bucketPrefix.length() + suffix.length() <= 48,
+          "bucketPrefix and suffix can have cumulative length upto 48 chars to limit bucket name to 63 chars");
       return uniqueBucketPrefix + DELIMITER + suffix;
     }
 

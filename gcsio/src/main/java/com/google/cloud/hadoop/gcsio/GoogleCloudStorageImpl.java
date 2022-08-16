@@ -714,14 +714,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     checkArgument(
         resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
 
-    // The underlying channel doesn't initially read data, which means that we won't see a
-    // FileNotFoundException until read is called. As a result, in order to find out if the
-    // object exists, we'll need to do an RPC (metadata or data). A metadata check should be a less
-    // expensive operation than a read data operation.
-    GoogleCloudStorageItemInfo itemInfo =
-        readOptions.isFastFailOnNotFoundEnabled() ? getItemInfo(resourceId) : null;
-
-    return open(resourceId, itemInfo, readOptions);
+    return open(resourceId, /* itemInfo= */ null, readOptions);
   }
 
   /**
@@ -750,25 +743,16 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       throw createFileNotFoundException(
           resourceId.getBucketName(), resourceId.getObjectName(), /* cause= */ null);
     }
+
     if (storageOptions.isGrpcEnabled()) {
-      return itemInfo == null
-          ? new GoogleCloudStorageGrpcReadChannel(
-              storageStubProvider,
-              storage,
-              resourceId,
-              watchdog,
-              metricsRecorder,
-              readOptions,
-              BackOffFactory.DEFAULT,
-              this.storageOptions)
-          : new GoogleCloudStorageGrpcReadChannel(
-              storageStubProvider,
-              itemInfo,
-              watchdog,
-              metricsRecorder,
-              readOptions,
-              BackOffFactory.DEFAULT,
-              this.storageOptions);
+      return new GoogleCloudStorageGrpcReadChannel(
+          storageStubProvider,
+          itemInfo == null ? getItemInfo(resourceId) : itemInfo,
+          watchdog,
+          metricsRecorder,
+          storageOptions,
+          readOptions,
+          BackOffFactory.DEFAULT);
     }
 
     return new GoogleCloudStorageReadChannel(
