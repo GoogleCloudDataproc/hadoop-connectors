@@ -28,8 +28,10 @@ import static java.lang.Math.ceil;
 import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
+import com.google.cloud.hadoop.gcsio.AssertingLogHandler;
 import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
+import com.google.cloud.hadoop.gcsio.EventLoggingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
@@ -48,6 +50,7 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 import java.util.stream.IntStream;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -453,6 +456,47 @@ public class GoogleCloudStorageImplTest {
         .containsExactly(
             uploadRequestString(
                 resourceId.getBucketName(), resourceId.getObjectName(), /* generationId= */ 1));
+  }
+
+  @Test
+  public void tracelog_enabled() throws IOException {
+    doTestTraceLog(true, 3, 5);
+  }
+
+  @Test
+  public void tracelog_disabled() throws IOException {
+    doTestTraceLog(false, 0, 0);
+  }
+
+  private void doTestTraceLog(
+      boolean traceLogEnabled, int expectedAfterWrite, int expectedAfterRead) throws IOException {
+    AssertingLogHandler jsonLogHander = new AssertingLogHandler();
+    Logger jsonTracingLogger =
+        jsonLogHander.getLoggerForClass(EventLoggingHttpRequestInitializer.class.getName());
+
+    try {
+      GoogleCloudStorage storage =
+          new GoogleCloudStorageImpl(
+              GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+                  .setTraceLogEnabled(traceLogEnabled)
+                  .build(),
+              GoogleCloudStorageTestHelper.getCredentials());
+
+      int expectedSize = 5 * 1024 * 1024;
+      StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+      byte[] writtenData =
+          writeObject(
+              storage, resourceId, /* partitionSize= */ expectedSize, /* partitionsCount= */ 1);
+
+      jsonLogHander.assertLogCount(expectedAfterWrite);
+
+      assertObjectContent(storage, resourceId, writtenData);
+
+      jsonLogHander.assertLogCount(expectedAfterRead);
+      jsonLogHander.verifyJsonLogFields(TEST_BUCKET, name.getMethodName());
+    } finally {
+      jsonTracingLogger.removeHandler(jsonLogHander);
+    }
   }
 
   private static TrackingStorageWrapper<GoogleCloudStorageImpl> newTrackingGoogleCloudStorage(
