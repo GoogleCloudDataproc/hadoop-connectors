@@ -34,6 +34,7 @@ import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.ByteArrayContent;
 import com.google.api.client.http.HttpHeaders;
+import com.google.api.client.http.HttpRequestFactory;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.InputStreamContent;
@@ -281,10 +282,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer)
       throws IOException {
-    this(
-        options,
-        createStorage(options, httpRequestInitializer),
-        /* downscopedAccessTokenFn= */ null);
+    this(options, httpRequestInitializer, /* downscopedAccessTokenFn= */ null);
   }
 
   public GoogleCloudStorageImpl(
@@ -292,7 +290,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       HttpRequestInitializer httpRequestInitializer,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
-    this(options, createStorage(options, httpRequestInitializer), downscopedAccessTokenFn);
+    this(
+        options,
+        createStorage(options, getHttpRequestInitializer(httpRequestInitializer, options)),
+        downscopedAccessTokenFn,
+        tryGetCredentialsFromRequestInitializer(httpRequestInitializer));
   }
 
   /**
@@ -301,8 +303,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param storage {@link Storage} to use for I/O.
    */
   @SuppressWarnings("CheckReturnValue")
+  @VisibleForTesting
   public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage storage) {
-    this(options, storage, /* downscopedAccessTokenFn= */ null);
+    this(options, storage, null, tryGetCredentialsFromStorage(storage));
+    warnIfTracingEnabled(storageOptions.isTraceLogEnabled());
   }
 
   /**
@@ -322,19 +326,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     this.storageOptions = checkNotNull(options, "options must not be null");
     this.storageOptions.throwIfNotValid();
-    HttpRequestInitializer retryHttpInitializer =
-        new ChainingHttpRequestInitializer(
-            new StatisticsTrackingHttpRequestInitializer(statistics),
-            new RetryHttpInitializer(credentials, options.toRetryHttpInitializerOptions()));
+    this.httpRequestInitializer = getHttpRequestInitializers(options, credentials);
 
     this.storage =
-        checkNotNull(createStorage(options, retryHttpInitializer), "storage must not be null");
+        checkNotNull(
+            createStorage(options, this.httpRequestInitializer), "storage must not be null");
     this.storageRequestFactory = new StorageRequestFactory(storage);
-
-    this.httpRequestInitializer =
-        this.storage.getRequestFactory() == null
-            ? null
-            : this.storage.getRequestFactory().getInitializer();
 
     this.metricsRecorder =
         MetricsSink.CLOUD_MONITORING == this.storageOptions.getMetricsSink()
@@ -359,10 +356,21 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * @param storage {@link Storage} to use for I/O.
    * @param downscopedAccessTokenFn Function that generates downscoped access token.
    */
+  @VisibleForTesting
   public GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options,
       Storage storage,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
+    this(options, storage, downscopedAccessTokenFn, tryGetCredentialsFromStorage(storage));
+
+    warnIfTracingEnabled(storageOptions.isTraceLogEnabled());
+  }
+
+  private GoogleCloudStorageImpl(
+      GoogleCloudStorageOptions options,
+      Storage storage,
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
+      Credentials credentials) {
     logger.atFiner().log("GCS(options: %s)", options);
 
     this.storageOptions = checkNotNull(options, "options must not be null");
@@ -377,22 +385,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         MetricsSink.CLOUD_MONITORING == this.storageOptions.getMetricsSink()
             ? CloudMonitoringMetricsRecorder.create(
                 options.getProjectId(),
-                ((RetryHttpInitializer) httpRequestInitializer).getCredentials())
+                credentials != null
+                    ? credentials
+                    : ((RetryHttpInitializer) httpRequestInitializer).getCredentials())
             : new NoOpMetricsRecorder();
 
-    // Create the gRPC stub if necessary;
-    if (this.storageOptions.isGrpcEnabled()) {
-      this.watchdog =
-          Watchdog.create(Duration.ofMillis(options.getGrpcMessageTimeoutCheckInterval()));
-      checkArgument(
-          httpRequestInitializer instanceof RetryHttpInitializer,
-          "request initializer must be an instance of the RetryHttpInitializer class"
-              + " when gRPC API enabled");
-      Credentials credentials = ((RetryHttpInitializer) httpRequestInitializer).getCredentials();
-      this.storageStubProvider =
-          StorageStubProvider.newInstance(
-              this.storageOptions, this.backgroundTasksThreadPool, credentials);
-    }
+    createGrpcStubAndWatchdogIfEnabled(options, credentials);
 
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
   }
@@ -853,6 +851,78 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     if (!innerExceptions.isEmpty()) {
       throw GoogleCloudStorageExceptions.createCompositeException(innerExceptions);
+    }
+  }
+
+  private void createGrpcStubAndWatchdogIfEnabled(
+      GoogleCloudStorageOptions options, Credentials credentials) {
+    if (!options.isGrpcEnabled()) {
+      return;
+    }
+
+    this.watchdog =
+        Watchdog.create(Duration.ofMillis(options.getGrpcMessageTimeoutCheckInterval()));
+
+    Credentials theCredentials = credentials;
+    if (theCredentials == null) {
+      checkArgument(
+          httpRequestInitializer instanceof RetryHttpInitializer,
+          "request initializer must be an instance of the RetryHttpInitializer class or credential information should be supplied when gRPC API enabled");
+      theCredentials = ((RetryHttpInitializer) httpRequestInitializer).getCredentials();
+    }
+
+    this.storageStubProvider =
+        StorageStubProvider.newInstance(options, backgroundTasksThreadPool, theCredentials);
+  }
+
+  private ChainingHttpRequestInitializer getHttpRequestInitializers(
+      GoogleCloudStorageOptions options, Credentials credentials) {
+    if (options.isTraceLogEnabled()) {
+      return new ChainingHttpRequestInitializer(
+          new StatisticsTrackingHttpRequestInitializer(statistics),
+          new RetryHttpInitializer(credentials, options.toRetryHttpInitializerOptions()),
+          new EventLoggingHttpRequestInitializer());
+    }
+
+    return new ChainingHttpRequestInitializer(
+        new StatisticsTrackingHttpRequestInitializer(statistics),
+        new RetryHttpInitializer(credentials, options.toRetryHttpInitializerOptions()));
+  }
+
+  private static Credentials tryGetCredentialsFromStorage(Storage storage) {
+    HttpRequestFactory requestFactory = storage.getRequestFactory();
+    if (requestFactory == null) {
+      return null;
+    }
+
+    return tryGetCredentialsFromRequestInitializer(storage.getRequestFactory().getInitializer());
+  }
+
+  private static HttpRequestInitializer getHttpRequestInitializer(
+      HttpRequestInitializer httpRequestInitializer, GoogleCloudStorageOptions options) {
+    if (!options.isTraceLogEnabled()) {
+      return httpRequestInitializer;
+    }
+
+    return new ChainingHttpRequestInitializer(
+        httpRequestInitializer, new EventLoggingHttpRequestInitializer());
+  }
+
+  private static Credentials tryGetCredentialsFromRequestInitializer(
+      HttpRequestInitializer httpRequestInitializer) {
+    if (httpRequestInitializer instanceof RetryHttpInitializer) {
+      return ((RetryHttpInitializer) httpRequestInitializer).getCredentials();
+    }
+
+    return null;
+  }
+
+  private static void warnIfTracingEnabled(boolean traceLogEnabled) {
+    if (traceLogEnabled) {
+      // If the constructor which takes in the Storage object is used, then HTTP request tracing
+      // will not be enabled
+      logger.atWarning().atMostEvery(10, TimeUnit.MINUTES).log(
+          "JSON API request tracing is not happening since the caller is using a lower level API");
     }
   }
 
