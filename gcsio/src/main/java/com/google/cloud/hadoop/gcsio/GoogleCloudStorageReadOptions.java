@@ -45,7 +45,7 @@ public abstract class GoogleCloudStorageReadOptions {
   public static final Fadvise DEFAULT_FADVISE = Fadvise.AUTO;
   public static final long DEFAULT_MIN_RANGE_REQUEST_SIZE = 2 * 1024 * 1024;
   public static final boolean DEFAULT_GRPC_CHECKSUMS_ENABLED = false;
-  public static final long DEFAULT_GRPC_READ_TIMEOUT_MILLIS = 30 * 1000;
+  public static final long DEFAULT_GRPC_READ_TIMEOUT_MILLIS = 3600 * 1000;
   public static final boolean DEFAULT_GRPC_READ_ZEROCOPY_ENABLED = true;
   public static final long DEFAULT_GRPC_READ_MESSAGE_TIMEOUT_MILLIS = 3 * 1000;
 
