@@ -857,10 +857,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             listRequestWithTrailingDelimiter(
-                objectId.getBucketName(),
-                testDirName,
-                /* maxResults= */ 1024,
-                /* pageToken= */ null));
+                objectId.getBucketName(), testDirName, /* pageToken= */ null));
   }
 
   @Test
