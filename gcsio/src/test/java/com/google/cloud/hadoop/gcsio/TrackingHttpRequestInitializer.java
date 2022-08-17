@@ -84,7 +84,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
       "DELETE:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o/%s?ifGenerationMatch=%s";
 
   private static final String LIST_BUCKETS_REQUEST_FORMAT =
-      "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b?maxResults=1024&project=%s";
+      "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b?maxResults=5000&project=%s";
 
   private static final String LIST_REQUEST_FORMAT =
       "GET:"
@@ -406,6 +406,16 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         prefix,
         /* objectFields= */ OBJECT_FIELDS,
         maxResults,
+        pageToken);
+  }
+
+  public static String listRequestWithTrailingDelimiter(
+      String bucket, String prefix, String pageToken) {
+    return listRequestWithTrailingDelimiter(
+        bucket,
+        prefix,
+        /* objectFields= */ OBJECT_FIELDS,
+        (int) GoogleCloudStorageOptions.MAX_LIST_ITEMS_PER_CALL_DEFAULT,
         pageToken);
   }
 
