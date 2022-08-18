@@ -365,7 +365,7 @@ public class GoogleHadoopFileSystemConfiguration {
    * Configuration key for the connection timeout (in millisecond) for gRPC read requests to GCS.
    */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_TIMEOUT_MS =
-      new HadoopConfigurationProperty<>("fs.gs.grpc.read.timeout.ms", 30 * 1000L);
+      new HadoopConfigurationProperty<>("fs.gs.grpc.read.timeout.ms", 3600 * 1000L);
 
   /** Configuration key for the message timeout (in millisecond) for gRPC read requests to GCS. */
   public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_MESSAGE_TIMEOUT_MS =
