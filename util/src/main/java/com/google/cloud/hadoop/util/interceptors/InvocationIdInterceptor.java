@@ -71,8 +71,6 @@ public final class InvocationIdInterceptor implements HttpExecuteInterceptor {
   }
 
   private static boolean isInvocationIdPresent(String apiClientHeader) {
-    return apiClientHeader != null && apiClientHeader.contains(GCCL_INVOCATION_ID_PREFIX)
-        ? true
-        : false;
+    return (apiClientHeader != null && apiClientHeader.contains(GCCL_INVOCATION_ID_PREFIX));
   }
 }
