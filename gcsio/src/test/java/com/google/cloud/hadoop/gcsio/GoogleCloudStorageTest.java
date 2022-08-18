@@ -2945,6 +2945,42 @@ public class GoogleCloudStorageTest {
   }
 
   @Test
+  public void testGetItemInfosWithRetries() throws IOException {
+    Bucket bucket = newBucket(BUCKET_NAME);
+    StorageObject storageObject = newStorageObject(BUCKET_NAME, OBJECT_NAME);
+
+    MockHttpTransport transport =
+        mockBatchTransport(
+            /* requestsPerBatch= */ 2,
+            jsonDataResponse(storageObject),
+            jsonErrorResponse(ErrorResponses.RATE_LIMITED),
+            jsonDataResponse(bucket));
+
+    GoogleCloudStorage gcs = mockedGcs(transport);
+
+    // Call in order of StorageObject, Bucket.
+    List<GoogleCloudStorageItemInfo> itemInfos =
+        gcs.getItemInfos(ImmutableList.of(RESOURCE_ID, new StorageResourceId(BUCKET_NAME)));
+
+    assertThat(itemInfos)
+        .containsExactly(
+            createItemInfoForStorageObject(RESOURCE_ID, storageObject),
+            createItemInfoForBucket(new StorageResourceId(BUCKET_NAME), bucket))
+        .inOrder();
+
+    assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
+        .containsExactly(
+            // Request of 1st batch
+            batchRequestString(),
+            getRequestString(BUCKET_NAME, OBJECT_NAME),
+            getBucketRequestString(BUCKET_NAME),
+            // Request of 2nd batch
+            batchRequestString(),
+            getBucketRequestString(BUCKET_NAME))
+        .inOrder();
+  }
+
+  @Test
   public void testGetItemInfosNotFound() throws IOException {
     MockHttpTransport transport =
         mockBatchTransport(
