@@ -31,6 +31,7 @@ import com.google.api.client.http.HttpUnsuccessfulResponseHandler;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.auth.Credentials;
 import com.google.auth.http.HttpCredentialsAdapter;
+import com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.flogger.LogContext;
@@ -95,6 +96,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
       headers.setUserAgent(options.getDefaultUserAgent());
     }
     headers.putAll(options.getHttpHeaders());
+    request.setInterceptor(new InvocationIdInterceptor(request.getInterceptor()));
   }
 
   public Credentials getCredentials() {

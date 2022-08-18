@@ -28,6 +28,7 @@ import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpResponseException;
 import com.google.api.client.http.HttpStatusCodes;
 import com.google.auth.Credentials;
+import com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor;
 import com.google.cloud.hadoop.util.testing.FakeCredentials;
 import com.google.cloud.hadoop.util.testing.ThrowingInputStream;
 import com.google.common.collect.ImmutableList;
@@ -67,6 +68,8 @@ public class RetryHttpInitializerTest {
     HttpResponse res = req.execute();
 
     assertThat(res).isNotNull();
+    assertThat((String) req.getHeaders().get(InvocationIdInterceptor.GOOG_API_CLIENT))
+        .contains(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
     assertThat(res.getStatusCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_OK);
   }
 
@@ -86,7 +89,8 @@ public class RetryHttpInitializerTest {
             "authorization", ImmutableList.of(authHeaderValue));
 
     HttpResponseException thrown = assertThrows(HttpResponseException.class, req::execute);
-
+    assertThat((String) req.getHeaders().get(InvocationIdInterceptor.GOOG_API_CLIENT))
+        .contains(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
     assertThat(thrown.getStatusCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_FORBIDDEN);
   }
 
@@ -116,7 +120,8 @@ public class RetryHttpInitializerTest {
             "authorization", ImmutableList.of(authHeaderValue));
 
     HttpResponse res = req.execute();
-
+    assertThat((String) req.getHeaders().get(InvocationIdInterceptor.GOOG_API_CLIENT))
+        .contains(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
     assertThat(res).isNotNull();
     assertThat(res.getStatusCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_OK);
   }
@@ -142,7 +147,8 @@ public class RetryHttpInitializerTest {
             "authorization", ImmutableList.of(authHeaderValue));
 
     HttpResponse res = req.execute();
-
+    assertThat((String) req.getHeaders().get(InvocationIdInterceptor.GOOG_API_CLIENT))
+        .contains(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
     assertThat(res).isNotNull();
     assertThat(res.getStatusCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_OK);
   }
