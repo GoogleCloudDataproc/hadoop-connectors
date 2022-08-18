@@ -1,32 +1,32 @@
 ### 3.0.0 - 2022-XX-XX
 
-1. Remove Hadoop 2.x support.
+1.  Remove Hadoop 2.x support.
 
-2. Update all dependencies to the latest versions.
+1.  Update all dependencies to the latest versions.
 
-3. Add support for downscoped tokens in `AccessTokenProvider`.
+1.  Add support for downscoped tokens in `AccessTokenProvider`.
 
-4. Implement `FileSystem.openFile` to take advantage of the `FileStatus` if
+1.  Implement `FileSystem.openFile` to take advantage of the `FileStatus` if
     passed.
 
-5. Remove an obsolete `AuthorizationHandler` and related properties:
+1.  Remove an obsolete `AuthorizationHandler` and related properties:
 
     ```properties
     fs.gs.authorization.handler.impl
     fs.gs.authorization.handler.properties.<AUTHORIZATION_HANDLER_PROPERTY>
     ```
 
-6. Remove support for Apache HTTP transport and related property:
+1.  Remove support for Apache HTTP transport and related property:
 
     ```properties
     fs.gs.http.transport.type
     ```
 
-7. Support GCS fine-grained action in AuthorizationHandlers.
+1.  Support GCS fine-grained action in AuthorizationHandlers.
 
-8. Decrease log level for `hflush` rate limit log message.
+1.  Decrease log level for `hflush` rate limit log message.
 
-9. Remove Cooperative Locking support for directory operations and related
+1.  Remove Cooperative Locking support for directory operations and related
     properties:
 
     ```properties
@@ -35,50 +35,43 @@
     fs.gs.cooperative.locking.max.concurrent.operations
     ```
 
-10. Migrate authentication to `com.google.auth.Credentials` and remove obsolete
-     properties:
-
-     ```properties
-     fs.gs.auth.service.account.email
-     fs.gs.auth.service.account.keyfile
-     fs.gs.auth.service.account.private.key
-     fs.gs.auth.service.account.private.key.id
-     ```
-
-11. Refactor authentication configuration to use an explicit `fs.gs.auth.type`
-     enum property, instead of relying on inference of the authentication type
-     based on the set configuration properties, and remove obsolete properties:
-
-     ```properties
-     fs.gs.auth.null.enable
-     fs.gs.auth.service.account.enable
-     ```
-
-12. Add support for a new `USER_CREDENTIALS` authentication type that retrieves
-     a refresh token using the authorisation code grant flow configured via the
-     following properties:
-
-     ```properties
-     fs.gs.auth.client.id
-     fs.gs.auth.client.secret
-     fs.gs.auth.refresh.token
-     ```
-
-13. Merge all output stream types functionality in the default output stream
-     that behaves similarly to the `FLUSHABLE_COMPOSITE` stream, and remove
-     obsolete property:
-
-     ```properties
-     fs.gs.outputstream.type
-     ```
-
-14. Updated default value for max item to return from list Cloud Storage
-    requests via following property:
+1.  Migrate authentication to `com.google.auth.Credentials` and remove obsolete
+    properties:
 
     ```properties
-     fs.gs.list.max.items.per.call
-     ```
+    fs.gs.auth.service.account.email
+    fs.gs.auth.service.account.keyfile
+    fs.gs.auth.service.account.private.key
+    fs.gs.auth.service.account.private.key.id
+    ```
 
+1.  Refactor authentication configuration to use an explicit `fs.gs.auth.type`
+    enum property, instead of relying on inference of the authentication type
+    based on the set configuration properties, and remove obsolete properties:
+
+    ```properties
+    fs.gs.auth.null.enable
+    fs.gs.auth.service.account.enable
+    ```
+
+1.  Add support for a new `USER_CREDENTIALS` authentication type that retrieves
+    a refresh token using the authorisation code grant flow configured via the
+    following properties:
+
+    ```properties
+    fs.gs.auth.client.id
+    fs.gs.auth.client.secret
+    fs.gs.auth.refresh.token
+    ```
+
+1.  Merge all output stream types functionality in the default output stream
+    that behaves similarly to the `FLUSHABLE_COMPOSITE` stream, and remove
+    obsolete property:
+
+    ```properties
+    fs.gs.outputstream.type
+    ```
+1.  Set default value for `fs.gs.list.max.items.per.call` property to `5000`.
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.
