@@ -36,6 +36,7 @@ import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.Set;
 import org.apache.http.HttpStatus;
+import com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor;
 
 public class RetryHttpInitializer implements HttpRequestInitializer {
 
@@ -270,6 +271,7 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
     }
 
     request.getHeaders().putAll(options.getHttpHeaders());
+    request.setInterceptor(new InvocationIdInterceptor(request.getInterceptor()));
   }
 
   public Credential getCredential() {

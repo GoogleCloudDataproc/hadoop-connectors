@@ -39,6 +39,8 @@ import com.google.api.client.util.DateTime;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
+import com.google.cloud.hadoop.util.RetryHttpInitializer;
+import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
 import com.google.common.collect.ImmutableMap;
 import java.io.FileNotFoundException;
@@ -49,6 +51,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -486,6 +489,31 @@ public class GoogleCloudStorageReadChannelTest {
 
     assertThat(readChannel.size()).isNotEqualTo(0);
     assertThat(readChannel.generation()).isEqualTo(generation);
+  }
+
+  @Test
+  public void retired_request_same_invocationId() throws IOException {
+    long generation = 5L;
+    MockHttpTransport transport =
+        mockTransport(
+            jsonErrorResponse(ErrorResponses.RATE_LIMITED),
+            jsonDataResponse(newStorageObject(BUCKET_NAME, OBJECT_NAME).setGeneration(generation)));
+    TrackingHttpRequestInitializer requestsTracker =
+        new TrackingHttpRequestInitializer(
+            new RetryHttpInitializer(null, RetryHttpInitializerOptions.builder().build()));
+    Storage storage = new Storage(transport, JSON_FACTORY, requestsTracker);
+
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFound(false).build();
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options, generation);
+
+    assertThat(readChannel.size()).isNotEqualTo(0);
+    List<String> invocationIds = requestsTracker.getAllRequestInvocationIds();
+    // Request is retired only once, making total request count to be 2.
+    assertThat(invocationIds.size()).isEqualTo(2);
+    Set<String> uniqueInvocationIds = Set.copyOf(invocationIds);
+    // For retried request invocationId remains same causing the set to contain only one element
+    assertThat(uniqueInvocationIds.size()).isEqualTo(1);
   }
 
   @Test

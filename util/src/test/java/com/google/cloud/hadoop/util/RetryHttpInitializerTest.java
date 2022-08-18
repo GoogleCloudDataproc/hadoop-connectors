@@ -23,6 +23,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
+import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.http.GenericUrl;
@@ -33,6 +34,9 @@ import com.google.api.client.http.LowLevelHttpRequest;
 import com.google.api.client.http.LowLevelHttpResponse;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.util.Sleeper;
+import com.google.api.client.http.HttpResponseException;
+import com.google.api.client.http.HttpStatusCodes;
+import com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Duration;
@@ -132,6 +136,9 @@ public class RetryHttpInitializerTest {
     verify(mockLowLevelRequest).addHeader(eq("Authorization"), eq(authHeaderValue));
     verify(mockLowLevelRequest).execute();
     verify(mockLowLevelResponse, times(2)).getStatusCode();
+    assertThat((String) req.getHeaders().get(InvocationIdInterceptor.GOOG_API_CLIENT))
+        .contains(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
+    assertThat(res.getStatusCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_OK);
   }
 
   @Test
@@ -170,6 +177,11 @@ public class RetryHttpInitializerTest {
     verify(mockLowLevelRequest, times(2)).execute();
     verify(mockLowLevelResponse, times(4)).getStatusCode();
     verify(mockCredential).handleResponse(eq(req), any(HttpResponse.class), eq(true));
+
+    HttpResponseException thrown = assertThrows(HttpResponseException.class, req::execute);
+    assertThat((String) req.getHeaders().get(InvocationIdInterceptor.GOOG_API_CLIENT))
+        .contains(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
+    assertThat(thrown.getStatusCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_FORBIDDEN);
   }
 
   @Test
@@ -211,6 +223,8 @@ public class RetryHttpInitializerTest {
         .thenReturn(false);
 
     HttpResponse res = req.execute();
+    assertThat((String) req.getHeaders().get(InvocationIdInterceptor.GOOG_API_CLIENT))
+        .contains(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
     assertThat(res).isNotNull();
 
     verify(mockCredential, times(2)).intercept(eq(req));
@@ -250,6 +264,8 @@ public class RetryHttpInitializerTest {
         .thenReturn(false);
 
     HttpResponse res = req.execute();
+    assertThat((String) req.getHeaders().get(InvocationIdInterceptor.GOOG_API_CLIENT))
+        .contains(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
     assertThat(res).isNotNull();
 
     verify(mockCredential, times(2)).intercept(eq(req));
