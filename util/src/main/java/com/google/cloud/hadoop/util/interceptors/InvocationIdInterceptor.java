@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.util.interceptors;
 import com.google.api.client.http.HttpExecuteInterceptor;
 import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpRequest;
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.UUID;
 
@@ -26,6 +27,7 @@ import java.util.UUID;
  * HTTP request interceptor to attach unique identifier i.e. invocationId to each new request and
  * make sure to pass in the same identifier if request is retried.
  */
+@VisibleForTesting
 public final class InvocationIdInterceptor implements HttpExecuteInterceptor {
 
   public static final String GCCL_INVOCATION_ID_PREFIX = "gccl-invocation-id/";
@@ -50,7 +52,9 @@ public final class InvocationIdInterceptor implements HttpExecuteInterceptor {
       // TODO: add support for attempt_count
       return;
     }
-
+    // Replicating the logic from `manual` client.
+    // reference:
+    // https://github.com/googleapis/java-storage/blob/main/google-cloud-storage/src/main/java/com/google/cloud/storage/spi/v1/HttpStorageRpc.java#L156-L177
     final String signatureKey = "Signature="; // For V2 and V4 signedURLs
     final String builtURL = request.getUrl().build();
     if (!builtURL.contains(signatureKey)) {

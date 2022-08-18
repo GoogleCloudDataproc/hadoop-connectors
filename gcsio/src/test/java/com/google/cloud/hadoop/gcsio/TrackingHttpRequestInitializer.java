@@ -19,12 +19,14 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.GOOGLEAPIS_ENDPOINT;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.function.Predicate.not;
 
 import com.google.api.client.http.HttpExecuteInterceptor;
 import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -174,7 +176,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   public ImmutableList<String> getAllRequestInvocationIds() {
     return requests.stream()
         .map(r -> getInvocationId(r.getHeaders()))
-        .filter(id -> id != null && !id.isEmpty())
+        .filter(not(Strings::isNullOrEmpty))
         .collect(toImmutableList());
   }
 
@@ -186,6 +188,9 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
 
   private String getInvocationId(HttpHeaders header) {
     String apiClientHeader = (String) header.get(InvocationIdInterceptor.GOOG_API_CLIENT);
+    // This is how the header value look like
+    // x-goog-api-client -> gl-java/11.0.12 gdcl/1.32.2 mac-os-x/12.5
+    // gccl-invocation-id/9ad3804c-fdc1-4cb1-8337-5cf6ae1829b5
     int beginIndex = apiClientHeader.indexOf(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
     if (beginIndex >= 0) {
       beginIndex = beginIndex + InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX.length();
