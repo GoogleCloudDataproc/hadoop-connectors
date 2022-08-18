@@ -71,7 +71,7 @@
      ```properties
      fs.gs.outputstream.type
      ```
-    
+
 14. Updated default value for max item to return from list Cloud Storage
     requests via following property:
 
