@@ -104,6 +104,9 @@ public class GoogleCloudStorageImplTest {
       assertThat(readChannel.size()).isEqualTo(expectedSize);
     }
 
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
+
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactly(
             getRequestString(
@@ -127,6 +130,9 @@ public class GoogleCloudStorageImplTest {
       assertThat(readChannel.size()).isEqualTo(expectedSize);
     }
 
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
+
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings()).isEmpty();
   }
 
@@ -147,6 +153,10 @@ public class GoogleCloudStorageImplTest {
             partitionsCount);
 
     assertObjectContent(helperGcs, resourceId, partition, partitionsCount);
+
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
+
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactlyElementsIn(
             getExpectedRequestsForCreateObject(
@@ -217,6 +227,9 @@ public class GoogleCloudStorageImplTest {
 
     assertObjectContent(helperGcs, resourceId, partition, partitionsCount);
 
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
+
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactlyElementsIn(
             getExpectedRequestsForCreateObject(
@@ -254,6 +267,9 @@ public class GoogleCloudStorageImplTest {
 
     assertObjectContent(helperGcs, resourceId, bytesToWrite, /* expectedBytesCount= */ 1);
 
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
+
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactly(
             getRequestString(resourceId.getBucketName(), resourceId.getObjectName()),
@@ -268,6 +284,9 @@ public class GoogleCloudStorageImplTest {
                 /* generationId= */ 2,
                 /* uploadId= */ 1))
         .inOrder();
+
+    assertThat(trackingGcs2.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs2.requestsTracker.getAllRequests().size());
 
     assertThat(trackingGcs2.requestsTracker.getAllRequestStrings())
         .containsExactly(
@@ -306,6 +325,9 @@ public class GoogleCloudStorageImplTest {
         .asList()
         .containsExactly(resourceId);
 
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
+
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactly(
             uploadRequestString(
@@ -340,6 +362,9 @@ public class GoogleCloudStorageImplTest {
         .asList()
         .containsExactly("text/plain", "image/png", "application/octet-stream")
         .inOrder();
+
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
 
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactly(
@@ -401,6 +426,9 @@ public class GoogleCloudStorageImplTest {
 
     assertObjectContent(helperGcs, copiedResourceId, partition, partitionsCount);
 
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
+
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactly(
             getBucketRequestString(resourceId.getBucketName()),
@@ -451,6 +479,9 @@ public class GoogleCloudStorageImplTest {
     assertThat(itemInfo.metadataEquals(expectedMetadata)).isTrue();
     assertThat(itemInfo.metadataEquals(itemInfo.getMetadata())).isTrue();
     assertThat(itemInfo.metadataEquals(wrongMetadata)).isFalse();
+
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
 
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactly(
