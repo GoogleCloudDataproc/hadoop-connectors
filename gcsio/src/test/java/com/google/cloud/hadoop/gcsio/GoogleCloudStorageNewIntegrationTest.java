@@ -86,7 +86,8 @@ public class GoogleCloudStorageNewIntegrationTest {
     Credentials credentials =
         checkNotNull(GoogleCloudStorageTestHelper.getCredentials(), "credentials must not be null");
 
-    gcsOptions = getStandardOptionBuilder().build();
+    gcsOptions =
+        getStandardOptionBuilder().setBatchThreads(0).setCopyWithRewriteEnabled(false).build();
     httpRequestsInitializer =
         new RetryHttpInitializer(credentials, gcsOptions.toRetryHttpInitializerOptions());
 
@@ -1118,7 +1119,12 @@ public class GoogleCloudStorageNewIntegrationTest {
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
     GoogleCloudStorage gcs =
         new GoogleCloudStorageImpl(
-            gcsOptions.toBuilder().setCopyWithRewriteEnabled(true).build(), gcsRequestsTracker);
+            gcsOptions.toBuilder()
+                .setBatchThreads(0)
+                .setCopyWithRewriteEnabled(true)
+                .setMaxBytesRewrittenPerCall(0)
+                .build(),
+            gcsRequestsTracker);
 
     String testBucket1 = gcsfsIHelper.sharedBucketName1;
     String testBucket2 = gcsfsIHelper.sharedBucketName2;
@@ -1274,7 +1280,10 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
-            getRequestString(testBucket, testFile.getObjectName()),
+            getRequestString(
+                testBucket,
+                testFile.getObjectName(),
+                /* fields= */ "contentEncoding,generation,size"),
             getMediaRequestString(testBucket, testFile.getObjectName(), generationId))
         .inOrder();
   }
@@ -1333,7 +1342,11 @@ public class GoogleCloudStorageNewIntegrationTest {
         .isEqualTo("Cannot read GZIP encoded files - content encoding support is disabled.");
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(getRequestString(testBucket, testFile.getObjectName()));
+        .containsExactly(
+            getRequestString(
+                testBucket,
+                testFile.getObjectName(),
+                /* fields= */ "contentEncoding,generation,size"));
   }
 
   @Test
@@ -1377,6 +1390,8 @@ public class GoogleCloudStorageNewIntegrationTest {
         assertThrows(FileNotFoundException.class, () -> gcs.open(itemInfo, readOptions));
 
     assertThat(e).hasMessageThat().startsWith("Item not found");
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings()).isEmpty();
   }
 
   private static List<String> getObjectNames(List<GoogleCloudStorageItemInfo> listedObjects) {

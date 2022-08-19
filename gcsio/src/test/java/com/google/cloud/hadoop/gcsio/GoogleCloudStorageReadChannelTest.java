@@ -41,6 +41,8 @@ import com.google.api.client.util.DateTime;
 import com.google.api.services.storage.Storage;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
+import com.google.cloud.hadoop.util.RetryHttpInitializer;
+import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
 import com.google.common.collect.ImmutableMap;
 import java.io.FileNotFoundException;
@@ -52,6 +54,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -189,9 +192,9 @@ public class GoogleCloudStorageReadChannelTest {
 
   @Test
   public void footerPrefetch_reused() throws IOException {
-    int footeSize = 2;
+    int footerSize = 2;
     byte[] testData = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
-    int footerStart = testData.length - footeSize;
+    int footerStart = testData.length - footerSize;
     byte[] footer = Arrays.copyOfRange(testData, footerStart, testData.length);
 
     MockHttpTransport transport =
@@ -208,7 +211,7 @@ public class GoogleCloudStorageReadChannelTest {
     GoogleCloudStorageReadOptions options =
         newLazyReadOptionsBuilder()
             .setFadvise(Fadvise.RANDOM)
-            .setMinRangeRequestSize(footeSize)
+            .setMinRangeRequestSize(footerSize)
             .build();
 
     GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
@@ -270,8 +273,9 @@ public class GoogleCloudStorageReadChannelTest {
                 newStorageObject(BUCKET_NAME, OBJECT_NAME).setContentEncoding("gzip")));
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), r -> {});
 
-    GoogleCloudStorageReadChannel readChannel =
-        createReadChannel(storage, GoogleCloudStorageReadOptions.DEFAULT);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setGzipEncodingSupportEnabled(true).build();
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, readOptions);
 
     assertThat(readChannel.size()).isEqualTo(Long.MAX_VALUE);
   }
@@ -299,7 +303,8 @@ public class GoogleCloudStorageReadChannelTest {
       throws IOException {
     Storage storage = new Storage(HTTP_TRANSPORT, GsonFactory.getDefaultInstance(), r -> {});
 
-    GoogleCloudStorageReadOptions options = newLazyReadOptionsBuilder().build();
+    GoogleCloudStorageReadOptions options =
+        newLazyReadOptionsBuilder().setGzipEncodingSupportEnabled(true).build();
 
     GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
 
@@ -495,6 +500,31 @@ public class GoogleCloudStorageReadChannelTest {
   }
 
   @Test
+  public void retired_request_same_invocationId() throws IOException {
+    long generation = 5L;
+    MockHttpTransport transport =
+        mockTransport(
+            jsonErrorResponse(ErrorResponses.RATE_LIMITED),
+            jsonDataResponse(newStorageObject(BUCKET_NAME, OBJECT_NAME).setGeneration(generation)));
+    TrackingHttpRequestInitializer requestsTracker =
+        new TrackingHttpRequestInitializer(
+            new RetryHttpInitializer(null, RetryHttpInitializerOptions.builder().build()));
+    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requestsTracker);
+
+    GoogleCloudStorageReadOptions options =
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options, generation);
+
+    assertThat(readChannel.size()).isNotEqualTo(0);
+    List<String> invocationIds = requestsTracker.getAllRequestInvocationIds();
+    // Request is retired only once, making total request count to be 2.
+    assertThat(invocationIds.size()).isEqualTo(2);
+    Set<String> uniqueInvocationIds = Set.copyOf(invocationIds);
+    // For retried request invocationId remains same causing the set to contain only one element
+    assertThat(uniqueInvocationIds.size()).isEqualTo(1);
+  }
+
+  @Test
   public void read_gzipEncoded_shouldReadAllBytes() throws IOException {
     byte[] testData = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
 
@@ -505,8 +535,10 @@ public class GoogleCloudStorageReadChannelTest {
 
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), r -> {});
 
-    GoogleCloudStorageReadChannel readChannel =
-        createReadChannel(storage, GoogleCloudStorageReadOptions.DEFAULT);
+    GoogleCloudStorageReadOptions readOptions =
+        GoogleCloudStorageReadOptions.builder().setGzipEncodingSupportEnabled(true).build();
+
+    GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, readOptions);
 
     assertThat(readChannel.size()).isEqualTo(Long.MAX_VALUE);
     assertThat(readChannel.read(ByteBuffer.wrap(new byte[testData.length + 1])))
@@ -602,7 +634,10 @@ public class GoogleCloudStorageReadChannelTest {
         (GoogleCloudStorageReadChannel)
             gcs.open(
                 new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
-                GoogleCloudStorageReadOptions.builder().setInplaceSeekLimit(3).build());
+                GoogleCloudStorageReadOptions.builder()
+                    .setInplaceSeekLimit(3)
+                    .setFadvise(Fadvise.SEQUENTIAL)
+                    .build());
 
     setUpAndValidateReadChannelMocksAndSetMaxRetries(readChannel, 3);
 
@@ -674,7 +709,10 @@ public class GoogleCloudStorageReadChannelTest {
     Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requests::add);
 
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setFadvise(Fadvise.SEQUENTIAL).build();
+        GoogleCloudStorageReadOptions.builder()
+            .setFadvise(Fadvise.SEQUENTIAL)
+            .setGzipEncodingSupportEnabled(true)
+            .build();
 
     GoogleCloudStorageReadChannel readChannel = createReadChannel(storage, options);
 
