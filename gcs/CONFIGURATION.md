@@ -102,7 +102,7 @@
 
     Maximum number of threads used to execute batch requests in parallel.
 
-*   `fs.gs.list.max.items.per.call` (default: `1024`)
+*   `fs.gs.list.max.items.per.call` (default: `5000`)
 
     Maximum number of items to return in response for list Cloud Storage
     requests.

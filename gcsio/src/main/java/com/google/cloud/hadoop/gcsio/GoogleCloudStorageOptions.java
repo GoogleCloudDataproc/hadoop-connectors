@@ -66,7 +66,7 @@ public abstract class GoogleCloudStorageOptions {
   public static final int MAX_WAIT_MILLIS_FOR_EMPTY_OBJECT_CREATION = 3_000;
 
   /** Default number of items to return per call to the list* GCS RPCs. */
-  public static final long MAX_LIST_ITEMS_PER_CALL_DEFAULT = 1024;
+  public static final long MAX_LIST_ITEMS_PER_CALL_DEFAULT = 5000;
 
   /** Default setting for maximum number of requests per GCS batch. */
   public static final long MAX_REQUESTS_PER_BATCH_DEFAULT = 15;

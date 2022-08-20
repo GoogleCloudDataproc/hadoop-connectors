@@ -590,8 +590,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             getRequestString(bucketName, fileObject),
-            listRequestWithTrailingDelimiter(
-                bucketName, fileObject + "/", /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucketName, fileObject + "/", /* pageToken= */ null));
 
     assertThat(fileInfos).hasSize(1);
     FileInfo fileInfo = fileInfos.get(0);
@@ -616,8 +615,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                bucketName, fileObject + "/", /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucketName, fileObject + "/", /* pageToken= */ null));
   }
 
   @Test
@@ -637,8 +635,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             getRequestString(bucketName, dirObject),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/", /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucketName, dirObject + "/", /* pageToken= */ null));
 
     assertThat(fileInfos.stream().map(FileInfo::exists).collect(toList()))
         .containsExactly(true, true);
@@ -686,8 +683,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/", /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucketName, dirObject + "/", /* pageToken= */ null));
 
     assertThat(fileInfos.stream().map(FileInfo::exists).collect(toList()))
         .containsExactly(true, true);
@@ -713,8 +709,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             getRequestString(bucketName, dirObject),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/", /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucketName, dirObject + "/", /* pageToken= */ null));
 
     assertThat(fileInfos.stream().map(FileInfo::exists).collect(toList())).containsExactly(true);
     assertThat(fileInfos.stream().map(FileInfo::getPath).collect(toList()))
@@ -738,8 +733,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             getRequestString(bucketName, dirObject),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/", /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucketName, dirObject + "/", /* pageToken= */ null));
 
     assertThat(fileInfos).isEmpty();
   }
@@ -760,8 +754,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             getRequestString(bucketName, dirObject),
-            listRequestWithTrailingDelimiter(
-                bucketName, dirObject + "/", /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucketName, dirObject + "/", /* pageToken= */ null));
   }
 
   @Test
@@ -805,7 +798,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
                 bucketName,
                 dirObject + "/",
                 /* objectFields= */ "bucket,name",
-                /* maxResults= */ 1024,
+
                 /* pageToken= */ null));
   }
 
@@ -850,7 +843,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
                 bucketName,
                 dirObject + "/",
                 /* objectFields= */ "bucket,name,contentType",
-                /* maxResults= */ 1024,
+
                 /* pageToken= */ null));
   }
 
@@ -880,11 +873,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
         .containsExactly(
             getRequestString(bucketName, dirObject),
             listRequestWithTrailingDelimiter(
-                bucketName,
-                dirObject + "/",
-                /* objectFields= */ "bucket",
-                /* maxResults= */ 1024,
-                /* pageToken= */ null));
+                bucketName, dirObject + "/", /* objectFields= */ "bucket", /* pageToken= */ null));
   }
 
   @Test
@@ -975,13 +964,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
             listRequestWithTrailingDelimiter(
                 bucketName, dirObject + "/d1/", /* maxResults= */ 1, /* pageToken= */ null),
             listRequestString(
-                bucketName,
-                /* flatList= */ true,
-                /* includeTrailingDelimiter= */ null,
-                dirObject + "/d1/",
-                "bucket,name,generation",
-                /* maxResults= */ 1024,
-                /* pageToken= */ null),
+                bucketName, true, null, dirObject + "/d1/", "bucket,name,generation", null),
             deleteRequestString(bucketName, dirObject + "/d1/", /* generationId= */ 1));
 
     assertThat(gcsFs.exists(bucketUri.resolve(dirObject + "/d1"))).isFalse();
@@ -1015,7 +998,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
                 /* includeTrailingDelimiter= */ null,
                 dirObject + "/d1/",
                 "bucket,name,generation",
-                /* maxResults= */ 1024,
+
                 /* pageToken= */ null),
             deleteRequestString(bucketName, dirObject + "/d1/f1", /* generationId= */ 1),
             getRequestString(bucketName, dirObject + "/"));
@@ -1190,7 +1173,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
                 /* includeTrailingDelimiter= */ null,
                 dirObject + "/srcParent/srcDir/",
                 "bucket,name,generation",
-                /* maxResults= */ 1024,
+
                 /* pageToken= */ null),
             // Copy file
             copyRequestString(
@@ -1259,7 +1242,7 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
                 /* includeTrailingDelimiter= */ null,
                 dirObject + "/srcParent/srcDir/",
                 "bucket,name,generation",
-                /* maxResults= */ 1024,
+
                 /* pageToken= */ null),
             // Copy file
             copyRequestString(
