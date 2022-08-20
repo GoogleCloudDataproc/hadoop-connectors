@@ -1945,8 +1945,7 @@ public class GoogleCloudStorageTest {
         .inOrder();
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+            listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, /* pageToken= */ null))
         .inOrder();
   }
 
@@ -1979,8 +1978,7 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, objectPrefix, /* maxResults= */ 1024, /* pageToken= */ null))
+            listRequestWithTrailingDelimiter(BUCKET_NAME, objectPrefix, /* pageToken= */ null))
         .inOrder();
   }
 
@@ -2017,10 +2015,8 @@ public class GoogleCloudStorageTest {
         .inOrder();
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null),
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, prefix, /* maxResults= */ 1024, pageToken))
+            listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, /* pageToken= */ null),
+            listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, pageToken))
         .inOrder();
   }
 
@@ -2037,7 +2033,7 @@ public class GoogleCloudStorageTest {
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
             listRequestWithTrailingDelimiter(
-                BUCKET_NAME, /* prefix= */ null, /* maxResults= */ 1024, /* pageToken= */ null))
+                BUCKET_NAME, /* prefix= */ null, /* pageToken= */ null))
         .inOrder();
   }
 
@@ -2057,7 +2053,7 @@ public class GoogleCloudStorageTest {
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
             listRequestWithTrailingDelimiter(
-                BUCKET_NAME, /* prefix= */ null, /* maxResults= */ 1024, /* pageToken= */ null))
+                BUCKET_NAME, /* prefix= */ null, /* pageToken= */ null))
         .inOrder();
   }
 
@@ -2078,7 +2074,7 @@ public class GoogleCloudStorageTest {
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
             listRequestWithTrailingDelimiter(
-                BUCKET_NAME, /* prefix= */ null, /* maxResults= */ 1024, /* pageToken= */ null))
+                BUCKET_NAME, /* prefix= */ null, /* pageToken= */ null))
         .inOrder();
   }
 
@@ -2103,7 +2099,7 @@ public class GoogleCloudStorageTest {
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
             listRequestWithTrailingDelimiter(
-                BUCKET_NAME, /* prefix= */ null, /* maxResults= */ 1024, /* pageToken= */ null))
+                BUCKET_NAME, /* prefix= */ null, /* pageToken= */ null))
         .inOrder();
   }
 
@@ -2136,10 +2132,8 @@ public class GoogleCloudStorageTest {
         .inOrder();
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null),
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, prefix, /* maxResults= */ 1024, pageToken))
+            listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, /* pageToken= */ null),
+            listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, pageToken))
         .inOrder();
   }
 
@@ -2171,10 +2165,8 @@ public class GoogleCloudStorageTest {
         .inOrder();
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null),
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, prefix, /* maxResults= */ 1024, pageToken))
+            listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, /* pageToken= */ null),
+            listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, pageToken))
         .inOrder();
   }
 
@@ -2207,10 +2199,8 @@ public class GoogleCloudStorageTest {
         .inOrder();
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null),
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, prefix, /* maxResults= */ 1024, pageToken))
+            listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, /* pageToken= */ null),
+            listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, pageToken))
         .inOrder();
   }
 
@@ -2244,10 +2234,8 @@ public class GoogleCloudStorageTest {
         .inOrder();
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null),
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, prefix, /* maxResults= */ 1024, pageToken))
+            listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, /* pageToken= */ null),
+            listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, pageToken))
         .inOrder();
   }
 
@@ -2270,8 +2258,7 @@ public class GoogleCloudStorageTest {
     assertThat(objects).containsExactly(createItemInfoForStorageObject(prefixObj)).inOrder();
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+            listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, /* pageToken= */ null))
         .inOrder();
   }
 
@@ -2289,8 +2276,7 @@ public class GoogleCloudStorageTest {
     assertThat(objects).isEmpty();
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+            listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, /* pageToken= */ null))
         .inOrder();
   }
 
@@ -2324,8 +2310,7 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, objectPrefix, /* maxResults= */ 1024, /* pageToken= */ null))
+            listRequestWithTrailingDelimiter(BUCKET_NAME, objectPrefix, /* pageToken= */ null))
         .inOrder();
   }
 
@@ -2358,8 +2343,7 @@ public class GoogleCloudStorageTest {
         .inOrder();
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+            listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, /* pageToken= */ null))
         .inOrder();
   }
 
@@ -2394,8 +2378,7 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, objectPrefix, /* maxResults= */ 1024, /* pageToken= */ null))
+            listRequestWithTrailingDelimiter(BUCKET_NAME, objectPrefix, /* pageToken= */ null))
         .inOrder();
   }
 
@@ -2430,8 +2413,7 @@ public class GoogleCloudStorageTest {
         .inOrder();
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+            listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, /* pageToken= */ null))
         .inOrder();
   }
 
@@ -2453,7 +2435,7 @@ public class GoogleCloudStorageTest {
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
             listRequestWithTrailingDelimiter(
-                BUCKET_NAME, /* prefix= */ null, /* maxResults= */ 1024, /* pageToken= */ null))
+                BUCKET_NAME, /* prefix= */ null, /* pageToken= */ null))
         .inOrder();
   }
 
@@ -2478,7 +2460,7 @@ public class GoogleCloudStorageTest {
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
             listRequestWithTrailingDelimiter(
-                BUCKET_NAME, /* prefix= */ null, /* maxResults= */ 1024, /* pageToken= */ null))
+                BUCKET_NAME, /* prefix= */ null, /* pageToken= */ null))
         .inOrder();
   }
 
@@ -2504,7 +2486,7 @@ public class GoogleCloudStorageTest {
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
             listRequestWithTrailingDelimiter(
-                BUCKET_NAME, /* prefix= */ null, /* maxResults= */ 1024, /* pageToken= */ null))
+                BUCKET_NAME, /* prefix= */ null, /* pageToken= */ null))
         .inOrder();
   }
 
@@ -2534,7 +2516,7 @@ public class GoogleCloudStorageTest {
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
             listRequestWithTrailingDelimiter(
-                BUCKET_NAME, /* prefix= */ null, /* maxResults= */ 1024, /* pageToken= */ null))
+                BUCKET_NAME, /* prefix= */ null, /* pageToken= */ null))
         .inOrder();
   }
 
@@ -2567,8 +2549,7 @@ public class GoogleCloudStorageTest {
         .inOrder();
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+            listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, /* pageToken= */ null))
         .inOrder();
   }
 
@@ -2600,8 +2581,7 @@ public class GoogleCloudStorageTest {
         .inOrder();
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+            listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, /* pageToken= */ null))
         .inOrder();
   }
 
@@ -2633,8 +2613,7 @@ public class GoogleCloudStorageTest {
         .inOrder();
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+            listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, /* pageToken= */ null))
         .inOrder();
   }
 
@@ -2669,8 +2648,7 @@ public class GoogleCloudStorageTest {
         .inOrder();
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+            listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, /* pageToken= */ null))
         .inOrder();
   }
 
@@ -2697,8 +2675,7 @@ public class GoogleCloudStorageTest {
         .inOrder();
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+            listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, /* pageToken= */ null))
         .inOrder();
   }
 
@@ -2718,8 +2695,7 @@ public class GoogleCloudStorageTest {
     assertThat(objectsPage.getItems()).isEmpty();
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, prefix, /* maxResults= */ 1024, /* pageToken= */ null))
+            listRequestWithTrailingDelimiter(BUCKET_NAME, prefix, /* pageToken= */ null))
         .inOrder();
   }
 
@@ -2755,8 +2731,7 @@ public class GoogleCloudStorageTest {
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                BUCKET_NAME, objectPrefix, /* maxResults= */ 1024, /* pageToken= */ null))
+            listRequestWithTrailingDelimiter(BUCKET_NAME, objectPrefix, /* pageToken= */ null))
         .inOrder();
   }
 
