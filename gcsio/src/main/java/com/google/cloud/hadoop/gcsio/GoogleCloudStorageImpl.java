@@ -450,7 +450,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             options.getTransportType(),
             options.getProxyAddress(),
             options.getProxyUsername(),
-            options.getProxyPassword());
+            options.getProxyPassword(),
+            Duration.ofMillis(options.getHttpRequestReadTimeout()));
 
     HttpRequestInitializer requestInitializer = httpRequestInitializer;
     if (options.isTraceLogEnabled()) {
