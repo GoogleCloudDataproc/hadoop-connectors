@@ -27,6 +27,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.security.GeneralSecurityException;
+import java.time.Duration;
 import javax.net.ssl.SSLSocketFactory;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -164,13 +165,13 @@ public class HttpTransportFactoryTest {
 
   @Test
   public void testCustomSslSocketFactorySetReadTimeout() throws IOException {
-    int readTimeoutMillis = 20 * 1000;
+    Duration readTimeout = Duration.ofMillis(20 * 1000);
     CustomSslSocketFactory customSslSocketFactory =
-        new CustomSslSocketFactory(FAKE_SOCKET_FACTORY, readTimeoutMillis);
+        new CustomSslSocketFactory(FAKE_SOCKET_FACTORY, readTimeout);
 
     checkSocket(
         customSslSocketFactory,
-        socket -> assertThat(socket.getSoTimeout()).isEqualTo(readTimeoutMillis));
+        socket -> assertThat(socket.getSoTimeout()).isEqualTo((int) readTimeout.toMillis()));
   }
 
   private static class FakeSslSocketFactory extends SSLSocketFactory {

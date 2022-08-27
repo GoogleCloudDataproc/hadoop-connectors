@@ -403,7 +403,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             options.getProxyAddress(),
             options.getProxyUsername(),
             options.getProxyPassword(),
-            options.getHttpRequestReadTimeout());
+            Duration.ofMillis(options.getHttpRequestReadTimeout()));
     return new Storage.Builder(
             httpTransport, GsonFactory.getDefaultInstance(), httpRequestInitializer)
         .setRootUrl(options.getStorageRootUrl())

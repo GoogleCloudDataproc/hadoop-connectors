@@ -33,6 +33,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
@@ -318,7 +319,8 @@ public class HadoopCredentialsConfiguration {
                 PROXY_ADDRESS_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get),
                 PROXY_USERNAME_SUFFIX.withPrefixes(keyPrefixes).getPassword(config),
                 PROXY_PASSWORD_SUFFIX.withPrefixes(keyPrefixes).getPassword(config),
-                READ_TIMEOUT_SUFFIX.withPrefixes(keyPrefixes).get(config, config::getInt));
+                Duration.ofMillis(
+                    READ_TIMEOUT_SUFFIX.withPrefixes(keyPrefixes).get(config, config::getInt)));
           } catch (IOException e) {
             throw new UncheckedIOException(e);
           }

@@ -23,7 +23,6 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.DEFAULT_GR
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.DEFAULT_GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL_MILLIS;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.DEFAULT_TRAFFIC_DIRECTOR_ENABLED;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.HTTP_REQUEST_CONNECT_TIMEOUT;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.HTTP_REQUEST_READ_TIMEOUT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MAX_HTTP_REQUEST_RETRIES;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MAX_LIST_ITEMS_PER_CALL_DEFAULT;
@@ -40,6 +39,7 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAUL
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_ADDRESS_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_PASSWORD_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_USERNAME_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.READ_TIMEOUT_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.getConfigKeyPrefixes;
 import static com.google.common.base.Strings.nullToEmpty;
 
@@ -254,10 +254,6 @@ public class GoogleHadoopFileSystemConfiguration {
   /** Configuration key for the connect timeout (in millisecond) for HTTP request to GCS. */
   public static final HadoopConfigurationProperty<Integer> GCS_HTTP_CONNECT_TIMEOUT =
       new HadoopConfigurationProperty<>("fs.gs.http.connect-timeout", HTTP_REQUEST_CONNECT_TIMEOUT);
-
-  /** Configuration key for the connect timeout (in millisecond) for HTTP request to GCS. */
-  public static final HadoopConfigurationProperty<Integer> GCS_HTTP_READ_TIMEOUT =
-      new HadoopConfigurationProperty<>("fs.gs.http.read-timeout", HTTP_REQUEST_READ_TIMEOUT);
 
   /** Configuration key for adding a suffix to the GHFS application name sent to GCS. */
   public static final HadoopConfigurationProperty<String> GCS_APPLICATION_NAME_SUFFIX =
@@ -478,7 +474,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setBatchThreads(GCS_BATCH_THREADS.get(config, config::getInt))
         .setMaxHttpRequestRetries(GCS_HTTP_MAX_RETRY.get(config, config::getInt))
         .setHttpRequestConnectTimeout(GCS_HTTP_CONNECT_TIMEOUT.get(config, config::getInt))
-        .setHttpRequestReadTimeout(GCS_HTTP_READ_TIMEOUT.get(config, config::getInt))
+        .setHttpRequestReadTimeout(
+            READ_TIMEOUT_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::getInt))
         .setAppName(getApplicationName(config))
         .setMaxWaitMillisForEmptyObjectCreation(
             GCS_MAX_WAIT_MILLIS_EMPTY_OBJECT_CREATE.get(config, config::getInt))

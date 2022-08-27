@@ -35,6 +35,7 @@ import java.net.SocketException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.GeneralSecurityException;
+import java.time.Duration;
 import javax.annotation.Nullable;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLSocketFactory;
@@ -73,8 +74,7 @@ public class HttpTransportFactory {
       @Nullable RedactedString proxyUsername,
       @Nullable RedactedString proxyPassword)
       throws IOException {
-    return createHttpTransport(
-        proxyAddress, proxyUsername, proxyPassword, /* readTimeoutMillis= */ null);
+    return createHttpTransport(proxyAddress, proxyUsername, proxyPassword, /* readTimeout= */ null);
   }
 
   /**
@@ -87,8 +87,8 @@ public class HttpTransportFactory {
    *     username will be used.
    * @param proxyPassword The HTTP proxy password to use with the transport. If empty no proxy
    *     password will be used.
-   * @param readTimeoutMillis The socket read timeout to apply immediately on all HTTP requests. If
-   *     empty, no socket read timeout will be applied.
+   * @param readTimeout The socket read timeout to apply immediately on all HTTP requests. If empty,
+   *     no socket read timeout will be applied.
    * @return The resulting HttpTransport.
    * @throws IllegalArgumentException If the proxy address is invalid.
    * @throws IOException If there is an issue connecting to Google's Certification server.
@@ -97,7 +97,7 @@ public class HttpTransportFactory {
       @Nullable String proxyAddress,
       @Nullable RedactedString proxyUsername,
       @Nullable RedactedString proxyPassword,
-      @Nullable Integer readTimeoutMillis)
+      @Nullable Duration readTimeout)
       throws IOException {
     logger.atFiner().log(
         "createHttpTransport(%s, %s, %s)", proxyAddress, proxyUsername, proxyPassword);
@@ -114,7 +114,7 @@ public class HttpTransportFactory {
               ? new PasswordAuthentication(
                   proxyUsername.value(), proxyPassword.value().toCharArray())
               : null;
-      return createNetHttpTransport(proxyUri, proxyAuth, readTimeoutMillis);
+      return createNetHttpTransport(proxyUri, proxyAuth, readTimeout);
     } catch (GeneralSecurityException e) {
       throw new IOException(e);
     }
@@ -125,8 +125,7 @@ public class HttpTransportFactory {
    *
    * @param proxyUri Optional HTTP proxy URI to use with the transport.
    * @param proxyAuth Optional HTTP proxy credentials to authenticate with the transport proxy.
-   * @param readTimeoutMillis Optional socket read timeout to apply immediately on all HTTP
-   *     requests.
+   * @param readTimeout Optional socket read timeout to apply immediately on all HTTP requests.
    * @return The resulting HttpTransport.
    * @throws IOException If there is an issue connecting to Google's certification server.
    * @throws GeneralSecurityException If there is a security issue with the keystore.
@@ -134,7 +133,7 @@ public class HttpTransportFactory {
   public static NetHttpTransport createNetHttpTransport(
       @Nullable URI proxyUri,
       @Nullable PasswordAuthentication proxyAuth,
-      @Nullable Integer readTimeoutMillis)
+      @Nullable Duration readTimeout)
       throws IOException, GeneralSecurityException {
     checkArgument(
         proxyUri != null || proxyAuth == null,
@@ -157,12 +156,12 @@ public class HttpTransportFactory {
             }
           });
     }
-    return createNetHttpTransportBuilder(proxyUri, readTimeoutMillis).build();
+    return createNetHttpTransportBuilder(proxyUri, readTimeout).build();
   }
 
   @VisibleForTesting
   static NetHttpTransport.Builder createNetHttpTransportBuilder(
-      @Nullable URI proxyUri, @Nullable Integer readTimeoutMillis)
+      @Nullable URI proxyUri, @Nullable Duration readTimeout)
       throws IOException, GeneralSecurityException {
     NetHttpTransport.Builder builder =
         new NetHttpTransport.Builder().trustCertificates(GoogleUtils.getCertificateTrustStore());
@@ -170,7 +169,7 @@ public class HttpTransportFactory {
         requireNonNullElseGet(
             builder.getSslSocketFactory(), HttpsURLConnection::getDefaultSSLSocketFactory);
     return builder
-        .setSslSocketFactory(new CustomSslSocketFactory(wrappedSslSocketFactory, readTimeoutMillis))
+        .setSslSocketFactory(new CustomSslSocketFactory(wrappedSslSocketFactory, readTimeout))
         .setProxy(
             proxyUri == null
                 ? null
@@ -222,10 +221,9 @@ public class HttpTransportFactory {
     private final SSLSocketFactory wrappedSockedFactory;
     private final Integer readTimeoutMillis;
 
-    public CustomSslSocketFactory(
-        SSLSocketFactory wrappedSocketFactory, Integer readTimeoutMillis) {
+    public CustomSslSocketFactory(SSLSocketFactory wrappedSocketFactory, Duration readTimeout) {
       this.wrappedSockedFactory = wrappedSocketFactory;
-      this.readTimeoutMillis = readTimeoutMillis;
+      this.readTimeoutMillis = readTimeout != null ? (int) readTimeout.toMillis() : null;
     }
 
     @Override

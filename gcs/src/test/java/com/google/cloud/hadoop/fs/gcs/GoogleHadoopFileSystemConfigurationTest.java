@@ -93,7 +93,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.grpc.write.message.timeout.ms", 3_000L);
           put("fs.gs.http.connect-timeout", 20_000);
           put("fs.gs.http.max.retry", 10);
-          put("fs.gs.http.read-timeout", 20_000);
           put("fs.gs.implicit.dir.repair.enable", true);
           put("fs.gs.inputstream.fadvise", Fadvise.AUTO);
           put("fs.gs.inputstream.fast.fail.on.not.found.enable", true);
