@@ -223,7 +223,7 @@ public class HttpTransportFactory {
 
     public CustomSslSocketFactory(SSLSocketFactory wrappedSocketFactory, Duration readTimeout) {
       this.wrappedSockedFactory = wrappedSocketFactory;
-      this.readTimeoutMillis = readTimeout != null ? (int) readTimeout.toMillis() : null;
+      this.readTimeoutMillis = readTimeout != null ? Math.toIntExact(readTimeout.toMillis()) : null;
     }
 
     @Override

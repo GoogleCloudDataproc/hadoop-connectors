@@ -171,7 +171,8 @@ public class HttpTransportFactoryTest {
 
     checkSocket(
         customSslSocketFactory,
-        socket -> assertThat(socket.getSoTimeout()).isEqualTo((int) readTimeout.toMillis()));
+        socket ->
+            assertThat(socket.getSoTimeout()).isEqualTo(Math.toIntExact(readTimeout.toMillis())));
   }
 
   private static class FakeSslSocketFactory extends SSLSocketFactory {
