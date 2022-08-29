@@ -1544,7 +1544,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
               options.getTransportType(),
               options.getProxyAddress(),
               options.getProxyUsername(),
-              options.getProxyPassword());
+              options.getProxyPassword(),
+              Duration.ofMillis(options.getHttpRequestReadTimeout()));
       GoogleCredential impersonatedCredential =
           new GoogleCredentialWithIamAccessToken(
               httpTransport,

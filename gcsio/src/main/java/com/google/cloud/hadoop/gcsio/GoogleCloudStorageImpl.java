@@ -235,7 +235,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
             options.getTransportType(),
             options.getProxyAddress(),
             options.getProxyUsername(),
-            options.getProxyPassword());
+            options.getProxyPassword(),
+            Duration.ofMillis(options.getHttpRequestReadTimeout()));
 
     // Create GCS instance.
     this.gcs =

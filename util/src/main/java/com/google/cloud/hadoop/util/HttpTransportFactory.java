@@ -37,6 +37,7 @@ import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
+import java.time.Duration;
 import javax.annotation.Nullable;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLSocketFactory;
@@ -98,8 +99,37 @@ public class HttpTransportFactory {
       @Nullable RedactedString proxyUsername,
       @Nullable RedactedString proxyPassword)
       throws IOException {
-    logger.atFine().log(
-        "createHttpTransport(%s, %s, %s, %s)", type, proxyAddress, proxyUsername, proxyPassword);
+    return createHttpTransport(
+        type, proxyAddress, proxyUsername, proxyPassword, /* readTimeout= */ null);
+  }
+
+  /**
+   * Create an {@link HttpTransport} based on a type class, optional HTTP proxy and optional socket
+   * read timeout.
+   *
+   * @param type The type of HttpTransport to use.
+   * @param proxyAddress The HTTP proxy to use with the transport. Of the form hostname:port. If
+   *     empty no proxy will be used.
+   * @param proxyUsername The HTTP proxy username to use with the transport. If empty no proxy
+   *     username will be used.
+   * @param proxyPassword The HTTP proxy password to use with the transport. If empty no proxy
+   *     password will be used.
+   * @param readTimeout The socket read timeout to apply immediately on all HTTP requests. If empty,
+   *     no socket read timeout will be applied.
+   * @return The resulting HttpTransport.
+   * @throws IllegalArgumentException If the proxy address is invalid.
+   * @throws IOException If there is an issue connecting to Google's Certification server.
+   */
+  public static HttpTransport createHttpTransport(
+      HttpTransportType type,
+      @Nullable String proxyAddress,
+      @Nullable RedactedString proxyUsername,
+      @Nullable RedactedString proxyPassword,
+      @Nullable Duration readTimeout)
+      throws IOException {
+    logger.atFiner().log(
+        "createHttpTransport(%s, %s, %s, %s, %s)",
+        type, proxyAddress, proxyUsername, proxyPassword, readTimeout);
     checkArgument(
         proxyAddress != null || (proxyUsername == null && proxyPassword == null),
         "if proxyAddress is null then proxyUsername and proxyPassword should be null too");
@@ -114,14 +144,14 @@ public class HttpTransportFactory {
               proxyUsername != null
                   ? new UsernamePasswordCredentials(proxyUsername.value(), proxyPassword.value())
                   : null;
-          return createApacheHttpTransport(proxyUri, proxyCredentials);
+          return createApacheHttpTransport(proxyUri, proxyCredentials, readTimeout);
         case JAVA_NET:
           PasswordAuthentication proxyAuth =
               proxyUsername != null
                   ? new PasswordAuthentication(
                       proxyUsername.value(), proxyPassword.value().toCharArray())
                   : null;
-          return createNetHttpTransport(proxyUri, proxyAuth);
+          return createNetHttpTransport(proxyUri, proxyAuth, readTimeout);
         default:
           throw new IllegalArgumentException(
               String.format("Invalid HttpTransport type '%s'", type.name()));
@@ -137,12 +167,14 @@ public class HttpTransportFactory {
    * @param proxyUri Optional HTTP proxy URI to use with the transport.
    * @param proxyCredentials Optional HTTP proxy credentials to authenticate with the transport
    *     proxy.
+   * @param readTimeout The socket read timeout to apply immediately on all HTTP requests. If empty,
+   *     no socket read timeout will be applied.
    * @return The resulting HttpTransport.
    * @throws IOException If there is an issue connecting to Google's certification server.
    * @throws GeneralSecurityException If there is a security issue with the keystore.
    */
   public static ApacheHttpTransport createApacheHttpTransport(
-      @Nullable URI proxyUri, @Nullable Credentials proxyCredentials)
+      @Nullable URI proxyUri, @Nullable Credentials proxyCredentials, @Nullable Duration readTimeout)
       throws IOException, GeneralSecurityException {
     checkArgument(
         proxyUri != null || proxyCredentials == null,
@@ -150,7 +182,7 @@ public class HttpTransportFactory {
 
     ApacheHttpTransport transport =
         new ApacheHttpTransport.Builder()
-            .setSocketFactory(new ApacheSslKeepAliveSocketFactory(GoogleUtils.getCertificateTrustStore()))
+            .setSocketFactory(new ApacheCustomSslSocketFactory(GoogleUtils.getCertificateTrustStore(), readTimeout))
             .setProxy(
                 proxyUri == null ? null : new HttpHost(proxyUri.getHost(), proxyUri.getPort()))
             .build();
@@ -169,12 +201,15 @@ public class HttpTransportFactory {
    *
    * @param proxyUri Optional HTTP proxy URI to use with the transport.
    * @param proxyAuth Optional HTTP proxy credentials to authenticate with the transport proxy.
+   * @param readTimeout Optional socket read timeout to apply immediately on all HTTP requests.
    * @return The resulting HttpTransport.
    * @throws IOException If there is an issue connecting to Google's certification server.
    * @throws GeneralSecurityException If there is a security issue with the keystore.
    */
   public static NetHttpTransport createNetHttpTransport(
-      @Nullable URI proxyUri, @Nullable PasswordAuthentication proxyAuth)
+      @Nullable URI proxyUri,
+      @Nullable PasswordAuthentication proxyAuth,
+      @Nullable Duration readTimeout)
       throws IOException, GeneralSecurityException {
     checkArgument(
         proxyUri != null || proxyAuth == null,
@@ -198,20 +233,20 @@ public class HttpTransportFactory {
     }
 
     NetHttpTransport.Builder builder =
-        prepareNetHttpTransportBuilder(GoogleUtils.getCertificateTrustStore(), proxyUri);
+        prepareNetHttpTransportBuilder(GoogleUtils.getCertificateTrustStore(), proxyUri, readTimeout);
     return builder.build();
   }
 
   @VisibleForTesting
   static NetHttpTransport.Builder prepareNetHttpTransportBuilder(
-      KeyStore keyStore, @Nullable URI proxyUri) throws GeneralSecurityException {
+      KeyStore keyStore, @Nullable URI proxyUri, @Nullable Duration readTimeout) throws GeneralSecurityException {
     NetHttpTransport.Builder builder = new NetHttpTransport.Builder().trustCertificates(keyStore);
     SSLSocketFactory socketFactory = builder.getSslSocketFactory();
     if (socketFactory == null) {
       socketFactory = HttpsURLConnection.getDefaultSSLSocketFactory();
     }
     return builder
-        .setSslSocketFactory(new JavaxSslKeepAliveSocketFactory(socketFactory))
+        .setSslSocketFactory(new JavaxCustomSslSocketFactory(socketFactory, readTimeout))
         .setProxy(
             proxyUri == null
                 ? null
@@ -253,42 +288,47 @@ public class HttpTransportFactory {
   }
 
   @VisibleForTesting
-  static class ApacheSslKeepAliveSocketFactory extends org.apache.http.conn.ssl.SSLSocketFactory {
+  static final class ApacheCustomSslSocketFactory extends org.apache.http.conn.ssl.SSLSocketFactory {
 
-    public ApacheSslKeepAliveSocketFactory(KeyStore keyStore) throws GeneralSecurityException {
+    private final Integer readTimeoutMillis;
+
+    public ApacheCustomSslSocketFactory(KeyStore keyStore, Duration readTimeout) throws GeneralSecurityException {
       super(keyStore);
+      this.readTimeoutMillis = readTimeout != null ? Math.toIntExact(readTimeout.toMillis()) : null;
     }
 
     @Override
     public Socket createSocket() throws IOException {
-      return setKeepAlive(super.createSocket());
+      return customizeSocket(super.createSocket(), readTimeoutMillis);
     }
 
     @Override
     public Socket createSocket(HttpParams params) throws IOException {
-      return setKeepAlive(super.createSocket(params));
+      return customizeSocket(super.createSocket(params), readTimeoutMillis);
     }
 
     @Override
     public Socket createSocket(Socket socket, String host, int port, boolean autoClose)
         throws IOException, UnknownHostException {
-      return setKeepAlive(super.createSocket(socket, host, port, autoClose));
+      return customizeSocket(super.createSocket(socket, host, port, autoClose), readTimeoutMillis);
     }
 
     @Override
     public Socket createSocket(HttpContext context) throws IOException {
-      return setKeepAlive(super.createSocket(context));
+      return customizeSocket(super.createSocket(context), readTimeoutMillis);
     }
   }
 
   /** Wrapper class to have socketKeepAlive property while creating the socket */
   @VisibleForTesting
-  static class JavaxSslKeepAliveSocketFactory extends SSLSocketFactory {
+  static final class JavaxCustomSslSocketFactory extends SSLSocketFactory {
 
     private final SSLSocketFactory wrappedSockedFactory;
+    private final Integer readTimeoutMillis;
 
-    public JavaxSslKeepAliveSocketFactory(SSLSocketFactory wrappedSocketFactory) {
+    public JavaxCustomSslSocketFactory(SSLSocketFactory wrappedSocketFactory, Duration readTimeout) {
       this.wrappedSockedFactory = wrappedSocketFactory;
+      this.readTimeoutMillis = readTimeout != null ? Math.toIntExact(readTimeout.toMillis()) : null;
     }
 
     @Override
@@ -303,46 +343,57 @@ public class HttpTransportFactory {
 
     @Override
     public Socket createSocket() throws IOException {
-      return setKeepAlive(wrappedSockedFactory.createSocket());
+      return customizeSocket(wrappedSockedFactory.createSocket(), readTimeoutMillis);
     }
 
     @Override
     public Socket createSocket(Socket s, InputStream consumed, boolean autoClose)
         throws IOException {
-      return setKeepAlive(wrappedSockedFactory.createSocket(s, consumed, autoClose));
+      return customizeSocket(wrappedSockedFactory.createSocket(s, consumed, autoClose), readTimeoutMillis);
     }
 
     @Override
     public Socket createSocket(Socket s, String host, int port, boolean autoClose)
         throws IOException {
-      return setKeepAlive(wrappedSockedFactory.createSocket(s, host, port, autoClose));
+      return customizeSocket(wrappedSockedFactory.createSocket(s, host, port, autoClose), readTimeoutMillis);
     }
 
     public Socket createSocket(String host, int port) throws IOException {
-      return setKeepAlive(wrappedSockedFactory.createSocket(host, port));
+      return customizeSocket(wrappedSockedFactory.createSocket(host, port), readTimeoutMillis);
     }
 
     public Socket createSocket(InetAddress address, int port) throws IOException {
-      return setKeepAlive(wrappedSockedFactory.createSocket(address, port));
+      return customizeSocket(wrappedSockedFactory.createSocket(address, port), readTimeoutMillis);
     }
 
     public Socket createSocket(String host, int port, InetAddress clientAddress, int clientPort)
         throws IOException {
-      return setKeepAlive(
-          wrappedSockedFactory.createSocket(host, port, clientAddress, clientPort));
+      return customizeSocket(
+          wrappedSockedFactory.createSocket(host, port, clientAddress, clientPort), readTimeoutMillis);
     }
 
     public Socket createSocket(
         InetAddress address, int port, InetAddress clientAddress, int clientPort)
         throws IOException {
-      return setKeepAlive(
-          wrappedSockedFactory.createSocket(address, port, clientAddress, clientPort));
+      return customizeSocket(
+          wrappedSockedFactory.createSocket(address, port, clientAddress, clientPort), readTimeoutMillis);
     }
 
   }
 
-  private static Socket setKeepAlive(Socket socket) throws SocketException {
+  private static Socket customizeSocket(Socket socket, Integer readTimeoutMillis) throws SocketException {
+    // Enable TCP keep-alive.
     socket.setKeepAlive(true);
+
+    // Set socket read timeout. This shouldn't be necessary, because we generally set the timeout
+    // through other layers, such as com.google.api.client.http.HttpRequest#setReadTimeout(int).
+    // However, setting it here guarantees that the timeout is enforced during TLS handshake when
+    // using Conscrypt as the security provider. (See discussion in
+    // https://github.com/google/conscrypt/issues/864 .)
+    if (readTimeoutMillis != null) {
+      socket.setSoTimeout(readTimeoutMillis);
+    }
+
     return socket;
   }
 }
