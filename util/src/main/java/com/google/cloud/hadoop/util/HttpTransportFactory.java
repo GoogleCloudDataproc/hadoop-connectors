@@ -100,7 +100,8 @@ public class HttpTransportFactory {
       @Nullable Duration readTimeout)
       throws IOException {
     logger.atFiner().log(
-        "createHttpTransport(%s, %s, %s)", proxyAddress, proxyUsername, proxyPassword);
+        "createHttpTransport(%s, %s, %s, %s)",
+        proxyAddress, proxyUsername, proxyPassword, readTimeout);
     checkArgument(
         proxyAddress != null || (proxyUsername == null && proxyPassword == null),
         "if proxyAddress is null then proxyUsername and proxyPassword should be null too");
