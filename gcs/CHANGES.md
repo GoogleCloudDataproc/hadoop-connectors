@@ -1,5 +1,10 @@
 ### 2.2.8 - 2022-XX-XX
 
+1.  Set socket read timeout (`fs.gs.http.read-timeout`) as early as possible on
+    new sockets returned from the custom `SSLSocketFactory`. This guarantees the
+    timeout is enforced during TLS handshakes when using Conscrypt as the
+    security provider.
+
 ### 2.2.7 - 2022-06-01
 
 1. Fix: Prevent clobbering of SSL trustCertificates
