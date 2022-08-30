@@ -74,6 +74,11 @@
 
 1.  Set default value for `fs.gs.list.max.items.per.call` property to `5000`.
 
+1.  Set socket read timeout (`fs.gs.http.read-timeout`) as early as possible on
+    new sockets returned from the custom `SSLSocketFactory`. This guarantees the
+    timeout is enforced during TLS handshakes when using Conscrypt as the
+    security provider.
+
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.

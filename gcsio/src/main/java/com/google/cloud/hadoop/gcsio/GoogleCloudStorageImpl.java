@@ -400,7 +400,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       throws IOException {
     HttpTransport httpTransport =
         HttpTransportFactory.createHttpTransport(
-            options.getProxyAddress(), options.getProxyUsername(), options.getProxyPassword());
+            options.getProxyAddress(),
+            options.getProxyUsername(),
+            options.getProxyPassword(),
+            Duration.ofMillis(options.getHttpRequestReadTimeout()));
     return new Storage.Builder(
             httpTransport, GsonFactory.getDefaultInstance(), httpRequestInitializer)
         .setRootUrl(options.getStorageRootUrl())
