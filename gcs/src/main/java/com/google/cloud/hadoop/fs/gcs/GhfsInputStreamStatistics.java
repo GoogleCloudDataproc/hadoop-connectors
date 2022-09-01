@@ -56,6 +56,14 @@ interface GhfsInputStreamStatistics extends AutoCloseable, GhfsStatisticInterfac
   void readOperationStarted(long pos, long len);
 
   /**
+   * A {@code readFully(int position, byte[] buf, int off, int len)} operation has started.
+   *
+   * @param pos starting position of the read
+   * @param len length of bytes to read
+   */
+  void readFullyOperationStarted(long pos, long len);
+
+  /**
    * A read operation has completed.
    *
    * @param requested number of requested bytes
@@ -89,6 +97,9 @@ interface GhfsInputStreamStatistics extends AutoCloseable, GhfsStatisticInterfac
 
   /** The total number of times the read() operation in an input stream has been called. */
   long getReadOperations();
+
+  /** The total number of times the readFully() operation in an input stream has been called. */
+  long getReadFullyOperations();
 
   /** The total number of Incomplete read() operations */
   long getReadsIncomplete();

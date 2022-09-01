@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FileSystem;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -121,6 +122,44 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     GoogleHadoopFSInputStream in = GoogleHadoopFSInputStream.create(ghfs, path, statistics);
     in.close();
     assertThrows(IOException.class, in::read);
+  }
+
+  @Test
+  public void testReadFully() throws Exception {
+    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "testReadFully");
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+            path, GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
+
+    String testContent = "test content";
+    gcsFsIHelper.writeTextFile(path, testContent);
+
+    byte[] value = new byte[5];
+    byte[] expected = Arrays.copyOfRange(testContent.getBytes(StandardCharsets.UTF_8), 2, 7);
+
+    GoogleHadoopFSInputStream in = createGhfsInputStream(ghfs, path);
+    try (GoogleHadoopFSInputStream ignore = in) {
+      in.readFully(2, value);
+      assertThat(in.getPos()).isEqualTo(0);
+    }
+    assertThat(value).isEqualTo(expected);
+  }
+
+  @Test
+  public void testReadFully_illegalSize() throws Exception {
+    URI path = gcsFsIHelper.getUniqueObjectUri(getClass(), "testReadFully");
+    GoogleHadoopFileSystem ghfs =
+        GoogleHadoopFileSystemIntegrationHelper.createGhfs(
+            path, GoogleHadoopFileSystemIntegrationHelper.getTestConfig());
+
+    String testContent = "test content";
+    gcsFsIHelper.writeTextFile(path, testContent);
+
+    byte[] value = new byte[20];
+
+    GoogleHadoopFSInputStream in = createGhfsInputStream(ghfs, path);
+    Throwable exception = assertThrows(EOFException.class, () -> in.readFully(2, value));
+    assertThat(exception).hasMessageThat().contains(FSExceptionMessages.EOF_IN_READ_FULLY);
   }
 
   private static GoogleHadoopFSInputStream createGhfsInputStream(

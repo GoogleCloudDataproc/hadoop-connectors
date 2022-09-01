@@ -356,13 +356,13 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
     assertWithMessage("Expected exactly 1 byte to be read").that(numBytesRead).isEqualTo(1);
 
     // Null buffer.
-    testReadInvalidArgsHelper(readStream, null, 0, 1, NullPointerException.class);
+    testReadInvalidArgsHelper(readStream, null, 0, 1, IllegalArgumentException.class);
 
     // offset < 0
     testReadInvalidArgsHelper(readStream, buffer, -1, 1, IndexOutOfBoundsException.class);
 
     // length < 0
-    testReadInvalidArgsHelper(readStream, buffer, 0, -1, IndexOutOfBoundsException.class);
+    testReadInvalidArgsHelper(readStream, buffer, 0, -1, IllegalArgumentException.class);
 
     // length > buffer.length - offset
     testReadInvalidArgsHelper(readStream, buffer, 0, 2, IndexOutOfBoundsException.class);

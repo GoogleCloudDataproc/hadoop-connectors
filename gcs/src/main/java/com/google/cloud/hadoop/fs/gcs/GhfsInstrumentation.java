@@ -470,6 +470,7 @@ public class GhfsInstrumentation
     private final AtomicLong readExceptions;
     private final AtomicLong readsIncomplete;
     private final AtomicLong readOperations;
+    private final AtomicLong readFullyOperations;
     private final AtomicLong seekOperations;
 
     /** Bytes read by the application and any when draining streams . */
@@ -489,6 +490,7 @@ public class GhfsInstrumentation
                   StreamStatisticNames.STREAM_READ_BYTES,
                   StreamStatisticNames.STREAM_READ_EXCEPTIONS,
                   StreamStatisticNames.STREAM_READ_OPERATIONS,
+                  StreamStatisticNames.STREAM_READ_FULLY_OPERATIONS,
                   StreamStatisticNames.STREAM_READ_OPERATIONS_INCOMPLETE,
                   StreamStatisticNames.STREAM_READ_SEEK_OPERATIONS,
                   StreamStatisticNames.STREAM_READ_SEEK_BACKWARD_OPERATIONS,
@@ -511,6 +513,8 @@ public class GhfsInstrumentation
       readsIncomplete =
           st.getCounterReference(StreamStatisticNames.STREAM_READ_OPERATIONS_INCOMPLETE);
       readOperations = st.getCounterReference(StreamStatisticNames.STREAM_READ_OPERATIONS);
+      readFullyOperations =
+          st.getCounterReference(StreamStatisticNames.STREAM_READ_FULLY_OPERATIONS);
       seekOperations = st.getCounterReference(StreamStatisticNames.STREAM_READ_SEEK_OPERATIONS);
       totalBytesRead = st.getCounterReference(StreamStatisticNames.STREAM_READ_TOTAL_BYTES);
       setIOStatistics(st);
@@ -597,6 +601,17 @@ public class GhfsInstrumentation
     @Override
     public void readOperationStarted(long pos, long len) {
       readOperations.incrementAndGet();
+    }
+
+    /**
+     * A readFully() operation in the input stream has started.
+     *
+     * @param pos starting position of the read
+     * @param len length of bytes to read
+     */
+    @Override
+    public void readFullyOperationStarted(long pos, long len) {
+      readFullyOperations.incrementAndGet();
     }
 
     /**
@@ -727,6 +742,16 @@ public class GhfsInstrumentation
     @Override
     public long getReadOperations() {
       return lookupCounterValue(StreamStatisticNames.STREAM_READ_OPERATIONS);
+    }
+
+    /**
+     * The total number of times the readFully() operation in an input stream has been called.
+     *
+     * @return the count of read operations.
+     */
+    @Override
+    public long getReadFullyOperations() {
+      return lookupCounterValue(StreamStatisticNames.STREAM_READ_FULLY_OPERATIONS);
     }
 
     /**
