@@ -112,8 +112,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     list_nonExistentBucket_nullPrefix(
         (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   @Test
@@ -123,8 +122,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             getObjectNames(
                 gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   private void list_nonExistentBucket_nullPrefix(
@@ -149,8 +147,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     list_emptyBucket_nullPrefix(
         (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   @Test
@@ -160,8 +157,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             getObjectNames(
                 gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   private void list_emptyBucket_nullPrefix(
@@ -186,8 +182,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     list_nonEmptyBucket_nullPrefix_object(
         (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   @Test
@@ -197,8 +192,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             getObjectNames(
                 gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   private void list_nonEmptyBucket_nullPrefix_object(
@@ -224,8 +218,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     list_nonEmptyBucket_nullPrefix_emptyDir(
         (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   @Test
@@ -235,8 +228,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             getObjectNames(
                 gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   private void list_nonEmptyBucket_nullPrefix_emptyDir(
@@ -262,8 +254,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     list_nonEmptyBucket_nullPrefix_subDir(
         (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   @Test
@@ -273,8 +264,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             getObjectNames(
                 gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   private void list_nonEmptyBucket_nullPrefix_subDir(
@@ -300,8 +290,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     list_nonEmptyBucket_nullPrefix_implicitSubDir(
         (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   @Test
@@ -311,8 +300,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             getObjectNames(
                 gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   private void list_nonEmptyBucket_nullPrefix_implicitSubDir(
@@ -338,8 +326,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     list_prefix_doesNotExist(
         (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   @Test
@@ -349,8 +336,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             getObjectNames(
                 gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   private void list_prefix_doesNotExist(
@@ -376,8 +362,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     list_prefixObject_empty(
         (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   @Test
@@ -387,8 +372,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             getObjectNames(
                 gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   private void list_prefixObject_empty(
@@ -415,8 +399,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     list_prefixObject_withObject(
         (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   @Test
@@ -426,8 +409,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             getObjectNames(
                 gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   private void list_prefixObject_withObject(
@@ -453,8 +435,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     list_prefixObject_withSubdir(
         (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   @Test
@@ -464,8 +445,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             getObjectNames(
                 gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   private void list_prefixObject_withSubdir(
@@ -491,8 +471,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     list_prefixObject_withImplicitSubdir(
         (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   @Test
@@ -502,8 +481,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             getObjectNames(
                 gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   private void list_prefixObject_withImplicitSubdir(
@@ -530,8 +508,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     list_implicitPrefix_withObject(
         (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   @Test
@@ -541,8 +518,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             getObjectNames(
                 gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   private void list_implicitPrefix_withObject(
@@ -568,8 +544,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     list_implicitPrefix_withSubdir(
         (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   @Test
@@ -579,8 +554,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             getObjectNames(
                 gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   private void list_implicitPrefix_withSubdir(
@@ -606,8 +580,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     list_implicitPrefix_withImplicitSubdir(
         (gcs, bucket, prefix) -> getObjectNames(gcs.listObjectInfo(bucket, prefix)),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   @Test
@@ -617,8 +590,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             getObjectNames(
                 gcs.listObjectInfoPage(bucket, prefix, /* pageToken= */ null).getItems()),
         (bucket, prefix) ->
-            listRequestWithTrailingDelimiter(
-                bucket, prefix, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(bucket, prefix, /* pageToken= */ null));
   }
 
   private void list_implicitPrefix_withImplicitSubdir(
@@ -724,7 +696,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             listRequestWithTrailingDelimiter(
-                testBucket, /* prefix= */ null, /* maxResults= */ 1024, /* pageToken= */ null));
+                testBucket, /* prefix= */ null, /* pageToken= */ null));
   }
 
   @Test
@@ -743,7 +715,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             listRequestWithTrailingDelimiter(
-                testBucket, /* prefix= */ null, /* maxResults= */ 1024, /* pageToken= */ null));
+                testBucket, /* prefix= */ null, /* pageToken= */ null));
   }
 
   @Test
@@ -762,7 +734,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             listRequestWithTrailingDelimiter(
-                testBucket, /* prefix= */ null, /* maxResults= */ 1024, /* pageToken= */ null));
+                testBucket, /* prefix= */ null, /* pageToken= */ null));
   }
 
   @Test
@@ -780,8 +752,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(getObjectNames(listedObjects)).containsExactly(testDir);
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                testBucket, testDir, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(testBucket, testDir, /* pageToken= */ null));
   }
 
   @Test
@@ -799,8 +770,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(getObjectNames(listedObjects)).containsExactly(testDir, testDir + "obj");
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                testBucket, testDir, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(testBucket, testDir, /* pageToken= */ null));
   }
 
   @Test
@@ -818,8 +788,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(getObjectNames(listedObjects)).containsExactly(testDir, testDir + "dir/");
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                testBucket, testDir, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(testBucket, testDir, /* pageToken= */ null));
   }
 
   @Test
@@ -837,8 +806,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(getObjectNames(listedObjects)).containsExactly(testDir, testDir + "obj");
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                testBucket, testDir, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(testBucket, testDir, /* pageToken= */ null));
   }
 
   @Test
@@ -856,8 +824,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(getObjectNames(listedObjects)).containsExactly(testDir, testDir + "dir/");
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
-            listRequestWithTrailingDelimiter(
-                testBucket, testDir, /* maxResults= */ 1024, /* pageToken= */ null));
+            listRequestWithTrailingDelimiter(testBucket, testDir, /* pageToken= */ null));
   }
 
   @Test
@@ -890,10 +857,7 @@ public class GoogleCloudStorageNewIntegrationTest {
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
             listRequestWithTrailingDelimiter(
-                objectId.getBucketName(),
-                testDirName,
-                /* maxResults= */ 1024,
-                /* pageToken= */ null));
+                objectId.getBucketName(), testDirName, /* pageToken= */ null));
   }
 
   @Test

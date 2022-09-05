@@ -93,7 +93,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.grpc.write.message.timeout.ms", 3_000L);
           put("fs.gs.http.connect-timeout", 20_000);
           put("fs.gs.http.max.retry", 10);
-          put("fs.gs.http.read-timeout", 20_000);
           put("fs.gs.implicit.dir.repair.enable", true);
           put("fs.gs.inputstream.fadvise", Fadvise.AUTO);
           put("fs.gs.inputstream.fast.fail.on.not.found.enable", true);
@@ -102,7 +101,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.inputstream.support.gzip.encoding.enable", false);
           put("fs.gs.io.buffersize.write", 64 * 1024 * 1024);
           put("fs.gs.lazy.init.enable", false);
-          put("fs.gs.list.max.items.per.call", 1024L);
+          put("fs.gs.list.max.items.per.call", 5000L);
           put("fs.gs.marker.file.pattern", null);
           put("fs.gs.max.requests.per.batch", 15L);
           put("fs.gs.max.wait.for.empty.object.creation.ms", 3_000);
