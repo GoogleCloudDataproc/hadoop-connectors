@@ -31,7 +31,8 @@
 
     Permissions that are reported for a file or directory to have regardless of
     actual Cloud Storage permissions. Can be either in octal or symbolic format
-    that accepted by FsPermission class.
+    that accepted by FsPermission class. This permission needs to be set when the default file system is 
+    set to gs instead of hdfs in yarn-site.xml.
 
 *   `fs.gs.delegation.token.binding` (not set by default)
 
@@ -100,7 +101,11 @@
 
 *   `fs.gs.batch.threads` (default: `15`)
 
-    Maximum number of threads used to execute batch requests in parallel.
+    Maximum number of threads used to execute batch requests in parallel. The number of 
+    threads here control the concurrency of the GCS batched API (fs.gs.max.requests.per.batch) calls.
+    
+    Depending on the number of requests the connector evenly distributes the number of batched requests 
+    across batch threads.
 
 *   `fs.gs.list.max.items.per.call` (default: `1024`)
 
@@ -126,7 +131,7 @@
     fs.gs.storage.http.headers.some-custom-header=custom_value
     fs.gs.storage.http.headers.another-custom-header=another_custom_value
     ```
-
+    
 ### Encryption ([CSEK](https://cloud.google.com/storage/docs/encryption/customer-supplied-keys))
 
 *   `fs.gs.encryption.algorithm` (not set by default)
@@ -296,7 +301,8 @@ default service account impersonation.
 
 *   `fs.gs.outputstream.upload.chunk.size` (default: `67108864`)
 
-    The number of bytes in one Google Cloud Storage upload request.
+    The number of bytes in one Google Cloud Storage upload request via the HTTP Media Uploader Service. 
+    More details can be found here https://cloud.google.com/java/docs/reference/google-api-client/latest/com.google.api.client.googleapis.media.MediaHttpUploader
 
 *   `fs.gs.outputstream.upload.cache.size` (default: `0`)
 
