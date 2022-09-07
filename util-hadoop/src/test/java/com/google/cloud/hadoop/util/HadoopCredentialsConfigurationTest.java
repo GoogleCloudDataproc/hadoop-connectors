@@ -17,6 +17,8 @@ package com.google.cloud.hadoop.util;
 import static com.github.stefanbirkner.systemlambda.SystemLambda.withEnvironmentVariable;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.ACCESS_TOKEN_PROVIDER_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTHENTICATION_TYPE_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTH_ACCESS_TOKEN_EXPIRATION_TIME_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTH_ACCESS_TOKEN_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTH_CLIENT_ID_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTH_CLIENT_SECRET_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTH_REFRESH_TOKEN_SUFFIX;
@@ -47,6 +49,7 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -224,6 +227,50 @@ public class HadoopCredentialsConfigurationTest {
         .isGreaterThan(Date.from(Instant.now().plusSeconds(expireInSec - 10)));
     assertThat(accessToken.getExpirationTime())
         .isLessThan(Date.from(Instant.now().plusSeconds(expireInSec + 10)));
+
+    String refreshToken = userCredentials.getRefreshToken();
+
+    assertThat(refreshToken).isEqualTo(initialRefreshToken);
+  }
+
+  @Test
+  public void userCredentials_credentialFactory_existing_access_token() throws IOException {
+    // GIVEN
+    String initialRefreshToken = "FAKE_REFRESH_TOKEN";
+    String tokenServerUrl = "http://localhost/token";
+    configuration.set(getConfigKey(TOKEN_SERVER_URL_SUFFIX), tokenServerUrl);
+    configuration.setEnum(
+            getConfigKey(AUTHENTICATION_TYPE_SUFFIX), AuthenticationType.USER_CREDENTIALS);
+    configuration.set(getConfigKey(AUTH_REFRESH_TOKEN_SUFFIX), initialRefreshToken);
+    configuration.set(getConfigKey(AUTH_CLIENT_ID_SUFFIX), "FAKE_CLIENT_ID");
+    configuration.set(getConfigKey(AUTH_CLIENT_SECRET_SUFFIX), "FAKE_CLIENT_SECRET");
+    configuration.set(getConfigKey(AUTH_ACCESS_TOKEN_SUFFIX), "FAKE_ACCESS_TOKEN");
+    Instant accessTokenExpiration = Instant.now().plus(15, ChronoUnit.MINUTES);
+    configuration.setLong(getConfigKey(AUTH_ACCESS_TOKEN_EXPIRATION_TIME_SUFFIX), accessTokenExpiration.toEpochMilli());
+
+    long expireInSec = 300L;
+    String accessTokenAsString = "SlAV32hkKG";
+
+    TokenResponse tokenResponse =
+            new TokenResponse().setAccessToken(accessTokenAsString).setExpiresInSeconds(expireInSec);
+
+    MockHttpTransport transport = mockTransport(jsonDataResponse(tokenResponse));
+
+    // WHEN
+    GoogleCredentials credentials = getCredentials(transport);
+    credentials.refreshIfExpired();
+
+    // THEN
+    assertThat(credentials).isInstanceOf(UserCredentials.class);
+
+    UserCredentials userCredentials = (UserCredentials) credentials;
+
+    assertThat(userCredentials.getClientId()).isEqualTo("FAKE_CLIENT_ID");
+    assertThat(userCredentials.getClientSecret()).isEqualTo("FAKE_CLIENT_SECRET");
+
+    AccessToken accessToken = userCredentials.getAccessToken();
+    assertThat(accessToken.getTokenValue()).isEqualTo("FAKE_ACCESS_TOKEN");
+    assertThat(accessToken.getExpirationTime().toInstant().getEpochSecond()).isEqualTo(accessTokenExpiration.getEpochSecond());
 
     String refreshToken = userCredentials.getRefreshToken();
 

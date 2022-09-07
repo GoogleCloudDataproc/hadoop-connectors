@@ -164,6 +164,20 @@ public class HadoopCredentialsConfiguration {
       new HadoopConfigurationProperty<>(".auth.refresh.token");
 
   /**
+   * Configuration key for defining the OAuth2 access token. Optional when the authentication type
+   * is USER_CREDENTIALS
+   */
+  public static final HadoopConfigurationProperty<RedactedString> AUTH_ACCESS_TOKEN_SUFFIX =
+          new HadoopConfigurationProperty<>(".auth.access.token");
+
+  /**
+   * Configuration key for defining the OAuth2 access token expiration time. Optional when the authentication type
+   * is USER_CREDENTIALS
+   */
+  public static final HadoopConfigurationProperty<Long> AUTH_ACCESS_TOKEN_EXPIRATION_TIME_SUFFIX =
+          new HadoopConfigurationProperty<>(".auth.access.token.expiration.time", 0L);
+
+  /**
    * Returns full list of config prefixes that will be resolved based on the order in returned list.
    */
   public static List<String> getConfigKeyPrefixes(String... keyPrefixes) {
@@ -226,13 +240,21 @@ public class HadoopCredentialsConfiguration {
             AUTH_CLIENT_SECRET_SUFFIX.withPrefixes(keyPrefixes).getPassword(config);
         RedactedString refreshToken =
             AUTH_REFRESH_TOKEN_SUFFIX.withPrefixes(keyPrefixes).getPassword(config);
+        RedactedString accessToken =
+            AUTH_ACCESS_TOKEN_SUFFIX.withPrefixes(keyPrefixes).getPassword(config);
+        Long accessTokenExpirationTime =
+            AUTH_ACCESS_TOKEN_EXPIRATION_TIME_SUFFIX.withPrefixes(keyPrefixes).get(config, config::getLong);
 
-        return UserCredentials.newBuilder()
-            .setClientId(clientId)
-            .setClientSecret(clientSecret.value())
-            .setRefreshToken(refreshToken.value())
-            .setHttpTransportFactory(transport::get)
-            .build();
+        UserCredentials.Builder userCredentialsBuilder = UserCredentials.newBuilder()
+                .setClientId(clientId)
+                .setClientSecret(clientSecret.value())
+                .setRefreshToken(refreshToken.value())
+                .setHttpTransportFactory(transport::get);
+
+        if (accessToken != null) {
+          userCredentialsBuilder = userCredentialsBuilder.setAccessToken(new AccessToken(accessToken.value(), new Date(accessTokenExpirationTime)));
+        }
+        return userCredentialsBuilder.build();
       case UNAUTHENTICATED:
         return null;
       default:
@@ -341,7 +363,10 @@ public class HadoopCredentialsConfiguration {
     }
     if (credentials instanceof UserCredentials) {
       return ((UserCredentials) credentials)
-          .toBuilder().setTokenServerUri(URI.create(tokenServerUrl)).build();
+          .toBuilder()
+              .setAccessToken(credentials.getAccessToken())
+              .setTokenServerUri(URI.create(tokenServerUrl))
+              .build();
     }
     return credentials;
   }

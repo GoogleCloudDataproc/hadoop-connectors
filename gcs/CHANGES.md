@@ -62,6 +62,8 @@
     fs.gs.auth.client.id
     fs.gs.auth.client.secret
     fs.gs.auth.refresh.token
+    fs.gs.auth.access.token
+    fs.gs.auth.access.token.expiration.time
     ```
 
 1.  Merge all output stream types functionality in the default output stream
@@ -78,6 +80,7 @@
     new sockets returned from the custom `SSLSocketFactory`. This guarantees the
     timeout is enforced during TLS handshakes when using Conscrypt as the
     security provider.
+
 
 ### 2.2.2 - 2021-06-25
 

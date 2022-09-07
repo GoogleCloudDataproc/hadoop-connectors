@@ -199,17 +199,28 @@ refresh token using the
 [authorization code grant flow](https://oauth.net/2/grant-types/authorization-code)
 and pass it to the connector with OAuth client ID and secret:
 
-*   `fs.gs.auth.client.id` (not set by default)
+* `fs.gs.auth.client.id` (not set by default)
 
     The OAuth2 client ID.
 
-*   `fs.gs.auth.client.secret` (not set by default)
+* `fs.gs.auth.client.secret` (not set by default)
 
     The OAuth2 client secret.
 
-*   `fs.gs.auth.refresh.token` (not set by default)
+* `fs.gs.auth.refresh.token` (not set by default)
 
     The refresh token.
+
+During the authorisation code grant flow, you also retrieved an access token and its expiration time.
+If the token is not expired, you can also provide it.
+
+* `fs.gs.auth.access.token`
+
+    The access token.
+
+* `fs.gs.auth.access.token.expiration.time` 
+
+    The access token expiration time in milliseconds since epoch.
 
 ### Service account impersonation
 
