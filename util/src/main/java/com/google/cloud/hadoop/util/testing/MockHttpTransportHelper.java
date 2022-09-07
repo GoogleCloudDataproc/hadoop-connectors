@@ -140,12 +140,14 @@ public final class MockHttpTransportHelper {
       int requestsPerBatch, LowLevelHttpResponse... responses) {
     return new MockHttpTransport() {
       int responsesIndex = 0;
+      int responseBatchCounter = 0;
 
       @Override
       public LowLevelHttpRequest buildRequest(String method, String url) {
         return new MockLowLevelHttpRequest() {
           @Override
           public LowLevelHttpResponse execute() {
+            responseBatchCounter++;
             String boundary = "batch_pK7JBAk73-E=_AA5eFwv4m2Q=";
             String contentId = "";
 
@@ -155,8 +157,10 @@ public final class MockHttpTransportHelper {
                     .setContentType("multipart/mixed; boundary=" + boundary);
 
             StringBuilder batchResponse = new StringBuilder();
-
-            for (int i = 0; i < requestsPerBatch; i++) {
+            int remainingResponses = responses.length - responsesIndex;
+            int responsesInBatch =
+                Math.min((responseBatchCounter * requestsPerBatch), remainingResponses);
+            for (int i = 0; i < responsesInBatch; i++) {
               try {
                 LowLevelHttpResponse resp = responses[responsesIndex++];
                 batchResponse
