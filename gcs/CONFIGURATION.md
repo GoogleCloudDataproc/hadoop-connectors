@@ -2,43 +2,43 @@
 
 ### General configuration
 
-*   `fs.gs.project.id` (not set by default)
+* `fs.gs.project.id` (not set by default)
 
     Google Cloud Project ID with access to Google Cloud Storage buckets.
     Required only for list buckets and create bucket operations.
 
-*   `fs.gs.working.dir` (default: `/`)
+* `fs.gs.working.dir` (default: `/`)
 
     The directory relative `gs:` uris resolve in inside the default bucket.
 
-*   `fs.gs.implicit.dir.repair.enable` (default: `true`)
+* `fs.gs.implicit.dir.repair.enable` (default: `true`)
 
     Whether to create objects for the parent directories of objects with `/` in
     their path e.g. creating `gs://bucket/foo/` upon deleting or renaming
     `gs://bucket/foo/bar`.
 
-*   `fs.gs.copy.with.rewrite.enable` (default: `true`)
+* `fs.gs.copy.with.rewrite.enable` (default: `true`)
 
     Whether to perform copy operation using Rewrite requests which allows copy
     files between different locations and storage classes.
 
-*   `fs.gs.rewrite.max.bytes.per.call` (default: `536870912`)
+* `fs.gs.rewrite.max.bytes.per.call` (default: `536870912`)
 
     Maximum number of bytes rewritten in a single rewrite request when
     `fs.gs.copy.with.rewrite.enable` is set to `true`.
 
-*   `fs.gs.reported.permissions` (default: `700`)
+* `fs.gs.reported.permissions` (default: `700`)
 
     Permissions that are reported for a file or directory to have regardless of
     actual Cloud Storage permissions. Can be either in octal or symbolic format
     that accepted by FsPermission class. This permission needs to be set when the default file system is 
     set to gs instead of hdfs in yarn-site.xml.
 
-*   `fs.gs.delegation.token.binding` (not set by default)
+* `fs.gs.delegation.token.binding` (not set by default)
 
     Delegation Token binding class.
 
-*   `fs.gs.bucket.delete.enable` (default: `false`)
+* `fs.gs.bucket.delete.enable` (default: `false`)
 
     If `true`, recursive delete on a path that refers to a Cloud Storage bucket
     itself or delete on that path when it is empty will result in deletion of
@@ -48,35 +48,35 @@
     root, but without clobbering the filesystem authority corresponding to that
     root path in the process.
 
-*   `fs.gs.checksum.type` (default: `NONE`)
+* `fs.gs.checksum.type` (default: `NONE`)
 
     Configuration of object checksum type to return; if a particular file
     doesn't support the requested type, then getFileChecksum() method will
     return `null` for that file. Supported checksum types are `NONE`, `CRC32C`
     and `MD5`
 
-*   `fs.gs.status.parallel.enable` (default: `true`)
+* `fs.gs.status.parallel.enable` (default: `true`)
 
     If `true`, executes Cloud Storage object requests in `FileSystem`'s
     `listStatus` and `getFileStatus` methods in parallel to reduce latency.
 
-*   `fs.gs.lazy.init.enable` (default: `false`)
+* `fs.gs.lazy.init.enable` (default: `false`)
 
     Enables lazy initialization of `GoogleHadoopFileSystem` instances.
 
-*   `fs.gs.block.size` (default: `67108864`)
+* `fs.gs.block.size` (default: `67108864`)
 
     The reported block size of the file system. This does not change any
     behavior of the connector or the underlying Google Cloud Storage objects.
     However, it will affect the number of splits Hadoop MapReduce uses for a
     given input.
 
-*   `fs.gs.create.items.conflict.check.enable` (default: `true`)
+* `fs.gs.create.items.conflict.check.enable` (default: `true`)
 
     Enables a check that ensures that conflicting directories do not exist when
     creating files and conflicting files do not exist when creating directories.
 
-*   `fs.gs.glob.algorithm` (default: `CONCURRENT`)
+* `fs.gs.glob.algorithm` (default: `CONCURRENT`)
 
     Glob search algorithm to use in Hadoop
     [FileSystem.globStatus](https://hadoop.apache.org/docs/r3.3.0/api/org/apache/hadoop/fs/FileSystem.html#globStatus-org.apache.hadoop.fs.Path-)
@@ -94,34 +94,36 @@
         performance. Whichever algorithm will finish first that result will be
         returned, and the other algorithm execution will be interrupted.
 
-*   `fs.gs.max.requests.per.batch` (default: `15`)
+* `fs.gs.max.requests.per.batch` (default: `15`)
 
     Maximum number of Cloud Storage requests that could be sent in a single
     batch request.
 
-*   `fs.gs.batch.threads` (default: `15`)
+* `fs.gs.batch.threads` (default: `15`)
 
     Maximum number of threads used to execute batch requests in parallel. The number of 
     threads here control the concurrency of the GCS batched API (fs.gs.max.requests.per.batch) calls.
+    These threads are used to execute the Class A and Free operations in GCS such as copy, list, delete etc. 
+    These operations are part of typical hdfs commands such as `hdfs mv` `hdfs cp`    
     
-    Depending on the number of requests the connector evenly distributes the number of batched requests 
+    Depending on the number of requests the connector evenly distributes the number of requests 
     across batch threads.
 
-*   `fs.gs.list.max.items.per.call` (default: `1024`)
+* `fs.gs.list.max.items.per.call` (default: `1024`)
 
     Maximum number of items to return in response for list Cloud Storage
     requests.
 
-*   `fs.gs.max.wait.for.empty.object.creation.ms` (default: `3000`)
+* `fs.gs.max.wait.for.empty.object.creation.ms` (default: `3000`)
 
     Maximum amount of time to wait after exception during empty object creation.
 
-*   `fs.gs.marker.file.pattern` (not set by default)
+* `fs.gs.marker.file.pattern` (not set by default)
 
     If set, files that match specified pattern are copied last during folder
     rename operation.
 
-*   `fs.gs.storage.http.headers.<HEADER>=<VALUE>` (not set by default)
+* `fs.gs.storage.http.headers.<HEADER>=<VALUE>` (not set by default)
 
     Custom HTTP headers added to Cloud Storage API requests.
 
@@ -249,7 +251,7 @@ default service account impersonation.
 
 ### IO configuration
 
-*   `fs.gs.inputstream.fast.fail.on.not.found.enable` (default: `true`)
+* `fs.gs.inputstream.fast.fail.on.not.found.enable` (default: `true`)
 
     If `true`, on opening a file connector will proactively send a Cloud Storage
     metadata request to check whether the object exists, even though the
@@ -261,7 +263,7 @@ default service account impersonation.
     has independently already ensured that a file exists before calling open(),
     then set this property to false for more efficient reads.
 
-*   `fs.gs.inputstream.support.gzip.encoding.enable` (default: `false`)
+* `fs.gs.inputstream.support.gzip.encoding.enable` (default: `false`)
 
     If set to `false` then reading files with GZIP content encoding (HTTP header
     `Content-Encoding: gzip`) will result in failure (`IOException` is thrown).
@@ -270,15 +272,12 @@ default service account impersonation.
     [GZIP encoded](https://cloud.google.com/storage/docs/transcoding#decompressive_transcoding)
     files is inefficient and error-prone in Hadoop and Spark.
 
-*   `fs.gs.outputstream.buffer.size` (default: `8388608`)
+* `fs.gs.outputstream.buffer.size` (default: `8388608`)
 
-    Write buffer size.
+    Write buffer size used by the file system API's to send the data to be uploaded to GCS via pipes. 
+    The various pipe types are documented below
 
-*   `fs.gs.outputstream.pipe.buffer.size` (default: `1048576`)
-
-    Pipe buffer size used for uploading Cloud Storage objects.
-
-*   `fs.gs.outputstream.pipe.type` (default: `IO_STREAM_PIPE`)
+* `fs.gs.outputstream.pipe.type` (default: `IO_STREAM_PIPE`)
 
     Pipe type used for uploading Cloud Storage objects.
 
@@ -299,23 +298,39 @@ default service account impersonation.
         client cannot reliably write in the output stream from multiple threads
         without triggering *"Pipe broken"* exceptions;
 
-*   `fs.gs.outputstream.upload.chunk.size` (default: `67108864`)
+* `fs.gs.outputstream.pipe.buffer.size` (default: `1048576`)
+
+    Pipe buffer size used for uploading Cloud Storage objects. This pipe is an intermediate channel which is used to 
+    receive the data on one side and allow for reading of the data to be uploaded to GCS on the other side. 
+
+* `fs.gs.outputstream.upload.chunk.size` (default: `67108864`)
 
     The number of bytes in one Google Cloud Storage upload request via the HTTP Media Uploader Service. 
-    More details can be found here https://cloud.google.com/java/docs/reference/google-api-client/latest/com.google.api.client.googleapis.media.MediaHttpUploader
+    This is used only for JSON API and for best performance should be a multiple of 8MB. 
+    
+    Having a large value example:- 64MB allows the upload performance must be much better due to fewer number of HTTP 
+    calls but on the other side if there are many partitions being written by the write call then each partition will hold 
+    64MB of data. Therefore for example:- if data for 250 partitions is written at once then the total memory requirement 
+    will be 250*64MB = 16 GB of memory resulting in OOM memory.
+ 
+    To arrive the optimal value this parameter needs to be tweaked based on the upload performance and number of concurrent files
+    being written.
+ 
+    More details can be found here 
+    https://cloud.google.com/java/docs/reference/google-api-client/latest/com.google.api.client.googleapis.media.MediaHttpUploader
 
-*   `fs.gs.outputstream.upload.cache.size` (default: `0`)
+* `fs.gs.outputstream.upload.cache.size` (default: `0`)
 
     The upload cache size in bytes used for high-level upload retries. To
     disable this feature set this property to zero or negative value. Retry will
     be performed if total size of written/uploaded data to the object is less
     than or equal to the cache size.
 
-*   `fs.gs.outputstream.direct.upload.enable` (default: `false`)
+* `fs.gs.outputstream.direct.upload.enable` (default: `false`)
 
     Enables Cloud Storage direct uploads.
 
-*   `fs.gs.outputstream.sync.min.interval.ms` (default: `0`)
+* `fs.gs.outputstream.sync.min.interval.ms` (default: `0`)
 
     Output stream configuration that controls the minimum interval
     (milliseconds) between consecutive syncs. This allows to avoid getting
