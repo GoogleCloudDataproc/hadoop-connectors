@@ -99,7 +99,7 @@
 
 *   `fs.gs.batch.threads` (default: `15`)
 
-    Maximum number of threads used to execute batch requests in parallel.
+    Maximum number of threads used to execute batch requests in parallel. The number of threads here control the concurrency of the GCS batched API (fs.gs.max.requests.per.batch) calls. These threads are used to execute the Class A and Free operations in GCS such as copy, list, delete etc. These operations are part of typical hdfs commands such as `hdfs mv`, `hdfs cp`
 
 *   `fs.gs.list.max.items.per.call` (default: `1024`)
 
