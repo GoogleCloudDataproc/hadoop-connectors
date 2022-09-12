@@ -21,6 +21,10 @@
 
 1. Increasing gRPC read timeout from 30 seconds to 3600 seconds.
 
+1. Set default value for `fs.gs.list.max.items.per.call` property to `5000`.
+
+1. Adding support for invocationId in Json path.
+
 ### 2.2.7 - 2022-06-01
 
 1. Fix: Prevent clobbering of SSL trustCertificates
@@ -68,8 +72,6 @@
     ```
     fs.gs.grpc.read.zerocopy.enable (default : true)
     ```
-
-1.  Set default value for `fs.gs.list.max.items.per.call` property to `5000`.
 
 ### 2.2.2 - 2021-06-25
 
