@@ -15,7 +15,11 @@
 
 1. Grpc read optimization to not prematurely close existing requests.
 
-1. Retry request on 408/timeout response from server
+1. Retry request on 408/timeout response from server.
+
+1. Upgrade Google auth dependency to 1.7.0.
+
+1. Increasing grpc read timeout from 30seconds to 3600 seconds.
 
 ### 2.2.7 - 2022-06-01
 
