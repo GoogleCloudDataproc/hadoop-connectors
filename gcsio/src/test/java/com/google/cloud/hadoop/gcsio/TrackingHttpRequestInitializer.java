@@ -19,7 +19,6 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.GOOGLEAPIS_ENDPOINT;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.function.Predicate.not;
 
 import com.google.api.client.http.HttpExecuteInterceptor;
 import com.google.api.client.http.HttpHeaders;
@@ -35,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Predicate;
 
 public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
 
@@ -176,7 +176,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   public ImmutableList<String> getAllRequestInvocationIds() {
     return requests.stream()
         .map(r -> getInvocationId(r.getHeaders()))
-        .filter(not(Strings::isNullOrEmpty))
+        .filter(((Predicate<String>) Strings::isNullOrEmpty).negate())
         .collect(toImmutableList());
   }
 
