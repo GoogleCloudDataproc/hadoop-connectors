@@ -69,6 +69,8 @@
     fs.gs.grpc.read.zerocopy.enable (default : true)
     ```
 
+1.  Set default value for `fs.gs.list.max.items.per.call` property to `5000`.
+
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.
