@@ -30,13 +30,13 @@ import com.google.api.client.http.HttpUnsuccessfulResponseHandler;
 import com.google.api.client.util.BackOff;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.Sleeper;
+import com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.util.Set;
 import org.apache.http.HttpStatus;
-import com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor;
 
 public class RetryHttpInitializer implements HttpRequestInitializer {
 
