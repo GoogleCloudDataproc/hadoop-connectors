@@ -21,7 +21,7 @@
 
 1. Increasing gRPC read timeout from 30 seconds to 3600 seconds.
 
-1. Updating max list items per call from 1024 to 5000.
+1. Set default value for `fs.gs.list.max.items.per.call` property to `5000`.
 
 1. Adding support for invocationId in Json path.
 
@@ -72,8 +72,6 @@
     ```
     fs.gs.grpc.read.zerocopy.enable (default : true)
     ```
-
-1.  Set default value for `fs.gs.list.max.items.per.call` property to `5000`.
 
 ### 2.2.2 - 2021-06-25
 
