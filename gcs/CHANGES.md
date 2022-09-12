@@ -1,9 +1,25 @@
-### 2.2.8 - 2022-XX-XX
+### 2.2.8 - 2022-09-12
 
 1.  Set socket read timeout (`fs.gs.http.read-timeout`) as early as possible on
     new sockets returned from the custom `SSLSocketFactory`. This guarantees the
     timeout is enforced during TLS handshakes when using Conscrypt as the
     security provider.
+
+1. Add trace logging for JSON and gRPC requests, toggled with option:
+
+    ```
+    fs.gs.tracelog.enable (default : false)
+    ```
+
+1. Fixing seek back to same position with grpc channel.
+
+1. Grpc read optimization to not prematurely close existing requests.
+
+1. Retry request on 408/timeout response from server.
+
+1. Upgrade Google auth dependency to 1.7.0.
+
+1. Increasing gRPC read timeout from 30 seconds to 3600 seconds.
 
 ### 2.2.7 - 2022-06-01
 
@@ -52,6 +68,8 @@
     ```
     fs.gs.grpc.read.zerocopy.enable (default : true)
     ```
+
+1.  Set default value for `fs.gs.list.max.items.per.call` property to `5000`.
 
 ### 2.2.2 - 2021-06-25
 
