@@ -31,8 +31,8 @@
 
     Permissions that are reported for a file or directory to have regardless of
     actual Cloud Storage permissions. Can be either in octal or symbolic format
-    that accepted by FsPermission class. This permission needs to be set when
-    the default file system is set to gs instead of hdfs in yarn-site.xml.
+    that accepted by FsPermission class. This permission is important when the
+    default file system is set to gs instead of hdfs in yarn-site.xml.
 
 *   `fs.gs.delegation.token.binding` (not set by default)
 
