@@ -19,7 +19,7 @@
 
 1. Upgrade Google auth dependency to 1.7.0.
 
-1. Increasing grpc read timeout from 30seconds to 3600 seconds.
+1. Increasing gRPC read timeout from 30 seconds to 3600 seconds.
 
 ### 2.2.7 - 2022-06-01
 
