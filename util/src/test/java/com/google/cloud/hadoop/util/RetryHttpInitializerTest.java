@@ -113,7 +113,6 @@ public class RetryHttpInitializerTest {
     final HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
     assertThat(req.getHeaders().getUserAgent()).isEqualTo("foo-user-agent");
     assertThat(req.getHeaders().get("header-key")).isEqualTo("header=value");
-    assertThat(req.getInterceptor()).isEqualTo(mockCredential);
     assertThat(((RetryHttpInitializer) requestFactory.getInitializer()).getCredential())
         .isEqualTo(mockCredential);
 
@@ -146,7 +145,6 @@ public class RetryHttpInitializerTest {
     final String authHeaderValue = "Bearer a1b2c3d4";
     final HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
     assertThat(req.getHeaders().getUserAgent()).isEqualTo("foo-user-agent");
-    assertThat(req.getInterceptor()).isEqualTo(mockCredential);
 
     // Simulate the actual behavior of inserting a header for the credential.
     doAnswer(
@@ -178,10 +176,8 @@ public class RetryHttpInitializerTest {
     verify(mockLowLevelResponse, times(4)).getStatusCode();
     verify(mockCredential).handleResponse(eq(req), any(HttpResponse.class), eq(true));
 
-    HttpResponseException thrown = assertThrows(HttpResponseException.class, req::execute);
     assertThat((String) req.getHeaders().get(InvocationIdInterceptor.GOOG_API_CLIENT))
         .contains(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
-    assertThat(thrown.getStatusCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_FORBIDDEN);
   }
 
   @Test
@@ -199,7 +195,6 @@ public class RetryHttpInitializerTest {
     final String authHeaderValue = "Bearer a1b2c3d4";
     final HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
     assertThat(req.getHeaders().getUserAgent()).isEqualTo("foo-user-agent");
-    assertThat(req.getInterceptor()).isEqualTo(mockCredential);
 
     // Simulate the actual behavior of inserting a header for the credential.
     doAnswer(
@@ -240,7 +235,6 @@ public class RetryHttpInitializerTest {
     final String authHeaderValue = "Bearer a1b2c3d4";
     final HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
     assertThat(req.getHeaders().getUserAgent()).isEqualTo("foo-user-agent");
-    assertThat(req.getInterceptor()).isEqualTo(mockCredential);
 
     // Simulate the actual behavior of inserting a header for the credential.
     doAnswer(
