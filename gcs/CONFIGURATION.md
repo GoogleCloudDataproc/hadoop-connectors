@@ -31,7 +31,8 @@
 
     Permissions that are reported for a file or directory to have regardless of
     actual Cloud Storage permissions. Can be either in octal or symbolic format
-    that accepted by FsPermission class.
+    that accepted by FsPermission class. This permission is important when the
+    default file system is set to gs instead of hdfs in yarn-site.xml.
 
 *   `fs.gs.delegation.token.binding` (not set by default)
 
@@ -99,7 +100,11 @@
 
 *   `fs.gs.batch.threads` (default: `15`)
 
-    Maximum number of threads used to execute batch requests in parallel. The number of threads here control the concurrency of the GCS batched API (fs.gs.max.requests.per.batch) calls. These threads are used to execute the Class A and Free operations in GCS such as copy, list, delete etc. These operations are part of typical hdfs commands such as `hdfs mv`, `hdfs cp`
+    Maximum number of threads used to execute batch requests in parallel. The
+    number of threads here control the concurrency of the GCS batched API
+    (fs.gs.max.requests.per.batch) calls. These threads are used to execute the
+    Class A and Free operations in GCS such as copy, list, delete etc. These
+    operations are part of typical hdfs commands such as `hdfs mv`, `hdfs cp`
 
 *   `fs.gs.list.max.items.per.call` (default: `1024`)
 
@@ -288,11 +293,14 @@ permissions (not authorized) to execute these requests.
 
 *   `fs.gs.outputstream.buffer.size` (default: `8388608`)
 
-    Write buffer size.
+    Write buffer size used by the file system API's to send the data to be
+    uploaded to GCS via pipes. The various pipe types are documented below
 
 *   `fs.gs.outputstream.pipe.buffer.size` (default: `1048576`)
 
-    Pipe buffer size used for uploading Cloud Storage objects.
+    Pipe buffer size used for uploading Cloud Storage objects. This pipe is an
+    intermediate channel which is used to receive the data on one side and allow
+    for reading of the data to be uploaded to GCS on the other side.
 
 *   `fs.gs.outputstream.pipe.type` (default: `IO_STREAM_PIPE`)
 
@@ -317,7 +325,22 @@ permissions (not authorized) to execute these requests.
 
 *   `fs.gs.outputstream.upload.chunk.size` (default: `67108864`)
 
-    The number of bytes in one GCS upload request.
+    The number of bytes in one Google Cloud Storage upload request via the HTTP
+    Media Uploader Service. This is used only for JSON API and for best
+    performance should be a multiple of 8MB.
+
+    Having a large value example:- 64MB allows the upload performance must be
+    much better due to fewer number of HTTP calls but on the other side if there
+    are many partitions being written by the write call then each partition will
+    hold 64MB of data. Therefore for example:- if data for 250 partitions is
+    written at once then the total memory requirement will be 250*64MB = 16 GB
+    of memory resulting in OOM memory.
+
+    To arrive the optimal value this parameter needs to be tweaked based on the
+    upload performance and number of concurrent files being written.
+
+    More details can be found here
+    https://cloud.google.com/java/docs/reference/google-api-client/latest/com.google.api.client.googleapis.media.MediaHttpUploader
 
 *   `fs.gs.outputstream.upload.cache.size` (default: `0`)
 
@@ -349,6 +372,11 @@ permissions (not authorized) to execute these requests.
     *   `FLUSHABLE_COMPOSITE` - stream behaves similarly to
         `SYNCABLE_COMPOSITE`, except `hflush()` is also supported. It will use
         the same implementation as `hsync()`.
+
+For streaming applications where checkpoint files are used,
+`FLUSHABLE_COMPOSITE` should be used as the upstream frameworks typically use
+`hflush()` or `hsync()` calls before closing a file and if `FLUSHABLE_COMPOSITE`
+is not used then data is not written to these files.
 
 *   `fs.gs.outputstream.sync.min.interval.ms` (default: `0`)
 
