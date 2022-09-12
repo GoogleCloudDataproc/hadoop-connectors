@@ -51,6 +51,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.HashSet;
 import java.util.Set;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -511,7 +512,7 @@ public class GoogleCloudStorageReadChannelTest {
     List<String> invocationIds = requestsTracker.getAllRequestInvocationIds();
     // Request is retired only once, making total request count to be 2.
     assertThat(invocationIds.size()).isEqualTo(2);
-    Set<String> uniqueInvocationIds = Set.copyOf(invocationIds);
+    Set<String> uniqueInvocationIds = new HashSet<String>(invocationIds);
     // For retried request invocationId remains same causing the set to contain only one element
     assertThat(uniqueInvocationIds.size()).isEqualTo(1);
   }
