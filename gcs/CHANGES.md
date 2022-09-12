@@ -21,7 +21,7 @@
 
 1. Increasing gRPC read timeout from 30 seconds to 3600 seconds.
 
-1. Updating max lit items per call from 1024 -> 5000. (#872)
+1. Updating max list items per call from 1024 -> 5000. (#872)
 
 1. Adding support for invocationId in Json path. (#873)
 
