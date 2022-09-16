@@ -37,7 +37,8 @@ import java.util.concurrent.ConcurrentMap;
  * Implements a HttpRequestInitializer which adds a ResponseInterceptor to each HttpRequest and
  * tracks the response time taken by the successful HttpRequests.
  */
-class EventLoggingHttpRequestInitializer implements HttpRequestInitializer {
+@VisibleForTesting
+public class EventLoggingHttpRequestInitializer implements HttpRequestInitializer {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private final Gson gson = new Gson();
 

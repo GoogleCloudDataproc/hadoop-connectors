@@ -29,10 +29,12 @@ import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestFactory;
 import com.google.api.client.http.HttpResponse;
+import com.google.api.client.http.HttpStatusCodes;
 import com.google.api.client.http.LowLevelHttpRequest;
 import com.google.api.client.http.LowLevelHttpResponse;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.util.Sleeper;
+import com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Duration;
@@ -109,7 +111,6 @@ public class RetryHttpInitializerTest {
     final HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
     assertThat(req.getHeaders().getUserAgent()).isEqualTo("foo-user-agent");
     assertThat(req.getHeaders().get("header-key")).isEqualTo("header=value");
-    assertThat(req.getInterceptor()).isEqualTo(mockCredential);
     assertThat(((RetryHttpInitializer) requestFactory.getInitializer()).getCredential())
         .isEqualTo(mockCredential);
 
@@ -132,6 +133,9 @@ public class RetryHttpInitializerTest {
     verify(mockLowLevelRequest).addHeader(eq("Authorization"), eq(authHeaderValue));
     verify(mockLowLevelRequest).execute();
     verify(mockLowLevelResponse, times(2)).getStatusCode();
+    assertThat((String) req.getHeaders().get(InvocationIdInterceptor.GOOG_API_CLIENT))
+        .contains(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
+    assertThat(res.getStatusCode()).isEqualTo(HttpStatusCodes.STATUS_CODE_OK);
   }
 
   @Test
@@ -139,7 +143,6 @@ public class RetryHttpInitializerTest {
     final String authHeaderValue = "Bearer a1b2c3d4";
     final HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
     assertThat(req.getHeaders().getUserAgent()).isEqualTo("foo-user-agent");
-    assertThat(req.getInterceptor()).isEqualTo(mockCredential);
 
     // Simulate the actual behavior of inserting a header for the credential.
     doAnswer(
@@ -170,6 +173,9 @@ public class RetryHttpInitializerTest {
     verify(mockLowLevelRequest, times(2)).execute();
     verify(mockLowLevelResponse, times(4)).getStatusCode();
     verify(mockCredential).handleResponse(eq(req), any(HttpResponse.class), eq(true));
+
+    assertThat((String) req.getHeaders().get(InvocationIdInterceptor.GOOG_API_CLIENT))
+        .contains(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
   }
 
   @Test
@@ -187,7 +193,6 @@ public class RetryHttpInitializerTest {
     final String authHeaderValue = "Bearer a1b2c3d4";
     final HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
     assertThat(req.getHeaders().getUserAgent()).isEqualTo("foo-user-agent");
-    assertThat(req.getInterceptor()).isEqualTo(mockCredential);
 
     // Simulate the actual behavior of inserting a header for the credential.
     doAnswer(
@@ -211,6 +216,8 @@ public class RetryHttpInitializerTest {
         .thenReturn(false);
 
     HttpResponse res = req.execute();
+    assertThat((String) req.getHeaders().get(InvocationIdInterceptor.GOOG_API_CLIENT))
+        .contains(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
     assertThat(res).isNotNull();
 
     verify(mockCredential, times(2)).intercept(eq(req));
@@ -226,7 +233,6 @@ public class RetryHttpInitializerTest {
     final String authHeaderValue = "Bearer a1b2c3d4";
     final HttpRequest req = requestFactory.buildGetRequest(new GenericUrl("http://fake-url.com"));
     assertThat(req.getHeaders().getUserAgent()).isEqualTo("foo-user-agent");
-    assertThat(req.getInterceptor()).isEqualTo(mockCredential);
 
     // Simulate the actual behavior of inserting a header for the credential.
     doAnswer(
@@ -250,6 +256,8 @@ public class RetryHttpInitializerTest {
         .thenReturn(false);
 
     HttpResponse res = req.execute();
+    assertThat((String) req.getHeaders().get(InvocationIdInterceptor.GOOG_API_CLIENT))
+        .contains(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
     assertThat(res).isNotNull();
 
     verify(mockCredential, times(2)).intercept(eq(req));

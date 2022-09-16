@@ -10,6 +10,7 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.hadoop.gcsio.AssertingLogHandler;
+import com.google.cloud.hadoop.gcsio.EventLoggingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageGrpcTracingInterceptor;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
@@ -33,7 +34,6 @@ import java.nio.channels.SeekableByteChannel;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.junit.AfterClass;
@@ -186,10 +186,12 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   public void testOpenWithTracingLogEnabled() throws IOException {
     AssertingLogHandler assertingHandler = new AssertingLogHandler();
     Logger grpcTracingLogger =
-        Logger.getLogger(GoogleCloudStorageGrpcTracingInterceptor.class.getName());
-    grpcTracingLogger.setUseParentHandlers(false);
-    grpcTracingLogger.addHandler(assertingHandler);
-    grpcTracingLogger.setLevel(Level.INFO);
+        assertingHandler.getLoggerForClass(
+            GoogleCloudStorageGrpcTracingInterceptor.class.getName());
+
+    AssertingLogHandler jsonLogHander = new AssertingLogHandler();
+    Logger jsonTracingLogger =
+        jsonLogHander.getLoggerForClass(EventLoggingHttpRequestInitializer.class.getName());
 
     try {
       GoogleCloudStorage rawStorage =
@@ -272,8 +274,12 @@ public class GoogleCloudStorageGrpcIntegrationTest {
           inboundReadContent1Details, inboundReadContent2Details, objectSize, 50);
 
       assertingHandler.verifyCommonTraceFields();
+      jsonLogHander.verifyJsonLogFields(BUCKET_NAME, "testOpen_Object");
+      jsonLogHander.assertLogCount(4);
+
     } finally {
-      grpcTracingLogger.removeHandler(assertingHandler);
+      grpcTracingLogger.removeHandler(jsonLogHander);
+      jsonTracingLogger.removeHandler(jsonLogHander);
     }
   }
 
