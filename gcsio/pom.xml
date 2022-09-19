@@ -206,6 +206,7 @@
             <exclude>**/*IntegrationTest.java</exclude>
             <exclude>**/GoogleCloudStorageImplTest.java</exclude>
           </excludes>
+          <runOrder>alphabetical</runOrder>
         </configuration>
       </plugin>
     </plugins>

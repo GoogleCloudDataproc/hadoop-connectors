@@ -201,6 +201,7 @@
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <skipTests>true</skipTests>
+              <runOrder>alphabetical</runOrder>
             </configuration>
           </plugin>
           <plugin>
@@ -653,6 +654,7 @@
           <forkCount>3</forkCount>
           <argLine>-Xmx3g @{argLine}</argLine>
           <reportNameSuffix>sponge_log</reportNameSuffix>
+          <runOrder>alphabetical</runOrder>
         </configuration>
       </plugin>
       <plugin>

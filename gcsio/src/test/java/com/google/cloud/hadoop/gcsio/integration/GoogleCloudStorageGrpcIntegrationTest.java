@@ -38,7 +38,9 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
@@ -57,6 +59,8 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   private static final String BUCKET_NAME = BUCKET_HELPER.getUniqueBucketName("shared");
 
   private final boolean tdEnabled;
+
+  @Rule public final TestName testName = new TestName();
 
   @Parameters
   // We want to test this entire class with both gRPC-LB and Traffic Director
@@ -109,6 +113,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testCreateObject() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testCreateObject_Object");
@@ -119,6 +126,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testCreateExistingObject() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testCreateExistingObject_Object");
@@ -138,6 +148,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testCreateEmptyObject() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testCreateEmptyObject_Object");
@@ -152,6 +165,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testCreateInvalidObject() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId objectToCreate =
         new StorageResourceId(BUCKET_NAME, "testCreateInvalidObject_InvalidObject\n");
@@ -162,6 +178,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testOpen() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME, "testOpen_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
@@ -171,6 +190,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testOpenWithMetricsEnabled() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     GoogleCloudStorage rawStorage =
         new GoogleCloudStorageImpl(
             GoogleCloudStorageTestHelper.getStandardOptionBuilder()
@@ -184,6 +206,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testOpenWithTracingLogEnabled() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     AssertingLogHandler assertingHandler = new AssertingLogHandler();
     Logger grpcTracingLogger =
         assertingHandler.getLoggerForClass(
@@ -319,6 +344,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testOpenNonExistentItem() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     Throwable throwable =
         assertThrows(
@@ -331,6 +359,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testOpenEmptyObject() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId resourceId = new StorageResourceId(BUCKET_NAME, "testOpenEmptyObject_Object");
     rawStorage.createEmptyObject(resourceId);
@@ -340,6 +371,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testOpenLargeObject() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId resourceId = new StorageResourceId(BUCKET_NAME, "testOpenLargeObject_Object");
 
@@ -352,6 +386,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testOpenObjectWithChecksum() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     AsyncWriteChannelOptions asyncWriteChannelOptions =
         AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
@@ -366,6 +403,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testOpenObjectWithSeek() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     AsyncWriteChannelOptions asyncWriteChannelOptions =
         AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
@@ -387,6 +427,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testOpenObjectWithSeekOverBounds() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     AsyncWriteChannelOptions asyncWriteChannelOptions =
         AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
@@ -408,6 +451,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testOpenObjectWithSeekLimits() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     AsyncWriteChannelOptions asyncWriteChannelOptions =
         AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
@@ -432,6 +478,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testReadFooterDataWithGrpcChecksums() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     AsyncWriteChannelOptions asyncWriteChannelOptions =
         AsyncWriteChannelOptions.builder().setGrpcChecksumsEnabled(true).build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
@@ -460,6 +509,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testReadCachedFooterData() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
@@ -483,6 +535,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testReadSeekToFooterData() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
@@ -506,6 +561,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testReadObjectCachedAsFooter() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
@@ -529,6 +587,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testPartialReadFooterDataWithSingleChunk() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
@@ -552,6 +613,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testPartialReadFooterDataWithMultipleChunks() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
@@ -575,6 +639,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testPartialReadFooterDataWithinSegment() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
@@ -602,6 +669,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testPartialRead() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     int segmentSize = 553;
     int segmentCount = 5;
@@ -628,6 +698,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testReadSeekToOffsetGreaterThanMinRangeRequestSize() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
@@ -661,6 +734,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testReadBeyondRangeWithFadviseRandom() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
@@ -693,6 +769,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testReadBeyondRangeWithFadviseAuto() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
@@ -725,6 +804,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testReadBeyondRangeWithFadviseSequential() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     AsyncWriteChannelOptions asyncWriteChannelOptions = AsyncWriteChannelOptions.builder().build();
     GoogleCloudStorage rawStorage = createGoogleCloudStorage(asyncWriteChannelOptions);
     StorageResourceId objectToCreate =
@@ -757,6 +839,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   @Test
   public void testChannelClosedException() throws IOException {
+    logger.atInfo().log(
+        "Running test: name=%s; tdenabled=%s",
+        testName.getMethodName(), Boolean.toString(tdEnabled));
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     int totalBytes = 1200;
 
