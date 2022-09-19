@@ -40,6 +40,7 @@ import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
@@ -415,6 +416,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   }
 
   @Test
+  @Ignore("Ignore")
   public void testOpenLargeObject() throws IOException {
     logger.atInfo().log(
         "Running test: name=%s; tdenabled=%s",
