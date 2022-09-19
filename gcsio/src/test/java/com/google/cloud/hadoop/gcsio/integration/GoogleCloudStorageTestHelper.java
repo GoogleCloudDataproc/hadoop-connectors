@@ -214,7 +214,9 @@ public class GoogleCloudStorageTestHelper {
   public static byte[] writeObject(
       GoogleCloudStorage gcs, StorageResourceId resourceId, int partitionSize, int partitionsCount)
       throws IOException {
-    return writeObject(gcs.create(resourceId), partitionSize, partitionsCount);
+    try (WritableByteChannel writableByteChannel = gcs.create(resourceId)) {
+      return writeObject(writableByteChannel, partitionSize, partitionsCount);
+    }
   }
 
   public static byte[] writeObject(

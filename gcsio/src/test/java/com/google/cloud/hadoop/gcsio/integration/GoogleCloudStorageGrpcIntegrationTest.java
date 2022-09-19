@@ -40,7 +40,6 @@ import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
@@ -416,23 +415,29 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   }
 
   @Test
-  @Ignore("Ignore")
   public void testOpenLargeObject() throws IOException {
     logger.atInfo().log(
         "Running test: name=%s; tdenabled=%s",
         testName.getMethodName(), Boolean.toString(tdEnabled));
-    GoogleCloudStorage rawStorage = createGoogleCloudStorage();
-    StorageResourceId resourceId = new StorageResourceId(BUCKET_NAME, "testOpenLargeObject_Object");
+    GoogleCloudStorage rawStorage = null;
+    try {
+      rawStorage = createGoogleCloudStorage();
+      StorageResourceId resourceId =
+          new StorageResourceId(BUCKET_NAME, "testOpenLargeObject_Object");
 
-    int partitionsCount = 50;
-    byte[] partition =
-        writeObject(rawStorage, resourceId, /* partitionSize= */ 10 * 1024 * 1024, partitionsCount);
+      int partitionsCount = 50;
+      byte[] partition =
+          writeObject(
+              rawStorage, resourceId, /* partitionSize= */ 10 * 1024 * 1024, partitionsCount);
 
-    assertObjectContent(rawStorage, resourceId, partition, partitionsCount);
+      assertObjectContent(rawStorage, resourceId, partition, partitionsCount);
 
-    logger.atInfo().log(
-        "Running test: name=%s - completed; duration=%s",
-        testName.getMethodName(), stopwatch.elapsed().getSeconds());
+      logger.atInfo().log(
+          "Running test: name=%s - completed; duration=%s",
+          testName.getMethodName(), stopwatch.elapsed().getSeconds());
+    } finally {
+      rawStorage.close();
+    }
   }
 
   @Test
