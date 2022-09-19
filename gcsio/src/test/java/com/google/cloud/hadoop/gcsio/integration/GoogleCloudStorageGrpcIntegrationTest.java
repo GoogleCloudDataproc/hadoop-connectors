@@ -24,6 +24,7 @@ import com.google.cloud.hadoop.gcsio.GrpcRequestTracingInfo;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import com.google.gson.Gson;
@@ -37,6 +38,7 @@ import java.util.Map;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
@@ -61,6 +63,8 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   private final boolean tdEnabled;
 
   @Rule public final TestName testName = new TestName();
+
+  private Stopwatch stopwatch = Stopwatch.createStarted();
 
   @Parameters
   // We want to test this entire class with both gRPC-LB and Traffic Director
@@ -111,6 +115,11 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     BUCKET_HELPER.cleanup(rawStorage);
   }
 
+  @Before
+  public void setup() {
+    stopwatch = Stopwatch.createStarted();
+  }
+
   @Test
   public void testCreateObject() throws IOException {
     logger.atInfo().log(
@@ -122,6 +131,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 512);
 
     assertObjectContent(rawStorage, objectToCreate, objectBytes);
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -144,6 +157,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     assertThat(overwrittenItemInfo.exists()).isTrue();
     assertThat(overwrittenItemInfo.getSize()).isEqualTo(256);
     assertObjectContent(rawStorage, objectToCreate, overwriteBytesToWrite);
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -161,6 +178,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
     assertThat(itemInfo.exists()).isTrue();
     assertThat(itemInfo.getSize()).isEqualTo(0);
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -174,6 +195,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
     assertThrows(
         IOException.class, () -> writeObject(rawStorage, objectToCreate, /* objectSize= */ 10));
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -186,6 +211,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
 
     assertObjectContent(rawStorage, objectToCreate, objectBytes);
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -202,6 +231,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME, "testOpen_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
     assertObjectContent(rawStorage, objectToCreate, objectBytes);
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -306,6 +339,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
       grpcTracingLogger.removeHandler(jsonLogHander);
       jsonTracingLogger.removeHandler(jsonLogHander);
     }
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   // The wiresize is usually greater than the content size by a few bytes. Hence, checking that the
@@ -355,6 +392,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
                 rawStorage.open(
                     new StorageResourceId(BUCKET_NAME, "testOpenNonExistentItem_Object")));
     assertThat(throwable).hasMessageThat().contains("Item not found");
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -367,6 +408,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     rawStorage.createEmptyObject(resourceId);
 
     assertObjectContent(rawStorage, resourceId, new byte[0]);
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -382,6 +427,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
         writeObject(rawStorage, resourceId, /* partitionSize= */ 10 * 1024 * 1024, partitionsCount);
 
     assertObjectContent(rawStorage, resourceId, partition, partitionsCount);
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -399,6 +448,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder().setGrpcChecksumsEnabled(true).build();
     assertObjectContent(rawStorage, objectToCreate, readOptions, objectBytes);
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -423,6 +476,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
         trimmedObjectBytes,
         /* expectedBytesCount= */ 1,
         offset);
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -447,6 +504,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
         trimmedObjectBytes,
         /* expectedBytesCount= */ 1,
         offset);
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -474,6 +535,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
         trimmedObjectBytes,
         /* expectedBytesCount= */ 1,
         offset);
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -505,6 +570,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
         trimmedObjectBytes,
         /* expectedBytesCount= */ 1,
         offset);
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -531,6 +600,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
         trimmedObjectBytes,
         /* expectedBytesCount= */ 1,
         footerOffset);
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -557,6 +630,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
         trimmedObjectBytes,
         /* expectedBytesCount= */ 1,
         offset);
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -583,6 +660,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
         trimmedObjectBytes,
         /* expectedBytesCount= */ 1,
         offset);
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -609,6 +690,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
         trimmedObjectBytes,
         /* expectedBytesCount= */ 1,
         readOffset);
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -635,6 +720,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
         trimmedObjectBytes,
         /* expectedBytesCount= */ 1,
         readOffset);
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -665,6 +754,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
           .that(segmentBytes)
           .isEqualTo(expectedSegment);
     }
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -694,6 +787,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
             .isEqualTo(expectedSegment);
       }
     }
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -730,6 +827,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
     assertEquals(totalBytes, bytesRead);
     assertByteArrayEquals(trimmedObjectBytes, readBufferByteArray);
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -765,6 +866,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
     assertEquals(totalBytes, bytesRead);
     assertByteArrayEquals(trimmedObjectBytes, readBufferByteArray);
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -800,6 +905,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
     assertEquals(totalBytes, bytesRead);
     assertByteArrayEquals(trimmedObjectBytes, readBufferByteArray);
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -835,6 +944,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
     assertEquals(totalBytes, bytesRead);
     assertByteArrayEquals(trimmedObjectBytes, readBufferByteArray);
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 
   @Test
@@ -860,5 +973,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     readBuffer.clear();
 
     assertThrows(ClosedChannelException.class, () -> readableByteChannel.read(readBuffer));
+
+    logger.atInfo().log(
+        "Running test: name=%s - completed; duration=%s",
+        testName.getMethodName(), stopwatch.elapsed().getSeconds());
   }
 }
