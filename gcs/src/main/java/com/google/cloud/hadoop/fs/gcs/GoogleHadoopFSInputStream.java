@@ -16,9 +16,13 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_CLOSE_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_OPERATIONS;
+import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_READ_SEEK_OPERATIONS;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Math.max;
+import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
@@ -35,6 +39,7 @@ import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 
 class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSource {
+
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   // Used for single-byte reads.
@@ -106,60 +111,82 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
 
   @Override
   public synchronized int read(@Nonnull byte[] buf, int offset, int length) throws IOException {
-    checkNotClosed();
-    streamStatistics.readOperationStarted(getPos(), length);
-    checkNotNull(buf, "buf must not be null");
-    if (offset < 0 || length < 0 || length > buf.length - offset) {
-      throw new IndexOutOfBoundsException();
-    }
-    int response = 0;
-    try {
-      // TODO(user): Wrap this in a while-loop if we ever introduce a non-blocking mode for the
-      // underlying channel.
-      int numRead = channel.read(ByteBuffer.wrap(buf, offset, length));
-      if (numRead > 0) {
-        // -1 means we actually read 0 bytes, but requested at least one byte.
-        totalBytesRead += numRead;
-        statistics.incrementBytesRead(numRead);
-        statistics.incrementReadOps(1);
-      }
-      response = numRead;
-    } catch (IOException e) {
-      streamStatistics.readException();
-    }
-    streamStatistics.bytesRead(max(response, 0));
-    streamStatistics.readOperationCompleted(length, max(response, 0));
-    return response;
+    return trackDuration(
+        streamStatistics,
+        STREAM_READ_OPERATIONS.getSymbol(),
+        () -> {
+          checkNotClosed();
+          // streamStatistics.readOperationStarted(getPos(), length);
+          checkNotNull(buf, "buf must not be null");
+          if (offset < 0 || length < 0 || length > buf.length - offset) {
+            throw new IndexOutOfBoundsException();
+          }
+          int response = 0;
+          try {
+            // TODO(user): Wrap this in a while-loop if we ever introduce a non-blocking mode for
+            // the underlying channel.
+            int numRead = channel.read(ByteBuffer.wrap(buf, offset, length));
+            if (numRead > 0) {
+              // -1 means we actually read 0 bytes, but requested at least one byte.
+              totalBytesRead += numRead;
+              statistics.incrementBytesRead(numRead);
+              statistics.incrementReadOps(1);
+            }
+            response = numRead;
+          } catch (IOException e) {
+            streamStatistics.readException();
+          }
+          streamStatistics.bytesRead(max(response, 0));
+          streamStatistics.readOperationCompleted(length, max(response, 0));
+          return response;
+        });
   }
 
   @Override
   public synchronized void seek(long pos) throws IOException {
-    checkNotClosed();
-    logger.atFiner().log("seek(%d)", pos);
-    long curPos = getPos();
-    long diff = pos - curPos;
-    if (diff > 0) {
-      streamStatistics.seekForwards(diff);
-    } else {
-      streamStatistics.seekBackwards(diff);
-    }
-    try {
-      channel.position(pos);
-    } catch (IllegalArgumentException e) {
-      throw new IOException(e);
-    }
+    trackDuration(
+        streamStatistics,
+        STREAM_READ_SEEK_OPERATIONS.getSymbol(),
+        () -> {
+          checkNotClosed();
+          logger.atFiner().log("seek(%d)", pos);
+          long curPos = getPos();
+          long diff = pos - curPos;
+          if (diff > 0) {
+            streamStatistics.seekForwards(diff);
+          } else {
+            streamStatistics.seekBackwards(diff);
+          }
+          try {
+            channel.position(pos);
+          } catch (IllegalArgumentException e) {
+            throw new IOException(e);
+          }
+          return null;
+        });
   }
 
   @Override
   public synchronized void close() throws IOException {
-    if (!closed) {
-      closed = true;
-      logger.atFiner().log("close(): %s", gcsPath);
+    boolean isClosed = closed;
+    trackDuration(
+        streamStatistics,
+        STREAM_READ_CLOSE_OPERATIONS.getSymbol(),
+        () -> {
+          if (!closed) {
+            closed = true;
+            logger.atFiner().log("close(): %s", gcsPath);
+            if (channel != null) {
+              logger.atFiner().log(
+                  "Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
+              channel.close();
+            }
+          }
+          return null;
+        });
+
+    if (!isClosed) {
       streamStatistics.close();
-      if (channel != null) {
-        logger.atFiner().log("Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
-        channel.close();
-      }
     }
   }
 
