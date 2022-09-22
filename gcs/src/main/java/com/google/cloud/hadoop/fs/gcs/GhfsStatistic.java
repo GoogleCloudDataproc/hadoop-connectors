@@ -111,16 +111,14 @@ public enum GhfsStatistic {
       TYPE_COUNTER),
   STREAM_READ_CLOSE_OPERATIONS(
       StreamStatisticNames.STREAM_READ_CLOSE_OPERATIONS,
-      "Total count of times an attempt to close an input stream was made",
+      "Calls of read stream close()",
       TYPE_DURATION),
   STREAM_READ_EXCEPTIONS(
       StreamStatisticNames.STREAM_READ_EXCEPTIONS,
       "Count of exceptions raised during input stream reads",
       TYPE_COUNTER),
   STREAM_READ_OPERATIONS(
-      StreamStatisticNames.STREAM_READ_OPERATIONS,
-      "Count of read() operations in an input stream",
-      TYPE_DURATION),
+      StreamStatisticNames.STREAM_READ_OPERATIONS, "Calls of read()", TYPE_DURATION),
   STREAM_READ_OPERATIONS_INCOMPLETE(
       StreamStatisticNames.STREAM_READ_OPERATIONS_INCOMPLETE,
       "Count of incomplete read() operations in an input stream",
@@ -142,9 +140,7 @@ public enum GhfsStatistic {
       "Count of executed seek operations which went forward in" + " an input stream",
       TYPE_COUNTER),
   STREAM_READ_SEEK_OPERATIONS(
-      StreamStatisticNames.STREAM_READ_SEEK_OPERATIONS,
-      "Count of seek operations in an input stream",
-      TYPE_DURATION),
+      StreamStatisticNames.STREAM_READ_SEEK_OPERATIONS, "Calls of seek()", TYPE_DURATION),
   STREAM_READ_TOTAL_BYTES(
       StreamStatisticNames.STREAM_READ_TOTAL_BYTES,
       "Total count of bytes read from an input stream",
@@ -160,11 +156,8 @@ public enum GhfsStatistic {
       "Count of bytes written to output stream" + " (including all not yet uploaded)",
       TYPE_COUNTER),
   STREAM_WRITE_CLOSE_OPERATIONS(
-      "stream_write_close_operations",
-      "Total count of times an attempt to close an output stream was made",
-      TYPE_DURATION),
-  STREAM_WRITE_OPERATIONS(
-      "stream_write_operations", "Count of write() operations in an output stream", TYPE_DURATION),
+      "stream_write_close_operations", "Calls of write stream close()", TYPE_DURATION),
+  STREAM_WRITE_OPERATIONS("stream_write_operations", "Calls of write()", TYPE_DURATION),
 
   /** The XAttr API statistics */
   INVOCATION_XATTR_GET_MAP(

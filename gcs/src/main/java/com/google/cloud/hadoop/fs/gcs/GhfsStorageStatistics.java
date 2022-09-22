@@ -45,40 +45,13 @@ public class GhfsStorageStatistics extends StorageStatisticsFromIOStatistics {
   }
 
   /**
-   * Map of minimums
-   *
-   * @return current map of minimums
-   */
-  private Map<String, Long> minimums() {
-    return this.ioStatistics.minimums();
-  }
-
-  /**
-   * Map of maximums
-   *
-   * @return current map of maximums
-   */
-  private Map<String, Long> maximums() {
-    return this.ioStatistics.maximums();
-  }
-
-  /**
-   * Map of meanStatistics
-   *
-   * @return current map of MeanStatistic statistics
-   */
-  private Map<String, MeanStatistic> meanStatistics() {
-    return this.ioStatistics.meanStatistics();
-  }
-
-  /**
    * To get the minimum value which is stored with MINIMUM extension
    *
    * @param symbol
    * @return minimum statistic value
    */
   public Long getMin(String symbol) {
-    return (Long) this.minimums().get(symbol + MINIMUM);
+    return (Long) minimums().get(symbol + MINIMUM);
   }
 
   /**
@@ -88,7 +61,7 @@ public class GhfsStorageStatistics extends StorageStatisticsFromIOStatistics {
    * @return maximum statistic value
    */
   public Long getMax(String symbol) {
-    return (Long) this.maximums().get(symbol + MAXIMUM);
+    return (Long) maximums().get(symbol + MAXIMUM);
   }
 
   /**
@@ -98,6 +71,33 @@ public class GhfsStorageStatistics extends StorageStatisticsFromIOStatistics {
    * @return mean statistic value
    */
   public double getMean(String symbol) {
-    return this.meanStatistics().get(symbol + MEAN).mean();
+    return meanStatistics().get(symbol + MEAN).mean();
+  }
+
+  /**
+   * Map of minimums
+   *
+   * @return current map of minimums
+   */
+  private Map<String, Long> minimums() {
+    return ioStatistics.minimums();
+  }
+
+  /**
+   * Map of maximums
+   *
+   * @return current map of maximums
+   */
+  private Map<String, Long> maximums() {
+    return ioStatistics.maximums();
+  }
+
+  /**
+   * Map of meanStatistics
+   *
+   * @return current map of MeanStatistic statistics
+   */
+  private Map<String, MeanStatistic> meanStatistics() {
+    return ioStatistics.meanStatistics();
   }
 }
