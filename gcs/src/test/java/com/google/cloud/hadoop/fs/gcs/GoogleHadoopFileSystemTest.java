@@ -376,4 +376,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
 
   @Override
   public void testConcurrentCreationWithoutOverwrite_onlyOneSucceeds() {}
+
+  @Override
+  public void testInitializeCompatibleWithHadoopCredentialProvider() {}
 }
