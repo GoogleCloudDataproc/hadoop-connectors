@@ -125,6 +125,7 @@ import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.security.ProviderUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
@@ -538,6 +539,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     logger.atFine().log(
         "initialize(path: %s, config: %s, initSuperclass: %b)", path, config, initSuperclass);
 
+    config =
+        ProviderUtils.excludeIncompatibleCredentialProviders(config, GoogleHadoopFileSystem.class);
     if (initSuperclass) {
       super.initialize(path, config);
     } else {

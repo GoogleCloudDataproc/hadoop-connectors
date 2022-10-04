@@ -26,6 +26,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_CREDENTIAL_PROVIDER_PATH;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemBase.GcsFileChecksumType;
@@ -66,6 +67,8 @@ import org.junit.runners.JUnit4;
 /** Integration tests for GoogleHadoopFileSystem class. */
 @RunWith(JUnit4.class)
 public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSystemTestBase {
+
+  private static final String PUBLIC_BUCKET = "gs://gcp-public-data-landsat";
 
   @ClassRule
   public static NotInheritableExternalResource storageResource =
@@ -1141,5 +1144,16 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     // Validate that authorities can't be crazy:
     assertThrows(
         IllegalArgumentException.class, () -> myghfs.getGcsPath(new Path("gs://buck^et/object")));
+  }
+
+  @Test
+  public void testInitializeCompatibleWithHadoopCredentialProvider() throws Exception {
+    Configuration config = loadConfig();
+
+    // This does not need to refer to a real bucket/path for the test.
+    config.set(HADOOP_SECURITY_CREDENTIAL_PROVIDER_PATH, "jceks://gs@foobar/test.jceks");
+
+    FileSystem.get(new URI(PUBLIC_BUCKET), config);
+    // Initialization successful with no exception thrown.
   }
 }
