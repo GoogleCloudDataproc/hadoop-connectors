@@ -120,6 +120,7 @@ import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.security.ProviderUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
@@ -452,6 +453,8 @@ public abstract class GoogleHadoopFileSystemBase extends FileSystem
     checkArgument(path.getScheme() != null, "scheme of path must not be null");
     checkArgument(path.getScheme().equals(getScheme()), "URI scheme not supported: %s", path);
 
+    config =
+        ProviderUtils.excludeIncompatibleCredentialProviders(config, GoogleHadoopFileSystem.class);
     super.initialize(path, config);
 
     initUri = path;
