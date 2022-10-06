@@ -30,6 +30,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.hadoop.fs.FileSystem;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -39,7 +40,8 @@ import org.junit.runners.JUnit4;
 public class GoogleHadoopFSInputStreamIntegrationTest {
 
   private static GoogleCloudStorageFileSystemIntegrationHelper gcsFsIHelper;
-  private AssertingLogHandler assertingHandler;
+  private AssertingLogHandler assertingHandler = new AssertingLogHandler();
+  private Logger grpcTracingLogger;
 
   @BeforeClass
   public static void beforeClass() throws Exception {
@@ -52,15 +54,17 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     gcsFsIHelper.afterAllTests();
   }
 
-  @Test
-  public void seek_illegalArgument() throws Exception {
-    URI path = gcsFsIHelper.getUniqueObjectUri(this.getClass(), "seek_illegalArgument");
-    assertingHandler = new AssertingLogHandler();
-
-    Logger grpcTracingLogger = Logger.getLogger(GoogleHadoopFSInputStream.class.getName());
+  @Before
+  public void setup() {
+    grpcTracingLogger = Logger.getLogger(GoogleHadoopFSInputStream.class.getName());
     grpcTracingLogger.setUseParentHandlers(false);
     grpcTracingLogger.addHandler(assertingHandler);
     grpcTracingLogger.setLevel(Level.INFO);
+  }
+
+  @Test
+  public void seek_illegalArgument() throws Exception {
+    URI path = gcsFsIHelper.getUniqueObjectUri(this.getClass(), "seek_illegalArgument");
 
     GoogleHadoopFileSystem ghfs =
         GoogleHadoopFileSystemIntegrationHelper.createGhfs(
@@ -71,19 +75,14 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
 
     GoogleHadoopFSInputStream in = createGhfsInputStream(ghfs, path);
 
-    Throwable exception = assertThrows(EOFException.class, () -> in.seek(testContent.length() - 1));
+    Throwable exception = assertThrows(EOFException.class, () -> in.seek(testContent.length()));
     assertThat(exception).hasMessageThat().contains("Invalid seek offset");
+    assertingHandler.assertLogCount(0);
   }
 
   @Test
   public void read_singleBytes() throws Exception {
     URI path = gcsFsIHelper.getUniqueObjectUri(this.getClass(), "read_singleBytes");
-    assertingHandler = new AssertingLogHandler();
-
-    Logger grpcTracingLogger = Logger.getLogger(GoogleHadoopFSInputStream.class.getName());
-    grpcTracingLogger.setUseParentHandlers(false);
-    grpcTracingLogger.addHandler(assertingHandler);
-    grpcTracingLogger.setLevel(Level.INFO);
 
     GoogleHadoopFileSystem ghfs =
         GoogleHadoopFileSystemIntegrationHelper.createGhfs(
@@ -95,14 +94,18 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     byte[] value = new byte[2];
     byte[] expected = Arrays.copyOf(testContent.getBytes(StandardCharsets.UTF_8), 2);
 
+    // enabled trace logging
     GoogleCloudStorageReadOptions options =
         GoogleCloudStorageReadOptions.builder().setTraceLogEnabled(true).build();
     FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
     try (GoogleHadoopFSInputStream in =
         new GoogleHadoopFSInputStream(ghfs, path, options, statistics)) {
-      assertThat(in.read(value, 0, 1)).isEqualTo(2);
+      assertThat(in.read(value, 0, 1)).isEqualTo(1);
       assertThat(statistics.getReadOps()).isEqualTo(1);
-      assertingHandler.assertLogCount(0);
+
+      assertingHandler.assertLogCount(1);
+      assertingHandler.verifyReadAPILogFields(GoogleHadoopFSInputStream.READ_METHOD);
+
       assertThat(in.read(1, value, 1, 1)).isEqualTo(1);
       assertThat(statistics.getReadOps()).isEqualTo(2);
     }
@@ -131,7 +134,7 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
   private static GoogleHadoopFSInputStream createGhfsInputStream(
       GoogleHadoopFileSystem ghfs, URI path) throws IOException {
     GoogleCloudStorageReadOptions options =
-        GoogleCloudStorageReadOptions.builder().setTraceLogEnabled(true).build();
+        ghfs.getGcsFs().getOptions().getCloudStorageOptions().getReadChannelOptions();
     return new GoogleHadoopFSInputStream(
         ghfs, path, options, new FileSystem.Statistics(ghfs.getScheme()));
   }

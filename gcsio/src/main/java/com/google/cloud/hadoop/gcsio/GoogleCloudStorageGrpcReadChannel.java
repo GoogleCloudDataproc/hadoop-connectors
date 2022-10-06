@@ -26,7 +26,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
 import com.google.api.client.util.BackOff;
 import com.google.api.client.util.Sleeper;
@@ -286,7 +285,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         : new IOException("Error reading " + resourceId, exception);
   }
 
-  private void recordSuccessMetricJson(
+  private void recordGCSAPILatency(
       MeasureLong measure, long time, String status, String method, String protocol) {
     if (storageOptions.isTraceLogEnabled()) {
       Map<String, Object> jsonMap = new HashMap<>();
@@ -302,10 +301,10 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private void recordSuccessMetric(
       MeasureLong measure, Stopwatch stopwatch, String method, String protocol) {
-    long time = stopwatch.elapsed(NANOSECONDS);
+    long time = stopwatch.elapsed(MILLISECONDS);
     TagKey[] keys = new TagKey[] {METHOD, STATUS, PROTOCOL};
     String[] values = new String[] {method, STATUS_OK, protocol};
-    recordSuccessMetricJson(measure, time, STATUS_OK, method, protocol);
+    recordGCSAPILatency(measure, time, STATUS_OK, method, protocol);
     metricsRecorder.recordLong(keys, values, measure, time);
     logger.atFinest().log(
         "method : %s , status : %s, protocol : %s , measure : %s , time : %d",
@@ -321,7 +320,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
             : e.getClass().getSimpleName();
     TagKey[] keys = new TagKey[] {METHOD, STATUS, PROTOCOL};
     String[] values = new String[] {method, error, protocol};
-    recordSuccessMetricJson(measure, time, error, method, protocol);
+    recordGCSAPILatency(measure, time, error, method, protocol);
     metricsRecorder.recordLong(keys, values, measure, time);
     logger.atFinest().log(
         "method : %s , status : %s, protocol : %s , measure : %s , time : %d",
