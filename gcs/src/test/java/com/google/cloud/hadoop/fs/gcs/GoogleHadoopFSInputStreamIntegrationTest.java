@@ -17,6 +17,7 @@ package com.google.cloud.hadoop.fs.gcs;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
+import com.google.cloud.hadoop.gcsio.AssertingLogHandler;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import java.io.EOFException;
@@ -25,6 +26,8 @@ import java.net.URI;
 import java.nio.channels.ClosedChannelException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.hadoop.fs.FileSystem;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -36,6 +39,7 @@ import org.junit.runners.JUnit4;
 public class GoogleHadoopFSInputStreamIntegrationTest {
 
   private static GoogleCloudStorageFileSystemIntegrationHelper gcsFsIHelper;
+  private AssertingLogHandler assertingHandler;
 
   @BeforeClass
   public static void beforeClass() throws Exception {
@@ -51,6 +55,12 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
   @Test
   public void seek_illegalArgument() throws Exception {
     URI path = gcsFsIHelper.getUniqueObjectUri(this.getClass(), "seek_illegalArgument");
+    assertingHandler = new AssertingLogHandler();
+
+    Logger grpcTracingLogger = Logger.getLogger(GoogleHadoopFSInputStream.class.getName());
+    grpcTracingLogger.setUseParentHandlers(false);
+    grpcTracingLogger.addHandler(assertingHandler);
+    grpcTracingLogger.setLevel(Level.INFO);
 
     GoogleHadoopFileSystem ghfs =
         GoogleHadoopFileSystemIntegrationHelper.createGhfs(
@@ -61,13 +71,19 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
 
     GoogleHadoopFSInputStream in = createGhfsInputStream(ghfs, path);
 
-    Throwable exception = assertThrows(EOFException.class, () -> in.seek(testContent.length()));
+    Throwable exception = assertThrows(EOFException.class, () -> in.seek(testContent.length() - 1));
     assertThat(exception).hasMessageThat().contains("Invalid seek offset");
   }
 
   @Test
   public void read_singleBytes() throws Exception {
     URI path = gcsFsIHelper.getUniqueObjectUri(this.getClass(), "read_singleBytes");
+    assertingHandler = new AssertingLogHandler();
+
+    Logger grpcTracingLogger = Logger.getLogger(GoogleHadoopFSInputStream.class.getName());
+    grpcTracingLogger.setUseParentHandlers(false);
+    grpcTracingLogger.addHandler(assertingHandler);
+    grpcTracingLogger.setLevel(Level.INFO);
 
     GoogleHadoopFileSystem ghfs =
         GoogleHadoopFileSystemIntegrationHelper.createGhfs(
@@ -80,12 +96,13 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     byte[] expected = Arrays.copyOf(testContent.getBytes(StandardCharsets.UTF_8), 2);
 
     GoogleCloudStorageReadOptions options =
-        ghfs.getGcsFs().getOptions().getCloudStorageOptions().getReadChannelOptions();
+        GoogleCloudStorageReadOptions.builder().setTraceLogEnabled(true).build();
     FileSystem.Statistics statistics = new FileSystem.Statistics(ghfs.getScheme());
     try (GoogleHadoopFSInputStream in =
         new GoogleHadoopFSInputStream(ghfs, path, options, statistics)) {
-      assertThat(in.read(value, 0, 1)).isEqualTo(1);
+      assertThat(in.read(value, 0, 1)).isEqualTo(2);
       assertThat(statistics.getReadOps()).isEqualTo(1);
+      assertingHandler.assertLogCount(0);
       assertThat(in.read(1, value, 1, 1)).isEqualTo(1);
       assertThat(statistics.getReadOps()).isEqualTo(2);
     }
@@ -114,7 +131,7 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
   private static GoogleHadoopFSInputStream createGhfsInputStream(
       GoogleHadoopFileSystem ghfs, URI path) throws IOException {
     GoogleCloudStorageReadOptions options =
-        ghfs.getGcsFs().getOptions().getCloudStorageOptions().getReadChannelOptions();
+        GoogleCloudStorageReadOptions.builder().setTraceLogEnabled(true).build();
     return new GoogleHadoopFSInputStream(
         ghfs, path, options, new FileSystem.Statistics(ghfs.getScheme()));
   }
