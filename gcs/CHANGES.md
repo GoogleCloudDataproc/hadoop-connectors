@@ -5,6 +5,9 @@
     timeout is enforced during TLS handshakes when using Conscrypt as the
     security provider.
 
+1.  The Google Cloud Storage Connector now can be used as a
+    [Hadoop Credential Provider](https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/CredentialProviderAPI.html).
+
 ### 2.1.8 - 2022-05-30
 
 1.  prevent clobbering of SSL trustCertificates
