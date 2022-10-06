@@ -41,7 +41,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Stopwatch;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.flogger.LazyArgs;
 import com.google.common.hash.Hashing;
+import com.google.gson.Gson;
 import com.google.protobuf.ByteString;
 import com.google.storage.v2.ReadObjectRequest;
 import com.google.storage.v2.ReadObjectResponse;
@@ -63,8 +65,10 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.OptionalLong;
 import javax.annotation.Nullable;
 
@@ -77,6 +81,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   static final String METHOD_GET_OBJECT_MEDIA = "getObjectMedia";
   static final String PROTOCOL_GRPC = "grpc";
   static final String PROTOCOL_JSON = "json";
+
+  private final Gson gson = new Gson();
 
   // ZeroCopy version of GetObjectMedia Method
   private final ZeroCopyMessageMarshaller<ReadObjectResponse> getObjectMediaResponseMarshaller =
@@ -279,11 +285,26 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         : new IOException("Error reading " + resourceId, exception);
   }
 
+  private void recordGCSAPILatency(
+      MeasureLong measure, long time, String status, String method, String protocol) {
+    if (storageOptions.isTraceLogEnabled()) {
+      Map<String, Object> jsonMap = new HashMap<>();
+      jsonMap.put("method", method);
+      jsonMap.put("status", status);
+      jsonMap.put("protocol", protocol);
+      jsonMap.put("duration", time);
+      jsonMap.put("measure", measure);
+
+      logger.atInfo().log("%s", LazyArgs.lazy(() -> gson.toJson(jsonMap)));
+    }
+  }
+
   private void recordSuccessMetric(
       MeasureLong measure, Stopwatch stopwatch, String method, String protocol) {
     long time = stopwatch.elapsed(MILLISECONDS);
     TagKey[] keys = new TagKey[] {METHOD, STATUS, PROTOCOL};
     String[] values = new String[] {method, STATUS_OK, protocol};
+    recordGCSAPILatency(measure, time, STATUS_OK, method, protocol);
     metricsRecorder.recordLong(keys, values, measure, time);
     logger.atFinest().log(
         "method : %s , status : %s, protocol : %s , measure : %s , time : %d",
@@ -299,6 +320,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
             : e.getClass().getSimpleName();
     TagKey[] keys = new TagKey[] {METHOD, STATUS, PROTOCOL};
     String[] values = new String[] {method, error, protocol};
+    recordGCSAPILatency(measure, time, error, method, protocol);
     metricsRecorder.recordLong(keys, values, measure, time);
     logger.atFinest().log(
         "method : %s , status : %s, protocol : %s , measure : %s , time : %d",

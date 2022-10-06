@@ -1625,9 +1625,11 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
     AssertingLogHandler assertingHandler = new AssertingLogHandler();
     Logger grpcTracingLogger =
         Logger.getLogger(GoogleCloudStorageGrpcTracingInterceptor.class.getName());
-    grpcTracingLogger.setUseParentHandlers(false);
     grpcTracingLogger.addHandler(assertingHandler);
-    grpcTracingLogger.setLevel(Level.INFO);
+
+    AssertingLogHandler gcsAPILogHandler = new AssertingLogHandler();
+    Logger gcsTracingLogger =
+        gcsAPILogHandler.getLoggerForClass(GoogleCloudStorageGrpcReadChannel.class.getName());
 
     try {
       readObjectAndVerify(GoogleCloudStorageOptions.builder().setTraceLogEnabled(true).build());
@@ -1644,8 +1646,17 @@ public final class GoogleCloudStorageGrpcReadChannelTest {
       verifyMethodsName(4, "inboundMessageRead", assertingHandler);
       verifyMethodsName(5, "inboundTrailers", assertingHandler);
       verifyMethodsName(6, "streamClosed", assertingHandler);
+
+      // Total 3 latencies recorded
+      // 1. Metadata operation
+      // 2. For overall read stream request
+      // 3. Individual chunk read from buffer.
+      gcsAPILogHandler.assertLogCount(3);
+      gcsAPILogHandler.verifyGCSReadLogFields();
+
     } finally {
       grpcTracingLogger.removeHandler(assertingHandler);
+      gcsTracingLogger.removeHandler(gcsAPILogHandler);
     }
   }
 
