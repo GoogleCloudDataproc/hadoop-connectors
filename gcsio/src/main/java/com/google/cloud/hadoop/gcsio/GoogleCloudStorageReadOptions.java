@@ -123,7 +123,7 @@ public abstract class GoogleCloudStorageReadOptions {
   public abstract long getGrpcReadMessageTimeoutMillis();
 
   /** See {@link Builder#setTraceLogEnabled(boolean)} . */
-  public abstract boolean getTraceLogEnabled();
+  public abstract boolean isTraceLogEnabled();
 
   /** Mutable builder for GoogleCloudStorageReadOptions. */
   @AutoValue.Builder

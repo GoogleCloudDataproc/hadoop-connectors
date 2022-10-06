@@ -288,7 +288,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private void recordSuccessMetricJson(
       MeasureLong measure, long time, String status, String method, String protocol) {
-    if (readOptions.getTraceLogEnabled()) {
+    if (storageOptions.isTraceLogEnabled()) {
       Map<String, Object> jsonMap = new HashMap<>();
       jsonMap.put("method", method);
       jsonMap.put("status", status);

@@ -80,7 +80,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     this.gcsPath = gcsPath;
     this.statistics = statistics;
     this.totalBytesRead = 0;
-    this.isTraceLoggingEnabled = readOptions.getTraceLogEnabled();
+    this.isTraceLoggingEnabled = readOptions.isTraceLogEnabled();
     this.channel = ghfs.getGcsFs().open(gcsPath, readOptions);
   }
 
