@@ -38,7 +38,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   static final String READ_METHOD = "gcsFSRead";
-  static final String POSITIONAL_READ_METHOD = "gcsFSRead";
+  static final String POSITIONAL_READ_METHOD = "gcsFSReadPositional";
   static final String SEEK_METHOD = "gcsFSSeek";
 
   private final Gson gson = new Gson();

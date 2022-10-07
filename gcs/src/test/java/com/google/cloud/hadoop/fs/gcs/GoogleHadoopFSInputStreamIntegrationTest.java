@@ -105,8 +105,15 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
 
       assertingHandler.assertLogCount(1);
       assertingHandler.verifyReadAPILogFields(GoogleHadoopFSInputStream.READ_METHOD);
+      assertingHandler.flush();
 
       assertThat(in.read(1, value, 1, 1)).isEqualTo(1);
+      // Total 4 calls for positional read
+      // 1. positional Read call
+      // 2. Seek to desired position
+      // 3. actual read from buffer after seek
+      // 4. Seek to old position
+      assertingHandler.assertLogCount(4);
       assertThat(statistics.getReadOps()).isEqualTo(2);
     }
 
