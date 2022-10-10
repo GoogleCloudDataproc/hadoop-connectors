@@ -40,8 +40,13 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   static final String READ_METHOD = "gcsFSRead";
   static final String POSITIONAL_READ_METHOD = "gcsFSReadPositional";
   static final String SEEK_METHOD = "gcsFSSeek";
+  static final String CLOSE_METHOD = "gcsFSClose";
 
-  private final Gson gson = new Gson();
+  static final String LATENCY_NS = "latencyNs";
+  static final String BYTES_READ = "bytesRead";
+  static final String GCS_PATH = "gcsPath";
+
+  private static final Gson gson = new Gson();
 
   private final boolean isTraceLoggingEnabled;
 
@@ -112,17 +117,6 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     return (b & 0xff);
   }
 
-  private void captureDuration(String suffix, Stopwatch stopwatch, int byteRead) {
-    if (isTraceLoggingEnabled) {
-      Map<String, Object> jsonMap = new HashMap<>();
-      // Capturing time in nanos because majority of the reads will be done from cache
-      long nanos = stopwatch.elapsed(TimeUnit.NANOSECONDS);
-      jsonMap.put(suffix + "_latencyNs", nanos);
-      jsonMap.put(suffix + "_byteRead", byteRead);
-      logger.atInfo().log("%s", LazyArgs.lazy(() -> gson.toJson(jsonMap)));
-    }
-  }
-
   /**
    * Reads up to length bytes from the underlying store and stores them starting at the specified
    * offset in the given buffer. Less than length bytes may be returned.
@@ -141,7 +135,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
       throw new IndexOutOfBoundsException();
     }
     int numRead = channel.read(ByteBuffer.wrap(buf, offset, length));
-    captureDuration(READ_METHOD, stopwatch, numRead);
+    captureLatency(READ_METHOD, stopwatch, numRead);
 
     if (numRead > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
@@ -170,7 +164,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
       throws IOException {
     Stopwatch stopwatch = Stopwatch.createStarted();
     int result = super.read(position, buf, offset, length);
-    captureDuration(POSITIONAL_READ_METHOD, stopwatch, result);
+    captureLatency(POSITIONAL_READ_METHOD, stopwatch, result);
     if (result > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
       statistics.incrementBytesRead(result);
@@ -204,7 +198,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     Stopwatch stopwatch = Stopwatch.createStarted();
     try {
       channel.position(pos);
-      captureDuration(SEEK_METHOD, stopwatch, 0);
+      captureLatency(SEEK_METHOD, stopwatch);
     } catch (IllegalArgumentException e) {
       throw new IOException(e);
     }
@@ -228,9 +222,11 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   @Override
   public synchronized void close() throws IOException {
     logger.atFiner().log("close(): %s", gcsPath);
+    Stopwatch stopwatch = Stopwatch.createStarted();
     if (channel != null) {
       logger.atFiner().log("Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
       channel.close();
+      captureLatency(CLOSE_METHOD, stopwatch);
     }
   }
 
@@ -251,5 +247,23 @@ class GoogleHadoopFSInputStream extends FSInputStream {
       throw new ClosedChannelException();
     }
     return super.available();
+  }
+
+  private void captureLatency(String method, Stopwatch stopwatch) {
+    captureLatency(method, stopwatch, null);
+  }
+
+  private void captureLatency(String method, Stopwatch stopwatch, Integer byteRead) {
+    if (isTraceLoggingEnabled) {
+      Map<String, Object> jsonMap = new HashMap<>();
+      // Capturing time in nanos because majority of the reads will be done from cache
+      long nanos = stopwatch.elapsed(TimeUnit.NANOSECONDS);
+      jsonMap.put(String.format("%s_%s", method, LATENCY_NS), nanos);
+      jsonMap.put(String.format("%s_%s", method, GCS_PATH), gcsPath);
+      if (byteRead != null) {
+        jsonMap.put(String.format("%s_%s", method, BYTES_READ), byteRead);
+      }
+      logger.atInfo().log("%s", LazyArgs.lazy(() -> gson.toJson(jsonMap)));
+    }
   }
 }

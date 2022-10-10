@@ -292,7 +292,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
       jsonMap.put("method", method);
       jsonMap.put("status", status);
       jsonMap.put("protocol", protocol);
-      jsonMap.put("duration", time);
+      jsonMap.put("latency", time);
       jsonMap.put("measure", measure);
 
       logger.atInfo().log("%s", LazyArgs.lazy(() -> gson.toJson(jsonMap)));

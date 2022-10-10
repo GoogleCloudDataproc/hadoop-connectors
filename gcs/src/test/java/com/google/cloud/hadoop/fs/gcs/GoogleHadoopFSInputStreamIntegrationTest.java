@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.hadoop.fs.FileSystem;
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -60,6 +61,11 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     grpcTracingLogger.setUseParentHandlers(false);
     grpcTracingLogger.addHandler(assertingHandler);
     grpcTracingLogger.setLevel(Level.INFO);
+  }
+
+  @After
+  public void cleanUp() {
+    grpcTracingLogger.removeHandler(assertingHandler);
   }
 
   @Test
@@ -104,7 +110,18 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
       assertThat(statistics.getReadOps()).isEqualTo(1);
 
       assertingHandler.assertLogCount(1);
-      assertingHandler.verifyReadAPILogFields(GoogleHadoopFSInputStream.READ_METHOD);
+      assertThat(
+              assertingHandler.containsFiled(
+                  String.format(
+                      "%s_%s",
+                      GoogleHadoopFSInputStream.READ_METHOD, GoogleHadoopFSInputStream.LATENCY_NS)))
+          .isEqualTo(1);
+      assertThat(
+              assertingHandler.containsFiled(
+                  String.format(
+                      "%s_%s",
+                      GoogleHadoopFSInputStream.READ_METHOD, GoogleHadoopFSInputStream.BYTES_READ)))
+          .isEqualTo(1);
       assertingHandler.flush();
 
       assertThat(in.read(1, value, 1, 1)).isEqualTo(1);
@@ -114,6 +131,33 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
       // 3. actual read from buffer after seek
       // 4. Seek to old position
       assertingHandler.assertLogCount(4);
+      assertThat(
+              assertingHandler.containsFiled(
+                  String.format(
+                      "%s_%s",
+                      GoogleHadoopFSInputStream.POSITIONAL_READ_METHOD,
+                      GoogleHadoopFSInputStream.LATENCY_NS)))
+          .isEqualTo(1);
+      assertThat(
+              assertingHandler.containsFiled(
+                  String.format(
+                      "%s_%s",
+                      GoogleHadoopFSInputStream.READ_METHOD, GoogleHadoopFSInputStream.LATENCY_NS)))
+          .isEqualTo(1);
+      assertThat(
+              assertingHandler.containsFiled(
+                  String.format(
+                      "%s_%s",
+                      GoogleHadoopFSInputStream.SEEK_METHOD, GoogleHadoopFSInputStream.LATENCY_NS)))
+          .isEqualTo(2);
+      assertThat(
+              assertingHandler.containsFiled(
+                  String.format(
+                      "%s_%s",
+                      GoogleHadoopFSInputStream.POSITIONAL_READ_METHOD,
+                      GoogleHadoopFSInputStream.BYTES_READ)))
+          .isEqualTo(1);
+
       assertThat(statistics.getReadOps()).isEqualTo(2);
     }
 
