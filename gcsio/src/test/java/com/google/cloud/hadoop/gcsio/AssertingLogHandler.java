@@ -113,7 +113,7 @@ public class AssertingLogHandler extends Handler {
       assertThat(logRecord.get("method")).isNotNull();
       assertThat(logRecord.get("status")).isNotNull();
       assertThat(logRecord.get("protocol")).isNotNull();
-      assertThat(logRecord.get("duration")).isNotNull();
+      assertThat(logRecord.get("latency")).isNotNull();
       assertThat(logRecord.get("measure")).isNotNull();
     }
   }
