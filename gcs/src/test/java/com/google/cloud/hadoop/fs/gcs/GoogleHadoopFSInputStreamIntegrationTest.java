@@ -114,7 +114,8 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
               assertingHandler.containsFiled(
                   String.format(
                       "%s_%s",
-                      GoogleHadoopFSInputStream.READ_METHOD, GoogleHadoopFSInputStream.LATENCY_NS)))
+                      GoogleHadoopFSInputStream.READ_METHOD,
+                      GoogleHadoopFSInputStream.DURATION_NS)))
           .isEqualTo(1);
       assertThat(
               assertingHandler.containsFiled(
@@ -136,19 +137,21 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
                   String.format(
                       "%s_%s",
                       GoogleHadoopFSInputStream.POSITIONAL_READ_METHOD,
-                      GoogleHadoopFSInputStream.LATENCY_NS)))
+                      GoogleHadoopFSInputStream.DURATION_NS)))
           .isEqualTo(1);
       assertThat(
               assertingHandler.containsFiled(
                   String.format(
                       "%s_%s",
-                      GoogleHadoopFSInputStream.READ_METHOD, GoogleHadoopFSInputStream.LATENCY_NS)))
+                      GoogleHadoopFSInputStream.READ_METHOD,
+                      GoogleHadoopFSInputStream.DURATION_NS)))
           .isEqualTo(1);
       assertThat(
               assertingHandler.containsFiled(
                   String.format(
                       "%s_%s",
-                      GoogleHadoopFSInputStream.SEEK_METHOD, GoogleHadoopFSInputStream.LATENCY_NS)))
+                      GoogleHadoopFSInputStream.SEEK_METHOD,
+                      GoogleHadoopFSInputStream.DURATION_NS)))
           .isEqualTo(2);
       assertThat(
               assertingHandler.containsFiled(

@@ -42,7 +42,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   static final String SEEK_METHOD = "gcsFSSeek";
   static final String CLOSE_METHOD = "gcsFSClose";
 
-  static final String LATENCY_NS = "latencyNs";
+  static final String DURATION_NS = "durationNs";
   static final String BYTES_READ = "bytesRead";
   static final String GCS_PATH = "gcsPath";
 
@@ -130,12 +130,17 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   @Override
   public synchronized int read(byte[] buf, int offset, int length) throws IOException {
     Stopwatch stopwatch = Stopwatch.createStarted();
+    Map<String, Object> apiTraces = new HashMap<>();
+    apiTraces.put("offset", offset);
+    apiTraces.put("length", length);
     Preconditions.checkNotNull(buf, "buf must not be null");
     if (offset < 0 || length < 0 || length > buf.length - offset) {
       throw new IndexOutOfBoundsException();
     }
     int numRead = channel.read(ByteBuffer.wrap(buf, offset, length));
-    captureLatency(READ_METHOD, stopwatch, numRead);
+    apiTraces.put(BYTES_READ, numRead);
+    captureAPIDuration(apiTraces, stopwatch);
+    captureAPITraces(READ_METHOD, apiTraces);
 
     if (numRead > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
@@ -163,8 +168,14 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   public synchronized int read(long position, byte[] buf, int offset, int length)
       throws IOException {
     Stopwatch stopwatch = Stopwatch.createStarted();
+    Map<String, Object> apiTraces = new HashMap<>();
+    apiTraces.put("offset", offset);
+    apiTraces.put("position", position);
+    apiTraces.put("length", length);
     int result = super.read(position, buf, offset, length);
-    captureLatency(POSITIONAL_READ_METHOD, stopwatch, result);
+    apiTraces.put(BYTES_READ, result);
+    captureAPIDuration(apiTraces, stopwatch);
+    captureAPITraces(POSITIONAL_READ_METHOD, apiTraces);
     if (result > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
       statistics.incrementBytesRead(result);
@@ -196,9 +207,12 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   public synchronized void seek(long pos) throws IOException {
     logger.atFiner().log("seek(%d)", pos);
     Stopwatch stopwatch = Stopwatch.createStarted();
+    Map<String, Object> apiTraces = new HashMap<>();
+    apiTraces.put("position", pos);
     try {
       channel.position(pos);
-      captureLatency(SEEK_METHOD, stopwatch);
+      captureAPIDuration(apiTraces, stopwatch);
+      captureAPITraces(SEEK_METHOD, apiTraces);
     } catch (IllegalArgumentException e) {
       throw new IOException(e);
     }
@@ -223,10 +237,12 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   public synchronized void close() throws IOException {
     logger.atFiner().log("close(): %s", gcsPath);
     Stopwatch stopwatch = Stopwatch.createStarted();
+    Map<String, Object> apiTraces = new HashMap<>();
     if (channel != null) {
       logger.atFiner().log("Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
       channel.close();
-      captureLatency(CLOSE_METHOD, stopwatch);
+      captureAPIDuration(apiTraces, stopwatch);
+      captureAPITraces(CLOSE_METHOD, apiTraces);
     }
   }
 
@@ -249,19 +265,22 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     return super.available();
   }
 
-  private void captureLatency(String method, Stopwatch stopwatch) {
-    captureLatency(method, stopwatch, null);
+  private void captureAPIDuration(Map<String, Object> apiTraces, Stopwatch stopwatch) {
+    if (apiTraces == null) {
+      apiTraces = new HashMap<>();
+    }
+    // Capturing time in nanos because majority of the reads will be done from cache
+    apiTraces.put(DURATION_NS, stopwatch.elapsed(TimeUnit.NANOSECONDS));
   }
 
-  private void captureLatency(String method, Stopwatch stopwatch, Integer byteRead) {
+  private void captureAPITraces(String method, Map<String, Object> apiTraces) {
     if (isTraceLoggingEnabled) {
       Map<String, Object> jsonMap = new HashMap<>();
-      // Capturing time in nanos because majority of the reads will be done from cache
-      long nanos = stopwatch.elapsed(TimeUnit.NANOSECONDS);
-      jsonMap.put(String.format("%s_%s", method, LATENCY_NS), nanos);
       jsonMap.put(String.format("%s_%s", method, GCS_PATH), gcsPath);
-      if (byteRead != null) {
-        jsonMap.put(String.format("%s_%s", method, BYTES_READ), byteRead);
+      if (apiTraces != null && !apiTraces.isEmpty()) {
+        for (Map.Entry item : apiTraces.entrySet()) {
+          jsonMap.put(String.format("%s_%s", method, item.getKey()), item.getValue());
+        }
       }
       logger.atInfo().log("%s", LazyArgs.lazy(() -> gson.toJson(jsonMap)));
     }

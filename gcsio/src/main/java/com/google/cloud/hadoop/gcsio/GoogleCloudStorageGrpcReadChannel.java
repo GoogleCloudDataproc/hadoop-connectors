@@ -285,16 +285,15 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
         : new IOException("Error reading " + resourceId, exception);
   }
 
-  private void recordGCSAPILatency(
+  private void recordGCSAPIDuration(
       MeasureLong measure, long time, String status, String method, String protocol) {
     if (storageOptions.isTraceLogEnabled()) {
       Map<String, Object> jsonMap = new HashMap<>();
       jsonMap.put("method", method);
       jsonMap.put("status", status);
       jsonMap.put("protocol", protocol);
-      jsonMap.put("latency", time);
+      jsonMap.put("duration", time);
       jsonMap.put("measure", measure);
-
       logger.atInfo().log("%s", LazyArgs.lazy(() -> gson.toJson(jsonMap)));
     }
   }
@@ -304,11 +303,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     long time = stopwatch.elapsed(MILLISECONDS);
     TagKey[] keys = new TagKey[] {METHOD, STATUS, PROTOCOL};
     String[] values = new String[] {method, STATUS_OK, protocol};
-    recordGCSAPILatency(measure, time, STATUS_OK, method, protocol);
+    recordGCSAPIDuration(measure, time, STATUS_OK, method, protocol);
     metricsRecorder.recordLong(keys, values, measure, time);
-    logger.atFinest().log(
-        "method : %s , status : %s, protocol : %s , measure : %s , time : %d",
-        method, STATUS_OK, protocol, measure, time);
   }
 
   private void recordErrorMetric(
@@ -320,11 +316,8 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
             : e.getClass().getSimpleName();
     TagKey[] keys = new TagKey[] {METHOD, STATUS, PROTOCOL};
     String[] values = new String[] {method, error, protocol};
-    recordGCSAPILatency(measure, time, error, method, protocol);
+    recordGCSAPIDuration(measure, time, error, method, protocol);
     metricsRecorder.recordLong(keys, values, measure, time);
-    logger.atFinest().log(
-        "method : %s , status : %s, protocol : %s , measure : %s , time : %d",
-        method, error, protocol, measure, time);
   }
 
   private static Get getMetadataRequest(Storage gcs, StorageResourceId resourceId)
