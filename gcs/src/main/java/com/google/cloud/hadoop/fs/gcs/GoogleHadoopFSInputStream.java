@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
 import com.google.common.flogger.GoogleLogger;
@@ -37,18 +38,17 @@ import org.apache.hadoop.fs.FileSystem;
 class GoogleHadoopFSInputStream extends FSInputStream {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-  static final String READ_METHOD = "gcsFSRead";
-  static final String POSITIONAL_READ_METHOD = "gcsFSReadPositional";
-  static final String SEEK_METHOD = "gcsFSSeek";
-  static final String CLOSE_METHOD = "gcsFSClose";
-
-  static final String DURATION_NS = "durationNs";
-  static final String BYTES_READ = "bytesRead";
-  static final String GCS_PATH = "gcsPath";
-  static final String METHOD = "method";
-  static final String POSITION = "position";
-  static final String LENGTH = "length";
-  static final String OFFSET = "offset";
+  @VisibleForTesting static final String READ_METHOD = "gcsFSRead";
+  @VisibleForTesting static final String POSITIONAL_READ_METHOD = "gcsFSReadPositional";
+  @VisibleForTesting static final String SEEK_METHOD = "gcsFSSeek";
+  @VisibleForTesting static final String CLOSE_METHOD = "gcsFSClose";
+  @VisibleForTesting static final String DURATION_NS = "durationNs";
+  @VisibleForTesting static final String BYTES_READ = "bytesRead";
+  @VisibleForTesting static final String GCS_PATH = "gcsPath";
+  @VisibleForTesting static final String METHOD = "method";
+  @VisibleForTesting static final String POSITION = "position";
+  @VisibleForTesting static final String LENGTH = "length";
+  @VisibleForTesting static final String OFFSET = "offset";
 
   private static final Gson gson = new Gson();
 
