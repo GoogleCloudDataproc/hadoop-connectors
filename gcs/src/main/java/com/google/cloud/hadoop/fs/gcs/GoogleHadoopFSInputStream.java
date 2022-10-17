@@ -17,13 +17,20 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.flogger.LazyArgs;
+import com.google.gson.Gson;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileSystem;
 
@@ -31,6 +38,21 @@ import org.apache.hadoop.fs.FileSystem;
 class GoogleHadoopFSInputStream extends FSInputStream {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
+  @VisibleForTesting static final String READ_METHOD = "gcsFSRead";
+  @VisibleForTesting static final String POSITIONAL_READ_METHOD = "gcsFSReadPositional";
+  @VisibleForTesting static final String SEEK_METHOD = "gcsFSSeek";
+  @VisibleForTesting static final String CLOSE_METHOD = "gcsFSClose";
+  @VisibleForTesting static final String DURATION_NS = "durationNs";
+  @VisibleForTesting static final String BYTES_READ = "bytesRead";
+  @VisibleForTesting static final String GCS_PATH = "gcsPath";
+  @VisibleForTesting static final String METHOD = "method";
+  @VisibleForTesting static final String POSITION = "position";
+  @VisibleForTesting static final String LENGTH = "length";
+  @VisibleForTesting static final String OFFSET = "offset";
+
+  private static final Gson gson = new Gson();
+
+  private final boolean isTraceLoggingEnabled;
 
   // All store IO access goes through this.
   private final SeekableByteChannel channel;
@@ -67,6 +89,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     this.gcsPath = gcsPath;
     this.statistics = statistics;
     this.totalBytesRead = 0;
+    this.isTraceLoggingEnabled = readOptions.isTraceLogEnabled();
     this.channel = ghfs.getGcsFs().open(gcsPath, readOptions);
   }
 
@@ -110,12 +133,15 @@ class GoogleHadoopFSInputStream extends FSInputStream {
    */
   @Override
   public synchronized int read(byte[] buf, int offset, int length) throws IOException {
+    Stopwatch stopwatch = Stopwatch.createStarted();
+
     Preconditions.checkNotNull(buf, "buf must not be null");
     if (offset < 0 || length < 0 || length > buf.length - offset) {
       throw new IndexOutOfBoundsException();
     }
-
     int numRead = channel.read(ByteBuffer.wrap(buf, offset, length));
+
+    readAPITrace(READ_METHOD, stopwatch, 0, offset, length, numRead);
 
     if (numRead > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
@@ -142,8 +168,10 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   @Override
   public synchronized int read(long position, byte[] buf, int offset, int length)
       throws IOException {
-    int result = super.read(position, buf, offset, length);
+    Stopwatch stopwatch = Stopwatch.createStarted();
 
+    int result = super.read(position, buf, offset, length);
+    readAPITrace(POSITIONAL_READ_METHOD, stopwatch, position, offset, length, result);
     if (result > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
       statistics.incrementBytesRead(result);
@@ -174,8 +202,11 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   @Override
   public synchronized void seek(long pos) throws IOException {
     logger.atFiner().log("seek(%d)", pos);
+    Stopwatch stopwatch = Stopwatch.createStarted();
+
     try {
       channel.position(pos);
+      seekAPITrace(SEEK_METHOD, stopwatch, pos);
     } catch (IllegalArgumentException e) {
       throw new IOException(e);
     }
@@ -199,9 +230,12 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   @Override
   public synchronized void close() throws IOException {
     logger.atFiner().log("close(): %s", gcsPath);
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    Map<String, Object> apiTraces = new HashMap<>();
     if (channel != null) {
       logger.atFiner().log("Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
       channel.close();
+      closeAPITrace(CLOSE_METHOD, stopwatch);
     }
   }
 
@@ -222,5 +256,47 @@ class GoogleHadoopFSInputStream extends FSInputStream {
       throw new ClosedChannelException();
     }
     return super.available();
+  }
+
+  private void readAPITrace(
+      String method, Stopwatch stopwatch, long position, int offset, int length, int bytesRead) {
+    if (isTraceLoggingEnabled) {
+      Map<String, Object> jsonMap = new HashMap<>();
+      jsonMap.put(METHOD, method);
+      jsonMap.put(GCS_PATH, gcsPath);
+      jsonMap.put(DURATION_NS, stopwatch.elapsed(TimeUnit.NANOSECONDS));
+      jsonMap.put(POSITION, position);
+      jsonMap.put(OFFSET, offset);
+      jsonMap.put(LENGTH, length);
+      jsonMap.put(BYTES_READ, bytesRead);
+      captureAPITraces(jsonMap);
+    }
+  }
+
+  private void seekAPITrace(String method, Stopwatch stopwatch, long pos) {
+    if (isTraceLoggingEnabled) {
+      Map<String, Object> jsonMap = new HashMap<>();
+      jsonMap.put(METHOD, method);
+      jsonMap.put(GCS_PATH, gcsPath);
+      jsonMap.put(DURATION_NS, stopwatch.elapsed(TimeUnit.NANOSECONDS));
+      jsonMap.put(POSITION, pos);
+      captureAPITraces(jsonMap);
+    }
+  }
+
+  private void closeAPITrace(String method, Stopwatch stopwatch) {
+    if (isTraceLoggingEnabled) {
+      Map<String, Object> jsonMap = new HashMap<>();
+      jsonMap.put(METHOD, method);
+      jsonMap.put(GCS_PATH, gcsPath);
+      jsonMap.put(DURATION_NS, stopwatch.elapsed(TimeUnit.NANOSECONDS));
+      captureAPITraces(jsonMap);
+    }
+  }
+
+  private void captureAPITraces(Map<String, Object> apiTraces) {
+    if (isTraceLoggingEnabled) {
+      logger.atInfo().log("%s", LazyArgs.lazy(() -> gson.toJson(apiTraces)));
+    }
   }
 }

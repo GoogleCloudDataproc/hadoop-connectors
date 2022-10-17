@@ -108,6 +108,25 @@ public class AssertingLogHandler extends Handler {
     }
   }
 
+  public void verifyGCSReadLogFields() {
+    for (Map<String, Object> logRecord : logRecords) {
+      assertThat(logRecord.get("method")).isNotNull();
+      assertThat(logRecord.get("status")).isNotNull();
+      assertThat(logRecord.get("protocol")).isNotNull();
+      assertThat(logRecord.get("duration")).isNotNull();
+      assertThat(logRecord.get("measure")).isNotNull();
+    }
+  }
+
+  public Map<String, Object> getLogRecord(String key, Object value) {
+    for (Map<String, Object> logRecord : logRecords) {
+      if (logRecord.containsKey(key) && logRecord.get(key).equals(value)) {
+        return logRecord;
+      }
+    }
+    return null;
+  }
+
   String getMethodAtIndex(int index) {
     return methods.get(index);
   }

@@ -559,6 +559,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setGrpcReadMetadataTimeoutMillis(
             GCS_GRPC_READ_METADATA_TIMEOUT_MS.get(config, config::getLong))
         .setGrpcReadZeroCopyEnabled(GCS_GRPC_READ_ZEROCOPY_ENABLE.get(config, config::getBoolean))
+        .setTraceLogEnabled(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .build();
   }
 

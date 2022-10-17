@@ -49,6 +49,7 @@ public abstract class GoogleCloudStorageReadOptions {
   public static final long DEFAULT_GRPC_READ_METADATA_TIMEOUT_MILLIS = 60 * 1000;
   public static final boolean DEFAULT_GRPC_READ_ZEROCOPY_ENABLED = true;
   public static final long DEFAULT_GRPC_READ_MESSAGE_TIMEOUT_MILLIS = 3 * 1000;
+  public static final boolean TRACE_LOGGING_ENABLED_DEFAULT = false;
 
   // Default builder should be initialized after default values,
   // otherwise it will access not initialized default values.
@@ -70,7 +71,8 @@ public abstract class GoogleCloudStorageReadOptions {
         .setGrpcReadTimeoutMillis(DEFAULT_GRPC_READ_TIMEOUT_MILLIS)
         .setGrpcReadMetadataTimeoutMillis(DEFAULT_GRPC_READ_METADATA_TIMEOUT_MILLIS)
         .setGrpcReadZeroCopyEnabled(DEFAULT_GRPC_READ_ZEROCOPY_ENABLED)
-        .setGrpcReadMessageTimeoutMillis(DEFAULT_GRPC_READ_MESSAGE_TIMEOUT_MILLIS);
+        .setGrpcReadMessageTimeoutMillis(DEFAULT_GRPC_READ_MESSAGE_TIMEOUT_MILLIS)
+        .setTraceLogEnabled(TRACE_LOGGING_ENABLED_DEFAULT);
   }
 
   public abstract Builder toBuilder();
@@ -119,6 +121,9 @@ public abstract class GoogleCloudStorageReadOptions {
 
   /** See {@link Builder#setGrpcReadTimeoutMillis(long)}. */
   public abstract long getGrpcReadMessageTimeoutMillis();
+
+  /** See {@link Builder#setTraceLogEnabled(boolean)} . */
+  public abstract boolean isTraceLogEnabled();
 
   /** Mutable builder for GoogleCloudStorageReadOptions. */
   @AutoValue.Builder
@@ -217,6 +222,9 @@ public abstract class GoogleCloudStorageReadOptions {
 
     /** Sets the property to use the zero-copy deserializer for gRPC read. */
     public abstract Builder setGrpcReadZeroCopyEnabled(boolean grpcReadZeroCopyEnabled);
+
+    /** Sets the property to enable trace logging */
+    public abstract Builder setTraceLogEnabled(boolean enable);
 
     /** Sets the property for gRPC read message timeout in milliseconds. */
     public abstract Builder setGrpcReadMessageTimeoutMillis(long grpcMessageTimeout);
