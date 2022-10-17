@@ -118,14 +118,13 @@ public class AssertingLogHandler extends Handler {
     }
   }
 
-  public int containsFiled(String field) {
-    int counter = 0;
+  public Map<String, Object> getLogRecord(String key, Object value) {
     for (Map<String, Object> logRecord : logRecords) {
-      if (logRecord.containsKey(field)) {
-        counter += 1;
+      if (logRecord.containsKey(key) && logRecord.get(key).equals(value)) {
+        return logRecord;
       }
     }
-    return counter;
+    return null;
   }
 
   String getMethodAtIndex(int index) {

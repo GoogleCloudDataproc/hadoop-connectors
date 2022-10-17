@@ -26,6 +26,7 @@ import java.net.URI;
 import java.nio.channels.ClosedChannelException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.hadoop.fs.FileSystem;
@@ -110,19 +111,15 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
       assertThat(statistics.getReadOps()).isEqualTo(1);
 
       assertingHandler.assertLogCount(1);
-      assertThat(
-              assertingHandler.containsFiled(
-                  String.format(
-                      "%s_%s",
-                      GoogleHadoopFSInputStream.READ_METHOD,
-                      GoogleHadoopFSInputStream.DURATION_NS)))
-          .isEqualTo(1);
-      assertThat(
-              assertingHandler.containsFiled(
-                  String.format(
-                      "%s_%s",
-                      GoogleHadoopFSInputStream.READ_METHOD, GoogleHadoopFSInputStream.BYTES_READ)))
-          .isEqualTo(1);
+      Map<String, Object> logRecord =
+          assertingHandler.getLogRecord(
+              GoogleHadoopFSInputStream.METHOD, GoogleHadoopFSInputStream.READ_METHOD);
+      assertThat(logRecord).isNotNull();
+      assertThat(logRecord.get(GoogleHadoopFSInputStream.BYTES_READ)).isEqualTo(1);
+      assertThat(logRecord.get(GoogleHadoopFSInputStream.POSITION)).isEqualTo(0);
+      assertThat(logRecord.get(GoogleHadoopFSInputStream.DURATION_NS)).isNotNull();
+      assertThat(logRecord.get(GoogleHadoopFSInputStream.GCS_PATH)).isNotNull();
+
       assertingHandler.flush();
 
       assertThat(in.read(1, value, 1, 1)).isEqualTo(1);
@@ -132,34 +129,28 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
       // 3. actual read from buffer after seek
       // 4. Seek to old position
       assertingHandler.assertLogCount(4);
-      assertThat(
-              assertingHandler.containsFiled(
-                  String.format(
-                      "%s_%s",
-                      GoogleHadoopFSInputStream.POSITIONAL_READ_METHOD,
-                      GoogleHadoopFSInputStream.DURATION_NS)))
-          .isEqualTo(1);
-      assertThat(
-              assertingHandler.containsFiled(
-                  String.format(
-                      "%s_%s",
-                      GoogleHadoopFSInputStream.READ_METHOD,
-                      GoogleHadoopFSInputStream.DURATION_NS)))
-          .isEqualTo(1);
-      assertThat(
-              assertingHandler.containsFiled(
-                  String.format(
-                      "%s_%s",
-                      GoogleHadoopFSInputStream.SEEK_METHOD,
-                      GoogleHadoopFSInputStream.DURATION_NS)))
-          .isEqualTo(2);
-      assertThat(
-              assertingHandler.containsFiled(
-                  String.format(
-                      "%s_%s",
-                      GoogleHadoopFSInputStream.POSITIONAL_READ_METHOD,
-                      GoogleHadoopFSInputStream.BYTES_READ)))
-          .isEqualTo(1);
+      logRecord =
+          assertingHandler.getLogRecord(
+              GoogleHadoopFSInputStream.METHOD, GoogleHadoopFSInputStream.POSITIONAL_READ_METHOD);
+      assertThat(logRecord).isNotNull();
+      assertThat(logRecord.get(GoogleHadoopFSInputStream.BYTES_READ)).isEqualTo(1);
+      assertThat(logRecord.get(GoogleHadoopFSInputStream.POSITION)).isEqualTo(1);
+      assertThat(logRecord.get(GoogleHadoopFSInputStream.DURATION_NS)).isNotNull();
+      assertThat(logRecord.get(GoogleHadoopFSInputStream.GCS_PATH)).isNotNull();
+
+      logRecord =
+          assertingHandler.getLogRecord(
+              GoogleHadoopFSInputStream.METHOD, GoogleHadoopFSInputStream.SEEK_METHOD);
+      assertThat(logRecord).isNotNull();
+      assertThat(logRecord.get(GoogleHadoopFSInputStream.POSITION)).isEqualTo(1);
+      assertThat(logRecord.get(GoogleHadoopFSInputStream.DURATION_NS)).isNotNull();
+
+      logRecord =
+          assertingHandler.getLogRecord(
+              GoogleHadoopFSInputStream.METHOD, GoogleHadoopFSInputStream.READ_METHOD);
+      assertThat(logRecord).isNotNull();
+      assertThat(logRecord.get(GoogleHadoopFSInputStream.BYTES_READ)).isEqualTo(1);
+      assertThat(logRecord.get(GoogleHadoopFSInputStream.DURATION_NS)).isNotNull();
 
       assertThat(statistics.getReadOps()).isEqualTo(2);
     }

@@ -45,6 +45,10 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   static final String DURATION_NS = "durationNs";
   static final String BYTES_READ = "bytesRead";
   static final String GCS_PATH = "gcsPath";
+  static final String METHOD = "method";
+  static final String POSITION = "position";
+  static final String LENGTH = "length";
+  static final String OFFSET = "offset";
 
   private static final Gson gson = new Gson();
 
@@ -130,17 +134,14 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   @Override
   public synchronized int read(byte[] buf, int offset, int length) throws IOException {
     Stopwatch stopwatch = Stopwatch.createStarted();
-    Map<String, Object> apiTraces = new HashMap<>();
-    apiTraces.put("offset", offset);
-    apiTraces.put("length", length);
+
     Preconditions.checkNotNull(buf, "buf must not be null");
     if (offset < 0 || length < 0 || length > buf.length - offset) {
       throw new IndexOutOfBoundsException();
     }
     int numRead = channel.read(ByteBuffer.wrap(buf, offset, length));
-    apiTraces.put(BYTES_READ, numRead);
-    captureAPIDuration(apiTraces, stopwatch);
-    captureAPITraces(READ_METHOD, apiTraces);
+
+    readAPITrace(READ_METHOD, stopwatch, 0, offset, length, numRead);
 
     if (numRead > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
@@ -168,14 +169,9 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   public synchronized int read(long position, byte[] buf, int offset, int length)
       throws IOException {
     Stopwatch stopwatch = Stopwatch.createStarted();
-    Map<String, Object> apiTraces = new HashMap<>();
-    apiTraces.put("offset", offset);
-    apiTraces.put("position", position);
-    apiTraces.put("length", length);
+
     int result = super.read(position, buf, offset, length);
-    apiTraces.put(BYTES_READ, result);
-    captureAPIDuration(apiTraces, stopwatch);
-    captureAPITraces(POSITIONAL_READ_METHOD, apiTraces);
+    readAPITrace(POSITIONAL_READ_METHOD, stopwatch, position, offset, length, result);
     if (result > 0) {
       // -1 means we actually read 0 bytes, but requested at least one byte.
       statistics.incrementBytesRead(result);
@@ -207,12 +203,10 @@ class GoogleHadoopFSInputStream extends FSInputStream {
   public synchronized void seek(long pos) throws IOException {
     logger.atFiner().log("seek(%d)", pos);
     Stopwatch stopwatch = Stopwatch.createStarted();
-    Map<String, Object> apiTraces = new HashMap<>();
-    apiTraces.put("position", pos);
+
     try {
       channel.position(pos);
-      captureAPIDuration(apiTraces, stopwatch);
-      captureAPITraces(SEEK_METHOD, apiTraces);
+      seekAPITrace(SEEK_METHOD, stopwatch, pos);
     } catch (IllegalArgumentException e) {
       throw new IOException(e);
     }
@@ -241,8 +235,7 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     if (channel != null) {
       logger.atFiner().log("Closing '%s' file with %d total bytes read", gcsPath, totalBytesRead);
       channel.close();
-      captureAPIDuration(apiTraces, stopwatch);
-      captureAPITraces(CLOSE_METHOD, apiTraces);
+      closeAPITrace(CLOSE_METHOD, stopwatch);
     }
   }
 
@@ -265,24 +258,45 @@ class GoogleHadoopFSInputStream extends FSInputStream {
     return super.available();
   }
 
-  private void captureAPIDuration(Map<String, Object> apiTraces, Stopwatch stopwatch) {
-    if (apiTraces == null) {
-      apiTraces = new HashMap<>();
-    }
-    // Capturing time in nanos because majority of the reads will be done from cache
-    apiTraces.put(DURATION_NS, stopwatch.elapsed(TimeUnit.NANOSECONDS));
-  }
-
-  private void captureAPITraces(String method, Map<String, Object> apiTraces) {
+  private void readAPITrace(
+      String method, Stopwatch stopwatch, long position, int offset, int length, int bytesRead) {
     if (isTraceLoggingEnabled) {
       Map<String, Object> jsonMap = new HashMap<>();
-      jsonMap.put(String.format("%s_%s", method, GCS_PATH), gcsPath);
-      if (apiTraces != null && !apiTraces.isEmpty()) {
-        for (Map.Entry item : apiTraces.entrySet()) {
-          jsonMap.put(String.format("%s_%s", method, item.getKey()), item.getValue());
-        }
-      }
-      logger.atInfo().log("%s", LazyArgs.lazy(() -> gson.toJson(jsonMap)));
+      jsonMap.put(METHOD, method);
+      jsonMap.put(GCS_PATH, gcsPath);
+      jsonMap.put(DURATION_NS, stopwatch.elapsed(TimeUnit.NANOSECONDS));
+      jsonMap.put(POSITION, position);
+      jsonMap.put(OFFSET, offset);
+      jsonMap.put(LENGTH, length);
+      jsonMap.put(BYTES_READ, bytesRead);
+      captureAPITraces(jsonMap);
+    }
+  }
+
+  private void seekAPITrace(String method, Stopwatch stopwatch, long pos) {
+    if (isTraceLoggingEnabled) {
+      Map<String, Object> jsonMap = new HashMap<>();
+      jsonMap.put(METHOD, method);
+      jsonMap.put(GCS_PATH, gcsPath);
+      jsonMap.put(DURATION_NS, stopwatch.elapsed(TimeUnit.NANOSECONDS));
+      jsonMap.put(POSITION, pos);
+      captureAPITraces(jsonMap);
+    }
+  }
+
+  private void closeAPITrace(String method, Stopwatch stopwatch) {
+    if (isTraceLoggingEnabled) {
+      Map<String, Object> jsonMap = new HashMap<>();
+      jsonMap.put(METHOD, method);
+      jsonMap.put(GCS_PATH, gcsPath);
+      jsonMap.put(DURATION_NS, stopwatch.elapsed(TimeUnit.NANOSECONDS));
+      captureAPITraces(jsonMap);
+    }
+  }
+
+  private void captureAPITraces(Map<String, Object> apiTraces) {
+    if (isTraceLoggingEnabled) {
+      logger.atInfo().log("%s", LazyArgs.lazy(() -> gson.toJson(apiTraces)));
     }
   }
 }
