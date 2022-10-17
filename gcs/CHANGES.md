@@ -1227,7 +1227,7 @@
 1.  The new inferImplicitDirectories option to `GoogleCloudStorage` tells it to
     infer the existence of a directory (such as `foo`) when that directory node
     does not exist in GCS but there are GCS files that start with that path
-    (such as as `foo/bar`). This allows the GCS connector to be used on
+    (such as `foo/bar`). This allows the GCS connector to be used on
     read-only filesystems where those intermediate directory nodes can not be
     created by the connector. The value of this option can be controlled by the
     Hadoop boolean config option `fs.gs.implicit.dir.infer.enable`. The default
