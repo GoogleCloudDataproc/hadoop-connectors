@@ -1,4 +1,6 @@
-### 1.2.1 - 2022-XX-XX
+# Release Notes
+
+## Next
 
 1.  Update all dependencies to latest versions.
 
