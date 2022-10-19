@@ -1,4 +1,6 @@
-### 2.2.9 - 2022-XX-XX
+# Release Notes
+
+## Next
 
 1.  The Google Cloud Storage Connector now can be used as a
     [Hadoop Credential Provider](https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/CredentialProviderAPI.html).
