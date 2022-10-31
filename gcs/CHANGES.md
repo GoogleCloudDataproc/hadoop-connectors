@@ -1,4 +1,4 @@
-### 3.0.0 - 2022-XX-XX
+### 3.0.0 - 2022-10-31
 
 1.  Remove Hadoop 2.x support.
 
