@@ -2459,6 +2459,5 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     } catch (IOException e) {
       return null;
     }
-
   }
 }
