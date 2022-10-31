@@ -436,6 +436,10 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_TRACE_LOG_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.tracelog.enable", false);
 
+  /** Configuration key to enable logging of custom audit details. */
+  public static final HadoopConfigurationProperty<Boolean> GCS_AUDIT_LOG_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.log-ugi-to-header.enable", false);
+
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
   // @VisibleForTesting
@@ -493,7 +497,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setDirectPathPreferred(GCS_GRPC_DIRECTPATH_ENABLE.get(config, config::getBoolean))
         .setTrafficDirectorEnabled(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.get(config, config::getBoolean))
         .setMetricsSink(GCS_METRICS_SINK.get(config, config::getEnum))
-        .setTraceLogEnabled(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean));
+        .setTraceLogEnabled(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean))
+        .setGcsAuditLogEnabled(GCS_AUDIT_LOG_ENABLE.get(config, config::getBoolean));
   }
 
   private static PerformanceCachingGoogleCloudStorageOptions getPerformanceCachingOptions(

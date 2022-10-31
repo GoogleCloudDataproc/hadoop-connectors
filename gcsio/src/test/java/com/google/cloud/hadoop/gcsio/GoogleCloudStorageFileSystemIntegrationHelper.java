@@ -35,6 +35,7 @@ public class GoogleCloudStorageFileSystemIntegrationHelper
             .setAppName(GoogleCloudStorageTestHelper.APP_NAME)
             .setProjectId(projectId)
             .setCopyWithRewriteEnabled(true)
+            .setGcsAuditLogEnabled(true)
             .build();
 
     return new GoogleCloudStorageFileSystemImpl(

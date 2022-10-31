@@ -101,6 +101,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.hadoop.security.UserGroupInformation;
 
 /**
  * Provides read/write access to Google Cloud Storage (GCS), using Java nio channel semantics. This
@@ -117,6 +118,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private static final int MAXIMUM_PRECONDITION_FAILURES_IN_DELETE = 4;
 
   private static final String USER_PROJECT_FIELD_NAME = "userProject";
+
+  private static final String CUSTOM_AUDIT_USER_HEADER = "X-Goog-Custom-Audit-User";
 
   private static final CreateObjectOptions EMPTY_OBJECT_CREATE_OPTIONS =
       CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
@@ -2342,6 +2345,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       String token = downscopedAccessTokenFn.apply(accessBoundaries);
       request.getRequestHeaders().setAuthorization("Bearer " + token);
     }
+    if (storageOptions.isGcsAuditLogEnabled()
+        && !storageOptions.getHttpRequestHeaders().containsKey(CUSTOM_AUDIT_USER_HEADER)) {
+      String user = getUgiUserName();
+      if (!user.isEmpty()) request.getRequestHeaders().set(CUSTOM_AUDIT_USER_HEADER, user);
+    }
     return configureRequest(request, bucketName);
   }
 
@@ -2441,5 +2449,16 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   public Map<String, Long> getStatistics() {
     return statistics.entrySet().stream()
         .collect(toImmutableMap(Map.Entry::getKey, e -> e.getValue().get()));
+  }
+
+  /** Helper method to get the UGI short user name */
+  private static String getUgiUserName() {
+    try {
+      UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+      return ugi.getShortUserName();
+    } catch (IOException e) {
+      return null;
+    }
+
   }
 }

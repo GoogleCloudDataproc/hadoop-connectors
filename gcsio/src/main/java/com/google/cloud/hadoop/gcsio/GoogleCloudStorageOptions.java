@@ -126,7 +126,8 @@ public abstract class GoogleCloudStorageOptions {
         .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT)
         .setGrpcMessageTimeoutCheckInterval(DEFAULT_GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL_MILLIS)
         .setMetricsSink(MetricsSink.NONE)
-        .setTraceLogEnabled(false);
+        .setTraceLogEnabled(false)
+        .setGcsAuditLogEnabled(false);
   }
 
   public abstract Builder toBuilder();
@@ -200,6 +201,8 @@ public abstract class GoogleCloudStorageOptions {
   public abstract MetricsSink getMetricsSink();
 
   public abstract boolean isTraceLogEnabled();
+
+  public abstract boolean isGcsAuditLogEnabled();
 
   public RetryHttpInitializerOptions toRetryHttpInitializerOptions() {
     return RetryHttpInitializerOptions.builder()
@@ -283,6 +286,8 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setMetricsSink(MetricsSink metricsSink);
 
     public abstract Builder setTraceLogEnabled(Boolean enable);
+
+    public abstract Builder setGcsAuditLogEnabled(Boolean enable);
 
     abstract GoogleCloudStorageOptions autoBuild();
 
