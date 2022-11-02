@@ -2348,7 +2348,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     if (storageOptions.isGcsAuditLogEnabled()
         && !storageOptions.getHttpRequestHeaders().containsKey(CUSTOM_AUDIT_USER_HEADER)) {
       String user = getUgiUserName();
-      if (!user.isEmpty()) request.getRequestHeaders().set(CUSTOM_AUDIT_USER_HEADER, user);
+      if (!user.isEmpty()) {
+        request.getRequestHeaders().set(CUSTOM_AUDIT_USER_HEADER, user);
+      }
     }
     return configureRequest(request, bucketName);
   }
@@ -2451,7 +2453,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         .collect(toImmutableMap(Map.Entry::getKey, e -> e.getValue().get()));
   }
 
-  /** Helper method to get the UGI short user name */
   private static String getUgiUserName() {
     try {
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
