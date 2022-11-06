@@ -51,7 +51,7 @@ public class GhfsStorageStatistics extends StorageStatisticsFromIOStatistics {
    * @return minimum statistic value
    */
   public Long getMin(String symbol) {
-    return minimums().get(symbol + MINIMUM);
+    return (Long) minimums().get(symbol + MINIMUM);
   }
 
   /**
@@ -61,7 +61,7 @@ public class GhfsStorageStatistics extends StorageStatisticsFromIOStatistics {
    * @return maximum statistic value
    */
   public Long getMax(String symbol) {
-    return maximums().get(symbol + MAXIMUM);
+    return (Long) maximums().get(symbol + MAXIMUM);
   }
 
   /**
