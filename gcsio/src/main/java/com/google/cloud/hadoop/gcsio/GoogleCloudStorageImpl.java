@@ -302,7 +302,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       Credentials credentials,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
-    this(options, credentials, /* httpRequestInitializer= */ null, downscopedAccessTokenFn);
+    this(
+        options,
+        credentials,
+        /* httpTransport= */ null,
+        /* httpRequestInitializer= */ null,
+        downscopedAccessTokenFn);
   }
 
   /**
@@ -318,7 +323,12 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       HttpRequestInitializer httpRequestInitializer,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
-    this(options, /* credentials= */ null, httpRequestInitializer, downscopedAccessTokenFn);
+    this(
+        options,
+        /* credentials= */ null,
+        /* httpTransport= */ null,
+        httpRequestInitializer,
+        downscopedAccessTokenFn);
   }
 
   /**
@@ -326,28 +336,29 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    *
    * @param options {@link GoogleCloudStorageOptions} to use to initialize the object
    * @param credentials OAuth2 credentials that allows access to GCS
+   * @param httpTransport transport used for HTTP requests
    * @param httpRequestInitializer request initializer used to initialize all HTTP requests
    * @param downscopedAccessTokenFn Function that generates downscoped access token
    * @throws IOException on IO error
    */
-  private GoogleCloudStorageImpl(
+  @VisibleForTesting
+  GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options,
-      @Nullable Credentials credentials,
-      @Nullable HttpRequestInitializer httpRequestInitializer,
+      Credentials credentials,
+      HttpTransport httpTransport,
+      HttpRequestInitializer httpRequestInitializer,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
     logger.atFiner().log("GCS(options: %s)", options);
 
     checkNotNull(options, "options must not be null").throwIfNotValid();
-
-    checkArgument(
-        (credentials == null && httpRequestInitializer != null)
-            || (credentials != null && httpRequestInitializer == null),
-        "credentials (%s) or httpRequestInitializer (%s) parameter should be not null",
-        credentials,
-        httpRequestInitializer);
-    // If credentials var is null then use httpRequestInitializer to initialize it, if possible
-    if (credentials == null && httpRequestInitializer instanceof RetryHttpInitializer) {
+    // If credentials var is null then use httpRequestInitializer to initialize it
+    if (credentials == null && httpRequestInitializer != null) {
+      checkArgument(
+          httpRequestInitializer instanceof RetryHttpInitializer,
+          "httpRequestInitializer (%s) should be an instance of RetryHttpInitializer for"
+              + " credentials initialization",
+          httpRequestInitializer.getClass());
       credentials = ((RetryHttpInitializer) httpRequestInitializer).getCredentials();
     }
     // If httpRequestInitializer var is null then use credentials to initialize it
@@ -367,12 +378,14 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                 httpStatistics, httpRequestInitializer, new EventLoggingHttpRequestInitializer())
             : new ChainingHttpRequestInitializer(httpStatistics, httpRequestInitializer);
 
-    HttpTransport httpTransport =
-        HttpTransportFactory.createHttpTransport(
-            options.getProxyAddress(),
-            options.getProxyUsername(),
-            options.getProxyPassword(),
-            Duration.ofMillis(options.getHttpRequestReadTimeout()));
+    if (httpTransport == null) {
+      httpTransport =
+          HttpTransportFactory.createHttpTransport(
+              options.getProxyAddress(),
+              options.getProxyUsername(),
+              options.getProxyPassword(),
+              Duration.ofMillis(options.getHttpRequestReadTimeout()));
+    }
     this.storage =
         new Storage.Builder(
                 httpTransport, GsonFactory.getDefaultInstance(), this.httpRequestInitializer)

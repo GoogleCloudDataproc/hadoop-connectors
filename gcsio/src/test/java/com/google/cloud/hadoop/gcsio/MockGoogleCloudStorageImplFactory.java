@@ -12,8 +12,9 @@
  * limitations under the License.
  */
 
-package com.google.cloud.hadoop.gcsio.testing;
+package com.google.cloud.hadoop.gcsio;
 
+import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.storage.Storage;
@@ -30,32 +31,31 @@ import java.io.IOException;
 
 public class MockGoogleCloudStorageImplFactory {
 
-  private static final String PROJECT_ID = "google.com:foo-project";
-
-  public static GoogleCloudStorageImpl mockedGcs(HttpTransport transport) {
+  public static GoogleCloudStorageImpl mockedGcs(HttpTransport transport) throws IOException {
     return mockedGcs(
         GoogleCloudStorageOptions.builder()
             .setAppName("gcsio-unit-test")
-            .setProjectId(PROJECT_ID)
+            .setProjectId("google.com:foo-project")
             .build(),
         transport);
   }
 
   public static GoogleCloudStorageImpl mockedGcs(
-      GoogleCloudStorageOptions options, HttpTransport transport) {
-    Storage storage =
-        new Storage(
-            transport,
-            GsonFactory.getDefaultInstance(),
-            new TrackingHttpRequestInitializer(
-                new RetryHttpInitializer(
-                    new FakeCredentials(),
-                    RetryHttpInitializerOptions.builder()
-                        .setDefaultUserAgent("gcs-io-unit-test")
-                        .build()),
-                false));
+      GoogleCloudStorageOptions options, HttpTransport transport) throws IOException {
+    return mockedGcs(options, transport, /* httpRequestInitializer= */ null);
+  }
+
+  public static GoogleCloudStorageImpl mockedGcs(
+      GoogleCloudStorageOptions options,
+      HttpTransport transport,
+      HttpRequestInitializer httpRequestInitializer)
+      throws IOException {
     return new GoogleCloudStorageImpl(
-        options, storage, null, GoogleCloudStorageImpl.tryGetCredentialsFromStorage(storage));
+        options,
+        new FakeCredentials(),
+        transport,
+        httpRequestInitializer,
+        /* downscopedAccessTokenFn= */ null);
   }
 
   public static GcsJavaClientImpl mockedJavaClientGcs(HttpTransport transport) throws IOException {
