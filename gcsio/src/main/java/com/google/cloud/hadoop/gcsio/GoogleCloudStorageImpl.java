@@ -267,6 +267,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // Function that generates downscoped access token.
   private final Function<List<AccessBoundary>, String> downscopedAccessTokenFn;
 
+  // Short username of current logged in user.
+  private String ugiUserName;
+
   // Watchdog to monitor gRPC streams
   private Watchdog watchdog;
 
@@ -350,6 +353,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
               this.storageOptions, this.backgroundTasksThreadPool, credentials);
     }
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
+
+    this.ugiUserName = getUgiUserName();
   }
 
   /**
@@ -2347,9 +2352,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
     if (storageOptions.isGcsAuditLogEnabled()
         && !storageOptions.getHttpRequestHeaders().containsKey(CUSTOM_AUDIT_USER_HEADER)) {
-      String user = getUgiUserName();
-      if (!user.isEmpty()) {
-        request.getRequestHeaders().set(CUSTOM_AUDIT_USER_HEADER, user);
+      if (!isNullOrEmpty(ugiUserName)) {
+        request.getRequestHeaders().set(CUSTOM_AUDIT_USER_HEADER, ugiUserName);
       }
     }
     return configureRequest(request, bucketName);
@@ -2458,6 +2462,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
       return ugi.getShortUserName();
     } catch (IOException e) {
+      logger.atInfo().log(
+          "Ignoring IOException; failure to fetch current user info");
       return null;
     }
   }
