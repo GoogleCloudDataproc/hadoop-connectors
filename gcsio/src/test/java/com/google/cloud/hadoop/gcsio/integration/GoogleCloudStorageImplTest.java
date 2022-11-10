@@ -26,6 +26,7 @@ import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHe
 import static com.google.common.truth.Truth.assertThat;
 import static java.lang.Math.ceil;
 import static java.util.stream.Collectors.toList;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.gcsio.AssertingLogHandler;
@@ -38,20 +39,28 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
+import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TrackingStorageWrapper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.cloud.hadoop.util.RetryHttpInitializer;
+import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.gson.internal.LinkedTreeMap;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -566,5 +575,44 @@ public class GoogleCloudStorageImplTest {
                             /* uploadId= */ i))
                 .collect(toList()))
         .build();
+  }
+
+  @Test
+  public void initializeRequest_withGcsAuditLogEnabled() throws IOException {
+    AssertingLogHandler jsonLogHander = new AssertingLogHandler();
+    Logger jsonTracingLogger =
+        jsonLogHander.getLoggerForClass(EventLoggingHttpRequestInitializer.class.getName());
+
+    try {
+
+      String ugiUser = UUID.randomUUID().toString();
+      UserGroupInformation ugi = UserGroupInformation.createRemoteUser(ugiUser);
+      UserGroupInformation.setLoginUser(ugi);
+      GoogleCloudStorage storage =
+          new GoogleCloudStorageImpl(
+              GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+                  .setGcsAuditLogEnabled(true)
+                  .setTraceLogEnabled(true)
+                  .build(),
+              GoogleCloudStorageTestHelper.getCredentials());
+
+      int expectedSize = 5 * 1024 * 1024;
+      StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+      writeObject(
+          storage, resourceId, /* partitionSize= */ expectedSize, /* partitionsCount= */ 1);
+
+      // 3 types of log records are present in the job handler
+      // 1. Geting the object - GET call
+      // 2. Starting object upload (First write call) - POST call
+      // 3. Writing the chunk (Handled by the library internally therefore does not carry the storage options we set for HTTP request, thererfore we get the audit logs at the initial step and not one for each chunk written) - PUT call
+      jsonLogHander.getAllLogRecords().stream().filter(logRecord -> !logRecord.get("request_method").equals("PUT")).collect(
+          Collectors.toList()).forEach(logRecord -> {
+            LinkedTreeMap<String, Object> requestHeaders = (LinkedTreeMap<String, Object>) logRecord.get("request_headers");
+            assertEquals(ugiUser, requestHeaders.get("x-goog-custom-audit-user"));
+      });
+
+    } finally {
+      jsonTracingLogger.removeHandler(jsonLogHander);
+    }
   }
 }
