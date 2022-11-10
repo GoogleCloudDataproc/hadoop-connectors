@@ -1,4 +1,6 @@
-### 2.1.9 - 2022-XX-XX
+# Release Notes
+
+## Next
 
 1.  Set socket read timeout (`fs.gs.http.read-timeout`) as early as possible on
     new sockets returned from the custom `SSLSocketFactory`. This guarantees the
