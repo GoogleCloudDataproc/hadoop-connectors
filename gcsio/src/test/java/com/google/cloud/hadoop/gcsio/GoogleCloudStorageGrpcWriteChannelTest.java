@@ -314,7 +314,6 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     writeChannel.close();
 
     StartResumableWriteRequest.Builder expectedRequestBuilder = START_REQUEST.toBuilder();
-    expectedRequestBuilder.getCommonRequestParamsBuilder().setUserProject("project-id");
     verify(fakeService, times(1)).startResumableWrite(eq(expectedRequestBuilder.build()), any());
     headerInterceptor.verifyAllRequestsHasGoogRequestParamsHeader(V1_BUCKET_NAME, 2);
   }

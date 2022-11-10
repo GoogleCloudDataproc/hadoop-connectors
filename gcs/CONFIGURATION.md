@@ -59,6 +59,10 @@
     If `true`, executes Cloud Storage object requests in `FileSystem`'s
     `listStatus` and `getFileStatus` methods in parallel to reduce latency.
 
+    Note that enabling this performance optimization can increase workload
+    execution cost due to the increased number of Cloud Storage `objects.get`
+    and `objects.list` requests.
+
 *   `fs.gs.lazy.init.enable` (default: `false`)
 
     Enables lazy initialization of `GoogleHadoopFileSystem` instances.
