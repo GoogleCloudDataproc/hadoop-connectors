@@ -354,10 +354,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
 
-    if((!storageOptions.getHttpRequestHeaders().containsKey(CUSTOM_AUDIT_USER_HEADER)) && storageOptions.isGcsAuditLogEnabled()) {
+    if ((!storageOptions.getHttpRequestHeaders().containsKey(CUSTOM_AUDIT_USER_HEADER))
+        && storageOptions.isGcsAuditLogEnabled()) {
       this.ugiUserName = getUgiUserName();
-    }
-    else {
+    } else {
       this.ugiUserName = null;
     }
   }
@@ -407,10 +407,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
 
-    if((!storageOptions.getHttpRequestHeaders().containsKey(CUSTOM_AUDIT_USER_HEADER)) && storageOptions.isGcsAuditLogEnabled()) {
+    if ((!storageOptions.getHttpRequestHeaders().containsKey(CUSTOM_AUDIT_USER_HEADER))
+        && storageOptions.isGcsAuditLogEnabled()) {
       this.ugiUserName = getUgiUserName();
-    }
-    else {
+    } else {
       this.ugiUserName = null;
     }
   }
@@ -2363,7 +2363,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       request.getRequestHeaders().setAuthorization("Bearer " + token);
     }
     if (!isNullOrEmpty(ugiUserName)) {
-        request.getRequestHeaders().set(CUSTOM_AUDIT_USER_HEADER, ugiUserName);
+      request.getRequestHeaders().set(CUSTOM_AUDIT_USER_HEADER, ugiUserName);
     }
     return configureRequest(request, bucketName);
   }
