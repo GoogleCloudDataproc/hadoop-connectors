@@ -354,7 +354,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
 
-    if(this.storageOptions.isGcsAuditLogEnabled()) {
+    if((!storageOptions.getHttpRequestHeaders().containsKey(CUSTOM_AUDIT_USER_HEADER)) && storageOptions.isGcsAuditLogEnabled()) {
       this.ugiUserName = getUgiUserName();
     }
   }
@@ -403,6 +403,10 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     createGrpcStubAndWatchdogIfEnabled(options, credentials);
 
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
+
+    if((!storageOptions.getHttpRequestHeaders().containsKey(CUSTOM_AUDIT_USER_HEADER)) && storageOptions.isGcsAuditLogEnabled()) {
+      this.ugiUserName = getUgiUserName();
+    }
   }
 
   private static Storage createStorage(
@@ -2352,11 +2356,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       String token = downscopedAccessTokenFn.apply(accessBoundaries);
       request.getRequestHeaders().setAuthorization("Bearer " + token);
     }
-    if (storageOptions.isGcsAuditLogEnabled()
-        && !storageOptions.getHttpRequestHeaders().containsKey(CUSTOM_AUDIT_USER_HEADER)) {
-      if (!isNullOrEmpty(ugiUserName)) {
+    if (!isNullOrEmpty(ugiUserName)) {
         request.getRequestHeaders().set(CUSTOM_AUDIT_USER_HEADER, ugiUserName);
-      }
     }
     return configureRequest(request, bucketName);
   }
@@ -2464,7 +2465,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
       return ugi.getShortUserName();
     } catch (IOException e) {
-      logger.atInfo().log(
+      logger.atWarning().withCause(e).log(
           "Ignoring IOException; failure to fetch current user info");
       return null;
     }
