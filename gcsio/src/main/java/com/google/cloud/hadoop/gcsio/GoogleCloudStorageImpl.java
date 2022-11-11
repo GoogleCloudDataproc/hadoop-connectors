@@ -119,7 +119,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   private static final String USER_PROJECT_FIELD_NAME = "userProject";
 
-  private static final String CUSTOM_AUDIT_USER_HEADER = "X-Goog-Custom-Audit-User";
+  public static final String CUSTOM_AUDIT_USER_HEADER = "X-Goog-Custom-Audit-User";
 
   private static final CreateObjectOptions EMPTY_OBJECT_CREATE_OPTIONS =
       CreateObjectOptions.DEFAULT_OVERWRITE.toBuilder()
@@ -354,7 +354,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
 
-    this.ugiUserName = getUgiUserName();
+    if(this.storageOptions.isGcsAuditLogEnabled()) {
+      this.ugiUserName = getUgiUserName();
+    }
   }
 
   /**

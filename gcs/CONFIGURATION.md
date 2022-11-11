@@ -131,6 +131,10 @@
     fs.gs.storage.http.headers.another-custom-header=another_custom_value
     ```
 
+*   `fs.gs.audit.logs.header.enable` (default: `false`)
+
+    Enables adding HTTP header `X-Goog-Custom-Audit-User=Value` to Cloud Storage API requests.
+
 ### Encryption ([CSEK](https://cloud.google.com/storage/docs/encryption/customer-supplied-keys))
 
 *   `fs.gs.encryption.algorithm` (not set by default)

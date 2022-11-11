@@ -39,12 +39,9 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
-import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TrackingStorageWrapper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
-import com.google.cloud.hadoop.util.RetryHttpInitializer;
-import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.gson.internal.LinkedTreeMap;
@@ -53,7 +50,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -601,14 +597,14 @@ public class GoogleCloudStorageImplTest {
       writeObject(
           storage, resourceId, /* partitionSize= */ expectedSize, /* partitionsCount= */ 1);
 
-      // 3 types of log records are present in the job handler
+      // 3 types of log records are present in the job log handler
       // 1. Geting the object - GET call
       // 2. Starting object upload (First write call) - POST call
       // 3. Writing the chunk (Handled by the library internally therefore does not carry the storage options we set for HTTP request, thererfore we get the audit logs at the initial step and not one for each chunk written) - PUT call
       jsonLogHander.getAllLogRecords().stream().filter(logRecord -> !logRecord.get("request_method").equals("PUT")).collect(
           Collectors.toList()).forEach(logRecord -> {
             LinkedTreeMap<String, Object> requestHeaders = (LinkedTreeMap<String, Object>) logRecord.get("request_headers");
-            assertEquals(ugiUser, requestHeaders.get("x-goog-custom-audit-user"));
+            assertEquals(ugiUser, requestHeaders.get(GoogleCloudStorageImpl.CUSTOM_AUDIT_USER_HEADER.toLowerCase()));
       });
 
     } finally {
