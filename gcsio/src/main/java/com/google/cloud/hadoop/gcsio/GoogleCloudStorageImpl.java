@@ -268,7 +268,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   private final Function<List<AccessBoundary>, String> downscopedAccessTokenFn;
 
   // Short username of current logged in user.
-  private String ugiUserName;
+  private final String ugiUserName;
 
   // Watchdog to monitor gRPC streams
   private Watchdog watchdog;
@@ -357,6 +357,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     if((!storageOptions.getHttpRequestHeaders().containsKey(CUSTOM_AUDIT_USER_HEADER)) && storageOptions.isGcsAuditLogEnabled()) {
       this.ugiUserName = getUgiUserName();
     }
+    else {
+      this.ugiUserName = null;
+    }
   }
 
   /**
@@ -406,6 +409,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     if((!storageOptions.getHttpRequestHeaders().containsKey(CUSTOM_AUDIT_USER_HEADER)) && storageOptions.isGcsAuditLogEnabled()) {
       this.ugiUserName = getUgiUserName();
+    }
+    else {
+      this.ugiUserName = null;
     }
   }
 
