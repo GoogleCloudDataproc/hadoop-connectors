@@ -15,8 +15,8 @@
   limitations under the License.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <name>BigDataOSS Parent</name>
@@ -117,6 +117,8 @@
     <junit.system-rules.version>1.19.0</junit.system-rules.version>
     <mockito.version>3.6.0</mockito.version>
     <guava.retrying.version>2.0.0</guava.retrying.version>
+    <deploy.skip>true</deploy.skip>
+    <nexus.remote.skip>false</nexus.remote.skip>
   </properties>
 
   <modules>
@@ -245,6 +247,18 @@
       <build>
         <plugins>
           <plugin>
+            <groupId>org.sonatype.plugins</groupId>
+            <artifactId>nexus-staging-maven-plugin</artifactId>
+            <version>1.6.7</version>
+            <extensions>true</extensions>
+            <configuration>
+              <serverId>ossrh</serverId>
+              <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+              <autoReleaseAfterClose>false</autoReleaseAfterClose>
+              <skipRemoteStaging>${nexus.remote.skip}</skipRemoteStaging>
+            </configuration>
+          </plugin>
+          <plugin>
             <artifactId>maven-gpg-plugin</artifactId>
             <executions>
               <execution>
@@ -255,6 +269,10 @@
                 </goals>
               </execution>
             </executions>
+            <configuration>
+              <!-- Expect the password to be passed as the gpg.passphrase property instead of provided over a tty by the gpg-agent process. -->
+              <useAgent>false</useAgent>
+            </configuration>
           </plugin>
           <plugin>
             <artifactId>maven-source-plugin</artifactId>
@@ -590,23 +608,30 @@
             </execution>
           </executions>
         </plugin>
-      <plugin>
-        <groupId>kr.motd.maven</groupId>
-        <artifactId>os-maven-plugin</artifactId>
-        <version>1.6.2</version>
-        <executions>
-          <execution>
-            <phase>initialize</phase>
-            <goals>
-              <goal>detect</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
+        <plugin>
+          <groupId>kr.motd.maven</groupId>
+          <artifactId>os-maven-plugin</artifactId>
+          <version>1.6.2</version>
+          <executions>
+            <execution>
+              <phase>initialize</phase>
+              <goals>
+                <goal>detect</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
         <plugin>
           <groupId>org.xolstice.maven.plugins</groupId>
           <artifactId>protobuf-maven-plugin</artifactId>
           <version>0.6.1</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-deploy-plugin</artifactId>
+          <configuration>
+            <skip>${deploy.skip}</skip>
+          </configuration>
         </plugin>
       </plugins>
     </pluginManagement>
