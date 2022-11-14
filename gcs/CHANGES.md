@@ -82,6 +82,8 @@
 1.  The Google Cloud Storage Connector now can be used as a
     [Hadoop Credential Provider](https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/CredentialProviderAPI.html).
 
+1.  Added dependency on new storage client library: [google-cloud-storage](https://github.com/googleapis/java-storage/tree/main/google-cloud-storage).
+
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.

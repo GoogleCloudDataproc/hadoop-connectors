@@ -274,7 +274,7 @@
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>google-cloud-storage-bom</artifactId>
-        <version>2.14.0</version>
+        <version>${google.cloud-storage.bom.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>

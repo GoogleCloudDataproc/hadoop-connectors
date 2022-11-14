@@ -239,6 +239,7 @@
                     <include>com.google.api.gax.**</include>
                     <include>com.google.auth.**</include>
                     <include>com.google.cloud.audit.**</include>
+                    <include>com.google.cloud.storage.**</include>
                     <include>com.google.cloud.hadoop.gcsio.**</include>
                     <include>com.google.cloud.hadoop.util.**</include>
                     <include>com.google.common.**</include>
