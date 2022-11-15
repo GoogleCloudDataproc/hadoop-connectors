@@ -355,7 +355,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
 
     this.ugiUserName = getUgiUserName();
-
   }
 
   /**
