@@ -82,6 +82,8 @@
     fs.gs.grpc.read.zerocopy.enable (default : true)
     ```
 
+1.  Added dependency on new storage client library: [google-cloud-storage](https://github.com/googleapis/java-storage/tree/main/google-cloud-storage).
+
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.
