@@ -58,8 +58,7 @@ public class GCSVeneerIntegrationTest {
 
   private static GoogleCloudStorage helperGcs;
 
-  @Rule
-  public TestName name = new TestName();
+  @Rule public TestName name = new TestName();
 
   @BeforeClass
   public static void beforeAll() throws IOException {
@@ -82,8 +81,7 @@ public class GCSVeneerIntegrationTest {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
     writeObject(helperGcs, resourceId, /* partitionSize= */ expectedSize, /* partitionsCount= */ 1);
 
-    TrackingStorageWrapper<GCSVeneerImpl> trackingGcs =
-        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+    TrackingStorageWrapper<GCSVeneerImpl> trackingGcs = newTrackingGoogleCloudStorage(GCS_OPTIONS);
 
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
@@ -109,8 +107,7 @@ public class GCSVeneerIntegrationTest {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
     writeObject(helperGcs, resourceId, /* partitionSize= */ expectedSize, /* partitionsCount= */ 1);
 
-    TrackingStorageWrapper<GCSVeneerImpl> trackingGcs =
-        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+    TrackingStorageWrapper<GCSVeneerImpl> trackingGcs = newTrackingGoogleCloudStorage(GCS_OPTIONS);
 
     GoogleCloudStorageItemInfo itemInfo = helperGcs.getItemInfo(resourceId);
 
@@ -228,13 +225,11 @@ public class GCSVeneerIntegrationTest {
   @Test
   public void conflictingWrites_noOverwrite_lastFails() throws IOException {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
-    TrackingStorageWrapper<GCSVeneerImpl> trackingGcs =
-        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+    TrackingStorageWrapper<GCSVeneerImpl> trackingGcs = newTrackingGoogleCloudStorage(GCS_OPTIONS);
     // Have separate request tracker for channels as clubbing them into one will cause flakiness
     // while asserting the order or requests.
 
-    TrackingStorageWrapper<GCSVeneerImpl> trackingGcs2 =
-        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+    TrackingStorageWrapper<GCSVeneerImpl> trackingGcs2 = newTrackingGoogleCloudStorage(GCS_OPTIONS);
 
     byte[] bytesToWrite = new byte[1024];
     GoogleCloudStorageTestHelper.fillBytes(bytesToWrite);
@@ -296,8 +291,7 @@ public class GCSVeneerIntegrationTest {
   public void create_doesNotRepairImplicitDirectories() throws IOException {
     String testDirectory = name.getMethodName();
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, testDirectory + "/obj");
-    TrackingStorageWrapper<GCSVeneerImpl> trackingGcs =
-        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+    TrackingStorageWrapper<GCSVeneerImpl> trackingGcs = newTrackingGoogleCloudStorage(GCS_OPTIONS);
 
     trackingGcs.delegate.createEmptyObject(resourceId);
 
@@ -331,8 +325,7 @@ public class GCSVeneerIntegrationTest {
     StorageResourceId resourceId3 =
         new StorageResourceId(TEST_BUCKET, name.getMethodName() + "obj3");
 
-    TrackingStorageWrapper<GCSVeneerImpl> trackingGcs =
-        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+    TrackingStorageWrapper<GCSVeneerImpl> trackingGcs = newTrackingGoogleCloudStorage(GCS_OPTIONS);
 
     trackingGcs.delegate.createEmptyObject(
         resourceId1, CreateObjectOptions.builder().setContentType("text/plain").build());
@@ -344,9 +337,9 @@ public class GCSVeneerIntegrationTest {
     trackingGcs.delegate.create(resourceId3).close();
 
     assertThat(
-        helperGcs.getItemInfos(ImmutableList.of(resourceId1, resourceId2, resourceId3)).stream()
-            .map(GoogleCloudStorageItemInfo::getContentType)
-            .toArray())
+            helperGcs.getItemInfos(ImmutableList.of(resourceId1, resourceId2, resourceId3)).stream()
+                .map(GoogleCloudStorageItemInfo::getContentType)
+                .toArray())
         .asList()
         .containsExactly("text/plain", "image/png", "application/octet-stream")
         .inOrder();
@@ -447,8 +440,7 @@ public class GCSVeneerIntegrationTest {
   @Test
   public void create_gcsItemInfo_metadataEquals() throws IOException {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
-    TrackingStorageWrapper<GCSVeneerImpl> trackingGcs =
-        newTrackingGoogleCloudStorage(GCS_OPTIONS);
+    TrackingStorageWrapper<GCSVeneerImpl> trackingGcs = newTrackingGoogleCloudStorage(GCS_OPTIONS);
 
     Map<String, byte[]> expectedMetadata =
         ImmutableMap.of(
@@ -521,8 +513,7 @@ public class GCSVeneerIntegrationTest {
   private static TrackingStorageWrapper<GCSVeneerImpl> newTrackingGoogleCloudStorage(
       GoogleCloudStorageOptions options) throws IOException {
     return new TrackingStorageWrapper<>(
-        options,
-        httpRequestInitializer -> new GCSVeneerImpl(options, httpRequestInitializer));
+        options, httpRequestInitializer -> new GCSVeneerImpl(options, httpRequestInitializer));
   }
 
   private static GoogleCloudStorageOptions getOptionsWithUploadChunk(int uploadChunk) {
