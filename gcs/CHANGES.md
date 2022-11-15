@@ -84,6 +84,12 @@
 
 1.  Added dependency on new storage client library: [google-cloud-storage](https://github.com/googleapis/java-storage/tree/main/google-cloud-storage).
 
+1.  Added support for setting HTTP header `X-Goog-Custom-Audit-User=Value` in Cloud Storage API requests
+
+    ```properties
+    fs.gs.audit.logs.header.enable (default: false)
+    ```
+
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.

@@ -575,26 +575,50 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void initializeRequest_withGcsAuditLogEnabled() throws IOException {
+    String ugiUser = UUID.randomUUID().toString();
+    UserGroupInformation ugi = UserGroupInformation.createRemoteUser(ugiUser);
+    UserGroupInformation.setLoginUser(ugi);
+    GoogleCloudStorage googleCloudStorage =
+        new GoogleCloudStorageImpl(
+            GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+                .setGcsAuditLogEnabled(true)
+                .setTraceLogEnabled(true)
+                .build(),
+            GoogleCloudStorageTestHelper.getCredentials());
+    addAuditLogs(googleCloudStorage, ugiUser);
+  }
+
+  @Test
+  public void initializeRequest_withUserHeaderAlreadySet_doesNotOverrideCurrentLoggedInUser()
+      throws IOException {
+    String testUser = "test_user";
+    GoogleCloudStorage googleCloudStorage =
+        new GoogleCloudStorageImpl(
+            GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+                .setGcsAuditLogEnabled(true)
+                .setHttpRequestHeaders(
+                    Map.of(GoogleCloudStorageImpl.CUSTOM_AUDIT_USER_HEADER, testUser))
+                .setTraceLogEnabled(true)
+                .build(),
+            GoogleCloudStorageTestHelper.getCredentials());
+    addAuditLogs(googleCloudStorage, testUser);
+  }
+
+  private void addAuditLogs(GoogleCloudStorage googleCloudStorage, String expectedUserId)
+      throws IOException {
     AssertingLogHandler jsonLogHander = new AssertingLogHandler();
     Logger jsonTracingLogger =
         jsonLogHander.getLoggerForClass(EventLoggingHttpRequestInitializer.class.getName());
 
     try {
 
-      String ugiUser = UUID.randomUUID().toString();
-      UserGroupInformation ugi = UserGroupInformation.createRemoteUser(ugiUser);
-      UserGroupInformation.setLoginUser(ugi);
-      GoogleCloudStorage storage =
-          new GoogleCloudStorageImpl(
-              GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-                  .setGcsAuditLogEnabled(true)
-                  .setTraceLogEnabled(true)
-                  .build(),
-              GoogleCloudStorageTestHelper.getCredentials());
-
       int expectedSize = 5 * 1024 * 1024;
       StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
-      writeObject(storage, resourceId, /* partitionSize= */ expectedSize, /* partitionsCount= */ 1);
+      writeObject(
+          googleCloudStorage,
+          resourceId,
+          /* partitionSize= */ expectedSize,
+          /* partitionsCount= */ 1);
 
       // 3 types of log records are present in the job log handler
       // 1. Geting the object - GET call
@@ -610,7 +634,7 @@ public class GoogleCloudStorageImplTest {
                 LinkedTreeMap<String, Object> requestHeaders =
                     (LinkedTreeMap<String, Object>) logRecord.get("request_headers");
                 assertEquals(
-                    ugiUser,
+                    expectedUserId,
                     requestHeaders.get(
                         GoogleCloudStorageImpl.CUSTOM_AUDIT_USER_HEADER.toLowerCase()));
               });
