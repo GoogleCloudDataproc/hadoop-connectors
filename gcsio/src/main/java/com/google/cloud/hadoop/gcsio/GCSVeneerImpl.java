@@ -2,7 +2,6 @@ package com.google.cloud.hadoop.gcsio;
 
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.services.storage.Storage;
-import com.google.auth.Credentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
@@ -24,24 +23,10 @@ public class GCSVeneerImpl implements GoogleCloudStorage {
    */
   private GoogleCloudStorageImpl oldGCSClient;
 
-  public GCSVeneerImpl(GoogleCloudStorageOptions options, Credentials credentials)
-      throws IOException {
-    oldGCSClient = new GoogleCloudStorageImpl(options, credentials, null);
-  }
-
   public GCSVeneerImpl(
       GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer)
       throws IOException {
     oldGCSClient = new GoogleCloudStorageImpl(options, httpRequestInitializer);
-  }
-
-  public GCSVeneerImpl(
-      GoogleCloudStorageOptions options,
-      HttpRequestInitializer httpRequestInitializer,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
-      throws IOException {
-    oldGCSClient =
-        new GoogleCloudStorageImpl(options, httpRequestInitializer, downscopedAccessTokenFn);
   }
 
   public GCSVeneerImpl(
@@ -55,14 +40,6 @@ public class GCSVeneerImpl implements GoogleCloudStorage {
       Storage storage,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
     oldGCSClient = new GoogleCloudStorageImpl(options, storage, downscopedAccessTokenFn);
-  }
-
-  public GCSVeneerImpl(
-      GoogleCloudStorageOptions options,
-      Credentials credentials,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
-      throws IOException {
-    oldGCSClient = new GoogleCloudStorageImpl(options, credentials, downscopedAccessTokenFn);
   }
 
   @Override
