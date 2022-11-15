@@ -1,8 +1,10 @@
 package com.google.cloud.hadoop.gcsio;
 
 import com.google.api.client.http.HttpRequestInitializer;
+import com.google.api.services.storage.Storage;
 import com.google.auth.Credentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
@@ -45,6 +47,14 @@ public class GCSVeneerImpl implements GoogleCloudStorage {
   public GCSVeneerImpl(
       GoogleCloudStorageOptions options, com.google.api.services.storage.Storage storage) {
     oldGCSClient = new GoogleCloudStorageImpl(options, storage);
+  }
+
+  @VisibleForTesting
+  public GCSVeneerImpl(
+      GoogleCloudStorageOptions options,
+      Storage storage,
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
+    oldGCSClient = new GoogleCloudStorageImpl(options, storage, downscopedAccessTokenFn);
   }
 
   public GCSVeneerImpl(

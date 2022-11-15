@@ -304,8 +304,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    */
   @SuppressWarnings("CheckReturnValue")
   @VisibleForTesting
-  public GoogleCloudStorageImpl(
-      GoogleCloudStorageOptions options, com.google.api.services.storage.Storage storage) {
+  public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Storage storage) {
     this(options, storage, null, tryGetCredentialsFromStorage(storage));
     warnIfTracingEnabled(storageOptions.isTraceLogEnabled());
   }
