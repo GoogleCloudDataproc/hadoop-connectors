@@ -354,12 +354,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     }
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
 
-    if ((!storageOptions.getHttpRequestHeaders().containsKey(CUSTOM_AUDIT_USER_HEADER))
-        && storageOptions.isGcsAuditLogEnabled()) {
-      this.ugiUserName = getUgiUserName();
-    } else {
-      this.ugiUserName = null;
-    }
+    this.ugiUserName = getUgiUserName();
+
   }
 
   /**
@@ -407,12 +403,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
 
-    if ((!storageOptions.getHttpRequestHeaders().containsKey(CUSTOM_AUDIT_USER_HEADER))
-        && storageOptions.isGcsAuditLogEnabled()) {
-      this.ugiUserName = getUgiUserName();
-    } else {
-      this.ugiUserName = null;
-    }
+    this.ugiUserName = getUgiUserName();
   }
 
   private static Storage createStorage(
@@ -2466,7 +2457,15 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         .collect(toImmutableMap(Map.Entry::getKey, e -> e.getValue().get()));
   }
 
-  private static String getUgiUserName() {
+  private String getUgiUserName() {
+    if ((!storageOptions.getHttpRequestHeaders().containsKey(CUSTOM_AUDIT_USER_HEADER))
+        && storageOptions.isGcsAuditLogEnabled()) {
+      return getCurrentLoggedInUser();
+    }
+    return null;
+  }
+
+  private static String getCurrentLoggedInUser() {
     try {
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
       return ugi.getShortUserName();
