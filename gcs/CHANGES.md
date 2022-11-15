@@ -2,6 +2,8 @@
 
 ## Next
 
+1.  Added dependency on new storage client library: [google-cloud-storage](https://github.com/googleapis/java-storage/tree/main/google-cloud-storage).
+
 ## 2.2.10 - 2022-12-11
 
 1. Update dependencies to latest version
