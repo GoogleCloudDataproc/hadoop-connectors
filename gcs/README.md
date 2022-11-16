@@ -9,6 +9,7 @@ file system.
 
 ## Benefits of using the connector
 
+
 Choosing Cloud Storage alongside the
 [Hadoop Distributed File System (HDFS)](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/HdfsUserGuide.html)
 has several benefits:

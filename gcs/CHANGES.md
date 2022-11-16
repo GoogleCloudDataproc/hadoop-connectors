@@ -2,6 +2,8 @@
 
 ## Next
 
+## 2.1.9 - 2022-11-14
+
 1.  Set socket read timeout (`fs.gs.http.read-timeout`) as early as possible on
     new sockets returned from the custom `SSLSocketFactory`. This guarantees the
     timeout is enforced during TLS handshakes when using Conscrypt as the
