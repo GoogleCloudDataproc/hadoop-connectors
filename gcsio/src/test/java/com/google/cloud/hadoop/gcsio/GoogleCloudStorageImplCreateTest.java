@@ -58,7 +58,6 @@ public class GoogleCloudStorageImplCreateTest {
   private static final String BUCKET_NAME = "foo-bucket";
   private static final String OBJECT_NAME = "bar-object";
 
-
   private final boolean manualClientEnabled;
 
   public GoogleCloudStorageImplCreateTest(boolean manualClientEnabled) {
@@ -214,7 +213,7 @@ public class GoogleCloudStorageImplCreateTest {
   }
 
   private GoogleCloudStorage getCloudStorageImpl(HttpTransport transport) {
-    if(manualClientEnabled) {
+    if (manualClientEnabled) {
       return mockedManualGcs(transport);
     }
     return mockedGcs(transport);
