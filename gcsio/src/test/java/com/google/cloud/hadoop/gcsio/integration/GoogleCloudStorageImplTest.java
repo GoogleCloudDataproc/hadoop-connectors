@@ -86,7 +86,15 @@ public class GoogleCloudStorageImplTest {
     return List.of(false, true);
   }
 
-  @Rule public TestName name = new TestName();
+  @Rule
+  public TestName name =
+      new TestName() {
+        // With parametrization method name will get [index] appended in their name.
+        @Override
+        public String getMethodName() {
+          return super.getMethodName().replaceAll("[\\[,\\]]", "_");
+        }
+      };
 
   @BeforeClass
   public static void beforeAll() throws IOException {
