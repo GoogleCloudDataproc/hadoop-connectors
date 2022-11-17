@@ -281,11 +281,10 @@ public class GoogleCloudStorageTestHelper {
      * @return An unique bucket name with specified prefix and suffix.
      */
     public String getUniqueBucketName(String suffix) {
-      String randomSuffix = UUID.randomUUID().toString().substring(0, 4);
       checkArgument(
-          bucketPrefix.length() + suffix.length() + randomSuffix.length() <= 48,
+          bucketPrefix.length() + suffix.length() <= 48,
           "bucketPrefix and suffix can have cumulative length upto 48 chars to limit bucket name to 63 chars");
-      return uniqueBucketPrefix + DELIMITER + suffix + DELIMITER + randomSuffix;
+      return uniqueBucketPrefix + DELIMITER + suffix;
     }
 
     public String getUniqueBucketPrefix() {

@@ -93,7 +93,7 @@ public class GoogleCloudStorageImplTest {
         // With parametrization method name will get [index] appended in their name.
         @Override
         public String getMethodName() {
-          return super.getMethodName().replaceAll("[\\[,\\]]", "_");
+          return super.getMethodName().replaceAll("[\\[,\\]]", "");
         }
       };
 
@@ -429,7 +429,7 @@ public class GoogleCloudStorageImplTest {
     StorageResourceId resourceId =
         new StorageResourceId(srcBucketName, name.getMethodName() + "_src");
 
-    String dstBucketName = BUCKET_HELPER.getUniqueBucketName("copy-with-rewrite-dst");
+    String dstBucketName = BUCKET_HELPER.getUniqueBucketName(name.getMethodName().toLowerCase());
     // Create destination bucket with different storage class,
     // because this is supported only by rewrite but not copy requests
     helperGcs.createBucket(
