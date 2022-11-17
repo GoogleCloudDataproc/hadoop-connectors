@@ -1,6 +1,5 @@
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.testing.MockGoogleCloudStorageImplFactory.mockedGcs;
 import static com.google.cloud.hadoop.gcsio.testing.MockGoogleCloudStorageImplFactory.mockedGcsVeneer;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.arbitraryInputStreamSupplier;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.inputStreamResponse;
@@ -35,7 +34,7 @@ import org.junit.runners.JUnit4;
 
 /** Tests that require a particular configuration of GoogleCloudStorageImpl. */
 @RunWith(JUnit4.class)
-public class GCSVeneerImplTest {
+public class GCSManualClientImplTest {
 
   private static final String BUCKET_NAME = "foo-bucket";
   private static final String OBJECT_NAME = "bar-object";
@@ -55,7 +54,7 @@ public class GCSVeneerImplTest {
                 CONTENT_LENGTH,
                 /* headerValue = */ 1,
                 new ThrowingInputStream(/* readException = */ null, fakeError)));
-    GoogleCloudStorageImpl gcs = mockedGcs(transport);
+    GCSManualClientImpl gcs = mockedGcsVeneer(transport);
 
     WritableByteChannel writeChannel = gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
     assertThat(writeChannel.isOpen()).isTrue();

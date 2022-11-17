@@ -192,10 +192,7 @@ public class GoogleCloudStorageImplTest {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
 
     int uploadChunkSize = 1024 * 1024;
-    GoogleCloudStorageImpl gcs =
-        new GoogleCloudStorageImpl(
-            getOptionsWithUploadChunk(uploadChunkSize),
-            GoogleCloudStorageTestHelper.getCredentials());
+    GoogleCloudStorage gcs = getStorageFromOptions(getOptionsWithUploadChunk(uploadChunkSize));
 
     byte[] partition = writeObject(gcs, resourceId, /* objectSize= */ 5 * uploadChunkSize);
 
@@ -529,22 +526,23 @@ public class GoogleCloudStorageImplTest {
         jsonLogHander.getLoggerForClass(EventLoggingHttpRequestInitializer.class.getName());
 
     try {
-      GoogleCloudStorage storage =
-          new GoogleCloudStorageImpl(
-              GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-                  .setTraceLogEnabled(traceLogEnabled)
-                  .build(),
-              GoogleCloudStorageTestHelper.getCredentials());
+
+      TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+          newTrackingGoogleCloudStorage(
+              getStandardOptionBuilder().setTraceLogEnabled(traceLogEnabled).build());
 
       int expectedSize = 5 * 1024 * 1024;
       StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
       byte[] writtenData =
           writeObject(
-              storage, resourceId, /* partitionSize= */ expectedSize, /* partitionsCount= */ 1);
+              trackingGcs.delegate,
+              resourceId,
+              /* partitionSize= */ expectedSize,
+              /* partitionsCount= */ 1);
 
       jsonLogHander.assertLogCount(expectedAfterWrite);
 
-      assertObjectContent(storage, resourceId, writtenData);
+      assertObjectContent(trackingGcs.delegate, resourceId, writtenData);
 
       jsonLogHander.assertLogCount(expectedAfterRead);
       jsonLogHander.verifyJsonLogFields(TEST_BUCKET, name.getMethodName());
@@ -563,6 +561,16 @@ public class GoogleCloudStorageImplTest {
     return new TrackingStorageWrapper<>(
         options,
         httpRequestInitializer -> new GoogleCloudStorageImpl(options, httpRequestInitializer));
+  }
+
+  private GoogleCloudStorage getStorageFromOptions(GoogleCloudStorageOptions storageOptions)
+      throws IOException {
+    GoogleCloudStorage storageImpl;
+    if (manualClientEnabled) {
+      return new GCSManualClientImpl(storageOptions, GoogleCloudStorageTestHelper.getCredentials());
+    }
+    return new GoogleCloudStorageImpl(
+        storageOptions, GoogleCloudStorageTestHelper.getCredentials());
   }
 
   private static GoogleCloudStorageOptions getOptionsWithUploadChunk(int uploadChunk) {

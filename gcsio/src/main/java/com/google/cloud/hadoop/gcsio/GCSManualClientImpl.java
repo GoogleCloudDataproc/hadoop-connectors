@@ -2,6 +2,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.services.storage.Storage;
+import com.google.auth.Credentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
@@ -32,6 +33,11 @@ public class GCSManualClientImpl implements GoogleCloudStorage {
   public GCSManualClientImpl(
       GoogleCloudStorageOptions options, com.google.api.services.storage.Storage storage) {
     gcsClientDelegate = new GoogleCloudStorageImpl(options, storage);
+  }
+
+  public GCSManualClientImpl(GoogleCloudStorageOptions options, Credentials credentials)
+      throws IOException {
+    gcsClientDelegate = new GoogleCloudStorageImpl(options, credentials);
   }
 
   @VisibleForTesting
