@@ -28,11 +28,12 @@ import static java.lang.Math.ceil;
 import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
+import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.AssertingLogHandler;
 import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.EventLoggingHttpRequestInitializer;
-import com.google.cloud.hadoop.gcsio.GCSManualClientImpl;
+import com.google.cloud.hadoop.gcsio.GCSManualClientImpl.GCSManualClientImplBuilder;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
@@ -553,21 +554,29 @@ public class GoogleCloudStorageImplTest {
 
   private TrackingStorageWrapper<GoogleCloudStorage> newTrackingGoogleCloudStorage(
       GoogleCloudStorageOptions options) throws IOException {
+    Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
     if (manualClientEnabled) {
       return new TrackingStorageWrapper<>(
           options,
-          httpRequestInitializer -> new GCSManualClientImpl(options, httpRequestInitializer));
+          httpRequestInitializer ->
+              new GCSManualClientImplBuilder(options, credentials, null)
+                  .withHttpRequestInitializer(httpRequestInitializer)
+                  .build(),
+          credentials);
     }
     return new TrackingStorageWrapper<>(
         options,
-        httpRequestInitializer -> new GoogleCloudStorageImpl(options, httpRequestInitializer));
+        httpRequestInitializer -> new GoogleCloudStorageImpl(options, httpRequestInitializer),
+        credentials);
   }
 
   private GoogleCloudStorage getStorageFromOptions(GoogleCloudStorageOptions storageOptions)
       throws IOException {
     GoogleCloudStorage storageImpl;
     if (manualClientEnabled) {
-      return new GCSManualClientImpl(storageOptions, GoogleCloudStorageTestHelper.getCredentials());
+      return new GCSManualClientImplBuilder(
+              storageOptions, GoogleCloudStorageTestHelper.getCredentials(), null)
+          .build();
     }
     return new GoogleCloudStorageImpl(
         storageOptions, GoogleCloudStorageTestHelper.getCredentials());

@@ -395,7 +395,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
   }
 
-  private static Storage createStorage(
+  public static Storage createStorage(
       GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer)
       throws IOException {
     HttpTransport httpTransport =
@@ -892,7 +892,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         new RetryHttpInitializer(credentials, options.toRetryHttpInitializerOptions()));
   }
 
-  private static Credentials tryGetCredentialsFromStorage(Storage storage) {
+  public static Credentials tryGetCredentialsFromStorage(Storage storage) {
     HttpRequestFactory requestFactory = storage.getRequestFactory();
     if (requestFactory == null) {
       return null;
@@ -911,7 +911,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         httpRequestInitializer, new EventLoggingHttpRequestInitializer());
   }
 
-  private static Credentials tryGetCredentialsFromRequestInitializer(
+  public static Credentials tryGetCredentialsFromRequestInitializer(
       HttpRequestInitializer httpRequestInitializer) {
     if (httpRequestInitializer instanceof RetryHttpInitializer) {
       return ((RetryHttpInitializer) httpRequestInitializer).getCredentials();

@@ -212,7 +212,7 @@ public class GoogleCloudStorageImplCreateTest {
         .isTrue();
   }
 
-  private GoogleCloudStorage getCloudStorageImpl(HttpTransport transport) {
+  private GoogleCloudStorage getCloudStorageImpl(HttpTransport transport) throws IOException {
     if (manualClientEnabled) {
       return mockedManualGcs(transport);
     }

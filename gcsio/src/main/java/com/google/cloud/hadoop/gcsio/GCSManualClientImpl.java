@@ -1,10 +1,12 @@
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.google.api.client.http.HttpRequestInitializer;
-import com.google.api.services.storage.Storage;
 import com.google.auth.Credentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.flogger.GoogleLogger;
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
@@ -18,34 +20,31 @@ import java.util.function.Function;
  * the appropriate API call(s) google-cloud-storage client.
  */
 public class GCSManualClientImpl implements GoogleCloudStorage {
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   /**
    * Having an instance of gscImpl to redirect calls to Json client while new client implementation
    * is in WIP.
    */
   private GoogleCloudStorageImpl gcsClientDelegate;
 
-  public GCSManualClientImpl(
-      GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer)
-      throws IOException {
-    gcsClientDelegate = new GoogleCloudStorageImpl(options, httpRequestInitializer);
-  }
+  private GoogleCloudStorageOptions storageOptions;
+  private Credentials credentials;
 
-  public GCSManualClientImpl(
-      GoogleCloudStorageOptions options, com.google.api.services.storage.Storage storage) {
-    gcsClientDelegate = new GoogleCloudStorageImpl(options, storage);
-  }
+  public GCSManualClientImpl(GCSManualClientImplBuilder builder) throws IOException {
+    this.storageOptions = checkNotNull(builder.storageOptions, "options must not be null");
+    this.credentials = checkNotNull(builder.credentials, "credentials must not be null");
 
-  public GCSManualClientImpl(GoogleCloudStorageOptions options, Credentials credentials)
-      throws IOException {
-    gcsClientDelegate = new GoogleCloudStorageImpl(options, credentials);
-  }
-
-  @VisibleForTesting
-  public GCSManualClientImpl(
-      GoogleCloudStorageOptions options,
-      Storage storage,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
-    gcsClientDelegate = new GoogleCloudStorageImpl(options, storage, downscopedAccessTokenFn);
+    if (builder.httpRequestInitializer != null) {
+      logger.atWarning().log(
+          "Overriding httpRequestInitializer. ALERT: Should not be hit in production");
+      gcsClientDelegate =
+          new GoogleCloudStorageImpl(storageOptions, builder.httpRequestInitializer);
+    } else if (builder.storage != null) {
+      logger.atWarning().log("Overriding storage. ALERT: Should not be hit in production");
+      gcsClientDelegate = new GoogleCloudStorageImpl(storageOptions, builder.storage);
+    } else {
+      gcsClientDelegate = new GoogleCloudStorageImpl(storageOptions, credentials);
+    }
   }
 
   @Override
@@ -183,5 +182,41 @@ public class GCSManualClientImpl implements GoogleCloudStorage {
   @Override
   public void close() {
     gcsClientDelegate.close();
+  }
+
+  public static class GCSManualClientImplBuilder {
+
+    private Credentials credentials;
+    private com.google.api.services.storage.Storage storage;
+    private HttpRequestInitializer httpRequestInitializer;
+    private GoogleCloudStorageOptions storageOptions;
+    private Function<List<AccessBoundary>, String> downscopedAccessTokenFn;
+
+    public GCSManualClientImplBuilder(
+        GoogleCloudStorageOptions storageOptions,
+        Credentials credentials,
+        Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
+      this.storageOptions = storageOptions;
+      this.credentials = credentials;
+      this.downscopedAccessTokenFn = downscopedAccessTokenFn;
+    }
+
+    @VisibleForTesting
+    public GCSManualClientImplBuilder withApairyClientStorage(
+        com.google.api.services.storage.Storage storage) {
+      this.storage = storage;
+      return this;
+    }
+
+    @VisibleForTesting
+    public GCSManualClientImplBuilder withHttpRequestInitializer(
+        HttpRequestInitializer httpRequestInitializer) {
+      this.httpRequestInitializer = httpRequestInitializer;
+      return this;
+    }
+
+    public GCSManualClientImpl build() throws IOException {
+      return new GCSManualClientImpl(this);
+    }
   }
 }
