@@ -687,7 +687,7 @@ public class GoogleCloudStorageNewIntegrationTest {
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
     GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
 
-    String testBucket = gcsfsIHelper.createUniqueBucket("lst-objs_incl-pfx_empty-bckt");
+    String testBucket = gcsfsIHelper.createUniqueBucket("lst-objs_incl-pfx_empty");
 
     List<GoogleCloudStorageItemInfo> listedObjects =
         gcs.listObjectInfo(testBucket, /* objectNamePrefix= */ null, INCLUDE_PREFIX_LIST_OPTIONS);
@@ -705,7 +705,7 @@ public class GoogleCloudStorageNewIntegrationTest {
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
     GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
 
-    String testBucket = gcsfsIHelper.createUniqueBucket("lst-objs_incl-pfx_obj-in-bckt");
+    String testBucket = gcsfsIHelper.createUniqueBucket("lst-objs_incl-pfx_obj-in");
     gcsfsIHelper.createObjects(testBucket, "obj");
 
     List<GoogleCloudStorageItemInfo> listedObjects =
@@ -724,7 +724,7 @@ public class GoogleCloudStorageNewIntegrationTest {
         new TrackingHttpRequestInitializer(httpRequestsInitializer);
     GoogleCloudStorage gcs = new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker);
 
-    String testBucket = gcsfsIHelper.createUniqueBucket("lst-objs_incl-pfx_impl-dir-in-bckt");
+    String testBucket = gcsfsIHelper.createUniqueBucket("lst-obj_incl-pfx_impl-dir");
     gcsfsIHelper.createObjects(testBucket, "implDir/obj");
 
     List<GoogleCloudStorageItemInfo> listedObjects =

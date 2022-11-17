@@ -1,6 +1,6 @@
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.testing.MockGoogleCloudStorageImplFactory.mockedGcsVeneer;
+import static com.google.cloud.hadoop.gcsio.testing.MockGoogleCloudStorageImplFactory.mockedManualGcs;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.arbitraryInputStreamSupplier;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.inputStreamResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonErrorResponse;
@@ -54,7 +54,7 @@ public class GCSManualClientImplTest {
                 CONTENT_LENGTH,
                 /* headerValue = */ 1,
                 new ThrowingInputStream(/* readException = */ null, fakeError)));
-    GCSManualClientImpl gcs = mockedGcsVeneer(transport);
+    GoogleCloudStorage gcs = mockedManualGcs(transport);
 
     WritableByteChannel writeChannel = gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
     assertThat(writeChannel.isOpen()).isTrue();
@@ -78,7 +78,7 @@ public class GCSManualClientImplTest {
                 CONTENT_LENGTH,
                 /* headerValue = */ 1,
                 new ThrowingInputStream(/* readException = */ null, fakeException)));
-    GCSManualClientImpl gcs = mockedGcsVeneer(transport);
+    GoogleCloudStorage gcs = mockedManualGcs(transport);
 
     WritableByteChannel writeChannel = gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
     assertThat(writeChannel.isOpen()).isTrue();
@@ -113,7 +113,7 @@ public class GCSManualClientImplTest {
                   }
                   return null;
                 }));
-    GCSManualClientImpl gcs = mockedGcsVeneer(transport);
+    GoogleCloudStorage gcs = mockedManualGcs(transport);
 
     WritableByteChannel writeChannel = gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
     assertThat(writeChannel.isOpen()).isTrue();

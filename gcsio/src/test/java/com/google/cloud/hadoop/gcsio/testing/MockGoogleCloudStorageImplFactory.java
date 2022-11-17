@@ -54,8 +54,8 @@ public class MockGoogleCloudStorageImplFactory {
     return new GoogleCloudStorageImpl(options, storage, null);
   }
 
-  public static GCSManualClientImpl mockedGcsVeneer(HttpTransport transport) {
-    return mockedGcsVeneer(
+  public static GCSManualClientImpl mockedManualGcs(HttpTransport transport) {
+    return mockedManualGcs(
         GoogleCloudStorageOptions.builder()
             .setAppName("gcsio-unit-test")
             .setProjectId(PROJECT_ID)
@@ -63,7 +63,7 @@ public class MockGoogleCloudStorageImplFactory {
         transport);
   }
 
-  public static GCSManualClientImpl mockedGcsVeneer(
+  public static GCSManualClientImpl mockedManualGcs(
       GoogleCloudStorageOptions options, HttpTransport transport) {
     Storage storage =
         new Storage(
