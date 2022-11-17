@@ -80,8 +80,7 @@ public class MockGoogleCloudStorageImplFactory {
                         .setDefaultUserAgent("gcs-io-unit-test")
                         .build()),
                 false));
-    return new GCSManualClientImplBuilder(
-            options, fakeCredential, null)
+    return new GCSManualClientImplBuilder(options, fakeCredential, null)
         .withApairyClientStorage(storage)
         .build();
   }
