@@ -17,13 +17,16 @@ package com.google.cloud.hadoop.gcsio.testing;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.storage.Storage;
-import com.google.cloud.hadoop.gcsio.GCSVeneerImpl;
+import com.google.auth.Credentials;
+import com.google.cloud.hadoop.gcsio.GCSManualClientImpl;
+import com.google.cloud.hadoop.gcsio.GCSManualClientImpl.GCSManualClientImplBuilder;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.cloud.hadoop.util.testing.FakeCredentials;
+import java.io.IOException;
 
 public class MockGoogleCloudStorageImplFactory {
 
@@ -54,8 +57,8 @@ public class MockGoogleCloudStorageImplFactory {
     return new GoogleCloudStorageImpl(options, storage, null);
   }
 
-  public static GCSVeneerImpl mockedGcsVeneer(HttpTransport transport) {
-    return mockedGcsVeneer(
+  public static GCSManualClientImpl mockedManualGcs(HttpTransport transport) throws IOException {
+    return mockedManualGcs(
         GoogleCloudStorageOptions.builder()
             .setAppName("gcsio-unit-test")
             .setProjectId(PROJECT_ID)
@@ -63,19 +66,22 @@ public class MockGoogleCloudStorageImplFactory {
         transport);
   }
 
-  public static GCSVeneerImpl mockedGcsVeneer(
-      GoogleCloudStorageOptions options, HttpTransport transport) {
+  public static GCSManualClientImpl mockedManualGcs(
+      GoogleCloudStorageOptions options, HttpTransport transport) throws IOException {
+    Credentials fakeCredential = new FakeCredentials();
     Storage storage =
         new Storage(
             transport,
             GsonFactory.getDefaultInstance(),
             new TrackingHttpRequestInitializer(
                 new RetryHttpInitializer(
-                    new FakeCredentials(),
+                    fakeCredential,
                     RetryHttpInitializerOptions.builder()
                         .setDefaultUserAgent("gcs-io-unit-test")
                         .build()),
                 false));
-    return new GCSVeneerImpl(options, storage);
+    return new GCSManualClientImplBuilder(options, fakeCredential, null)
+        .withApairyClientStorage(storage)
+        .build();
   }
 }
