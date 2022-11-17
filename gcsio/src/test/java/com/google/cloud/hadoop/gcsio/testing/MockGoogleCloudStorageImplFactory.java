@@ -17,6 +17,7 @@ package com.google.cloud.hadoop.gcsio.testing;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.storage.Storage;
+import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.GCSManualClientImpl;
 import com.google.cloud.hadoop.gcsio.GCSManualClientImpl.GCSManualClientImplBuilder;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
@@ -67,19 +68,20 @@ public class MockGoogleCloudStorageImplFactory {
 
   public static GCSManualClientImpl mockedManualGcs(
       GoogleCloudStorageOptions options, HttpTransport transport) throws IOException {
+    Credentials fakeCredential = new FakeCredentials();
     Storage storage =
         new Storage(
             transport,
             GsonFactory.getDefaultInstance(),
             new TrackingHttpRequestInitializer(
                 new RetryHttpInitializer(
-                    new FakeCredentials(),
+                    fakeCredential,
                     RetryHttpInitializerOptions.builder()
                         .setDefaultUserAgent("gcs-io-unit-test")
                         .build()),
                 false));
     return new GCSManualClientImplBuilder(
-            options, GoogleCloudStorageImpl.tryGetCredentialsFromStorage(storage), null)
+            options, fakeCredential, null)
         .withApairyClientStorage(storage)
         .build();
   }
