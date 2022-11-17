@@ -17,7 +17,7 @@ package com.google.cloud.hadoop.gcsio.testing;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.storage.Storage;
-import com.google.cloud.hadoop.gcsio.GCSVeneerImpl;
+import com.google.cloud.hadoop.gcsio.GCSManualClientImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
@@ -54,7 +54,7 @@ public class MockGoogleCloudStorageImplFactory {
     return new GoogleCloudStorageImpl(options, storage, null);
   }
 
-  public static GCSVeneerImpl mockedGcsVeneer(HttpTransport transport) {
+  public static GCSManualClientImpl mockedGcsVeneer(HttpTransport transport) {
     return mockedGcsVeneer(
         GoogleCloudStorageOptions.builder()
             .setAppName("gcsio-unit-test")
@@ -63,7 +63,7 @@ public class MockGoogleCloudStorageImplFactory {
         transport);
   }
 
-  public static GCSVeneerImpl mockedGcsVeneer(
+  public static GCSManualClientImpl mockedGcsVeneer(
       GoogleCloudStorageOptions options, HttpTransport transport) {
     Storage storage =
         new Storage(
@@ -76,6 +76,6 @@ public class MockGoogleCloudStorageImplFactory {
                         .setDefaultUserAgent("gcs-io-unit-test")
                         .build()),
                 false));
-    return new GCSVeneerImpl(options, storage);
+    return new GCSManualClientImpl(options, storage);
   }
 }

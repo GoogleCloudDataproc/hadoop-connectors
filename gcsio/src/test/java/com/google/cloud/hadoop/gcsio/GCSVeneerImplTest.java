@@ -79,7 +79,7 @@ public class GCSVeneerImplTest {
                 CONTENT_LENGTH,
                 /* headerValue = */ 1,
                 new ThrowingInputStream(/* readException = */ null, fakeException)));
-    GCSVeneerImpl gcs = mockedGcsVeneer(transport);
+    GCSManualClientImpl gcs = mockedGcsVeneer(transport);
 
     WritableByteChannel writeChannel = gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
     assertThat(writeChannel.isOpen()).isTrue();
@@ -114,7 +114,7 @@ public class GCSVeneerImplTest {
                   }
                   return null;
                 }));
-    GCSVeneerImpl gcs = mockedGcsVeneer(transport);
+    GCSManualClientImpl gcs = mockedGcsVeneer(transport);
 
     WritableByteChannel writeChannel = gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
     assertThat(writeChannel.isOpen()).isTrue();

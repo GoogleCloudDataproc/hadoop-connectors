@@ -436,9 +436,9 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_TRACE_LOG_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.tracelog.enable", false);
 
-  /** Configuration key to enable using Veneer client for connecting with GCS */
-  public static final HadoopConfigurationProperty<Boolean> GCS_VENEER_CLIENT_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.veneer.enable", false);
+  /** Configuration key to enable using google-cloud-storage client for connecting with GCS */
+  public static final HadoopConfigurationProperty<Boolean> GCS_MANUAL_CLIENT_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.manualclient.enable", false);
 
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
@@ -453,7 +453,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setPerformanceCacheEnabled(GCS_PERFORMANCE_CACHE_ENABLE.get(config, config::getBoolean))
         .setPerformanceCacheOptions(getPerformanceCachingOptions(config))
         .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean))
-        .setVeneerClientEnabled(GCS_VENEER_CLIENT_ENABLE.get(config, config::getBoolean))
+        .setManualClientEnabled(GCS_MANUAL_CLIENT_ENABLE.get(config, config::getBoolean))
         .setFilesystemApi(GCS_FILESYSTEM_API.get(config, config::getEnum));
   }
 

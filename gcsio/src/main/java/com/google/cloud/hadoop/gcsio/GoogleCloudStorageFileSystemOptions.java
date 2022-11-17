@@ -39,7 +39,7 @@ public abstract class GoogleCloudStorageFileSystemOptions {
         .setPerformanceCacheEnabled(false)
         .setPerformanceCacheOptions(PerformanceCachingGoogleCloudStorageOptions.DEFAULT)
         .setFilesystemApi(FilesystemAPI.OBJECT)
-        .setVeneerClientEnabled(false)
+        .setManualClientEnabled(false)
         .setStatusParallelEnabled(true);
   }
 
@@ -47,7 +47,7 @@ public abstract class GoogleCloudStorageFileSystemOptions {
 
   public abstract boolean isPerformanceCacheEnabled();
 
-  public abstract boolean isVeneerClientEnabled();
+  public abstract boolean isManualClientEnabled();
 
   public abstract PerformanceCachingGoogleCloudStorageOptions getPerformanceCacheOptions();
 
@@ -100,6 +100,6 @@ public abstract class GoogleCloudStorageFileSystemOptions {
 
     public abstract Builder setFilesystemApi(FilesystemAPI filesystemApi);
 
-    public abstract Builder setVeneerClientEnabled(boolean veneerClientEnabled);
+    public abstract Builder setManualClientEnabled(boolean manualClientEnabled);
   }
 }
