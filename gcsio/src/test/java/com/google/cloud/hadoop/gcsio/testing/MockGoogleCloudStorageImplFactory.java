@@ -18,8 +18,8 @@ import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.storage.Storage;
 import com.google.auth.Credentials;
-import com.google.cloud.hadoop.gcsio.GCSJavaClientImpl;
-import com.google.cloud.hadoop.gcsio.GCSJavaClientImpl.GCSJavaClientImplBuilder;
+import com.google.cloud.hadoop.gcsio.GcsJavaClientImpl;
+import com.google.cloud.hadoop.gcsio.GcsJavaClientImpl.GcsJavaClientImplBuilder;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer;
@@ -57,7 +57,7 @@ public class MockGoogleCloudStorageImplFactory {
     return new GoogleCloudStorageImpl(options, storage, null);
   }
 
-  public static GCSJavaClientImpl mockedJavaClientGcs(HttpTransport transport) throws IOException {
+  public static GcsJavaClientImpl mockedJavaClientGcs(HttpTransport transport) throws IOException {
     return mockedJavaClientGcs(
         GoogleCloudStorageOptions.builder()
             .setAppName("gcsio-unit-test")
@@ -66,7 +66,7 @@ public class MockGoogleCloudStorageImplFactory {
         transport);
   }
 
-  public static GCSJavaClientImpl mockedJavaClientGcs(
+  public static GcsJavaClientImpl mockedJavaClientGcs(
       GoogleCloudStorageOptions options, HttpTransport transport) throws IOException {
     Credentials fakeCredential = new FakeCredentials();
     Storage storage =
@@ -80,7 +80,7 @@ public class MockGoogleCloudStorageImplFactory {
                         .setDefaultUserAgent("gcs-io-unit-test")
                         .build()),
                 false));
-    return new GCSJavaClientImplBuilder(options, fakeCredential, null)
+    return new GcsJavaClientImplBuilder(options, fakeCredential, null)
         .withApairyClientStorage(storage)
         .build();
   }

@@ -33,7 +33,7 @@ import com.google.cloud.hadoop.gcsio.AssertingLogHandler;
 import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.EventLoggingHttpRequestInitializer;
-import com.google.cloud.hadoop.gcsio.GCSJavaClientImpl.GCSJavaClientImplBuilder;
+import com.google.cloud.hadoop.gcsio.GcsJavaClientImpl.GcsJavaClientImplBuilder;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
@@ -559,7 +559,7 @@ public class GoogleCloudStorageImplTest {
       return new TrackingStorageWrapper<>(
           options,
           httpRequestInitializer ->
-              new GCSJavaClientImplBuilder(options, credentials, null)
+              new GcsJavaClientImplBuilder(options, credentials, null)
                   .withHttpRequestInitializer(httpRequestInitializer)
                   .build(),
           credentials);
@@ -574,7 +574,7 @@ public class GoogleCloudStorageImplTest {
       throws IOException {
     GoogleCloudStorage storageImpl;
     if (javaClientEnabled) {
-      return new GCSJavaClientImplBuilder(
+      return new GcsJavaClientImplBuilder(
               storageOptions, GoogleCloudStorageTestHelper.getCredentials(), null)
           .build();
     }

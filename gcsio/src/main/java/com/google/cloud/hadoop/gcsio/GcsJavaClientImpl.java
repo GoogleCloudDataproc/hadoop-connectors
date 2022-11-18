@@ -20,17 +20,18 @@ import java.util.function.Function;
  * the appropriate API call(s) google-cloud-storage client.
  */
 @VisibleForTesting
-public class GCSJavaClientImpl implements GoogleCloudStorage {
+public class GcsJavaClientImpl implements GoogleCloudStorage {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   /**
    * Having an instance of gscImpl to redirect calls to Json client while new client implementation
    * is in WIP.
    */
   private GoogleCloudStorageImpl gcsClientDelegate;
+
   private GoogleCloudStorageOptions storageOptions;
   private Credentials credentials;
 
-  private GCSJavaClientImpl(GCSJavaClientImplBuilder builder) throws IOException {
+  private GcsJavaClientImpl(GcsJavaClientImplBuilder builder) throws IOException {
     this.storageOptions = checkNotNull(builder.storageOptions, "options must not be null");
     this.credentials = checkNotNull(builder.credentials, "credentials must not be null");
 
@@ -184,14 +185,14 @@ public class GCSJavaClientImpl implements GoogleCloudStorage {
     gcsClientDelegate.close();
   }
 
-  public static class GCSJavaClientImplBuilder {
+  public static class GcsJavaClientImplBuilder {
     private Credentials credentials;
     private com.google.api.services.storage.Storage storage;
     private HttpRequestInitializer httpRequestInitializer;
     private GoogleCloudStorageOptions storageOptions;
     private Function<List<AccessBoundary>, String> downscopedAccessTokenFn;
 
-    public GCSJavaClientImplBuilder(
+    public GcsJavaClientImplBuilder(
         GoogleCloudStorageOptions storageOptions,
         Credentials credentials,
         Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
@@ -201,7 +202,7 @@ public class GCSJavaClientImpl implements GoogleCloudStorage {
     }
 
     @VisibleForTesting
-    public GCSJavaClientImplBuilder withApairyClientStorage(
+    public GcsJavaClientImplBuilder withApairyClientStorage(
         com.google.api.services.storage.Storage storage) {
       checkNotNull(storage, "storage must not be null");
       this.storage = storage;
@@ -209,15 +210,15 @@ public class GCSJavaClientImpl implements GoogleCloudStorage {
     }
 
     @VisibleForTesting
-    public GCSJavaClientImplBuilder withHttpRequestInitializer(
+    public GcsJavaClientImplBuilder withHttpRequestInitializer(
         HttpRequestInitializer httpRequestInitializer) {
       checkNotNull(httpRequestInitializer, "storage must not be null");
       this.httpRequestInitializer = httpRequestInitializer;
       return this;
     }
 
-    public GCSJavaClientImpl build() throws IOException {
-      return new GCSJavaClientImpl(this);
+    public GcsJavaClientImpl build() throws IOException {
+      return new GcsJavaClientImpl(this);
     }
   }
 }
