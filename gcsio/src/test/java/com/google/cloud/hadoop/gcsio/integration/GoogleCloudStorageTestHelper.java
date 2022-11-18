@@ -360,13 +360,12 @@ public class GoogleCloudStorageTestHelper {
 
     public TrackingStorageWrapper(
         GoogleCloudStorageOptions options,
-        CheckedFunction<TrackingHttpRequestInitializer, T, IOException> delegateStorageFn)
+        CheckedFunction<TrackingHttpRequestInitializer, T, IOException> delegateStorageFn,
+        Credential credential)
         throws IOException {
       this.requestsTracker =
           new TrackingHttpRequestInitializer(
-              new RetryHttpInitializer(
-                  GoogleCloudStorageTestHelper.getCredential(),
-                  options.toRetryHttpInitializerOptions()));
+              new RetryHttpInitializer(credential, options.toRetryHttpInitializerOptions()));
       this.delegate = delegateStorageFn.apply(this.requestsTracker);
     }
   }

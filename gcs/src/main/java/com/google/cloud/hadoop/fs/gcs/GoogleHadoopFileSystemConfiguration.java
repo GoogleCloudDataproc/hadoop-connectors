@@ -458,6 +458,10 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<Boolean> GCS_TRACE_LOG_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.tracelog.enable", false);
 
+  /** Configuration key to enable using google-cloud-storage client for connecting with GCS */
+  public static final HadoopConfigurationProperty<Boolean> GCS_JAVA_CLIENT_ENABLE =
+      new HadoopConfigurationProperty<>("fs.gs.javaclient.enable", false);
+
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
   // @VisibleForTesting
@@ -472,7 +476,8 @@ public class GoogleHadoopFileSystemConfiguration {
         .setMarkerFilePattern(GCS_MARKER_FILE_PATTERN.get(config, config::get))
         .setPerformanceCacheEnabled(GCS_PERFORMANCE_CACHE_ENABLE.get(config, config::getBoolean))
         .setPerformanceCacheOptions(getPerformanceCachingOptions(config))
-        .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean));
+        .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean))
+        .setJavaClientEnabled(GCS_JAVA_CLIENT_ENABLE.get(config, config::getBoolean));
   }
 
   @VisibleForTesting

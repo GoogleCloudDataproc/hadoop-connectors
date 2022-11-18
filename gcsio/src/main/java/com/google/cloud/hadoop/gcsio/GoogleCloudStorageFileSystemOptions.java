@@ -33,12 +33,15 @@ public abstract class GoogleCloudStorageFileSystemOptions {
         .setMarkerFilePattern((String) null)
         .setPerformanceCacheEnabled(false)
         .setPerformanceCacheOptions(PerformanceCachingGoogleCloudStorageOptions.DEFAULT)
+        .setJavaClientEnabled(false)
         .setStatusParallelEnabled(true);
   }
 
   public abstract Builder toBuilder();
 
   public abstract boolean isPerformanceCacheEnabled();
+
+  public abstract boolean isJavaClientEnabled();
 
   public abstract PerformanceCachingGoogleCloudStorageOptions getPerformanceCacheOptions();
 
@@ -90,5 +93,7 @@ public abstract class GoogleCloudStorageFileSystemOptions {
     public abstract Builder setEnsureNoConflictingItems(boolean ensureNoConflictingItems);
 
     public abstract GoogleCloudStorageFileSystemOptions build();
+
+    public abstract Builder setJavaClientEnabled(boolean manualClientEnabled);
   }
 }

@@ -276,6 +276,7 @@ public class GoogleCloudStorageFileSystemPerformanceCacheIntegrationTest {
                     new PerformanceCachingGoogleCloudStorage(
                         new GoogleCloudStorageImpl(gcsOptions, httpRequestInitializer),
                         PERF_CACHE_GCS_OPTIONS),
-                gcsfsOptions));
+                gcsfsOptions),
+        GoogleCloudStorageTestHelper.getCredential());
   }
 }
