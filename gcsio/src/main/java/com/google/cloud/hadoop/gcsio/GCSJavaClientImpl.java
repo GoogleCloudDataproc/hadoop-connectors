@@ -27,7 +27,6 @@ public class GCSJavaClientImpl implements GoogleCloudStorage {
    * is in WIP.
    */
   private GoogleCloudStorageImpl gcsClientDelegate;
-
   private GoogleCloudStorageOptions storageOptions;
   private Credentials credentials;
 
@@ -38,13 +37,13 @@ public class GCSJavaClientImpl implements GoogleCloudStorage {
     if (builder.httpRequestInitializer != null) {
       logger.atWarning().log(
           "Overriding httpRequestInitializer. ALERT: Should not be hit in production");
-      gcsClientDelegate =
-          new GoogleCloudStorageImpl(storageOptions, builder.httpRequestInitializer);
+      this.gcsClientDelegate =
+          new GoogleCloudStorageImpl(this.storageOptions, builder.httpRequestInitializer);
     } else if (builder.storage != null) {
       logger.atWarning().log("Overriding storage. ALERT: Should not be hit in production");
-      gcsClientDelegate = new GoogleCloudStorageImpl(storageOptions, builder.storage);
+      this.gcsClientDelegate = new GoogleCloudStorageImpl(this.storageOptions, builder.storage);
     } else {
-      gcsClientDelegate = new GoogleCloudStorageImpl(storageOptions, credentials);
+      this.gcsClientDelegate = new GoogleCloudStorageImpl(this.storageOptions, this.credentials);
     }
   }
 
@@ -186,7 +185,6 @@ public class GCSJavaClientImpl implements GoogleCloudStorage {
   }
 
   public static class GCSJavaClientImplBuilder {
-
     private Credentials credentials;
     private com.google.api.services.storage.Storage storage;
     private HttpRequestInitializer httpRequestInitializer;
