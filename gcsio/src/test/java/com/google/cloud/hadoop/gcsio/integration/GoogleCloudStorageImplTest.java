@@ -33,7 +33,7 @@ import com.google.cloud.hadoop.gcsio.AssertingLogHandler;
 import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.EventLoggingHttpRequestInitializer;
-import com.google.cloud.hadoop.gcsio.GCSManualClientImpl.GCSManualClientImplBuilder;
+import com.google.cloud.hadoop.gcsio.GCSJavaClientImpl.GCSJavaClientImplBuilder;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
@@ -74,16 +74,16 @@ public class GoogleCloudStorageImplTest {
 
   private static GoogleCloudStorage helperGcs;
 
-  private final boolean manualClientEnabled;
+  private final boolean javaClientEnabled;
 
-  public GoogleCloudStorageImplTest(boolean manualClientEnabled) {
-    this.manualClientEnabled = manualClientEnabled;
+  public GoogleCloudStorageImplTest(boolean javaClientEnabled) {
+    this.javaClientEnabled = javaClientEnabled;
   }
 
   @Parameters
-  // We want to test this entire class with both manualClientImp and gcsImpl
+  // We want to test this entire class with both javaClientImpl and gcsImpl
   // Some of our internal endpoints only work with TD
-  public static Iterable<Boolean> manualClientEnabled() {
+  public static Iterable<Boolean> javaClientEnabled() {
     return List.of(false, true);
   }
 
@@ -555,11 +555,11 @@ public class GoogleCloudStorageImplTest {
   private TrackingStorageWrapper<GoogleCloudStorage> newTrackingGoogleCloudStorage(
       GoogleCloudStorageOptions options) throws IOException {
     Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
-    if (manualClientEnabled) {
+    if (javaClientEnabled) {
       return new TrackingStorageWrapper<>(
           options,
           httpRequestInitializer ->
-              new GCSManualClientImplBuilder(options, credentials, null)
+              new GCSJavaClientImplBuilder(options, credentials, null)
                   .withHttpRequestInitializer(httpRequestInitializer)
                   .build(),
           credentials);
@@ -573,8 +573,8 @@ public class GoogleCloudStorageImplTest {
   private GoogleCloudStorage getStorageFromOptions(GoogleCloudStorageOptions storageOptions)
       throws IOException {
     GoogleCloudStorage storageImpl;
-    if (manualClientEnabled) {
-      return new GCSManualClientImplBuilder(
+    if (javaClientEnabled) {
+      return new GCSJavaClientImplBuilder(
               storageOptions, GoogleCloudStorageTestHelper.getCredentials(), null)
           .build();
     }

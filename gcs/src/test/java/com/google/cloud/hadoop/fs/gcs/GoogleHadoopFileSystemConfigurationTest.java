@@ -127,7 +127,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.storage.service.path", "storage/v1/");
           put("fs.gs.tracelog.enable", false);
           put("fs.gs.working.dir", "/");
-          put("fs.gs.manualclient.enable", false);
+          put("fs.gs.javaclient.enable", false);
         }
       };
 

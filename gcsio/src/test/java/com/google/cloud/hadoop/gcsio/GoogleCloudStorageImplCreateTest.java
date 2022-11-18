@@ -15,7 +15,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.testing.MockGoogleCloudStorageImplFactory.mockedGcs;
-import static com.google.cloud.hadoop.gcsio.testing.MockGoogleCloudStorageImplFactory.mockedManualGcs;
+import static com.google.cloud.hadoop.gcsio.testing.MockGoogleCloudStorageImplFactory.mockedJavaClientGcs;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.arbitraryInputStreamSupplier;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.inputStreamResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonErrorResponse;
@@ -58,16 +58,16 @@ public class GoogleCloudStorageImplCreateTest {
   private static final String BUCKET_NAME = "foo-bucket";
   private static final String OBJECT_NAME = "bar-object";
 
-  private final boolean manualClientEnabled;
+  private final boolean javaClientEnabled;
 
-  public GoogleCloudStorageImplCreateTest(boolean manualClientEnabled) {
-    this.manualClientEnabled = manualClientEnabled;
+  public GoogleCloudStorageImplCreateTest(boolean javaClientEnabled) {
+    this.javaClientEnabled = javaClientEnabled;
   }
 
   @Parameters
-  // We want to test this entire class with both manualClientImp and gcsImpl
+  // We want to test this entire class with both javaClientImp and gcsImpl
   // Some of our internal endpoints only work with TD
-  public static Iterable<Boolean> manualClientEnabled() {
+  public static Iterable<Boolean> javaClientEnabled() {
     return List.of(false, true);
   }
 
@@ -213,8 +213,8 @@ public class GoogleCloudStorageImplCreateTest {
   }
 
   private GoogleCloudStorage getCloudStorageImpl(HttpTransport transport) throws IOException {
-    if (manualClientEnabled) {
-      return mockedManualGcs(transport);
+    if (javaClientEnabled) {
+      return mockedJavaClientGcs(transport);
     }
     return mockedGcs(transport);
   }

@@ -19,7 +19,8 @@ import java.util.function.Function;
  * is a basic implementation of the GoogleCloudStorage interface that mostly delegates through to
  * the appropriate API call(s) google-cloud-storage client.
  */
-public class GCSManualClientImpl implements GoogleCloudStorage {
+@VisibleForTesting
+public class GCSJavaClientImpl implements GoogleCloudStorage {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   /**
    * Having an instance of gscImpl to redirect calls to Json client while new client implementation
@@ -30,7 +31,7 @@ public class GCSManualClientImpl implements GoogleCloudStorage {
   private GoogleCloudStorageOptions storageOptions;
   private Credentials credentials;
 
-  public GCSManualClientImpl(GCSManualClientImplBuilder builder) throws IOException {
+  private GCSJavaClientImpl(GCSJavaClientImplBuilder builder) throws IOException {
     this.storageOptions = checkNotNull(builder.storageOptions, "options must not be null");
     this.credentials = checkNotNull(builder.credentials, "credentials must not be null");
 
@@ -184,7 +185,7 @@ public class GCSManualClientImpl implements GoogleCloudStorage {
     gcsClientDelegate.close();
   }
 
-  public static class GCSManualClientImplBuilder {
+  public static class GCSJavaClientImplBuilder {
 
     private Credentials credentials;
     private com.google.api.services.storage.Storage storage;
@@ -192,7 +193,7 @@ public class GCSManualClientImpl implements GoogleCloudStorage {
     private GoogleCloudStorageOptions storageOptions;
     private Function<List<AccessBoundary>, String> downscopedAccessTokenFn;
 
-    public GCSManualClientImplBuilder(
+    public GCSJavaClientImplBuilder(
         GoogleCloudStorageOptions storageOptions,
         Credentials credentials,
         Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
@@ -202,21 +203,21 @@ public class GCSManualClientImpl implements GoogleCloudStorage {
     }
 
     @VisibleForTesting
-    public GCSManualClientImplBuilder withApairyClientStorage(
+    public GCSJavaClientImplBuilder withApairyClientStorage(
         com.google.api.services.storage.Storage storage) {
       this.storage = storage;
       return this;
     }
 
     @VisibleForTesting
-    public GCSManualClientImplBuilder withHttpRequestInitializer(
+    public GCSJavaClientImplBuilder withHttpRequestInitializer(
         HttpRequestInitializer httpRequestInitializer) {
       this.httpRequestInitializer = httpRequestInitializer;
       return this;
     }
 
-    public GCSManualClientImpl build() throws IOException {
-      return new GCSManualClientImpl(this);
+    public GCSJavaClientImpl build() throws IOException {
+      return new GCSJavaClientImpl(this);
     }
   }
 }
