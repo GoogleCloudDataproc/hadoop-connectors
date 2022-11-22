@@ -161,6 +161,18 @@ public class HadoopCredentialConfiguration {
           new HadoopConfigurationProperty<>(
               ".auth.impersonation.service.account.for.group.", ImmutableMap.of());
 
+  /** Configuration key for defining the OAUth2 client ID. */
+  public static final HadoopConfigurationProperty<String> AUTH_CLIENT_ID_SUFFIX =
+      new HadoopConfigurationProperty<>(".auth.client.id");
+
+  /** Configuration key for defining the OAUth2 client secret. */
+  public static final HadoopConfigurationProperty<RedactedString> AUTH_CLIENT_SECRET_SUFFIX =
+      new HadoopConfigurationProperty<>(".auth.client.secret");
+
+  /** Configuration key for defining the OAuth2 refresh token. */
+  public static final HadoopConfigurationProperty<RedactedString> AUTH_REFRESH_TOKEN_SUFFIX =
+      new HadoopConfigurationProperty<>(".auth.refresh.token");
+
   public static CredentialFactory getCredentialFactory(
       Configuration config, String... keyPrefixesVararg) {
     List<String> keyPrefixes = getConfigKeyPrefixes(keyPrefixesVararg);
@@ -204,6 +216,14 @@ public class HadoopCredentialConfiguration {
             .setProxyPassword(
                 RedactedString.create(
                     PROXY_PASSWORD_SUFFIX.withPrefixes(keyPrefixes).getPassword(config)))
+            .setAuthClientId(
+                AUTH_CLIENT_ID_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get))
+            .setAuthClientSecret(
+                RedactedString.create(
+                    AUTH_CLIENT_SECRET_SUFFIX.withPrefixes(keyPrefixes).getPassword(config)))
+            .setAuthRefreshToken(
+                RedactedString.create(
+                    AUTH_REFRESH_TOKEN_SUFFIX.withPrefixes(keyPrefixes).getPassword(config)))
             .build();
     return new CredentialFactory(credentialOptions);
   }
