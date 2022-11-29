@@ -261,6 +261,7 @@
                   <include>com.google.cloud</include>
                   <include>com.google.cloud.bigdataoss</include>
                   <include>com.google.flogger</include>
+                  <include>com.google.code.gson</include>
                   <include>com.google.guava</include>
                   <include>com.google.http-client</include>
                   <include>com.google.oauth-client</include>
@@ -294,6 +295,7 @@
                     <include>com.google.cloud.spi.**</include>
                     <include>com.google.common.**</include>
                     <include>com.google.geo.**</include>
+                    <include>com.google.gson.**</include>
                     <include>com.google.google.storage.**</include>
                     <include>com.google.iam.**</include>
                     <include>com.google.logging.**</include>
