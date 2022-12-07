@@ -15,12 +15,18 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
+import static com.google.common.net.HttpHeaders.AUTHORIZATION;
+import static com.google.common.net.HttpHeaders.COOKIE;
+import static com.google.common.net.HttpHeaders.PROXY_AUTHORIZATION;
+import static com.google.common.net.HttpHeaders.SET_COOKIE;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.http.GenericUrl;
+import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpResponse;
+import com.google.api.client.testing.http.MockLowLevelHttpResponse;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper;
 import java.io.IOException;
 import java.util.Map;
@@ -71,6 +77,70 @@ public class EventLoggingHttpRequestInitializerTest {
     assertThat(logRecord.get("request_start_time_utc")).isNotNull();
     assertThat(logRecord.get("request_finish_time_utc")).isNotNull();
     assertThat(logRecord.get("unexpected_error")).isNull();
+  }
+
+  @Test
+  public void testTracingHeadersSuccess() throws IOException {
+    int expectedStatusCode = 201;
+    MockLowLevelHttpResponse httpResponse =
+        MockHttpTransportHelper.emptyResponse(expectedStatusCode)
+            .addHeader("custom-response-header", "responseValue");
+    HttpRequest httpRequest =
+        getHttpRequestWithResponse(httpResponse)
+            .setHeaders(new HttpHeaders().set("custom-request-header", "requestValue"));
+    requestInitializer.initialize(httpRequest);
+
+    HttpResponse res = httpRequest.execute();
+
+    assertThat(res).isNotNull();
+    assertThat(res.getStatusCode()).isEqualTo(expectedStatusCode);
+
+    assertingHandler.assertLogCount(1);
+    Map<String, Object> logRecord = assertingHandler.getLogRecordAtIndex(0);
+    verifyFields(logRecord, expectedStatusCode);
+    Object requestHeadersObj = logRecord.get("request_headers");
+    assertThat(requestHeadersObj).isInstanceOf(Map.class);
+    Map<?, ?> requestHeadersMap = (Map<?, ?>) requestHeadersObj;
+    assertThat(requestHeadersMap.get("custom-request-header")).isNotNull();
+    Object responseHeadersObj = logRecord.get("response_headers");
+    assertThat(responseHeadersObj).isInstanceOf(Map.class);
+    Map<?, ?> responseHeadersMap = (Map<?, ?>) responseHeadersObj;
+    assertThat(responseHeadersMap.get("custom-response-header")).isNotNull();
+  }
+
+  @Test
+  public void testTracingHeadersFiltered() throws IOException {
+    int expectedStatusCode = 201;
+    MockLowLevelHttpResponse httpResponse =
+        MockHttpTransportHelper.emptyResponse(expectedStatusCode)
+            .addHeader(SET_COOKIE, "cookieName=cookieValue");
+    HttpRequest httpRequest =
+        getHttpRequestWithResponse(httpResponse)
+            .setHeaders(
+                new HttpHeaders()
+                    .set(AUTHORIZATION, "Bearer TOKEN")
+                    .set(COOKIE, "cookieName=cookieValue")
+                    .set(PROXY_AUTHORIZATION, "Basic user/pass"));
+    requestInitializer.initialize(httpRequest);
+
+    HttpResponse res = httpRequest.execute();
+
+    assertThat(res).isNotNull();
+    assertThat(res.getStatusCode()).isEqualTo(expectedStatusCode);
+
+    assertingHandler.assertLogCount(1);
+    Map<String, Object> logRecord = assertingHandler.getLogRecordAtIndex(0);
+    verifyFields(logRecord, expectedStatusCode);
+    Object requestHeadersObj = logRecord.get("request_headers");
+    assertThat(requestHeadersObj).isInstanceOf(Map.class);
+    Map<?, ?> requestHeadersMap = (Map<?, ?>) requestHeadersObj;
+    assertThat(requestHeadersMap.get("authorization")).isNull();
+    assertThat(requestHeadersMap.get("cookie")).isNull();
+    assertThat(requestHeadersMap.get("proxy-authorization")).isNull();
+    Object responseHeadersObj = logRecord.get("response_headers");
+    assertThat(responseHeadersObj).isInstanceOf(Map.class);
+    Map<?, ?> responseHeadersMap = (Map<?, ?>) responseHeadersObj;
+    assertThat(responseHeadersMap.get("set-cookie")).isNull();
   }
 
   @Test
