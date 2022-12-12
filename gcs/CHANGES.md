@@ -2,6 +2,8 @@
 
 ## Next
 
+1. Update dependencies to latest version
+
 ## 2.2.9 - 2022-11-09
 
 1.  The Google Cloud Storage Connector now can be used as a
