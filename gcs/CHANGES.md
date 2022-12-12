@@ -1,6 +1,6 @@
 # Release Notes
 
-## Next
+## 2.2.10 - 2022-12-11
 
 1. Update dependencies to latest version
 
