@@ -72,7 +72,7 @@ To add a dependency on one of the connectors using Maven, use the following:
     <dependency>
       <groupId>com.google.cloud.bigdataoss</groupId>
       <artifactId>gcs-connector</artifactId>
-      <version>hadoop2-2.2.9</version>
+      <version>2.2.10</version>
     </dependency>
     ```
 
@@ -82,7 +82,7 @@ To add a dependency on one of the connectors using Maven, use the following:
     <dependency>
       <groupId>com.google.cloud.bigdataoss</groupId>
       <artifactId>bigquery-connector</artifactId>
-      <version>hadoop2-1.2.0</version>
+      <version>${next-bigquery-connector-release-tag}</version>
     </dependency>
     ```
 
