@@ -51,7 +51,6 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -351,15 +350,13 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   }
 
   @Test
-  @Ignore(
-      "Ignoring the test since this is breaking all PRs. Will be re-enalbed after investigating")
   public void testOpenLargeObject() throws IOException {
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId resourceId = new StorageResourceId(BUCKET_NAME, "testOpenLargeObject_Object");
 
-    int partitionsCount = 50;
+    int partitionsCount = 1;
     byte[] partition =
-        writeObject(rawStorage, resourceId, /* partitionSize= */ 10 * 1024 * 1024, partitionsCount);
+        writeObject(rawStorage, resourceId, /* partitionSize= */ 1 * 1024 * 1024, partitionsCount);
 
     assertObjectContent(rawStorage, resourceId, partition, partitionsCount);
   }

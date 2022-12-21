@@ -18,6 +18,9 @@ package com.google.cloud.hadoop.gcsio;
 
 import com.google.api.services.storage.Storage;
 import com.google.auto.value.AutoValue;
+import com.google.cloud.storage.Storage.BlobWriteOption;
+import java.util.ArrayList;
+import java.util.List;
 import javax.annotation.Nullable;
 
 /**
@@ -61,6 +64,20 @@ public abstract class ObjectWriteConditions {
     if (hasMetaGenerationMatch()) {
       objectToInsert.setIfMetagenerationMatch(getMetaGenerationMatch());
     }
+  }
+
+  /** Apply the conditions represented by this object to an Insert operation. */
+  public List<BlobWriteOption> apply() {
+    List<BlobWriteOption> writeOptions = new ArrayList<>();
+
+    if (hasContentGenerationMatch()) {
+      writeOptions.add(BlobWriteOption.generationMatch());
+    }
+
+    if (hasMetaGenerationMatch()) {
+      writeOptions.add(BlobWriteOption.metagenerationMatch());
+    }
+    return writeOptions;
   }
 
   @AutoValue.Builder
