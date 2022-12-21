@@ -274,13 +274,29 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
 
       boolean objectFinalized = false;
+      boolean exception = false;
       while (!objectFinalized) {
+
+        if (responseObserver.isComplete()) {
+          // reset streams
+          responseObserver = new InsertChunkResponseObserver(uploadId, writeOffset);
+          call =
+              storageStub
+                  .getChannel()
+                  .newCall(StorageGrpc.getWriteObjectMethod(), stub.getCallOptions());
+          writeObjectRequestStreamObserver =
+              ClientCalls.asyncClientStreamingCall(call, responseObserver);
+          requestStreamObserver =
+              watchdog.watch(
+                  call,
+                  writeObjectRequestStreamObserver,
+                  Duration.ofSeconds(channelOptions.getGrpcWriteMessageTimeoutMillis()));
+        }
+
         WriteObjectRequest insertRequest = null;
         if (requestChunkMap.size() > 0 && requestChunkMap.lastKey() >= writeOffset) {
           insertRequest = getCachedRequest(requestChunkMap, writeOffset);
           writeOffset += insertRequest.getChecksummedData().getContent().size();
-        } else if (requestChunkMap.size() >= channelOptions.getNumberOfBufferedRequests()) {
-          freeUpCommittedRequests(requestChunkMap, writeOffset);
         } else {
           // Pick up a chunk to write only if dataChunkMap has space. Else continue after looking
           // for errors.
@@ -301,20 +317,24 @@ public final class GoogleCloudStorageGrpcWriteChannel
                   ? responseObserver.transientError
                   : responseObserver.nonTransientError);
           break;
-        } else if (objectFinalized) {
+        }
+        if (objectFinalized
+            || requestChunkMap.size() >= channelOptions.getNumberOfBufferedRequests()) {
+          // close request stream if final request OR Map is full
           requestStreamObserver.onCompleted();
+          try {
+            responseObserver.done.await();
+            requestChunkMap.clear();
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException(
+                String.format(
+                    "Interrupted while awaiting response during upload of '%s' with UploadID '%s'",
+                    resourceId, responseObserver.uploadId));
+          }
         }
       }
 
-      try {
-        responseObserver.done.await();
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new IOException(
-            String.format(
-                "Interrupted while awaiting response during upload of '%s' with UploadID '%s'",
-                resourceId, responseObserver.uploadId));
-      }
       if (responseObserver.hasTransientError()) {
         throw new IOException(
             String.format("Got transient error for UploadID '%s'", responseObserver.uploadId),
@@ -386,32 +406,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
       return checkNotNull(request, "Request chunk not found for '%s'", resourceId);
     }
 
-    /*
-    If dataChunkMap is full, get the committedWriteOffset. This will make a API call to the
-    server and add latency in this path/context. Since there are already chunks in flight,
-    calling this API will not reduce overall throughput. It will throttle the upstream
-    write call now rather than onFinalize, which is fine. This will also increase QPS to
-    the GCS backend. The increase will be linear to number of chunks written, so that
-    should also be fine.    */
-    private void freeUpCommittedRequests(
-        TreeMap<Long, WriteObjectRequest> requestChunkMap, long writeOffset) throws IOException {
-
-      long committedWriteOffset = getCommittedWriteSizeWithRetries(uploadId);
-      logger.atFinest().log(
-          "Fetched committedWriteOffset: size:%d, numBuffers:%d, writeOffset:%d, committedWriteOffset:%d",
-          requestChunkMap.size(),
-          channelOptions.getNumberOfBufferedRequests(),
-          writeOffset,
-          committedWriteOffset);
-
-      // check and remove chunks from dataChunkMap
-      while (requestChunkMap.size() > 0 && requestChunkMap.firstKey() < committedWriteOffset) {
-        logger.atFinest().log(
-            "clearing dataChunkMap one buffer at a time, size: %d, firstKey:%d, committedwriteOffset:%d",
-            requestChunkMap.size(), requestChunkMap.firstKey(), committedWriteOffset);
-        requestChunkMap.remove(requestChunkMap.firstKey());
-      }
-    }
     /** Handler for responses from the Insert streaming RPC. */
     private class InsertChunkResponseObserver
         implements ClientResponseObserver<WriteObjectRequest, WriteObjectResponse> {
@@ -487,6 +481,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
       public void beforeStart(
           ClientCallStreamObserver<WriteObjectRequest> clientCallStreamObserver) {
         clientCallStreamObserver.setOnReadyHandler(ready::countDown);
+      }
+
+      public boolean isComplete() {
+        return done.getCount() != 0 ? false : true;
       }
     }
 
