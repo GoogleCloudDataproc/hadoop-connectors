@@ -254,7 +254,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
           watchdog.watch(
               call,
               writeObjectRequestStreamObserver,
-              Duration.ofSeconds(channelOptions.getGrpcWriteMessageTimeoutMillis()));
+              Duration.ofMillis(channelOptions.getGrpcWriteMessageTimeoutMillis()));
 
       // Wait for streaming RPC to become ready for upload.
       try {
@@ -275,7 +275,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
 
       boolean objectFinalized = false;
       while (!objectFinalized) {
-
         if (responseObserver.isComplete()) {
           // reset streams
           responseObserver = new InsertChunkResponseObserver(uploadId, writeOffset);
@@ -289,7 +288,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
               watchdog.watch(
                   call,
                   writeObjectRequestStreamObserver,
-                  Duration.ofSeconds(channelOptions.getGrpcWriteMessageTimeoutMillis()));
+                  Duration.ofMillis(channelOptions.getGrpcWriteMessageTimeoutMillis()));
         }
 
         WriteObjectRequest insertRequest = null;
@@ -311,18 +310,27 @@ public final class GoogleCloudStorageGrpcWriteChannel
           objectFinalized = insertRequest.getFinishWrite();
         }
         if (responseObserver.hasTransientError() || responseObserver.hasNonTransientError()) {
-          requestStreamObserver.onError(
-              responseObserver.hasTransientError()
-                  ? responseObserver.transientError
-                  : responseObserver.nonTransientError);
           break;
         }
         if (objectFinalized
             || requestChunkMap.size() >= channelOptions.getNumberOfBufferedRequests()) {
-          // close request stream if final request OR Map is full
+          // We are closing request stream either
+          // 1. It's final request OR
+          // 2. If requestChunkMap is full -> to make sure that gcs checkpoint already sent chunks.
           requestStreamObserver.onCompleted();
           try {
             responseObserver.done.await();
+            if (responseObserver.hasTransientError() || responseObserver.hasNonTransientError()) {
+              // responseObserver
+              break;
+            }
+            // Clear the cached requests as we have established that
+            // 1. No more request to send in this stream AND
+            // 2. ResponseObserver is in Done state AND
+            // 3. No Error in ResponseObserver
+            logger.atFinest().log(
+                "Committed %d chunks against uploadId %s, resource %s. Cleaning up the requestChunkMap now.",
+                requestChunkMap.size(), uploadId, resourceId.toString());
             requestChunkMap.clear();
           } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -335,6 +343,10 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
 
       if (responseObserver.hasTransientError()) {
+        requestStreamObserver.onError(
+            responseObserver.hasTransientError()
+                ? responseObserver.transientError
+                : responseObserver.nonTransientError);
         throw new IOException(
             String.format("Got transient error for UploadID '%s'", responseObserver.uploadId),
             responseObserver.transientError);
@@ -483,7 +495,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
 
       public boolean isComplete() {
-        return done.getCount() != 0 ? false : true;
+        return done.getCount() == 0 ? true : false;
       }
     }
 

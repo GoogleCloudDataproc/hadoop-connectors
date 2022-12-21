@@ -52,6 +52,7 @@ import com.google.storage.v2.WriteObjectRequest;
 import com.google.storage.v2.WriteObjectResponse;
 import com.google.storage.v2.WriteObjectSpec;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.Server;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.inprocess.InProcessChannelBuilder;
@@ -583,6 +584,51 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   }
 
   @Test
+  public void verifyResponseObserverThrows() throws IOException {
+    Throwable fakeException = new RuntimeException("ResponseObserver's onError is called");
+    fakeService =
+        spy(
+            new FakeService() {
+              @Override
+              public StreamObserver<WriteObjectRequest> writeObject(
+                  StreamObserver<WriteObjectResponse> responseObserver) {
+                InsertRequestObserver insertRequestObserverLatest =
+                    spy(
+                        new InsertRequestObserver(null, null) {
+                          @Override
+                          public void onCompleted() {
+                            // onCompleted on Fake RequestObserver will make sure to trigger
+                            // responseObserver's onError
+                            this.onError(fakeException);
+                          }
+                        });
+                insertRequestObserverLatest.responseObserver = responseObserver;
+                return insertRequestObserverLatest;
+              }
+            });
+
+    String serverName = InProcessServerBuilder.generateName();
+    Server server =
+        InProcessServerBuilder.forName(serverName)
+            .directExecutor()
+            .addService(fakeService)
+            .build()
+            .start();
+    stub =
+        StorageGrpc.newStub(InProcessChannelBuilder.forName(serverName).directExecutor().build());
+
+    GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
+
+    ByteString data = ByteString.copyFromUtf8("test data");
+    writeChannel.initialize();
+    writeChannel.write(data.asReadOnlyByteBuffer());
+    assertThrows(IOException.class, writeChannel::close);
+
+    verify(fakeService, times(1)).startResumableWrite(eq(START_REQUEST), any());
+    server.shutdown();
+  }
+
+  @Test
   public void getItemInfoReturnsNullBeforeClose() throws Exception {
     GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
 
@@ -749,8 +795,9 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     for (InsertRequestObserver requestObserver : fakeService.insertRequestObserverList) {
       verify(requestObserver, times(1))
           .onNext(expectedInsertRequest != null ? expectedInsertRequest : requestCaptor.capture());
-      // TODO: should be able to verify the onError too.
-      if (!requestObserver.isErrored()) {
+      if (requestObserver.isErrored()) {
+        verify(requestObserver, times(1)).onError(any());
+      } else {
         verify(requestObserver, times(1)).onCompleted();
       }
     }
@@ -894,8 +941,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
       @Override
       public void onNext(WriteObjectRequest request) {
         if (insertRequestException != null) {
-          errored = true;
-          responseObserver.onError(insertRequestException);
+          onError(insertRequestException);
           if (resumeFromInsertException) {
             insertRequestException = null;
           }
@@ -904,6 +950,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
 
       @Override
       public void onError(Throwable t) {
+        errored = true;
         responseObserver.onError(t);
       }
 
