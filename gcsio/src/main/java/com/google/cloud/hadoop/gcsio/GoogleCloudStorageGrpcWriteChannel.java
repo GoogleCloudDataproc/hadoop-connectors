@@ -274,7 +274,6 @@ public final class GoogleCloudStorageGrpcWriteChannel
       }
 
       boolean objectFinalized = false;
-      boolean exception = false;
       while (!objectFinalized) {
 
         if (responseObserver.isComplete()) {
