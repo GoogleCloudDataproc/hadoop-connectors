@@ -74,11 +74,6 @@ public class GcsJavaClientImpl implements GoogleCloudStorage {
               getWriteGeneration(resourceId, options.isOverwriteExisting()));
     }
 
-    ObjectWriteConditions writeConditions =
-        ObjectWriteConditions.builder()
-            .setContentGenerationMatch(resourceId.getGenerationId())
-            .build();
-
     // Thread-pool used for background tasks.
     ExecutorService backgroundTasksThreadPool =
         Executors.newCachedThreadPool(
@@ -89,12 +84,7 @@ public class GcsJavaClientImpl implements GoogleCloudStorage {
 
     GCSJavaClientWriteChannel channel =
         new GCSJavaClientWriteChannel(
-            storage,
-            storageOptions,
-            resourceId,
-            writeConditions,
-            options,
-            backgroundTasksThreadPool);
+            storage, storageOptions, resourceId, options, backgroundTasksThreadPool);
     channel.initialize();
     return channel;
   }

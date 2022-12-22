@@ -17,6 +17,7 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -31,7 +32,6 @@ public class GCSJavaClientWriteChannel extends AbstractGoogleAsyncWriteChannel<B
   private final AsyncWriteChannelOptions channelOptions;
   private final Storage storage;
   private WriteChannel writeChannel;
-  private final ObjectWriteConditions writeConditions;
   private final CreateObjectOptions createOptions;
   private Boolean uploadSuccess = false;
   // TODO: not supported as of now
@@ -41,14 +41,12 @@ public class GCSJavaClientWriteChannel extends AbstractGoogleAsyncWriteChannel<B
       Storage storage,
       GoogleCloudStorageOptions storageOptions,
       StorageResourceId resourceId,
-      ObjectWriteConditions writeConditions,
       CreateObjectOptions createOptions,
       ExecutorService uploadThreadPool) {
     super(uploadThreadPool, storageOptions.getWriteChannelOptions());
     this.storage = storage;
     this.storageOptions = storageOptions;
     this.resourceId = resourceId;
-    this.writeConditions = writeConditions;
     this.createOptions = createOptions;
     this.channelOptions = storageOptions.getWriteChannelOptions();
   }
@@ -60,6 +58,7 @@ public class GCSJavaClientWriteChannel extends AbstractGoogleAsyncWriteChannel<B
     BlobInfo blobInfo =
         BlobInfo.newBuilder(blobId)
             .setContentType(createOptions.getContentType())
+            .setContentEncoding(createOptions.getContentEncoding())
             .setMetadata(encodeMetadata(createOptions.getMetadata()))
             .build();
     this.writeChannel = storage.writer(blobInfo, generateWriteOptions());
@@ -137,11 +136,12 @@ public class GCSJavaClientWriteChannel extends AbstractGoogleAsyncWriteChannel<B
   }
 
   private BlobWriteOption[] generateWriteOptions() {
-    List<BlobWriteOption> writeOptions = writeConditions.apply();
+    List<BlobWriteOption> writeOptions = new ArrayList<>();
+    writeOptions.add(BlobWriteOption.disableGzipContent());
+    writeOptions.add(BlobWriteOption.generationMatch());
     if (createOptions.getKmsKeyName() != null) {
       writeOptions.add(BlobWriteOption.kmsKeyName(createOptions.getKmsKeyName()));
     }
-    writeOptions.add(BlobWriteOption.disableGzipContent());
 
     if (channelOptions.isGrpcChecksumsEnabled()) {
       writeOptions.add(BlobWriteOption.crc32cMatch());

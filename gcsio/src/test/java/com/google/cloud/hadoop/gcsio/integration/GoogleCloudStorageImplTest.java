@@ -83,7 +83,8 @@ public class GoogleCloudStorageImplTest {
   @Parameters
   // We want to test this entire class with both javaClientImpl and gcsImpl
   public static Iterable<Boolean> javaClientEnabled() {
-    return List.of(false, true);
+    return List.of(true);
+    // return List.of(false, true);
   }
 
   @Rule
