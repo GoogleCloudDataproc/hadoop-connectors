@@ -155,8 +155,11 @@ public class GCSJavaClientWriteChannel extends AbstractGoogleAsyncWriteChannel<B
       super.close();
       writeChannel.close();
     } catch (IOException e) {
-      logger.atSevere().withCause(e).log("Exception while closing the channel");
+      logger.atSevere().withCause(e).log("Exception while closing write channel");
       throw e;
+    } catch (Exception e) {
+      logger.atSevere().withCause(e).log("Exception while closing write channel");
+      throw new IOException(String.format("Upload failed for '%s'", getResourceString()), e);
     }
   }
 

@@ -1,10 +1,16 @@
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.testing.MockGoogleCloudStorageImplFactory.mockGcsJavaStorage;
+import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonErrorResponse;
+import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
+import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth.assertWithMessage;
 import static com.google.storage.v2.ServiceConstants.Values.MAX_WRITE_CHUNK_BYTES;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -12,19 +18,25 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.cloud.RestorableState;
+import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.cloud.WriteChannel;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.Storage.BlobWriteOption;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedByInterruptException;
+import java.nio.channels.WritableByteChannel;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.junit.Before;
 import org.junit.Test;
@@ -117,6 +129,67 @@ public class GcsJavaClientWriteChannelTest {
     assertFalse(writeChannel.isUploadSuccessful());
   }
 
+  /**
+   * Test handling when the parent thread waiting for the write to finish via the close call is
+   * interrupted, that the actual write is cancelled and interrupted as well.
+   */
+  @Test
+  public void testCreateObjectApiInterruptedException() throws Exception {
+
+    Storage mockedJavaClientStorage = mock(Storage.class);
+    // Set up the mock Insert to wait forever.
+    CountDownLatch waitForEverLatch = new CountDownLatch(1);
+    CountDownLatch writeStartedLatch = new CountDownLatch(2);
+    CountDownLatch threadsDoneLatch = new CountDownLatch(2);
+    // Mock getItemInfo call
+    MockHttpTransport transport = mockTransport(jsonErrorResponse(ErrorResponses.NOT_FOUND));
+
+    when(mockedJavaClientStorage.writer(any(), any()))
+        .thenReturn(
+            new FakeWriteChannel() {
+              @Override
+              public int write(ByteBuffer src) {
+                try {
+                  writeStartedLatch.countDown();
+                  waitForEverLatch.await();
+                } catch (InterruptedException e) {
+                  // Expected test behavior. Do nothing.
+                } finally {
+                  threadsDoneLatch.countDown();
+                }
+                fail("Unexpected to get here.");
+                return 0;
+              }
+            });
+    GoogleCloudStorage gcs = mockGcsJavaStorage(transport, mockedJavaClientStorage);
+
+    WritableByteChannel writeChannel = gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
+    assertThat(writeChannel.isOpen()).isTrue();
+
+    ExecutorService executorService = Executors.newCachedThreadPool();
+    Future<?> callForClose =
+        executorService.submit(
+            () -> {
+              writeStartedLatch.countDown();
+              try {
+                IOException ioe = assertThrows(IOException.class, writeChannel::close);
+                assertThat(ioe).isInstanceOf(ClosedByInterruptException.class);
+              } finally {
+                threadsDoneLatch.countDown();
+              }
+            });
+    // Wait for the insert object to be executed, then cancel the writing thread, and finally wait
+    // for the two threads to finish.
+    assertWithMessage("Neither thread started.")
+        .that(writeStartedLatch.await(5000, TimeUnit.MILLISECONDS))
+        .isTrue();
+    // callForClose will be waiting on write(waiting forever) to finish. Interrupt it.
+    callForClose.cancel(/* interrupt= */ true);
+    assertWithMessage("Failed to wait for tasks to get interrupted.")
+        .that(threadsDoneLatch.await(5000, TimeUnit.MILLISECONDS))
+        .isTrue();
+  }
+
   private ByteString createTestData(int numBytes) {
     byte[] result = new byte[numBytes];
     for (int i = 0; i < numBytes; ++i) {
@@ -169,58 +242,5 @@ public class GcsJavaClientWriteChannelTest {
             Collectors.toMap(
                 entity -> entity.getKey(),
                 entity -> GoogleCloudStorageImpl.decodeMetadataValues(entity.getValue())));
-  }
-
-  /** FakeWriterChannel which writes only half the passed in byteBuffer capacity at a time. */
-  private class FakeWriteChannel implements WriteChannel {
-
-    private boolean isOpen = false;
-
-    private boolean writeException = false;
-
-    public FakeWriteChannel() {
-      isOpen = true;
-    }
-
-    public FakeWriteChannel(Boolean writeException) {
-      this();
-      this.writeException = writeException;
-    }
-
-    @Override
-    public void setChunkSize(int i) {}
-
-    @Override
-    public RestorableState<WriteChannel> capture() {
-      return null;
-    }
-
-    @Override
-    public int write(ByteBuffer src) throws IOException {
-      if (writeException) {
-        throw new IOException("Intentionally triggered");
-      }
-      int bytesWritten = 0;
-      // always writes half or lesser from the provided byte buffer capacity
-      int capacity = src.capacity();
-      if ((src.limit() - src.position()) <= capacity / 2) {
-        bytesWritten = src.limit();
-        src.position(src.limit());
-      } else {
-        bytesWritten = capacity / 2;
-        src.position(src.position() + capacity / 2);
-      }
-      return bytesWritten;
-    }
-
-    @Override
-    public boolean isOpen() {
-      return isOpen;
-    }
-
-    @Override
-    public void close() throws IOException {
-      isOpen = false;
-    }
   }
 }

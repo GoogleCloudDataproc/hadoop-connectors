@@ -282,28 +282,25 @@ public class GcsJavaClientImpl implements GoogleCloudStorage {
     }
 
     private Storage createStorage(GoogleCloudStorageOptions options, Credentials credentials) {
-      Storage s = null;
-
       if (options.isGrpcEnabled()) {
-        s =
+        Storage s =
             StorageOptions.grpc()
                 .setAttemptDirectPath(true)
                 .setCredentials(credentials)
                 .setServiceRpcFactory(HttpStorageOptions.defaults().getDefaultRpcFactory())
                 .build()
                 .getService();
-      } else {
-        // Json Veneer
-        s = StorageOptions.newBuilder().setCredentials(credentials).build().getService();
+        return s;
       }
-      return s;
+      // Json Veneer
+      return StorageOptions.newBuilder().setCredentials(credentials).build().getService();
     }
 
     public GcsJavaClientImpl build() throws IOException {
-      this.javaClientStorage =
-          this.javaClientStorage == null
-              ? checkNotNull(createStorage(storageOptions, credentials), "storage must not be null")
-              : this.javaClientStorage;
+      if (this.javaClientStorage == null) {
+        this.javaClientStorage =
+            checkNotNull(createStorage(storageOptions, credentials), "storage must not be null");
+      }
       return new GcsJavaClientImpl(this);
     }
   }
