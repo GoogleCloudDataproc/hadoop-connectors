@@ -235,11 +235,9 @@ public class GoogleCloudStorageTestHelper {
     long startTime = System.currentTimeMillis();
     try (WritableByteChannel ignore = channel) {
       for (int i = 0; i < partitionsCount; i++) {
-        int bytesWritten = channel.write(ByteBuffer.wrap(partition));
-        logger.atInfo().log("bytes written %d", bytesWritten);
+        channel.write(ByteBuffer.wrap(partition));
       }
     }
-    channel.close();
     long endTime = System.currentTimeMillis();
     logger.atInfo().log(
         "Took %sms to write %sB", (endTime - startTime), (long) partitionsCount * partitionSize);
