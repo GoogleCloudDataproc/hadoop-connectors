@@ -64,7 +64,6 @@ public class MockGoogleCloudStorageImplFactory {
         GoogleCloudStorageOptions.builder()
             .setAppName("gcsio-unit-test")
             .setProjectId(PROJECT_ID)
-            .setGrpcEnabled(true)
             .build(),
         transport,
         javaClientStorage);
@@ -80,11 +79,13 @@ public class MockGoogleCloudStorageImplFactory {
         new Storage(
             transport,
             GsonFactory.getDefaultInstance(),
-            new RetryHttpInitializer(
-                fakeCredential,
-                RetryHttpInitializerOptions.builder()
-                    .setDefaultUserAgent("gcs-io-unit-test")
-                    .build()));
+            new TrackingHttpRequestInitializer(
+                new RetryHttpInitializer(
+                    new FakeCredentials(),
+                    RetryHttpInitializerOptions.builder()
+                        .setDefaultUserAgent("gcs-io-unit-test")
+                        .build()),
+                false));
     return new GcsJavaClientImplBuilder(options, fakeCredential, null)
         .withApairyClientStorage(storage)
         .withJavaClientStorage(javaClientStorage)

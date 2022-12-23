@@ -245,11 +245,11 @@ public class GoogleCloudStorageImplTest {
   public void writeObject_withNonAlignedUploadChunk() throws IOException {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
 
-    int uploadChunkSize = 1 * 1024 * 1024;
+    int uploadChunkSize = 3 * 1024 * 1024;
     TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
         newTrackingGoogleCloudStorage(getOptionsWithUploadChunk(uploadChunkSize));
 
-    int partitionsCount = 5;
+    int partitionsCount = 17;
     byte[] partition =
         writeObject(
             trackingGcs.delegate, resourceId, /* partitionSize= */ 1024 * 1024, partitionsCount);

@@ -36,23 +36,27 @@ public class GcsJavaClientImpl implements GoogleCloudStorage {
   private GoogleCloudStorageImpl gcsClientDelegate;
 
   private GoogleCloudStorageOptions storageOptions;
-  private Credentials credentials;
   private Storage storage;
 
   private GcsJavaClientImpl(GcsJavaClientImplBuilder builder) throws IOException {
     this.storageOptions = checkNotNull(builder.storageOptions, "options must not be null");
-    this.credentials = checkNotNull(builder.credentials, "credentials must not be null");
     this.storage = checkNotNull(builder.javaClientStorage, "storage must not be null");
+    checkNotNull(builder.credentials, "credentials must not be null");
     if (builder.httpRequestInitializer != null) {
       logger.atWarning().log(
           "Overriding httpRequestInitializer. ALERT: Should not be hit in production");
       this.gcsClientDelegate =
-          new GoogleCloudStorageImpl(this.storageOptions, builder.httpRequestInitializer);
+          new GoogleCloudStorageImpl(
+              this.storageOptions, builder.httpRequestInitializer, builder.downscopedAccessTokenFn);
     } else if (builder.storage != null) {
       logger.atWarning().log("Overriding storage. ALERT: Should not be hit in production");
-      this.gcsClientDelegate = new GoogleCloudStorageImpl(this.storageOptions, builder.storage);
+      this.gcsClientDelegate =
+          new GoogleCloudStorageImpl(
+              this.storageOptions, builder.storage, builder.downscopedAccessTokenFn);
     } else {
-      this.gcsClientDelegate = new GoogleCloudStorageImpl(this.storageOptions, this.credentials);
+      this.gcsClientDelegate =
+          new GoogleCloudStorageImpl(
+              this.storageOptions, builder.credentials, builder.downscopedAccessTokenFn);
     }
   }
 
@@ -280,7 +284,7 @@ public class GcsJavaClientImpl implements GoogleCloudStorage {
       return this;
     }
 
-    private Storage createStorage(GoogleCloudStorageOptions options, Credentials credentials) {
+    private Storage createStorage(Credentials credentials) {
       return StorageOptions.grpc()
           .setAttemptDirectPath(true)
           .setCredentials(credentials)
@@ -291,7 +295,7 @@ public class GcsJavaClientImpl implements GoogleCloudStorage {
     public GcsJavaClientImpl build() throws IOException {
       if (this.javaClientStorage == null) {
         this.javaClientStorage =
-            checkNotNull(createStorage(storageOptions, credentials), "storage must not be null");
+            checkNotNull(createStorage(credentials), "storage must not be null");
       }
       return new GcsJavaClientImpl(this);
     }

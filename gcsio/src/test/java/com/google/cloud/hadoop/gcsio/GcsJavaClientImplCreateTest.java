@@ -30,11 +30,6 @@ public class GcsJavaClientImplCreateTest {
   private static final String BUCKET_NAME = "foo-bucket";
   private static final String OBJECT_NAME = "bar-object";
   private static final Storage mockedJavaClientStorage = mock(Storage.class);
-  private GoogleCloudStorageOptions storageOptions =
-      GoogleCloudStorageOptions.builder()
-          .setAppName("gcsio-unit-test")
-          .setGrpcEnabled(true)
-          .build();
 
   /**
    * Test handling of various types of Errors thrown during JSON API call for
