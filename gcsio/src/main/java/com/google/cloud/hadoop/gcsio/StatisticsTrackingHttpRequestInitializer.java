@@ -37,10 +37,8 @@ class StatisticsTrackingHttpRequestInitializer implements HttpRequestInitializer
     request.setResponseInterceptor(
         httpResponse -> {
           String requestMethod = Ascii.toLowerCase(httpResponse.getRequest().getRequestMethod());
-          int statusCode = httpResponse.getStatusCode();
-          statistics
-              .computeIfAbsent("http_" + requestMethod + "_" + statusCode, k -> new AtomicLong())
-              .incrementAndGet();
+          String statKey = String.format("http_%s_%d", requestMethod, httpResponse.getStatusCode());
+          statistics.computeIfAbsent(statKey, k -> new AtomicLong()).incrementAndGet();
         });
   }
 

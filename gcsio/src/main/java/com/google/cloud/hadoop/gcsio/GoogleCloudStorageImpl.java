@@ -244,7 +244,8 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   // Request initializer to use for batch and non-batch requests.
   private final HttpRequestInitializer httpRequestInitializer;
 
-  private final StatisticsTrackingHttpRequestInitializer httpStatistics;
+  private final StatisticsTrackingHttpRequestInitializer httpStatistics =
+      new StatisticsTrackingHttpRequestInitializer();
 
   // Configuration values for this instance
   private final GoogleCloudStorageOptions storageOptions;
@@ -344,48 +345,51 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   @VisibleForTesting
   GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options,
-      Credentials credentials,
-      HttpTransport httpTransport,
-      HttpRequestInitializer httpRequestInitializer,
+      Credentials credentialsParam,
+      HttpTransport httpTransportParam,
+      HttpRequestInitializer httpRequestInitializerParam,
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
     logger.atFiner().log("GCS(options: %s)", options);
 
     checkNotNull(options, "options must not be null").throwIfNotValid();
-    // If credentials var is null then use httpRequestInitializer to initialize it
-    if (credentials == null && httpRequestInitializer != null) {
-      checkArgument(
-          httpRequestInitializer instanceof RetryHttpInitializer,
-          "httpRequestInitializer (%s) should be an instance of RetryHttpInitializer for"
-              + " credentials initialization",
-          httpRequestInitializer.getClass());
-      credentials = ((RetryHttpInitializer) httpRequestInitializer).getCredentials();
-    }
-    // If httpRequestInitializer var is null then use credentials to initialize it
-    if (httpRequestInitializer == null) {
-      httpRequestInitializer =
-          new RetryHttpInitializer(credentials, options.toRetryHttpInitializerOptions());
-    }
-
     this.storageOptions = options;
-    this.downscopedAccessTokenFn = downscopedAccessTokenFn;
 
-    this.httpStatistics = new StatisticsTrackingHttpRequestInitializer();
+    Credentials credentials;
+    // If credentialsParam is null then use httpRequestInitializerParam to initialize credentials
+    if (credentialsParam == null && httpRequestInitializerParam != null) {
+      checkArgument(
+          httpRequestInitializerParam instanceof RetryHttpInitializer,
+          "httpRequestInitializerParam (%s) should be an instance of RetryHttpInitializer for"
+              + " credentials initialization",
+          httpRequestInitializerParam.getClass());
+      credentials = ((RetryHttpInitializer) httpRequestInitializerParam).getCredentials();
+    } else {
+      credentials = credentialsParam;
+    }
 
+    // If httpRequestInitializerParam is null then use
+    // credentials to initialize httpRequestInitializer
+    HttpRequestInitializer httpRequestInitializer =
+        httpRequestInitializerParam == null
+            ? new RetryHttpInitializer(credentials, options.toRetryHttpInitializerOptions())
+            : httpRequestInitializerParam;
     this.httpRequestInitializer =
         options.isTraceLogEnabled()
             ? new ChainingHttpRequestInitializer(
                 httpStatistics, httpRequestInitializer, new EventLoggingHttpRequestInitializer())
             : new ChainingHttpRequestInitializer(httpStatistics, httpRequestInitializer);
 
-    if (httpTransport == null) {
-      httpTransport =
-          HttpTransportFactory.createHttpTransport(
-              options.getProxyAddress(),
-              options.getProxyUsername(),
-              options.getProxyPassword(),
-              Duration.ofMillis(options.getHttpRequestReadTimeout()));
-    }
+    this.downscopedAccessTokenFn = downscopedAccessTokenFn;
+
+    HttpTransport httpTransport =
+        httpTransportParam == null
+            ? HttpTransportFactory.createHttpTransport(
+                options.getProxyAddress(),
+                options.getProxyUsername(),
+                options.getProxyPassword(),
+                Duration.ofMillis(options.getHttpRequestReadTimeout()))
+            : httpTransportParam;
     this.storage =
         new Storage.Builder(
                 httpTransport, GsonFactory.getDefaultInstance(), this.httpRequestInitializer)
