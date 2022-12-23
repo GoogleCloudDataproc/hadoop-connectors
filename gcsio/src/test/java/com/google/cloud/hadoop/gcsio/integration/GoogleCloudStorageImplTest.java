@@ -53,6 +53,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 import org.junit.After;
 import org.junit.Before;
@@ -83,8 +84,7 @@ public class GoogleCloudStorageImplTest {
   @Parameters
   // We want to test this entire class with both javaClientImpl and gcsImpl
   public static Iterable<Boolean> javaClientEnabled() {
-    return List.of(true);
-    // return List.of(false, true);
+    return List.of(false, true);
   }
 
   @Rule
@@ -294,7 +294,10 @@ public class GoogleCloudStorageImplTest {
 
     // Closing byte channel2 should fail:
     Throwable thrown = assertThrows(Throwable.class, channel2::close);
-    assertThat(thrown).hasCauseThat().hasMessageThat().contains("412 Precondition Failed");
+    assertThat(thrown)
+        .hasCauseThat()
+        .hasMessageThat()
+        .containsMatch(Pattern.compile("(412 Precondition Failed)|(FAILED_PRECONDITION)"));
 
     assertObjectContent(helperGcs, resourceId, bytesToWrite, /* expectedBytesCount= */ 1);
     if (isTraceSupported()) {
