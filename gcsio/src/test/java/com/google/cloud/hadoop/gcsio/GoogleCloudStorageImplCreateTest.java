@@ -14,6 +14,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.testing.MockGoogleCloudStorageImplFactory.mockGcsJavaStorage;
 import static com.google.cloud.hadoop.gcsio.testing.MockGoogleCloudStorageImplFactory.mockedGcs;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.arbitraryInputStreamSupplier;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.inputStreamResponse;
@@ -24,7 +25,11 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.services.storage.Storage;
@@ -36,8 +41,10 @@ import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
 import com.google.cloud.hadoop.util.testing.ThrowingInputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.WritableByteChannel;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -45,14 +52,30 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
 /** Tests that require a particular configuration of GoogleCloudStorageImpl. */
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class GoogleCloudStorageImplCreateTest {
 
   private static final String BUCKET_NAME = "foo-bucket";
   private static final String OBJECT_NAME = "bar-object";
+  private static final com.google.cloud.storage.Storage mockedJavaClientStorage =
+      mock(com.google.cloud.storage.Storage.class);
+
+  private final boolean javaClientEnabled;
+
+  public GoogleCloudStorageImplCreateTest(boolean javaClientEnabled) {
+    this.javaClientEnabled = javaClientEnabled;
+  }
+
+  @Parameters
+  // We want to test this entire class with both javaClientImp and gcsImpl
+  // Some of our internal endpoints only work with TD
+  public static Iterable<Boolean> javaClientEnabled() {
+    return List.of(false, true);
+  }
 
   @Test
   public void create_grpc_useDirectpath() throws IOException {
@@ -108,7 +131,16 @@ public class GoogleCloudStorageImplCreateTest {
                 CONTENT_LENGTH,
                 /* headerValue = */ 1,
                 new ThrowingInputStream(/* readException = */ null, fakeError)));
-    GoogleCloudStorageImpl gcs = mockedGcs(transport);
+    // This mock will be used only when JavaClientStorage is enabled
+    when(mockedJavaClientStorage.writer(any(), any()))
+        .thenReturn(
+            new FakeWriteChannel() {
+              @Override
+              public void close() {
+                throw fakeError;
+              }
+            });
+    GoogleCloudStorage gcs = getCloudStorageImpl(transport);
 
     WritableByteChannel writeChannel = gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
     assertThat(writeChannel.isOpen()).isTrue();
@@ -132,7 +164,16 @@ public class GoogleCloudStorageImplCreateTest {
                 CONTENT_LENGTH,
                 /* headerValue = */ 1,
                 new ThrowingInputStream(/* readException = */ null, fakeException)));
-    GoogleCloudStorageImpl gcs = mockedGcs(transport);
+    // This mock will be used only when JavaClientStorage is enabled
+    when(mockedJavaClientStorage.writer(any(), any()))
+        .thenReturn(
+            new FakeWriteChannel() {
+              @Override
+              public void close() {
+                throw fakeException;
+              }
+            });
+    GoogleCloudStorage gcs = getCloudStorageImpl(transport);
 
     WritableByteChannel writeChannel = gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
     assertThat(writeChannel.isOpen()).isTrue();
@@ -167,7 +208,27 @@ public class GoogleCloudStorageImplCreateTest {
                   }
                   return null;
                 }));
-    GoogleCloudStorageImpl gcs = mockedGcs(transport);
+
+    // This mock will be used only when JavaClientStorage is enabled
+    when(mockedJavaClientStorage.writer(any(), any()))
+        .thenReturn(
+            new FakeWriteChannel() {
+              @Override
+              public int write(ByteBuffer src) {
+                try {
+                  writeStartedLatch.countDown();
+                  waitForEverLatch.await();
+                } catch (InterruptedException e) {
+                  // Expected test behavior. Do nothing.
+                } finally {
+                  threadsDoneLatch.countDown();
+                }
+                fail("Unexpected to get here.");
+                return 0;
+              }
+            });
+
+    GoogleCloudStorage gcs = getCloudStorageImpl(transport);
 
     WritableByteChannel writeChannel = gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
     assertThat(writeChannel.isOpen()).isTrue();
@@ -189,10 +250,18 @@ public class GoogleCloudStorageImplCreateTest {
     assertWithMessage("Neither thread started.")
         .that(writeStartedLatch.await(5000, TimeUnit.MILLISECONDS))
         .isTrue();
+    // callForClose will be waiting on write(waiting forever) to finish. Interrupt it.
     write.cancel(/* interrupt= */ true);
     assertWithMessage("Failed to wait for tasks to get interrupted.")
         .that(threadsDoneLatch.await(5000, TimeUnit.MILLISECONDS))
         .isTrue();
+  }
+
+  private GoogleCloudStorage getCloudStorageImpl(HttpTransport transport) throws IOException {
+    if (javaClientEnabled) {
+      return mockGcsJavaStorage(transport, mockedJavaClientStorage);
+    }
+    return mockedGcs(transport);
   }
 
   private static Storage createStorage() throws IOException {

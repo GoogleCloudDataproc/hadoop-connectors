@@ -1,28 +1,23 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.testing.MockGoogleCloudStorageImplFactory.mockGcsJavaStorage;
+import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonDataResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonErrorResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.api.client.testing.http.MockHttpTransport;
+import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
 import com.google.cloud.storage.Storage;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.ClosedByInterruptException;
+import java.math.BigInteger;
 import java.nio.channels.WritableByteChannel;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.nio.file.FileAlreadyExistsException;
 import org.junit.Test;
 
 public class GcsJavaClientImplCreateTest {
@@ -83,59 +78,42 @@ public class GcsJavaClientImplCreateTest {
     assertThat(thrown).hasCauseThat().isEqualTo(fakeException);
   }
 
-  /**
-   * Test handling when the parent thread waiting for the write to finish via the close call is
-   * interrupted, that the actual write is cancelled and interrupted as well.
-   */
   @Test
-  public void testCreateObjectApiInterruptedException() throws Exception {
-    // Set up the mock Insert to wait forever.
-    CountDownLatch waitForEverLatch = new CountDownLatch(1);
-    CountDownLatch writeStartedLatch = new CountDownLatch(2);
-    CountDownLatch threadsDoneLatch = new CountDownLatch(2);
-    when(mockedJavaClientStorage.writer(any(), any()))
-        .thenReturn(
-            new FakeWriteChannel() {
-              @Override
-              public int write(ByteBuffer src) {
-                try {
-                  writeStartedLatch.countDown();
-                  waitForEverLatch.await();
-                  fail("Unexpected to get here.");
-                } catch (InterruptedException e) {
-                  // Expected test behavior. Do nothing.
-                } finally {
-                  threadsDoneLatch.countDown();
-                }
-                return 0;
-              }
-            });
-    MockHttpTransport transport = mockTransport(jsonErrorResponse(ErrorResponses.NOT_FOUND));
+  public void testFileExistException() throws IOException {
+
+    StorageObject storageObject =
+        new StorageObject()
+            .setBucket(BUCKET_NAME)
+            .setName(OBJECT_NAME)
+            .setSize(BigInteger.ONE)
+            .setStorageClass("standard");
+    // Mocking getItemInfo
+    MockHttpTransport transport = mockTransport(jsonDataResponse(storageObject));
+
     GoogleCloudStorage gcs = mockGcsJavaStorage(transport, mockedJavaClientStorage);
+    assertThrows(
+        FileAlreadyExistsException.class,
+        () ->
+            gcs.create(
+                new StorageResourceId(BUCKET_NAME, OBJECT_NAME),
+                CreateObjectOptions.DEFAULT_NO_OVERWRITE));
+  }
 
-    WritableByteChannel writeChannel = gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME));
-    assertThat(writeChannel.isOpen()).isTrue();
+  @Test
+  public void testResourceIllegalStateException() throws IOException {
 
-    ExecutorService executorService = Executors.newCachedThreadPool();
-    Future<?> write =
-        executorService.submit(
-            () -> {
-              writeStartedLatch.countDown();
-              try {
-                IOException ioe = assertThrows(IOException.class, writeChannel::close);
-                assertThat(ioe).isInstanceOf(ClosedByInterruptException.class);
-              } finally {
-                threadsDoneLatch.countDown();
-              }
-            });
-    // Wait for the insert object to be executed, then cancel the writing thread, and finally wait
-    // for the two threads to finish.
-    assertWithMessage("Neither thread started.")
-        .that(writeStartedLatch.await(5000, TimeUnit.MILLISECONDS))
-        .isTrue();
-    write.cancel(/* interrupt= */ true);
-    assertWithMessage("Failed to wait for tasks to get interrupted.")
-        .that(threadsDoneLatch.await(5000, TimeUnit.MILLISECONDS))
-        .isTrue();
+    StorageObject storageObject =
+        new StorageObject()
+            .setBucket(BUCKET_NAME)
+            .setName(OBJECT_NAME)
+            .setSize(BigInteger.ONE)
+            .setStorageClass("standard");
+    // Mocking getItemInfo
+    MockHttpTransport transport = mockTransport(jsonDataResponse(storageObject));
+
+    GoogleCloudStorage gcs = mockGcsJavaStorage(transport, mockedJavaClientStorage);
+    assertThrows(
+        IllegalStateException.class,
+        () -> gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME)));
   }
 }

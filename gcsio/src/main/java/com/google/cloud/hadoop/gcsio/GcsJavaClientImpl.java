@@ -1,5 +1,6 @@
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
@@ -68,6 +69,9 @@ public class GcsJavaClientImpl implements GoogleCloudStorage {
   @Override
   public WritableByteChannel create(StorageResourceId resourceId, CreateObjectOptions options)
       throws IOException {
+    logger.atFiner().log("create(%s)", resourceId);
+    checkArgument(
+        resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
     // Update resourceId if generationId is missing
     if (!resourceId.hasGenerationId()) {
       resourceId =

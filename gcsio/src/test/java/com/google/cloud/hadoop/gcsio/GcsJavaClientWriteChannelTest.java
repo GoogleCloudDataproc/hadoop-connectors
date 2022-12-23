@@ -47,7 +47,6 @@ import org.mockito.ArgumentCaptor;
 @RunWith(JUnit4.class)
 public class GcsJavaClientWriteChannelTest {
 
-  private static final int GCS_MINIMUM_CHUNK_SIZE = 256 * 1024;
   private static final String V1_BUCKET_NAME = "bucket-name";
   private static final String BUCKET_NAME = GrpcChannelUtils.toV2BucketName(V1_BUCKET_NAME);
   private static final String OBJECT_NAME = "object-name";

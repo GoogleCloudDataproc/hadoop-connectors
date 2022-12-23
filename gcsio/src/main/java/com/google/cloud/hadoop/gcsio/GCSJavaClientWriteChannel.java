@@ -22,8 +22,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 
-// TODO: see if we need to implement GoogleCloudStorageItemInfo.Provider too
-public class GCSJavaClientWriteChannel extends AbstractGoogleAsyncWriteChannel<Boolean> {
+class GCSJavaClientWriteChannel extends AbstractGoogleAsyncWriteChannel<Boolean> {
 
   protected static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
@@ -62,11 +61,6 @@ public class GCSJavaClientWriteChannel extends AbstractGoogleAsyncWriteChannel<B
             .setMetadata(encodeMetadata(createOptions.getMetadata()))
             .build();
     this.writeChannel = storage.writer(blobInfo, generateWriteOptions());
-    // TODO: add configuration to setup buffer capacity in library also, we might have to find the
-    // optimal capacity for this buffer
-    // Points to consider would be how many times do we actually wanna call onComplete and done on a
-    // stream.
-    // FYI: library always writes to gcs in chunk on 2MiB.
     this.writeChannel.setChunkSize(
         (int) channelOptions.getNumberOfBufferedRequests() * MAX_WRITE_CHUNK_BYTES.getNumber());
     super.initialize();
@@ -79,7 +73,8 @@ public class GCSJavaClientWriteChannel extends AbstractGoogleAsyncWriteChannel<B
     try {
       uploadOperation = threadPool.submit(new UploadOperation(pipeSource, this.resourceId));
     } catch (Exception e) {
-      throw new RuntimeException(String.format("Failed to start upload for '%s'", resourceId), e);
+      throw new RuntimeException(
+          String.format("Failed to start upload for '%s'", resourceId.toString()), e);
     }
   }
 
@@ -113,7 +108,6 @@ public class GCSJavaClientWriteChannel extends AbstractGoogleAsyncWriteChannel<B
           byteBuffer.put(data.toByteArray());
           // switch to read mode
           byteBuffer.flip();
-
           // this could result into partial write
           writeToGcs(byteBuffer);
           if (!lastChunk) {
@@ -131,19 +125,20 @@ public class GCSJavaClientWriteChannel extends AbstractGoogleAsyncWriteChannel<B
         return true;
       } catch (Exception e) {
         logger.atSevere().withCause(e).log("Exception while writing to channel");
-        throw e;
+        throw new IOException(
+            String.format("Error occurred while uploading resource %s", resourceId.toString()), e);
       }
     }
   }
 
   private BlobWriteOption[] generateWriteOptions() {
     List<BlobWriteOption> writeOptions = new ArrayList<>();
+
     writeOptions.add(BlobWriteOption.disableGzipContent());
     writeOptions.add(BlobWriteOption.generationMatch());
     if (createOptions.getKmsKeyName() != null) {
       writeOptions.add(BlobWriteOption.kmsKeyName(createOptions.getKmsKeyName()));
     }
-
     if (channelOptions.isGrpcChecksumsEnabled()) {
       writeOptions.add(BlobWriteOption.crc32cMatch());
     }
@@ -155,11 +150,9 @@ public class GCSJavaClientWriteChannel extends AbstractGoogleAsyncWriteChannel<B
     try {
       super.close();
       writeChannel.close();
-    } catch (IOException e) {
-      logger.atSevere().withCause(e).log("Exception while closing write channel");
-      throw e;
     } catch (Exception e) {
-      logger.atSevere().withCause(e).log("Exception while closing write channel");
+      logger.atSevere().withCause(e).log(
+          "Error occurred while closing write channel for resource %s", resourceId.toString());
       throw new IOException(String.format("Upload failed for '%s'", getResourceString()), e);
     }
   }
@@ -181,7 +174,7 @@ public class GCSJavaClientWriteChannel extends AbstractGoogleAsyncWriteChannel<B
   private int writeToGcs(ByteBuffer byteBuffer) throws IOException {
     // TODO: add metrics to capture write time
     int bytesWritten = writeChannel.write(byteBuffer);
-    logger.atInfo().log("Bytes written %d", bytesWritten);
+    logger.atFinest().log("Bytes written %d", bytesWritten);
     return bytesWritten;
   }
 }
