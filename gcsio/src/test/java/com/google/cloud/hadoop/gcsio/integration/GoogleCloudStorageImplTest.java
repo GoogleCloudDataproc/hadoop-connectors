@@ -67,7 +67,7 @@ import org.junit.runners.Parameterized.Parameters;
 @RunWith(Parameterized.class)
 public class GoogleCloudStorageImplTest {
 
-  private static final TestBucketHelper BUCKET_HELPER = new TestBucketHelper("gcs-impl");
+  private static final TestBucketHelper BUCKET_HELPER = new TestBucketHelper("gcs-grpc-team");
   private static final String TEST_BUCKET = BUCKET_HELPER.getUniqueBucketPrefix();
 
   private static final GoogleCloudStorageOptions GCS_OPTIONS = getStandardOptionBuilder().build();
