@@ -6,7 +6,6 @@ import static com.google.common.base.Preconditions.checkState;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.auth.Credentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
-import com.google.cloud.storage.HttpStorageOptions;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
@@ -282,18 +281,11 @@ public class GcsJavaClientImpl implements GoogleCloudStorage {
     }
 
     private Storage createStorage(GoogleCloudStorageOptions options, Credentials credentials) {
-      if (options.isGrpcEnabled()) {
-        Storage s =
-            StorageOptions.grpc()
-                .setAttemptDirectPath(true)
-                .setCredentials(credentials)
-                .setServiceRpcFactory(HttpStorageOptions.defaults().getDefaultRpcFactory())
-                .build()
-                .getService();
-        return s;
-      }
-      // Json Veneer
-      return StorageOptions.newBuilder().setCredentials(credentials).build().getService();
+      return StorageOptions.grpc()
+          .setAttemptDirectPath(true)
+          .setCredentials(credentials)
+          .build()
+          .getService();
     }
 
     public GcsJavaClientImpl build() throws IOException {

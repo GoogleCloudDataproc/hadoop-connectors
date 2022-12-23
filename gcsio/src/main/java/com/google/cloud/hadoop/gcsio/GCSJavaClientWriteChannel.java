@@ -67,7 +67,7 @@ public class GCSJavaClientWriteChannel extends AbstractGoogleAsyncWriteChannel<B
     // Points to consider would be how many times do we actually wanna call onComplete and done on a
     // stream.
     // FYI: library always writes to gcs in chunk on 2MiB.
-    this.writeChannel.setChunkSize((int) channelOptions.getNumberOfBufferedRequests());
+    this.writeChannel.setChunkSize((int) channelOptions.getNumberOfBufferedRequests() * MAX_WRITE_CHUNK_BYTES.getNumber() );
     super.initialize();
   }
 

@@ -25,7 +25,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 
-public class GcsJavaStorageImplCreateTest {
+public class GcsJavaClientImplCreateTest {
 
   private static final String BUCKET_NAME = "foo-bucket";
   private static final String OBJECT_NAME = "bar-object";
