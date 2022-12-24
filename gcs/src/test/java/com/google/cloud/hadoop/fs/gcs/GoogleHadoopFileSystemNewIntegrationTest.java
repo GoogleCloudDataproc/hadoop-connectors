@@ -84,7 +84,7 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
   }
 
   @AfterClass
-  public static void afterClass() throws Throwable {
+  public static void afterClass() {
     ghfsIHelper.afterAllTests();
   }
 
@@ -173,7 +173,10 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
     GoogleHadoopFileSystem ghfs =
         new GoogleHadoopFileSystem(
             new GoogleCloudStorageFileSystemImpl(
-                new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker),
+                GoogleCloudStorageImpl.builder()
+                    .setOptions(gcsOptions)
+                    .setHttpRequestInitializer(gcsRequestsTracker)
+                    .build(),
                 GoogleCloudStorageFileSystemOptions.builder()
                     .setCloudStorageOptions(gcsOptions)
                     .build()));

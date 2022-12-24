@@ -1335,6 +1335,11 @@ public class GoogleCloudStorageFileSystemNewIntegrationTest {
       TrackingHttpRequestInitializer gcsRequestsTracker)
       throws IOException {
     return new GoogleCloudStorageFileSystemImpl(
-        o -> new GoogleCloudStorageImpl(o, gcsRequestsTracker), gcsfsOptions);
+        o ->
+            GoogleCloudStorageImpl.builder()
+                .setOptions(o)
+                .setHttpRequestInitializer(gcsRequestsTracker)
+                .build(),
+        gcsfsOptions);
   }
 }

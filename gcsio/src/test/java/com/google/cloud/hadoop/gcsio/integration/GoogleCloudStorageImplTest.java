@@ -33,7 +33,7 @@ import com.google.cloud.hadoop.gcsio.AssertingLogHandler;
 import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.EventLoggingHttpRequestInitializer;
-import com.google.cloud.hadoop.gcsio.GcsJavaClientImpl.GcsJavaClientImplBuilder;
+import com.google.cloud.hadoop.gcsio.GcsJavaClientImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
@@ -555,31 +555,34 @@ public class GoogleCloudStorageImplTest {
   private TrackingStorageWrapper<GoogleCloudStorage> newTrackingGoogleCloudStorage(
       GoogleCloudStorageOptions options) throws IOException {
     Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
-    if (javaClientEnabled) {
-      return new TrackingStorageWrapper<>(
-          options,
-          httpRequestInitializer ->
-              new GcsJavaClientImplBuilder(options, credentials, null)
-                  .withHttpRequestInitializer(httpRequestInitializer)
-                  .build(),
-          credentials);
-    }
-    return new TrackingStorageWrapper<>(
-        options,
-        httpRequestInitializer -> new GoogleCloudStorageImpl(options, httpRequestInitializer),
-        credentials);
+    return javaClientEnabled
+        ? new TrackingStorageWrapper<>(
+            options,
+            httpRequestInitializer ->
+                GcsJavaClientImpl.builder()
+                    .setOptions(options)
+                    .setHttpRequestInitializer(httpRequestInitializer)
+                    .build(),
+            credentials)
+        : new TrackingStorageWrapper<>(
+            options,
+            httpRequestInitializer ->
+                GoogleCloudStorageImpl.builder()
+                    .setOptions(options)
+                    .setHttpRequestInitializer(httpRequestInitializer)
+                    .build(),
+            credentials);
   }
 
   private GoogleCloudStorage getStorageFromOptions(GoogleCloudStorageOptions storageOptions)
       throws IOException {
-    GoogleCloudStorage storageImpl;
-    if (javaClientEnabled) {
-      return new GcsJavaClientImplBuilder(
-              storageOptions, GoogleCloudStorageTestHelper.getCredentials(), null)
-          .build();
-    }
-    return new GoogleCloudStorageImpl(
-        storageOptions, GoogleCloudStorageTestHelper.getCredentials());
+    Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
+    return javaClientEnabled
+        ? GcsJavaClientImpl.builder().setOptions(storageOptions).setCredentials(credentials).build()
+        : GoogleCloudStorageImpl.builder()
+            .setOptions(storageOptions)
+            .setCredentials(credentials)
+            .build();
   }
 
   private static GoogleCloudStorageOptions getOptionsWithUploadChunk(int uploadChunk) {

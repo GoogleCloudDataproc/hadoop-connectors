@@ -63,8 +63,6 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageReadChannelTest {
 
-  private static final String PROJECT_ID = "google.com:foo-project";
-
   @Test
   public void metadataInitialization_eager() throws IOException {
     StorageObject object = newStorageObject(BUCKET_NAME, OBJECT_NAME);

@@ -50,6 +50,7 @@ import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.RewriteResponse;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.auth.Credentials;
+import com.google.auto.value.AutoBuilder;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
 import com.google.cloud.hadoop.util.AbstractGoogleAsyncWriteChannel;
 import com.google.cloud.hadoop.util.AccessBoundary;
@@ -66,7 +67,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.flogger.GoogleLogger;
@@ -268,81 +268,13 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   /**
    * Constructs an instance of GoogleCloudStorageImpl.
    *
-   * @param options options to customize behavior
-   * @param credentials OAuth2 credentials that allows access to GCS
-   * @throws IOException on IO error
-   */
-  public GoogleCloudStorageImpl(GoogleCloudStorageOptions options, Credentials credentials)
-      throws IOException {
-    this(options, credentials, /* downscopedAccessTokenFn= */ null);
-  }
-
-  /**
-   * Constructs an instance of GoogleCloudStorageImpl.
-   *
-   * @param options options to customize behavior
-   * @param httpRequestInitializer request initializer used to initialize all HTTP requests
-   * @throws IOException on IO error
-   */
-  public GoogleCloudStorageImpl(
-      GoogleCloudStorageOptions options, HttpRequestInitializer httpRequestInitializer)
-      throws IOException {
-    this(options, httpRequestInitializer, /* downscopedAccessTokenFn= */ null);
-  }
-
-  /**
-   * Constructs an instance of GoogleCloudStorageImpl.
-   *
-   * @param options options to customize behavior
-   * @param credentials OAuth2 credentials that allows access to GCS
-   * @param downscopedAccessTokenFn Function that generates downscoped access token
-   * @throws IOException on IO error
-   */
-  public GoogleCloudStorageImpl(
-      GoogleCloudStorageOptions options,
-      Credentials credentials,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
-      throws IOException {
-    this(
-        options,
-        credentials,
-        /* httpTransport= */ null,
-        /* httpRequestInitializer= */ null,
-        downscopedAccessTokenFn);
-  }
-
-  /**
-   * Constructs an instance of GoogleCloudStorageImpl.
-   *
-   * @param options options to customize behavior
-   * @param httpRequestInitializer request initializer used to initialize all HTTP requests
-   * @param downscopedAccessTokenFn Function that generates downscoped access token
-   * @throws IOException on IO error
-   */
-  public GoogleCloudStorageImpl(
-      GoogleCloudStorageOptions options,
-      HttpRequestInitializer httpRequestInitializer,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
-      throws IOException {
-    this(
-        options,
-        /* credentials= */ null,
-        /* httpTransport= */ null,
-        httpRequestInitializer,
-        downscopedAccessTokenFn);
-  }
-
-  /**
-   * Constructs an instance of GoogleCloudStorageImpl.
-   *
    * @param options {@link GoogleCloudStorageOptions} to use to initialize the object
-   * @param credentials OAuth2 credentials that allows access to GCS
-   * @param httpTransport transport used for HTTP requests
-   * @param httpRequestInitializer request initializer used to initialize all HTTP requests
+   * @param credentialsParam OAuth2 credentials that allows access to GCS
+   * @param httpTransportParam transport used for HTTP requests
+   * @param httpRequestInitializerParam request initializer used to initialize all HTTP requests
    * @param downscopedAccessTokenFn Function that generates downscoped access token
    * @throws IOException on IO error
    */
-  @VisibleForTesting
   GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options,
       Credentials credentialsParam,
@@ -1556,7 +1488,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     return maxResults - numResults;
   }
 
-  /** @see GoogleCloudStorage#listObjectInfo(String, String, ListObjectOptions) */
+  /**
+   * @see GoogleCloudStorage#listObjectInfo(String, String, ListObjectOptions)
+   */
   @Override
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions)
@@ -1573,7 +1507,9 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         bucketName, objectNamePrefix, listOptions, listedPrefixes, listedObjects);
   }
 
-  /** @see GoogleCloudStorage#listObjectInfoPage(String, String, ListObjectOptions, String) */
+  /**
+   * @see GoogleCloudStorage#listObjectInfoPage(String, String, ListObjectOptions, String)
+   */
   @Override
   public ListPage<GoogleCloudStorageItemInfo> listObjectInfoPage(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions, String pageToken)
@@ -2348,6 +2284,29 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
   @Override
   public Map<String, Long> getStatistics() {
-    return httpStatistics == null ? ImmutableMap.of() : httpStatistics.getStatistics();
+    return httpStatistics.getStatistics();
+  }
+
+  public static Builder builder() {
+    return new AutoBuilder_GoogleCloudStorageImpl_Builder();
+  }
+
+  @AutoBuilder(ofClass = GoogleCloudStorageImpl.class)
+  public abstract static class Builder {
+
+    public abstract Builder setOptions(GoogleCloudStorageOptions options);
+
+    public abstract Builder setHttpTransport(HttpTransport httpTransport);
+
+    @VisibleForTesting
+    public abstract Builder setHttpRequestInitializer(
+        HttpRequestInitializer httpRequestInitializer);
+
+    public abstract Builder setCredentials(Credentials credentials);
+
+    public abstract Builder setDownscopedAccessTokenFn(
+        Function<List<AccessBoundary>, String> downscopedAccessTokenFn);
+
+    public abstract GoogleCloudStorageImpl build() throws IOException;
   }
 }

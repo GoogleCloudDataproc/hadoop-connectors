@@ -16,10 +16,6 @@ package com.google.cloud.hadoop.gcsio;
 
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
-import com.google.api.client.json.gson.GsonFactory;
-import com.google.api.services.storage.Storage;
-import com.google.auth.Credentials;
-import com.google.cloud.hadoop.gcsio.GcsJavaClientImpl.GcsJavaClientImplBuilder;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.cloud.hadoop.util.testing.FakeCredentials;
@@ -28,12 +24,7 @@ import java.io.IOException;
 public class MockGoogleCloudStorageImplFactory {
 
   public static GoogleCloudStorageImpl mockedGcs(HttpTransport transport) throws IOException {
-    return mockedGcs(
-        GoogleCloudStorageOptions.builder()
-            .setAppName("gcsio-unit-test")
-            .setProjectId("google.com:foo-project")
-            .build(),
-        transport);
+    return mockedGcs(getDefaultOptions(), transport);
   }
 
   public static GoogleCloudStorageImpl mockedGcs(
@@ -46,39 +37,36 @@ public class MockGoogleCloudStorageImplFactory {
       HttpTransport transport,
       HttpRequestInitializer httpRequestInitializer)
       throws IOException {
-    return new GoogleCloudStorageImpl(
-        options,
-        new FakeCredentials(),
-        transport,
-        httpRequestInitializer,
-        /* downscopedAccessTokenFn= */ null);
+    return GoogleCloudStorageImpl.builder()
+        .setOptions(options)
+        .setCredentials(new FakeCredentials())
+        .setHttpTransport(transport)
+        .setHttpRequestInitializer(httpRequestInitializer)
+        .build();
   }
 
   public static GcsJavaClientImpl mockedJavaClientGcs(HttpTransport transport) throws IOException {
-    return mockedJavaClientGcs(
-        GoogleCloudStorageOptions.builder()
-            .setAppName("gcsio-unit-test")
-            .setProjectId(PROJECT_ID)
-            .build(),
-        transport);
+    return mockedJavaClientGcs(getDefaultOptions(), transport);
   }
 
   public static GcsJavaClientImpl mockedJavaClientGcs(
       GoogleCloudStorageOptions options, HttpTransport transport) throws IOException {
-    Credentials fakeCredential = new FakeCredentials();
-    Storage storage =
-        new Storage(
-            transport,
-            GsonFactory.getDefaultInstance(),
-            new TrackingHttpRequestInitializer(
-                new RetryHttpInitializer(
-                    fakeCredential,
-                    RetryHttpInitializerOptions.builder()
-                        .setDefaultUserAgent("gcs-io-unit-test")
-                        .build()),
-                false));
-    return new GcsJavaClientImplBuilder(options, fakeCredential, null)
-        .withApairyClientStorage(storage)
+    return GcsJavaClientImpl.builder()
+        .setOptions(options)
+        .setHttpTransport(transport)
+        .setHttpRequestInitializer(
+            new RetryHttpInitializer(
+                new FakeCredentials(),
+                RetryHttpInitializerOptions.builder()
+                    .setDefaultUserAgent("gcsio-unit-test")
+                    .build()))
+        .build();
+  }
+
+  private static GoogleCloudStorageOptions getDefaultOptions() {
+    return GoogleCloudStorageOptions.builder()
+        .setAppName("gcsio-unit-test")
+        .setProjectId("google.com:foo-project")
         .build();
   }
 }

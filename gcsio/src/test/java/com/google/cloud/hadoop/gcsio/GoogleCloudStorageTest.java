@@ -180,7 +180,11 @@ public class GoogleCloudStorageTest {
             .setStorageRootUrl("https://unit-test-storage.googleapis.com/")
             .build();
 
-    GoogleCloudStorageImpl gcsImpl = new GoogleCloudStorageImpl(options, new FakeCredentials());
+    GoogleCloudStorageImpl gcsImpl =
+        GoogleCloudStorageImpl.builder()
+            .setOptions(options)
+            .setCredentials(new FakeCredentials())
+            .build();
 
     assertThat(gcsImpl.storage.getRootUrl()).isEqualTo("https://unit-test-storage.googleapis.com/");
   }
@@ -3572,12 +3576,11 @@ public class GoogleCloudStorageTest {
     MockHttpTransport transport = mockTransport(jsonDataResponse(newBucket(BUCKET_NAME)));
 
     GoogleCloudStorageImpl gcs =
-        new GoogleCloudStorageImpl(
-            GCS_OPTIONS,
-            new FakeCredentials(),
-            transport,
-            /* requestInitializer= */ null,
-            /* downscopedAccessTokenFn= */ null);
+        GoogleCloudStorageImpl.builder()
+            .setOptions(GCS_OPTIONS)
+            .setCredentials(new FakeCredentials())
+            .setHttpTransport(transport)
+            .build();
 
     Storage.Objects.Get testGetRequest = gcs.storage.objects().get(BUCKET_NAME, OBJECT_NAME);
     gcs.initializeRequest(testGetRequest, BUCKET_NAME);
@@ -3590,12 +3593,12 @@ public class GoogleCloudStorageTest {
     MockHttpTransport transport = mockTransport(jsonDataResponse(newBucket(BUCKET_NAME)));
 
     GoogleCloudStorageImpl gcs =
-        new GoogleCloudStorageImpl(
-            GCS_OPTIONS,
-            new FakeCredentials(),
-            transport,
-            /* requestInitializer= */ null,
-            /* downscopedAccessTokenFn= */ ignore -> "testDownscopedAccessToken");
+        GoogleCloudStorageImpl.builder()
+            .setOptions(GCS_OPTIONS)
+            .setCredentials(new FakeCredentials())
+            .setHttpTransport(transport)
+            .setDownscopedAccessTokenFn(ignore -> "testDownscopedAccessToken")
+            .build();
 
     Storage.Objects.Get testGetRequest =
         gcs.storageRequestFactory.objectsGetMetadata(BUCKET_NAME, OBJECT_NAME);
