@@ -217,20 +217,15 @@
      -->
     <profile>
       <id>snapshots-and-staging</id>
-      <properties>
-        <!-- override point for ASF staging/snapshot repos -->
-        <asf.staging>https://repository.apache.org/content/groups/staging/</asf.staging>
-        <asf.snapshots>https://repository.apache.org/content/repositories/snapshots/</asf.snapshots>
-      </properties>
-
+      <!-- override point for ASF staging/snapshot repos -->
       <pluginRepositories>
         <pluginRepository>
           <id>ASF Staging</id>
-          <url>${asf.staging}</url>
+          <url>https://repository.apache.org/content/groups/staging/</url>
         </pluginRepository>
         <pluginRepository>
           <id>ASF Snapshots</id>
-          <url>${asf.snapshots}</url>
+          <url>https://repository.apache.org/content/repositories/snapshots/</url>
           <snapshots>
             <enabled>true</enabled>
           </snapshots>
@@ -238,16 +233,15 @@
             <enabled>false</enabled>
           </releases>
         </pluginRepository>
-
       </pluginRepositories>
       <repositories>
         <repository>
           <id>ASF Staging</id>
-          <url>${asf.staging}</url>
+          <url>https://repository.apache.org/content/groups/staging/</url>
         </repository>
         <repository>
           <id>ASF Snapshots</id>
-          <url>${asf.snapshots}</url>
+          <url>https://repository.apache.org/content/repositories/snapshots/</url>
           <snapshots>
             <enabled>true</enabled>
           </snapshots>
