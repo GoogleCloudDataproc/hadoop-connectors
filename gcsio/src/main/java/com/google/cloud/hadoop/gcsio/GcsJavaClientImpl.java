@@ -15,6 +15,7 @@ import java.nio.channels.WritableByteChannel;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 
 /**
  * Provides read/write access to Google Cloud Storage (GCS), using Java nio channel semantics. This
@@ -32,10 +33,10 @@ public class GcsJavaClientImpl implements GoogleCloudStorage {
 
   GcsJavaClientImpl(
       GoogleCloudStorageOptions options,
-      Credentials credentials,
-      HttpTransport httpTransport,
-      HttpRequestInitializer httpRequestInitializer,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
+      @Nullable Credentials credentials,
+      @Nullable HttpTransport httpTransport,
+      @Nullable HttpRequestInitializer httpRequestInitializer,
+      @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
     checkNotNull(options, "options must not be null").throwIfNotValid();
     logger.atWarning().log(
@@ -193,23 +194,18 @@ public class GcsJavaClientImpl implements GoogleCloudStorage {
   @AutoBuilder(ofClass = GcsJavaClientImpl.class)
   public abstract static class Builder {
 
-
     public abstract Builder setOptions(GoogleCloudStorageOptions options);
 
+    public abstract Builder setHttpTransport(@Nullable HttpTransport httpTransport);
 
-    public abstract Builder setHttpTransport(HttpTransport httpTransport);
+    public abstract Builder setCredentials(@Nullable Credentials credentials);
 
     @VisibleForTesting
     public abstract Builder setHttpRequestInitializer(
-        HttpRequestInitializer httpRequestInitializer);
-
-
-    public abstract Builder setCredentials(Credentials credentials);
-
+        @Nullable HttpRequestInitializer httpRequestInitializer);
 
     public abstract Builder setDownscopedAccessTokenFn(
-        Function<List<AccessBoundary>, String> downscopedAccessTokenFn);
-
+        @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn);
 
     public abstract GcsJavaClientImpl build() throws IOException;
   }

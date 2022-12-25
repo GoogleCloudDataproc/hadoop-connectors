@@ -269,62 +269,64 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * Constructs an instance of GoogleCloudStorageImpl.
    *
    * @param options {@link GoogleCloudStorageOptions} to use to initialize the object
-   * @param credentialsParam OAuth2 credentials that allows access to GCS
-   * @param httpTransportParam transport used for HTTP requests
-   * @param httpRequestInitializerParam request initializer used to initialize all HTTP requests
+   * @param credentials OAuth2 credentials that allows access to GCS
+   * @param httpTransport transport used for HTTP requests
+   * @param httpRequestInitializer request initializer used to initialize all HTTP requests
    * @param downscopedAccessTokenFn Function that generates downscoped access token
    * @throws IOException on IO error
    */
   GoogleCloudStorageImpl(
       GoogleCloudStorageOptions options,
-      Credentials credentialsParam,
-      HttpTransport httpTransportParam,
-      HttpRequestInitializer httpRequestInitializerParam,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
+      @Nullable Credentials credentials,
+      @Nullable HttpTransport httpTransport,
+      @Nullable HttpRequestInitializer httpRequestInitializer,
+      @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
       throws IOException {
     logger.atFiner().log("GCS(options: %s)", options);
 
     checkNotNull(options, "options must not be null").throwIfNotValid();
     this.storageOptions = options;
 
-    Credentials credentials;
-    // If credentialsParam is null then use httpRequestInitializerParam to initialize credentials
-    if (credentialsParam == null && httpRequestInitializerParam != null) {
+    Credentials finalCredentials;
+    // If credentials is null then use httpRequestInitializer to initialize finalCredentials
+    if (credentials == null && httpRequestInitializer != null) {
       checkArgument(
-          httpRequestInitializerParam instanceof RetryHttpInitializer,
+          httpRequestInitializer instanceof RetryHttpInitializer,
           "httpRequestInitializerParam (%s) should be an instance of RetryHttpInitializer for"
               + " credentials initialization",
-          httpRequestInitializerParam.getClass());
-      credentials = ((RetryHttpInitializer) httpRequestInitializerParam).getCredentials();
+          httpRequestInitializer.getClass());
+      finalCredentials = ((RetryHttpInitializer) httpRequestInitializer).getCredentials();
     } else {
-      credentials = credentialsParam;
+      finalCredentials = credentials;
     }
 
-    // If httpRequestInitializerParam is null then use
-    // credentials to initialize httpRequestInitializer
-    HttpRequestInitializer httpRequestInitializer =
-        httpRequestInitializerParam == null
-            ? new RetryHttpInitializer(credentials, options.toRetryHttpInitializerOptions())
-            : httpRequestInitializerParam;
+    // If httpRequestInitializer is null then use
+    // finalCredentials to initialize finalHttpRequestInitializer
+    HttpRequestInitializer finalHttpRequestInitializer =
+        httpRequestInitializer == null
+            ? new RetryHttpInitializer(finalCredentials, options.toRetryHttpInitializerOptions())
+            : httpRequestInitializer;
     this.httpRequestInitializer =
         options.isTraceLogEnabled()
             ? new ChainingHttpRequestInitializer(
-                httpStatistics, httpRequestInitializer, new EventLoggingHttpRequestInitializer())
-            : new ChainingHttpRequestInitializer(httpStatistics, httpRequestInitializer);
+                httpStatistics,
+                finalHttpRequestInitializer,
+                new EventLoggingHttpRequestInitializer())
+            : new ChainingHttpRequestInitializer(httpStatistics, finalHttpRequestInitializer);
 
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
 
-    HttpTransport httpTransport =
-        httpTransportParam == null
+    HttpTransport finalHttpTransport =
+        httpTransport == null
             ? HttpTransportFactory.createHttpTransport(
                 options.getProxyAddress(),
                 options.getProxyUsername(),
                 options.getProxyPassword(),
                 Duration.ofMillis(options.getHttpRequestReadTimeout()))
-            : httpTransportParam;
+            : httpTransport;
     this.storage =
         new Storage.Builder(
-                httpTransport, GsonFactory.getDefaultInstance(), this.httpRequestInitializer)
+                finalHttpTransport, GsonFactory.getDefaultInstance(), this.httpRequestInitializer)
             .setRootUrl(options.getStorageRootUrl())
             .setServicePath(options.getStorageServicePath())
             .setApplicationName(options.getAppName())
@@ -334,7 +336,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     this.metricsRecorder =
         MetricsSink.CLOUD_MONITORING == options.getMetricsSink()
-            ? CloudMonitoringMetricsRecorder.create(options.getProjectId(), credentials)
+            ? CloudMonitoringMetricsRecorder.create(options.getProjectId(), finalCredentials)
             : new NoOpMetricsRecorder();
 
     // Create the gRPC stub if necessary;
@@ -342,7 +344,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       this.watchdog =
           Watchdog.create(Duration.ofMillis(options.getGrpcMessageTimeoutCheckInterval()));
       this.storageStubProvider =
-          StorageStubProvider.newInstance(options, backgroundTasksThreadPool, credentials);
+          StorageStubProvider.newInstance(options, backgroundTasksThreadPool, finalCredentials);
     }
   }
 
@@ -2296,16 +2298,16 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     public abstract Builder setOptions(GoogleCloudStorageOptions options);
 
-    public abstract Builder setHttpTransport(HttpTransport httpTransport);
+    public abstract Builder setCredentials(@Nullable Credentials credentials);
+
+    public abstract Builder setHttpTransport(@Nullable HttpTransport httpTransport);
 
     @VisibleForTesting
     public abstract Builder setHttpRequestInitializer(
-        HttpRequestInitializer httpRequestInitializer);
-
-    public abstract Builder setCredentials(Credentials credentials);
+        @Nullable HttpRequestInitializer httpRequestInitializer);
 
     public abstract Builder setDownscopedAccessTokenFn(
-        Function<List<AccessBoundary>, String> downscopedAccessTokenFn);
+        @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn);
 
     public abstract GoogleCloudStorageImpl build() throws IOException;
   }

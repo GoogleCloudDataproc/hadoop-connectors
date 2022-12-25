@@ -200,11 +200,10 @@ public class GoogleCloudStorageImplTest {
     assertThat(gcs.getStatistics())
         .containsExactlyEntriesIn(
             ImmutableMap.<String, Long>builder()
-                .put("HTTP_GET_REQUEST", 1L)
-                .put("HTTP_GET_REQUEST_FAILURE", 1L)
-                .put("HTTP_POST_REQUEST", 1L)
-                .put("HTTP_PUT_REQUEST", 5L)
-                .put("HTTP_PUT_REQUEST_FAILURE", 4L)
+                .put("http_get_404", 1L)
+                .put("http_post_200", 1L)
+                .put("http_put_200", 1L)
+                .put("http_put_308", 4L)
                 .build());
 
     assertObjectContent(gcs, resourceId, partition);
@@ -212,11 +211,12 @@ public class GoogleCloudStorageImplTest {
     assertThat(gcs.getStatistics())
         .containsExactlyEntriesIn(
             ImmutableMap.<String, Long>builder()
-                .put("HTTP_GET_REQUEST", 3L)
-                .put("HTTP_GET_REQUEST_FAILURE", 1L)
-                .put("HTTP_POST_REQUEST", 1L)
-                .put("HTTP_PUT_REQUEST", 5L)
-                .put("HTTP_PUT_REQUEST_FAILURE", 4L)
+                .put("http_get_200", 1L)
+                .put("http_get_206", 1L)
+                .put("http_get_404", 1L)
+                .put("http_post_200", 1L)
+                .put("http_put_200", 1L)
+                .put("http_put_308", 4L)
                 .build());
 
     gcs.deleteObjects(ImmutableList.of(resourceId));
@@ -224,12 +224,13 @@ public class GoogleCloudStorageImplTest {
     assertThat(gcs.getStatistics())
         .containsExactlyEntriesIn(
             ImmutableMap.<String, Long>builder()
-                .put("HTTP_DELETE_REQUEST", 1L)
-                .put("HTTP_GET_REQUEST", 4L)
-                .put("HTTP_GET_REQUEST_FAILURE", 1L)
-                .put("HTTP_POST_REQUEST", 1L)
-                .put("HTTP_PUT_REQUEST", 5L)
-                .put("HTTP_PUT_REQUEST_FAILURE", 4L)
+                .put("http_delete_204", 1L)
+                .put("http_get_200", 2L)
+                .put("http_get_206", 1L)
+                .put("http_get_404", 1L)
+                .put("http_post_200", 1L)
+                .put("http_put_200", 1L)
+                .put("http_put_308", 4L)
                 .build());
   }
 
@@ -555,34 +556,29 @@ public class GoogleCloudStorageImplTest {
   private TrackingStorageWrapper<GoogleCloudStorage> newTrackingGoogleCloudStorage(
       GoogleCloudStorageOptions options) throws IOException {
     Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
-    return javaClientEnabled
-        ? new TrackingStorageWrapper<>(
-            options,
-            httpRequestInitializer ->
-                GcsJavaClientImpl.builder()
+    return new TrackingStorageWrapper<>(
+        options,
+        httpRequestInitializer ->
+            javaClientEnabled
+                ? GcsJavaClientImpl.builder()
                     .setOptions(options)
+                    .setCredentials(credentials)
+                    .setHttpRequestInitializer(httpRequestInitializer)
+                    .build()
+                : GoogleCloudStorageImpl.builder()
+                    .setOptions(options)
+                    .setCredentials(credentials)
                     .setHttpRequestInitializer(httpRequestInitializer)
                     .build(),
-            credentials)
-        : new TrackingStorageWrapper<>(
-            options,
-            httpRequestInitializer ->
-                GoogleCloudStorageImpl.builder()
-                    .setOptions(options)
-                    .setHttpRequestInitializer(httpRequestInitializer)
-                    .build(),
-            credentials);
+        credentials);
   }
 
-  private GoogleCloudStorage getStorageFromOptions(GoogleCloudStorageOptions storageOptions)
+  private GoogleCloudStorage getStorageFromOptions(GoogleCloudStorageOptions options)
       throws IOException {
     Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
     return javaClientEnabled
-        ? GcsJavaClientImpl.builder().setOptions(storageOptions).setCredentials(credentials).build()
-        : GoogleCloudStorageImpl.builder()
-            .setOptions(storageOptions)
-            .setCredentials(credentials)
-            .build();
+        ? GcsJavaClientImpl.builder().setOptions(options).setCredentials(credentials).build()
+        : GoogleCloudStorageImpl.builder().setOptions(options).setCredentials(credentials).build();
   }
 
   private static GoogleCloudStorageOptions getOptionsWithUploadChunk(int uploadChunk) {
