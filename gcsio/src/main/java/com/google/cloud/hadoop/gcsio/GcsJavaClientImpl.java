@@ -1,17 +1,25 @@
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
 
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.auth.Credentials;
 import com.google.cloud.hadoop.util.AccessBoundary;
+import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.nio.file.FileAlreadyExistsException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Function;
 
 /**
@@ -29,22 +37,35 @@ public class GcsJavaClientImpl implements GoogleCloudStorage {
   private GoogleCloudStorageImpl gcsClientDelegate;
 
   private GoogleCloudStorageOptions storageOptions;
-  private Credentials credentials;
+  private Storage storage;
+
+  // Thread-pool used for background tasks.
+  private final ExecutorService backgroundTasksThreadPool =
+      Executors.newCachedThreadPool(
+          new ThreadFactoryBuilder()
+              .setNameFormat("gcs-java-client-write-channel-pool-%d")
+              .setDaemon(true)
+              .build());
 
   private GcsJavaClientImpl(GcsJavaClientImplBuilder builder) throws IOException {
     this.storageOptions = checkNotNull(builder.storageOptions, "options must not be null");
-    this.credentials = checkNotNull(builder.credentials, "credentials must not be null");
-
+    this.storage = checkNotNull(builder.javaClientStorage, "storage must not be null");
+    checkNotNull(builder.credentials, "credentials must not be null");
     if (builder.httpRequestInitializer != null) {
       logger.atWarning().log(
           "Overriding httpRequestInitializer. ALERT: Should not be hit in production");
       this.gcsClientDelegate =
-          new GoogleCloudStorageImpl(this.storageOptions, builder.httpRequestInitializer);
+          new GoogleCloudStorageImpl(
+              this.storageOptions, builder.httpRequestInitializer, builder.downscopedAccessTokenFn);
     } else if (builder.storage != null) {
       logger.atWarning().log("Overriding storage. ALERT: Should not be hit in production");
-      this.gcsClientDelegate = new GoogleCloudStorageImpl(this.storageOptions, builder.storage);
+      this.gcsClientDelegate =
+          new GoogleCloudStorageImpl(
+              this.storageOptions, builder.storage, builder.downscopedAccessTokenFn);
     } else {
-      this.gcsClientDelegate = new GoogleCloudStorageImpl(this.storageOptions, this.credentials);
+      this.gcsClientDelegate =
+          new GoogleCloudStorageImpl(
+              this.storageOptions, builder.credentials, builder.downscopedAccessTokenFn);
     }
   }
 
@@ -56,7 +77,23 @@ public class GcsJavaClientImpl implements GoogleCloudStorage {
   @Override
   public WritableByteChannel create(StorageResourceId resourceId, CreateObjectOptions options)
       throws IOException {
-    return gcsClientDelegate.create(resourceId, options);
+    logger.atFiner().log("create(%s)", resourceId);
+    checkArgument(
+        resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
+    // Update resourceId if generationId is missing
+    if (!resourceId.hasGenerationId()) {
+      resourceId =
+          new StorageResourceId(
+              resourceId.getBucketName(),
+              resourceId.getObjectName(),
+              getWriteGeneration(resourceId, options.isOverwriteExisting()));
+    }
+
+    GcsJavaClientWriteChannel channel =
+        new GcsJavaClientWriteChannel(
+            storage, storageOptions, resourceId, options, backgroundTasksThreadPool);
+    channel.initialize();
+    return channel;
   }
 
   @Override
@@ -185,9 +222,36 @@ public class GcsJavaClientImpl implements GoogleCloudStorage {
     gcsClientDelegate.close();
   }
 
+  /**
+   * Gets the object generation for a write operation
+   *
+   * <p>making getItemInfo call even if overwrite is disabled to fail fast in case file is existing.
+   *
+   * @param resourceId object for which generation info is requested
+   * @param overwrite whether existing object should be overwritten
+   * @return the generation of the object
+   * @throws IOException if the object already exists and cannot be overwritten
+   */
+  private long getWriteGeneration(StorageResourceId resourceId, boolean overwrite)
+      throws IOException {
+    logger.atFiner().log("getWriteGeneration(%s, %s)", resourceId, overwrite);
+    GoogleCloudStorageItemInfo info = getItemInfo(resourceId);
+    if (!info.exists()) {
+      return 0L;
+    }
+    if (info.exists() && overwrite) {
+      long generation = info.getContentGeneration();
+      checkState(generation != 0, "Generation should not be 0 for an existing item");
+      return generation;
+    }
+    throw new FileAlreadyExistsException(String.format("Object %s already exists.", resourceId));
+  }
+
   public static class GcsJavaClientImplBuilder {
+
     private Credentials credentials;
     private com.google.api.services.storage.Storage storage;
+    private Storage javaClientStorage;
     private HttpRequestInitializer httpRequestInitializer;
     private GoogleCloudStorageOptions storageOptions;
     private Function<List<AccessBoundary>, String> downscopedAccessTokenFn;
@@ -199,6 +263,13 @@ public class GcsJavaClientImpl implements GoogleCloudStorage {
       this.storageOptions = storageOptions;
       this.credentials = credentials;
       this.downscopedAccessTokenFn = downscopedAccessTokenFn;
+    }
+
+    @VisibleForTesting
+    public GcsJavaClientImplBuilder withJavaClientStorage(Storage javaClientStorage) {
+      checkNotNull(javaClientStorage, "storage must not be null");
+      this.javaClientStorage = javaClientStorage;
+      return this;
     }
 
     @VisibleForTesting
@@ -217,7 +288,19 @@ public class GcsJavaClientImpl implements GoogleCloudStorage {
       return this;
     }
 
+    private Storage createStorage(Credentials credentials) {
+      return StorageOptions.grpc()
+          .setAttemptDirectPath(true)
+          .setCredentials(credentials)
+          .build()
+          .getService();
+    }
+
     public GcsJavaClientImpl build() throws IOException {
+      if (this.javaClientStorage == null) {
+        this.javaClientStorage =
+            checkNotNull(createStorage(credentials), "storage must not be null");
+      }
       return new GcsJavaClientImpl(this);
     }
   }
