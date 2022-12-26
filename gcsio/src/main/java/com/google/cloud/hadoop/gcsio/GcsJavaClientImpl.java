@@ -39,6 +39,14 @@ public class GcsJavaClientImpl implements GoogleCloudStorage {
   private GoogleCloudStorageOptions storageOptions;
   private Storage storage;
 
+  // Thread-pool used for background tasks.
+  private final ExecutorService backgroundTasksThreadPool =
+      Executors.newCachedThreadPool(
+          new ThreadFactoryBuilder()
+              .setNameFormat("gcs-java-client-write-channel-pool-%d")
+              .setDaemon(true)
+              .build());
+
   private GcsJavaClientImpl(GcsJavaClientImplBuilder builder) throws IOException {
     this.storageOptions = checkNotNull(builder.storageOptions, "options must not be null");
     this.storage = checkNotNull(builder.javaClientStorage, "storage must not be null");
@@ -81,16 +89,8 @@ public class GcsJavaClientImpl implements GoogleCloudStorage {
               getWriteGeneration(resourceId, options.isOverwriteExisting()));
     }
 
-    // Thread-pool used for background tasks.
-    ExecutorService backgroundTasksThreadPool =
-        Executors.newCachedThreadPool(
-            new ThreadFactoryBuilder()
-                .setNameFormat("gcs-async-channel-pool-%d")
-                .setDaemon(true)
-                .build());
-
-    GCSJavaClientWriteChannel channel =
-        new GCSJavaClientWriteChannel(
+    GcsJavaClientWriteChannel channel =
+        new GcsJavaClientWriteChannel(
             storage, storageOptions, resourceId, options, backgroundTasksThreadPool);
     channel.initialize();
     return channel;

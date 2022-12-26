@@ -59,7 +59,7 @@ public class GcsJavaClientWriteChannelTest {
 
   private final StorageResourceId resourceId =
       new StorageResourceId(BUCKET_NAME, OBJECT_NAME, GENERATION_ID);
-  private GCSJavaClientWriteChannel writeChannel;
+  private GcsJavaClientWriteChannel writeChannel;
   private Storage mockedStorage = mock(Storage.class);
   private WriteChannel fakeWriteChannel;
   ArgumentCaptor<BlobInfo> blobInfoCapture = ArgumentCaptor.forClass(BlobInfo.class);
@@ -201,8 +201,8 @@ public class GcsJavaClientWriteChannelTest {
     return ByteString.copyFrom(result);
   }
 
-  private GCSJavaClientWriteChannel getJavaStorageChannel() {
-    return new GCSJavaClientWriteChannel(
+  private GcsJavaClientWriteChannel getJavaStorageChannel() {
+    return new GcsJavaClientWriteChannel(
         mockedStorage,
         GoogleCloudStorageOptions.DEFAULT.toBuilder()
             .setWriteChannelOptions(

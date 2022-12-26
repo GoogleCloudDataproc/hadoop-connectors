@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 
-class GCSJavaClientWriteChannel extends AbstractGoogleAsyncWriteChannel<Boolean> {
+class GcsJavaClientWriteChannel extends AbstractGoogleAsyncWriteChannel<Boolean> {
 
   protected static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
@@ -36,7 +36,7 @@ class GCSJavaClientWriteChannel extends AbstractGoogleAsyncWriteChannel<Boolean>
   // TODO: not supported as of now
   // private final String requesterPaysProject;
 
-  public GCSJavaClientWriteChannel(
+  public GcsJavaClientWriteChannel(
       Storage storage,
       GoogleCloudStorageOptions storageOptions,
       StorageResourceId resourceId,
@@ -172,9 +172,8 @@ class GCSJavaClientWriteChannel extends AbstractGoogleAsyncWriteChannel<Boolean>
   }
 
   private int writeToGcs(ByteBuffer byteBuffer) throws IOException {
-    // TODO: add metrics to capture write time
     int bytesWritten = writeChannel.write(byteBuffer);
-    logger.atFinest().log("Bytes written %d", bytesWritten);
+    logger.atFinest().log("Bytes written %d for resource %s", bytesWritten, resourceId.toString());
     return bytesWritten;
   }
 }
