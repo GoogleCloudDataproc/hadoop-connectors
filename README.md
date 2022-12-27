@@ -18,18 +18,7 @@ The Google Cloud Storage connector for Hadoop enables running MapReduce jobs
 directly on data in Google Cloud Storage by implementing the Hadoop FileSystem
 interface. For details, see [the README](gcs/README.md).
 
-## Google BigQuery connector for Apache Hadoop MapReduce
-
-[![Maven Central](https://img.shields.io/maven-central/v/com.google.cloud.bigdataoss/bigquery-connector/hadoop1.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:com.google.cloud.bigdataoss%20AND%20a:bigquery-connector%20AND%20v:hadoop1-*)
-[![Maven Central](https://img.shields.io/maven-central/v/com.google.cloud.bigdataoss/bigquery-connector/hadoop2.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:com.google.cloud.bigdataoss%20AND%20a:bigquery-connector%20AND%20v:hadoop2-*)
-[![Maven Central](https://img.shields.io/maven-central/v/com.google.cloud.bigdataoss/bigquery-connector/hadoop3.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:com.google.cloud.bigdataoss%20AND%20a:bigquery-connector%20AND%20v:hadoop3-*)
-
-The Google BigQuery connector for Hadoop MapReduce enables running MapReduce
-jobs on data in BigQuery by implementing the `InputFormat` & `OutputFormat`
-interfaces. For more details see
-[the documentation](https://cloud.google.com/dataproc/docs/concepts/connectors/bigquery)
-
-## Building the Cloud Storage and BigQuery connectors
+## Building the Cloud Storage connector
 
 > Note that build requires Java 11+ and fails with older Java versions.
 
@@ -47,36 +36,22 @@ commands from the main directory:
 ./mvnw -P coverage clean verify
 ```
 
-The Cloud Storage connector JAR can be found in `gcs/target/`. The BigQuery
-connector JAR can be found in `bigquery/target/`.
+The Cloud Storage connector JAR can be found in `gcs/target/` directory.
 
-## Adding the Cloud Storage and BigQuery connectors to your build
+## Adding the Cloud Storage connector to your build
 
 Maven group ID is `com.google.cloud.bigdataoss` and artifact ID for Cloud
-Storage connector is `gcs-connector` and for BigQuery connectors is
-`bigquery-connector`.
+Storage connector is `gcs-connector`.
 
-To add a dependency on one of the connectors using Maven, use the following:
+To add a dependency on Cloud Storage connector using Maven, use the following:
 
-*   Cloud Storage connector:
-
-    ```xml
-    <dependency>
-      <groupId>com.google.cloud.bigdataoss</groupId>
-      <artifactId>gcs-connector</artifactId>
-      <version>hadoop2-2.2.2</version>
-    </dependency>
-    ```
-
-*   BigQuery connector:
-
-    ```xml
-    <dependency>
-      <groupId>com.google.cloud.bigdataoss</groupId>
-      <artifactId>bigquery-connector</artifactId>
-      <version>hadoop2-1.2.0</version>
-    </dependency>
-    ```
+```xml
+<dependency>
+  <groupId>com.google.cloud.bigdataoss</groupId>
+  <artifactId>gcs-connector</artifactId>
+  <version>hadoop3-2.2.10</version>
+</dependency>
+```
 
 ## Resources
 
