@@ -38,7 +38,7 @@ commands from the main directory:
 
 The Cloud Storage connector JAR can be found in `gcs/target/` directory.
 
-## Adding the Cloud Storage to your build
+## Adding the Cloud Storage connector to your build
 
 Maven group ID is `com.google.cloud.bigdataoss` and artifact ID for Cloud
 Storage connector is `gcs-connector`.
