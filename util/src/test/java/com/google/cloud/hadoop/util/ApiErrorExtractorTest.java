@@ -56,6 +56,7 @@ public class ApiErrorExtractorTest {
   private GoogleJsonResponseException notRateLimited; // not rate limited because of domain
   private GoogleJsonResponseException quotaExceeded; // quotaExceeded
   private GoogleJsonResponseException resourceNotReady;
+  private GoogleJsonResponseException bigqueryRateLimited; // bigquery rate limited
   private static final int POSSIBLE_RATE_LIMIT = 429; // Can be many things, but not STATUS_CODE_OK
 
   private final ApiErrorExtractor errorExtractor = ApiErrorExtractor.INSTANCE;
@@ -83,6 +84,8 @@ public class ApiErrorExtractorTest {
     notRateLimited = googleJsonResponseException(POSSIBLE_RATE_LIMIT, errorInfo, "");
     errorInfo.setDomain(ApiErrorExtractor.USAGE_LIMITS_DOMAIN);
     rateLimited = googleJsonResponseException(POSSIBLE_RATE_LIMIT, errorInfo, "");
+    errorInfo.setDomain(ApiErrorExtractor.GLOBAL_DOMAIN);
+    bigqueryRateLimited = googleJsonResponseException(POSSIBLE_RATE_LIMIT, errorInfo, "");
     errorInfo.setReason(ApiErrorExtractor.QUOTA_EXCEEDED_REASON);
     quotaExceeded = googleJsonResponseException(POSSIBLE_RATE_LIMIT, errorInfo, "");
   }
@@ -175,6 +178,19 @@ public class ApiErrorExtractorTest {
     assertThat(errorExtractor.quotaExceeded(new IOException())).isFalse();
     assertThat(errorExtractor.quotaExceeded(new IOException(new IOException()))).isFalse();
     assertThat(errorExtractor.quotaExceeded(null)).isFalse();
+  }
+
+  /** Validates rateLimited() with BigQuery domain / reason codes */
+  @Test
+  public void testBigQueryRateLimited() {
+    // Check success case.
+    assertThat(errorExtractor.rateLimited(bigqueryRateLimited)).isTrue();
+    assertThat(errorExtractor.rateLimited(new IOException(bigqueryRateLimited))).isTrue();
+    assertThat(errorExtractor.rateLimited(new IOException(new IOException(bigqueryRateLimited))))
+        .isTrue();
+
+    // Check failure cases.
+    assertThat(errorExtractor.rateLimited(notRateLimited)).isFalse();
   }
 
   /** Validates ioError(). */
