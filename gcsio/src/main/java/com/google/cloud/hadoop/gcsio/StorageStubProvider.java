@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.storage.v2.StorageGrpc;
 import com.google.storage.v2.StorageGrpc.StorageBlockingStub;
 import com.google.storage.v2.StorageGrpc.StorageStub;
+import io.grpc.ChannelCredentials;
 import io.grpc.Grpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -168,14 +169,12 @@ class StorageStubProvider {
     }
 
     public ManagedChannelBuilder<?> createChannelBuilder(String target) {
-      GoogleDefaultChannelCredentials.Builder credentialsBuilder =
-          GoogleDefaultChannelCredentials.newBuilder();
-      if (credentialsBuilder != null) {
-        credentialsBuilder.callCredentials(MoreCallCredentials.from(credentials));
-      }
-      return Grpc.newChannelBuilder(
-          // TODO(veblush): Remove experimental suffix once this code is proven stable.
-          "google-c2p-experimental:///" + target, credentialsBuilder.build());
+      ChannelCredentials credentialsBuilder =
+          GoogleDefaultChannelCredentials.newBuilder()
+              .callCredentials(MoreCallCredentials.from(credentials))
+              .build();
+      // TODO(veblush): Remove experimental suffix once this code is proven stable.
+      return Grpc.newChannelBuilder("google-c2p-experimental:///" + target, credentialsBuilder);
     }
 
     public AbstractStub<?> applyCallOption(AbstractStub<?> stub) {

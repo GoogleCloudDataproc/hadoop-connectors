@@ -17,7 +17,6 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.truth.Truth.assertThat;
-import static org.junit.Assert.assertTrue;
 
 import com.google.common.flogger.GoogleLogger;
 import com.google.gson.Gson;
@@ -77,12 +76,14 @@ public class AssertingLogHandler extends Handler {
 
   public void verifyCommonTraceFields() {
     for (Map<String, Object> event : logRecords) {
-      assertTrue(event.containsKey("initiatingthreadname"));
-      assertTrue(event.containsKey("remoteaddress"));
-      assertTrue(event.containsKey("elapsedmillis"));
-      assertTrue(event.containsKey("requestinfo"));
-      assertTrue(event.containsKey("eventtime"));
-      assertTrue(event.containsKey("details"));
+      assertThat(event.keySet())
+          .containsAtLeast(
+              "details",
+              "elapsedmillis",
+              "eventtime",
+              "initiatingthreadname",
+              "remoteaddress",
+              "requestinfo");
     }
   }
 
