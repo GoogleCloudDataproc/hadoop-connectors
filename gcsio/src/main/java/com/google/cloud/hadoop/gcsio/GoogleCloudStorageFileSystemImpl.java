@@ -825,9 +825,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     return fileInfo;
   }
 
-  /**
-   * @see #getFileInfo(URI)
-   */
+  /** @see #getFileInfo(URI) */
   private GoogleCloudStorageItemInfo getFileInfoInternal(
       StorageResourceId resourceId, boolean inferImplicitDirectories) throws IOException {
     if (resourceId.isRoot() || resourceId.isBucket()) {

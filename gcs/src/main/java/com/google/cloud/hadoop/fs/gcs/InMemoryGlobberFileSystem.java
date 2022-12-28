@@ -84,25 +84,19 @@ class InMemoryGlobberFileSystem extends FileSystem {
     }
   }
 
-  /**
-   * @inheritDoc
-   */
+  /** @inheritDoc */
   @Override
   public URI getUri() {
     return uri;
   }
 
-  /**
-   * @inheritDoc
-   */
+  /** @inheritDoc */
   @Override
   public Path getWorkingDirectory() {
     return workingDirectory;
   }
 
-  /**
-   * @inheritDoc
-   */
+  /** @inheritDoc */
   @Override
   public FileStatus[] listStatus(Path f) throws IOException {
     Path qualifiedPath = makeQualified(f);
@@ -120,9 +114,7 @@ class InMemoryGlobberFileSystem extends FileSystem {
     return result;
   }
 
-  /**
-   * @inheritDoc
-   */
+  /** @inheritDoc */
   @Override
   public FileStatus getFileStatus(Path f) throws IOException {
     Path qualifiedPath = makeQualified(f);
@@ -137,17 +129,13 @@ class InMemoryGlobberFileSystem extends FileSystem {
 
   // Below are unsupported methods that are not used in 'globStatus' calls
 
-  /**
-   * @inheritDoc
-   */
+  /** @inheritDoc */
   @Override
   public FSDataInputStream open(Path f, int bufferSize) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * @inheritDoc
-   */
+  /** @inheritDoc */
   @Override
   public FSDataOutputStream create(
       Path f,
@@ -160,49 +148,37 @@ class InMemoryGlobberFileSystem extends FileSystem {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * @inheritDoc
-   */
+  /** @inheritDoc */
   @Override
   public FSDataOutputStream append(Path f, int bufferSize, Progressable progress) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * @inheritDoc
-   */
+  /** @inheritDoc */
   @Override
   public boolean rename(Path src, Path dst) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * @inheritDoc
-   */
+  /** @inheritDoc */
   @Override
   public boolean delete(Path f) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * @inheritDoc
-   */
+  /** @inheritDoc */
   @Override
   public boolean delete(Path f, boolean recursive) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * @inheritDoc
-   */
+  /** @inheritDoc */
   @Override
   public void setWorkingDirectory(Path newDir) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * @inheritDoc
-   */
+  /** @inheritDoc */
   @Override
   public boolean mkdirs(Path f, FsPermission permission) {
     throw new UnsupportedOperationException();

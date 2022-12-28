@@ -42,31 +42,23 @@ public interface AccessTokenProvider extends Configurable {
       this.expirationTime = expirationTime;
     }
 
-    /**
-     * @return the Access Token string.
-     */
+    /** @return the Access Token string. */
     public String getToken() {
       return token;
     }
 
-    /**
-     * @return the Time when the token will expire, expressed in milliseconds.
-     */
+    /** @return the Time when the token will expire, expressed in milliseconds. */
     public Instant getExpirationTime() {
       return expirationTime;
     }
   }
 
-  /**
-   * @return an access token type.
-   */
+  /** @return an access token type. */
   default AccessTokenType getAccessTokenType() {
     return AccessTokenType.GENERIC;
   }
 
-  /**
-   * @return an access token.
-   */
+  /** @return an access token. */
   AccessToken getAccessToken();
 
   /**

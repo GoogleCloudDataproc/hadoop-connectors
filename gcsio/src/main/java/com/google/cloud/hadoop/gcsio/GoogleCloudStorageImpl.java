@@ -1488,9 +1488,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     return maxResults - numResults;
   }
 
-  /**
-   * @see GoogleCloudStorage#listObjectInfo(String, String, ListObjectOptions)
-   */
+  /** @see GoogleCloudStorage#listObjectInfo(String, String, ListObjectOptions) */
   @Override
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions)
@@ -1507,9 +1505,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         bucketName, objectNamePrefix, listOptions, listedPrefixes, listedObjects);
   }
 
-  /**
-   * @see GoogleCloudStorage#listObjectInfoPage(String, String, ListObjectOptions, String)
-   */
+  /** @see GoogleCloudStorage#listObjectInfoPage(String, String, ListObjectOptions, String) */
   @Override
   public ListPage<GoogleCloudStorageItemInfo> listObjectInfoPage(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions, String pageToken)
