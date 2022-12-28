@@ -20,6 +20,7 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInf
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.HTTP_TRANSPORT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.resumableUploadResponse;
+import static com.google.cloud.hadoop.gcsio.MockGoogleCloudStorageImplFactory.mockedGcs;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.batchRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.composeRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.copyRequestString;
@@ -48,10 +49,7 @@ import static org.junit.Assert.assertThrows;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.googleapis.media.MediaHttpUploader;
 import com.google.api.client.http.HttpRequest;
-import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpStatusCodes;
-import com.google.api.client.http.HttpTransport;
-import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.api.client.util.BackOff;
 import com.google.api.client.util.DateTime;
@@ -64,7 +62,6 @@ import com.google.api.services.storage.model.Buckets;
 import com.google.api.services.storage.model.Objects;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
-import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
@@ -101,7 +98,6 @@ import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
 import java.util.zip.GZIPOutputStream;
 import javax.net.ssl.SSLException;
 import org.junit.Before;
@@ -184,14 +180,18 @@ public class GoogleCloudStorageTest {
             .setStorageRootUrl("https://unit-test-storage.googleapis.com/")
             .build();
 
-    GoogleCloudStorageImpl gcsImpl = new GoogleCloudStorageImpl(options, request -> {});
+    GoogleCloudStorageImpl gcsImpl =
+        GoogleCloudStorageImpl.builder()
+            .setOptions(options)
+            .setCredentials(new FakeCredentials())
+            .build();
 
     assertThat(gcsImpl.storage.getRootUrl()).isEqualTo("https://unit-test-storage.googleapis.com/");
   }
 
   /** Test argument sanitization for GoogleCloudStorage.create(2). */
   @Test
-  public void testCreateObjectIllegalArguments() {
+  public void testCreateObjectIllegalArguments() throws IOException {
     GoogleCloudStorage gcs = mockedGcs(HTTP_TRANSPORT);
     ILLEGAL_OBJECT_IDS.forEach(
         resourceId -> assertThrows(IllegalArgumentException.class, () -> gcs.create(resourceId)));
@@ -210,7 +210,8 @@ public class GoogleCloudStorageTest {
                 newStorageObject(BUCKET_NAME, OBJECT_NAME)
                     .setSize(BigInteger.valueOf(testData.length))));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     try (WritableByteChannel writeChannel = gcs.create(RESOURCE_ID)) {
       assertThat(writeChannel.isOpen()).isTrue();
@@ -246,7 +247,8 @@ public class GoogleCloudStorageTest {
                 newStorageObject(BUCKET_NAME, OBJECT_NAME)
                     .setSize(BigInteger.valueOf(testData.length))));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     try (WritableByteChannel writeChannel =
         gcs.create(new StorageResourceId(BUCKET_NAME, OBJECT_NAME, generationId))) {
@@ -282,7 +284,8 @@ public class GoogleCloudStorageTest {
             jsonDataResponse(newStorageObject(BUCKET_NAME, OBJECT_NAME)),
             jsonErrorResponse(ErrorResponses.NOT_FOUND));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     WritableByteChannel writeChannel = gcs.create(RESOURCE_ID);
     assertThat(writeChannel.isOpen()).isTrue();
@@ -321,7 +324,10 @@ public class GoogleCloudStorageTest {
             .build();
 
     GoogleCloudStorage gcs =
-        mockedGcs(GCS_OPTIONS.toBuilder().setWriteChannelOptions(writeOptions).build(), transport);
+        mockedGcs(
+            GCS_OPTIONS.toBuilder().setWriteChannelOptions(writeOptions).build(),
+            transport,
+            trackingRequestInitializerWithRetries);
 
     try (WritableByteChannel writeChannel = gcs.create(RESOURCE_ID)) {
       writeChannel.write(ByteBuffer.wrap(testData));
@@ -367,7 +373,10 @@ public class GoogleCloudStorageTest {
         AsyncWriteChannelOptions.builder().setUploadChunkSize(uploadChunkSize).build();
 
     GoogleCloudStorage gcs =
-        mockedGcs(GCS_OPTIONS.toBuilder().setWriteChannelOptions(writeOptions).build(), transport);
+        mockedGcs(
+            GCS_OPTIONS.toBuilder().setWriteChannelOptions(writeOptions).build(),
+            transport,
+            trackingRequestInitializerWithRetries);
 
     try (WritableByteChannel writeChannel = gcs.create(RESOURCE_ID)) {
       writeChannel.write(ByteBuffer.wrap(testData));
@@ -404,7 +413,8 @@ public class GoogleCloudStorageTest {
             resumableUploadResponse(BUCKET_NAME, OBJECT_NAME),
             uploadException);
 
-    GoogleCloudStorage gcs = mockedGcs(GCS_OPTIONS, transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     WritableByteChannel writeChannel = gcs.create(RESOURCE_ID);
     writeChannel.write(ByteBuffer.wrap(testData));
@@ -436,7 +446,8 @@ public class GoogleCloudStorageTest {
                 newStorageObject(BUCKET_NAME, OBJECT_NAME)
                     .setSize(BigInteger.valueOf(testData.length))));
 
-    GoogleCloudStorage gcs = mockedGcs(GCS_OPTIONS, transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     try (WritableByteChannel writeChannel = gcs.create(RESOURCE_ID)) {
       writeChannel.write(ByteBuffer.wrap(testData));
@@ -466,7 +477,8 @@ public class GoogleCloudStorageTest {
                 newStorageObject(BUCKET_NAME, OBJECT_NAME)
                     .setSize(BigInteger.valueOf(testData.length))));
 
-    GoogleCloudStorage gcs = mockedGcs(GCS_OPTIONS, transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     WritableByteChannel writeChannel = gcs.create(RESOURCE_ID);
     writeChannel.write(ByteBuffer.wrap(testData));
@@ -516,7 +528,10 @@ public class GoogleCloudStorageTest {
             .build();
 
     GoogleCloudStorage gcs =
-        mockedGcs(GCS_OPTIONS.toBuilder().setWriteChannelOptions(writeOptions).build(), transport);
+        mockedGcs(
+            GCS_OPTIONS.toBuilder().setWriteChannelOptions(writeOptions).build(),
+            transport,
+            trackingRequestInitializerWithRetries);
 
     try (WritableByteChannel writeChannel = gcs.create(RESOURCE_ID)) {
       writeChannel.write(ByteBuffer.wrap(testData));
@@ -570,7 +585,10 @@ public class GoogleCloudStorageTest {
             .build();
 
     GoogleCloudStorage gcs =
-        mockedGcs(GCS_OPTIONS.toBuilder().setWriteChannelOptions(writeOptions).build(), transport);
+        mockedGcs(
+            GCS_OPTIONS.toBuilder().setWriteChannelOptions(writeOptions).build(),
+            transport,
+            trackingRequestInitializerWithRetries);
 
     try (WritableByteChannel writeChannel = gcs.create(RESOURCE_ID)) {
       writeChannel.write(ByteBuffer.wrap(testData));
@@ -630,7 +648,10 @@ public class GoogleCloudStorageTest {
             .build();
 
     GoogleCloudStorage gcs =
-        mockedGcs(GCS_OPTIONS.toBuilder().setWriteChannelOptions(writeOptions).build(), transport);
+        mockedGcs(
+            GCS_OPTIONS.toBuilder().setWriteChannelOptions(writeOptions).build(),
+            transport,
+            trackingRequestInitializerWithRetries);
 
     try (WritableByteChannel writeChannel = gcs.create(RESOURCE_ID)) {
       writeChannel.write(ByteBuffer.wrap(testData));
@@ -706,7 +727,8 @@ public class GoogleCloudStorageTest {
     MockHttpTransport transport =
         mockTransport(jsonDataResponse(newStorageObject(BUCKET_NAME, OBJECT_NAME)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     gcs.createEmptyObject(RESOURCE_ID);
 
@@ -717,7 +739,7 @@ public class GoogleCloudStorageTest {
 
   /** Test argument sanitization for GoogleCloudStorage.open(2). */
   @Test
-  public void testOpenObjectIllegalArguments() {
+  public void testOpenObjectIllegalArguments() throws IOException {
     GoogleCloudStorage gcs = mockedGcs(HTTP_TRANSPORT);
     ILLEGAL_OBJECT_IDS.forEach(
         resourceId -> assertThrows(IllegalArgumentException.class, () -> gcs.open(resourceId)));
@@ -728,7 +750,8 @@ public class GoogleCloudStorageTest {
     MockHttpTransport transport =
         mockTransport(jsonDataResponse(newStorageObject(BUCKET_NAME, OBJECT_NAME)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     GoogleCloudStorageReadChannel channel = (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
 
@@ -768,7 +791,8 @@ public class GoogleCloudStorageTest {
             inputStreamResponse(CONTENT_LENGTH, testData.length, ioExceptionStream),
             dataResponse(testData));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     GoogleCloudStorageReadChannel readChannel =
         (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
@@ -809,7 +833,8 @@ public class GoogleCloudStorageTest {
             inputStreamResponse(CONTENT_LENGTH, testData.length, failedStream),
             dataResponse(testData));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     GoogleCloudStorageReadChannel readChannel =
         (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
@@ -845,7 +870,8 @@ public class GoogleCloudStorageTest {
         mockTransport(
             jsonDataResponse(storageObject), inputStreamResponse(CONTENT_LENGTH, 1, failedStream));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     GoogleCloudStorageReadChannel readChannel =
         (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
@@ -884,7 +910,8 @@ public class GoogleCloudStorageTest {
         mockTransport(
             jsonDataResponse(storageObject), inputStreamResponse(CONTENT_LENGTH, 1, failedStream));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     GoogleCloudStorageReadChannel readChannel =
         (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
@@ -934,7 +961,8 @@ public class GoogleCloudStorageTest {
             // retries.
             inputStreamResponse(CONTENT_LENGTH, 1, new ByteArrayInputStream(new byte[0])));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     GoogleCloudStorageReadChannel readChannel =
         (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
@@ -989,7 +1017,8 @@ public class GoogleCloudStorageTest {
             // retries.
             inputStreamResponse(CONTENT_LENGTH, 1, new ByteArrayInputStream(thirdReadData)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     GoogleCloudStorageReadChannel readChannel =
         (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
@@ -1045,7 +1074,8 @@ public class GoogleCloudStorageTest {
             inputStreamResponse(CONTENT_LENGTH, 1, new ThrowingInputStream(readException1)),
             inputStreamResponse(CONTENT_LENGTH, 1, new ThrowingInputStream(readException2)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     GoogleCloudStorageReadChannel readChannel =
         (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
@@ -1087,7 +1117,8 @@ public class GoogleCloudStorageTest {
             inputStreamResponse(
                 CONTENT_LENGTH, 1, new ThrowingInputStream(new IOException("read IOException"))));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     GoogleCloudStorageReadChannel readChannel =
         (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
@@ -1123,7 +1154,8 @@ public class GoogleCloudStorageTest {
             inputStreamResponse(CONTENT_LENGTH, 1, sslExceptionStream),
             inputStreamResponse(CONTENT_LENGTH, 1, new ThrowingInputStream(readIOException)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     GoogleCloudStorageReadChannel readChannel =
         (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
@@ -1186,7 +1218,8 @@ public class GoogleCloudStorageTest {
             inputStreamResponse(
                 CONTENT_LENGTH, testData.length, new ByteArrayInputStream(testData2)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     GoogleCloudStorageReadChannel readChannel =
         (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
@@ -1235,7 +1268,8 @@ public class GoogleCloudStorageTest {
             dataResponse(responseHeaders, compressedData),
             dataResponse(responseHeaders, compressedData));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder().setGzipEncodingSupportEnabled(true).build();
 
@@ -1313,7 +1347,8 @@ public class GoogleCloudStorageTest {
 
     MockHttpTransport transport = mockTransport(dataResponse(testData));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder()
@@ -1341,7 +1376,8 @@ public class GoogleCloudStorageTest {
 
     MockHttpTransport transport = mockTransport(dataResponse(testData));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder()
@@ -1370,7 +1406,8 @@ public class GoogleCloudStorageTest {
 
     MockHttpTransport transport = mockTransport(dataResponse(testData));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     GoogleCloudStorageReadChannel readChannel =
         (GoogleCloudStorageReadChannel)
@@ -1410,7 +1447,8 @@ public class GoogleCloudStorageTest {
 
     MockHttpTransport transport = mockTransport(dataResponse(testData));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder()
@@ -1455,7 +1493,8 @@ public class GoogleCloudStorageTest {
         mockTransport(
             jsonDataResponse(storageObject), dataResponse(testData), dataResponse(testData));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     GoogleCloudStorageReadChannel readChannel =
         (GoogleCloudStorageReadChannel)
@@ -1535,7 +1574,8 @@ public class GoogleCloudStorageTest {
                     compressedData, /* readFraction= */ 0.75, "read timeout #2")),
             inputStreamResponse(responseHeaders, new ByteArrayInputStream(compressedData)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder().setGzipEncodingSupportEnabled(true).build();
@@ -1577,7 +1617,8 @@ public class GoogleCloudStorageTest {
         mockTransport(
             jsonDataResponse(storageObject), dataResponse(testData), dataResponse(testData2));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     GoogleCloudStorageReadChannel readChannel =
         (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
@@ -1652,7 +1693,8 @@ public class GoogleCloudStorageTest {
             jsonDataResponse(storageObject2),
             jsonErrorResponse(ErrorResponses.GONE));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     StorageResourceId objectId = RESOURCE_ID;
 
@@ -1691,7 +1733,7 @@ public class GoogleCloudStorageTest {
 
   /** Test argument sanitization for GoogleCloudStorage.create(String). */
   @Test
-  public void testCreateBucketIllegalArguments() {
+  public void testCreateBucketIllegalArguments() throws IOException {
     GoogleCloudStorage gcs = mockedGcs(HTTP_TRANSPORT);
     assertThrows(IllegalArgumentException.class, () -> gcs.createBucket(null));
     assertThrows(IllegalArgumentException.class, () -> gcs.createBucket(""));
@@ -1702,7 +1744,8 @@ public class GoogleCloudStorageTest {
   public void testCreateBucketNormalOperation() throws IOException {
     MockHttpTransport transport = mockTransport(jsonDataResponse(newBucket(BUCKET_NAME)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     gcs.createBucket(BUCKET_NAME);
 
@@ -1716,7 +1759,8 @@ public class GoogleCloudStorageTest {
   public void testCreateBucketWithOptionsNormalOperation() throws IOException {
     MockHttpTransport transport = mockTransport(jsonDataResponse(newBucket(BUCKET_NAME)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     String location = "some-location";
     String storageClass = "storage-class";
@@ -1740,7 +1784,8 @@ public class GoogleCloudStorageTest {
   public void testCreateBucketApiException() throws Exception {
     MockHttpTransport transport = mockTransport(jsonErrorResponse(ErrorResponses.GONE));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     // TODO(user): Switch to testing for FileExistsException once implemented.
     IOException exception = assertThrows(IOException.class, () -> gcs.createBucket(BUCKET_NAME));
@@ -1760,7 +1805,8 @@ public class GoogleCloudStorageTest {
     MockHttpTransport transport =
         mockTransport(jsonErrorResponse(ErrorResponses.RATE_LIMITED), jsonDataResponse(bucket));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     gcs.createBucket(BUCKET_NAME);
 
@@ -1772,7 +1818,7 @@ public class GoogleCloudStorageTest {
 
   /** Test argument sanitization for GoogleCloudStorage.delete(1). */
   @Test
-  public void testDeleteBucketIllegalArguments() {
+  public void testDeleteBucketIllegalArguments() throws IOException {
     GoogleCloudStorage gcs = mockedGcs(HTTP_TRANSPORT);
     assertThrows(
         IllegalArgumentException.class, () -> gcs.deleteBuckets(Lists.newArrayList((String) null)));
@@ -1785,7 +1831,8 @@ public class GoogleCloudStorageTest {
     MockHttpTransport transport =
         mockTransport(emptyResponse(HttpStatusCodes.STATUS_CODE_NO_CONTENT));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     gcs.deleteBuckets(ImmutableList.of(BUCKET_NAME));
 
@@ -1826,7 +1873,8 @@ public class GoogleCloudStorageTest {
     MockHttpTransport transport =
         mockTransport(jsonErrorResponse(ErrorResponses.RATE_LIMITED), jsonDataResponse(bucket));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     gcs.deleteBuckets(ImmutableList.of(BUCKET_NAME));
 
@@ -1838,7 +1886,7 @@ public class GoogleCloudStorageTest {
 
   /** Test argument sanitization for GoogleCloudStorage.delete(2). */
   @Test
-  public void testDeleteObjectIllegalArguments() {
+  public void testDeleteObjectIllegalArguments() throws IOException {
     GoogleCloudStorage gcs = mockedGcs(HTTP_TRANSPORT);
     ILLEGAL_OBJECT_IDS.forEach(
         resourceId ->
@@ -1858,7 +1906,8 @@ public class GoogleCloudStorageTest {
         mockTransport(
             jsonDataResponse(storageObject), emptyResponse(HttpStatusCodes.STATUS_CODE_NO_CONTENT));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     gcs.deleteObjects(Lists.newArrayList(RESOURCE_ID));
 
@@ -1877,7 +1926,8 @@ public class GoogleCloudStorageTest {
     MockHttpTransport transport =
         mockTransport(emptyResponse(HttpStatusCodes.STATUS_CODE_NO_CONTENT));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     gcs.deleteObjects(
         ImmutableList.of(new StorageResourceId(BUCKET_NAME, OBJECT_NAME, generationId)));
@@ -1891,7 +1941,7 @@ public class GoogleCloudStorageTest {
 
   /** Test argument sanitization for GoogleCloudStorage.copy(4). */
   @Test
-  public void testCopyObjectsIllegalArguments() {
+  public void testCopyObjectsIllegalArguments() throws IOException {
     String b = BUCKET_NAME;
     List<String> o = ImmutableList.of(OBJECT_NAME);
 
@@ -1929,7 +1979,8 @@ public class GoogleCloudStorageTest {
     MockHttpTransport transport =
         mockTransport(jsonDataResponse(new Objects().setItems(ImmutableList.of(object))));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     gcs.copy(BUCKET_NAME, ImmutableList.of(OBJECT_NAME), BUCKET_NAME, ImmutableList.of(dstObject));
 
@@ -1953,7 +2004,8 @@ public class GoogleCloudStorageTest {
             jsonDataResponse(newBucket(dstBucket)),
             dataResponse("{\"done\": true}".getBytes(StandardCharsets.UTF_8)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     gcs.copy(BUCKET_NAME, ImmutableList.of(OBJECT_NAME), dstBucket, ImmutableList.of(dstObject));
 
@@ -1983,7 +2035,8 @@ public class GoogleCloudStorageTest {
             jsonDataResponse(newBucket(BUCKET_NAME)),
             jsonErrorResponse(ErrorResponses.GONE));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     // Order of exceptions:
     // 1. Src 404
@@ -2046,7 +2099,8 @@ public class GoogleCloudStorageTest {
             jsonDataResponse(newBucket(BUCKET_NAME).setStorageClass("class-be2-incomp")),
             jsonDataResponse(newBucket(dstBucket)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     UnsupportedOperationException locationException =
         assertThrows(
@@ -2079,7 +2133,8 @@ public class GoogleCloudStorageTest {
 
     MockHttpTransport transport = mockTransport(jsonDataResponse(new Buckets().setItems(buckets)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     List<String> bucketNames = gcs.listBucketNames();
 
@@ -2097,7 +2152,8 @@ public class GoogleCloudStorageTest {
 
     MockHttpTransport transport = mockTransport(jsonDataResponse(new Buckets().setItems(buckets)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     List<GoogleCloudStorageItemInfo> bucketInfos = gcs.listBucketInfo();
 
@@ -2125,7 +2181,8 @@ public class GoogleCloudStorageTest {
     MockHttpTransport transport =
         mockTransport(jsonDataResponse(new Objects().setItems(objects).setNextPageToken(null)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     List<GoogleCloudStorageItemInfo> objectInfos = gcs.listObjectInfo(BUCKET_NAME, prefix);
 
@@ -2161,7 +2218,8 @@ public class GoogleCloudStorageTest {
                     .setItems(objects)
                     .setNextPageToken(null)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     List<GoogleCloudStorageItemInfo> objectInfos = gcs.listObjectInfo(BUCKET_NAME, objectPrefix);
 
@@ -2196,7 +2254,8 @@ public class GoogleCloudStorageTest {
                         ImmutableList.of(newStorageObject(BUCKET_NAME, "foo/bar/baz/"), obj1, obj2))
                     .setNextPageToken(null)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     List<GoogleCloudStorageItemInfo> objects = gcs.listObjectInfo(BUCKET_NAME, prefix);
 
@@ -2218,7 +2277,8 @@ public class GoogleCloudStorageTest {
   public void listObjectInfo_includePrefix_emptyBucket() throws IOException {
     MockHttpTransport transport = mockTransport(jsonDataResponse(new Objects()));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     List<GoogleCloudStorageItemInfo> objects =
         gcs.listObjectInfo(BUCKET_NAME, /* objectNamePrefix= */ null, INCLUDE_PREFIX_LIST_OPTIONS);
@@ -2238,7 +2298,8 @@ public class GoogleCloudStorageTest {
     MockHttpTransport transport =
         mockTransport(jsonDataResponse(new Objects().setItems(ImmutableList.of(obj))));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     List<GoogleCloudStorageItemInfo> objects =
         gcs.listObjectInfo(BUCKET_NAME, /* objectNamePrefix= */ null, INCLUDE_PREFIX_LIST_OPTIONS);
@@ -2258,7 +2319,8 @@ public class GoogleCloudStorageTest {
     MockHttpTransport transport =
         mockTransport(jsonDataResponse(new Objects().setPrefixes(ImmutableList.of(dirName))));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     List<GoogleCloudStorageItemInfo> objects =
         gcs.listObjectInfo(BUCKET_NAME, /* objectNamePrefix= */ null, INCLUDE_PREFIX_LIST_OPTIONS);
@@ -2284,7 +2346,8 @@ public class GoogleCloudStorageTest {
                     .setItems(ImmutableList.of(dir))
                     .setPrefixes(ImmutableList.of(dirName))));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     List<GoogleCloudStorageItemInfo> objects =
         gcs.listObjectInfo(BUCKET_NAME, /* objectNamePrefix= */ null, INCLUDE_PREFIX_LIST_OPTIONS);
@@ -2313,7 +2376,8 @@ public class GoogleCloudStorageTest {
             jsonDataResponse(
                 new Objects().setItems(ImmutableList.of(obj0)).setNextPageToken(null)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     List<GoogleCloudStorageItemInfo> objects =
         gcs.listObjectInfo(BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS);
@@ -2346,7 +2410,8 @@ public class GoogleCloudStorageTest {
             jsonDataResponse(
                 new Objects().setItems(ImmutableList.of(obj1)).setNextPageToken(null)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     List<GoogleCloudStorageItemInfo> objects =
         gcs.listObjectInfo(BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS);
@@ -2380,7 +2445,8 @@ public class GoogleCloudStorageTest {
                     .setPrefixes(ImmutableList.of("foo/bar/baz/dir1/"))
                     .setNextPageToken(null)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     List<GoogleCloudStorageItemInfo> objects =
         gcs.listObjectInfo(BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS);
@@ -2415,7 +2481,8 @@ public class GoogleCloudStorageTest {
             jsonDataResponse(
                 new Objects().setItems(ImmutableList.of(prefixObj, obj0)).setNextPageToken(null)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     List<GoogleCloudStorageItemInfo> objects =
         gcs.listObjectInfo(BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS);
@@ -2444,7 +2511,8 @@ public class GoogleCloudStorageTest {
             jsonDataResponse(
                 new Objects().setItems(ImmutableList.of(prefixObj)).setNextPageToken(null)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     List<GoogleCloudStorageItemInfo> objects =
         gcs.listObjectInfo(BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS);
@@ -2462,7 +2530,8 @@ public class GoogleCloudStorageTest {
 
     MockHttpTransport transport = mockTransport(jsonDataResponse(new Objects()));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     List<GoogleCloudStorageItemInfo> objects =
         gcs.listObjectInfo(BUCKET_NAME, prefix, INCLUDE_PREFIX_LIST_OPTIONS);
@@ -2490,7 +2559,8 @@ public class GoogleCloudStorageTest {
                     .setItems(ImmutableList.of(dir1))
                     .setNextPageToken(null)));
 
-    GoogleCloudStorage gcs = mockedGcs(GCS_OPTIONS, transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     // List the objects
     List<GoogleCloudStorageItemInfo> objectInfos = gcs.listObjectInfo(BUCKET_NAME, objectPrefix);
@@ -2521,7 +2591,8 @@ public class GoogleCloudStorageTest {
     MockHttpTransport transport =
         mockTransport(jsonDataResponse(new Objects().setItems(objects).setNextPageToken(null)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     ListPage<GoogleCloudStorageItemInfo> objectsPage =
         gcs.listObjectInfoPage(BUCKET_NAME, prefix, /* pageToken= */ null);
@@ -2559,7 +2630,8 @@ public class GoogleCloudStorageTest {
                     .setItems(objects)
                     .setNextPageToken(null)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     ListPage<GoogleCloudStorageItemInfo> objectsPage =
         gcs.listObjectInfoPage(BUCKET_NAME, objectPrefix, /* pageToken= */ null);
@@ -2592,7 +2664,8 @@ public class GoogleCloudStorageTest {
                         ImmutableList.of(newStorageObject(BUCKET_NAME, "foo/bar/baz/"), obj1, obj2))
                     .setNextPageToken(null)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     ListPage<GoogleCloudStorageItemInfo> objectsPage =
         gcs.listObjectInfoPage(BUCKET_NAME, prefix, /* pageToken= */ null);
@@ -2615,7 +2688,8 @@ public class GoogleCloudStorageTest {
   public void listObjectInfoPage_includePrefix_emptyBucket() throws IOException {
     MockHttpTransport transport = mockTransport(jsonDataResponse(new Objects()));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     ListPage<GoogleCloudStorageItemInfo> objectsPage =
         gcs.listObjectInfoPage(
@@ -2640,7 +2714,8 @@ public class GoogleCloudStorageTest {
     MockHttpTransport transport =
         mockTransport(jsonDataResponse(new Objects().setItems(ImmutableList.of(obj))));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     ListPage<GoogleCloudStorageItemInfo> objectsPage =
         gcs.listObjectInfoPage(
@@ -2665,7 +2740,8 @@ public class GoogleCloudStorageTest {
     MockHttpTransport transport =
         mockTransport(jsonDataResponse(new Objects().setPrefixes(ImmutableList.of(dirName))));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     ListPage<GoogleCloudStorageItemInfo> objectsPage =
         gcs.listObjectInfoPage(
@@ -2696,7 +2772,8 @@ public class GoogleCloudStorageTest {
                     .setItems(ImmutableList.of(dir))
                     .setPrefixes(ImmutableList.of(dirName))));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     ListPage<GoogleCloudStorageItemInfo> objectsPage =
         gcs.listObjectInfoPage(
@@ -2728,7 +2805,8 @@ public class GoogleCloudStorageTest {
                     .setItems(ImmutableList.of(obj0))
                     .setNextPageToken(null)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     ListPage<GoogleCloudStorageItemInfo> objectsPage =
         gcs.listObjectInfoPage(
@@ -2760,7 +2838,8 @@ public class GoogleCloudStorageTest {
             jsonDataResponse(
                 new Objects().setItems(ImmutableList.of(obj0, obj1)).setNextPageToken(null)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     ListPage<GoogleCloudStorageItemInfo> objectsPage =
         gcs.listObjectInfoPage(
@@ -2792,7 +2871,8 @@ public class GoogleCloudStorageTest {
                     .setPrefixes(ImmutableList.of("foo/bar/baz/dir0/", "foo/bar/baz/dir1/"))
                     .setNextPageToken(pageToken)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     ListPage<GoogleCloudStorageItemInfo> objects =
         gcs.listObjectInfoPage(
@@ -2827,7 +2907,8 @@ public class GoogleCloudStorageTest {
                     .setItems(ImmutableList.of(prefixObj, obj0))
                     .setNextPageToken(pageToken)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     ListPage<GoogleCloudStorageItemInfo> objectsPage =
         gcs.listObjectInfoPage(
@@ -2857,7 +2938,8 @@ public class GoogleCloudStorageTest {
             jsonDataResponse(
                 new Objects().setItems(ImmutableList.of(prefixObj)).setNextPageToken(null)));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     ListPage<GoogleCloudStorageItemInfo> objectsPage =
         gcs.listObjectInfoPage(
@@ -2879,7 +2961,8 @@ public class GoogleCloudStorageTest {
 
     MockHttpTransport transport = mockTransport(jsonDataResponse(new Objects()));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     ListPage<GoogleCloudStorageItemInfo> objectsPage =
         gcs.listObjectInfoPage(
@@ -2909,7 +2992,8 @@ public class GoogleCloudStorageTest {
                     .setItems(ImmutableList.of(dir1))
                     .setNextPageToken(null)));
 
-    GoogleCloudStorage gcs = mockedGcs(GCS_OPTIONS, transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     // List the objects
     ListPage<GoogleCloudStorageItemInfo> objectInfos =
@@ -2947,7 +3031,8 @@ public class GoogleCloudStorageTest {
 
     MockHttpTransport transport = mockTransport(jsonDataResponse(bucket));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     GoogleCloudStorageItemInfo info = gcs.getItemInfo(bucketId);
 
@@ -2965,7 +3050,8 @@ public class GoogleCloudStorageTest {
 
     MockHttpTransport transport = mockTransport(jsonDataResponse(bucket));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     IllegalArgumentException thrown =
         assertThrows(IllegalArgumentException.class, () -> gcs.getItemInfo(bucketId));
@@ -2991,7 +3077,8 @@ public class GoogleCloudStorageTest {
         mockTransport(
             jsonErrorResponse(ErrorResponses.NOT_FOUND), jsonErrorResponse(ErrorResponses.GONE));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     // Not found.
     GoogleCloudStorageItemInfo info = gcs.getItemInfo(new StorageResourceId(BUCKET_NAME));
@@ -3017,7 +3104,8 @@ public class GoogleCloudStorageTest {
 
     MockHttpTransport transport = mockTransport(jsonDataResponse(storageObject));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     GoogleCloudStorageItemInfo info = gcs.getItemInfo(RESOURCE_ID);
 
@@ -3040,7 +3128,8 @@ public class GoogleCloudStorageTest {
 
     MockHttpTransport transport = mockTransport(jsonDataResponse(wrongObjectName));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     IllegalArgumentException thrown =
         assertThrows(IllegalArgumentException.class, () -> gcs.getItemInfo(RESOURCE_ID));
@@ -3067,7 +3156,8 @@ public class GoogleCloudStorageTest {
         mockTransport(
             jsonErrorResponse(ErrorResponses.NOT_FOUND), jsonErrorResponse(ErrorResponses.GONE));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     // Not found.
     GoogleCloudStorageItemInfo info = gcs.getItemInfo(RESOURCE_ID);
@@ -3092,7 +3182,8 @@ public class GoogleCloudStorageTest {
         mockBatchTransport(
             /* requestsPerBatch= */ 2, jsonDataResponse(storageObject), jsonDataResponse(bucket));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     // Call in order of StorageObject, Bucket.
     List<GoogleCloudStorageItemInfo> itemInfos =
@@ -3124,7 +3215,8 @@ public class GoogleCloudStorageTest {
             jsonErrorResponse(ErrorResponses.RATE_LIMITED),
             jsonDataResponse(bucket));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     // Call in order of StorageObject, Bucket.
     List<GoogleCloudStorageItemInfo> itemInfos =
@@ -3156,7 +3248,8 @@ public class GoogleCloudStorageTest {
             jsonErrorResponse(ErrorResponses.NOT_FOUND),
             jsonErrorResponse(ErrorResponses.NOT_FOUND));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     // Call in order of StorageObject, ROOT, Bucket.
     List<GoogleCloudStorageItemInfo> itemInfos =
@@ -3182,11 +3275,11 @@ public class GoogleCloudStorageTest {
 
   /** Test for GoogleCloudStorage.close(0). */
   @Test
-  public void testClose() {
-    GoogleCloudStorage gcs = mockedGcs(HTTP_TRANSPORT);
+  public void testClose() throws IOException {
+    GoogleCloudStorageImpl gcs = mockedGcs(HTTP_TRANSPORT);
 
     ExecutorService executorService = Executors.newSingleThreadExecutor();
-    ((GoogleCloudStorageImpl) gcs).setBackgroundTasksThreadPool(executorService);
+    gcs.setBackgroundTasksThreadPool(executorService);
 
     gcs.close();
 
@@ -3204,7 +3297,8 @@ public class GoogleCloudStorageTest {
     MockHttpTransport transport =
         mockTransport(jsonDataResponse(storageObject), jsonDataResponse(storageObject));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     gcs.compose(BUCKET_NAME, sources, OBJECT_NAME, CreateObjectOptions.CONTENT_TYPE_DEFAULT);
 
@@ -3236,7 +3330,8 @@ public class GoogleCloudStorageTest {
             jsonDataResponse(object1),
             jsonDataResponse(object2));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     Map<String, byte[]> rawMetadata =
         ImmutableMap.of("foo", new byte[] {0x01}, "bar", new byte[] {0x02});
@@ -3254,50 +3349,6 @@ public class GoogleCloudStorageTest {
             composeRequestString(
                 BUCKET_NAME, destination, generationId, /* replaceGenerationId= */ false))
         .inOrder();
-  }
-
-  /** Test validation of Storage passing constructor. */
-  @Test
-  @SuppressWarnings("CheckReturnValue")
-  public void testStoragePassedConstructor() {
-    GoogleCloudStorageOptions.Builder optionsBuilder =
-        GoogleCloudStorageOptions.builder().setAppName("appName").setProjectId("projectId");
-
-    Storage storage =
-        new Storage(
-            HTTP_TRANSPORT,
-            GsonFactory.getDefaultInstance(),
-            trackingRequestInitializerWithRetries);
-    // Verify that fake projectId/appName and mock storage does not throw.
-    new GoogleCloudStorageImpl(optionsBuilder.build(), storage);
-
-    // Verify that projectId == null or empty does not throw.
-    optionsBuilder.setProjectId(null);
-    new GoogleCloudStorageImpl(optionsBuilder.build(), storage);
-
-    optionsBuilder.setProjectId("");
-    new GoogleCloudStorageImpl(optionsBuilder.build(), storage);
-
-    optionsBuilder.setProjectId("projectId");
-
-    // Verify that appName == null or empty throws IllegalArgumentException.
-
-    optionsBuilder.setAppName(null);
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> new GoogleCloudStorageImpl(optionsBuilder.build(), storage));
-
-    optionsBuilder.setAppName("");
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> new GoogleCloudStorageImpl(optionsBuilder.build(), storage));
-
-    optionsBuilder.setAppName("appName");
-
-    // Verify that gcs == null throws NullPointerException.
-    assertThrows(
-        NullPointerException.class,
-        () -> new GoogleCloudStorageImpl(optionsBuilder.build(), (Storage) null));
   }
 
   /** Coverage for GoogleCloudStorageItemInfo.metadataEquals. */
@@ -3350,9 +3401,8 @@ public class GoogleCloudStorageTest {
   public void testItemInfoEqualityIncludesMetadata() {
     assertThat(
             getItemInfoForEmptyObjectWithMetadata(
-                    ImmutableMap.of("foo", new byte[] {0x01}, "bar", new byte[] {0x02}))
-                .equals(getItemInfoForEmptyObjectWithMetadata(null)))
-        .isFalse();
+                ImmutableMap.of("foo", new byte[] {0x01}, "bar", new byte[] {0x02})))
+        .isNotEqualTo(getItemInfoForEmptyObjectWithMetadata(null));
   }
 
   @Test
@@ -3452,7 +3502,8 @@ public class GoogleCloudStorageTest {
   public void testIgnoreExceptionsOnCreateEmptyObjectsNonIgnorableException() throws Exception {
     MockHttpTransport transport = mockTransport(jsonErrorResponse(ErrorResponses.GONE));
 
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs =
+        mockedGcs(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
     assertThrows(IOException.class, () -> gcs.createEmptyObjects(ImmutableList.of(RESOURCE_ID)));
 
@@ -3525,11 +3576,11 @@ public class GoogleCloudStorageTest {
     MockHttpTransport transport = mockTransport(jsonDataResponse(newBucket(BUCKET_NAME)));
 
     GoogleCloudStorageImpl gcs =
-        mockedGcs(
-            GCS_OPTIONS,
-            transport,
-            /* requestInitializer= */ null,
-            /* downscopedAccessTokenFn= */ null);
+        GoogleCloudStorageImpl.builder()
+            .setOptions(GCS_OPTIONS)
+            .setCredentials(new FakeCredentials())
+            .setHttpTransport(transport)
+            .build();
 
     Storage.Objects.Get testGetRequest = gcs.storage.objects().get(BUCKET_NAME, OBJECT_NAME);
     gcs.initializeRequest(testGetRequest, BUCKET_NAME);
@@ -3542,11 +3593,12 @@ public class GoogleCloudStorageTest {
     MockHttpTransport transport = mockTransport(jsonDataResponse(newBucket(BUCKET_NAME)));
 
     GoogleCloudStorageImpl gcs =
-        mockedGcs(
-            GCS_OPTIONS,
-            transport,
-            /* requestInitializer= */ null,
-            /* downscopedAccessTokenFn= */ ignore -> "testDownscopedAccessToken");
+        GoogleCloudStorageImpl.builder()
+            .setOptions(GCS_OPTIONS)
+            .setCredentials(new FakeCredentials())
+            .setHttpTransport(transport)
+            .setDownscopedAccessTokenFn(ignore -> "testDownscopedAccessToken")
+            .build();
 
     Storage.Objects.Get testGetRequest =
         gcs.storageRequestFactory.objectsGetMetadata(BUCKET_NAME, OBJECT_NAME);
@@ -3554,32 +3606,6 @@ public class GoogleCloudStorageTest {
 
     assertThat(testGetRequest.getRequestHeaders().getAuthorization())
         .isEqualTo("Bearer testDownscopedAccessToken");
-  }
-
-  private GoogleCloudStorage mockedGcs(HttpTransport transport) {
-    return mockedGcs(GCS_OPTIONS, transport);
-  }
-
-  private GoogleCloudStorage mockedGcs(
-      GoogleCloudStorageOptions gcsOptions, HttpTransport transport) {
-    return mockedGcs(gcsOptions, transport, trackingRequestInitializerWithRetries);
-  }
-
-  private GoogleCloudStorage mockedGcs(
-      GoogleCloudStorageOptions gcsOptions,
-      HttpTransport transport,
-      HttpRequestInitializer requestInitializer) {
-    return mockedGcs(
-        gcsOptions, transport, requestInitializer, /* downscopedAccessTokenFn= */ null);
-  }
-
-  private GoogleCloudStorageImpl mockedGcs(
-      GoogleCloudStorageOptions gcsOptions,
-      HttpTransport transport,
-      HttpRequestInitializer requestInitializer,
-      Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
-    Storage storage = new Storage(transport, GsonFactory.getDefaultInstance(), requestInitializer);
-    return new GoogleCloudStorageImpl(gcsOptions, storage, downscopedAccessTokenFn);
   }
 
   static Bucket newBucket(String name) {

@@ -18,6 +18,7 @@ import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRe
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getStandardOptionBuilder;
 import static com.google.common.truth.Truth.assertThat;
 
+import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TrackingStorageWrapper;
@@ -87,12 +88,17 @@ public class PerformanceCachingGoogleCloudStorageIntegrationTest {
 
   private static TrackingStorageWrapper<PerformanceCachingGoogleCloudStorage>
       newTrackingGoogleCloudStorage(GoogleCloudStorageOptions options) throws IOException {
+    Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
     return new TrackingStorageWrapper<>(
         options,
         httpRequestInitializer ->
             new PerformanceCachingGoogleCloudStorage(
-                new GoogleCloudStorageImpl(options, httpRequestInitializer),
+                GoogleCloudStorageImpl.builder()
+                    .setOptions(options)
+                    .setCredentials(credentials)
+                    .setHttpRequestInitializer(httpRequestInitializer)
+                    .build(),
                 PERF_CACHE_GCS_OPTIONS),
-        GoogleCloudStorageTestHelper.getCredentials());
+        credentials);
   }
 }

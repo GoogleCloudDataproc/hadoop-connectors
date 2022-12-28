@@ -87,7 +87,10 @@ public class CsekEncryptionIntegrationTest {
 
   private static GoogleCloudStorageImpl makeStorage(GoogleCloudStorageOptions options)
       throws IOException {
-    return new GoogleCloudStorageImpl(options, GoogleCloudStorageTestHelper.getCredentials());
+    return GoogleCloudStorageImpl.builder()
+        .setOptions(options)
+        .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
+        .build();
   }
 
   private static GoogleCloudStorageOptions.Builder getCsekStorageOptions() {
