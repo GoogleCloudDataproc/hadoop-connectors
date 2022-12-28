@@ -93,7 +93,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
     this.gcsPath = gcsPath;
     this.channel = channel;
     this.statistics = statistics;
-    this.streamStatistics = ghfs.getInstrumentation().newInputStreamStatistics(statistics);
+    this.streamStatistics = ghfs.getStatsInstrumentation().newInputStreamStatistics();
   }
 
   @Override

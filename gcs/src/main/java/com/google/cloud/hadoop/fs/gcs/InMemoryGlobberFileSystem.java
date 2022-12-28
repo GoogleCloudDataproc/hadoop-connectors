@@ -36,10 +36,10 @@ import org.apache.hadoop.util.Progressable;
 
 /**
  * InMemoryGlobberFileSystem overrides the behavior of {@link FileSystem} to manifest a temporary
- * FileSystem suitable only for list/get methods for retrieving file statuses, based on an
- * collection of provided file statuses at construction time. Can be used as a heavyweight cache
- * which behaves just like a normal filesystem for such metadata-read operations and lives in the
- * context of a single complex top-level method call, like globStatus.
+ * FileSystem suitable only for list/get methods for retrieving file statuses, based on a collection
+ * of provided file statuses at construction time. Can be used as a heavyweight cache which behaves
+ * just like a normal filesystem for such metadata-read operations and lives in the context of a
+ * single complex top-level method call, like globStatus.
  *
  * <p>Note that this class is <b>not</b> intended to be used as a general-usage {@link FileSystem}.
  */

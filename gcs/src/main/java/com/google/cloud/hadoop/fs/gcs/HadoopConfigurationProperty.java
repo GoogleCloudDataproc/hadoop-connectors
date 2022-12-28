@@ -13,7 +13,7 @@
  */
 package com.google.cloud.hadoop.fs.gcs;
 
-/** Hadoop configuration property for Google Cloud Storage Connector */
+/** The Hadoop configuration property for Google Cloud Storage Connector */
 public class HadoopConfigurationProperty<T>
     extends com.google.cloud.hadoop.util.HadoopConfigurationProperty<T> {
 

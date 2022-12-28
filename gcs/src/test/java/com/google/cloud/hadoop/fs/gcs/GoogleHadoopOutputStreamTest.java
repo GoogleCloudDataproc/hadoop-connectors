@@ -284,7 +284,7 @@ public class GoogleHadoopOutputStreamTest {
     verifyDurationMetric(fout.getIOStatistics(), STREAM_WRITE_CLOSE_OPERATIONS.getSymbol(), 1);
     verifyDurationMetric(fout.getIOStatistics(), STREAM_WRITE_OPERATIONS.getSymbol(), 4);
 
-    IOStatisticsStore ghfsStats = ghfs.getInstrumentation().getIOStatistics();
+    IOStatisticsStore ghfsStats = ghfs.getStatsInstrumentation().getIOStatistics();
     verifyDurationMetric(ghfsStats, STREAM_WRITE_OPERATIONS.getSymbol(), 4);
     verifyDurationMetric(ghfsStats, STREAM_WRITE_CLOSE_OPERATIONS.getSymbol(), 1);
     verifyDurationMetric(ghfsStats, INVOCATION_HFLUSH.getSymbol(), 1);

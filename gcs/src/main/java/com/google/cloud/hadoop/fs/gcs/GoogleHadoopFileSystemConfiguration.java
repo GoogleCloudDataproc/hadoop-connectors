@@ -95,9 +95,9 @@ public class GoogleHadoopFileSystemConfiguration {
    * symbolic mode accepted by {@link FsPermission#FsPermission(String)}
    *
    * <p>Default value for the permissions that we report a file or directory to have. Note: We do
-   * not really support file/dir permissions but we need to report some permission value when Hadoop
+   * not really support file/dir permissions, but we need to report some permission value Hadoop
    * calls getFileStatus(). A MapReduce job fails if we report permissions more relaxed than the
-   * value below and this is the default File System.
+   * value below and this is the default FileSystem.
    */
   public static final HadoopConfigurationProperty<String> PERMISSIONS_TO_REPORT =
       new HadoopConfigurationProperty<>("fs.gs.reported.permissions", "700");

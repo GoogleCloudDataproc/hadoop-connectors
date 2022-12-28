@@ -66,6 +66,7 @@ import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.hash.Hashing;
 import com.google.common.primitives.Ints;
 import java.io.File;
@@ -91,7 +92,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.Service;
 import org.junit.Before;
 import org.junit.ClassRule;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -1342,47 +1342,112 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   }
 
   @Test
-  @Ignore("Test is failing")
   public void http_IOStatistics() throws IOException {
-    FSDataOutputStream fout = ghfs.create(new Path("/file1"));
-    fout.writeBytes("Test Content");
-    fout.close();
-    // evaluating the iostatistics by extracting the values set for the iostatistics key after each
-    // file operation
-    assertThat(
-            ((GoogleHadoopFileSystem) ghfs)
-                .getIOStatistics()
-                .counters()
-                .get(INVOCATION_CREATE.getSymbol()))
-        .isEqualTo(1);
+    try (FSDataOutputStream fout = ghfs.create(new Path("/file1"))) {
+      fout.writeBytes("Test Content");
+    }
 
-    // The create and write methods are expected to trigger requests of types GET, PUT and PATCH
-    assertThat(
-            ((GoogleHadoopFileSystem) ghfs)
-                .getIOStatistics()
-                .counters()
-                .get(GhfsStatistic.ACTION_HTTP_GET_REQUEST.getSymbol()))
-        .isEqualTo(2);
-    assertThat(
-            ((GoogleHadoopFileSystem) ghfs)
-                .getIOStatistics()
-                .counters()
-                .get(GhfsStatistic.ACTION_HTTP_PUT_REQUEST.getSymbol()))
-        .isEqualTo(1);
-    assertThat(
-            ((GoogleHadoopFileSystem) ghfs)
-                .getIOStatistics()
-                .counters()
-                .get(GhfsStatistic.ACTION_HTTP_PATCH_REQUEST.getSymbol()))
-        .isEqualTo(1);
-    assertThat(ghfs.delete(new Path("/file1"))).isTrue();
-    // Delete operation triggers the DELETE type request
-    assertThat(
-            ((GoogleHadoopFileSystem) ghfs)
-                .getIOStatistics()
-                .counters()
-                .get(GhfsStatistic.ACTION_HTTP_DELETE_REQUEST.getSymbol()))
-        .isEqualTo(1);
+    assertThat(((GoogleHadoopFileSystem) ghfs).getIOStatistics().counters())
+        .containsExactlyEntriesIn(
+            ImmutableMap.builder()
+                .put("delegation_tokens_issued", 0L)
+                .put("delegation_tokens_issued.failures", 0L)
+                .put("directories_created", 3L)
+                .put("directories_deleted", 0L)
+                .put("files_created", 1L)
+                .put("files_delete_rejected", 0L)
+                .put("files_deleted", 0L)
+                .put("op_copy_from_local_file", 0L)
+                .put("op_create", 1L)
+                .put("op_create_non_recursive", 0L)
+                .put("op_delete", 0L)
+                .put("op_exists", 0L)
+                .put("op_get_delegation_token", 0L)
+                .put("op_get_file_checksum", 0L)
+                .put("op_get_file_status", 0L)
+                .put("op_glob_status", 0L)
+                .put("op_hflush", 0L)
+                .put("op_hsync", 0L)
+                .put("op_list_files", 0L)
+                .put("op_list_located_status", 0L)
+                .put("op_list_status", 0L)
+                .put("op_mkdirs", 3L)
+                .put("op_open", 0L)
+                .put("op_rename", 0L)
+                .put("op_xattr_get_map", 0L)
+                .put("op_xattr_get_map.failures", 0L)
+                .put("op_xattr_get_named", 0L)
+                .put("op_xattr_get_named.failures", 0L)
+                .put("op_xattr_get_named_map", 0L)
+                .put("op_xattr_get_named_map.failures", 0L)
+                .put("op_xattr_list", 0L)
+                .put("op_xattr_list.failures", 0L)
+                .put("stream_read_bytes", 0L)
+                .put("stream_read_bytes_backwards_on_seek", 0L)
+                .put("stream_read_close_operations", 0L)
+                .put("stream_read_exceptions", 0L)
+                .put("stream_read_operations", 0L)
+                .put("stream_read_operations_incomplete", 0L)
+                .put("stream_read_seek_backward_operations", 0L)
+                .put("stream_read_seek_bytes_skipped", 0L)
+                .put("stream_read_seek_forward_operations", 0L)
+                .put("stream_read_seek_operations", 0L)
+                .put("stream_read_total_bytes", 0L)
+                .put("stream_write_bytes", 12L)
+                .put("stream_write_exceptions", 0L)
+                .build());
+
+    assertThat(ghfs.delete(new Path("/file1"), /* recursive= */ false)).isTrue();
+
+    assertThat(((GoogleHadoopFileSystem) ghfs).getIOStatistics().counters())
+        .containsExactlyEntriesIn(
+            ImmutableMap.builder()
+                .put("delegation_tokens_issued", 0L)
+                .put("delegation_tokens_issued.failures", 0L)
+                .put("directories_created", 3L)
+                .put("directories_deleted", 0L)
+                .put("files_created", 1L)
+                .put("files_delete_rejected", 0L)
+                .put("files_deleted", 1L)
+                .put("op_copy_from_local_file", 0L)
+                .put("op_create", 1L)
+                .put("op_create_non_recursive", 0L)
+                .put("op_delete", 1L)
+                .put("op_exists", 0L)
+                .put("op_get_delegation_token", 0L)
+                .put("op_get_file_checksum", 0L)
+                .put("op_get_file_status", 0L)
+                .put("op_glob_status", 0L)
+                .put("op_hflush", 0L)
+                .put("op_hsync", 0L)
+                .put("op_list_files", 0L)
+                .put("op_list_located_status", 0L)
+                .put("op_list_status", 0L)
+                .put("op_mkdirs", 3L)
+                .put("op_open", 0L)
+                .put("op_rename", 0L)
+                .put("op_xattr_get_map", 0L)
+                .put("op_xattr_get_map.failures", 0L)
+                .put("op_xattr_get_named", 0L)
+                .put("op_xattr_get_named.failures", 0L)
+                .put("op_xattr_get_named_map", 0L)
+                .put("op_xattr_get_named_map.failures", 0L)
+                .put("op_xattr_list", 0L)
+                .put("op_xattr_list.failures", 0L)
+                .put("stream_read_bytes", 0L)
+                .put("stream_read_bytes_backwards_on_seek", 0L)
+                .put("stream_read_close_operations", 0L)
+                .put("stream_read_exceptions", 0L)
+                .put("stream_read_operations", 0L)
+                .put("stream_read_operations_incomplete", 0L)
+                .put("stream_read_seek_backward_operations", 0L)
+                .put("stream_read_seek_bytes_skipped", 0L)
+                .put("stream_read_seek_forward_operations", 0L)
+                .put("stream_read_seek_operations", 0L)
+                .put("stream_read_total_bytes", 0L)
+                .put("stream_write_bytes", 12L)
+                .put("stream_write_exceptions", 0L)
+                .build());
   }
 
   @Test

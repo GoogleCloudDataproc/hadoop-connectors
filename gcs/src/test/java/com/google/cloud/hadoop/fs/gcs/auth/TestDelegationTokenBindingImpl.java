@@ -32,13 +32,12 @@ public class TestDelegationTokenBindingImpl extends AbstractDelegationTokenBindi
   }
 
   @Override
-  public AccessTokenProvider deployUnbonded() throws IOException {
+  public AccessTokenProvider deployUnbonded() {
     return new TestAccessTokenProviderImpl();
   }
 
   @Override
-  public AccessTokenProvider bindToTokenIdentifier(DelegationTokenIdentifier retrievedIdentifier)
-      throws IOException {
+  public AccessTokenProvider bindToTokenIdentifier(DelegationTokenIdentifier retrievedIdentifier) {
     return deployUnbonded();
   }
 
@@ -52,11 +51,6 @@ public class TestDelegationTokenBindingImpl extends AbstractDelegationTokenBindi
       realUser = new Text(ugi.getRealUser().getUserName());
     }
     return new TestTokenIdentifierImpl(owner, renewer, realUser, getService());
-  }
-
-  @Override
-  public DelegationTokenIdentifier createTokenIdentifier() {
-    return createEmptyIdentifier();
   }
 
   @Override
@@ -76,7 +70,7 @@ public class TestDelegationTokenBindingImpl extends AbstractDelegationTokenBindi
     }
 
     @Override
-    public void refresh() throws IOException {}
+    public void refresh() {}
 
     @Override
     public void setConf(Configuration config) {

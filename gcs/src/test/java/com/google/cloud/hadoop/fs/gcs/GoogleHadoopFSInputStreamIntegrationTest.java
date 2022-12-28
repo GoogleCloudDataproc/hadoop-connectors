@@ -165,12 +165,16 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
     }
 
     TestUtils.verifyDurationMetric(
-        ghfs.getInstrumentation().getIOStatistics(), STREAM_READ_CLOSE_OPERATIONS.getSymbol(), 2);
+        ghfs.getStatsInstrumentation().getIOStatistics(),
+        STREAM_READ_CLOSE_OPERATIONS.getSymbol(),
+        2);
     TestUtils.verifyDurationMetric(
-        ghfs.getInstrumentation().getIOStatistics(), STREAM_READ_SEEK_OPERATIONS.getSymbol(), 4);
+        ghfs.getStatsInstrumentation().getIOStatistics(),
+        STREAM_READ_SEEK_OPERATIONS.getSymbol(),
+        4);
 
     TestUtils.verifyDurationMetric(
-        ghfs.getInstrumentation().getIOStatistics(), STREAM_READ_OPERATIONS.getSymbol(), 2);
+        ghfs.getStatsInstrumentation().getIOStatistics(), STREAM_READ_OPERATIONS.getSymbol(), 2);
   }
 
   private static GoogleHadoopFSInputStream createGhfsInputStream(

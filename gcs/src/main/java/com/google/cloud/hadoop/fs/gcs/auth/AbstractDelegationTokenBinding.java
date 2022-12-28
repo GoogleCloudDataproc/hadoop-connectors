@@ -19,8 +19,8 @@ package com.google.cloud.hadoop.fs.gcs.auth;
 import static java.util.Objects.requireNonNull;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
-import com.google.cloud.hadoop.fs.gcs.DelegationTokenStatistics;
 import com.google.cloud.hadoop.fs.gcs.GhfsStatistic;
+import com.google.cloud.hadoop.fs.gcs.GhfsStatisticsInstrumentation;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
 import com.google.cloud.hadoop.util.AccessTokenProvider;
 import com.google.common.flogger.GoogleLogger;
@@ -47,9 +47,6 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
 
   /** The owning filesystem. Valid after {@link #bindToFileSystem(GoogleHadoopFileSystem, Text)}. */
   private GoogleHadoopFileSystem fileSystem;
-
-  /** Statistics for the operations. */
-  private DelegationTokenStatistics stats;
 
   protected AbstractDelegationTokenBinding(Text kind) {
     this(SERVICE_NAME, kind);
@@ -116,23 +113,21 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
    * @throws IOException if one cannot be created
    */
   public Token<DelegationTokenIdentifier> createDelegationToken(
-      String renewer, DelegationTokenStatistics stats) throws IOException {
-    Text renewerText = new Text();
-    this.stats = stats;
-    if (renewer != null) {
-      renewerText.set(renewer);
-    }
+      String renewer, GhfsStatisticsInstrumentation stats) throws IOException {
+    Text renewerText = renewer == null ? new Text() : new Text(renewer);
     DelegationTokenIdentifier tokenIdentifier =
         requireNonNull(createTokenIdentifier(renewerText), "Token identifier");
     Token<DelegationTokenIdentifier> token =
         trackDuration(
-            this.stats,
+            stats,
             GhfsStatistic.DELEGATION_TOKENS_ISSUED.getSymbol(),
-            () -> new Token<>(tokenIdentifier, secretManager));
-    token.setKind(getKind());
-    token.setService(service);
-    noteTokenCreated(token);
-
+            () -> {
+              Token<DelegationTokenIdentifier> newToken =
+                  new Token<>(tokenIdentifier, secretManager);
+              newToken.setKind(getKind());
+              newToken.setService(service);
+              return newToken;
+            });
     logger.atFine().log("Created token %s with token identifier %s", token, tokenIdentifier);
     return token;
   }
@@ -150,42 +145,12 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
   public abstract DelegationTokenIdentifier createTokenIdentifier(Text renewer) throws IOException;
 
   /**
-   * Create a token identifier with all the information needed to be included in a delegation token.
-   * This is where session credentials need to be extracted, etc. This will only be called if a new
-   * DT is needed, that is: the filesystem has been deployed unbound.
-   *
-   * <p>If {@link #createDelegationToken} is overridden, this method can be replaced with a stub.
-   *
-   * @return the token data to include in the token identifier.
-   * @throws IOException failure creating the token data.
-   */
-  public abstract DelegationTokenIdentifier createTokenIdentifier() throws IOException;
-
-  /**
    * Create a new "empty" token identifier. It is used by the "dummy" SecretManager, which requires
    * a token identifier (even one that's not real) to satisfy the contract.
    *
    * @return an empty identifier.
    */
   public abstract DelegationTokenIdentifier createEmptyIdentifier();
-
-  /**
-   * Verify that a token identifier is of a specific class. This will reject subclasses (i.e. it is
-   * stricter than {@code instanceof}, then cast it to that type.
-   *
-   * @param identifier identifier to validate
-   * @param expectedClass class of the expected token identifier.
-   * @throws DelegationTokenIOException If the wrong class was found.
-   */
-  @SuppressWarnings("unchecked") // safe by contract of convertTokenIdentifier()
-  protected <T extends DelegationTokenIdentifier> T convertTokenIdentifier(
-      DelegationTokenIdentifier identifier, Class<T> expectedClass)
-      throws DelegationTokenIOException {
-    if (identifier.getClass().equals(expectedClass)) {
-      return (T) identifier;
-    }
-    throw DelegationTokenIOException.wrongTokenType(expectedClass, identifier);
-  }
 
   /**
    * The secret manager always uses the same secret; the factory for new identifiers is that of the
@@ -209,13 +174,5 @@ public abstract class AbstractDelegationTokenBinding extends AbstractService {
     public DelegationTokenIdentifier createIdentifier() {
       return createEmptyIdentifier();
     }
-  }
-  /**
-   * Note that a token has been created; increment counters and statistics.
-   *
-   * @param token token created
-   */
-  private void noteTokenCreated(Token<DelegationTokenIdentifier> token) {
-    stats.tokenIssued();
   }
 }

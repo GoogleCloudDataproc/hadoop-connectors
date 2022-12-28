@@ -121,7 +121,7 @@ class GoogleHadoopOutputStream extends OutputStream
   // Statistics tracker for output stream related statistics
   private final GhfsOutputStreamStatistics streamStatistics;
   // Instrumentation to track Statistics
-  private final GhfsInstrumentation instrumentation;
+  private final GhfsStatisticsInstrumentation instrumentation;
 
   /**
    * Constructs an instance of GoogleHadoopOutputStream object.
@@ -144,10 +144,10 @@ class GoogleHadoopOutputStream extends OutputStream
     this.ghfs = ghfs;
     this.dstGcsPath = dstGcsPath;
     this.statistics = statistics;
-    this.streamStatistics = ghfs.getInstrumentation().newOutputStreamStatistics(statistics);
+    this.streamStatistics = ghfs.getStatsInstrumentation().newOutputStreamStatistics();
 
     Duration minSyncInterval = createFileOptions.getMinSyncInterval();
-    this.instrumentation = ghfs.getInstrumentation();
+    this.instrumentation = ghfs.getStatsInstrumentation();
 
     this.syncRateLimiter =
         minSyncInterval.isNegative() || minSyncInterval.isZero()
