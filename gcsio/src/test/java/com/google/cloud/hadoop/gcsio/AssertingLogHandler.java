@@ -44,8 +44,7 @@ public class AssertingLogHandler extends Handler {
       logRecords.add(logRecordToMap(record));
       methods.add(record.getSourceMethodName());
 
-      logger.atInfo().log(
-          String.format("Message %d: %s", logRecords.size(), GSON.toJson(logRecordToMap(record))));
+      logger.atInfo().log("Message %d: %s", logRecords.size(), GSON.toJson(logRecordToMap(record)));
     }
   }
 

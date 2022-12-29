@@ -243,7 +243,7 @@ public class HadoopFileSystemIntegrationHelper
           .that(bytesReadStats)
           .isEqualTo(len);
     } else if (statistics == FileSystemStatistics.GREATER_OR_EQUAL) {
-      assertWithMessage("Expected %d <= %d", len, bytesReadStats)
+      assertWithMessage("Expected %s <= %s", len, bytesReadStats)
           .that(len <= bytesReadStats)
           .isTrue();
     } else if (statistics == FileSystemStatistics.NONE) {
@@ -431,7 +431,7 @@ public class HadoopFileSystemIntegrationHelper
           .that(bytesWrittenStats)
           .isEqualTo(totalBytesWritten);
     } else if (statistics == FileSystemStatistics.GREATER_OR_EQUAL) {
-      assertWithMessage("Expected %d <= %d", totalBytesWritten, bytesWrittenStats)
+      assertWithMessage("Expected %s <= %s", totalBytesWritten, bytesWrittenStats)
           .that(totalBytesWritten <= bytesWrittenStats)
           .isTrue();
     } else if (statistics == FileSystemStatistics.NONE) {
