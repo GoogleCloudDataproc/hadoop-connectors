@@ -161,7 +161,7 @@ public class ResilientOperationTest {
 
   private static class CallableTester implements Callable<Integer> {
     int called = 0;
-    ArrayList<Exception> exceptions = null;
+    ArrayList<Exception> exceptions;
 
     public CallableTester(ArrayList<Exception> exceptions) {
       this.exceptions = exceptions;
