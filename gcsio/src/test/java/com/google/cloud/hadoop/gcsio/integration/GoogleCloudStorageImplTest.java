@@ -83,9 +83,7 @@ public class GoogleCloudStorageImplTest {
   }
 
   @Parameters
-  // We want to test this entire class with both javaClientImpl and gcsImpl
-  // Some of our internal endpoints only work with TD
-  public static Iterable<Boolean> javaClientEnabled() {
+  public static Iterable<Boolean> getTestClientLibraryImplParameter() {
     return List.of(false, true);
   }
 
