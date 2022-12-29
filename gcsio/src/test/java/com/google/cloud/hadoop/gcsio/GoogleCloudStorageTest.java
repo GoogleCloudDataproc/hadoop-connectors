@@ -194,7 +194,7 @@ public class GoogleCloudStorageTest {
   /** Test argument sanitization for GoogleCloudStorage.create(2). */
   @Test
   public void testCreateObjectIllegalArguments() throws IOException {
-    GoogleCloudStorage gcs = MockGoogleCloudStorageImplFactory.mockedGcsImpl(HTTP_TRANSPORT);
+    GoogleCloudStorage gcs = mockedGcsImpl(HTTP_TRANSPORT);
     ILLEGAL_OBJECT_IDS.forEach(
         resourceId -> assertThrows(IllegalArgumentException.class, () -> gcs.create(resourceId)));
   }
@@ -712,7 +712,7 @@ public class GoogleCloudStorageTest {
             .build();
 
     GoogleCloudStorage gcs =
-        MockGoogleCloudStorageImplFactory.mockedGcsImpl(
+        mockedGcsImpl(
             GCS_OPTIONS.toBuilder().setWriteChannelOptions(writeOptions).build(), transport);
 
     WritableByteChannel writeChannel = gcs.create(RESOURCE_ID);
@@ -743,7 +743,7 @@ public class GoogleCloudStorageTest {
   /** Test argument sanitization for GoogleCloudStorage.open(2). */
   @Test
   public void testOpenObjectIllegalArguments() throws IOException {
-    GoogleCloudStorage gcs = MockGoogleCloudStorageImplFactory.mockedGcsImpl(HTTP_TRANSPORT);
+    GoogleCloudStorage gcs = mockedGcsImpl(HTTP_TRANSPORT);
     ILLEGAL_OBJECT_IDS.forEach(
         resourceId -> assertThrows(IllegalArgumentException.class, () -> gcs.open(resourceId)));
   }
@@ -1737,7 +1737,7 @@ public class GoogleCloudStorageTest {
   /** Test argument sanitization for GoogleCloudStorage.create(String). */
   @Test
   public void testCreateBucketIllegalArguments() throws IOException {
-    GoogleCloudStorage gcs = MockGoogleCloudStorageImplFactory.mockedGcsImpl(HTTP_TRANSPORT);
+    GoogleCloudStorage gcs = mockedGcsImpl(HTTP_TRANSPORT);
     assertThrows(IllegalArgumentException.class, () -> gcs.createBucket(null));
     assertThrows(IllegalArgumentException.class, () -> gcs.createBucket(""));
   }
@@ -1822,7 +1822,7 @@ public class GoogleCloudStorageTest {
   /** Test argument sanitization for GoogleCloudStorage.delete(1). */
   @Test
   public void testDeleteBucketIllegalArguments() throws IOException {
-    GoogleCloudStorage gcs = MockGoogleCloudStorageImplFactory.mockedGcsImpl(HTTP_TRANSPORT);
+    GoogleCloudStorage gcs = mockedGcsImpl(HTTP_TRANSPORT);
     assertThrows(
         IllegalArgumentException.class, () -> gcs.deleteBuckets(Lists.newArrayList((String) null)));
     assertThrows(IllegalArgumentException.class, () -> gcs.deleteBuckets(Lists.newArrayList("")));
@@ -1890,7 +1890,7 @@ public class GoogleCloudStorageTest {
   /** Test argument sanitization for GoogleCloudStorage.delete(2). */
   @Test
   public void testDeleteObjectIllegalArguments() throws IOException {
-    GoogleCloudStorage gcs = MockGoogleCloudStorageImplFactory.mockedGcsImpl(HTTP_TRANSPORT);
+    GoogleCloudStorage gcs = mockedGcsImpl(HTTP_TRANSPORT);
     ILLEGAL_OBJECT_IDS.forEach(
         resourceId ->
             assertThrows(
@@ -1948,7 +1948,7 @@ public class GoogleCloudStorageTest {
     String b = BUCKET_NAME;
     List<String> o = ImmutableList.of(OBJECT_NAME);
 
-    GoogleCloudStorage gcs = MockGoogleCloudStorageImplFactory.mockedGcsImpl(HTTP_TRANSPORT);
+    GoogleCloudStorage gcs = mockedGcsImpl(HTTP_TRANSPORT);
 
     ILLEGAL_OBJECTS.forEach(
         objectPair -> {
@@ -3019,7 +3019,7 @@ public class GoogleCloudStorageTest {
   /** Test GoogleCloudStorage.getItemInfo(StorageResourceId) when arguments represent ROOT. */
   @Test
   public void testGetItemInfoRoot() throws IOException {
-    GoogleCloudStorage gcs = MockGoogleCloudStorageImplFactory.mockedGcsImpl(HTTP_TRANSPORT);
+    GoogleCloudStorage gcs = mockedGcsImpl(HTTP_TRANSPORT);
     GoogleCloudStorageItemInfo info = gcs.getItemInfo(StorageResourceId.ROOT);
     assertThat(info).isEqualTo(GoogleCloudStorageItemInfo.ROOT_INFO);
   }
@@ -3279,7 +3279,7 @@ public class GoogleCloudStorageTest {
   /** Test for GoogleCloudStorage.close(0). */
   @Test
   public void testClose() throws IOException {
-    GoogleCloudStorageImpl gcs = MockGoogleCloudStorageImplFactory.mockedGcsImpl(HTTP_TRANSPORT);
+    GoogleCloudStorageImpl gcs = mockedGcsImpl(HTTP_TRANSPORT);
 
     ExecutorService executorService = Executors.newSingleThreadExecutor();
     gcs.setBackgroundTasksThreadPool(executorService);
