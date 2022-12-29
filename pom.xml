@@ -14,9 +14,7 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0">
   <modelVersion>4.0.0</modelVersion>
 
   <name>BigDataOSS Parent</name>
@@ -34,7 +32,7 @@
   <licenses>
     <license>
       <name>Apache License, Version 2.0</name>
-      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
       <distribution>repo</distribution>
     </license>
   </licenses>
@@ -42,7 +40,7 @@
   <developers>
     <developer>
       <organization>Google Inc.</organization>
-      <organizationUrl>http://www.google.com</organizationUrl>
+      <organizationUrl>https://www.google.com</organizationUrl>
     </developer>
   </developers>
 
@@ -82,31 +80,32 @@
 
     <bigdataoss.version>3.0.0-SNAPSHOT</bigdataoss.version>
 
-    <google.api.grpc.proto-google-iam-v1.version>1.2.0</google.api.grpc.proto-google-iam-v1.version>
-    <google.api-client.version>2.0.1</google.api-client.version>
+    <google.api-client.version>2.1.1</google.api-client.version>
     <google.api-client-libraries.version>2.0.0</google.api-client-libraries.version>
     <google.api-iamcredentials.version>v1-rev20211203-${google.api-client-libraries.version}</google.api-iamcredentials.version>
     <google.api-storage.version>v1-rev20220705-${google.api-client-libraries.version}</google.api-storage.version>
-    <google.auth.version>1.12.1</google.auth.version>
-    <google.auto-value.version>1.9</google.auto-value.version>
-    <google.cloud-core.verion>2.8.27</google.cloud-core.verion>
-    <google.cloud-storage.bom.version>2.15.0</google.cloud-storage.bom.version>
-    <google.error-prone.version>2.10.0</google.error-prone.version>
+    <google.api.grpc.proto-google-iam-v1.version>1.6.23</google.api.grpc.proto-google-iam-v1.version>
+    <google.auth.version>1.14.0</google.auth.version>
+    <google.auto-value.version>1.10.1</google.auto-value.version>
+    <google.cloud-core.verion>2.9.0</google.cloud-core.verion>
+    <google.cloud-storage.bom.version>2.16.0</google.cloud-storage.bom.version>
+    <google.error-prone.version>2.16</google.error-prone.version>
     <google.flogger.version>0.7.4</google.flogger.version>
-    <google.gax.version>2.19.5</google.gax.version>
-    <google.gson.version>2.8.9</google.gson.version>
+    <google.gax.version>2.20.1</google.gax.version>
+    <google.gson.version>2.10</google.gson.version>
     <google.guava.version>31.1-jre</google.guava.version>
     <google.http-client.version>1.42.3</google.http-client.version>
+    <google.java-format.version>1.15.0</google.java-format.version>
     <google.oauth-client.version>1.34.1</google.oauth-client.version>
-    <google.protobuf.version>3.21.9</google.protobuf.version>
-    <grpc.version>1.50.2</grpc.version>
-    <hadoop.version>3.3.1</hadoop.version>
-    <opencensus.version>0.31.0</opencensus.version>
+    <google.protobuf.version>3.21.12</google.protobuf.version>
+    <grpc.version>1.51.1</grpc.version>
+    <hadoop.version>3.3.4</hadoop.version>
+    <opencensus.version>0.31.1</opencensus.version>
 
     <!-- Test dependencies -->
     <google.truth.version>1.1.3</google.truth.version>
     <junit.version>4.13.2</junit.version>
-    <mockito.version>4.2.0</mockito.version>
+    <mockito.version>4.10.0</mockito.version>
     <system-lambda.version>1.2.1</system-lambda.version>
     <!-- TODO: remove AssertJ dependency when Hadoop will fix transitive test dependencies -->
     <assertj.version>3.14.0</assertj.version>
@@ -218,20 +217,15 @@
      -->
     <profile>
       <id>snapshots-and-staging</id>
-      <properties>
-        <!-- override point for ASF staging/snapshot repos -->
-        <asf.staging>https://repository.apache.org/content/groups/staging/</asf.staging>
-        <asf.snapshots>https://repository.apache.org/content/repositories/snapshots/</asf.snapshots>
-      </properties>
-
+      <!-- override point for ASF staging/snapshot repos -->
       <pluginRepositories>
         <pluginRepository>
           <id>ASF Staging</id>
-          <url>${asf.staging}</url>
+          <url>https://repository.apache.org/content/groups/staging/</url>
         </pluginRepository>
         <pluginRepository>
           <id>ASF Snapshots</id>
-          <url>${asf.snapshots}</url>
+          <url>https://repository.apache.org/content/repositories/snapshots/</url>
           <snapshots>
             <enabled>true</enabled>
           </snapshots>
@@ -239,16 +233,15 @@
             <enabled>false</enabled>
           </releases>
         </pluginRepository>
-
       </pluginRepositories>
       <repositories>
         <repository>
           <id>ASF Staging</id>
-          <url>${asf.staging}</url>
+          <url>https://repository.apache.org/content/groups/staging/</url>
         </repository>
         <repository>
           <id>ASF Snapshots</id>
-          <url>${asf.snapshots}</url>
+          <url>https://repository.apache.org/content/repositories/snapshots/</url>
           <snapshots>
             <enabled>true</enabled>
           </snapshots>
@@ -268,13 +261,6 @@
         <version>${google.http-client.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.google.cloud</groupId>
-        <artifactId>google-cloud-storage-bom</artifactId>
-        <version>${google.cloud-storage.bom.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
         <groupId>com.google.api-client</groupId>
         <artifactId>google-api-client-gson</artifactId>
         <version>${google.api-client.version}</version>
@@ -284,6 +270,11 @@
             <artifactId>google-http-client-gson</artifactId>
           </exclusion>
         </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>com.google.api</groupId>
+        <artifactId>gax-grpc</artifactId>
+        <version>${google.gax.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.apis</groupId>
@@ -311,6 +302,18 @@
         <version>${google.auth.version}</version>
       </dependency>
       <dependency>
+        <groupId>com.google.cloud</groupId>
+        <artifactId>google-cloud-core</artifactId>
+        <version>${google.cloud-core.verion}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.cloud</groupId>
+        <artifactId>google-cloud-storage-bom</artifactId>
+        <version>${google.cloud-storage.bom.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
         <groupId>com.google.code.gson</groupId>
         <artifactId>gson</artifactId>
         <version>${google.gson.version}</version>
@@ -326,26 +329,16 @@
         <version>${google.guava.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.grpc</groupId>
-        <artifactId>grpc-bom</artifactId>
-        <version>${grpc.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
         <groupId>com.google.api.grpc</groupId>
         <artifactId>proto-google-iam-v1</artifactId>
         <version>${google.api.grpc.proto-google-iam-v1.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.protobuf</groupId>
-        <artifactId>protobuf-java</artifactId>
+        <artifactId>protobuf-bom</artifactId>
         <version>${google.protobuf.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.protobuf</groupId>
-        <artifactId>protobuf-java-util</artifactId>
-        <version>${google.protobuf.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>com.google.flogger</groupId>
@@ -362,6 +355,28 @@
         <artifactId>flogger-system-backend</artifactId>
         <version>${google.flogger.version}</version>
         <scope>runtime</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-bom</artifactId>
+        <version>${grpc.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.opencensus</groupId>
+        <artifactId>opencensus-impl</artifactId>
+        <version>${opencensus.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.opencensus</groupId>
+        <artifactId>opencensus-exporter-stats-stackdriver</artifactId>
+        <version>${opencensus.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.opencensus</groupId>
+        <artifactId>opencensus-contrib-grpc-metrics</artifactId>
+        <version>${opencensus.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
@@ -381,31 +396,6 @@
         <version>${hadoop.version}</version>
         <scope>provided</scope>
         <type>pom</type>
-      </dependency>
-      <dependency>
-        <groupId>io.opencensus</groupId>
-        <artifactId>opencensus-impl</artifactId>
-        <version>${opencensus.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.opencensus</groupId>
-        <artifactId>opencensus-exporter-stats-stackdriver</artifactId>
-        <version>${opencensus.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.opencensus</groupId>
-        <artifactId>opencensus-contrib-grpc-metrics</artifactId>
-        <version>${opencensus.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.cloud</groupId>
-        <artifactId>google-cloud-core</artifactId>
-        <version>${google.cloud-core.verion}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.api</groupId>
-        <artifactId>gax-grpc</artifactId>
-        <version>${google.gax.version}</version>
       </dependency>
 
       <!-- Test dependencies -->
@@ -499,11 +489,11 @@
         </plugin>
         <plugin>
           <artifactId>maven-javadoc-plugin</artifactId>
-          <version>3.3.1</version>
+          <version>3.4.1</version>
         </plugin>
         <plugin>
           <artifactId>maven-jar-plugin</artifactId>
-          <version>3.2.0</version>
+          <version>3.3.0</version>
           <executions>
             <execution>
               <id>default-jar</id>
@@ -517,7 +507,7 @@
         </plugin>
         <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.8.1</version>
+          <version>3.10.1</version>
         </plugin>
         <plugin>
           <artifactId>maven-enforcer-plugin</artifactId>
@@ -525,20 +515,20 @@
         </plugin>
         <plugin>
           <artifactId>maven-failsafe-plugin</artifactId>
-          <version>3.0.0-M5</version>
+          <version>3.0.0-M7</version>
         </plugin>
         <plugin>
           <artifactId>maven-surefire-plugin</artifactId>
-          <version>3.0.0-M5</version>
+          <version>3.0.0-M7</version>
         </plugin>
         <plugin>
           <artifactId>maven-shade-plugin</artifactId>
-          <version>3.2.4</version>
+          <version>3.4.1</version>
         </plugin>
         <plugin>
           <groupId>com.diffplug.spotless</groupId>
           <artifactId>spotless-maven-plugin</artifactId>
-          <version>2.18.0</version>
+          <version>2.28.0</version>
         </plugin>
         <plugin>
           <groupId>org.jacoco</groupId>
@@ -615,11 +605,6 @@
               <artifactId>auto-value</artifactId>
               <version>${google.auto-value.version}</version>
             </path>
-            <path>
-              <groupId>com.google.auto.service</groupId>
-              <artifactId>auto-service</artifactId>
-              <version>1.0.1</version>
-            </path>
           </annotationProcessorPaths>
         </configuration>
       </plugin>
@@ -643,7 +628,7 @@
               <on>fmt:on</on>
             </toggleOffOn>
             <googleJavaFormat>
-              <version>1.13.0</version>
+              <version>${google.java-format.version}</version>
             </googleJavaFormat>
           </java>
         </configuration>
