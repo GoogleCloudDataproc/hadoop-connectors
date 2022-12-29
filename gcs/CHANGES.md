@@ -72,6 +72,18 @@
     fs.gs.outputstream.type
     ```
 
+1.  Set default value for `fs.gs.list.max.items.per.call` property to `5000`.
+
+1.  Set socket read timeout (`fs.gs.http.read-timeout`) as early as possible on
+    new sockets returned from the custom `SSLSocketFactory`. This guarantees the
+    timeout is enforced during TLS handshakes when using Conscrypt as the
+    security provider.
+
+1.  The Google Cloud Storage Connector now can be used as a
+    [Hadoop Credential Provider](https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/CredentialProviderAPI.html).
+
+1.  Added dependency on new storage client library: [google-cloud-storage](https://github.com/googleapis/java-storage/tree/main/google-cloud-storage).
+
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.

@@ -28,8 +28,12 @@ import static java.lang.Math.ceil;
 import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
+import com.google.auth.Credentials;
+import com.google.cloud.hadoop.gcsio.AssertingLogHandler;
 import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
+import com.google.cloud.hadoop.gcsio.EventLoggingHttpRequestInitializer;
+import com.google.cloud.hadoop.gcsio.GcsJavaClientImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
@@ -48,6 +52,7 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 import java.util.stream.IntStream;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -55,10 +60,11 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
 /** Tests that require a particular configuration of GoogleCloudStorageImpl. */
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class GoogleCloudStorageImplTest {
 
   private static final TestBucketHelper BUCKET_HELPER = new TestBucketHelper("gcs-impl");
@@ -68,7 +74,28 @@ public class GoogleCloudStorageImplTest {
 
   private static GoogleCloudStorage helperGcs;
 
-  @Rule public TestName name = new TestName();
+  private final boolean javaClientEnabled;
+
+  public GoogleCloudStorageImplTest(boolean javaClientEnabled) {
+    this.javaClientEnabled = javaClientEnabled;
+  }
+
+  @Parameters
+  // We want to test this entire class with both javaClientImpl and gcsImpl
+  // Some of our internal endpoints only work with TD
+  public static Iterable<Boolean> javaClientEnabled() {
+    return List.of(false, true);
+  }
+
+  @Rule
+  public TestName name =
+      new TestName() {
+        // With parametrization method name will get [index] appended in their name.
+        @Override
+        public String getMethodName() {
+          return super.getMethodName().replaceAll("[\\[,\\]]", "");
+        }
+      };
 
   @BeforeClass
   public static void beforeAll() throws IOException {
@@ -91,7 +118,7 @@ public class GoogleCloudStorageImplTest {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
     writeObject(helperGcs, resourceId, /* partitionSize= */ expectedSize, /* partitionsCount= */ 1);
 
-    TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
 
     GoogleCloudStorageReadOptions readOptions =
@@ -100,6 +127,9 @@ public class GoogleCloudStorageImplTest {
     try (SeekableByteChannel readChannel = trackingGcs.delegate.open(resourceId, readOptions)) {
       assertThat(readChannel.size()).isEqualTo(expectedSize);
     }
+
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
 
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactly(
@@ -115,7 +145,7 @@ public class GoogleCloudStorageImplTest {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
     writeObject(helperGcs, resourceId, /* partitionSize= */ expectedSize, /* partitionsCount= */ 1);
 
-    TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
 
     GoogleCloudStorageItemInfo itemInfo = helperGcs.getItemInfo(resourceId);
@@ -123,6 +153,9 @@ public class GoogleCloudStorageImplTest {
     try (SeekableByteChannel readChannel = trackingGcs.delegate.open(itemInfo)) {
       assertThat(readChannel.size()).isEqualTo(expectedSize);
     }
+
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
 
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings()).isEmpty();
   }
@@ -132,7 +165,7 @@ public class GoogleCloudStorageImplTest {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
 
     int uploadChunkSize = 1024 * 1024;
-    TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
         newTrackingGoogleCloudStorage(getOptionsWithUploadChunk(uploadChunkSize));
 
     int partitionsCount = 32;
@@ -144,6 +177,10 @@ public class GoogleCloudStorageImplTest {
             partitionsCount);
 
     assertObjectContent(helperGcs, resourceId, partition, partitionsCount);
+
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
+
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactlyElementsIn(
             getExpectedRequestsForCreateObject(
@@ -156,21 +193,17 @@ public class GoogleCloudStorageImplTest {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
 
     int uploadChunkSize = 1024 * 1024;
-    GoogleCloudStorageImpl gcs =
-        new GoogleCloudStorageImpl(
-            getOptionsWithUploadChunk(uploadChunkSize),
-            GoogleCloudStorageTestHelper.getCredentials());
+    GoogleCloudStorage gcs = getStorageFromOptions(getOptionsWithUploadChunk(uploadChunkSize));
 
     byte[] partition = writeObject(gcs, resourceId, /* objectSize= */ 5 * uploadChunkSize);
 
     assertThat(gcs.getStatistics())
         .containsExactlyEntriesIn(
             ImmutableMap.<String, Long>builder()
-                .put("HTTP_GET_REQUEST", 1L)
-                .put("HTTP_GET_REQUEST_FAILURE", 1L)
-                .put("HTTP_POST_REQUEST", 1L)
-                .put("HTTP_PUT_REQUEST", 5L)
-                .put("HTTP_PUT_REQUEST_FAILURE", 4L)
+                .put("http_get_404", 1L)
+                .put("http_post_200", 1L)
+                .put("http_put_200", 1L)
+                .put("http_put_308", 4L)
                 .build());
 
     assertObjectContent(gcs, resourceId, partition);
@@ -178,11 +211,12 @@ public class GoogleCloudStorageImplTest {
     assertThat(gcs.getStatistics())
         .containsExactlyEntriesIn(
             ImmutableMap.<String, Long>builder()
-                .put("HTTP_GET_REQUEST", 3L)
-                .put("HTTP_GET_REQUEST_FAILURE", 1L)
-                .put("HTTP_POST_REQUEST", 1L)
-                .put("HTTP_PUT_REQUEST", 5L)
-                .put("HTTP_PUT_REQUEST_FAILURE", 4L)
+                .put("http_get_200", 1L)
+                .put("http_get_206", 1L)
+                .put("http_get_404", 1L)
+                .put("http_post_200", 1L)
+                .put("http_put_200", 1L)
+                .put("http_put_308", 4L)
                 .build());
 
     gcs.deleteObjects(ImmutableList.of(resourceId));
@@ -190,12 +224,13 @@ public class GoogleCloudStorageImplTest {
     assertThat(gcs.getStatistics())
         .containsExactlyEntriesIn(
             ImmutableMap.<String, Long>builder()
-                .put("HTTP_DELETE_REQUEST", 1L)
-                .put("HTTP_GET_REQUEST", 4L)
-                .put("HTTP_GET_REQUEST_FAILURE", 1L)
-                .put("HTTP_POST_REQUEST", 1L)
-                .put("HTTP_PUT_REQUEST", 5L)
-                .put("HTTP_PUT_REQUEST_FAILURE", 4L)
+                .put("http_delete_204", 1L)
+                .put("http_get_200", 2L)
+                .put("http_get_206", 1L)
+                .put("http_get_404", 1L)
+                .put("http_post_200", 1L)
+                .put("http_put_200", 1L)
+                .put("http_put_308", 4L)
                 .build());
   }
 
@@ -204,7 +239,7 @@ public class GoogleCloudStorageImplTest {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
 
     int uploadChunkSize = 3 * 1024 * 1024;
-    TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
         newTrackingGoogleCloudStorage(getOptionsWithUploadChunk(uploadChunkSize));
 
     int partitionsCount = 17;
@@ -213,6 +248,9 @@ public class GoogleCloudStorageImplTest {
             trackingGcs.delegate, resourceId, /* partitionSize= */ 1024 * 1024, partitionsCount);
 
     assertObjectContent(helperGcs, resourceId, partition, partitionsCount);
+
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
 
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactlyElementsIn(
@@ -224,12 +262,12 @@ public class GoogleCloudStorageImplTest {
   @Test
   public void conflictingWrites_noOverwrite_lastFails() throws IOException {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
-    TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
     // Have separate request tracker for channels as clubbing them into one will cause flakiness
     // while asserting the order or requests.
 
-    TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs2 =
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs2 =
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
 
     byte[] bytesToWrite = new byte[1024];
@@ -251,6 +289,9 @@ public class GoogleCloudStorageImplTest {
 
     assertObjectContent(helperGcs, resourceId, bytesToWrite, /* expectedBytesCount= */ 1);
 
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
+
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactly(
             getRequestString(resourceId.getBucketName(), resourceId.getObjectName()),
@@ -265,6 +306,9 @@ public class GoogleCloudStorageImplTest {
                 /* generationId= */ 2,
                 /* uploadId= */ 1))
         .inOrder();
+
+    assertThat(trackingGcs2.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs2.requestsTracker.getAllRequests().size());
 
     assertThat(trackingGcs2.requestsTracker.getAllRequestStrings())
         .containsExactly(
@@ -286,7 +330,7 @@ public class GoogleCloudStorageImplTest {
   public void create_doesNotRepairImplicitDirectories() throws IOException {
     String testDirectory = name.getMethodName();
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, testDirectory + "/obj");
-    TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
 
     trackingGcs.delegate.createEmptyObject(resourceId);
@@ -303,6 +347,9 @@ public class GoogleCloudStorageImplTest {
         .asList()
         .containsExactly(resourceId);
 
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
+
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactly(
             uploadRequestString(
@@ -318,7 +365,7 @@ public class GoogleCloudStorageImplTest {
     StorageResourceId resourceId3 =
         new StorageResourceId(TEST_BUCKET, name.getMethodName() + "obj3");
 
-    TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
 
     trackingGcs.delegate.createEmptyObject(
@@ -337,6 +384,9 @@ public class GoogleCloudStorageImplTest {
         .asList()
         .containsExactly("text/plain", "image/png", "application/octet-stream")
         .inOrder();
+
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
 
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactly(
@@ -369,7 +419,7 @@ public class GoogleCloudStorageImplTest {
   @Test
   public void copy_withRewrite_multipleRequests() throws IOException {
     int maxBytesRewrittenPerCall = 256 * 1024 * 1024;
-    TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
         newTrackingGoogleCloudStorage(
             getStandardOptionBuilder()
                 .setCopyWithRewriteEnabled(true)
@@ -380,7 +430,7 @@ public class GoogleCloudStorageImplTest {
     StorageResourceId resourceId =
         new StorageResourceId(srcBucketName, name.getMethodName() + "_src");
 
-    String dstBucketName = BUCKET_HELPER.getUniqueBucketName("copy-with-rewrite-dst");
+    String dstBucketName = BUCKET_HELPER.getUniqueBucketName(name.getMethodName().toLowerCase());
     // Create destination bucket with different storage class,
     // because this is supported only by rewrite but not copy requests
     helperGcs.createBucket(
@@ -397,6 +447,9 @@ public class GoogleCloudStorageImplTest {
         dstBucketName, ImmutableList.of(copiedResourceId.getObjectName()));
 
     assertObjectContent(helperGcs, copiedResourceId, partition, partitionsCount);
+
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
 
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactly(
@@ -428,7 +481,7 @@ public class GoogleCloudStorageImplTest {
   @Test
   public void create_gcsItemInfo_metadataEquals() throws IOException {
     StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
-    TrackingStorageWrapper<GoogleCloudStorageImpl> trackingGcs =
+    TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
 
     Map<String, byte[]> expectedMetadata =
@@ -449,17 +502,83 @@ public class GoogleCloudStorageImplTest {
     assertThat(itemInfo.metadataEquals(itemInfo.getMetadata())).isTrue();
     assertThat(itemInfo.metadataEquals(wrongMetadata)).isFalse();
 
+    assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
+        .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
+
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactly(
             uploadRequestString(
                 resourceId.getBucketName(), resourceId.getObjectName(), /* generationId= */ 1));
   }
 
-  private static TrackingStorageWrapper<GoogleCloudStorageImpl> newTrackingGoogleCloudStorage(
+  @Test
+  public void tracelog_enabled() throws IOException {
+    doTestTraceLog(true, 3, 5);
+  }
+
+  @Test
+  public void tracelog_disabled() throws IOException {
+    doTestTraceLog(false, 0, 0);
+  }
+
+  private void doTestTraceLog(
+      boolean traceLogEnabled, int expectedAfterWrite, int expectedAfterRead) throws IOException {
+    AssertingLogHandler jsonLogHander = new AssertingLogHandler();
+    Logger jsonTracingLogger =
+        jsonLogHander.getLoggerForClass(EventLoggingHttpRequestInitializer.class.getName());
+
+    try {
+
+      TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
+          newTrackingGoogleCloudStorage(
+              getStandardOptionBuilder().setTraceLogEnabled(traceLogEnabled).build());
+
+      int expectedSize = 5 * 1024 * 1024;
+      StorageResourceId resourceId = new StorageResourceId(TEST_BUCKET, name.getMethodName());
+      byte[] writtenData =
+          writeObject(
+              trackingGcs.delegate,
+              resourceId,
+              /* partitionSize= */ expectedSize,
+              /* partitionsCount= */ 1);
+
+      jsonLogHander.assertLogCount(expectedAfterWrite);
+
+      assertObjectContent(trackingGcs.delegate, resourceId, writtenData);
+
+      jsonLogHander.assertLogCount(expectedAfterRead);
+      jsonLogHander.verifyJsonLogFields(TEST_BUCKET, name.getMethodName());
+    } finally {
+      jsonTracingLogger.removeHandler(jsonLogHander);
+    }
+  }
+
+  private TrackingStorageWrapper<GoogleCloudStorage> newTrackingGoogleCloudStorage(
       GoogleCloudStorageOptions options) throws IOException {
+    Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
     return new TrackingStorageWrapper<>(
         options,
-        httpRequestInitializer -> new GoogleCloudStorageImpl(options, httpRequestInitializer));
+        httpRequestInitializer ->
+            javaClientEnabled
+                ? GcsJavaClientImpl.builder()
+                    .setOptions(options)
+                    .setCredentials(credentials)
+                    .setHttpRequestInitializer(httpRequestInitializer)
+                    .build()
+                : GoogleCloudStorageImpl.builder()
+                    .setOptions(options)
+                    .setCredentials(credentials)
+                    .setHttpRequestInitializer(httpRequestInitializer)
+                    .build(),
+        credentials);
+  }
+
+  private GoogleCloudStorage getStorageFromOptions(GoogleCloudStorageOptions options)
+      throws IOException {
+    Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
+    return javaClientEnabled
+        ? GcsJavaClientImpl.builder().setOptions(options).setCredentials(credentials).build()
+        : GoogleCloudStorageImpl.builder().setOptions(options).setCredentials(credentials).build();
   }
 
   private static GoogleCloudStorageOptions getOptionsWithUploadChunk(int uploadChunk) {

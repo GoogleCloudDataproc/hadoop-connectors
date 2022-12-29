@@ -18,15 +18,15 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.cloud.hadoop.util.HttpTransportFactory.SslKeepAliveSocketFactory;
+import com.google.cloud.hadoop.util.HttpTransportFactory.CustomSslSocketFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.UnknownHostException;
 import java.security.GeneralSecurityException;
+import java.time.Duration;
 import javax.net.ssl.SSLSocketFactory;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -36,7 +36,7 @@ import org.junit.runners.JUnit4;
 public class HttpTransportFactoryTest {
 
   private static final FakeSslSocketFactory FAKE_SOCKET_FACTORY = new FakeSslSocketFactory();
-  private static final String[] SUPPORTED_TEST_SUITES = {"testSuite"};
+  private static final String[] SUPPORTED_CIPHER_SUITES = {"testSuite"};
   private static final String[] DEFAULT_CIPHER_SUITES = {"testDefaultCipherSuite"};
 
   @Test
@@ -120,52 +120,58 @@ public class HttpTransportFactoryTest {
   }
 
   @Test
-  public void testKeepAliveSocketFactoryDefaultCipherSuites() {
-    SslKeepAliveSocketFactory sslKeepAliveSocketFactory =
-        new SslKeepAliveSocketFactory(FAKE_SOCKET_FACTORY);
+  public void testCustomSslSocketFactoryDefaultCipherSuites() {
+    CustomSslSocketFactory customSslSocketFactory =
+        new CustomSslSocketFactory(FAKE_SOCKET_FACTORY, null);
 
-    assertThat(sslKeepAliveSocketFactory.getDefaultCipherSuites()).isEqualTo(DEFAULT_CIPHER_SUITES);
+    assertThat(customSslSocketFactory.getDefaultCipherSuites()).isEqualTo(DEFAULT_CIPHER_SUITES);
   }
 
   @Test
-  public void testKeepAliveSocketFactorySupportedCipherSuites() {
-    SslKeepAliveSocketFactory sslKeepAliveSocketFactory =
-        new SslKeepAliveSocketFactory(FAKE_SOCKET_FACTORY);
+  public void testCustomSslSocketFactorySupportedCipherSuites() {
+    CustomSslSocketFactory customSslSocketFactory =
+        new CustomSslSocketFactory(FAKE_SOCKET_FACTORY, null);
 
-    assertThat(sslKeepAliveSocketFactory.getSupportedCipherSuites())
-        .isEqualTo(SUPPORTED_TEST_SUITES);
+    assertThat(customSslSocketFactory.getSupportedCipherSuites())
+        .isEqualTo(SUPPORTED_CIPHER_SUITES);
   }
 
   @Test
-  public void testKeepAliveSettingIsNotCorrupted() throws GeneralSecurityException, IOException {
+  public void testCustomSslSocketFactoryIsNotCorrupted()
+      throws GeneralSecurityException, IOException {
     NetHttpTransport.Builder builder =
-        HttpTransportFactory.createNetHttpTransportBuilder(/* proxyUri= */ null);
+        HttpTransportFactory.createNetHttpTransportBuilder(
+            /* proxyUri= */ null, /* readTimeoutMillis= */ null);
 
-    assertThat(builder.getSslSocketFactory()).isInstanceOf(SslKeepAliveSocketFactory.class);
+    assertThat(builder.getSslSocketFactory()).isInstanceOf(CustomSslSocketFactory.class);
   }
 
   @Test
-  public void testKeepAliveSocketFactoryKeepAliveTrue() throws IOException {
-    SslKeepAliveSocketFactory sslKeepAliveSocketFactory =
-        new SslKeepAliveSocketFactory(FAKE_SOCKET_FACTORY);
+  public void testCustomSslSocketFactoryKeepAliveTrue() throws IOException {
+    CustomSslSocketFactory customSslSocketFactory =
+        new CustomSslSocketFactory(FAKE_SOCKET_FACTORY, null);
 
-    assertThat(sslKeepAliveSocketFactory.createSocket().getKeepAlive()).isTrue();
+    checkSocket(customSslSocketFactory, socket -> assertThat(socket.getKeepAlive()).isTrue());
+  }
 
-    assertThat(sslKeepAliveSocketFactory.createSocket(null, "localhost", 80, false).getKeepAlive())
-        .isTrue();
+  @Test
+  public void testCustomSslSocketFactoryNoReadTimeout() throws IOException {
+    CustomSslSocketFactory customSslSocketFactory =
+        new CustomSslSocketFactory(FAKE_SOCKET_FACTORY, null);
 
-    assertThat(sslKeepAliveSocketFactory.createSocket(null, null, false).getKeepAlive()).isTrue();
+    checkSocket(customSslSocketFactory, socket -> assertThat(socket.getSoTimeout()).isEqualTo(0));
+  }
 
-    assertThat(sslKeepAliveSocketFactory.createSocket("localhost", 80).getKeepAlive()).isTrue();
+  @Test
+  public void testCustomSslSocketFactorySetReadTimeout() throws IOException {
+    Duration readTimeout = Duration.ofMillis(20 * 1000);
+    CustomSslSocketFactory customSslSocketFactory =
+        new CustomSslSocketFactory(FAKE_SOCKET_FACTORY, readTimeout);
 
-    assertThat(sslKeepAliveSocketFactory.createSocket("localhost", 80, null, 443).getKeepAlive())
-        .isTrue();
-
-    InetAddress fakeInet = InetAddress.getByName("10.0.0.0");
-    assertThat(sslKeepAliveSocketFactory.createSocket(fakeInet, 443).getKeepAlive()).isTrue();
-
-    assertThat(sslKeepAliveSocketFactory.createSocket(fakeInet, 443, fakeInet, 80).getKeepAlive())
-        .isTrue();
+    checkSocket(
+        customSslSocketFactory,
+        socket ->
+            assertThat(socket.getSoTimeout()).isEqualTo(Math.toIntExact(readTimeout.toMillis())));
   }
 
   private static class FakeSslSocketFactory extends SSLSocketFactory {
@@ -177,7 +183,7 @@ public class HttpTransportFactoryTest {
 
     @Override
     public String[] getSupportedCipherSuites() {
-      return SUPPORTED_TEST_SUITES;
+      return SUPPORTED_CIPHER_SUITES;
     }
 
     @Override
@@ -197,13 +203,12 @@ public class HttpTransportFactoryTest {
     }
 
     @Override
-    public Socket createSocket(String s, int i) throws IOException, UnknownHostException {
+    public Socket createSocket(String s, int i) {
       return createSocket();
     }
 
     @Override
-    public Socket createSocket(String s, int i, InetAddress inetAddress, int i1)
-        throws IOException, UnknownHostException {
+    public Socket createSocket(String s, int i, InetAddress inetAddress, int i1) {
       return createSocket();
     }
 
@@ -217,6 +222,42 @@ public class HttpTransportFactoryTest {
         throws IOException {
       return createSocket();
     }
+  }
+
+  /**
+   * Similar to {@link java.util.function.Consumer}, but supports calling {@link Socket} methods
+   * that declare a checked {@link IOException}.
+   */
+  @FunctionalInterface
+  private interface SocketAssertion {
+
+    void accept(Socket socket) throws IOException;
+  }
+
+  /**
+   * Performs an assertion on sockets returned from an {@link SSLSocketFactory}, making sure to
+   * check the assertion against all overloads of the {@code createSocket} method.
+   *
+   * @param sslSocketFactory the socket factory to check
+   * @param assertion the assertion to perform on created sockets
+   * @throws IOException for any socket error
+   */
+  private static void checkSocket(SSLSocketFactory sslSocketFactory, SocketAssertion assertion)
+      throws IOException {
+    assertion.accept(sslSocketFactory.createSocket());
+
+    assertion.accept(sslSocketFactory.createSocket(null, "localhost", 80, false));
+
+    assertion.accept(sslSocketFactory.createSocket(null, null, false));
+
+    assertion.accept(sslSocketFactory.createSocket("localhost", 80));
+
+    assertion.accept(sslSocketFactory.createSocket("localhost", 80, null, 443));
+
+    InetAddress fakeInet = InetAddress.getByName("10.0.0.0");
+    assertion.accept(sslSocketFactory.createSocket(fakeInet, 443));
+
+    assertion.accept(sslSocketFactory.createSocket(fakeInet, 443, fakeInet, 80));
   }
 
   private static URI getURI(String scheme, String host, int port) throws URISyntaxException {

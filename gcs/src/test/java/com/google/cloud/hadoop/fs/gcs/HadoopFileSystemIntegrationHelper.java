@@ -205,7 +205,7 @@ public class HadoopFileSystemIntegrationHelper
    */
   protected String readTextFile(Path hadoopPath, int offset, int len, boolean checkOverflow)
       throws IOException {
-    String text = null;
+    String text;
     FSDataInputStream readStream = null;
     long fileSystemBytesRead = 0;
     FileSystem.Statistics stats = FileSystem.getStatistics(ghfs.getScheme(), ghfs.getClass());
@@ -243,7 +243,7 @@ public class HadoopFileSystemIntegrationHelper
           .that(bytesReadStats)
           .isEqualTo(len);
     } else if (statistics == FileSystemStatistics.GREATER_OR_EQUAL) {
-      assertWithMessage("Expected %d <= %d", len, bytesReadStats)
+      assertWithMessage("Expected %s <= %s", len, bytesReadStats)
           .that(len <= bytesReadStats)
           .isTrue();
     } else if (statistics == FileSystemStatistics.NONE) {
@@ -396,7 +396,7 @@ public class HadoopFileSystemIntegrationHelper
    */
   public int writeFile(Path hadoopPath, byte[] buffer, int numWrites, boolean overwrite)
       throws IOException {
-    int numBytesWritten = -1;
+    int numBytesWritten;
     int totalBytesWritten = 0;
 
     long fileSystemBytesWritten = 0;
@@ -431,7 +431,7 @@ public class HadoopFileSystemIntegrationHelper
           .that(bytesWrittenStats)
           .isEqualTo(totalBytesWritten);
     } else if (statistics == FileSystemStatistics.GREATER_OR_EQUAL) {
-      assertWithMessage("Expected %d <= %d", totalBytesWritten, bytesWrittenStats)
+      assertWithMessage("Expected %s <= %s", totalBytesWritten, bytesWrittenStats)
           .that(totalBytesWritten <= bytesWrittenStats)
           .isTrue();
     } else if (statistics == FileSystemStatistics.NONE) {

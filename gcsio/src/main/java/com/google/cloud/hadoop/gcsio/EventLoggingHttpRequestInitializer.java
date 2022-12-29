@@ -14,13 +14,22 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static com.google.common.net.HttpHeaders.AUTHORIZATION;
+import static com.google.common.net.HttpHeaders.COOKIE;
+import static com.google.common.net.HttpHeaders.PROXY_AUTHORIZATION;
+import static com.google.common.net.HttpHeaders.SET_COOKIE;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
+import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpResponse;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.MapMaker;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.flogger.LazyArgs;
@@ -30,16 +39,28 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Stream;
 
 /**
  * Implements a HttpRequestInitializer which adds a ResponseInterceptor to each HttpRequest and
  * tracks the response time taken by the successful HttpRequests.
  */
-class EventLoggingHttpRequestInitializer implements HttpRequestInitializer {
+@VisibleForTesting
+public class EventLoggingHttpRequestInitializer implements HttpRequestInitializer {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private final Gson gson = new Gson();
+
+  private static final ImmutableSet<String> REDACTED_REQUEST_HEADERS =
+      Stream.of(AUTHORIZATION, COOKIE, PROXY_AUTHORIZATION)
+          .map(header -> header.toLowerCase(Locale.US))
+          .collect(toImmutableSet());
+
+  private static final ImmutableSet<String> REDACTED_RESPONSE_HEADERS =
+      ImmutableSet.of(SET_COOKIE.toLowerCase(Locale.US));
 
   // Using a ConcurrentMap with weak key reference to avoid potential memory leak during failure
   // scenarios. We do not get an response interceptor callback if there is some failure while
@@ -61,8 +82,9 @@ class EventLoggingHttpRequestInitializer implements HttpRequestInitializer {
     Map<String, Object> jsonMap = new HashMap<>();
     jsonMap.put("request_method", request.getRequestMethod());
     jsonMap.put("request_url", request.getUrl().toString());
-    jsonMap.put("request_headers", request.getHeaders());
-    jsonMap.put("response_headers", httpResponse.getHeaders());
+    jsonMap.put("request_headers", filterMap(request.getHeaders(), REDACTED_REQUEST_HEADERS));
+    jsonMap.put(
+        "response_headers", filterMap(httpResponse.getHeaders(), REDACTED_RESPONSE_HEADERS));
     jsonMap.put("response_status_code", httpResponse.getStatusCode());
     jsonMap.put("response_status_message", httpResponse.getStatusMessage());
     jsonMap.put("thread_name", Thread.currentThread().getName());
@@ -82,6 +104,13 @@ class EventLoggingHttpRequestInitializer implements HttpRequestInitializer {
 
   private void logDetails(Map<String, Object> jsonMap) {
     logger.atInfo().log("%s", LazyArgs.lazy(() -> gson.toJson(jsonMap)));
+  }
+
+  private static ImmutableMap<String, Object> filterMap(
+      HttpHeaders httpHeaders, Set<String> filterSet) {
+    return httpHeaders.entrySet().stream()
+        .filter(e -> !filterSet.contains(e.getKey().toLowerCase(Locale.US)))
+        .collect(toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   private static class HttpRequestResponseTimeTracker {

@@ -35,13 +35,13 @@ import javax.annotation.Nullable;
 public abstract class GoogleCloudStorageOptions {
 
   /** Default setting for enabling use of GCS gRPC API. */
-  public static final boolean ENABLE_GRPC_DEFAULT = false;
+  public static final boolean DEFAULT_GRPC_ENABLED = false;
 
   /** Default setting for enabling use of the Traffic Director for GCS gRPC API. */
-  public static final boolean ENABLE_TRAFFIC_DIRECTOR_DEFAULT = true;
+  public static final boolean DEFAULT_TRAFFIC_DIRECTOR_ENABLED = true;
 
   /** Default setting to prefer DirectPath for gRPC. */
-  public static final boolean DIRECT_PATH_PREFERRED_DEFAULT = true;
+  public static final boolean DEFAULT_DIRECT_PATH_PREFERRED = true;
 
   /** Default root URL for Cloud Storage API endpoint. */
   public static final String STORAGE_ROOT_URL_DEFAULT = Storage.DEFAULT_ROOT_URL;
@@ -66,13 +66,13 @@ public abstract class GoogleCloudStorageOptions {
   public static final int MAX_WAIT_MILLIS_FOR_EMPTY_OBJECT_CREATION = 3_000;
 
   /** Default number of items to return per call to the list* GCS RPCs. */
-  public static final long MAX_LIST_ITEMS_PER_CALL_DEFAULT = 1024;
+  public static final long MAX_LIST_ITEMS_PER_CALL_DEFAULT = 5000;
 
   /** Default setting for maximum number of requests per GCS batch. */
-  public static final long MAX_REQUESTS_PER_BATCH_DEFAULT = 30;
+  public static final long MAX_REQUESTS_PER_BATCH_DEFAULT = 15;
 
   /** Default setting for number of threads to execute GCS batch requests. */
-  public static final int BATCH_THREADS_DEFAULT = 0;
+  public static final int BATCH_THREADS_DEFAULT = 15;
 
   /** Default setting for maximum number of GCS HTTP request retires. */
   public static final int MAX_HTTP_REQUEST_RETRIES = 10;
@@ -84,13 +84,13 @@ public abstract class GoogleCloudStorageOptions {
   public static final int HTTP_REQUEST_READ_TIMEOUT = 20 * 1000;
 
   /** Default setting for whether or not to use rewrite request for copy operation. */
-  public static final boolean COPY_WITH_REWRITE_DEFAULT = false;
+  public static final boolean COPY_WITH_REWRITE_DEFAULT = true;
 
   /** Default setting for max number of bytes rewritten per rewrite request/call. */
-  public static final int MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT = 0;
+  public static final long MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT = 512 * 1024 * 1024L;
 
   /** Default setting for grpc message timeout check interval (in milliseconds) */
-  public static final long GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL = 1000;
+  public static final long DEFAULT_GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL_MILLIS = 1000;
 
   /** Default setting for GCS HTTP request headers. */
   public static final ImmutableMap<String, String> HTTP_REQUEST_HEADERS_DEFAULT = ImmutableMap.of();
@@ -104,9 +104,9 @@ public abstract class GoogleCloudStorageOptions {
 
   public static Builder builder() {
     return new AutoValue_GoogleCloudStorageOptions.Builder()
-        .setGrpcEnabled(ENABLE_GRPC_DEFAULT)
-        .setTrafficDirectorEnabled(ENABLE_TRAFFIC_DIRECTOR_DEFAULT)
-        .setDirectPathPreferred(DIRECT_PATH_PREFERRED_DEFAULT)
+        .setGrpcEnabled(DEFAULT_GRPC_ENABLED)
+        .setTrafficDirectorEnabled(DEFAULT_TRAFFIC_DIRECTOR_ENABLED)
+        .setDirectPathPreferred(DEFAULT_DIRECT_PATH_PREFERRED)
         .setStorageRootUrl(STORAGE_ROOT_URL_DEFAULT)
         .setStorageServicePath(STORAGE_SERVICE_PATH_DEFAULT)
         .setGrpcServerAddress(DEFAULT_GCS_GRPC_SERVER_ADDRESS)
@@ -124,7 +124,7 @@ public abstract class GoogleCloudStorageOptions {
         .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
         .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
         .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT)
-        .setGrpcMessageTimeoutCheckInterval(GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL)
+        .setGrpcMessageTimeoutCheckInterval(DEFAULT_GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL_MILLIS)
         .setMetricsSink(MetricsSink.NONE)
         .setTraceLogEnabled(false);
   }

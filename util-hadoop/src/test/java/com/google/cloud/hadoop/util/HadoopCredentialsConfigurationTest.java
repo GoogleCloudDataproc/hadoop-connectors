@@ -72,6 +72,7 @@ public class HadoopCredentialsConfigurationTest {
           put(".auth.refresh.token", null);
           put(".auth.service.account.json.keyfile", null);
           put(".auth.type", AuthenticationType.COMPUTE_ENGINE);
+          put(".http.read-timeout", 20 * 1000);
           put(".proxy.address", null);
           put(".proxy.password", null);
           put(".proxy.username", null);

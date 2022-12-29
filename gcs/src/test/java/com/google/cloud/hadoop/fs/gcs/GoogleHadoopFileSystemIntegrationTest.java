@@ -47,6 +47,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.stream;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_CREDENTIAL_PROVIDER_PATH;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.http.HttpResponseException;
@@ -85,6 +86,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.Service;
 import org.junit.Before;
@@ -97,6 +99,8 @@ import org.junit.runners.JUnit4;
 /** Integration tests for GoogleHadoopFileSystem class. */
 @RunWith(JUnit4.class)
 public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSystemTestBase {
+
+  private static final String PUBLIC_BUCKET = "gs://gcp-public-data-landsat";
 
   @ClassRule
   public static NotInheritableExternalResource storageResource =
@@ -323,6 +327,8 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     assertThat(myGhfs.getIOStatistics().counters().get(INVOCATION_CREATE.getSymbol())).isEqualTo(1);
     assertThat(myGhfs.getIOStatistics().counters().get(FILES_CREATED.getSymbol())).isEqualTo(1);
     assertThat(myGhfs.delete(new Path("/file1"))).isTrue();
+
+    TestUtils.verifyDurationMetric(myGhfs.getIOStatistics(), INVOCATION_CREATE.getSymbol(), 1);
   }
 
   @Test
@@ -394,6 +400,8 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     myGhfs.open(new Path("/directory1/file1"));
     assertThat(myGhfs.getIOStatistics().counters().get(INVOCATION_OPEN.getSymbol())).isEqualTo(1);
     assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
+
+    TestUtils.verifyDurationMetric(myGhfs.getIOStatistics(), INVOCATION_OPEN.getSymbol(), 1);
   }
 
   @Test
@@ -403,7 +411,8 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     fout.writeBytes("data");
     fout.close();
     myGhfs.delete(new Path("/file1"));
-    assertThat(myGhfs.getIOStatistics().counters().get(INVOCATION_DELETE.getSymbol())).isEqualTo(1);
+
+    TestUtils.verifyDurationMetric(myGhfs.getIOStatistics(), INVOCATION_DELETE.getSymbol(), 1);
   }
 
   @Test
@@ -494,6 +503,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
       assertThat(e.getLocalizedMessage()).startsWith("Wrong bucket:");
     }
   }
+
   /** Verify that default constructor does not throw. */
   @Test
   @SuppressWarnings("CheckReturnValue")
@@ -1112,6 +1122,9 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     assertThat(myGhfs.getIOStatistics().counters().get(INVOCATION_CREATE_NON_RECURSIVE.getSymbol()))
         .isEqualTo(1);
     assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
+
+    TestUtils.verifyDurationMetric(
+        myGhfs.getIOStatistics(), INVOCATION_CREATE_NON_RECURSIVE.getSymbol(), 1);
   }
 
   @Test
@@ -1280,8 +1293,9 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     myGhfs.create(source).writeBytes("data");
     Path dest = new Path("/directory1/file2");
     myGhfs.rename(source, dest);
-    assertThat(myGhfs.getIOStatistics().counters().get(INVOCATION_RENAME.getSymbol())).isEqualTo(1);
     assertThat(myGhfs.delete(testRoot, /* recursive= */ true)).isTrue();
+
+    TestUtils.verifyDurationMetric(myGhfs.getIOStatistics(), INVOCATION_RENAME.getSymbol(), 1);
   }
 
   @Test
@@ -1305,24 +1319,26 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     myGhfs.create(filePath).writeBytes("data");
 
     myGhfs.getXAttrs(filePath);
-    assertThat(myGhfs.getIOStatistics().counters().get(INVOCATION_XATTR_GET_MAP.getSymbol()))
-        .isEqualTo(1);
+    IOStatistics ioStats = myGhfs.getIOStatistics();
+    TestUtils.verifyDurationMetric(ioStats, INVOCATION_XATTR_GET_MAP.getSymbol(), 1);
 
     myGhfs.getXAttr(filePath, "test-xattr_statistics");
-    assertThat(myGhfs.getIOStatistics().counters().get(INVOCATION_XATTR_GET_NAMED.getSymbol()))
-        .isEqualTo(1);
+    TestUtils.verifyDurationMetric(ioStats, INVOCATION_XATTR_GET_NAMED.getSymbol(), 1);
 
     myGhfs.getXAttrs(
         filePath,
         ImmutableList.of("test-xattr-statistics", "test-xattr-statistics1", "test-xattr"));
-    assertThat(myGhfs.getIOStatistics().counters().get(INVOCATION_XATTR_GET_NAMED_MAP.getSymbol()))
-        .isEqualTo(1);
+    TestUtils.verifyDurationMetric(ioStats, INVOCATION_XATTR_GET_NAMED_MAP.getSymbol(), 1);
+    TestUtils.verifyDurationMetric(ioStats, INVOCATION_XATTR_GET_MAP.getSymbol(), 2);
 
     myGhfs.listXAttrs(filePath);
-    assertThat(myGhfs.getIOStatistics().counters().get(INVOCATION_OP_XATTR_LIST.getSymbol()))
-        .isEqualTo(1);
+    TestUtils.verifyDurationMetric(ioStats, INVOCATION_OP_XATTR_LIST.getSymbol(), 1);
 
     assertThat(myGhfs.delete(testRoot, true)).isTrue();
+
+    TestUtils.verifyDurationMetric(ioStats, INVOCATION_XATTR_GET_NAMED.getSymbol(), 1);
+    TestUtils.verifyDurationMetric(ioStats, INVOCATION_XATTR_GET_MAP.getSymbol(), 2);
+    TestUtils.verifyDurationMetric(ioStats, INVOCATION_XATTR_GET_NAMED_MAP.getSymbol(), 1);
   }
 
   @Test
@@ -1339,6 +1355,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
                 .counters()
                 .get(INVOCATION_CREATE.getSymbol()))
         .isEqualTo(1);
+
     // The create and write methods are expected to trigger requests of types GET, PUT and PATCH
     assertThat(
             ((GoogleHadoopFileSystem) ghfs)
@@ -1779,14 +1796,12 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
   @Test
   public void unauthenticatedAccessToPublicBuckets_fsGsProperties() throws Exception {
-    String publicBucket = "gs://gcp-public-data-landsat";
-
     Configuration config = new Configuration();
     config.setEnum("fs.gs.auth.type", AuthenticationType.UNAUTHENTICATED);
 
-    FileSystem fs = FileSystem.get(new URI(publicBucket), config);
+    FileSystem fs = FileSystem.get(new URI(PUBLIC_BUCKET), config);
 
-    FileStatus[] fileStatuses = fs.listStatus(new Path(publicBucket));
+    FileStatus[] fileStatuses = fs.listStatus(new Path(PUBLIC_BUCKET));
 
     assertThat(
             ((GoogleHadoopFileSystem) fs)
@@ -1806,15 +1821,24 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
   @Test
   public void unauthenticatedAccessToPublicBuckets_googleCloudProperties() throws Exception {
-    String publicBucket = "gs://gcp-public-data-landsat";
-
     Configuration config = new Configuration();
     config.setEnum("google.cloud.auth.type", AuthenticationType.UNAUTHENTICATED);
 
-    FileSystem fs = FileSystem.get(new URI(publicBucket), config);
+    FileSystem fs = FileSystem.get(new URI(PUBLIC_BUCKET), config);
 
-    FileStatus[] fileStatuses = fs.listStatus(new Path(publicBucket));
+    FileStatus[] fileStatuses = fs.listStatus(new Path(PUBLIC_BUCKET));
 
     assertThat(fileStatuses).isNotEmpty();
+  }
+
+  @Test
+  public void testInitializeCompatibleWithHadoopCredentialProvider() throws Exception {
+    Configuration config = loadConfig();
+
+    // This does not need to refer to a real bucket/path for the test.
+    config.set(HADOOP_SECURITY_CREDENTIAL_PROVIDER_PATH, "jceks://gs@foobar/test.jceks");
+
+    FileSystem.get(new URI(PUBLIC_BUCKET), config);
+    // Initialization successful with no exception thrown.
   }
 }

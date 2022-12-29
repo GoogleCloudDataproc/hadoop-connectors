@@ -262,4 +262,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
 
   @Override
   public void unauthenticatedAccessToPublicBuckets_googleCloudProperties() {}
+
+  @Override
+  public void testInitializeCompatibleWithHadoopCredentialProvider() {}
 }

@@ -17,7 +17,6 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.truth.Truth.assertThat;
-import static org.junit.Assert.assertTrue;
 
 import com.google.common.flogger.GoogleLogger;
 import com.google.gson.Gson;
@@ -27,7 +26,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Handler;
+import java.util.logging.Level;
 import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 public class AssertingLogHandler extends Handler {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
@@ -43,8 +44,7 @@ public class AssertingLogHandler extends Handler {
       logRecords.add(logRecordToMap(record));
       methods.add(record.getSourceMethodName());
 
-      logger.atInfo().log(
-          String.format("Message %d: %s", logRecords.size(), GSON.toJson(logRecordToMap(record))));
+      logger.atInfo().log("Message %d: %s", logRecords.size(), GSON.toJson(logRecordToMap(record)));
     }
   }
 
@@ -75,12 +75,36 @@ public class AssertingLogHandler extends Handler {
 
   public void verifyCommonTraceFields() {
     for (Map<String, Object> event : logRecords) {
-      assertTrue(event.containsKey("initiatingthreadname"));
-      assertTrue(event.containsKey("remoteaddress"));
-      assertTrue(event.containsKey("elapsedmillis"));
-      assertTrue(event.containsKey("requestinfo"));
-      assertTrue(event.containsKey("eventtime"));
-      assertTrue(event.containsKey("details"));
+      assertThat(event.keySet())
+          .containsAtLeast(
+              "details",
+              "elapsedmillis",
+              "eventtime",
+              "initiatingthreadname",
+              "remoteaddress",
+              "requestinfo");
+    }
+  }
+
+  public Logger getLoggerForClass(String className) {
+    Logger grpcTracingLogger = Logger.getLogger(className);
+    grpcTracingLogger.setUseParentHandlers(false);
+    grpcTracingLogger.addHandler(this);
+    grpcTracingLogger.setLevel(Level.INFO);
+    return grpcTracingLogger;
+  }
+
+  public void verifyJsonLogFields(String bucketName, String objectPrefix) {
+    for (Map<String, Object> logRecord : logRecords) {
+      assertThat(logRecord.get("response_time")).isNotNull();
+      assertThat(logRecord.get("response_headers")).isNotNull();
+      assertThat(logRecord.get("request_headers")).isNotNull();
+      assertThat(logRecord.get("request_method")).isNotNull();
+      assertThat(logRecord.get("request_url").toString())
+          .startsWith("https://storage.googleapis.com/");
+      assertThat(logRecord.get("request_url").toString()).contains(bucketName);
+      assertThat(logRecord.get("request_url").toString()).contains(objectPrefix);
+      assertThat(logRecord.get("response_status_code")).isNotNull();
     }
   }
 

@@ -19,13 +19,16 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.GOOGLEAPIS_ENDPOINT;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.function.Predicate.not;
 
 import com.google.api.client.http.HttpExecuteInterceptor;
+import com.google.api.client.http.HttpHeaders;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
+import com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -84,7 +87,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
       "DELETE:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b/%s/o/%s?ifGenerationMatch=%s";
 
   private static final String LIST_BUCKETS_REQUEST_FORMAT =
-      "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b?maxResults=1024&project=%s";
+      "GET:" + GOOGLEAPIS_ENDPOINT + "/storage/v1/b?maxResults=5000&project=%s";
 
   private static final String LIST_REQUEST_FORMAT =
       "GET:"
@@ -161,7 +164,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     AtomicLong resumableUploadId = new AtomicLong();
     return requests.stream()
         .map(GoogleCloudStorageIntegrationHelper::requestToString)
-        // Replace randomized pageToken with predictable value so it could be asserted in tests
+        // Replace randomized pageToken with predictable value, so it could be asserted in tests
         .map(r -> replacePageTokenWithId(r, pageTokenId))
         .map(r -> replaceRewriteTokenWithId(r, rewriteTokenId))
         .map(r -> replaceGenerationMatchWithId(r, generationMatchId))
@@ -169,10 +172,34 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         .collect(toImmutableList());
   }
 
+  public ImmutableList<String> getAllRequestInvocationIds() {
+    return requests.stream()
+        .map(r -> getInvocationId(r.getHeaders()))
+        .filter(not(Strings::isNullOrEmpty))
+        .collect(toImmutableList());
+  }
+
   public ImmutableList<String> getAllRawRequestStrings() {
     return requests.stream()
         .map(GoogleCloudStorageIntegrationHelper::requestToString)
         .collect(toImmutableList());
+  }
+
+  private String getInvocationId(HttpHeaders header) {
+    String apiClientHeader = (String) header.get(InvocationIdInterceptor.GOOG_API_CLIENT);
+    // This is how the header value look like
+    // x-goog-api-client -> gl-java/11.0.12 gdcl/1.32.2 mac-os-x/12.5
+    // gccl-invocation-id/9ad3804c-fdc1-4cb1-8337-5cf6ae1829b5
+    int beginIndex = apiClientHeader.indexOf(InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX);
+    if (beginIndex >= 0) {
+      beginIndex = beginIndex + InvocationIdInterceptor.GCCL_INVOCATION_ID_PREFIX.length();
+      int endIndex =
+          Math.max(
+              apiClientHeader.indexOf(" ", beginIndex), apiClientHeader.indexOf(",", beginIndex));
+      endIndex = endIndex == -1 ? apiClientHeader.length() : endIndex;
+      return apiClientHeader.substring(beginIndex, endIndex);
+    }
+    return null;
   }
 
   private String replacePageTokenWithId(String request, AtomicLong pageTokenId) {
@@ -410,9 +437,30 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   }
 
   public static String listRequestWithTrailingDelimiter(
+      String bucket, String prefix, String pageToken) {
+    return listRequestWithTrailingDelimiter(
+        bucket,
+        prefix,
+        /* objectFields= */ OBJECT_FIELDS,
+        (int) GoogleCloudStorageOptions.MAX_LIST_ITEMS_PER_CALL_DEFAULT,
+        pageToken);
+  }
+
+  public static String listRequestWithTrailingDelimiter(
       String bucket, String prefix, int maxResults, String pageToken) {
     return listRequestWithTrailingDelimiter(
         bucket, prefix, /* objectFields= */ OBJECT_FIELDS, maxResults, pageToken);
+  }
+
+  public static String listRequestWithTrailingDelimiter(
+      String bucket, String prefix, String objectFields, String pageToken) {
+    return listRequestString(
+        bucket,
+        /* includeTrailingDelimiter= */ true,
+        prefix,
+        objectFields,
+        (int) GoogleCloudStorageOptions.MAX_LIST_ITEMS_PER_CALL_DEFAULT,
+        pageToken);
   }
 
   public static String listRequestWithTrailingDelimiter(
@@ -459,6 +507,23 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
       Boolean includeTrailingDelimiter,
       String prefix,
       String objectFields,
+      String pageToken) {
+    return listRequestString(
+        bucket,
+        flatList,
+        includeTrailingDelimiter,
+        prefix,
+        objectFields,
+        (int) GoogleCloudStorageOptions.MAX_LIST_ITEMS_PER_CALL_DEFAULT,
+        pageToken);
+  }
+
+  public static String listRequestString(
+      String bucket,
+      boolean flatList,
+      Boolean includeTrailingDelimiter,
+      String prefix,
+      String objectFields,
       int maxResults,
       String pageToken) {
     String extraParams = pageToken == null ? "" : "&pageToken=" + pageToken;
@@ -480,10 +545,6 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   }
 
   private static String urlEncode(String string) {
-    try {
-      return URLEncoder.encode(string, UTF_8.name());
-    } catch (UnsupportedEncodingException e) {
-      throw new RuntimeException("Failed to url encode string: " + string, e);
-    }
+    return URLEncoder.encode(string, UTF_8);
   }
 }

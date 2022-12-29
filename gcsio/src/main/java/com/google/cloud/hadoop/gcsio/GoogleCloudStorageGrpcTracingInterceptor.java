@@ -23,6 +23,7 @@ import io.grpc.Attributes;
 import io.grpc.CallOptions;
 import io.grpc.Channel;
 import io.grpc.ClientCall;
+import io.grpc.ClientInterceptor;
 import io.grpc.ClientStreamTracer;
 import io.grpc.ClientStreamTracer.StreamInfo;
 import io.grpc.Grpc;
@@ -36,7 +37,7 @@ import java.time.format.DateTimeFormatter;
 
 /** Interceptor to create a trace of the lifecycle of GRPC api calls. */
 @VisibleForTesting
-public class GoogleCloudStorageGrpcTracingInterceptor implements io.grpc.ClientInterceptor {
+public class GoogleCloudStorageGrpcTracingInterceptor implements ClientInterceptor {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private final GrpcRequestTracingInfo requestInfo;
 
@@ -54,13 +55,13 @@ public class GoogleCloudStorageGrpcTracingInterceptor implements io.grpc.ClientI
     return new ClientStreamTracer.Factory() {
       @Override
       public ClientStreamTracer newClientStreamTracer(StreamInfo info, Metadata headers) {
-        return new GRPCClientStreamTracer(info, headers, requestInfo);
+        return new GrpcClientStreamTracer(info, requestInfo);
       }
     };
   }
 
-  private static class GRPCClientStreamTracer extends ClientStreamTracer {
-    private static final DateTimeFormatter dateTimeFormatter =
+  private static class GrpcClientStreamTracer extends ClientStreamTracer {
+    private static final DateTimeFormatter DATE_TIME_FORMATTER =
         DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSXXX").withZone(ZoneOffset.UTC);
 
     private final StreamInfo streamInfo;
@@ -70,8 +71,7 @@ public class GoogleCloudStorageGrpcTracingInterceptor implements io.grpc.ClientI
     private final Stopwatch stopwatch = Stopwatch.createUnstarted();
     private SocketAddress remoteAddress;
 
-    public GRPCClientStreamTracer(
-        StreamInfo info, Metadata headers, GrpcRequestTracingInfo requestInfo) {
+    public GrpcClientStreamTracer(StreamInfo info, GrpcRequestTracingInfo requestInfo) {
       this.streamInfo = info;
       this.requestInfo = requestInfo;
     }
@@ -82,6 +82,7 @@ public class GoogleCloudStorageGrpcTracingInterceptor implements io.grpc.ClientI
       this.remoteAddress = transportAttrs.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR);
 
       logger.atInfo().log(
+          "%s",
           toJson(
               getRequestTrackingInfo("streamCreated")
                   .put("transportattrs", transportAttrs)
@@ -99,17 +100,18 @@ public class GoogleCloudStorageGrpcTracingInterceptor implements io.grpc.ClientI
 
     private ImmutableMap.Builder<String, Object> getRequestTrackingInfo(String message) {
       return new ImmutableMap.Builder<String, Object>()
-          .put("initiatingthreadname", this.initiatingThreadName)
-          .put("remoteaddress", this.remoteAddress)
+          .put("initiatingthreadname", initiatingThreadName)
+          .put("remoteaddress", remoteAddress)
           .put("elapsedmillis", stopwatch.elapsed().toMillis())
-          .put("requestinfo", this.requestInfo)
-          .put("eventtime", dateTimeFormatter.format(Instant.now()))
+          .put("requestinfo", requestInfo)
+          .put("eventtime", DATE_TIME_FORMATTER.format(Instant.now()))
           .put("details", message);
     }
 
     /** Trailing metadata has been received from the server. */
     public void inboundTrailers(Metadata trailers) {
       logger.atInfo().log(
+          "%s",
           toJson(
               getRequestTrackingInfo("inboundTrailers()")
                   .put("trailers", trailers == null ? "null" : trailers.toString())
@@ -119,7 +121,7 @@ public class GoogleCloudStorageGrpcTracingInterceptor implements io.grpc.ClientI
     /** Stream is closed. This will be called exactly once. */
     public void streamClosed(Status status) {
       logger.atInfo().log(
-          toJson(getRequestTrackingInfo("streamcloses()").put("status", status).build()));
+          "%s", toJson(getRequestTrackingInfo("streamcloses()").put("status", status).build()));
     }
 
     /**
@@ -132,7 +134,7 @@ public class GoogleCloudStorageGrpcTracingInterceptor implements io.grpc.ClientI
      */
     public void outboundMessage(int seqNo) {
       logger.atInfo().log(
-          toJson(getRequestTrackingInfo("outboundMessage()").put("seqno", seqNo).build()));
+          "%s", toJson(getRequestTrackingInfo("outboundMessage()").put("seqno", seqNo).build()));
     }
 
     /**
@@ -145,7 +147,7 @@ public class GoogleCloudStorageGrpcTracingInterceptor implements io.grpc.ClientI
      */
     public void inboundMessage(int seqNo) {
       logger.atInfo().log(
-          toJson(getRequestTrackingInfo("inboundMessage()").put("seqno", seqNo).build()));
+          "%s", toJson(getRequestTrackingInfo("inboundMessage()").put("seqno", seqNo).build()));
     }
 
     /**
@@ -160,6 +162,7 @@ public class GoogleCloudStorageGrpcTracingInterceptor implements io.grpc.ClientI
     public void outboundMessageSent(
         int seqNo, long optionalWireSize, long optionalUncompressedSize) {
       logger.atInfo().log(
+          "%s",
           toJson(
               getRequestTrackingInfo("outboundMessageSent()")
                   .put("seqno", seqNo)
@@ -179,6 +182,7 @@ public class GoogleCloudStorageGrpcTracingInterceptor implements io.grpc.ClientI
     public void inboundMessageRead(
         int seqNo, long optionalWireSize, long optionalUncompressedSize) {
       logger.atInfo().log(
+          "%s",
           toJson(
               getRequestTrackingInfo("inboundMessageRead()")
                   .put("seqno", seqNo)

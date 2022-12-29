@@ -21,7 +21,10 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
 /** Contains helper methods for standardizing String-matching algorithms specific to GCS. */
-public class GoogleCloudStorageStrings {
+public final class GoogleCloudStorageStrings {
+
+  private GoogleCloudStorageStrings() {}
+
   /**
    * Helper that mimics the GCS API behavior for taking an existing objectName and checking if it
    * matches a user-supplied prefix with an optional directory "delimiter". If it matches, either

@@ -33,7 +33,6 @@ import com.google.common.io.ByteStreams;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.util.Timestamps;
 import com.google.storage.v2.ChecksummedData;
-import com.google.storage.v2.CommonRequestParams;
 import com.google.storage.v2.Object;
 import com.google.storage.v2.ObjectChecksums;
 import com.google.storage.v2.QueryWriteStatusRequest;
@@ -511,17 +510,8 @@ public final class GoogleCloudStorageGrpcWriteChannel
               writeConditions.getMetaGenerationMatch());
         }
 
-        CommonRequestParams.Builder commonRequestParamsBuilder = null;
-        if (requesterPaysProject != null) {
-          commonRequestParamsBuilder =
-              CommonRequestParams.newBuilder().setUserProject(requesterPaysProject);
-        }
-
         StartResumableWriteRequest.Builder startResumableWriteRequestBuilder =
             StartResumableWriteRequest.newBuilder().setWriteObjectSpec(insertObjectSpecBuilder);
-        if (commonRequestParamsBuilder != null) {
-          startResumableWriteRequestBuilder.setCommonRequestParams(commonRequestParamsBuilder);
-        }
         StartResumableWriteRequest request = startResumableWriteRequestBuilder.build();
         return ResilientOperation.retry(
             () -> startResumableUpload(request),

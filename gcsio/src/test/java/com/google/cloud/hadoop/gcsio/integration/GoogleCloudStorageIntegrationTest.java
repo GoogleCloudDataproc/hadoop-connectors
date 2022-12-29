@@ -47,8 +47,10 @@ public class GoogleCloudStorageIntegrationTest extends GoogleCloudStorageTest {
 
   private static GoogleCloudStorage getGoogleCloudStorage(
       GoogleCloudStorageOptions.Builder optionsBuilder) throws IOException {
-    return new GoogleCloudStorageImpl(
-        optionsBuilder.build(), GoogleCloudStorageTestHelper.getCredentials());
+    return GoogleCloudStorageImpl.builder()
+        .setOptions(optionsBuilder.build())
+        .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
+        .build();
   }
 
   public GoogleCloudStorageIntegrationTest(GoogleCloudStorage gcs) {

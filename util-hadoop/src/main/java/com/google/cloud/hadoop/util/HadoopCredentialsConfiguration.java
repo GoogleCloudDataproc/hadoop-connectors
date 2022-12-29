@@ -33,6 +33,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
@@ -136,6 +137,10 @@ public class HadoopCredentialsConfiguration {
    */
   public static final HadoopConfigurationProperty<RedactedString> PROXY_PASSWORD_SUFFIX =
       new HadoopConfigurationProperty<>(".proxy.password");
+
+  /** Key suffix for setting the read timeout (in milliseconds) for HTTP request. */
+  public static final HadoopConfigurationProperty<Integer> READ_TIMEOUT_SUFFIX =
+      new HadoopConfigurationProperty<>(".http.read-timeout", 20 * 1000);
 
   /**
    * Configuration key for defining the OAUth2 client ID. Required when the authentication type is
@@ -313,7 +318,9 @@ public class HadoopCredentialsConfiguration {
             return HttpTransportFactory.createHttpTransport(
                 PROXY_ADDRESS_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get),
                 PROXY_USERNAME_SUFFIX.withPrefixes(keyPrefixes).getPassword(config),
-                PROXY_PASSWORD_SUFFIX.withPrefixes(keyPrefixes).getPassword(config));
+                PROXY_PASSWORD_SUFFIX.withPrefixes(keyPrefixes).getPassword(config),
+                Duration.ofMillis(
+                    READ_TIMEOUT_SUFFIX.withPrefixes(keyPrefixes).get(config, config::getInt)));
           } catch (IOException e) {
             throw new UncheckedIOException(e);
           }
