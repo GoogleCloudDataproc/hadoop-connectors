@@ -377,6 +377,11 @@ permissions (not authorized) to execute these requests.
         `SYNCABLE_COMPOSITE`, except `hflush()` is also supported. It will use
         the same implementation as `hsync()`.
 
+    For streaming applications where checkpoint files are used,
+    `FLUSHABLE_COMPOSITE` should be used as the upstream frameworks typically
+    use `hflush()` or `hsync()` calls before closing a file and if
+    `FLUSHABLE_COMPOSITE` is not used then data is not written to these files.
+
 *   `fs.gs.outputstream.sync.min.interval.ms` (default: `0`)
 
     `SYNCABLE_COMPOSITE` and `FLUSHABLE_COMPOSITE` streams configuration that
