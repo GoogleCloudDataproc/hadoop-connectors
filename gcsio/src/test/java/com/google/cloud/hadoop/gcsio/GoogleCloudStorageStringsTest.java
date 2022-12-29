@@ -25,11 +25,6 @@ import org.junit.runners.JUnit4;
 /** UnitTests for GoogleCloudStorageStrings class. */
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageStringsTest {
-  @Test
-  @SuppressWarnings("CheckReturnValue")
-  public void testConstructorForLineCoverage() {
-    new GoogleCloudStorageStrings();
-  }
 
   @Test
   public void testMatchListPrefixIllegalArguments() {

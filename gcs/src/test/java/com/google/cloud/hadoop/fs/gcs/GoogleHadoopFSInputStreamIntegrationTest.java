@@ -161,9 +161,7 @@ public class GoogleHadoopFSInputStreamIntegrationTest {
       Throwable exception =
           assertThrows(EOFException.class, () -> inputStream.seek(testContent.length()));
       TestUtils.verifyDurationMetric(
-          inputStream.getIOStatistics(),
-          String.valueOf(STREAM_READ_SEEK_OPERATIONS) + SUFFIX_FAILURES,
-          1);
+          inputStream.getIOStatistics(), STREAM_READ_SEEK_OPERATIONS + SUFFIX_FAILURES, 1);
     }
 
     TestUtils.verifyDurationMetric(

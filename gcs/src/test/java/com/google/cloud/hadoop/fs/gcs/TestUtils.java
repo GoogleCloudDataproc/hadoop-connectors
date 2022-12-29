@@ -14,7 +14,7 @@ class TestUtils {
 
     Long minValue = ioStatistics.minimums().get(minKey);
     Long maxValue = ioStatistics.maximums().get(maxKey);
-    Long meanValue = Double.valueOf(ioStatistics.meanStatistics().get(meanKey).mean()).longValue();
+    long meanValue = Double.valueOf(ioStatistics.meanStatistics().get(meanKey).mean()).longValue();
 
     assertThat(minValue).isLessThan(maxValue + 1);
     assertThat(minValue).isLessThan(meanValue + 1);
