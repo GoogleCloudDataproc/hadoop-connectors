@@ -151,7 +151,7 @@ public class EventLoggingHttpRequestInitializerTest {
     HttpRequest httpRequest = getHttpRequestWithResponse(new IOException("test IOException"));
     requestInitializer.initialize(httpRequest);
 
-    assertThrows(IOException.class, () -> httpRequest.execute());
+    assertThrows(IOException.class, httpRequest::execute);
 
     assertingHandler.assertLogCount(0);
   }

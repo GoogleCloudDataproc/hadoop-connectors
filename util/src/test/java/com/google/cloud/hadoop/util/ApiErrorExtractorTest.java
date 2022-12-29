@@ -123,8 +123,6 @@ public class ApiErrorExtractorTest {
   public void testItemNotFound() {
     // Check success cases.
     assertThat(errorExtractor.itemNotFound(notFound)).isTrue();
-    GoogleJsonError gje = new GoogleJsonError();
-    gje.setCode(HttpStatusCodes.STATUS_CODE_NOT_FOUND);
     assertThat(errorExtractor.itemNotFound(new IOException(notFound))).isTrue();
     assertThat(errorExtractor.itemNotFound(new IOException(new IOException(notFound)))).isTrue();
 

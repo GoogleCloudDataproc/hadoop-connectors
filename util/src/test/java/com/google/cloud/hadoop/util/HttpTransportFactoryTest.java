@@ -25,7 +25,6 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.UnknownHostException;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
 import javax.net.ssl.SSLSocketFactory;
@@ -204,13 +203,12 @@ public class HttpTransportFactoryTest {
     }
 
     @Override
-    public Socket createSocket(String s, int i) throws IOException, UnknownHostException {
+    public Socket createSocket(String s, int i) {
       return createSocket();
     }
 
     @Override
-    public Socket createSocket(String s, int i, InetAddress inetAddress, int i1)
-        throws IOException, UnknownHostException {
+    public Socket createSocket(String s, int i, InetAddress inetAddress, int i1) {
       return createSocket();
     }
 

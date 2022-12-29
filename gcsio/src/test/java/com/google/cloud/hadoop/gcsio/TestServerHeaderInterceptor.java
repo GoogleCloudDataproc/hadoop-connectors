@@ -25,7 +25,7 @@ import java.util.List;
 
 // Header interceptor to capture the header information received at the server side
 class TestServerHeaderInterceptor implements ServerInterceptor {
-  private List<Metadata> allMeta = new ArrayList<>();
+  private final List<Metadata> allMeta = new ArrayList<>();
 
   @Override
   public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(

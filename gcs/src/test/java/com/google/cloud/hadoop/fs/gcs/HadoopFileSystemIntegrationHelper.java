@@ -205,7 +205,7 @@ public class HadoopFileSystemIntegrationHelper
    */
   protected String readTextFile(Path hadoopPath, int offset, int len, boolean checkOverflow)
       throws IOException {
-    String text = null;
+    String text;
     FSDataInputStream readStream = null;
     long fileSystemBytesRead = 0;
     FileSystem.Statistics stats = FileSystem.getStatistics(ghfs.getScheme(), ghfs.getClass());
@@ -396,7 +396,7 @@ public class HadoopFileSystemIntegrationHelper
    */
   public int writeFile(Path hadoopPath, byte[] buffer, int numWrites, boolean overwrite)
       throws IOException {
-    int numBytesWritten = -1;
+    int numBytesWritten;
     int totalBytesWritten = 0;
 
     long fileSystemBytesWritten = 0;
