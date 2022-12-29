@@ -46,7 +46,7 @@ import static com.google.common.base.Strings.nullToEmpty;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GcsFileChecksumType;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GlobAlgorithm;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.FilesystemAPI;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
@@ -95,9 +95,9 @@ public class GoogleHadoopFileSystemConfiguration {
    * symbolic mode accepted by {@link FsPermission#FsPermission(String)}
    *
    * <p>Default value for the permissions that we report a file or directory to have. Note: We do
-   * not really support file/dir permissions but we need to report some permission value when Hadoop
-   * calls getFileStatus(). A MapReduce job fails if we report permissions more relaxed than the
-   * value below and this is the default File System.
+   * not really support file/dir permissions, but we need to report some permission value when
+   * Hadoop calls getFileStatus(). A MapReduce job fails if we report permissions more relaxed than
+   * the value below and this is the default File System.
    */
   public static final HadoopConfigurationProperty<String> PERMISSIONS_TO_REPORT =
       new HadoopConfigurationProperty<>("fs.gs.reported.permissions", "700");
@@ -428,23 +428,20 @@ public class GoogleHadoopFileSystemConfiguration {
   public static final HadoopConfigurationProperty<MetricsSink> GCS_METRICS_SINK =
       new HadoopConfigurationProperty<>("fs.gs.metrics.sink", MetricsSink.NONE);
 
-  /** Configuration key to enable publishing metrics to Google cloud monitoring. */
-  public static final HadoopConfigurationProperty<FilesystemAPI> GCS_FILESYSTEM_API =
-      new HadoopConfigurationProperty<>("fs.gs.filesystem.api", FilesystemAPI.OBJECT);
-
   /** Configuration key to enable logging of additional trace details. */
   public static final HadoopConfigurationProperty<Boolean> GCS_TRACE_LOG_ENABLE =
       new HadoopConfigurationProperty<>("fs.gs.tracelog.enable", false);
 
-  /** Configuration key to enable using google-cloud-storage client for connecting with GCS */
-  public static final HadoopConfigurationProperty<Boolean> GCS_JAVA_CLIENT_ENABLE =
-      new HadoopConfigurationProperty<>("fs.gs.javaclient.enable", false);
+  /** Configuration key to configure client to use for GCS access. */
+  public static final HadoopConfigurationProperty<ClientType> GCS_CLIENT_TYPE =
+      new HadoopConfigurationProperty<>("fs.gs.client.type", ClientType.HTTP_API_CLIENT);
 
   // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
   // Please check that removing it is correct, and remove this comment along with it.
   // @VisibleForTesting
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
+        .setClientType(GCS_CLIENT_TYPE.get(config, config::getEnum))
         .setCloudStorageOptions(getGcsOptionsBuilder(config).build())
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))
         .setEnsureNoConflictingItems(
@@ -452,9 +449,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setMarkerFilePattern(GCS_MARKER_FILE_PATTERN.get(config, config::get))
         .setPerformanceCacheEnabled(GCS_PERFORMANCE_CACHE_ENABLE.get(config, config::getBoolean))
         .setPerformanceCacheOptions(getPerformanceCachingOptions(config))
-        .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean))
-        .setJavaClientEnabled(GCS_JAVA_CLIENT_ENABLE.get(config, config::getBoolean))
-        .setFilesystemApi(GCS_FILESYSTEM_API.get(config, config::getEnum));
+        .setStatusParallelEnabled(GCS_STATUS_PARALLEL_ENABLE.get(config, config::getBoolean));
   }
 
   @VisibleForTesting

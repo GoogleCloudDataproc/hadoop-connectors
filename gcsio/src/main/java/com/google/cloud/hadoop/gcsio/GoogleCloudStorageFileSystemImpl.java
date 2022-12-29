@@ -548,13 +548,11 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       }
 
       if (dstInfo.exists()) {
-        if (dst.equals(GCS_ROOT)) {
-          dst =
-              UriPaths.fromStringPathComponents(
-                  srcItemName, /* objectName= */ null, /* allowEmptyObjectName= */ true);
-        } else {
-          dst = UriPaths.toDirectory(dst.resolve(srcItemName));
-        }
+        dst =
+            dst.equals(GCS_ROOT)
+                ? UriPaths.fromStringPathComponents(
+                    srcItemName, /* objectName= */ null, /* allowEmptyObjectName= */ true)
+                : UriPaths.toDirectory(dst.resolve(srcItemName));
       }
     } else {
       // -- src is a file

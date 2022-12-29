@@ -35,8 +35,8 @@ import com.google.cloud.hadoop.gcsio.AssertingLogHandler;
 import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.EventLoggingHttpRequestInitializer;
-import com.google.cloud.hadoop.gcsio.GcsJavaClientImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientLibraryImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
@@ -76,10 +76,10 @@ public class GoogleCloudStorageImplTest {
 
   private static GoogleCloudStorage helperGcs;
 
-  private final boolean javaClientEnabled;
+  private final boolean testClientLibraryImpl;
 
-  public GoogleCloudStorageImplTest(boolean javaClientEnabled) {
-    this.javaClientEnabled = javaClientEnabled;
+  public GoogleCloudStorageImplTest(boolean testClientLibraryImpl) {
+    this.testClientLibraryImpl = testClientLibraryImpl;
   }
 
   @Parameters
@@ -561,8 +561,8 @@ public class GoogleCloudStorageImplTest {
     return new TrackingStorageWrapper<>(
         options,
         httpRequestInitializer ->
-            javaClientEnabled
-                ? GcsJavaClientImpl.builder()
+            testClientLibraryImpl
+                ? GoogleCloudStorageClientLibraryImpl.builder()
                     .setOptions(options)
                     .setCredentials(credentials)
                     .setHttpRequestInitializer(httpRequestInitializer)
@@ -578,8 +578,11 @@ public class GoogleCloudStorageImplTest {
   private GoogleCloudStorage getStorageFromOptions(GoogleCloudStorageOptions options)
       throws IOException {
     Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
-    return javaClientEnabled
-        ? GcsJavaClientImpl.builder().setOptions(options).setCredentials(credentials).build()
+    return testClientLibraryImpl
+        ? GoogleCloudStorageClientLibraryImpl.builder()
+            .setOptions(options)
+            .setCredentials(credentials)
+            .build()
         : GoogleCloudStorageImpl.builder().setOptions(options).setCredentials(credentials).build();
   }
 
