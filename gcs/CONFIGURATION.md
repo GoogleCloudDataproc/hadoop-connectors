@@ -106,7 +106,7 @@
 *   `fs.gs.batch.threads` (default: `15`)
 
     Maximum number of threads used to execute batch requests in parallel. Each
-    thread bacthes at most `fs.gs.max.requests.per.batch` Cloud Storage requests
+    thread batches at most `fs.gs.max.requests.per.batch` Cloud Storage requests
     in a single batch request. These threads are used to execute the Class A,
     Class B and Free Cloud Storage operations as copy, list, delete, etc. These
     operations are part of typical `hdfs` CLI commands such as `hdfs mv`, `hdfs
@@ -280,8 +280,9 @@ default service account impersonation.
 
 *   `fs.gs.outputstream.buffer.size` (default: `8388608`)
 
-    Write buffer size used by the file system API's to send the data to be
-    uploaded to GCS via pipes. The various pipe types are documented below
+    Write buffer size used by the file system API to send the data to be
+    uploaded to Cloud Storage upload thread via pipes. The various pipe types
+    are documented below.
 
 *   `fs.gs.outputstream.pipe.type` (default: `IO_STREAM_PIPE`)
 
@@ -308,26 +309,25 @@ default service account impersonation.
 
     Pipe buffer size used for uploading Cloud Storage objects. This pipe is an
     intermediate channel which is used to receive the data on one side and allow
-    for reading of the data to be uploaded to GCS on the other side.
+    for reading of the data by the Cloud Storage upload thread on the other
+    side.
 
 *   `fs.gs.outputstream.upload.chunk.size` (default: `67108864`)
 
-    The number of bytes in one Google Cloud Storage upload request via the HTTP
-    Media Uploader Service. This is used only for JSON API and for best
-    performance should be a multiple of 8MB.
+    The number of bytes in one Google Cloud Storage upload request via the
+    [`MediaHttUploader` class](https://cloud.google.com/java/docs/reference/google-api-client/latest/com.google.api.client.googleapis.media.MediaHttpUploader).
+    This is used only for JSON API and for best performance should be a multiple
+    of 8 MiB.
 
-    Having a large value example:- 64MB allows the upload performance must be
-    much better due to fewer number of HTTP calls but on the other side if there
-    are many partitions being written by the write call then each partition will
-    hold 64MB of data. Therefore for example:- if data for 250 partitions is
-    written at once then the total memory requirement will be 250*64MB = 16 GB
-    of memory resulting in OOM memory.
+    Having a large value like 64 MiB allows the upload to Cloud Storage to be
+    faster due to smaller number of HTTP requests needed for upload. But on the
+    other side if there are many files (partitions) being written at the same
+    time then each file will hold 64 MiB buffer in memory, i.e. if 250 files are
+    written at once then the total memory requirement will be 250 * 64 MiB = 16
+    GiB of memory, which mey result in OOM.
 
-    To arrive the optimal value this parameter needs to be tweaked based on the
-    upload performance and number of concurrent files being written.
-
-    More details can be found here
-    https://cloud.google.com/java/docs/reference/google-api-client/latest/com.google.api.client.googleapis.media.MediaHttpUploader
+    To arrive to the optimal value this parameter needs to be tweaked based on
+    the upload performance and number of concurrent files being written.
 
 *   `fs.gs.outputstream.upload.cache.size` (default: `0`)
 
