@@ -324,7 +324,7 @@ default service account impersonation.
     other side if there are many files (partitions) being written at the same
     time then each file will hold 64 MiB buffer in memory, i.e. if 250 files are
     written at once then the total memory requirement will be 250 * 64 MiB = 16
-    GiB of memory, which mey result in OOM.
+    GiB of memory, which may result in OOM.
 
     To arrive to the optimal value this parameter needs to be tweaked based on
     the upload performance and number of concurrent files being written.
