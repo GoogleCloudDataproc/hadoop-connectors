@@ -581,7 +581,7 @@
           </excludes>
           <reuseForks>false</reuseForks>
           <forkCount>3</forkCount>
-          <argLine>-Xmx3g @{argLine}</argLine>
+          <argLine>-Xmx3g --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED @{argLine}</argLine>
           <reportNameSuffix>sponge_log</reportNameSuffix>
         </configuration>
       </plugin>
