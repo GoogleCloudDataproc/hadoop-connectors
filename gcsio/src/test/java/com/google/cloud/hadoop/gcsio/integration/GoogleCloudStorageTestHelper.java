@@ -65,7 +65,10 @@ public class GoogleCloudStorageTestHelper {
 
   public static GoogleCloudStorage createGoogleCloudStorage() {
     try {
-      return new GoogleCloudStorageImpl(getStandardOptionBuilder().build(), getCredentials());
+      return GoogleCloudStorageImpl.builder()
+          .setOptions(getStandardOptionBuilder().build())
+          .setCredentials(getCredentials())
+          .build();
     } catch (IOException e) {
       throw new RuntimeException("Failed to create GoogleCloudStorage instance", e);
     }
@@ -265,13 +268,13 @@ public class GoogleCloudStorageTestHelper {
 
     private static String makeUniqueBucketNamePrefix(String prefix) {
       String username = System.getProperty("user.name", "unknown").replaceAll("[-.]", "");
-      // Total 13 characters of unique string will be created.
-      // Maximum only first 8 characters of username is considered. Remaining characters will be
-      // taken from UUID.
-      // Leaving room of 48 characters for bucketPrefix and suffix (excluding delimiters)
+      // Total 13 characters of unique string will be created. Maximum only first 8 characters of
+      // username is considered. Remaining characters will be taken from UUID. Leaving room of 48
+      // characters for bucketPrefix and suffix (excluding delimiters)
       int usernamePrefixLen = min(username.length(), 8);
       username = username.substring(0, usernamePrefixLen);
-      String uuidSuffix = UUID.randomUUID().toString().substring(0, 12 - usernamePrefixLen);
+      String uuidSuffix =
+          UUID.randomUUID().toString().replaceAll("-", "").substring(0, 12 - usernamePrefixLen);
       return prefix + DELIMITER + username + DELIMITER + uuidSuffix;
     }
 

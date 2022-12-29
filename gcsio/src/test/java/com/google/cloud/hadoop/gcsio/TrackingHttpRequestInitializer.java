@@ -29,7 +29,6 @@ import com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -165,7 +164,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     AtomicLong resumableUploadId = new AtomicLong();
     return requests.stream()
         .map(GoogleCloudStorageIntegrationHelper::requestToString)
-        // Replace randomized pageToken with predictable value so it could be asserted in tests
+        // Replace randomized pageToken with predictable value, so it could be asserted in tests
         .map(r -> replacePageTokenWithId(r, pageTokenId))
         .map(r -> replaceRewriteTokenWithId(r, rewriteTokenId))
         .map(r -> replaceGenerationMatchWithId(r, generationMatchId))
@@ -546,10 +545,6 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   }
 
   private static String urlEncode(String string) {
-    try {
-      return URLEncoder.encode(string, UTF_8.name());
-    } catch (UnsupportedEncodingException e) {
-      throw new RuntimeException("Failed to url encode string: " + string, e);
-    }
+    return URLEncoder.encode(string, UTF_8);
   }
 }

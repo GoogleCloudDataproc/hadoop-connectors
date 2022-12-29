@@ -44,6 +44,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
@@ -61,6 +62,7 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
   private static String testBucketName;
 
   @Rule public TestName name = new TestName();
+  private TrackingHttpRequestInitializer gcsRequestsTracker;
 
   @BeforeClass
   public static void beforeClass() throws Throwable {
@@ -84,17 +86,20 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
   }
 
   @AfterClass
-  public static void afterClass() throws Throwable {
+  public static void afterClass() {
     ghfsIHelper.afterAllTests();
+  }
+
+  @Before
+  public void before() throws Exception {
+    gcsRequestsTracker = new TrackingHttpRequestInitializer(httpRequestsInitializer);
   }
 
   @Test
   public void openFile() throws Exception {
     String expectedContent = "test-file-content: " + name.getMethodName();
 
-    TrackingHttpRequestInitializer gcsRequestsTracker =
-        new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleHadoopFileSystem ghfs = createGhfs(gcsRequestsTracker);
+    GoogleHadoopFileSystem ghfs = createGhfs();
 
     StorageResourceId fileId = new StorageResourceId(testBucketName, name.getMethodName());
     Path filePath = new Path(fileId.toString());
@@ -136,9 +141,7 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
   public void openFile_withFileStatus() throws Exception {
     String expectedContent = "test-file-content: " + name.getMethodName();
 
-    TrackingHttpRequestInitializer gcsRequestsTracker =
-        new TrackingHttpRequestInitializer(httpRequestsInitializer);
-    GoogleHadoopFileSystem ghfs = createGhfs(gcsRequestsTracker);
+    GoogleHadoopFileSystem ghfs = createGhfs();
 
     StorageResourceId fileId = new StorageResourceId(testBucketName, name.getMethodName());
     Path filePath = new Path(fileId.toString());
@@ -168,12 +171,15 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
                 testBucketName, name.getMethodName(), itemInfo.getContentGeneration()));
   }
 
-  private GoogleHadoopFileSystem createGhfs(TrackingHttpRequestInitializer gcsRequestsTracker)
-      throws IOException {
+  private GoogleHadoopFileSystem createGhfs() throws IOException {
     GoogleHadoopFileSystem ghfs =
         new GoogleHadoopFileSystem(
             new GoogleCloudStorageFileSystemImpl(
-                new GoogleCloudStorageImpl(gcsOptions, gcsRequestsTracker),
+                GoogleCloudStorageImpl.builder()
+                    .setOptions(gcsOptions)
+                    .setCredentials(httpRequestsInitializer.getCredentials())
+                    .setHttpRequestInitializer(gcsRequestsTracker)
+                    .build(),
                 GoogleCloudStorageFileSystemOptions.builder()
                     .setCloudStorageOptions(gcsOptions)
                     .build()));

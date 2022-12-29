@@ -125,9 +125,10 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   public GoogleCloudStorageFileSystemImpl(
       Credentials credentials, GoogleCloudStorageFileSystemOptions options) throws IOException {
     this(
-        new GoogleCloudStorageImpl(
-            checkNotNull(options, "options must not be null").getCloudStorageOptions(),
-            credentials),
+        GoogleCloudStorageImpl.builder()
+            .setOptions(checkNotNull(options, "options must not be null").getCloudStorageOptions())
+            .setCredentials(credentials)
+            .build(),
         options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }
@@ -146,10 +147,11 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       GoogleCloudStorageFileSystemOptions options)
       throws IOException {
     this(
-        new GoogleCloudStorageImpl(
-            checkNotNull(options, "options must not be null").getCloudStorageOptions(),
-            credentials,
-            downscopedAccessTokenFn),
+        GoogleCloudStorageImpl.builder()
+            .setOptions(checkNotNull(options, "options must not be null").getCloudStorageOptions())
+            .setCredentials(credentials)
+            .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
+            .build(),
         options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }
@@ -339,7 +341,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     // Delete children before their parents.
     //
     // Note: we modify the input list, which is ok for current usage.
-    // We should make a copy in case that changes in future.
+    // We should make a copy in case that changes in the future.
     itemsToDelete.sort(FILE_INFO_PATH_COMPARATOR.reversed());
 
     if (!itemsToDelete.isEmpty()) {
@@ -416,7 +418,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     try {
       gcs.createEmptyObject(resourceId);
     } catch (FileAlreadyExistsException e) {
-      // This means that directory object already exist and we do not need to do anything.
+      // This means that directory object already exist, and we do not need to do anything.
       logger.atFiner().withCause(e).log(
           "mkdirs: %s already exists, ignoring creation failure", resourceId);
     }
@@ -586,7 +588,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   /**
    * Renames given directory without checking any parameters.
    *
-   * <p>GCS does not support atomic renames therefore a rename is implemented as copying source
+   * <p>GCS does not support atomic renames therefore rename is implemented as copying source
    * metadata to destination and then deleting source metadata. Note that only the metadata is
    * copied and not the content of any file.
    */
@@ -980,7 +982,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
    * </ul>
    *
    * @param objectName Name of an object.
-   * @return List of sub-directory like paths.
+   * @return List of subdirectory like paths.
    */
   static List<String> getDirs(String objectName) {
     if (isNullOrEmpty(objectName)) {

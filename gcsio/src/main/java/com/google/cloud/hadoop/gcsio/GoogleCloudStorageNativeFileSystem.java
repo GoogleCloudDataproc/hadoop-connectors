@@ -56,9 +56,10 @@ public class GoogleCloudStorageNativeFileSystem implements GoogleCloudStorageFil
   public GoogleCloudStorageNativeFileSystem(
       Credentials credentials, GoogleCloudStorageFileSystemOptions options) throws IOException {
     this(
-        new GoogleCloudStorageImpl(
-            checkNotNull(options, "options must not be null").getCloudStorageOptions(),
-            credentials),
+        GoogleCloudStorageImpl.builder()
+            .setOptions(checkNotNull(options, "options must not be null").getCloudStorageOptions())
+            .setCredentials(credentials)
+            .build(),
         options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }
@@ -77,10 +78,11 @@ public class GoogleCloudStorageNativeFileSystem implements GoogleCloudStorageFil
       GoogleCloudStorageFileSystemOptions options)
       throws IOException {
     this(
-        new GoogleCloudStorageImpl(
-            checkNotNull(options, "options must not be null").getCloudStorageOptions(),
-            credentials,
-            downscopedAccessTokenFn),
+        GoogleCloudStorageImpl.builder()
+            .setOptions(checkNotNull(options, "options must not be null").getCloudStorageOptions())
+            .setCredentials(credentials)
+            .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
+            .build(),
         options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }

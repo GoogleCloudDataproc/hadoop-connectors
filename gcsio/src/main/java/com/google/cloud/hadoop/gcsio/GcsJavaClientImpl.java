@@ -3,7 +3,9 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.api.client.http.HttpRequestInitializer;
+import com.google.api.client.http.HttpTransport;
 import com.google.auth.Credentials;
+import com.google.auto.value.AutoBuilder;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
@@ -13,6 +15,7 @@ import java.nio.channels.WritableByteChannel;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 
 /**
  * Provides read/write access to Google Cloud Storage (GCS), using Java nio channel semantics. This
@@ -26,87 +29,87 @@ public class GcsJavaClientImpl implements GoogleCloudStorage {
    * Having an instance of gscImpl to redirect calls to Json client while new client implementation
    * is in WIP.
    */
-  private GoogleCloudStorageImpl gcsClientDelegate;
+  private final GoogleCloudStorageImpl gcsImplDelegate;
 
-  private GoogleCloudStorageOptions storageOptions;
-  private Credentials credentials;
-
-  private GcsJavaClientImpl(GcsJavaClientImplBuilder builder) throws IOException {
-    this.storageOptions = checkNotNull(builder.storageOptions, "options must not be null");
-    this.credentials = checkNotNull(builder.credentials, "credentials must not be null");
-
-    if (builder.httpRequestInitializer != null) {
-      logger.atWarning().log(
-          "Overriding httpRequestInitializer. ALERT: Should not be hit in production");
-      this.gcsClientDelegate =
-          new GoogleCloudStorageImpl(this.storageOptions, builder.httpRequestInitializer);
-    } else if (builder.storage != null) {
-      logger.atWarning().log("Overriding storage. ALERT: Should not be hit in production");
-      this.gcsClientDelegate = new GoogleCloudStorageImpl(this.storageOptions, builder.storage);
-    } else {
-      this.gcsClientDelegate = new GoogleCloudStorageImpl(this.storageOptions, this.credentials);
-    }
+  GcsJavaClientImpl(
+      GoogleCloudStorageOptions options,
+      @Nullable Credentials credentials,
+      @Nullable HttpTransport httpTransport,
+      @Nullable HttpRequestInitializer httpRequestInitializer,
+      @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
+      throws IOException {
+    checkNotNull(options, "options must not be null").throwIfNotValid();
+    logger.atWarning().log(
+        "ALERT: Overriding httpRequestInitializer - this should not be done in production!");
+    this.gcsImplDelegate =
+        GoogleCloudStorageImpl.builder()
+            .setOptions(options)
+            .setCredentials(credentials)
+            .setHttpTransport(httpTransport)
+            .setHttpRequestInitializer(httpRequestInitializer)
+            .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
+            .build();
   }
 
   @Override
   public GoogleCloudStorageOptions getOptions() {
-    return gcsClientDelegate.getOptions();
+    return gcsImplDelegate.getOptions();
   }
 
   @Override
   public WritableByteChannel create(StorageResourceId resourceId, CreateObjectOptions options)
       throws IOException {
-    return gcsClientDelegate.create(resourceId, options);
+    return gcsImplDelegate.create(resourceId, options);
   }
 
   @Override
   public void createBucket(String bucketName, CreateBucketOptions options) throws IOException {
-    gcsClientDelegate.createBucket(bucketName, options);
+    gcsImplDelegate.createBucket(bucketName, options);
   }
 
   @Override
   public void createEmptyObject(StorageResourceId resourceId) throws IOException {
-    gcsClientDelegate.createEmptyObject(resourceId);
+    gcsImplDelegate.createEmptyObject(resourceId);
   }
 
   @Override
   public void createEmptyObject(StorageResourceId resourceId, CreateObjectOptions options)
       throws IOException {
-    gcsClientDelegate.createEmptyObject(resourceId, options);
+    gcsImplDelegate.createEmptyObject(resourceId, options);
   }
 
   @Override
   public void createEmptyObjects(List<StorageResourceId> resourceIds) throws IOException {
-    gcsClientDelegate.createEmptyObjects(resourceIds);
+    gcsImplDelegate.createEmptyObjects(resourceIds);
   }
 
   @Override
   public void createEmptyObjects(List<StorageResourceId> resourceIds, CreateObjectOptions options)
       throws IOException {
-    gcsClientDelegate.createEmptyObjects(resourceIds, options);
+    gcsImplDelegate.createEmptyObjects(resourceIds, options);
   }
 
   @Override
   public SeekableByteChannel open(
       StorageResourceId resourceId, GoogleCloudStorageReadOptions readOptions) throws IOException {
-    return gcsClientDelegate.open(resourceId, readOptions);
+    return gcsImplDelegate.open(resourceId, readOptions);
   }
 
   @Override
   public SeekableByteChannel open(
       GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
       throws IOException {
-    return gcsClientDelegate.open(itemInfo, readOptions);
+    return gcsImplDelegate.open(itemInfo, readOptions);
   }
 
   @Override
   public void deleteBuckets(List<String> bucketNames) throws IOException {
-    gcsClientDelegate.deleteBuckets(bucketNames);
+    gcsImplDelegate.deleteBuckets(bucketNames);
   }
 
   @Override
   public void deleteObjects(List<StorageResourceId> fullObjectNames) throws IOException {
-    gcsClientDelegate.deleteObjects(fullObjectNames);
+    gcsImplDelegate.deleteObjects(fullObjectNames);
   }
 
   @Override
@@ -116,109 +119,94 @@ public class GcsJavaClientImpl implements GoogleCloudStorage {
       String dstBucketName,
       List<String> dstObjectNames)
       throws IOException {
-    gcsClientDelegate.copy(srcBucketName, srcObjectNames, dstBucketName, dstObjectNames);
+    gcsImplDelegate.copy(srcBucketName, srcObjectNames, dstBucketName, dstObjectNames);
   }
 
   @Override
   public List<String> listBucketNames() throws IOException {
-    return gcsClientDelegate.listBucketNames();
+    return gcsImplDelegate.listBucketNames();
   }
 
   @Override
   public List<GoogleCloudStorageItemInfo> listBucketInfo() throws IOException {
-    return gcsClientDelegate.listBucketInfo();
+    return gcsImplDelegate.listBucketInfo();
   }
 
   @Override
   public List<GoogleCloudStorageItemInfo> listObjectInfo(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions)
       throws IOException {
-    return gcsClientDelegate.listObjectInfo(bucketName, objectNamePrefix, listOptions);
+    return gcsImplDelegate.listObjectInfo(bucketName, objectNamePrefix, listOptions);
   }
 
   @Override
   public ListPage<GoogleCloudStorageItemInfo> listObjectInfoPage(
       String bucketName, String objectNamePrefix, ListObjectOptions listOptions, String pageToken)
       throws IOException {
-    return gcsClientDelegate.listObjectInfoPage(
-        bucketName, objectNamePrefix, listOptions, pageToken);
+    return gcsImplDelegate.listObjectInfoPage(bucketName, objectNamePrefix, listOptions, pageToken);
   }
 
   @Override
   public GoogleCloudStorageItemInfo getItemInfo(StorageResourceId resourceId) throws IOException {
-    return gcsClientDelegate.getItemInfo(resourceId);
+    return gcsImplDelegate.getItemInfo(resourceId);
   }
 
   @Override
   public List<GoogleCloudStorageItemInfo> getItemInfos(List<StorageResourceId> resourceIds)
       throws IOException {
-    return gcsClientDelegate.getItemInfos(resourceIds);
+    return gcsImplDelegate.getItemInfos(resourceIds);
   }
 
   @Override
   public List<GoogleCloudStorageItemInfo> updateItems(List<UpdatableItemInfo> itemInfoList)
       throws IOException {
-    return gcsClientDelegate.updateItems(itemInfoList);
+    return gcsImplDelegate.updateItems(itemInfoList);
   }
 
   @Override
   public void compose(
       String bucketName, List<String> sources, String destination, String contentType)
       throws IOException {
-    gcsClientDelegate.compose(bucketName, sources, destination, contentType);
+    gcsImplDelegate.compose(bucketName, sources, destination, contentType);
   }
 
   @Override
   public GoogleCloudStorageItemInfo composeObjects(
       List<StorageResourceId> sources, StorageResourceId destination, CreateObjectOptions options)
       throws IOException {
-    return gcsClientDelegate.composeObjects(sources, destination, options);
+    return gcsImplDelegate.composeObjects(sources, destination, options);
   }
 
   @Override
   public Map<String, Long> getStatistics() {
-    return gcsClientDelegate.getStatistics();
+    return gcsImplDelegate.getStatistics();
   }
 
   @Override
   public void close() {
-    gcsClientDelegate.close();
+    gcsImplDelegate.close();
   }
 
-  public static class GcsJavaClientImplBuilder {
-    private Credentials credentials;
-    private com.google.api.services.storage.Storage storage;
-    private HttpRequestInitializer httpRequestInitializer;
-    private GoogleCloudStorageOptions storageOptions;
-    private Function<List<AccessBoundary>, String> downscopedAccessTokenFn;
+  public static Builder builder() {
+    return new AutoBuilder_GcsJavaClientImpl_Builder();
+  }
 
-    public GcsJavaClientImplBuilder(
-        GoogleCloudStorageOptions storageOptions,
-        Credentials credentials,
-        Function<List<AccessBoundary>, String> downscopedAccessTokenFn) {
-      this.storageOptions = storageOptions;
-      this.credentials = credentials;
-      this.downscopedAccessTokenFn = downscopedAccessTokenFn;
-    }
+  @AutoBuilder(ofClass = GcsJavaClientImpl.class)
+  public abstract static class Builder {
+
+    public abstract Builder setOptions(GoogleCloudStorageOptions options);
+
+    public abstract Builder setHttpTransport(@Nullable HttpTransport httpTransport);
+
+    public abstract Builder setCredentials(@Nullable Credentials credentials);
 
     @VisibleForTesting
-    public GcsJavaClientImplBuilder withApairyClientStorage(
-        com.google.api.services.storage.Storage storage) {
-      checkNotNull(storage, "storage must not be null");
-      this.storage = storage;
-      return this;
-    }
+    public abstract Builder setHttpRequestInitializer(
+        @Nullable HttpRequestInitializer httpRequestInitializer);
 
-    @VisibleForTesting
-    public GcsJavaClientImplBuilder withHttpRequestInitializer(
-        HttpRequestInitializer httpRequestInitializer) {
-      checkNotNull(httpRequestInitializer, "storage must not be null");
-      this.httpRequestInitializer = httpRequestInitializer;
-      return this;
-    }
+    public abstract Builder setDownscopedAccessTokenFn(
+        @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn);
 
-    public GcsJavaClientImpl build() throws IOException {
-      return new GcsJavaClientImpl(this);
-    }
+    public abstract GcsJavaClientImpl build() throws IOException;
   }
 }

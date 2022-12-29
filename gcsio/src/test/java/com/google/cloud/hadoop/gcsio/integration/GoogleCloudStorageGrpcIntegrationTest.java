@@ -92,32 +92,38 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   }
 
   private GoogleCloudStorage createGoogleCloudStorage() throws IOException {
-    return new GoogleCloudStorageImpl(
-        configureOptionsWithTD().build(), GoogleCloudStorageTestHelper.getCredentials());
+    return GoogleCloudStorageImpl.builder()
+        .setOptions(configureOptionsWithTD().build())
+        .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
+        .build();
   }
 
   private GoogleCloudStorage createGoogleCloudStorage(
       AsyncWriteChannelOptions asyncWriteChannelOptions) throws IOException {
-    return new GoogleCloudStorageImpl(
-        configureOptionsWithTD().setWriteChannelOptions(asyncWriteChannelOptions).build(),
-        GoogleCloudStorageTestHelper.getCredentials());
+    return GoogleCloudStorageImpl.builder()
+        .setOptions(
+            configureOptionsWithTD().setWriteChannelOptions(asyncWriteChannelOptions).build())
+        .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
+        .build();
   }
 
   @BeforeClass
   public static void createBuckets() throws IOException {
     GoogleCloudStorage rawStorage =
-        new GoogleCloudStorageImpl(
-            GoogleCloudStorageTestUtils.configureDefaultOptions().build(),
-            GoogleCloudStorageTestHelper.getCredentials());
+        GoogleCloudStorageImpl.builder()
+            .setOptions(GoogleCloudStorageTestUtils.configureDefaultOptions().build())
+            .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
+            .build();
     rawStorage.createBucket(BUCKET_NAME);
   }
 
   @AfterClass
   public static void cleanupBuckets() throws IOException {
     GoogleCloudStorage rawStorage =
-        new GoogleCloudStorageImpl(
-            GoogleCloudStorageTestUtils.configureDefaultOptions().build(),
-            GoogleCloudStorageTestHelper.getCredentials());
+        GoogleCloudStorageImpl.builder()
+            .setOptions(GoogleCloudStorageTestUtils.configureDefaultOptions().build())
+            .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
+            .build();
     BUCKET_HELPER.cleanup(rawStorage);
   }
 
@@ -186,11 +192,13 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   @Test
   public void testOpenWithMetricsEnabled() throws IOException {
     GoogleCloudStorage rawStorage =
-        new GoogleCloudStorageImpl(
-            GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-                .setMetricsSink(MetricsSink.CLOUD_MONITORING)
-                .build(),
-            GoogleCloudStorageTestHelper.getCredentials());
+        GoogleCloudStorageImpl.builder()
+            .setOptions(
+                GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+                    .setMetricsSink(MetricsSink.CLOUD_MONITORING)
+                    .build())
+            .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
+            .build();
     StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME, "testOpen_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
     assertObjectContent(rawStorage, objectToCreate, objectBytes);
@@ -209,11 +217,13 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
     try {
       GoogleCloudStorage rawStorage =
-          new GoogleCloudStorageImpl(
-              GoogleCloudStorageTestUtils.configureDefaultOptions()
-                  .setTraceLogEnabled(true)
-                  .build(),
-              GoogleCloudStorageTestHelper.getCredentials());
+          GoogleCloudStorageImpl.builder()
+              .setOptions(
+                  GoogleCloudStorageTestUtils.configureDefaultOptions()
+                      .setTraceLogEnabled(true)
+                      .build())
+              .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
+              .build();
 
       StorageResourceId objectToCreate1 = new StorageResourceId(BUCKET_NAME, "testOpen_Object1");
       StorageResourceId objectToCreate2 = new StorageResourceId(BUCKET_NAME, "testOpen_Object2");
