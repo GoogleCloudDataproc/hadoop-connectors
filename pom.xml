@@ -26,7 +26,7 @@
 
   <groupId>com.google.cloud.bigdataoss</groupId>
   <artifactId>bigdataoss-parent</artifactId>
-  <version>2.2.8-SNAPSHOT</version>
+  <version>2.2.11-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <url>https://github.com/GoogleCloudDataproc/hadoop-connectors</url>
@@ -80,28 +80,28 @@
 
     <gpg.skip>true</gpg.skip>
 
-    <bigdataoss.version>2.2.8-SNAPSHOT</bigdataoss.version>
+    <bigdataoss.version>2.2.11-SNAPSHOT</bigdataoss.version>
     <bigquery-connector.version>1.2.1-SNAPSHOT</bigquery-connector.version>
     <apache.httpclient.version>4.5.13</apache.httpclient.version>
     <google.api.grpc.proto-google-iam-v1.version>1.1.7</google.api.grpc.proto-google-iam-v1.version>
-    <google.api-client.version>1.32.2</google.api-client.version>
-    <google.api-client-libraries.version>1.32.1</google.api-client-libraries.version>
-    <google.api-bigquery.version>v2-rev20210617-${google.api-client-libraries.version}</google.api-bigquery.version>
-    <google.api-iamcredentials.version>v1-rev20210326-${google.api-client-libraries.version}</google.api-iamcredentials.version>
-    <google.api-storage.version>v1-rev20211018-${google.api-client-libraries.version}</google.api-storage.version>
-    <google.auth.version>1.7.0</google.auth.version>
+    <google.api-client.version>2.0.1</google.api-client.version>
+    <google.api-client-libraries.version>2.0.0</google.api-client-libraries.version>
+    <google.api-bigquery.version>v2-rev20221028-${google.api-client-libraries.version}</google.api-bigquery.version>
+    <google.api-iamcredentials.version>v1-rev20211203-${google.api-client-libraries.version}</google.api-iamcredentials.version>
+    <google.api-storage.version>v1-rev20220705-${google.api-client-libraries.version}</google.api-storage.version>
+    <google.auth.version>1.12.1</google.auth.version>
     <google.auto-value.version>1.8.2</google.auto-value.version>
-    <google.cloud-bigquerystorage.version>1.22.5</google.cloud-bigquerystorage.version>
+    <google.cloud-bigquerystorage.version>2.25.0</google.cloud-bigquerystorage.version>
     <google.cloud-core.version>2.5.4</google.cloud-core.version>
     <google.cloud-storage.grpc.version>2.2.2-alpha</google.cloud-storage.grpc.version>
     <google.flogger.version>0.7.1</google.flogger.version>
-    <google.gax.version>2.7.1</google.gax.version>
+    <google.gax.version>2.19.5</google.gax.version>
     <google.gson.version>2.8.9</google.gson.version>
-    <google.guava.version>31.0.1-jre</google.guava.version>
-    <google.http-client.version>1.40.1</google.http-client.version>
-    <google.oauth-client.version>1.33.3</google.oauth-client.version>
-    <google.protobuf.version>3.19.2</google.protobuf.version>
-    <grpc.version>1.43.2</grpc.version>
+    <google.guava.version>31.1-jre</google.guava.version>
+    <google.http-client.version>1.42.3</google.http-client.version>
+    <google.oauth-client.version>1.34.1</google.oauth-client.version>
+    <google.protobuf.version>3.21.9</google.protobuf.version>
+    <grpc.version>1.50.2</grpc.version>
     <hadoop.two.version>2.10.1</hadoop.two.version>
     <hadoop.three.version>3.2.2</hadoop.three.version>
     <opencensus.version>0.31.0</opencensus.version>
@@ -111,6 +111,8 @@
     <junit.version>4.13.2</junit.version>
     <mockito.version>3.11.2</mockito.version>
     <system-lambda.version>1.2.0</system-lambda.version>
+    <deploy.skip>true</deploy.skip>
+    <nexus.remote.skip>false</nexus.remote.skip>
   </properties>
 
   <modules>
@@ -247,6 +249,18 @@
       <build>
         <plugins>
           <plugin>
+            <groupId>org.sonatype.plugins</groupId>
+            <artifactId>nexus-staging-maven-plugin</artifactId>
+            <version>1.6.7</version>
+            <extensions>true</extensions>
+            <configuration>
+              <serverId>ossrh</serverId>
+              <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+              <autoReleaseAfterClose>false</autoReleaseAfterClose>
+              <skipRemoteStaging>${nexus.remote.skip}</skipRemoteStaging>
+            </configuration>
+          </plugin>
+          <plugin>
             <artifactId>maven-gpg-plugin</artifactId>
             <executions>
               <execution>
@@ -257,6 +271,10 @@
                 </goals>
               </execution>
             </executions>
+            <configuration>
+              <!-- Expect the password to be passed as the gpg.passphrase property instead of provided over a tty by the gpg-agent process. -->
+              <useAgent>false</useAgent>
+            </configuration>
           </plugin>
           <plugin>
             <artifactId>maven-source-plugin</artifactId>
@@ -611,6 +629,13 @@
               </goals>
             </execution>
           </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-deploy-plugin</artifactId>
+          <configuration>
+            <skip>${deploy.skip}</skip>
+          </configuration>
         </plugin>
       </plugins>
     </pluginManagement>

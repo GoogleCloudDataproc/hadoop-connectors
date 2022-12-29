@@ -216,7 +216,7 @@ public class GoogleHadoopFileSystemConfiguration {
 
   /** Configuration key for number of items to return per call to the list* GCS RPCs. */
   public static final HadoopConfigurationProperty<Long> GCS_MAX_LIST_ITEMS_PER_CALL =
-      new HadoopConfigurationProperty<>("fs.gs.list.max.items.per.call", 1024L);
+      new HadoopConfigurationProperty<>("fs.gs.list.max.items.per.call", 5000L);
 
   /**
    * Configuration key for the max number of retries for failed HTTP request to GCS. Note that the
@@ -559,6 +559,7 @@ public class GoogleHadoopFileSystemConfiguration {
         .setGrpcReadMetadataTimeoutMillis(
             GCS_GRPC_READ_METADATA_TIMEOUT_MS.get(config, config::getLong))
         .setGrpcReadZeroCopyEnabled(GCS_GRPC_READ_ZEROCOPY_ENABLE.get(config, config::getBoolean))
+        .setTraceLogEnabled(GCS_TRACE_LOG_ENABLE.get(config, config::getBoolean))
         .build();
   }
 

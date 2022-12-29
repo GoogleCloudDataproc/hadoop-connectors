@@ -18,6 +18,12 @@ The Google Cloud Storage connector for Hadoop enables running MapReduce jobs
 directly on data in Google Cloud Storage by implementing the Hadoop FileSystem
 interface. For details, see [the README](gcs/README.md).
 
+## Unreleased Changes
+
+This Readme may include documentation for changes that haven't been released yet.  The latest release's documentation and source code are found here.
+
+https://github.com/GoogleCloudDataproc/hadoop-connectors/tree/branch-2.2.x
+
 ## Google BigQuery connector for Apache Hadoop MapReduce
 
 [![Maven Central](https://img.shields.io/maven-central/v/com.google.cloud.bigdataoss/bigquery-connector/hadoop1.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:com.google.cloud.bigdataoss%20AND%20a:bigquery-connector%20AND%20v:hadoop1-*)
@@ -72,7 +78,7 @@ To add a dependency on one of the connectors using Maven, use the following:
     <dependency>
       <groupId>com.google.cloud.bigdataoss</groupId>
       <artifactId>gcs-connector</artifactId>
-      <version>hadoop2-2.2.10</version>
+      <version>${next-gcs-connector-release-tag}</version>
     </dependency>
     ```
 
@@ -82,7 +88,7 @@ To add a dependency on one of the connectors using Maven, use the following:
     <dependency>
       <groupId>com.google.cloud.bigdataoss</groupId>
       <artifactId>bigquery-connector</artifactId>
-      <version>hadoop2-1.2.0</version>
+      <version>${next-bigquery-connector-release-tag}</version>
     </dependency>
     ```
 

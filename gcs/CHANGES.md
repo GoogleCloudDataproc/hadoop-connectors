@@ -1,9 +1,42 @@
-### 2.2.8 - 2022-XX-XX
+# Release Notes
+
+## Next
+
+## 2.2.10 - 2022-12-11
+
+1. Update dependencies to latest version
+
+## 2.2.9 - 2022-11-09
+
+1.  The Google Cloud Storage Connector now can be used as a
+    [Hadoop Credential Provider](https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/CredentialProviderAPI.html).
+
+### 2.2.8 - 2022-09-12
 
 1.  Set socket read timeout (`fs.gs.http.read-timeout`) as early as possible on
     new sockets returned from the custom `SSLSocketFactory`. This guarantees the
     timeout is enforced during TLS handshakes when using Conscrypt as the
     security provider.
+
+1. Add trace logging for JSON and gRPC requests, toggled with option:
+
+    ```
+    fs.gs.tracelog.enable (default : false)
+    ```
+
+1. Fixing seek back to same position with grpc channel.
+
+1. Grpc read optimization to not prematurely close existing requests.
+
+1. Retry request on 408/timeout response from server.
+
+1. Upgrade Google auth dependency to 1.7.0.
+
+1. Increasing gRPC read timeout from 30 seconds to 3600 seconds.
+
+1. Set default value for `fs.gs.list.max.items.per.call` property to `5000`.
+
+1. Adding support for invocationId in Json path.
 
 ### 2.2.7 - 2022-06-01
 
@@ -1202,7 +1235,7 @@
 1.  The new inferImplicitDirectories option to `GoogleCloudStorage` tells it to
     infer the existence of a directory (such as `foo`) when that directory node
     does not exist in GCS but there are GCS files that start with that path
-    (such as as `foo/bar`). This allows the GCS connector to be used on
+    (such as `foo/bar`). This allows the GCS connector to be used on
     read-only filesystems where those intermediate directory nodes can not be
     created by the connector. The value of this option can be controlled by the
     Hadoop boolean config option `fs.gs.implicit.dir.infer.enable`. The default

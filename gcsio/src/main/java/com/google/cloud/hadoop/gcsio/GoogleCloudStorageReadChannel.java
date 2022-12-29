@@ -1028,6 +1028,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
     try {
       InputStream contentStream = response.getContent();
+      contentStream.available();
       logger.atFiner().log(
           "Opened stream from %d position with %s range and %d bytesToRead for '%s'",
           currentPosition, rangeHeader, bytesToRead, resourceId);
