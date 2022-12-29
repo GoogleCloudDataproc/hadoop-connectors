@@ -139,8 +139,6 @@ public class StorageRequestToAccessBoundaryConverterTest {
    * {@link Storage.Objects.Get} is disabled since it gives out permission too wide for getting
    * metadata. Use {@link StorageRequestFactory.ObjectsGetData} or {@link
    * StorageRequestFactory.ObjectsGetMetadata} instead.
-   *
-   * @throws IOException
    */
   @Test
   public void testDisallowGetRequest() throws IOException {

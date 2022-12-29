@@ -121,7 +121,7 @@ class GoogleHadoopOutputStream extends OutputStream
   // Statistics tracker for output stream related statistics
   private final GhfsOutputStreamStatistics streamStatistics;
   // Instrumentation to track Statistics
-  private GhfsInstrumentation instrumentation;
+  private final GhfsInstrumentation instrumentation;
 
   /**
    * Constructs an instance of GoogleHadoopOutputStream object.
