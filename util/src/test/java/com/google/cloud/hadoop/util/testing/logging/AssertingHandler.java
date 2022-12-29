@@ -15,6 +15,7 @@
 package com.google.cloud.hadoop.util.testing.logging;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.truth.Truth.assertWithMessage;
 
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -35,7 +36,6 @@ import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.junit.Assert;
 
 /**
  * A log handler that records messages and lets callers perform assertions against them.
@@ -117,8 +117,8 @@ public class AssertingHandler extends Handler {
 
   /**
    * Creates a new AssertingHandler with configurations set. Can be added to a logger so that it
-   * monitors all child loggers of the logger. It's reasonable to add it to com.google logger for
-   * monitoring the logging behavior of all google code.
+   * monitors all child loggers of the logger. It's reasonable to add it to {@code com.google}
+   * logger for monitoring the logging behavior of all Google code.
    *
    * @param configs the configuration for AssertingHandler
    */
@@ -409,7 +409,7 @@ public class AssertingHandler extends Handler {
   @SuppressWarnings("AssertionFailureIgnored")
   private void assertEquals(String message, String expected, String actual) {
     try {
-      Assert.assertEquals(message, expected, actual);
+      assertWithMessage(message).that(actual).isEqualTo(expected);
     } catch (AssertionError t) {
       throw (AssertionError) t.initCause(constructionTrace);
     }
@@ -419,7 +419,7 @@ public class AssertingHandler extends Handler {
   @FormatMethod
   private void fail(String message, Object... args) {
     try {
-      Assert.fail(String.format(message, args));
+      org.junit.Assert.fail(String.format(message, args));
     } catch (AssertionError t) {
       throw (AssertionError) t.initCause(constructionTrace);
     }
