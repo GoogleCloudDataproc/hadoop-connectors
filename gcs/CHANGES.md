@@ -1,4 +1,4 @@
-### 3.0.0 - 2022-XX-XX
+### 3.0.0 - 2023-XX-XX
 
 1.  Remove Hadoop 2.x support.
 
@@ -11,14 +11,14 @@
 
 1.  Remove an obsolete `AuthorizationHandler` and related properties:
 
-    ```properties
+    ```
     fs.gs.authorization.handler.impl
     fs.gs.authorization.handler.properties.<AUTHORIZATION_HANDLER_PROPERTY>
     ```
 
 1.  Remove support for Apache HTTP transport and related property:
 
-    ```properties
+    ```
     fs.gs.http.transport.type
     ```
 
@@ -29,7 +29,7 @@
 1.  Remove Cooperative Locking support for directory operations and related
     properties:
 
-    ```properties
+    ```
     fs.gs.cooperative.locking.enable
     fs.gs.cooperative.locking.expiration.timeout.ms
     fs.gs.cooperative.locking.max.concurrent.operations
@@ -38,7 +38,7 @@
 1.  Migrate authentication to `com.google.auth.Credentials` and remove obsolete
     properties:
 
-    ```properties
+    ```
     fs.gs.auth.service.account.email
     fs.gs.auth.service.account.keyfile
     fs.gs.auth.service.account.private.key
@@ -49,7 +49,7 @@
     enum property, instead of relying on inference of the authentication type
     based on the set configuration properties, and remove obsolete properties:
 
-    ```properties
+    ```
     fs.gs.auth.null.enable
     fs.gs.auth.service.account.enable
     ```
@@ -58,7 +58,7 @@
     a refresh token using the authorisation code grant flow configured via the
     following properties:
 
-    ```properties
+    ```
     fs.gs.auth.client.id
     fs.gs.auth.client.secret
     fs.gs.auth.refresh.token
@@ -66,11 +66,7 @@
 
 1.  Merge all output stream types functionality in the default output stream
     that behaves similarly to the `FLUSHABLE_COMPOSITE` stream, and remove
-    obsolete property:
-
-    ```properties
-    fs.gs.outputstream.type
-    ```
+    obsolete `fs.gs.outputstream.type` property.
 
 1.  Set default value for `fs.gs.list.max.items.per.call` property to `5000`.
 
@@ -82,7 +78,26 @@
 1.  The Google Cloud Storage Connector now can be used as a
     [Hadoop Credential Provider](https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/CredentialProviderAPI.html).
 
-1.  Added dependency on new storage client library: [google-cloud-storage](https://github.com/googleapis/java-storage/tree/main/google-cloud-storage).
+1.  Added dependency on the Cloud Storage Client Library
+    ([google-cloud-storage](https://github.com/googleapis/java-storage/tree/main/google-cloud-storage)).
+
+1.  Rename `fs.gs.rewrite.max.bytes.per.call` property to
+    `fs.gs.rewrite.max.chunk.per.call`.
+
+1.  Remove support of the deprecated `fs.gs.io.buffersize.write` property.
+
+1.  Add support for size suffixes (`k`, `m`, `g`, etc) in values of size-related
+    properties:
+
+    ```
+    fs.gs.inputstream.inplace.seek.limit
+    fs.gs.inputstream.min.range.request.size
+    fs.gs.outputstream.buffer.size
+    fs.gs.outputstream.pipe.buffer.size
+    fs.gs.outputstream.upload.cache.size
+    fs.gs.outputstream.upload.chunk.size
+    fs.gs.rewrite.max.chunk.per.call
+    ```
 
 ### 2.2.2 - 2021-06-25
 

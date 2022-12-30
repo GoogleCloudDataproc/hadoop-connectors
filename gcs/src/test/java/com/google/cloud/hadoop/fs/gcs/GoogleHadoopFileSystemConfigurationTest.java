@@ -36,7 +36,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_PIPE_BUFFER_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_UPLOAD_CACHE_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_UPLOAD_CHUNK_SIZE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_REWRITE_MAX_SIZE_PER_CALL;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_REWRITE_MAX_CHUNK_PER_CALL;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ROOT_URL;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_SERVICE_PATH;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
@@ -130,7 +130,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.requester.pays.buckets", ImmutableList.of());
           put("fs.gs.requester.pays.mode", RequesterPaysMode.DISABLED);
           put("fs.gs.requester.pays.project.id", null);
-          put("fs.gs.rewrite.max.size.per.call", 512 * 1024 * 1024L);
+          put("fs.gs.rewrite.max.chunk.per.call", 512 * 1024 * 1024L);
           put("fs.gs.status.parallel.enable", true);
           put("fs.gs.storage.http.headers.", ImmutableMap.of());
           put("fs.gs.storage.root.url", "https://storage.googleapis.com/");
@@ -369,7 +369,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
     config.set(GCS_OUTPUT_STREAM_PIPE_BUFFER_SIZE.getKey(), "256");
     config.set(GCS_OUTPUT_STREAM_UPLOAD_CACHE_SIZE.getKey(), "512M");
     config.set(GCS_OUTPUT_STREAM_UPLOAD_CHUNK_SIZE.getKey(), "16m");
-    config.set(GCS_REWRITE_MAX_SIZE_PER_CALL.getKey(), "2g");
+    config.set(GCS_REWRITE_MAX_CHUNK_PER_CALL.getKey(), "2g");
 
     GoogleCloudStorageOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
