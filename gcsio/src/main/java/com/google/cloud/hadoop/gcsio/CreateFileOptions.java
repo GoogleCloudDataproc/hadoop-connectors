@@ -44,9 +44,9 @@ public abstract class CreateFileOptions {
   public static Builder builder() {
     return new AutoValue_CreateFileOptions.Builder()
         .setAttributes(ImmutableMap.of())
-        .setContentType(CreateObjectOptions.CONTENT_TYPE_DEFAULT)
+        .setContentType("application/octet-stream")
         .setEnsureNoDirectoryConflict(true)
-        .setMinSyncInterval(Duration.ofSeconds(10))
+        .setMinSyncInterval(Duration.ZERO)
         .setOverwriteGenerationId(StorageResourceId.UNKNOWN_GENERATION_ID)
         .setWriteMode(WriteMode.CREATE_NEW);
   }
@@ -105,13 +105,11 @@ public abstract class CreateFileOptions {
       checkArgument(
           !options.getAttributes().containsKey("Content-Type"),
           "The Content-Type attribute must be set via the contentType option");
-      switch (options.getWriteMode()) {
-        case APPEND:
-        case CREATE_NEW:
-          checkArgument(
-              options.getOverwriteGenerationId() == StorageResourceId.UNKNOWN_GENERATION_ID,
-              "overwriteGenerationId is set to %s but it can be set only in OVERWRITE mode",
-              options.getOverwriteGenerationId());
+      if (options.getWriteMode() != WriteMode.OVERWRITE) {
+        checkArgument(
+            options.getOverwriteGenerationId() == StorageResourceId.UNKNOWN_GENERATION_ID,
+            "overwriteGenerationId is set to %s but it can be set only in OVERWRITE mode",
+            options.getOverwriteGenerationId());
       }
       return options;
     }

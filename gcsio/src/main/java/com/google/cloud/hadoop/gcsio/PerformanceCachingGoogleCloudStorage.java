@@ -20,7 +20,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.channels.WritableByteChannel;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -62,7 +61,7 @@ public class PerformanceCachingGoogleCloudStorage extends ForwardingGoogleCloudS
 
   private static PrefixMappedItemCache createCache(
       PerformanceCachingGoogleCloudStorageOptions options) {
-    return new PrefixMappedItemCache(Duration.ofMillis(options.getMaxEntryAgeMillis()));
+    return new PrefixMappedItemCache(options.getMaxEntryAge());
   }
 
   @Override

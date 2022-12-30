@@ -233,7 +233,7 @@ class GoogleHadoopFSInputStream extends FSInputStream implements IOStatisticsSou
   }
 
   /**
-   * Verify that the input stream is open. Non blocking; this gives the last state of the volatile
+   * Verify that the input stream is open. Non-blocking; this gives the last state of the volatile
    * {@link #closed} field.
    *
    * @throws IOException if the connection is closed.

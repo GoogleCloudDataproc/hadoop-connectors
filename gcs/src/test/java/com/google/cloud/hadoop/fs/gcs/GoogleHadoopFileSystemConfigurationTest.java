@@ -54,6 +54,7 @@ import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
@@ -90,10 +91,10 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.grpc.read.zerocopy.enable", true);
           put("fs.gs.grpc.server.address", "storage.googleapis.com");
           put("fs.gs.grpc.trafficdirector.enable", true);
-          put("fs.gs.grpc.write.buffered.requests", 20L);
+          put("fs.gs.grpc.write.buffered.requests", 20);
           put("fs.gs.grpc.write.message.timeout.ms", 3_000L);
           put("fs.gs.grpc.write.timeout.ms", 10 * 60_000L);
-          put("fs.gs.http.connect-timeout", 20_000);
+          put("fs.gs.http.connect-timeout", 5_000L);
           put("fs.gs.http.max.retry", 10);
           put("fs.gs.implicit.dir.repair.enable", true);
           put("fs.gs.inputstream.fadvise", Fadvise.AUTO);
@@ -101,20 +102,21 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.inputstream.inplace.seek.limit", 8 * 1024 * 1024L);
           put("fs.gs.inputstream.min.range.request.size", 2 * 1024 * 1024L);
           put("fs.gs.inputstream.support.gzip.encoding.enable", false);
-          put("fs.gs.io.buffersize.write", 64 * 1024 * 1024);
+          put("fs.gs.io.buffersize.write", 24 * 1024 * 1024L);
+          put("fs.gs.javaclient.enable", false);
           put("fs.gs.lazy.init.enable", false);
-          put("fs.gs.list.max.items.per.call", 5000L);
+          put("fs.gs.list.max.items.per.call", 5_000);
           put("fs.gs.marker.file.pattern", null);
-          put("fs.gs.max.requests.per.batch", 15L);
-          put("fs.gs.max.wait.for.empty.object.creation.ms", 3_000);
+          put("fs.gs.max.requests.per.batch", 15);
+          put("fs.gs.max.wait.for.empty.object.creation.ms", 3_000L);
           put("fs.gs.metrics.sink", MetricsSink.NONE);
-          put("fs.gs.outputstream.buffer.size", 8 * 1024 * 1024);
+          put("fs.gs.outputstream.buffer.size", 8 * 1024 * 1024L);
           put("fs.gs.outputstream.direct.upload.enable", false);
-          put("fs.gs.outputstream.pipe.buffer.size", 1024 * 1024);
+          put("fs.gs.outputstream.pipe.buffer.size", 1024 * 1024L);
           put("fs.gs.outputstream.pipe.type", PipeType.IO_STREAM_PIPE);
-          put("fs.gs.outputstream.sync.min.interval.ms", 0);
-          put("fs.gs.outputstream.upload.cache.size", 0);
-          put("fs.gs.outputstream.upload.chunk.size", 64 * 1024 * 1024);
+          put("fs.gs.outputstream.sync.min.interval.ms", 0L);
+          put("fs.gs.outputstream.upload.cache.size", 0L);
+          put("fs.gs.outputstream.upload.chunk.size", 24 * 1024 * 1024L);
           put("fs.gs.performance.cache.enable", false);
           put("fs.gs.performance.cache.max.entry.age.ms", 5_000L);
           put("fs.gs.project.id", null);
@@ -122,7 +124,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.requester.pays.buckets", ImmutableList.of());
           put("fs.gs.requester.pays.mode", RequesterPaysMode.DISABLED);
           put("fs.gs.requester.pays.project.id", null);
-          put("fs.gs.rewrite.max.bytes.per.call", 512 * 1024 * 1024L);
+          put("fs.gs.rewrite.max.size.per.call", 512 * 1024 * 1024L);
           put("fs.gs.status.parallel.enable", true);
           put("fs.gs.storage.http.headers.", ImmutableMap.of());
           put("fs.gs.storage.root.url", "https://storage.googleapis.com/");
@@ -313,6 +315,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
     Configuration config = new Configuration();
     long grpcCheckIntervalTimeout = 5;
     long grpcReadTimeout = 10;
+    long grpcReadMetadataTimeout = 15;
     long grpcReadMessageTimeout = 10;
     long grpcWriteTimeout = 20;
     long grpcWriteMessageTimeout = 25;
@@ -336,18 +339,19 @@ public class GoogleHadoopFileSystemConfigurationTest {
     GoogleCloudStorageOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
 
-    assertThat(options.getReadChannelOptions().getGrpcReadTimeoutMillis())
-        .isEqualTo(grpcReadTimeout);
-    assertThat(options.getWriteChannelOptions().getGrpcWriteTimeout()).isEqualTo(grpcWriteTimeout);
-    assertThat(options.getWriteChannelOptions().getNumberOfBufferedRequests())
-        .isEqualTo(grpcUploadBufferedRequests);
-    assertThat(options.isDirectPathPreferred()).isEqualTo(directPathEnabled);
-    assertThat(options.isGrpcEnabled()).isEqualTo(grpcEnabled);
-    assertThat(options.getGrpcMessageTimeoutCheckInterval()).isEqualTo(grpcCheckIntervalTimeout);
-    assertThat(options.getReadChannelOptions().getGrpcReadMessageTimeoutMillis())
-        .isEqualTo(grpcReadMessageTimeout);
-    assertThat(options.getWriteChannelOptions().getGrpcWriteMessageTimeoutMillis())
-        .isEqualTo(grpcWriteMessageTimeout);
+    assertThat(options.getGrpcMessageTimeoutCheckInterval()).isEqualTo(Duration.ofMillis(5));
+    assertThat(options.getReadChannelOptions().getGrpcReadMessageTimeout())
+        .isEqualTo(Duration.ofMillis(10));
+    assertThat(options.getReadChannelOptions().getGrpcReadTimeout())
+        .isEqualTo(Duration.ofMillis(10));
+    assertThat(options.getWriteChannelOptions().getGrpcWriteMessageTimeout())
+        .isEqualTo(Duration.ofMillis(25));
+    assertThat(options.getWriteChannelOptions().getGrpcWriteTimeout())
+        .isEqualTo(Duration.ofMillis(20));
+    assertThat(options.getWriteChannelOptions().getNumberOfBufferedRequests()).isEqualTo(30);
+    assertThat(options.isDirectPathPreferred()).isTrue();
+    assertThat(options.isGrpcEnabled()).isTrue();
+    assertThat(options.isTrafficDirectorEnabled()).isTrue();
   }
 
   @Test
@@ -358,6 +362,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
     GoogleCloudStorageOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
 
-    assertThat(options.getReadChannelOptions().getMinRangeRequestSize()).isEqualTo(307200);
+    assertThat(options.getReadChannelOptions().getMinRangeRequestSize()).isEqualTo(300 * 1024);
   }
 }

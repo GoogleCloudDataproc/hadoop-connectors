@@ -197,11 +197,11 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   @VisibleForTesting
   ExponentialBackOff createBackOff() {
     return new ExponentialBackOff.Builder()
-        .setInitialIntervalMillis(readOptions.getBackoffInitialIntervalMillis())
+        .setInitialIntervalMillis(toIntExact(readOptions.getBackoffInitialInterval().toMillis()))
         .setRandomizationFactor(readOptions.getBackoffRandomizationFactor())
         .setMultiplier(readOptions.getBackoffMultiplier())
-        .setMaxIntervalMillis(readOptions.getBackoffMaxIntervalMillis())
-        .setMaxElapsedTimeMillis(readOptions.getBackoffMaxElapsedTimeMillis())
+        .setMaxIntervalMillis(toIntExact(readOptions.getBackoffMaxInterval().toMillis()))
+        .setMaxElapsedTimeMillis(toIntExact(readOptions.getBackoffMaxElapsedTime().toMillis()))
         .build();
   }
 

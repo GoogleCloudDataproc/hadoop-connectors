@@ -17,32 +17,30 @@
 package com.google.cloud.hadoop.gcsio;
 
 import com.google.auto.value.AutoValue;
+import java.time.Duration;
 
 /** Configurable options for {@link PerformanceCachingGoogleCloudStorage}. */
 @AutoValue
 public abstract class PerformanceCachingGoogleCloudStorageOptions {
 
-  /** Max age of an item in cache in milliseconds. */
-  public static final long MAX_ENTRY_AGE_MILLIS_DEFAULT = 5_000;
-
   public static final PerformanceCachingGoogleCloudStorageOptions DEFAULT = builder().build();
 
   public static Builder builder() {
     return new AutoValue_PerformanceCachingGoogleCloudStorageOptions.Builder()
-        .setMaxEntryAgeMillis(MAX_ENTRY_AGE_MILLIS_DEFAULT);
+        .setMaxEntryAge(Duration.ofSeconds(5));
   }
 
   public abstract Builder toBuilder();
 
   /** Gets the max age of an item in cache in milliseconds. */
-  public abstract long getMaxEntryAgeMillis();
+  public abstract Duration getMaxEntryAge();
 
   /** Builder class for PerformanceCachingGoogleCloudStorageOptions. */
   @AutoValue.Builder
   public abstract static class Builder {
 
     /** Sets the max age of an item in cache in milliseconds. */
-    public abstract Builder setMaxEntryAgeMillis(long maxEntryAgeMillis);
+    public abstract Builder setMaxEntryAge(Duration maxEntryAge);
 
     public abstract PerformanceCachingGoogleCloudStorageOptions build();
   }

@@ -86,9 +86,7 @@ public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSyst
             .setAppName("appName")
             .setProjectId("projectId")
             .setWriteChannelOptions(
-                AsyncWriteChannelOptions.builder()
-                    .setUploadChunkSize(UPLOAD_CHUNK_SIZE_DEFAULT)
-                    .build())
+                AsyncWriteChannelOptions.builder().setUploadChunkSize(24 * 1024 * 1024).build())
             .build());
   }
 

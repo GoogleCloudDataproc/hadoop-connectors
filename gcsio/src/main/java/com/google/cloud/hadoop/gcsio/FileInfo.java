@@ -17,8 +17,8 @@
 package com.google.cloud.hadoop.gcsio;
 
 import java.net.URI;
+import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -140,7 +140,8 @@ public class FileInfo {
   /** Gets string representation of this instance. */
   @Override
   public String toString() {
-    return getPath() + (exists() ? ": created on: " + new Date(getCreationTime()) : ": exists: no");
+    return getPath()
+        + (exists() ? ": created on: " + Instant.ofEpochMilli(getCreationTime()) : ": exists: no");
   }
 
   @Override

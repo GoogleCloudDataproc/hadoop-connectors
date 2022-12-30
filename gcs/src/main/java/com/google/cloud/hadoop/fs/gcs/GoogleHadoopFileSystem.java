@@ -38,7 +38,6 @@ import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDura
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
-import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
@@ -543,7 +542,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                           .setMinSyncInterval(
                               Duration.ofMillis(
                                   GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(
-                                      getConf(), getConf()::getInt)))
+                                      getConf(), getConf()::getLong)))
                           .build(),
                       statistics),
                   statistics);
@@ -1106,7 +1105,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                 .setWriteMode(CreateFileOptions.WriteMode.APPEND)
                 .setMinSyncInterval(
                     Duration.ofMillis(
-                        GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)))
+                        GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getLong)))
                 .build(),
             statistics),
         statistics);
@@ -1139,7 +1138,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       // concat operation appends to the target.
       List<URI> sources = Lists.newArrayList(tgtPath);
       sources.addAll(partition);
-      getGcsFs().compose(sources, tgtPath, CreateObjectOptions.CONTENT_TYPE_DEFAULT);
+      getGcsFs().compose(sources, tgtPath, "application/octet-stream");
     }
   }
 

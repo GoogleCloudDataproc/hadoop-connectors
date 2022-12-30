@@ -196,6 +196,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     return service;
   }
 
+  @Override
   public GoogleCloudStorageFileSystemOptions getOptions() {
     return options;
   }

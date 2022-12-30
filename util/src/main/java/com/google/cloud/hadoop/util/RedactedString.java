@@ -36,7 +36,7 @@ public abstract class RedactedString {
   public abstract String value();
 
   @Override
-  public String toString() {
+  public final String toString() {
     return "<redacted>";
   }
 }

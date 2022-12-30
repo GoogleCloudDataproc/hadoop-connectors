@@ -20,6 +20,7 @@ import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.g
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
+import static java.lang.Math.toIntExact;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
@@ -410,7 +411,8 @@ public class HadoopFileSystemIntegrationHelper
             hadoopPath,
             FsPermission.getDefault(),
             overwrite,
-            GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE.getDefault(),
+            toIntExact(
+                GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE.getDefault()),
             GoogleHadoopFileSystem.REPLICATION_FACTOR_DEFAULT,
             GoogleHadoopFileSystemConfiguration.BLOCK_SIZE.getDefault(),
             /* progress= */ null)) {

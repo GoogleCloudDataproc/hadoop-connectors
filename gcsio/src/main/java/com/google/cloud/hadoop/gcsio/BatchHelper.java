@@ -72,15 +72,15 @@ public class BatchHelper {
    */
   public static class Factory {
     public BatchHelper newBatchHelper(
-        HttpRequestInitializer requestInitializer, Storage gcs, long maxRequestsPerBatch) {
+        HttpRequestInitializer requestInitializer, Storage gcs, int maxRequestsPerBatch) {
       return new BatchHelper(requestInitializer, gcs, maxRequestsPerBatch, /* numThreads= */ 0);
     }
 
     BatchHelper newBatchHelper(
         HttpRequestInitializer requestInitializer,
         Storage gcs,
-        long maxRequestsPerBatch,
-        long totalRequests,
+        int maxRequestsPerBatch,
+        int totalRequests,
         int maxThreads) {
       checkArgument(maxRequestsPerBatch > 0, "maxRequestsPerBatch should be greater than 0");
       checkArgument(totalRequests > 0, "totalRequests should be greater than 0");

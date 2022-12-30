@@ -374,7 +374,7 @@ default service account impersonation.
     The maximum number of retries for low-level HTTP requests to Google Cloud
     Storage when server errors (code: `5XX`) or I/O errors are encountered.
 
-*   `fs.gs.http.connect-timeout` (default: `20000`)
+*   `fs.gs.http.connect-timeout` (default: `5000`)
 
     Timeout in milliseconds to establish a connection. Use `0` for an infinite
     timeout.

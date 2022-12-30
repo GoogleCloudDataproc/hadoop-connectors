@@ -19,7 +19,6 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.createItemInfoForBucket;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.createItemInfoForStorageObject;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInferredDirectory;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.HTTP_TRANSPORT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.resumableUploadResponse;
 import static com.google.cloud.hadoop.gcsio.MockGoogleCloudStorageImplFactory.mockedGcsImpl;
@@ -1057,9 +1056,7 @@ public class GoogleCloudStorageTest {
                   Duration.ofMillis(1).toNanos(),
                   Duration.ofMillis(2).toNanos(),
                   Duration.ofMillis(3).toNanos(),
-                  Duration.ofMillis(3)
-                      .plusMillis(DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS)
-                      .toNanos());
+                  Duration.ofMillis(3).plusMillis(2 * 60 * 1000).toNanos());
 
           private final AtomicInteger fakeValueIndex = new AtomicInteger(0);
 
@@ -1084,7 +1081,7 @@ public class GoogleCloudStorageTest {
         (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
     readChannel.setReadBackOff(
         new ExponentialBackOff.Builder()
-            .setMaxElapsedTimeMillis(DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS)
+            .setMaxElapsedTimeMillis(2 * 60 * 1000)
             .setNanoClock(fakeNanoClock)
             .build());
     assertThat(readChannel.isOpen()).isTrue();
@@ -3303,7 +3300,7 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorage gcs =
         mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
-    gcs.compose(BUCKET_NAME, sources, OBJECT_NAME, CreateObjectOptions.CONTENT_TYPE_DEFAULT);
+    gcs.compose(BUCKET_NAME, sources, OBJECT_NAME, "application/octet-stream");
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(

@@ -33,18 +33,12 @@ public abstract class RequesterPaysOptions {
     ENABLED
   }
 
-  /** Default value for {@link RequesterPaysOptions#getMode}. */
-  public static final RequesterPaysMode REQUESTER_PAYS_MODE_DEFAULT = RequesterPaysMode.DISABLED;
-
-  /** Default value for {@link RequesterPaysOptions#getBuckets}. */
-  public static final ImmutableSet<String> REQUESTER_PAYS_BUCKETS_DEFAULT = ImmutableSet.of();
-
   public static final RequesterPaysOptions DEFAULT = builder().build();
 
   public static Builder builder() {
     return new AutoValue_RequesterPaysOptions.Builder()
-        .setMode(REQUESTER_PAYS_MODE_DEFAULT)
-        .setBuckets(REQUESTER_PAYS_BUCKETS_DEFAULT);
+        .setBuckets(ImmutableSet.of())
+        .setMode(RequesterPaysMode.DISABLED);
   }
 
   public abstract Builder toBuilder();

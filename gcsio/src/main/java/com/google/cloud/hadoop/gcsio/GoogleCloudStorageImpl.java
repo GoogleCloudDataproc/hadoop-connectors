@@ -137,8 +137,6 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
           "crc32c",
           "metadata");
 
-  private static final String LIST_OBJECT_FIELDS_FORMAT = "items(%s),prefixes,nextPageToken";
-
   private final MetricsRecorder metricsRecorder;
 
   // A function to encode metadata map values
@@ -327,7 +325,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
                 options.getProxyAddress(),
                 options.getProxyUsername(),
                 options.getProxyPassword(),
-                Duration.ofMillis(options.getHttpRequestReadTimeout()))
+                options.getHttpRequestReadTimeout())
             : httpTransport;
     this.storage =
         new Storage.Builder(
@@ -346,8 +344,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     // Create the gRPC stub if necessary;
     if (options.isGrpcEnabled()) {
-      this.watchdog =
-          Watchdog.create(Duration.ofMillis(options.getGrpcMessageTimeoutCheckInterval()));
+      this.watchdog = Watchdog.create(options.getGrpcMessageTimeoutCheckInterval());
       this.storageStubProvider =
           StorageStubProvider.newInstance(options, backgroundTasksThreadPool, finalCredentials);
     }
@@ -658,6 +655,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
    * See {@link GoogleCloudStorage#open(GoogleCloudStorageItemInfo)} for details about expected
    * behavior.
    */
+  @Override
   public SeekableByteChannel open(
       GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
       throws IOException {
@@ -1205,7 +1203,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
         initializeRequest(storage.buckets().list(storageOptions.getProjectId()), null);
 
     // Set number of items to retrieve per call.
-    listBucket.setMaxResults(storageOptions.getMaxListItemsPerCall());
+    listBucket.setMaxResults((long) storageOptions.getMaxListItemsPerCall());
 
     // Loop till we fetch all items.
     String pageToken = null;
@@ -1478,7 +1476,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
     // Request only fields used in GoogleCloudStorageItemInfo:
     // https://cloud.google.com/storage/docs/json_api/v1/objects#resource-representations
     if (!isNullOrEmpty(objectFields)) {
-      listObject.setFields(String.format(LIST_OBJECT_FIELDS_FORMAT, objectFields));
+      listObject.setFields(String.format("items(%s),prefixes,nextPageToken", objectFields));
     }
 
     return listObject;
@@ -2068,11 +2066,11 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
       // maximum delay that caller will wait to receive an exception in the case of an incorrect
       // assumption and this being a scenario other than the multiple workers racing situation.
       GoogleCloudStorageItemInfo existingInfo;
-      int maxWaitMillis = storageOptions.getMaxWaitMillisForEmptyObjectCreation();
+      Duration maxWaitTime = storageOptions.getMaxWaitTimeForEmptyObjectCreation();
       BackOff backOff =
-          maxWaitMillis > 0
+          !maxWaitTime.isZero() && !maxWaitTime.isNegative()
               ? new ExponentialBackOff.Builder()
-                  .setMaxElapsedTimeMillis(maxWaitMillis)
+                  .setMaxElapsedTimeMillis(toIntExact(maxWaitTime.toMillis()))
                   .setMaxIntervalMillis(500)
                   .setInitialIntervalMillis(100)
                   .setMultiplier(1.5)

@@ -225,9 +225,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
       return isRetriableError(cause);
     }
 
-    private StorageStub getStorageStubWithTracking(long grpcWriteTimeoutMilliSeconds) {
+    private StorageStub getStorageStubWithTracking(Duration grpcWriteTimeout) {
       StorageStub stubWithDeadline =
-          stub.withDeadlineAfter(grpcWriteTimeoutMilliSeconds, MILLISECONDS);
+          stub.withDeadlineAfter(grpcWriteTimeout.toMillis(), MILLISECONDS);
 
       if (!this.tracingEnabled) {
         return stubWithDeadline;
@@ -254,9 +254,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
           ClientCalls.asyncClientStreamingCall(call, responseObserver);
       StreamObserver<WriteObjectRequest> requestStreamObserver =
           watchdog.watch(
-              call,
-              writeObjectRequestStreamObserver,
-              Duration.ofSeconds(channelOptions.getGrpcWriteMessageTimeoutMillis()));
+              call, writeObjectRequestStreamObserver, channelOptions.getGrpcWriteMessageTimeout());
 
       // Wait for streaming RPC to become ready for upload.
       try {
@@ -532,7 +530,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
       // re-used and we wait for the actual response instead of returning the last response/error
       SimpleResponseObserver<StartResumableWriteResponse> responseObserver =
           new SimpleResponseObserver<>();
-      getStorageStubWithTracking(START_RESUMABLE_WRITE_TIMEOUT.toMillis())
+      getStorageStubWithTracking(START_RESUMABLE_WRITE_TIMEOUT)
           .startResumableWrite(request, responseObserver);
       try {
         responseObserver.done.await();
@@ -568,7 +566,7 @@ public final class GoogleCloudStorageGrpcWriteChannel
     private long getCommittedWriteSize(QueryWriteStatusRequest request) throws IOException {
       SimpleResponseObserver<QueryWriteStatusResponse> responseObserver =
           new SimpleResponseObserver<>();
-      getStorageStubWithTracking(QUERY_WRITE_STATUS_TIMEOUT.toMillis())
+      getStorageStubWithTracking(QUERY_WRITE_STATUS_TIMEOUT)
           .queryWriteStatus(request, responseObserver);
       try {
         responseObserver.done.await();

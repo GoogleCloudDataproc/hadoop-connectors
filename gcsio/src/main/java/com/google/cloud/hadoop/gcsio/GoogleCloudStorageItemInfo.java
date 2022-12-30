@@ -21,8 +21,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+import java.time.Instant;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.Map;
 import java.util.Objects;
 
@@ -400,7 +400,7 @@ public class GoogleCloudStorageItemInfo {
   @Override
   public String toString() {
     return exists()
-        ? String.format("%s: created on: %s", resourceId, new Date(creationTime))
+        ? String.format("%s: created on: %s", resourceId, Instant.ofEpochMilli(creationTime))
         : String.format("%s: exists: no", resourceId);
   }
 

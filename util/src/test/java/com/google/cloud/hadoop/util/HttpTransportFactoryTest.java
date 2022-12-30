@@ -143,7 +143,7 @@ public class HttpTransportFactoryTest {
       throws GeneralSecurityException, IOException {
     NetHttpTransport.Builder builder =
         HttpTransportFactory.createNetHttpTransportBuilder(
-            /* proxyUri= */ null, /* readTimeoutMillis= */ null);
+            /* proxyUri= */ null, /* readTimeout= */ null);
 
     assertThat(builder.getSslSocketFactory()).isInstanceOf(CustomSslSocketFactory.class);
   }
@@ -166,7 +166,7 @@ public class HttpTransportFactoryTest {
 
   @Test
   public void testCustomSslSocketFactorySetReadTimeout() throws IOException {
-    Duration readTimeout = Duration.ofMillis(20 * 1000);
+    Duration readTimeout = Duration.ofSeconds(20);
     CustomSslSocketFactory customSslSocketFactory =
         new CustomSslSocketFactory(FAKE_SOCKET_FACTORY, readTimeout);
 

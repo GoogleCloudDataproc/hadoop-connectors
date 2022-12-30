@@ -141,8 +141,8 @@ public class HadoopCredentialsConfiguration {
       new HadoopConfigurationProperty<>(".proxy.password");
 
   /** Key suffix for setting the read timeout (in milliseconds) for HTTP request. */
-  public static final HadoopConfigurationProperty<Integer> READ_TIMEOUT_SUFFIX =
-      new HadoopConfigurationProperty<>(".http.read-timeout", 20 * 1000);
+  public static final HadoopConfigurationProperty<Long> READ_TIMEOUT_SUFFIX =
+      new HadoopConfigurationProperty<>(".http.read-timeout", 20_000L);
 
   /**
    * Configuration key for defining the OAUth2 client ID. Required when the authentication type is
@@ -322,7 +322,7 @@ public class HadoopCredentialsConfiguration {
                 PROXY_USERNAME_SUFFIX.withPrefixes(keyPrefixes).getPassword(config),
                 PROXY_PASSWORD_SUFFIX.withPrefixes(keyPrefixes).getPassword(config),
                 Duration.ofMillis(
-                    READ_TIMEOUT_SUFFIX.withPrefixes(keyPrefixes).get(config, config::getInt)));
+                    READ_TIMEOUT_SUFFIX.withPrefixes(keyPrefixes).get(config, config::getLong)));
           } catch (IOException e) {
             throw new UncheckedIOException(e);
           }

@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.google.auto.value.AutoValue;
+import java.time.Duration;
 
 /**
  * Advanced options for reading GoogleCloudStorage objects. Immutable; callers must use the inner
@@ -34,47 +35,32 @@ public abstract class GoogleCloudStorageReadOptions {
     SEQUENTIAL
   }
 
-  public static final int DEFAULT_BACKOFF_INITIAL_INTERVAL_MILLIS = 200;
-  public static final double DEFAULT_BACKOFF_RANDOMIZATION_FACTOR = 0.5;
-  public static final double DEFAULT_BACKOFF_MULTIPLIER = 1.5;
-  public static final int DEFAULT_BACKOFF_MAX_INTERVAL_MILLIS = 10 * 1000;
-  public static final int DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS = 2 * 60 * 1000;
-  public static final boolean DEFAULT_FAST_FAIL_ON_NOT_FOUND_ENABLED = true;
-  public static final boolean DEFAULT_GZIP_ENCODING_SUPPORT_ENABLED = false;
-  public static final long DEFAULT_INPLACE_SEEK_LIMIT = 8 * 1024 * 1024;
-  public static final Fadvise DEFAULT_FADVISE = Fadvise.AUTO;
-  public static final long DEFAULT_MIN_RANGE_REQUEST_SIZE = 2 * 1024 * 1024;
-  public static final boolean DEFAULT_GRPC_CHECKSUMS_ENABLED = false;
-  public static final long DEFAULT_GRPC_READ_TIMEOUT_MILLIS = 3600 * 1000;
-  public static final boolean DEFAULT_GRPC_READ_ZEROCOPY_ENABLED = true;
-  public static final long DEFAULT_GRPC_READ_MESSAGE_TIMEOUT_MILLIS = 3 * 1000;
-
   // Default builder should be initialized after default values,
   // otherwise it will access not initialized default values.
   public static final GoogleCloudStorageReadOptions DEFAULT = builder().build();
 
   public static Builder builder() {
     return new AutoValue_GoogleCloudStorageReadOptions.Builder()
-        .setBackoffInitialIntervalMillis(DEFAULT_BACKOFF_INITIAL_INTERVAL_MILLIS)
-        .setBackoffRandomizationFactor(DEFAULT_BACKOFF_RANDOMIZATION_FACTOR)
-        .setBackoffMultiplier(DEFAULT_BACKOFF_MULTIPLIER)
-        .setBackoffMaxIntervalMillis(DEFAULT_BACKOFF_MAX_INTERVAL_MILLIS)
-        .setBackoffMaxElapsedTimeMillis(DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS)
-        .setFastFailOnNotFoundEnabled(DEFAULT_FAST_FAIL_ON_NOT_FOUND_ENABLED)
-        .setGzipEncodingSupportEnabled(DEFAULT_GZIP_ENCODING_SUPPORT_ENABLED)
-        .setInplaceSeekLimit(DEFAULT_INPLACE_SEEK_LIMIT)
-        .setFadvise(DEFAULT_FADVISE)
-        .setMinRangeRequestSize(DEFAULT_MIN_RANGE_REQUEST_SIZE)
-        .setGrpcChecksumsEnabled(DEFAULT_GRPC_CHECKSUMS_ENABLED)
-        .setGrpcReadTimeoutMillis(DEFAULT_GRPC_READ_TIMEOUT_MILLIS)
-        .setGrpcReadZeroCopyEnabled(DEFAULT_GRPC_READ_ZEROCOPY_ENABLED)
-        .setGrpcReadMessageTimeoutMillis(DEFAULT_GRPC_READ_MESSAGE_TIMEOUT_MILLIS);
+        .setBackoffInitialInterval(Duration.ofMillis(200))
+        .setBackoffMaxElapsedTime(Duration.ofMinutes(2))
+        .setBackoffMaxInterval(Duration.ofSeconds(10))
+        .setBackoffMultiplier(1.5)
+        .setBackoffRandomizationFactor(0.5)
+        .setFadvise(Fadvise.AUTO)
+        .setFastFailOnNotFoundEnabled(true)
+        .setGrpcChecksumsEnabled(false)
+        .setGrpcReadMessageTimeout(Duration.ofSeconds(3))
+        .setGrpcReadTimeout(Duration.ofHours(1))
+        .setGrpcReadZeroCopyEnabled(true)
+        .setGzipEncodingSupportEnabled(false)
+        .setInplaceSeekLimit(8 * 1024 * 1024)
+        .setMinRangeRequestSize(2 * 1024 * 1024);
   }
 
   public abstract Builder toBuilder();
 
-  /** See {@link Builder#setBackoffInitialIntervalMillis}. */
-  public abstract int getBackoffInitialIntervalMillis();
+  /** See {@link Builder#setBackoffInitialInterval}. */
+  public abstract Duration getBackoffInitialInterval();
 
   /** See {@link Builder#setBackoffRandomizationFactor}. */
   public abstract double getBackoffRandomizationFactor();
@@ -82,11 +68,11 @@ public abstract class GoogleCloudStorageReadOptions {
   /** See {@link Builder#setBackoffMultiplier}. */
   public abstract double getBackoffMultiplier();
 
-  /** See {@link Builder#setBackoffMaxIntervalMillis}. */
-  public abstract int getBackoffMaxIntervalMillis();
+  /** See {@link Builder#setBackoffMaxInterval}. */
+  public abstract Duration getBackoffMaxInterval();
 
-  /** See {@link Builder#setBackoffMaxElapsedTimeMillis}. */
-  public abstract int getBackoffMaxElapsedTimeMillis();
+  /** See {@link Builder#setBackoffMaxElapsedTime}. */
+  public abstract Duration getBackoffMaxElapsedTime();
 
   /** See {@link Builder#setFastFailOnNotFoundEnabled}. */
   public abstract boolean isFastFailOnNotFoundEnabled();
@@ -106,14 +92,14 @@ public abstract class GoogleCloudStorageReadOptions {
   /** See {@link Builder#setGrpcChecksumsEnabled}. */
   public abstract boolean isGrpcChecksumsEnabled();
 
-  /** See {@link Builder#setGrpcReadTimeoutMillis}. */
-  public abstract long getGrpcReadTimeoutMillis();
+  /** See {@link Builder#setGrpcReadTimeout}. */
+  public abstract Duration getGrpcReadTimeout();
 
   /** See {@link Builder#setGrpcReadZeroCopyEnabled}. */
   public abstract boolean isGrpcReadZeroCopyEnabled();
 
-  /** See {@link Builder#setGrpcReadTimeoutMillis(long)}. */
-  public abstract long getGrpcReadMessageTimeoutMillis();
+  /** See {@link Builder#setGrpcReadTimeout(Duration)}. */
+  public abstract Duration getGrpcReadMessageTimeout();
 
   /** Mutable builder for GoogleCloudStorageReadOptions. */
   @AutoValue.Builder
@@ -122,7 +108,7 @@ public abstract class GoogleCloudStorageReadOptions {
      * On exponential back-off, the initial delay before the first retry; subsequent retries then
      * grow as an exponential function of the current delay interval.
      */
-    public abstract Builder setBackoffInitialIntervalMillis(int backoffInitialIntervalMillis);
+    public abstract Builder setBackoffInitialInterval(Duration backoffInitialInterval);
 
     /**
      * The amount of jitter introduced when computing the next retry sleep interval so that when
@@ -140,7 +126,7 @@ public abstract class GoogleCloudStorageReadOptions {
      * The maximum amount of sleep between retries; at this point, there will be no further
      * exponential back-off. This prevents intervals from growing unreasonably large.
      */
-    public abstract Builder setBackoffMaxIntervalMillis(int backoffMaxIntervalMillis);
+    public abstract Builder setBackoffMaxInterval(Duration backoffMaxInterval);
 
     /**
      * The maximum total time elapsed since the first retry over the course of a series of retries.
@@ -148,14 +134,14 @@ public abstract class GoogleCloudStorageReadOptions {
      * without having to calculate the summation of a series of exponentiated intervals while
      * accounting for the randomization of back-off intervals.
      */
-    public abstract Builder setBackoffMaxElapsedTimeMillis(int backoffMaxElapsedTimeMillis);
+    public abstract Builder setBackoffMaxElapsedTime(Duration backoffMaxElapsedTime);
 
     /**
      * True if attempts to open a new channel on a nonexistent object are required to immediately
      * throw an IOException. If false, then channels may not throw exceptions for such cases until
      * attempting to call read(). Performance can be improved if this is set to false and the caller
      * is equipped to deal with delayed failures for not-found objects. Or if the caller is already
-     * sure the object being opened exists, it is recommended to set this to false to avoid doing
+     * sure the object being opened exists, it is recommended to set this to `false` to avoid doing
      * extraneous checks on open().
      */
     public abstract Builder setFastFailOnNotFoundEnabled(boolean fastFailOnNotFound);
@@ -205,13 +191,13 @@ public abstract class GoogleCloudStorageReadOptions {
     public abstract Builder setGrpcChecksumsEnabled(boolean grpcChecksumsEnabled);
 
     /** Sets the property to override the default GCS gRPC read stream timeout. */
-    public abstract Builder setGrpcReadTimeoutMillis(long grpcReadTimeoutMillis);
+    public abstract Builder setGrpcReadTimeout(Duration grpcReadTimeout);
 
     /** Sets the property to use the zero-copy deserializer for gRPC read. */
     public abstract Builder setGrpcReadZeroCopyEnabled(boolean grpcReadZeroCopyEnabled);
 
     /** Sets the property for gRPC read message timeout in milliseconds. */
-    public abstract Builder setGrpcReadMessageTimeoutMillis(long grpcMessageTimeout);
+    public abstract Builder setGrpcReadMessageTimeout(Duration grpcMessageTimeout);
 
     abstract GoogleCloudStorageReadOptions autoBuild();
 
