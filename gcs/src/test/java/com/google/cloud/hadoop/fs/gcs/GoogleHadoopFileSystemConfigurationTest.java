@@ -30,7 +30,13 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_MESSAGE_TIMEOUT_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_TIMEOUT_MS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_HTTP_HEADERS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_PIPE_BUFFER_SIZE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_UPLOAD_CACHE_SIZE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_UPLOAD_CHUNK_SIZE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_REWRITE_MAX_SIZE_PER_CALL;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ROOT_URL;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_SERVICE_PATH;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
@@ -355,13 +361,25 @@ public class GoogleHadoopFileSystemConfigurationTest {
   }
 
   @Test
-  public void testMinRangeRequestSize() {
+  public void sizeProperties() {
     Configuration config = new Configuration();
+    config.set(GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.getKey(), "2048");
     config.set(GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.getKey(), "300K");
+    config.set(GCS_OUTPUT_STREAM_BUFFER_SIZE.getKey(), "40k");
+    config.set(GCS_OUTPUT_STREAM_PIPE_BUFFER_SIZE.getKey(), "256");
+    config.set(GCS_OUTPUT_STREAM_UPLOAD_CACHE_SIZE.getKey(), "512M");
+    config.set(GCS_OUTPUT_STREAM_UPLOAD_CHUNK_SIZE.getKey(), "16m");
+    config.set(GCS_REWRITE_MAX_SIZE_PER_CALL.getKey(), "2g");
 
     GoogleCloudStorageOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
 
+    assertThat(options.getReadChannelOptions().getInplaceSeekLimit()).isEqualTo(2048);
     assertThat(options.getReadChannelOptions().getMinRangeRequestSize()).isEqualTo(300 * 1024);
+    assertThat(options.getWriteChannelOptions().getBufferSize()).isEqualTo(40 * 1024);
+    assertThat(options.getWriteChannelOptions().getPipeBufferSize()).isEqualTo(256);
+    assertThat(options.getWriteChannelOptions().getUploadCacheSize()).isEqualTo(512 * 1024 * 1024);
+    assertThat(options.getWriteChannelOptions().getUploadChunkSize()).isEqualTo(16 * 1024 * 1024);
+    assertThat(options.getMaxBytesRewrittenPerCall()).isEqualTo(2 * 1024 * 1024 * 1024L);
   }
 }
