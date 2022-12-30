@@ -23,6 +23,7 @@ import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.READ_T
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.getConfigKeyPrefixes;
 import static com.google.common.base.Strings.nullToEmpty;
 import static java.lang.Math.toIntExact;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GcsFileChecksumType;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GlobAlgorithm;
@@ -152,16 +153,13 @@ public class GoogleHadoopFileSystemConfiguration {
           GoogleCloudStorageFileSystemOptions.DEFAULT.isPerformanceCacheEnabled());
 
   /**
-   * Configuration key for maximum number of milliseconds a GoogleCloudStorageItemInfo will remain
-   * "valid" in the performance cache before it's invalidated.
+   * Configuration key for maximum time a GoogleCloudStorageItemInfo will remain "valid" in the
+   * performance cache before it's invalidated.
    */
-  public static final HadoopConfigurationProperty<Long> GCS_PERFORMANCE_CACHE_MAX_ENTRY_AGE_MILLIS =
+  public static final HadoopConfigurationProperty<Long> GCS_PERFORMANCE_CACHE_MAX_ENTRY_AGE =
       new HadoopConfigurationProperty<>(
-          "fs.gs.performance.cache.max.entry.age.ms",
-          GoogleCloudStorageFileSystemOptions.DEFAULT
-              .getPerformanceCacheOptions()
-              .getMaxEntryAge()
-              .toMillis());
+          "fs.gs.performance.cache.max.entry.age",
+          PerformanceCachingGoogleCloudStorageOptions.DEFAULT.getMaxEntryAge().toMillis());
 
   /**
    * If true, executes GCS requests in {@code listStatus} and {@code getFileStatus} methods in
@@ -250,7 +248,7 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>(
           "fs.gs.http.max.retry", GoogleCloudStorageOptions.DEFAULT.getMaxHttpRequestRetries());
 
-  /** Configuration key for the connect timeout (in millisecond) for HTTP request to GCS. */
+  /** Configuration key for the connect timeout for HTTP request to GCS. */
   public static final HadoopConfigurationProperty<Long> GCS_HTTP_CONNECT_TIMEOUT =
       new HadoopConfigurationProperty<>(
           "fs.gs.http.connect-timeout",
@@ -263,9 +261,9 @@ public class GoogleHadoopFileSystemConfiguration {
   /**
    * Configuration key for modifying the maximum amount of time to wait for empty object creation.
    */
-  public static final HadoopConfigurationProperty<Long> GCS_MAX_WAIT_MILLIS_EMPTY_OBJECT_CREATE =
+  public static final HadoopConfigurationProperty<Long> GCS_MAX_WAIT_TIME_EMPTY_OBJECT_CREATE =
       new HadoopConfigurationProperty<>(
-          "fs.gs.max.wait.for.empty.object.creation.ms",
+          "fs.gs.max.wait.for.empty.object.creation",
           GoogleCloudStorageOptions.DEFAULT.getMaxWaitTimeForEmptyObjectCreation().toMillis());
 
   /** Configuration key for setting write buffer size. */
@@ -308,9 +306,9 @@ public class GoogleHadoopFileSystemConfiguration {
   /**
    * Configuration key for the minimal time interval between consecutive sync/hsync/hflush calls.
    */
-  public static final HadoopConfigurationProperty<Long> GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS =
+  public static final HadoopConfigurationProperty<Long> GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL =
       new HadoopConfigurationProperty<>(
-          "fs.gs.outputstream.sync.min.interval.ms",
+          "fs.gs.outputstream.sync.min.interval",
           CreateFileOptions.DEFAULT.getMinSyncInterval().toMillis());
 
   /**
@@ -381,24 +379,22 @@ public class GoogleHadoopFileSystemConfiguration {
       new HadoopConfigurationProperty<>(
           "fs.gs.grpc.server.address", GoogleCloudStorageOptions.DEFAULT.getGrpcServerAddress());
 
-  /** Configuration key for check interval (in millisecond) for gRPC request timeout to GCS. */
-  public static final HadoopConfigurationProperty<Long> GCS_GRPC_CHECK_INTERVAL_TIMEOUT_MS =
+  /** Configuration key for check interval for gRPC request timeout to GCS. */
+  public static final HadoopConfigurationProperty<Long> GCS_GRPC_CHECK_INTERVAL_TIMEOUT =
       new HadoopConfigurationProperty<>(
-          "fs.gs.grpc.checkinterval.timeout.ms",
+          "fs.gs.grpc.checkinterval.timeout",
           GoogleCloudStorageOptions.DEFAULT.getGrpcMessageTimeoutCheckInterval().toMillis());
 
-  /**
-   * Configuration key for the connection timeout (in millisecond) for gRPC read requests to GCS.
-   */
-  public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_TIMEOUT_MS =
+  /** Configuration key for the connection timeout for gRPC read requests to GCS. */
+  public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_TIMEOUT =
       new HadoopConfigurationProperty<>(
-          "fs.gs.grpc.read.timeout.ms",
+          "fs.gs.grpc.read.timeout",
           GoogleCloudStorageReadOptions.DEFAULT.getGrpcReadTimeout().toMillis());
 
-  /** Configuration key for the message timeout (in millisecond) for gRPC read requests to GCS. */
-  public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_MESSAGE_TIMEOUT_MS =
+  /** Configuration key for the message timeout for gRPC read requests to GCS. */
+  public static final HadoopConfigurationProperty<Long> GCS_GRPC_READ_MESSAGE_TIMEOUT =
       new HadoopConfigurationProperty<>(
-          "fs.gs.grpc.read.message.timeout.ms",
+          "fs.gs.grpc.read.message.timeout",
           GoogleCloudStorageReadOptions.DEFAULT.getGrpcReadMessageTimeout().toMillis());
 
   /** Configuration key for enabling the zero-copy deserializer for the gRPC API. */
@@ -413,16 +409,16 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.grpc.write.buffered.requests",
           AsyncWriteChannelOptions.DEFAULT.getNumberOfBufferedRequests());
 
-  /** Configuration key for the connect timeout (in millisecond) for gRPC write requests to GCS. */
-  public static final HadoopConfigurationProperty<Long> GCS_GRPC_WRITE_TIMEOUT_MS =
+  /** Configuration key for the connect timeout for gRPC write requests to GCS. */
+  public static final HadoopConfigurationProperty<Long> GCS_GRPC_WRITE_TIMEOUT =
       new HadoopConfigurationProperty<>(
-          "fs.gs.grpc.write.timeout.ms",
+          "fs.gs.grpc.write.timeout",
           AsyncWriteChannelOptions.DEFAULT.getGrpcWriteTimeout().toMillis());
 
-  /** Configuration key for the message timeout (in millisecond) for gRPC write requests to GCS. */
-  public static final HadoopConfigurationProperty<Long> GCS_GRPC_WRITE_MESSAGE_TIMEOUT_MS =
+  /** Configuration key for the message timeout for gRPC write requests to GCS. */
+  public static final HadoopConfigurationProperty<Long> GCS_GRPC_WRITE_MESSAGE_TIMEOUT =
       new HadoopConfigurationProperty<>(
-          "fs.gs.grpc.write.message.timeout.ms",
+          "fs.gs.grpc.write.message.timeout",
           AsyncWriteChannelOptions.DEFAULT.getGrpcWriteMessageTimeout().toMillis());
 
   /** Configuration key for enabling use of directpath gRPC API for read/write. */
@@ -470,9 +466,6 @@ public class GoogleHadoopFileSystemConfiguration {
           "fs.gs.client.type",
           ClientTypeGoogleCloudStorageFileSystemOptions.DEFAULT.getClientType());
 
-  // TODO(b/120887495): This @VisibleForTesting annotation was being ignored by prod code.
-  // Please check that removing it is correct, and remove this comment along with it.
-  // @VisibleForTesting
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
         .setBucketDeleteEnabled(GCE_BUCKET_DELETE_ENABLE.get(config, config::getBoolean))
@@ -502,21 +495,31 @@ public class GoogleHadoopFileSystemConfiguration {
         .setEncryptionKeyHash(GCS_ENCRYPTION_KEY_HASH.getPassword(config))
         .setGrpcEnabled(GCS_GRPC_ENABLE.get(config, config::getBoolean))
         .setGrpcMessageTimeoutCheckInterval(
-            Duration.ofMillis(GCS_GRPC_CHECK_INTERVAL_TIMEOUT_MS.get(config, config::getLong)))
+            Duration.ofMillis(
+                GCS_GRPC_CHECK_INTERVAL_TIMEOUT.get(
+                    config, (name, defVal) -> config.getTimeDuration(name, defVal, MILLISECONDS))))
         .setGrpcServerAddress(GCS_GRPC_SERVER_ADDRESS.get(config, config::get))
         .setHttpRequestConnectTimeout(
-            Duration.ofMillis(GCS_HTTP_CONNECT_TIMEOUT.get(config, config::getLong)))
+            Duration.ofMillis(
+                GCS_HTTP_CONNECT_TIMEOUT.get(
+                    config, (name, defVal) -> config.getTimeDuration(name, defVal, MILLISECONDS))))
         .setHttpRequestHeaders(GCS_HTTP_HEADERS.getPropsWithPrefix(config))
         .setHttpRequestReadTimeout(
             Duration.ofMillis(
-                READ_TIMEOUT_SUFFIX.withPrefixes(CONFIG_KEY_PREFIXES).get(config, config::getLong)))
+                READ_TIMEOUT_SUFFIX
+                    .withPrefixes(CONFIG_KEY_PREFIXES)
+                    .get(
+                        config,
+                        (name, defVal) -> config.getTimeDuration(name, defVal, MILLISECONDS))))
         .setMaxBytesRewrittenPerCall(
             GCS_REWRITE_MAX_CHUNK_PER_CALL.get(config, config::getLongBytes))
         .setMaxHttpRequestRetries(GCS_HTTP_MAX_RETRY.get(config, config::getInt))
         .setMaxListItemsPerCall(GCS_MAX_LIST_ITEMS_PER_CALL.get(config, config::getInt))
         .setMaxRequestsPerBatch(GCS_MAX_REQUESTS_PER_BATCH.get(config, config::getInt))
         .setMaxWaitTimeForEmptyObjectCreation(
-            Duration.ofMillis(GCS_MAX_WAIT_MILLIS_EMPTY_OBJECT_CREATE.get(config, config::getLong)))
+            Duration.ofMillis(
+                GCS_MAX_WAIT_TIME_EMPTY_OBJECT_CREATE.get(
+                    config, (name, defVal) -> config.getTimeDuration(name, defVal, MILLISECONDS))))
         .setMetricsSink(GCS_METRICS_SINK.get(config, config::getEnum))
         .setProjectId(projectId)
         .setProxyAddress(
@@ -534,12 +537,14 @@ public class GoogleHadoopFileSystemConfiguration {
         .setWriteChannelOptions(getWriteChannelOptions(config));
   }
 
-  private static PerformanceCachingGoogleCloudStorageOptions getPerformanceCachingOptions(
+  @VisibleForTesting
+  static PerformanceCachingGoogleCloudStorageOptions getPerformanceCachingOptions(
       Configuration config) {
     return PerformanceCachingGoogleCloudStorageOptions.builder()
         .setMaxEntryAge(
             Duration.ofMillis(
-                GCS_PERFORMANCE_CACHE_MAX_ENTRY_AGE_MILLIS.get(config, config::getLong)))
+                GCS_PERFORMANCE_CACHE_MAX_ENTRY_AGE.get(
+                    config, (name, defVal) -> config.getTimeDuration(name, defVal, MILLISECONDS))))
         .build();
   }
 
@@ -557,9 +562,13 @@ public class GoogleHadoopFileSystemConfiguration {
             GCS_INPUT_STREAM_FAST_FAIL_ON_NOT_FOUND_ENABLE.get(config, config::getBoolean))
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
         .setGrpcReadMessageTimeout(
-            Duration.ofMillis(GCS_GRPC_READ_MESSAGE_TIMEOUT_MS.get(config, config::getLong)))
+            Duration.ofMillis(
+                GCS_GRPC_READ_MESSAGE_TIMEOUT.get(
+                    config, (name, defVal) -> config.getTimeDuration(name, defVal, MILLISECONDS))))
         .setGrpcReadTimeout(
-            Duration.ofMillis(GCS_GRPC_READ_TIMEOUT_MS.get(config, config::getLong)))
+            Duration.ofMillis(
+                GCS_GRPC_READ_TIMEOUT.get(
+                    config, (name, defVal) -> config.getTimeDuration(name, defVal, MILLISECONDS))))
         .setGrpcReadZeroCopyEnabled(GCS_GRPC_READ_ZEROCOPY_ENABLE.get(config, config::getBoolean))
         .setGzipEncodingSupportEnabled(
             GCS_INPUT_STREAM_SUPPORT_GZIP_ENCODING_ENABLE.get(config, config::getBoolean))
@@ -576,9 +585,13 @@ public class GoogleHadoopFileSystemConfiguration {
             GCS_OUTPUT_STREAM_DIRECT_UPLOAD_ENABLE.get(config, config::getBoolean))
         .setGrpcChecksumsEnabled(GCS_GRPC_CHECKSUMS_ENABLE.get(config, config::getBoolean))
         .setGrpcWriteMessageTimeout(
-            Duration.ofMillis(GCS_GRPC_WRITE_MESSAGE_TIMEOUT_MS.get(config, config::getLong)))
+            Duration.ofMillis(
+                GCS_GRPC_WRITE_MESSAGE_TIMEOUT.get(
+                    config, (name, defVal) -> config.getTimeDuration(name, defVal, MILLISECONDS))))
         .setGrpcWriteTimeout(
-            Duration.ofMillis(GCS_GRPC_WRITE_TIMEOUT_MS.get(config, config::getLong)))
+            Duration.ofMillis(
+                GCS_GRPC_WRITE_TIMEOUT.get(
+                    config, (name, defVal) -> config.getTimeDuration(name, defVal, MILLISECONDS))))
         .setNumberOfBufferedRequests(GCS_GRPC_UPLOAD_BUFFERED_REQUESTS.get(config, config::getInt))
         .setPipeBufferSize(
             toIntExact(GCS_OUTPUT_STREAM_PIPE_BUFFER_SIZE.get(config, config::getLongBytes)))

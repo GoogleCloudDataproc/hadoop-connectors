@@ -22,7 +22,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GLOB_ALGORITHM;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_LAZY_INITIALIZATION_ENABLE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.CLOUD_PLATFORM_SCOPE;
@@ -33,6 +33,7 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.flogger.LazyArgs.lazy;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
 import com.google.auth.oauth2.GoogleCredentials;
@@ -541,8 +542,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                                   : CreateFileOptions.WriteMode.CREATE_NEW)
                           .setMinSyncInterval(
                               Duration.ofMillis(
-                                  GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(
-                                      getConf(), getConf()::getLong)))
+                                  GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL.get(
+                                      getConf(),
+                                      (name, defVal) ->
+                                          getConf().getTimeDuration(name, defVal, MILLISECONDS))))
                           .build(),
                       statistics),
                   statistics);
@@ -1105,7 +1108,10 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                 .setWriteMode(CreateFileOptions.WriteMode.APPEND)
                 .setMinSyncInterval(
                     Duration.ofMillis(
-                        GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getLong)))
+                        GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL.get(
+                            getConf(),
+                            (name, defVal) ->
+                                getConf().getTimeDuration(name, defVal, MILLISECONDS))))
                 .build(),
             statistics),
         statistics);

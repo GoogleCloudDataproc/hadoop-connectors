@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.util;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.google.api.client.http.HttpTransport;
 import com.google.auth.oauth2.AccessToken;
@@ -140,9 +141,9 @@ public class HadoopCredentialsConfiguration {
   public static final HadoopConfigurationProperty<RedactedString> PROXY_PASSWORD_SUFFIX =
       new HadoopConfigurationProperty<>(".proxy.password");
 
-  /** Key suffix for setting the read timeout (in milliseconds) for HTTP request. */
+  /** Key suffix for setting the read timeout for HTTP request. */
   public static final HadoopConfigurationProperty<Long> READ_TIMEOUT_SUFFIX =
-      new HadoopConfigurationProperty<>(".http.read-timeout", 20_000L);
+      new HadoopConfigurationProperty<>(".http.read-timeout", 5_000L);
 
   /**
    * Configuration key for defining the OAUth2 client ID. Required when the authentication type is
@@ -322,7 +323,11 @@ public class HadoopCredentialsConfiguration {
                 PROXY_USERNAME_SUFFIX.withPrefixes(keyPrefixes).getPassword(config),
                 PROXY_PASSWORD_SUFFIX.withPrefixes(keyPrefixes).getPassword(config),
                 Duration.ofMillis(
-                    READ_TIMEOUT_SUFFIX.withPrefixes(keyPrefixes).get(config, config::getLong)));
+                    READ_TIMEOUT_SUFFIX
+                        .withPrefixes(keyPrefixes)
+                        .get(
+                            config,
+                            (name, defVal) -> config.getTimeDuration(name, defVal, MILLISECONDS))));
           } catch (IOException e) {
             throw new UncheckedIOException(e);
           }

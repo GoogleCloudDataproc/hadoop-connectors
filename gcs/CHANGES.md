@@ -99,6 +99,17 @@
     fs.gs.rewrite.max.chunk.per.call
     ```
 
+1.  Remove `.ms` suffix from names and add support for time suffixes (`ms`, `s`,
+    `m`, etc) in values of time-related properties:
+
+    ```
+    fs.gs.http.connect-timeout
+    fs.gs.http.read-timeout
+    fs.gs.max.wait.for.empty.object.creation
+    fs.gs.outputstream.sync.min.interval
+    fs.gs.performance.cache.max.entry.age
+    ```
+
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.

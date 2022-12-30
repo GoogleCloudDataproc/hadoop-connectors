@@ -120,7 +120,7 @@
     Maximum number of items to return in response for list Cloud Storage
     requests.
 
-*   `fs.gs.max.wait.for.empty.object.creation.ms` (default: `3000`)
+*   `fs.gs.max.wait.for.empty.object.creation` (default: `3s`)
 
     Maximum amount of time to wait after exception during empty object creation.
 
@@ -340,14 +340,13 @@ default service account impersonation.
 
     Enables Cloud Storage direct uploads.
 
-*   `fs.gs.outputstream.sync.min.interval.ms` (default: `0`)
+*   `fs.gs.outputstream.sync.min.interval` (default: `0`)
 
-    Output stream configuration that controls the minimum interval
-    (milliseconds) between consecutive syncs. This allows to avoid getting
-    rate-limited by Google Cloud Storage. Default is `0` - no wait between
-    syncs. Note that `hflush()` will be no-op if called more frequently than
-    minimum sync interval and `hsync()` will block until an end of a min sync
-    interval.
+    Output stream configuration that controls the minimum interval between
+    consecutive syncs. This allows to avoid getting rate-limited by Google Cloud
+    Storage. Default is `0` - no wait between syncs. Note that `hflush()` will
+    be no-op if called more frequently than minimum sync interval and `hsync()`
+    will block until an end of a min sync interval.
 
 ### HTTP transport configuration
 
@@ -374,15 +373,14 @@ default service account impersonation.
     The maximum number of retries for low-level HTTP requests to Google Cloud
     Storage when server errors (code: `5XX`) or I/O errors are encountered.
 
-*   `fs.gs.http.connect-timeout` (default: `5000`)
+*   `fs.gs.http.connect-timeout` (default: `5s`)
 
-    Timeout in milliseconds to establish a connection. Use `0` for an infinite
+    Timeout to establish a connection. Use `0` for an infinite timeout.
+
+*   `fs.gs.http.read-timeout` (default: `5s`)
+
+    Timeout to read from an established connection. Use `0` for an infinite
     timeout.
-
-*   `fs.gs.http.read-timeout` (default: `20000`)
-
-    Timeout in milliseconds to read from an established connection. Use `0` for
-    an infinite timeout.
 
 ### API client configuration
 
@@ -447,10 +445,10 @@ default service account impersonation.
     modifications made outside this connector instance may not be immediately
     reflected.
 
-*   `fs.gs.performance.cache.max.entry.age.ms` (default: `5000`)
+*   `fs.gs.performance.cache.max.entry.age` (default: `5s`)
 
-    Maximum number of milliseconds to store a cached metadata in the performance
-    cache before it's invalidated.
+    Maximum number of time to store a cached metadata in the performance cache
+    before it's invalidated.
 
 ### Cloud Storage [Requester Pays](https://cloud.google.com/storage/docs/requester-pays) feature configuration:
 
