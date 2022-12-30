@@ -36,7 +36,7 @@ public abstract class AsyncWriteChannelOptions {
   private static final int DEFAULT_UPLOAD_CHUNK_SIZE =
       Runtime.getRuntime().maxMemory() < 512 * 1024 * 1024
           ? UPLOAD_CHUNK_SIZE_GRANULARITY
-          : 8 * UPLOAD_CHUNK_SIZE_GRANULARITY;
+          : 3 * UPLOAD_CHUNK_SIZE_GRANULARITY;
 
   /** Pipe used for output stream. */
   public enum PipeType {
