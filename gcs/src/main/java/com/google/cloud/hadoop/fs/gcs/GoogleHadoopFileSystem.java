@@ -1144,7 +1144,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       // concat operation appends to the target.
       List<URI> sources = Lists.newArrayList(tgtPath);
       sources.addAll(partition);
-      getGcsFs().compose(sources, tgtPath, "application/octet-stream");
+      getGcsFs().compose(sources, tgtPath, CreateFileOptions.DEFAULT.getContentType());
     }
   }
 

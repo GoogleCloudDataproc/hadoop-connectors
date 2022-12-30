@@ -44,7 +44,7 @@ public abstract class CreateFileOptions {
   public static Builder builder() {
     return new AutoValue_CreateFileOptions.Builder()
         .setAttributes(ImmutableMap.of())
-        .setContentType("application/octet-stream")
+        .setContentType(CreateObjectOptions.DEFAULT_OVERWRITE.getContentType())
         .setEnsureNoDirectoryConflict(true)
         .setMinSyncInterval(Duration.ZERO)
         .setOverwriteGenerationId(StorageResourceId.UNKNOWN_GENERATION_ID)

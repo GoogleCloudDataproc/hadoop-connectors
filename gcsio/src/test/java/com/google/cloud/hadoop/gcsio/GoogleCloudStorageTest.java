@@ -45,6 +45,7 @@ import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockB
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.net.HttpHeaders.CONTENT_LENGTH;
 import static com.google.common.truth.Truth.assertThat;
+import static java.lang.Math.toIntExact;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
@@ -1051,18 +1052,19 @@ public class GoogleCloudStorageTest {
     NanoClock fakeNanoClock =
         new NanoClock() {
 
-          private final ImmutableList<Long> fakeValues =
+          private final ImmutableList<Duration> fakeValues =
               ImmutableList.of(
-                  Duration.ofMillis(1).toNanos(),
-                  Duration.ofMillis(2).toNanos(),
-                  Duration.ofMillis(3).toNanos(),
-                  Duration.ofMillis(3).plusMillis(2 * 60 * 1000).toNanos());
+                  Duration.ofMillis(1),
+                  Duration.ofMillis(2),
+                  Duration.ofMillis(3),
+                  Duration.ofMillis(3)
+                      .plus(GoogleCloudStorageReadOptions.DEFAULT.getBackoffMaxElapsedTime()));
 
           private final AtomicInteger fakeValueIndex = new AtomicInteger(0);
 
           @Override
           public long nanoTime() {
-            return fakeValues.get(fakeValueIndex.getAndIncrement());
+            return fakeValues.get(fakeValueIndex.getAndIncrement()).toNanos();
           }
         };
 
@@ -1081,7 +1083,9 @@ public class GoogleCloudStorageTest {
         (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
     readChannel.setReadBackOff(
         new ExponentialBackOff.Builder()
-            .setMaxElapsedTimeMillis(2 * 60 * 1000)
+            .setMaxElapsedTimeMillis(
+                toIntExact(
+                    GoogleCloudStorageReadOptions.DEFAULT.getBackoffMaxElapsedTime().toMillis()))
             .setNanoClock(fakeNanoClock)
             .build());
     assertThat(readChannel.isOpen()).isTrue();

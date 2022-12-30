@@ -39,6 +39,7 @@ import com.google.cloud.hadoop.gcsio.UpdatableItemInfo;
 import com.google.cloud.hadoop.gcsio.VerificationAttributes;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
+import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.common.base.Equivalence;
 import com.google.common.base.Suppliers;
 import com.google.common.cache.CacheBuilder;
@@ -224,7 +225,7 @@ public class GoogleCloudStorageTest {
   public void testCreate1PageLengthObjectUsingCreate() throws IOException {
     String bucketName = getSharedBucketName();
 
-    int objectSize = 1024 * 1024;
+    int objectSize = AsyncWriteChannelOptions.DEFAULT.getPipeBufferSize();
     StorageResourceId objectToCreate =
         new StorageResourceId(bucketName, "testCreate1PageLengthObjectUsingCreate_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, objectSize);
@@ -236,7 +237,7 @@ public class GoogleCloudStorageTest {
   public void testCreate1PageLengthPlus1byteObjectUsingCreate() throws IOException {
     String bucketName = getSharedBucketName();
 
-    int objectSize = 1024 * 1024 + 1;
+    int objectSize = AsyncWriteChannelOptions.DEFAULT.getPipeBufferSize() + 1;
     StorageResourceId objectToCreate =
         new StorageResourceId(bucketName, "testCreate1PageLengthPlus1byteObjectUsingCreate_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, objectSize);

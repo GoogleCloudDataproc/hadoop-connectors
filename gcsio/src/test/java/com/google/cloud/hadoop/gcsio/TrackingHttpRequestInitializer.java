@@ -439,7 +439,11 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   public static String listRequestWithTrailingDelimiter(
       String bucket, String prefix, String pageToken) {
     return listRequestWithTrailingDelimiter(
-        bucket, prefix, /* objectFields= */ OBJECT_FIELDS, (int) (long) 5000, pageToken);
+        bucket,
+        prefix,
+        /* objectFields= */ OBJECT_FIELDS,
+        GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
+        pageToken);
   }
 
   public static String listRequestWithTrailingDelimiter(
@@ -455,7 +459,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         /* includeTrailingDelimiter= */ true,
         prefix,
         objectFields,
-        (int) (long) 5000,
+        GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
         pageToken);
   }
 
@@ -510,7 +514,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         includeTrailingDelimiter,
         prefix,
         objectFields,
-        (int) (long) 5000,
+        GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
         pageToken);
   }
 

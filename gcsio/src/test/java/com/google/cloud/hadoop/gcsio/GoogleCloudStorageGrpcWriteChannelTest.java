@@ -389,7 +389,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     fakeService.setStartRequestException(new IOException("Error"));
     // Test data has to be larger than default 1 MiB pipe
     // buffer size in order to trigger a blocking call
-    ByteString data = createTestData(2 * 1024 * 1024);
+    ByteString data = createTestData(AsyncWriteChannelOptions.DEFAULT.getPipeBufferSize() * 2);
 
     GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
     writeChannel.initialize();

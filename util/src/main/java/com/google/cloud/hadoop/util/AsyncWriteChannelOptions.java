@@ -29,6 +29,15 @@ public abstract class AsyncWriteChannelOptions {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
+  /** Upload chunk size granularity */
+  private static final int UPLOAD_CHUNK_SIZE_GRANULARITY = 8 * 1024 * 1024;
+
+  /** Default upload chunk size. */
+  private static final int DEFAULT_UPLOAD_CHUNK_SIZE =
+      Runtime.getRuntime().maxMemory() < 512 * 1024 * 1024
+          ? UPLOAD_CHUNK_SIZE_GRANULARITY
+          : 8 * UPLOAD_CHUNK_SIZE_GRANULARITY;
+
   /** Pipe used for output stream. */
   public enum PipeType {
     NIO_CHANNEL_PIPE,
@@ -48,7 +57,7 @@ public abstract class AsyncWriteChannelOptions {
         .setPipeBufferSize(1024 * 1024)
         .setPipeType(PipeType.IO_STREAM_PIPE)
         .setUploadCacheSize(0)
-        .setUploadChunkSize(24 * 1024 * 1024);
+        .setUploadChunkSize(DEFAULT_UPLOAD_CHUNK_SIZE);
   }
 
   public abstract Builder toBuilder();
@@ -116,10 +125,11 @@ public abstract class AsyncWriteChannelOptions {
           chunkSize % MediaHttpUploader.MINIMUM_CHUNK_SIZE == 0,
           "Upload chunk size must be a multiple of %s",
           MediaHttpUploader.MINIMUM_CHUNK_SIZE);
-      if (chunkSize > 8 * 1024 * 1024 && chunkSize % (8 * 1024 * 1024) != 0) {
+      if (chunkSize > UPLOAD_CHUNK_SIZE_GRANULARITY
+          && chunkSize % UPLOAD_CHUNK_SIZE_GRANULARITY != 0) {
         logger.atWarning().log(
             "Upload chunk size should be a multiple of %s for the best performance, got %s",
-            8 * 1024 * 1024, chunkSize);
+            UPLOAD_CHUNK_SIZE_GRANULARITY, chunkSize);
       }
     }
   }

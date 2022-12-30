@@ -29,24 +29,13 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_UPLOAD_BUFFERED_REQUESTS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_MESSAGE_TIMEOUT;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_TIMEOUT;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_HTTP_CONNECT_TIMEOUT;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_HTTP_HEADERS;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_MAX_WAIT_TIME_EMPTY_OBJECT_CREATE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_PIPE_BUFFER_SIZE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_UPLOAD_CACHE_SIZE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_UPLOAD_CHUNK_SIZE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_PERFORMANCE_CACHE_MAX_ENTRY_AGE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_REWRITE_MAX_CHUNK_PER_CALL;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ROOT_URL;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_SERVICE_PATH;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_ADDRESS_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_PASSWORD_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_USERNAME_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.READ_TIMEOUT_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.cloud.hadoop.util.testing.HadoopConfigurationUtils.getDefaultProperties;
 import static com.google.common.truth.Truth.assertThat;
@@ -354,13 +343,13 @@ public class GoogleHadoopFileSystemConfigurationTest {
   @Test
   public void sizeProperties() {
     Configuration config = new Configuration();
-    config.set(GCS_INPUT_STREAM_INPLACE_SEEK_LIMIT.getKey(), "2048");
-    config.set(GCS_INPUT_STREAM_MIN_RANGE_REQUEST_SIZE.getKey(), "300K");
-    config.set(GCS_OUTPUT_STREAM_BUFFER_SIZE.getKey(), "40k");
-    config.set(GCS_OUTPUT_STREAM_PIPE_BUFFER_SIZE.getKey(), "256");
-    config.set(GCS_OUTPUT_STREAM_UPLOAD_CACHE_SIZE.getKey(), "512M");
-    config.set(GCS_OUTPUT_STREAM_UPLOAD_CHUNK_SIZE.getKey(), "16m");
-    config.set(GCS_REWRITE_MAX_CHUNK_PER_CALL.getKey(), "2g");
+    config.set("fs.gs.inputstream.inplace.seek.limit", "2048");
+    config.set("fs.gs.inputstream.min.range.request.size", "300K");
+    config.set("fs.gs.outputstream.buffer.size", "40k");
+    config.set("fs.gs.outputstream.pipe.buffer.size", "256");
+    config.set("fs.gs.outputstream.upload.cache.size", "512M");
+    config.set("fs.gs.outputstream.upload.chunk.size", "16m");
+    config.set("fs.gs.rewrite.max.chunk.per.call", "2g");
 
     GoogleCloudStorageOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
@@ -393,9 +382,6 @@ public class GoogleHadoopFileSystemConfigurationTest {
         GoogleHadoopFileSystemConfiguration.getPerformanceCachingOptions(config);
 
     assertThat(options.getGrpcMessageTimeoutCheckInterval()).isEqualTo(Duration.ofMinutes(1));
-    assertThat(options.getHttpRequestConnectTimeout()).isEqualTo(Duration.ofMinutes(2));
-    assertThat(options.getHttpRequestReadTimeout()).isEqualTo(Duration.ofSeconds(2));
-    assertThat(options.getMaxWaitTimeForEmptyObjectCreation()).isEqualTo(Duration.ofSeconds(90));
     assertThat(options.getReadChannelOptions().getGrpcReadMessageTimeout())
         .isEqualTo(Duration.ZERO);
     assertThat(options.getReadChannelOptions().getGrpcReadTimeout())
@@ -404,6 +390,9 @@ public class GoogleHadoopFileSystemConfigurationTest {
         .isEqualTo(Duration.ofSeconds(3));
     assertThat(options.getWriteChannelOptions().getGrpcWriteTimeout())
         .isEqualTo(Duration.ofHours(1));
+    assertThat(options.getHttpRequestConnectTimeout()).isEqualTo(Duration.ofMinutes(2));
+    assertThat(options.getHttpRequestReadTimeout()).isEqualTo(Duration.ofSeconds(2));
+    assertThat(options.getMaxWaitTimeForEmptyObjectCreation()).isEqualTo(Duration.ofSeconds(90));
     assertThat(perfCacheOptions.getMaxEntryAge()).isEqualTo(Duration.ofSeconds(4));
   }
 }
