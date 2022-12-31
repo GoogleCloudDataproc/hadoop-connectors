@@ -29,6 +29,7 @@ public abstract class AsyncWriteChannelOptions {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
+  /** Pipe used for output stream. */
   public enum PipeType {
     IO_STREAM_PIPE,
     NIO_CHANNEL_PIPE,
