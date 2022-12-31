@@ -17,28 +17,11 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_ALGORITHM;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ENCRYPTION_KEY_HASH;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_CHECK_INTERVAL_TIMEOUT;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_DIRECTPATH_ENABLE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_ENABLE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_READ_MESSAGE_TIMEOUT;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_READ_TIMEOUT;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_TRAFFICDIRECTOR_ENABLE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_UPLOAD_BUFFERED_REQUESTS;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_MESSAGE_TIMEOUT;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GRPC_WRITE_TIMEOUT;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_HTTP_HEADERS;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_ROOT_URL;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_SERVICE_PATH;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_ADDRESS_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_PASSWORD_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.PROXY_USERNAME_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.cloud.hadoop.util.testing.HadoopConfigurationUtils.getDefaultProperties;
 import static com.google.common.truth.Truth.assertThat;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GcsFileChecksumType;
@@ -50,7 +33,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.PerformanceCachingGoogleCloudStorageOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
-import com.google.cloud.hadoop.util.RedactedString;
 import com.google.cloud.hadoop.util.RequesterPaysOptions.RequesterPaysMode;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -134,17 +116,11 @@ public class GoogleHadoopFileSystemConfigurationTest {
       };
 
   @Test
-  public void testProxyProperties_throwsExceptionWhenMissingProxyAddress() {
-    HadoopConfigurationProperty<String> gcsProxyUsername =
-        new HadoopConfigurationProperty<>(
-            GCS_CONFIG_PREFIX + PROXY_USERNAME_SUFFIX.getKey(), "proxy-user");
-    HadoopConfigurationProperty<String> gcsProxyPassword =
-        new HadoopConfigurationProperty<>(
-            GCS_CONFIG_PREFIX + PROXY_PASSWORD_SUFFIX.getKey(), "proxy-pass");
-
+  public void proxyProperties_throwsException_whenMissingProxyAddress() {
     Configuration config = new Configuration();
-    config.set(gcsProxyUsername.getKey(), gcsProxyUsername.getDefault());
-    config.set(gcsProxyPassword.getKey(), gcsProxyPassword.getDefault());
+    config.set("fs.gs.proxy.password", "proxy-pass");
+    config.set("fs.gs.proxy.username", "proxy-user");
+
     GoogleCloudStorageOptions.Builder optionsBuilder =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config);
 
@@ -152,77 +128,89 @@ public class GoogleHadoopFileSystemConfigurationTest {
   }
 
   @Test
-  public void testProxyPropertiesAll() {
-    HadoopConfigurationProperty<String> gcsProxyUsername =
-        new HadoopConfigurationProperty<>(
-            GCS_CONFIG_PREFIX + PROXY_USERNAME_SUFFIX.getKey(), "proxy-user");
-    HadoopConfigurationProperty<String> gcsProxyPassword =
-        new HadoopConfigurationProperty<>(
-            GCS_CONFIG_PREFIX + PROXY_PASSWORD_SUFFIX.getKey(), "proxy-pass");
-    HadoopConfigurationProperty<String> gcsProxyAddress =
-        new HadoopConfigurationProperty<>(
-            GCS_CONFIG_PREFIX + PROXY_ADDRESS_SUFFIX.getKey(), "proxy-address");
-
+  public void proxyProperties_throwsException_whenOnlyProxyPasswordIsSet() {
     Configuration config = new Configuration();
-    config.set(gcsProxyUsername.getKey(), gcsProxyUsername.getDefault());
-    config.set(gcsProxyPassword.getKey(), gcsProxyPassword.getDefault());
-    config.set(gcsProxyAddress.getKey(), gcsProxyAddress.getDefault());
+    config.set("fs.gs.proxy.address", "proxy-addr");
+    config.set("fs.gs.proxy.password", "proxy-pass");
+
+    GoogleCloudStorageOptions.Builder optionsBuilder =
+        GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config);
+
+    assertThrows(IllegalArgumentException.class, optionsBuilder::build);
+  }
+
+  @Test
+  public void proxyProperties_throwsException_whenOnlyProxyUserIsSet() {
+    Configuration config = new Configuration();
+    config.set("fs.gs.proxy.address", "proxy-addr");
+    config.set("fs.gs.proxy.username", "proxy-user");
+
+    GoogleCloudStorageOptions.Builder optionsBuilder =
+        GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config);
+
+    assertThrows(IllegalArgumentException.class, optionsBuilder::build);
+  }
+
+  @Test
+  public void proxyProperties() {
+    Configuration config = new Configuration();
+    config.set("fs.gs.proxy.address", "proxy-addr");
+    config.set("fs.gs.proxy.password", "proxy-pass");
+    config.set("fs.gs.proxy.username", "proxy-user");
+
     GoogleCloudStorageFileSystemOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
 
-    assertThat(options.getCloudStorageOptions().getProxyUsername()).isNotNull();
-    assertThat(options.getCloudStorageOptions().getProxyUsername().value()).isEqualTo("proxy-user");
-    assertThat(options.getCloudStorageOptions().getProxyUsername().toString())
-        .isEqualTo("<redacted>");
+    assertThat(options.getCloudStorageOptions().getProxyAddress()).isEqualTo("proxy-addr");
 
     assertThat(options.getCloudStorageOptions().getProxyPassword()).isNotNull();
     assertThat(options.getCloudStorageOptions().getProxyPassword().value()).isEqualTo("proxy-pass");
     assertThat(options.getCloudStorageOptions().getProxyPassword().toString())
         .isEqualTo("<redacted>");
 
-    assertThat(options.getCloudStorageOptions().getProxyAddress()).isEqualTo("proxy-address");
+    assertThat(options.getCloudStorageOptions().getProxyUsername()).isNotNull();
+    assertThat(options.getCloudStorageOptions().getProxyUsername().value()).isEqualTo("proxy-user");
+    assertThat(options.getCloudStorageOptions().getProxyUsername().toString())
+        .isEqualTo("<redacted>");
   }
 
   @Test
-  public void testDeprecatedKeys_throwsExceptionWhenDeprecatedKeyIsUsed() {
-    HadoopConfigurationProperty<String> gcsProxyAddress =
-        new HadoopConfigurationProperty<>(
-            GCS_CONFIG_PREFIX + PROXY_ADDRESS_SUFFIX.getKey(),
-            "proxy-address",
-            "fs.gs.proxy.deprecated.address");
-
-    HadoopConfigurationProperty<Integer> gcsProxyUsername =
-        new HadoopConfigurationProperty<>(
-            GCS_CONFIG_PREFIX + PROXY_USERNAME_SUFFIX.getKey(),
-            1234,
-            "fs.gs.proxy.deprecated.user");
-
-    HadoopConfigurationProperty<String> gcsProxyPassword =
-        new HadoopConfigurationProperty<>(
-            GCS_CONFIG_PREFIX + PROXY_PASSWORD_SUFFIX.getKey(),
-            "proxy-pass",
-            "fs.gs.proxy.deprecated.pass");
+  public void deprecatedKey_default() {
+    HadoopConfigurationProperty<String> prop =
+        new HadoopConfigurationProperty<>("prop.key-new", "prop-val-def", "prop.key-deprecated");
 
     Configuration config = new Configuration();
-    config.set(gcsProxyAddress.getKey(), gcsProxyAddress.getDefault());
-    config.setInt(gcsProxyUsername.getKey(), gcsProxyUsername.getDefault());
-    config.set("fs.gs.proxy.deprecated.pass", gcsProxyPassword.getDefault());
 
-    // Verify that we can read password from config when used key is deprecated.
-    RedactedString userPass = gcsProxyPassword.getPassword(config);
-    assertThat(userPass.value()).isEqualTo("proxy-pass");
-
-    GoogleCloudStorageOptions.Builder optionsBuilder =
-        GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config);
-
-    // Building configuration using deprecated key (in e.g. proxy password) should fail.
-    assertThrows(IllegalArgumentException.class, optionsBuilder::build);
+    assertThat(prop.get(config, config::get)).isEqualTo("prop-val-def");
   }
 
   @Test
-  public void testHttpHeadersProperties_singleHeader() {
+  public void deprecatedKey_canReadValue() {
+    HadoopConfigurationProperty<String> prop =
+        new HadoopConfigurationProperty<>("prop.key-new", "prop-val-def", "prop.key-deprecated");
+
     Configuration config = new Configuration();
-    config.set(GCS_HTTP_HEADERS.getKey() + "header-key", "val=ue");
+    config.set("prop.key-deprecated", "prop-val-deprecated");
+
+    assertThat(prop.get(config, config::get)).isEqualTo("prop-val-deprecated");
+  }
+
+  @Test
+  public void deprecatedKey_canReadOverriddenValue() {
+    HadoopConfigurationProperty<String> prop =
+        new HadoopConfigurationProperty<>("prop.key-new", "prop-val-def", "prop.key-deprecated");
+
+    Configuration config = new Configuration();
+    config.set("prop.key-deprecated", "prop-val-deprecated");
+    config.set("prop.key-new", "prop-val-new");
+
+    assertThat(prop.get(config, config::get)).isEqualTo("prop-val-new");
+  }
+
+  @Test
+  public void httpHeadersProperties_singleHeader() {
+    Configuration config = new Configuration();
+    config.set("fs.gs.storage.http.headers.header-key", "val=ue");
 
     GoogleCloudStorageFileSystemOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
@@ -232,10 +220,10 @@ public class GoogleHadoopFileSystemConfigurationTest {
   }
 
   @Test
-  public void testHttpHeadersProperties_multipleHeaders() {
+  public void httpHeadersProperties_multipleHeaders() {
     Configuration config = new Configuration();
-    config.set(GCS_HTTP_HEADERS.getKey() + "test-header", "test-VAL");
-    config.set(GCS_HTTP_HEADERS.getKey() + "key-in-header", "+G2Ap33m5NVOgmXznSGTEvG0I=");
+    config.set("fs.gs.storage.http.headers.test-header", "test-VAL");
+    config.set("fs.gs.storage.http.headers.key-in-header", "+G2Ap33m5NVOgmXznSGTEvG0I=");
 
     GoogleCloudStorageFileSystemOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
@@ -245,11 +233,11 @@ public class GoogleHadoopFileSystemConfigurationTest {
   }
 
   @Test
-  public void testEncryptionProperties() {
+  public void encryptionProperties() {
     Configuration config = new Configuration();
-    config.set(GCS_ENCRYPTION_ALGORITHM.getKey(), "AES256");
-    config.set(GCS_ENCRYPTION_KEY.getKey(), "+G2Ap33m5NVOgmXznSGTEvG0I=");
-    config.set(GCS_ENCRYPTION_KEY_HASH.getKey(), "LpH4y6BkG/1B+n3FwORpdoyQ=");
+    config.set("fs.gs.encryption.algorithm", "AES256");
+    config.set("fs.gs.encryption.key", "+G2Ap33m5NVOgmXznSGTEvG0I=");
+    config.set("fs.gs.encryption.key.hash", "LpH4y6BkG/1B+n3FwORpdoyQ=");
 
     GoogleCloudStorageFileSystemOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config).build();
@@ -277,8 +265,8 @@ public class GoogleHadoopFileSystemConfigurationTest {
   @Test
   public void customPropertiesValues() {
     Configuration config = new Configuration();
-    config.set(GCS_ROOT_URL.getKey(), "https://unit-test-storage.googleapis.com/");
-    config.set(GCS_SERVICE_PATH.getKey(), "storage/dev_v1/");
+    config.set("fs.gs.storage.root.url", "https://unit-test-storage.googleapis.com/");
+    config.set("fs.gs.storage.service.path", "storage/dev_v1/");
 
     GoogleCloudStorageOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
@@ -288,14 +276,12 @@ public class GoogleHadoopFileSystemConfigurationTest {
   }
 
   @Test
-  public void testImpersonationIdentifier() {
+  public void saImpersonationProperties() {
     Configuration config = new Configuration();
     config.set(
-        GCS_CONFIG_PREFIX + USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey() + "test-user",
-        "test-service-account1");
+        "fs.gs.auth.impersonation.service.account.for.user.test-user", "test-service-account1");
     config.set(
-        GCS_CONFIG_PREFIX + GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey() + "test-grp",
-        "test-service-account2");
+        "fs.gs.auth.impersonation.service.account.for.group.test-grp", "test-service-account2");
 
     assertThat(
             USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX
@@ -310,38 +296,38 @@ public class GoogleHadoopFileSystemConfigurationTest {
   }
 
   @Test
-  public void testGrpcConfiguration() {
+  public void grpcConfiguration() {
     Configuration config = new Configuration();
-    config.setBoolean(GCS_GRPC_DIRECTPATH_ENABLE.getKey(), true);
-    config.setBoolean(GCS_GRPC_ENABLE.getKey(), true);
-    config.setBoolean(GCS_GRPC_TRAFFICDIRECTOR_ENABLE.getKey(), true);
-    config.setInt(GCS_GRPC_UPLOAD_BUFFERED_REQUESTS.getKey(), 30);
-    config.setLong(GCS_GRPC_CHECK_INTERVAL_TIMEOUT_MS.getKey(), 5);
-    config.setLong(GCS_GRPC_READ_MESSAGE_TIMEOUT_MS.getKey(), 10);
-    config.setLong(GCS_GRPC_READ_TIMEOUT_MS.getKey(), 10);
-    config.setLong(GCS_GRPC_WRITE_MESSAGE_TIMEOUT_MS.getKey(), 25);
-    config.setLong(GCS_GRPC_WRITE_TIMEOUT_MS.getKey(), 20);
+    config.setBoolean("fs.gs.grpc.directpath.enable", true);
+    config.setBoolean("fs.gs.grpc.enable", true);
+    config.setBoolean("fs.gs.grpc.trafficdirector.enable", true);
+    config.setInt("fs.gs.grpc.write.buffered.requests", 30);
+    config.setTimeDuration("fs.gs.grpc.checkinterval.timeout", 5, MILLISECONDS);
+    config.setTimeDuration("fs.gs.grpc.read.message.timeout", 10, MILLISECONDS);
+    config.setTimeDuration("fs.gs.grpc.read.timeout", 7, MILLISECONDS);
+    config.setTimeDuration("fs.gs.grpc.write.message.timeout", 25, MILLISECONDS);
+    config.setTimeDuration("fs.gs.grpc.write.timeout", 20, MILLISECONDS);
 
     GoogleCloudStorageOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
 
+    assertThat(options.isDirectPathPreferred()).isTrue();
+    assertThat(options.isGrpcEnabled()).isTrue();
+    assertThat(options.isTrafficDirectorEnabled()).isTrue();
+    assertThat(options.getWriteChannelOptions().getNumberOfBufferedRequests()).isEqualTo(30);
     assertThat(options.getGrpcMessageTimeoutCheckInterval()).isEqualTo(Duration.ofMillis(5));
     assertThat(options.getReadChannelOptions().getGrpcReadMessageTimeout())
         .isEqualTo(Duration.ofMillis(10));
     assertThat(options.getReadChannelOptions().getGrpcReadTimeout())
-        .isEqualTo(Duration.ofMillis(10));
+        .isEqualTo(Duration.ofMillis(7));
     assertThat(options.getWriteChannelOptions().getGrpcWriteMessageTimeout())
         .isEqualTo(Duration.ofMillis(25));
     assertThat(options.getWriteChannelOptions().getGrpcWriteTimeout())
         .isEqualTo(Duration.ofMillis(20));
-    assertThat(options.getWriteChannelOptions().getNumberOfBufferedRequests()).isEqualTo(30);
-    assertThat(options.isDirectPathPreferred()).isTrue();
-    assertThat(options.isGrpcEnabled()).isTrue();
-    assertThat(options.isTrafficDirectorEnabled()).isTrue();
   }
 
   @Test
-  public void sizeProperties() {
+  public void sizeProperties_sizeSuffixes() {
     Configuration config = new Configuration();
     config.set("fs.gs.inputstream.inplace.seek.limit", "2048");
     config.set("fs.gs.inputstream.min.range.request.size", "300K");
@@ -364,7 +350,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
   }
 
   @Test
-  public void timeDateProperties() {
+  public void timeProperties_timeDurationSuffixes() {
     Configuration config = new Configuration();
     config.set("fs.gs.grpc.checkinterval.timeout", "1m");
     config.set("fs.gs.grpc.read.message.timeout", "0");

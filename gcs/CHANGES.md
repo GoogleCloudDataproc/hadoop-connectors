@@ -110,6 +110,14 @@
     fs.gs.performance.cache.max.entry.age
     ```
 
+1.  Change default values of properties:
+
+    ```
+    fs.gs.http.connect-timeout (default: 20s -> 5s)
+    fs.gs.http.read-timeout (default: 20s -> 5s)
+    fs.gs.outputstream.upload.chunk.size (default: 64m -> 24m)
+    ```
+
 ### 2.2.2 - 2021-06-25
 
 1.  Support footer prefetch in gRPC read channel.

@@ -29,6 +29,11 @@ public abstract class AsyncWriteChannelOptions {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
+  public enum PipeType {
+    IO_STREAM_PIPE,
+    NIO_CHANNEL_PIPE,
+  }
+
   /** Upload chunk size granularity */
   private static final int UPLOAD_CHUNK_SIZE_GRANULARITY = 8 * 1024 * 1024;
 
@@ -37,12 +42,6 @@ public abstract class AsyncWriteChannelOptions {
       Runtime.getRuntime().maxMemory() < 512 * 1024 * 1024
           ? UPLOAD_CHUNK_SIZE_GRANULARITY
           : 3 * UPLOAD_CHUNK_SIZE_GRANULARITY;
-
-  /** Pipe used for output stream. */
-  public enum PipeType {
-    NIO_CHANNEL_PIPE,
-    IO_STREAM_PIPE,
-  }
 
   public static final AsyncWriteChannelOptions DEFAULT = builder().build();
 
