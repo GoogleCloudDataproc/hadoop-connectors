@@ -33,13 +33,13 @@ import javax.annotation.Nullable;
  * the appropriate API call(s) google-cloud-storage client.
  */
 @VisibleForTesting
-public class GoogleCloudStorageClientLibraryImpl extends ForwardingGoogleCloudStorage {
+public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
   /**
    * Having an instance of gscImpl to redirect calls to Json client while new client implementation
    * is in WIP.
    */
-  GoogleCloudStorageClientLibraryImpl(
+  GoogleCloudStorageClientImpl(
       GoogleCloudStorageOptions options,
       @Nullable Credentials credentials,
       @Nullable HttpTransport httpTransport,
@@ -57,10 +57,10 @@ public class GoogleCloudStorageClientLibraryImpl extends ForwardingGoogleCloudSt
   }
 
   public static Builder builder() {
-    return new AutoBuilder_GoogleCloudStorageClientLibraryImpl_Builder();
+    return new AutoBuilder_GoogleCloudStorageClientImpl_Builder();
   }
 
-  @AutoBuilder(ofClass = GoogleCloudStorageClientLibraryImpl.class)
+  @AutoBuilder(ofClass = GoogleCloudStorageClientImpl.class)
   public abstract static class Builder {
 
     public abstract Builder setOptions(GoogleCloudStorageOptions options);
@@ -76,6 +76,6 @@ public class GoogleCloudStorageClientLibraryImpl extends ForwardingGoogleCloudSt
     public abstract Builder setDownscopedAccessTokenFn(
         @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn);
 
-    public abstract GoogleCloudStorageClientLibraryImpl build() throws IOException;
+    public abstract GoogleCloudStorageClientImpl build() throws IOException;
   }
 }

@@ -47,14 +47,14 @@ public class MockGoogleCloudStorageImplFactory {
         .build();
   }
 
-  public static GoogleCloudStorageClientLibraryImpl mockedGcsClientLibraryImpl(
-      HttpTransport transport) throws IOException {
-    return mockedGcsClientLibraryImpl(getDefaultOptions(), transport);
+  public static GoogleCloudStorageClientImpl mockedGcsClientImpl(HttpTransport transport)
+      throws IOException {
+    return mockedGcsClientImpl(getDefaultOptions(), transport);
   }
 
-  public static GoogleCloudStorageClientLibraryImpl mockedGcsClientLibraryImpl(
+  public static GoogleCloudStorageClientImpl mockedGcsClientImpl(
       GoogleCloudStorageOptions options, HttpTransport transport) throws IOException {
-    return GoogleCloudStorageClientLibraryImpl.builder()
+    return GoogleCloudStorageClientImpl.builder()
         .setOptions(options)
         .setHttpTransport(transport)
         .setHttpRequestInitializer(

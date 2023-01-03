@@ -29,7 +29,7 @@ public abstract class GoogleCloudStorageFileSystemOptions {
   /** Cloud Storage client to use. */
   public enum ClientType {
     HTTP_API_CLIENT,
-    CLIENT_LIBRARY
+    STORAGE_CLIENT,
   }
 
   public static Builder builder() {
