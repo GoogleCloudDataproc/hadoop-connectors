@@ -59,10 +59,10 @@ public abstract class GoogleCloudStorageOptions {
         .setHttpRequestConnectTimeout(Duration.ofSeconds(5))
         .setHttpRequestHeaders(ImmutableMap.of())
         .setHttpRequestReadTimeout(Duration.ofSeconds(5))
-        .setMaxBytesRewrittenPerCall(512 * 1024 * 1024L)
         .setMaxHttpRequestRetries(10)
         .setMaxListItemsPerCall(5_000)
         .setMaxRequestsPerBatch(15)
+        .setMaxRewriteChunkSize(512 * 1024 * 1024L)
         .setMaxWaitTimeForEmptyObjectCreation(Duration.ofSeconds(3))
         .setMetricsSink(MetricsSink.NONE)
         .setReadChannelOptions(GoogleCloudStorageReadOptions.DEFAULT)
@@ -121,7 +121,7 @@ public abstract class GoogleCloudStorageOptions {
 
   public abstract boolean isCopyWithRewriteEnabled();
 
-  public abstract long getMaxBytesRewrittenPerCall();
+  public abstract long getMaxRewriteChunkSize();
 
   public abstract GoogleCloudStorageReadOptions getReadChannelOptions();
 
@@ -206,7 +206,7 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setCopyWithRewriteEnabled(boolean copyWithRewrite);
 
-    public abstract Builder setMaxBytesRewrittenPerCall(long bytes);
+    public abstract Builder setMaxRewriteChunkSize(long bytes);
 
     public abstract Builder setReadChannelOptions(GoogleCloudStorageReadOptions readChannelOptions);
 
@@ -234,10 +234,10 @@ public abstract class GoogleCloudStorageOptions {
     public GoogleCloudStorageOptions build() {
       GoogleCloudStorageOptions instance = autoBuild();
       checkArgument(
-          instance.getMaxBytesRewrittenPerCall() <= 0
-              || instance.getMaxBytesRewrittenPerCall() % (1024 * 1024) == 0,
-          "maxBytesRewrittenPerCall must be an integral multiple of 1 MiB (1048576), but was: %s",
-          instance.getMaxBytesRewrittenPerCall());
+          instance.getMaxRewriteChunkSize() <= 0
+              || instance.getMaxRewriteChunkSize() % (1024 * 1024) == 0,
+          "maxRewriteChunkSize must be an integral multiple of 1 MiB (1048576), but was: %s",
+          instance.getMaxRewriteChunkSize());
       checkArgument(
           instance.getProxyAddress() != null
               || (instance.getProxyUsername() == null && instance.getProxyPassword() == null),

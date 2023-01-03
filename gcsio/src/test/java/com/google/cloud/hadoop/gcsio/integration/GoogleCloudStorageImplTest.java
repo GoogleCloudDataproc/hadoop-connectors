@@ -418,12 +418,12 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void copy_withRewrite_multipleRequests() throws IOException {
-    int maxBytesRewrittenPerCall = 256 * 1024 * 1024;
+    int maxRewriteChunkSize = 256 * 1024 * 1024;
     TrackingStorageWrapper<GoogleCloudStorage> trackingGcs =
         newTrackingGoogleCloudStorage(
             getStandardOptionBuilder()
                 .setCopyWithRewriteEnabled(true)
-                .setMaxBytesRewrittenPerCall(maxBytesRewrittenPerCall)
+                .setMaxRewriteChunkSize(maxRewriteChunkSize)
                 .build());
 
     String srcBucketName = TEST_BUCKET;
@@ -460,21 +460,21 @@ public class GoogleCloudStorageImplTest {
                 resourceId.getObjectName(),
                 copiedResourceId.getBucketName(),
                 copiedResourceId.getObjectName(),
-                maxBytesRewrittenPerCall,
+                maxRewriteChunkSize,
                 /* rewriteTokenId= */ null),
             rewriteRequestString(
                 resourceId.getBucketName(),
                 resourceId.getObjectName(),
                 copiedResourceId.getBucketName(),
                 copiedResourceId.getObjectName(),
-                maxBytesRewrittenPerCall,
+                maxRewriteChunkSize,
                 /* rewriteTokenId= */ 1),
             rewriteRequestString(
                 resourceId.getBucketName(),
                 resourceId.getObjectName(),
                 copiedResourceId.getBucketName(),
                 copiedResourceId.getObjectName(),
-                maxBytesRewrittenPerCall,
+                maxRewriteChunkSize,
                 /* rewriteTokenId= */ 2));
   }
 

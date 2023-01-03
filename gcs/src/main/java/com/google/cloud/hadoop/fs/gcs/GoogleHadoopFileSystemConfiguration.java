@@ -225,10 +225,10 @@ public class GoogleHadoopFileSystemConfiguration {
    * Configuration key for specifying max number of bytes rewritten in a single rewrite request when
    * fs.gs.copy.with.rewrite.enable is set to 'true'.
    */
-  public static final HadoopConfigurationProperty<Long> GCS_REWRITE_MAX_CHUNK_PER_CALL =
+  public static final HadoopConfigurationProperty<Long> GCS_REWRITE_MAX_CHUNK_SIZE =
       new HadoopConfigurationProperty<>(
-          "fs.gs.rewrite.max.chunk.per.call",
-          GoogleCloudStorageOptions.DEFAULT.getMaxBytesRewrittenPerCall());
+          "fs.gs.rewrite.max.chunk.size",
+          GoogleCloudStorageOptions.DEFAULT.getMaxRewriteChunkSize());
 
   /** Configuration key for number of items to return per call to the list* GCS RPCs. */
   public static final HadoopConfigurationProperty<Integer> GCS_MAX_LIST_ITEMS_PER_CALL =
@@ -511,11 +511,10 @@ public class GoogleHadoopFileSystemConfiguration {
                     .get(
                         config,
                         (name, defVal) -> config.getTimeDuration(name, defVal, MILLISECONDS))))
-        .setMaxBytesRewrittenPerCall(
-            GCS_REWRITE_MAX_CHUNK_PER_CALL.get(config, config::getLongBytes))
         .setMaxHttpRequestRetries(GCS_HTTP_MAX_RETRY.get(config, config::getInt))
         .setMaxListItemsPerCall(GCS_MAX_LIST_ITEMS_PER_CALL.get(config, config::getInt))
         .setMaxRequestsPerBatch(GCS_MAX_REQUESTS_PER_BATCH.get(config, config::getInt))
+        .setMaxRewriteChunkSize(GCS_REWRITE_MAX_CHUNK_SIZE.get(config, config::getLongBytes))
         .setMaxWaitTimeForEmptyObjectCreation(
             Duration.ofMillis(
                 GCS_MAX_WAIT_TIME_EMPTY_OBJECT_CREATE.get(

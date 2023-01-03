@@ -65,7 +65,7 @@ public class CsekEncryptionIntegrationTest {
         makeStorage(
             getCsekStorageOptions()
                 .setCopyWithRewriteEnabled(true)
-                .setMaxBytesRewrittenPerCall(512 * 1024 * 1024)
+                .setMaxRewriteChunkSize(512 * 1024 * 1024)
                 .build());
 
     String srcBucketName = BUCKET_HELPER.getUniqueBucketName("rewrite-src");

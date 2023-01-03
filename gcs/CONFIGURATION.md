@@ -22,10 +22,10 @@
     Whether to perform copy operation using Rewrite requests which allows copy
     files between different locations and storage classes.
 
-*   `fs.gs.rewrite.max.chunk.per.call` (default: `512m`)
+*   `fs.gs.rewrite.max.chunk.size` (default: `512m`)
 
-    Maximum number of bytes rewritten in a single rewrite request when
-    `fs.gs.copy.with.rewrite.enable` is set to `true`.
+    Maximum size of object chunk that will be rewritten in a single rewrite
+    request when `fs.gs.copy.with.rewrite.enable` is set to `true`.
 
 *   `fs.gs.reported.permissions` (default: `700`)
 

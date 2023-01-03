@@ -105,7 +105,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.requester.pays.buckets", ImmutableList.of());
           put("fs.gs.requester.pays.mode", RequesterPaysMode.DISABLED);
           put("fs.gs.requester.pays.project.id", null);
-          put("fs.gs.rewrite.max.chunk.per.call", 512 * 1024 * 1024L);
+          put("fs.gs.rewrite.max.chunk.size", 512 * 1024 * 1024L);
           put("fs.gs.status.parallel.enable", true);
           put("fs.gs.storage.http.headers.", ImmutableMap.of());
           put("fs.gs.storage.root.url", "https://storage.googleapis.com/");
@@ -335,7 +335,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
     config.set("fs.gs.outputstream.pipe.buffer.size", "256");
     config.set("fs.gs.outputstream.upload.cache.size", "512M");
     config.set("fs.gs.outputstream.upload.chunk.size", "16m");
-    config.set("fs.gs.rewrite.max.chunk.per.call", "2g");
+    config.set("fs.gs.rewrite.max.chunk.size", "2g");
 
     GoogleCloudStorageOptions options =
         GoogleHadoopFileSystemConfiguration.getGcsOptionsBuilder(config).build();
@@ -346,7 +346,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
     assertThat(options.getWriteChannelOptions().getPipeBufferSize()).isEqualTo(256);
     assertThat(options.getWriteChannelOptions().getUploadCacheSize()).isEqualTo(512 * 1024 * 1024);
     assertThat(options.getWriteChannelOptions().getUploadChunkSize()).isEqualTo(16 * 1024 * 1024);
-    assertThat(options.getMaxBytesRewrittenPerCall()).isEqualTo(2 * 1024 * 1024 * 1024L);
+    assertThat(options.getMaxRewriteChunkSize()).isEqualTo(2 * 1024 * 1024 * 1024L);
   }
 
   @Test

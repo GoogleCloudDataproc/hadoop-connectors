@@ -82,7 +82,7 @@
     ([google-cloud-storage](https://github.com/googleapis/java-storage/tree/main/google-cloud-storage)).
 
 1.  Rename `fs.gs.rewrite.max.bytes.per.call` property to
-    `fs.gs.rewrite.max.chunk.per.call`.
+    `fs.gs.rewrite.max.chunk.size`.
 
 1.  Remove support of the deprecated `fs.gs.io.buffersize.write` property.
 
@@ -96,7 +96,7 @@
     fs.gs.outputstream.pipe.buffer.size
     fs.gs.outputstream.upload.cache.size
     fs.gs.outputstream.upload.chunk.size
-    fs.gs.rewrite.max.chunk.per.call
+    fs.gs.rewrite.max.chunk.size
     ```
 
 1.  Remove `.ms` suffix from names and add support for time suffixes (`ms`, `s`,

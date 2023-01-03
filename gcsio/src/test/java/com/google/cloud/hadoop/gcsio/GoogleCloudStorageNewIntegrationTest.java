@@ -1021,7 +1021,7 @@ public class GoogleCloudStorageNewIntegrationTest {
             gcsOptions.toBuilder()
                 .setBatchThreads(0)
                 .setCopyWithRewriteEnabled(true)
-                .setMaxBytesRewrittenPerCall(0)
+                .setMaxRewriteChunkSize(0)
                 .build());
 
     String testBucket1 = gcsfsIHelper.sharedBucketName1;

@@ -270,12 +270,10 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
       String srcObject,
       String dstBucket,
       String dstObject,
-      Integer maxBytesRewrittenPerCall,
+      Integer maxRewriteChunkSize,
       Integer rewriteTokenId) {
     String rewriteParams =
-        (maxBytesRewrittenPerCall == null
-                ? ""
-                : "?maxBytesRewrittenPerCall=" + maxBytesRewrittenPerCall)
+        (maxRewriteChunkSize == null ? "" : "?maxBytesRewrittenPerCall=" + maxRewriteChunkSize)
             + (rewriteTokenId == null ? "" : "&rewriteToken=token_" + rewriteTokenId);
     return copyRequestString(srcBucket, srcObject, dstBucket, dstObject, "rewriteTo")
         + rewriteParams;
