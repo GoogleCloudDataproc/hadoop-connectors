@@ -61,28 +61,28 @@ public class HadoopCredentialConfigurationTest {
   private static final Map<String, Object> expectedDefaultConfiguration =
       new HashMap<String, Object>() {
         {
-          put(".auth.access.token.provider.impl", null);
+          put(".auth.client.id", null);
+          put(".auth.client.secret", null);
+          put(".auth.impersonation.service.account", null);
+          put(".auth.impersonation.service.account.for.group.", ImmutableMap.of());
+          put(".auth.impersonation.service.account.for.user.", ImmutableMap.of());
           put(".auth.null.enable", false);
+          put(".auth.refresh.token", null);
           put(".auth.service.account.email", null);
-          put(".service.account.auth.email", null);
           put(".auth.service.account.enable", true);
-          put(".enable.service.account.auth", true);
           put(".auth.service.account.json.keyfile", null);
           put(".auth.service.account.keyfile", null);
-          put(".service.account.auth.keyfile", null);
           put(".auth.service.account.private.key", null);
           put(".auth.service.account.private.key.id", null);
-          put(".token.server.url", "https://oauth2.googleapis.com/token");
+          put(".enable.service.account.auth", true);
           put(".http.transport.type", JAVA_NET);
           put(".proxy.address", null);
           put(".proxy.password", null);
           put(".proxy.username", null);
-          put(".auth.impersonation.service.account", null);
-          put(".auth.impersonation.service.account.for.user.", ImmutableMap.of());
-          put(".auth.impersonation.service.account.for.group.", ImmutableMap.of());
-          put(".auth.client.id", null);
-          put(".auth.client.secret", null);
-          put(".auth.refresh.token", null);
+          put(".service.account.auth.email", null);
+          put(".service.account.auth.keyfile", null);
+          put(".token.server.url", "https://oauth2.googleapis.com/token");
+          put(".auth.access.token.provider.impl", null);
         }
       };
 
