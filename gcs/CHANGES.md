@@ -2,6 +2,15 @@
 
 ## Next
 
+1. Add support for OAuth2 based client authentication that retrieves
+a refresh token using the authorisation code grant flow configured via the
+following properties:
+
+    ```
+    fs.gs.auth.client.id
+    fs.gs.auth.client.secret
+    fs.gs.auth.refresh.token
+   ```
 ## 2.2.10 - 2022-12-11
 
 1. Update dependencies to latest version
