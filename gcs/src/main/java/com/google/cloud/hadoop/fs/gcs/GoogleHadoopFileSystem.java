@@ -16,9 +16,6 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DIRECTORIES_CREATED;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_CREATED;
-import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.FILES_DELETED;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
@@ -551,7 +548,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                           .build(),
                       statistics),
                   statistics);
-          statsInstrumentation.incrementCounter(FILES_CREATED, 1);
+          statsInstrumentation.incrementCounter(GhfsStatistic.FILES_CREATED, 1);
           return response;
         });
   }
@@ -653,7 +650,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                   "delete(hadoopPath: %s, recursive: %b): true", hadoopPath, recursive);
             }
             response = result;
-            statsInstrumentation.incrementCounter(FILES_DELETED, 1);
+            statsInstrumentation.incrementCounter(GhfsStatistic.FILES_DELETED, 1);
           } catch (IOException e) {
             incrementStatistic(GhfsStatistic.FILES_DELETE_REJECTED, 1);
             throw e;
@@ -712,7 +709,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
     }
     logger.atFiner().log("mkdirs(hadoopPath: %s, permission: %s): true", hadoopPath, permission);
     boolean response = true;
-    statsInstrumentation.incrementCounter(DIRECTORIES_CREATED, 1);
+    statsInstrumentation.incrementCounter(GhfsStatistic.DIRECTORIES_CREATED, 1);
     return response;
   }
 
