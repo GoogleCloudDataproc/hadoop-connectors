@@ -318,8 +318,8 @@ public class HadoopCredentialsConfiguration {
           try {
             return HttpTransportFactory.createHttpTransport(
                 PROXY_ADDRESS_SUFFIX.withPrefixes(keyPrefixes).get(config, config::get),
-                PROXY_PASSWORD_SUFFIX.withPrefixes(keyPrefixes).getPassword(config),
                 PROXY_USERNAME_SUFFIX.withPrefixes(keyPrefixes).getPassword(config),
+                PROXY_PASSWORD_SUFFIX.withPrefixes(keyPrefixes).getPassword(config),
                 READ_TIMEOUT_SUFFIX.withPrefixes(keyPrefixes).getTimeDuration(config));
           } catch (IOException e) {
             throw new UncheckedIOException(e);
