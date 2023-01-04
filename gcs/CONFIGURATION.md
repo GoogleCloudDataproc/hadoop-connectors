@@ -174,7 +174,7 @@ provider.
 #### Service account authentication
 
 The following properties are required only when running not on a GCE VM and
-`fs.gs.auth.service.account.enable` is `true`. There are 3 ways to configure
+`fs.gs.auth.service.account.enable` is `true`. There are 4 ways to configure
 these credentials, which are mutually exclusive.
 
 *   `fs.gs.auth.service.account.email` (not set by default)
@@ -219,6 +219,32 @@ exist at the same path on all nodes
 
     The PKCS12 (p12) certificate file of the service account used for GCS access
     when `fs.gs.auth.service.account.enable` is `true`.
+
+##### Method 4
+
+Configure service account credentials using OAuth client secret and refresh token.
+
+To achieve this the connector will use the
+[refresh token grant flow](https://oauth.net/2/grant-types/refresh-token/) to
+retrieve a new access tokens when necessary.
+
+In order to use this authentication type, you will first need to retrieve a
+refresh token using the
+[authorization code grant flow](https://oauth.net/2/grant-types/authorization-code)
+and pass it to the connector with OAuth client ID and secret:
+
+*   `fs.gs.auth.client.id` (not set by default)
+
+    The OAuth2 client ID.
+
+*   `fs.gs.auth.client.secret` (not set by default)
+
+    The OAuth2 client secret.
+
+*   `fs.gs.auth.refresh.token` (not set by default)
+
+    The refresh token.
+
 
 #### Service account impersonation
 

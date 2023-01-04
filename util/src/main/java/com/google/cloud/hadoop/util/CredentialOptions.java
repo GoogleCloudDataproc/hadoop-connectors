@@ -83,6 +83,15 @@ public abstract class CredentialOptions {
   @Nullable
   public abstract RedactedString getProxyPassword();
 
+  @Nullable
+  public abstract String getAuthClientId();
+
+  @Nullable
+  public abstract RedactedString getAuthClientSecret();
+
+  @Nullable
+  public abstract RedactedString getAuthRefreshToken();
+
   /** Builder for {@link CredentialOptions} */
   @AutoValue.Builder
   public abstract static class Builder {
@@ -111,6 +120,12 @@ public abstract class CredentialOptions {
     public abstract Builder setProxyUsername(RedactedString proxyUsername);
 
     public abstract Builder setProxyPassword(RedactedString proxyPassword);
+
+    public abstract Builder setAuthClientId(String clientId);
+
+    public abstract Builder setAuthClientSecret(RedactedString clientSecret);
+
+    public abstract Builder setAuthRefreshToken(RedactedString refreshToken);
 
     abstract CredentialOptions autoBuild();
 
