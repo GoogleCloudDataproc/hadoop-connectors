@@ -17,7 +17,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTest.newStorageObject;
-import static com.google.cloud.hadoop.gcsio.MockGoogleCloudStorageImplFactory.mockedGcs;
+import static com.google.cloud.hadoop.gcsio.MockGoogleCloudStorageImplFactory.mockedGcsImpl;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
@@ -85,7 +85,7 @@ public class GoogleCloudStorageMockitoTest {
             .setProjectId(PROJECT_ID)
             .setCopyWithRewriteEnabled(false)
             .build();
-    gcs = mockedGcs(gcsOptions, transport);
+    gcs = mockedGcsImpl(gcsOptions, transport);
     gcs.setBatchFactory(mockBatchFactory);
     gcs.setErrorExtractor(mockErrorExtractor);
 

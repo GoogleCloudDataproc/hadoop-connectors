@@ -25,16 +25,16 @@ import java.io.IOException;
 
 public class MockGoogleCloudStorageImplFactory {
 
-  public static GoogleCloudStorageImpl mockedGcs(HttpTransport transport) throws IOException {
-    return mockedGcs(getDefaultOptions(), transport);
+  public static GoogleCloudStorageImpl mockedGcsImpl(HttpTransport transport) throws IOException {
+    return mockedGcsImpl(getDefaultOptions(), transport);
   }
 
-  public static GoogleCloudStorageImpl mockedGcs(
+  public static GoogleCloudStorageImpl mockedGcsImpl(
       GoogleCloudStorageOptions options, HttpTransport transport) throws IOException {
-    return mockedGcs(options, transport, /* httpRequestInitializer= */ null);
+    return mockedGcsImpl(options, transport, /* httpRequestInitializer= */ null);
   }
 
-  public static GoogleCloudStorageImpl mockedGcs(
+  public static GoogleCloudStorageImpl mockedGcsImpl(
       GoogleCloudStorageOptions options,
       HttpTransport transport,
       HttpRequestInitializer httpRequestInitializer)
@@ -47,13 +47,14 @@ public class MockGoogleCloudStorageImplFactory {
         .build();
   }
 
-  public static GcsJavaClientImpl mockedJavaClientGcs(HttpTransport transport) throws IOException {
-    return mockedJavaClientGcs(getDefaultOptions(), transport);
+  public static GoogleCloudStorageClientImpl mockedGcsClientImpl(HttpTransport transport)
+      throws IOException {
+    return mockedGcsClientImpl(getDefaultOptions(), transport);
   }
 
-  public static GcsJavaClientImpl mockedJavaClientGcs(
+  public static GoogleCloudStorageClientImpl mockedGcsClientImpl(
       GoogleCloudStorageOptions options, HttpTransport transport) throws IOException {
-    return GcsJavaClientImpl.builder()
+    return GoogleCloudStorageClientImpl.builder()
         .setOptions(options)
         .setHttpTransport(transport)
         .setHttpRequestInitializer(

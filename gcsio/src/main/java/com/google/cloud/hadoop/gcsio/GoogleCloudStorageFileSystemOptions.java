@@ -26,22 +26,21 @@ public abstract class GoogleCloudStorageFileSystemOptions {
 
   public static GoogleCloudStorageFileSystemOptions DEFAULT = builder().build();
 
-  public enum FilesystemAPI {
-    OBJECT,
-    DIRECTORY,
-    AUTO
+  /** Cloud Storage client to use. */
+  public enum ClientType {
+    HTTP_API_CLIENT,
+    STORAGE_CLIENT,
   }
 
   public static Builder builder() {
     return new AutoValue_GoogleCloudStorageFileSystemOptions.Builder()
         .setBucketDeleteEnabled(false)
+        .setClientType(ClientType.HTTP_API_CLIENT)
         .setCloudStorageOptions(GoogleCloudStorageOptions.DEFAULT)
         .setEnsureNoConflictingItems(true)
         .setMarkerFilePattern((String) null)
         .setPerformanceCacheEnabled(false)
         .setPerformanceCacheOptions(PerformanceCachingGoogleCloudStorageOptions.DEFAULT)
-        .setFilesystemApi(FilesystemAPI.OBJECT)
-        .setJavaClientEnabled(false)
         .setStatusParallelEnabled(true);
   }
 
@@ -49,7 +48,7 @@ public abstract class GoogleCloudStorageFileSystemOptions {
 
   public abstract boolean isPerformanceCacheEnabled();
 
-  public abstract boolean isJavaClientEnabled();
+  public abstract ClientType getClientType();
 
   public abstract PerformanceCachingGoogleCloudStorageOptions getPerformanceCacheOptions();
 
@@ -64,8 +63,6 @@ public abstract class GoogleCloudStorageFileSystemOptions {
 
   public abstract boolean isEnsureNoConflictingItems();
 
-  public abstract FilesystemAPI getFilesystemApi();
-
   public void throwIfNotValid() {
     getCloudStorageOptions().throwIfNotValid();
   }
@@ -73,6 +70,8 @@ public abstract class GoogleCloudStorageFileSystemOptions {
   /** Mutable builder for {@link GoogleCloudStorageFileSystemOptions}. */
   @AutoValue.Builder
   public abstract static class Builder {
+
+    public abstract Builder setClientType(ClientType clientType);
 
     public abstract Builder setPerformanceCacheEnabled(boolean performanceCacheEnabled);
 
@@ -99,9 +98,5 @@ public abstract class GoogleCloudStorageFileSystemOptions {
     public abstract Builder setEnsureNoConflictingItems(boolean ensureNoConflictingItems);
 
     public abstract GoogleCloudStorageFileSystemOptions build();
-
-    public abstract Builder setFilesystemApi(FilesystemAPI filesystemApi);
-
-    public abstract Builder setJavaClientEnabled(boolean manualClientEnabled);
   }
 }

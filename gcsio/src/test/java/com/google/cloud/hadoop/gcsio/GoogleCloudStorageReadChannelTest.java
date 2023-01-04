@@ -21,7 +21,7 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.BUCKET_N
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.HTTP_TRANSPORT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.OBJECT_NAME;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.createReadChannel;
-import static com.google.cloud.hadoop.gcsio.MockGoogleCloudStorageImplFactory.mockedGcs;
+import static com.google.cloud.hadoop.gcsio.MockGoogleCloudStorageImplFactory.mockedGcsImpl;
 import static com.google.cloud.hadoop.gcsio.StorageResourceId.UNKNOWN_GENERATION_ID;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getMediaRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
@@ -628,7 +628,7 @@ public class GoogleCloudStorageReadChannelTest {
                   }
                 }),
             dataResponse(ImmutableMap.of("Content-Length", testData2.length), testData2));
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs = mockedGcsImpl(transport);
 
     GoogleCloudStorageReadChannel readChannel =
         (GoogleCloudStorageReadChannel)

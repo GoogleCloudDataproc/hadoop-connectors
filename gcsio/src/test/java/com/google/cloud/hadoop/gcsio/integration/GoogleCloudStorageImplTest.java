@@ -35,8 +35,8 @@ import com.google.cloud.hadoop.gcsio.AssertingLogHandler;
 import com.google.cloud.hadoop.gcsio.CreateBucketOptions;
 import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.EventLoggingHttpRequestInitializer;
-import com.google.cloud.hadoop.gcsio.GcsJavaClientImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
@@ -76,16 +76,14 @@ public class GoogleCloudStorageImplTest {
 
   private static GoogleCloudStorage helperGcs;
 
-  private final boolean javaClientEnabled;
+  private final boolean tesStorageClientImpl;
 
-  public GoogleCloudStorageImplTest(boolean javaClientEnabled) {
-    this.javaClientEnabled = javaClientEnabled;
+  public GoogleCloudStorageImplTest(boolean tesStorageClientImpl) {
+    this.tesStorageClientImpl = tesStorageClientImpl;
   }
 
   @Parameters
-  // We want to test this entire class with both javaClientImpl and gcsImpl
-  // Some of our internal endpoints only work with TD
-  public static Iterable<Boolean> javaClientEnabled() {
+  public static Iterable<Boolean> getTesStorageClientImplParameter() {
     return List.of(false, true);
   }
 
@@ -561,8 +559,8 @@ public class GoogleCloudStorageImplTest {
     return new TrackingStorageWrapper<>(
         options,
         httpRequestInitializer ->
-            javaClientEnabled
-                ? GcsJavaClientImpl.builder()
+            tesStorageClientImpl
+                ? GoogleCloudStorageClientImpl.builder()
                     .setOptions(options)
                     .setCredentials(credentials)
                     .setHttpRequestInitializer(httpRequestInitializer)
@@ -578,8 +576,11 @@ public class GoogleCloudStorageImplTest {
   private GoogleCloudStorage getStorageFromOptions(GoogleCloudStorageOptions options)
       throws IOException {
     Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
-    return javaClientEnabled
-        ? GcsJavaClientImpl.builder().setOptions(options).setCredentials(credentials).build()
+    return tesStorageClientImpl
+        ? GoogleCloudStorageClientImpl.builder()
+            .setOptions(options)
+            .setCredentials(credentials)
+            .build()
         : GoogleCloudStorageImpl.builder().setOptions(options).setCredentials(credentials).build();
   }
 

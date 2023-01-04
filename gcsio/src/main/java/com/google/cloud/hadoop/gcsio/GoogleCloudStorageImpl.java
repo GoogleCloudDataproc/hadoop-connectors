@@ -302,10 +302,15 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     // If httpRequestInitializer is null then use
     // finalCredentials to initialize finalHttpRequestInitializer
-    HttpRequestInitializer finalHttpRequestInitializer =
-        httpRequestInitializer == null
-            ? new RetryHttpInitializer(finalCredentials, options.toRetryHttpInitializerOptions())
-            : httpRequestInitializer;
+    HttpRequestInitializer finalHttpRequestInitializer;
+    if (httpRequestInitializer == null) {
+      finalHttpRequestInitializer =
+          new RetryHttpInitializer(finalCredentials, options.toRetryHttpInitializerOptions());
+    } else {
+      logger.atWarning().log(
+          "ALERT: Overriding httpRequestInitializer - this should not be done in production!");
+      finalHttpRequestInitializer = httpRequestInitializer;
+    }
     this.httpRequestInitializer =
         options.isTraceLogEnabled()
             ? new ChainingHttpRequestInitializer(
