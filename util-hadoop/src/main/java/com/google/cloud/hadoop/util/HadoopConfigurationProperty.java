@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.util;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.nullToEmpty;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
@@ -25,6 +26,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -91,6 +93,13 @@ public class HadoopConfigurationProperty<T> {
     return logProperty(
         lookupKey,
         RedactedString.create(value == null ? (String) defaultValue : String.valueOf(value)));
+  }
+
+  public Duration getTimeDuration(Configuration config) {
+    String lookupKey = getLookupKey(config, key, deprecatedKeys, (c, k) -> c.get(k) != null);
+    String defValStr = defaultValue == null ? null : String.valueOf(defaultValue);
+    return logProperty(
+        lookupKey, Duration.ofMillis(config.getTimeDuration(lookupKey, defValStr, MILLISECONDS)));
   }
 
   public Collection<String> getStringCollection(Configuration config) {

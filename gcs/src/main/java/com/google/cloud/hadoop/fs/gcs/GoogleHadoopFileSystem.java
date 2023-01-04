@@ -33,7 +33,6 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.flogger.LazyArgs.lazy;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDuration;
 
 import com.google.auth.oauth2.GoogleCredentials;
@@ -71,7 +70,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.DirectoryNotEmptyException;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -541,11 +539,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                                   ? CreateFileOptions.WriteMode.OVERWRITE
                                   : CreateFileOptions.WriteMode.CREATE_NEW)
                           .setMinSyncInterval(
-                              Duration.ofMillis(
-                                  GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL.get(
-                                      getConf(),
-                                      (name, defVal) ->
-                                          getConf().getTimeDuration(name, defVal, MILLISECONDS))))
+                              GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL.getTimeDuration(getConf()))
                           .build(),
                       statistics),
                   statistics);
@@ -1106,12 +1100,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
             filePath,
             CreateFileOptions.builder()
                 .setWriteMode(CreateFileOptions.WriteMode.APPEND)
-                .setMinSyncInterval(
-                    Duration.ofMillis(
-                        GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL.get(
-                            getConf(),
-                            (name, defVal) ->
-                                getConf().getTimeDuration(name, defVal, MILLISECONDS))))
+                .setMinSyncInterval(GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL.getTimeDuration(getConf()))
                 .build(),
             statistics),
         statistics);
