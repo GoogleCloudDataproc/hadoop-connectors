@@ -16,7 +16,6 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PIPE_BUFFER_SIZE_DEFAULT;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.any;
@@ -388,8 +387,9 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
   @Test
   public void writeHandlesErrorOnStartRequestFailure() throws Exception {
     fakeService.setStartRequestException(new IOException("Error"));
-    // test data has to be larger than PIPE_BUFFER_SIZE_DEFAULT in order to trigger a blocking call
-    ByteString data = createTestData(PIPE_BUFFER_SIZE_DEFAULT * 2);
+    // Test data has to be larger than default 1 MiB pipe
+    // buffer size in order to trigger a blocking call
+    ByteString data = createTestData(AsyncWriteChannelOptions.DEFAULT.getPipeBufferSize() * 2);
 
     GoogleCloudStorageGrpcWriteChannel writeChannel = newWriteChannel();
     writeChannel.initialize();

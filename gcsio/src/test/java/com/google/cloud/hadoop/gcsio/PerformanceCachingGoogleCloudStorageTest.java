@@ -39,7 +39,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnit4.class)
 public class PerformanceCachingGoogleCloudStorageTest {
@@ -102,13 +101,10 @@ public class PerformanceCachingGoogleCloudStorageTest {
 
   @Before
   public void setUp() throws IOException {
-    // Setup mocks.
-    MockitoAnnotations.initMocks(this);
-
     // Create the cache configuration.
     cache = new PrefixMappedItemCache(new TestTicker(), Duration.ofMillis(10));
 
-    // Setup the delegate
+    // Set up the delegate
     clock = new TestClock();
     GoogleCloudStorage gcsImpl =
         new InMemoryGoogleCloudStorage(GoogleCloudStorageOptions.DEFAULT, clock);

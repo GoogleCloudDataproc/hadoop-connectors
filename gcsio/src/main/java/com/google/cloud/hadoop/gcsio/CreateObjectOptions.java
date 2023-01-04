@@ -27,8 +27,6 @@ import javax.annotation.Nullable;
 @AutoValue
 public abstract class CreateObjectOptions {
 
-  public static final String CONTENT_TYPE_DEFAULT = "application/octet-stream";
-
   public static final CreateObjectOptions DEFAULT_NO_OVERWRITE = builder().build();
   public static final CreateObjectOptions DEFAULT_OVERWRITE =
       builder().setOverwriteExisting(true).build();
@@ -36,7 +34,7 @@ public abstract class CreateObjectOptions {
   public static Builder builder() {
     return new AutoValue_CreateObjectOptions.Builder()
         .setContentEncoding(null)
-        .setContentType(CONTENT_TYPE_DEFAULT)
+        .setContentType("application/octet-stream")
         .setEnsureEmptyObjectsMetadataMatch(true)
         .setKmsKeyName(null)
         .setMetadata(ImmutableMap.of())

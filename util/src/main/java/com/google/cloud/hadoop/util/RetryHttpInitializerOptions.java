@@ -28,21 +28,15 @@ import javax.annotation.Nullable;
 @AutoValue
 public abstract class RetryHttpInitializerOptions {
 
-  public static final String DEFAULT_DEFAULT_USER_AGENT = null;
-  public static final ImmutableMap<String, String> DEFAULT_HTTP_HEADERS = ImmutableMap.of();
-  public static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(20);
-  public static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(20);
-  public static final int DEFAULT_MAX_REQUEST_RETRIES = 10;
-
   public static final RetryHttpInitializerOptions DEFAULT = builder().build();
 
   public static Builder builder() {
     return new AutoValue_RetryHttpInitializerOptions.Builder()
-        .setDefaultUserAgent(DEFAULT_DEFAULT_USER_AGENT)
-        .setHttpHeaders(DEFAULT_HTTP_HEADERS)
-        .setConnectTimeout(DEFAULT_CONNECT_TIMEOUT)
-        .setReadTimeout(DEFAULT_READ_TIMEOUT)
-        .setMaxRequestRetries(DEFAULT_MAX_REQUEST_RETRIES);
+        .setConnectTimeout(Duration.ofSeconds(5))
+        .setDefaultUserAgent(null)
+        .setHttpHeaders(ImmutableMap.of())
+        .setMaxRequestRetries(10)
+        .setReadTimeout(Duration.ofSeconds(5));
   }
 
   public abstract Builder toBuilder();

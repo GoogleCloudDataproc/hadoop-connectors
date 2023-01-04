@@ -19,7 +19,6 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.createItemInfoForBucket;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.createItemInfoForStorageObject;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo.createInferredDirectory;
-import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.HTTP_TRANSPORT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.resumableUploadResponse;
 import static com.google.cloud.hadoop.gcsio.MockGoogleCloudStorageImplFactory.mockedGcsImpl;
@@ -46,6 +45,7 @@ import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockB
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.net.HttpHeaders.CONTENT_LENGTH;
 import static com.google.common.truth.Truth.assertThat;
+import static java.lang.Math.toIntExact;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
@@ -1052,20 +1052,19 @@ public class GoogleCloudStorageTest {
     NanoClock fakeNanoClock =
         new NanoClock() {
 
-          private final ImmutableList<Long> fakeValues =
+          private final ImmutableList<Duration> fakeValues =
               ImmutableList.of(
-                  Duration.ofMillis(1).toNanos(),
-                  Duration.ofMillis(2).toNanos(),
-                  Duration.ofMillis(3).toNanos(),
+                  Duration.ofMillis(1),
+                  Duration.ofMillis(2),
+                  Duration.ofMillis(3),
                   Duration.ofMillis(3)
-                      .plusMillis(DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS)
-                      .toNanos());
+                      .plus(GoogleCloudStorageReadOptions.DEFAULT.getBackoffMaxElapsedTime()));
 
           private final AtomicInteger fakeValueIndex = new AtomicInteger(0);
 
           @Override
           public long nanoTime() {
-            return fakeValues.get(fakeValueIndex.getAndIncrement());
+            return fakeValues.get(fakeValueIndex.getAndIncrement()).toNanos();
           }
         };
 
@@ -1084,7 +1083,9 @@ public class GoogleCloudStorageTest {
         (GoogleCloudStorageReadChannel) gcs.open(RESOURCE_ID);
     readChannel.setReadBackOff(
         new ExponentialBackOff.Builder()
-            .setMaxElapsedTimeMillis(DEFAULT_BACKOFF_MAX_ELAPSED_TIME_MILLIS)
+            .setMaxElapsedTimeMillis(
+                toIntExact(
+                    GoogleCloudStorageReadOptions.DEFAULT.getBackoffMaxElapsedTime().toMillis()))
             .setNanoClock(fakeNanoClock)
             .build());
     assertThat(readChannel.isOpen()).isTrue();
@@ -3303,7 +3304,7 @@ public class GoogleCloudStorageTest {
     GoogleCloudStorage gcs =
         mockedGcsImpl(GCS_OPTIONS, transport, trackingRequestInitializerWithRetries);
 
-    gcs.compose(BUCKET_NAME, sources, OBJECT_NAME, CreateObjectOptions.CONTENT_TYPE_DEFAULT);
+    gcs.compose(BUCKET_NAME, sources, OBJECT_NAME, "application/octet-stream");
 
     assertThat(trackingRequestInitializerWithRetries.getAllRequestStrings())
         .containsExactly(

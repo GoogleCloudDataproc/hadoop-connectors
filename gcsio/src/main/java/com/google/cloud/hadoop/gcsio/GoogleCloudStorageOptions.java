@@ -36,67 +36,6 @@ import javax.annotation.Nullable;
 @AutoValue
 public abstract class GoogleCloudStorageOptions {
 
-  /** Default setting for enabling use of GCS gRPC API. */
-  public static final boolean DEFAULT_GRPC_ENABLED = false;
-
-  /** Default setting for enabling use of the Traffic Director for GCS gRPC API. */
-  public static final boolean DEFAULT_TRAFFIC_DIRECTOR_ENABLED = true;
-
-  /** Default setting to prefer DirectPath for gRPC. */
-  public static final boolean DEFAULT_DIRECT_PATH_PREFERRED = true;
-
-  /** Default root URL for Cloud Storage API endpoint. */
-  public static final String STORAGE_ROOT_URL_DEFAULT = Storage.DEFAULT_ROOT_URL;
-
-  // Default root URL for Cloud Storage gRPC API endpoint. */
-  public static final String DEFAULT_GCS_GRPC_SERVER_ADDRESS =
-      StorageProto.getDescriptor()
-          .findServiceByName("Storage")
-          .getOptions()
-          .getExtension(ClientProto.defaultHost);
-
-  /** Default service Path for Cloud Storage API endpoint. */
-  public static final String STORAGE_SERVICE_PATH_DEFAULT = Storage.DEFAULT_SERVICE_PATH;
-
-  /** Default setting for enabling auto-repair of implicit directories. */
-  public static final boolean AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT = true;
-
-  /**
-   * Default setting for the length of time to wait for empty objects to appear if we believe we are
-   * in a race with multiple workers.
-   */
-  public static final int MAX_WAIT_MILLIS_FOR_EMPTY_OBJECT_CREATION = 3_000;
-
-  /** Default number of items to return per call to the list* GCS RPCs. */
-  public static final long MAX_LIST_ITEMS_PER_CALL_DEFAULT = 5000;
-
-  /** Default setting for maximum number of requests per GCS batch. */
-  public static final long MAX_REQUESTS_PER_BATCH_DEFAULT = 15;
-
-  /** Default setting for number of threads to execute GCS batch requests. */
-  public static final int BATCH_THREADS_DEFAULT = 15;
-
-  /** Default setting for maximum number of GCS HTTP request retires. */
-  public static final int MAX_HTTP_REQUEST_RETRIES = 10;
-
-  /** Default setting for connect timeout (in millisecond) of GCS HTTP request. */
-  public static final int HTTP_REQUEST_CONNECT_TIMEOUT = 20 * 1000;
-
-  /** Default setting for read timeout (in millisecond) of GCS HTTP request. */
-  public static final int HTTP_REQUEST_READ_TIMEOUT = 20 * 1000;
-
-  /** Default setting for whether or not to use rewrite request for copy operation. */
-  public static final boolean COPY_WITH_REWRITE_DEFAULT = true;
-
-  /** Default setting for max number of bytes rewritten per rewrite request/call. */
-  public static final long MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT = 512 * 1024 * 1024L;
-
-  /** Default setting for grpc message timeout check interval (in milliseconds) */
-  public static final long DEFAULT_GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL_MILLIS = 1000;
-
-  /** Default setting for GCS HTTP request headers. */
-  public static final ImmutableMap<String, String> HTTP_REQUEST_HEADERS_DEFAULT = ImmutableMap.of();
-
   public enum MetricsSink {
     NONE,
     CLOUD_MONITORING,
@@ -106,29 +45,33 @@ public abstract class GoogleCloudStorageOptions {
 
   public static Builder builder() {
     return new AutoValue_GoogleCloudStorageOptions.Builder()
-        .setGrpcEnabled(DEFAULT_GRPC_ENABLED)
-        .setTrafficDirectorEnabled(DEFAULT_TRAFFIC_DIRECTOR_ENABLED)
-        .setDirectPathPreferred(DEFAULT_DIRECT_PATH_PREFERRED)
-        .setStorageRootUrl(STORAGE_ROOT_URL_DEFAULT)
-        .setStorageServicePath(STORAGE_SERVICE_PATH_DEFAULT)
-        .setGrpcServerAddress(DEFAULT_GCS_GRPC_SERVER_ADDRESS)
-        .setAutoRepairImplicitDirectoriesEnabled(AUTO_REPAIR_IMPLICIT_DIRECTORIES_DEFAULT)
-        .setMaxWaitMillisForEmptyObjectCreation(MAX_WAIT_MILLIS_FOR_EMPTY_OBJECT_CREATION)
-        .setMaxListItemsPerCall(MAX_LIST_ITEMS_PER_CALL_DEFAULT)
-        .setMaxRequestsPerBatch(MAX_REQUESTS_PER_BATCH_DEFAULT)
-        .setBatchThreads(BATCH_THREADS_DEFAULT)
-        .setMaxHttpRequestRetries(MAX_HTTP_REQUEST_RETRIES)
-        .setHttpRequestConnectTimeout(HTTP_REQUEST_CONNECT_TIMEOUT)
-        .setHttpRequestReadTimeout(HTTP_REQUEST_READ_TIMEOUT)
-        .setCopyWithRewriteEnabled(COPY_WITH_REWRITE_DEFAULT)
-        .setMaxBytesRewrittenPerCall(MAX_BYTES_REWRITTEN_PER_CALL_DEFAULT)
-        .setReadChannelOptions(GoogleCloudStorageReadOptions.DEFAULT)
-        .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT)
-        .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
-        .setHttpRequestHeaders(HTTP_REQUEST_HEADERS_DEFAULT)
-        .setGrpcMessageTimeoutCheckInterval(DEFAULT_GRPC_MESSAGE_TIMEOUT_CHECK_INTERVAL_MILLIS)
+        .setAutoRepairImplicitDirectoriesEnabled(true)
+        .setBatchThreads(15)
+        .setCopyWithRewriteEnabled(true)
+        .setDirectPathPreferred(true)
+        .setGrpcEnabled(false)
+        .setGrpcMessageTimeoutCheckInterval(Duration.ofSeconds(1))
+        .setGrpcServerAddress(
+            StorageProto.getDescriptor()
+                .findServiceByName("Storage")
+                .getOptions()
+                .getExtension(ClientProto.defaultHost))
+        .setHttpRequestConnectTimeout(Duration.ofSeconds(5))
+        .setHttpRequestHeaders(ImmutableMap.of())
+        .setHttpRequestReadTimeout(Duration.ofSeconds(5))
+        .setMaxHttpRequestRetries(10)
+        .setMaxListItemsPerCall(5_000)
+        .setMaxRequestsPerBatch(15)
+        .setMaxRewriteChunkSize(512 * 1024 * 1024L)
+        .setMaxWaitTimeForEmptyObjectCreation(Duration.ofSeconds(3))
         .setMetricsSink(MetricsSink.NONE)
-        .setTraceLogEnabled(false);
+        .setReadChannelOptions(GoogleCloudStorageReadOptions.DEFAULT)
+        .setRequesterPaysOptions(RequesterPaysOptions.DEFAULT)
+        .setStorageRootUrl(Storage.DEFAULT_ROOT_URL)
+        .setStorageServicePath(Storage.DEFAULT_SERVICE_PATH)
+        .setTraceLogEnabled(false)
+        .setTrafficDirectorEnabled(true)
+        .setWriteChannelOptions(AsyncWriteChannelOptions.DEFAULT);
   }
 
   public abstract Builder toBuilder();
@@ -153,19 +96,19 @@ public abstract class GoogleCloudStorageOptions {
 
   public abstract boolean isAutoRepairImplicitDirectoriesEnabled();
 
-  public abstract int getMaxWaitMillisForEmptyObjectCreation();
+  public abstract Duration getMaxWaitTimeForEmptyObjectCreation();
 
-  public abstract long getMaxListItemsPerCall();
+  public abstract int getMaxListItemsPerCall();
 
-  public abstract long getMaxRequestsPerBatch();
+  public abstract int getMaxRequestsPerBatch();
 
   public abstract int getBatchThreads();
 
   public abstract int getMaxHttpRequestRetries();
 
-  public abstract int getHttpRequestConnectTimeout();
+  public abstract Duration getHttpRequestConnectTimeout();
 
-  public abstract int getHttpRequestReadTimeout();
+  public abstract Duration getHttpRequestReadTimeout();
 
   @Nullable
   public abstract String getProxyAddress();
@@ -178,7 +121,7 @@ public abstract class GoogleCloudStorageOptions {
 
   public abstract boolean isCopyWithRewriteEnabled();
 
-  public abstract long getMaxBytesRewrittenPerCall();
+  public abstract long getMaxRewriteChunkSize();
 
   public abstract GoogleCloudStorageReadOptions getReadChannelOptions();
 
@@ -197,7 +140,7 @@ public abstract class GoogleCloudStorageOptions {
   @Nullable
   public abstract RedactedString getEncryptionKeyHash();
 
-  public abstract long getGrpcMessageTimeoutCheckInterval();
+  public abstract Duration getGrpcMessageTimeoutCheckInterval();
 
   public abstract MetricsSink getMetricsSink();
 
@@ -208,8 +151,8 @@ public abstract class GoogleCloudStorageOptions {
         .setDefaultUserAgent(getAppName())
         .setHttpHeaders(getHttpRequestHeaders())
         .setMaxRequestRetries(getMaxHttpRequestRetries())
-        .setConnectTimeout(Duration.ofMillis(getHttpRequestConnectTimeout()))
-        .setReadTimeout(Duration.ofMillis(getHttpRequestReadTimeout()))
+        .setConnectTimeout(getHttpRequestConnectTimeout())
+        .setReadTimeout(getHttpRequestReadTimeout())
         .build();
   }
 
@@ -227,7 +170,7 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setTrafficDirectorEnabled(boolean trafficDirectorEnabled);
 
-    public abstract Builder setDirectPathPreferred(boolean directPathPreffered);
+    public abstract Builder setDirectPathPreferred(boolean directPathPreferred);
 
     public abstract Builder setStorageRootUrl(String rootUrl);
 
@@ -239,21 +182,21 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setAutoRepairImplicitDirectoriesEnabled(boolean autoRepair);
 
-    public abstract Builder setMaxWaitMillisForEmptyObjectCreation(int durationMillis);
+    public abstract Builder setMaxWaitTimeForEmptyObjectCreation(Duration maxWaitTime);
 
-    public abstract Builder setMaxListItemsPerCall(long maxListItemsPerCall);
+    public abstract Builder setMaxListItemsPerCall(int maxListItemsPerCall);
 
     // According to https://developers.google.com/storage/docs/json_api/v1/how-tos/batch
     // there is a maximum of 1000 requests per batch.
-    public abstract Builder setMaxRequestsPerBatch(long maxRequestsPerBatch);
+    public abstract Builder setMaxRequestsPerBatch(int maxRequestsPerBatch);
 
     public abstract Builder setBatchThreads(int batchThreads);
 
     public abstract Builder setMaxHttpRequestRetries(int maxHttpRequestRetries);
 
-    public abstract Builder setHttpRequestConnectTimeout(int httpRequestConnectTimeout);
+    public abstract Builder setHttpRequestConnectTimeout(Duration httpRequestConnectTimeout);
 
-    public abstract Builder setHttpRequestReadTimeout(int httpRequestReadTimeout);
+    public abstract Builder setHttpRequestReadTimeout(Duration httpRequestReadTimeout);
 
     public abstract Builder setProxyAddress(String proxyAddress);
 
@@ -263,7 +206,7 @@ public abstract class GoogleCloudStorageOptions {
 
     public abstract Builder setCopyWithRewriteEnabled(boolean copyWithRewrite);
 
-    public abstract Builder setMaxBytesRewrittenPerCall(long bytes);
+    public abstract Builder setMaxRewriteChunkSize(long bytes);
 
     public abstract Builder setReadChannelOptions(GoogleCloudStorageReadOptions readChannelOptions);
 
@@ -280,7 +223,7 @@ public abstract class GoogleCloudStorageOptions {
     public abstract Builder setEncryptionKeyHash(RedactedString encryptionKeyHash);
 
     public abstract Builder setGrpcMessageTimeoutCheckInterval(
-        long grpcMessageTimeoutInMillisCheckInterval);
+        Duration grpcMessageTimeoutInMillisCheckInterval);
 
     public abstract Builder setMetricsSink(MetricsSink metricsSink);
 
@@ -291,10 +234,10 @@ public abstract class GoogleCloudStorageOptions {
     public GoogleCloudStorageOptions build() {
       GoogleCloudStorageOptions instance = autoBuild();
       checkArgument(
-          instance.getMaxBytesRewrittenPerCall() <= 0
-              || instance.getMaxBytesRewrittenPerCall() % (1024 * 1024) == 0,
-          "maxBytesRewrittenPerCall must be an integral multiple of 1 MiB (1048576), but was: %s",
-          instance.getMaxBytesRewrittenPerCall());
+          instance.getMaxRewriteChunkSize() <= 0
+              || instance.getMaxRewriteChunkSize() % (1024 * 1024) == 0,
+          "maxRewriteChunkSize must be an integral multiple of 1 MiB (1048576), but was: %s",
+          instance.getMaxRewriteChunkSize());
       checkArgument(
           instance.getProxyAddress() != null
               || (instance.getProxyUsername() == null && instance.getProxyPassword() == null),

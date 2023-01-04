@@ -27,6 +27,7 @@ import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.Te
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TrackingStorageWrapper;
 import java.io.IOException;
 import java.net.URI;
+import java.time.Duration;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -51,7 +52,7 @@ public class GoogleCloudStorageFileSystemPerformanceCacheIntegrationTest {
 
   private static final PerformanceCachingGoogleCloudStorageOptions PERF_CACHE_GCS_OPTIONS =
       PerformanceCachingGoogleCloudStorageOptions.DEFAULT.toBuilder()
-          .setMaxEntryAgeMillis(10_000)
+          .setMaxEntryAge(Duration.ofSeconds(10))
           .build();
 
   private static GoogleCloudStorage helperGcs;

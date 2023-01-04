@@ -20,7 +20,7 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HFLUSH;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_HSYNC;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_CLOSE_OPERATIONS;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.STREAM_WRITE_OPERATIONS;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL;
 import static com.google.cloud.hadoop.fs.gcs.TestUtils.verifyDurationMetric;
 import static com.google.common.truth.Truth.assertThat;
 import static java.lang.Math.toIntExact;
@@ -191,7 +191,7 @@ public class GoogleHadoopOutputStreamTest {
   @Test
   public void hsync_largeNumberOfComposeComponents() throws Exception {
     // Set an extremely low min sync interval as we need to perform many syncs in this test
-    ghfs.getConf().setInt(GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.getKey(), 1);
+    ghfs.getConf().setInt(GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL.getKey(), 1);
 
     Path objectPath = new Path(ghfs.getUri().resolve("/hsync_largeNumberOfComposeComponents.bin"));
 
@@ -212,7 +212,7 @@ public class GoogleHadoopOutputStreamTest {
   @Test
   public void hflush_rateLimited_writesEverything() throws Exception {
     ghfs.getConf()
-        .setLong(GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.getKey(), Duration.ofDays(1).toMillis());
+        .setLong(GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL.getKey(), Duration.ofDays(1).toMillis());
 
     Path objectPath = new Path(ghfs.getUri().resolve("/hflush_rateLimited_writesEverything.bin"));
 

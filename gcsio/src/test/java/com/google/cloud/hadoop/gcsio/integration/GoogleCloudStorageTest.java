@@ -225,7 +225,7 @@ public class GoogleCloudStorageTest {
   public void testCreate1PageLengthObjectUsingCreate() throws IOException {
     String bucketName = getSharedBucketName();
 
-    int objectSize = AsyncWriteChannelOptions.PIPE_BUFFER_SIZE_DEFAULT;
+    int objectSize = AsyncWriteChannelOptions.DEFAULT.getPipeBufferSize();
     StorageResourceId objectToCreate =
         new StorageResourceId(bucketName, "testCreate1PageLengthObjectUsingCreate_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, objectSize);
@@ -237,7 +237,7 @@ public class GoogleCloudStorageTest {
   public void testCreate1PageLengthPlus1byteObjectUsingCreate() throws IOException {
     String bucketName = getSharedBucketName();
 
-    int objectSize = AsyncWriteChannelOptions.PIPE_BUFFER_SIZE_DEFAULT + 1;
+    int objectSize = AsyncWriteChannelOptions.DEFAULT.getPipeBufferSize() + 1;
     StorageResourceId objectToCreate =
         new StorageResourceId(bucketName, "testCreate1PageLengthPlus1byteObjectUsingCreate_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, objectSize);
@@ -1561,7 +1561,7 @@ public class GoogleCloudStorageTest {
         bucketName,
         ImmutableList.of("testCompose_SourceObject1", "testCompose_SourceObject2"),
         destinationObject.getObjectName(),
-        CreateObjectOptions.CONTENT_TYPE_DEFAULT);
+        "application/octet-stream");
 
     assertObjectContent(rawStorage, destinationObject, Bytes.concat(content1, content2));
   }

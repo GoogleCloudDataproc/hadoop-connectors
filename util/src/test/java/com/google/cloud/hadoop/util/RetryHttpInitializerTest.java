@@ -162,8 +162,8 @@ public class RetryHttpInitializerTest {
             .setDefaultUserAgent("foo-user-agent")
             .setHttpHeaders(ImmutableMap.of("header-key", "header-value"))
             .setMaxRequestRetries(5)
-            .setConnectTimeout(Duration.ofMillis(20_000))
-            .setReadTimeout(Duration.ofMillis(20_000))
+            .setConnectTimeout(Duration.ofSeconds(5))
+            .setReadTimeout(Duration.ofSeconds(5))
             .build());
   }
 }

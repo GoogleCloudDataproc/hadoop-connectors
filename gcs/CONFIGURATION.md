@@ -22,10 +22,10 @@
     Whether to perform copy operation using Rewrite requests which allows copy
     files between different locations and storage classes.
 
-*   `fs.gs.rewrite.max.bytes.per.call` (default: `536870912`)
+*   `fs.gs.rewrite.max.chunk.size` (default: `512m`)
 
-    Maximum number of bytes rewritten in a single rewrite request when
-    `fs.gs.copy.with.rewrite.enable` is set to `true`.
+    Maximum size of object chunk that will be rewritten in a single rewrite
+    request when `fs.gs.copy.with.rewrite.enable` is set to `true`.
 
 *   `fs.gs.reported.permissions` (default: `700`)
 
@@ -68,7 +68,7 @@
 
     Enables lazy initialization of `GoogleHadoopFileSystem` instances.
 
-*   `fs.gs.block.size` (default: `67108864`)
+*   `fs.gs.block.size` (default: `64m`)
 
     The reported block size of the file system. This does not change any
     behavior of the connector or the underlying Google Cloud Storage objects.
@@ -120,7 +120,7 @@
     Maximum number of items to return in response for list Cloud Storage
     requests.
 
-*   `fs.gs.max.wait.for.empty.object.creation.ms` (default: `3000`)
+*   `fs.gs.max.wait.for.empty.object.creation` (default: `3s`)
 
     Maximum amount of time to wait after exception during empty object creation.
 
@@ -278,7 +278,7 @@ default service account impersonation.
     [GZIP encoded](https://cloud.google.com/storage/docs/transcoding#decompressive_transcoding)
     files is inefficient and error-prone in Hadoop and Spark.
 
-*   `fs.gs.outputstream.buffer.size` (default: `8388608`)
+*   `fs.gs.outputstream.buffer.size` (default: `8m`)
 
     Write buffer size used by the file system API to send the data to be
     uploaded to Cloud Storage upload thread via pipes. The various pipe types
@@ -305,14 +305,14 @@ default service account impersonation.
         client cannot reliably write in the output stream from multiple threads
         without triggering *"Pipe broken"* exceptions;
 
-*   `fs.gs.outputstream.pipe.buffer.size` (default: `1048576`)
+*   `fs.gs.outputstream.pipe.buffer.size` (default: `1m`)
 
     Pipe buffer size used for uploading Cloud Storage objects. This pipe is an
     intermediate channel which is used to receive the data on one side and allow
     for reading of the data by the Cloud Storage upload thread on the other
     side.
 
-*   `fs.gs.outputstream.upload.chunk.size` (default: `67108864`)
+*   `fs.gs.outputstream.upload.chunk.size` (default: `24m`)
 
     The number of bytes in one Google Cloud Storage upload request via the
     [`MediaHttUploader` class](https://cloud.google.com/java/docs/reference/google-api-client/latest/com.google.api.client.googleapis.media.MediaHttpUploader).
@@ -340,14 +340,13 @@ default service account impersonation.
 
     Enables Cloud Storage direct uploads.
 
-*   `fs.gs.outputstream.sync.min.interval.ms` (default: `0`)
+*   `fs.gs.outputstream.sync.min.interval` (default: `0`)
 
-    Output stream configuration that controls the minimum interval
-    (milliseconds) between consecutive syncs. This allows to avoid getting
-    rate-limited by Google Cloud Storage. Default is `0` - no wait between
-    syncs. Note that `hflush()` will be no-op if called more frequently than
-    minimum sync interval and `hsync()` will block until an end of a min sync
-    interval.
+    Output stream configuration that controls the minimum interval between
+    consecutive syncs. This allows to avoid getting rate-limited by Google Cloud
+    Storage. Default is `0` - no wait between syncs. Note that `hflush()` will
+    be no-op if called more frequently than minimum sync interval and `hsync()`
+    will block until an end of a min sync interval.
 
 ### HTTP transport configuration
 
@@ -374,15 +373,14 @@ default service account impersonation.
     The maximum number of retries for low-level HTTP requests to Google Cloud
     Storage when server errors (code: `5XX`) or I/O errors are encountered.
 
-*   `fs.gs.http.connect-timeout` (default: `20000`)
+*   `fs.gs.http.connect-timeout` (default: `5s`)
 
-    Timeout in milliseconds to establish a connection. Use `0` for an infinite
+    Timeout to establish a connection. Use `0` for an infinite timeout.
+
+*   `fs.gs.http.read-timeout` (default: `5s`)
+
+    Timeout to read from an established connection. Use `0` for an infinite
     timeout.
-
-*   `fs.gs.http.read-timeout` (default: `20000`)
-
-    Timeout in milliseconds to read from an established connection. Use `0` for
-    an infinite timeout.
 
 ### API client configuration
 
@@ -426,13 +424,13 @@ default service account impersonation.
         streaming requests as soon as first backward read or forward read for
         more than `fs.gs.inputstream.inplace.seek.limit` bytes was detected.
 
-*   `fs.gs.inputstream.inplace.seek.limit` (default: `8388608`)
+*   `fs.gs.inputstream.inplace.seek.limit` (default: `8m`)
 
     If forward seeks are within this many bytes of the current position, seeks
     are performed by reading and discarding bytes in-place rather than opening a
     new underlying stream.
 
-*   `fs.gs.inputstream.min.range.request.size` (default: `2097152`)
+*   `fs.gs.inputstream.min.range.request.size` (default: `2m`)
 
     Minimum size in bytes of the read range for Cloud Storage request when
     opening a new stream to read an object.
@@ -447,10 +445,10 @@ default service account impersonation.
     modifications made outside this connector instance may not be immediately
     reflected.
 
-*   `fs.gs.performance.cache.max.entry.age.ms` (default: `5000`)
+*   `fs.gs.performance.cache.max.entry.age` (default: `5s`)
 
-    Maximum number of milliseconds to store a cached metadata in the performance
-    cache before it's invalidated.
+    Maximum number of time to store a cached metadata in the performance cache
+    before it's invalidated.
 
 ### Cloud Storage [Requester Pays](https://cloud.google.com/storage/docs/requester-pays) feature configuration:
 

@@ -18,7 +18,7 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_PIPE_TYPE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -278,7 +278,7 @@ public class GoogleHadoopOutputStreamIntegrationTest {
     Path hadoopPath = new Path(path);
 
     Configuration config = getTestConfig();
-    config.setLong(GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.getKey(), Duration.ofDays(1).toMillis());
+    config.setLong(GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL.getKey(), Duration.ofDays(1).toMillis());
     FileSystem ghfs = GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, config);
 
     byte[] testData = new byte[10];

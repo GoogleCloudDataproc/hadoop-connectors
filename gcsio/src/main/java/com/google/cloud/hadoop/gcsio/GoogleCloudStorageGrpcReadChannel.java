@@ -134,7 +134,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private final Watchdog watchdog;
 
-  private final long gRPCReadMessageTimeout;
+  private final Duration grpcReadMessageTimeout;
 
   private static void validate(GoogleCloudStorageItemInfo itemInfo) throws IOException {
     checkNotNull(itemInfo, "itemInfo cannot be null");
@@ -190,7 +190,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     this.backOffFactory = backOffFactory;
     this.readStrategy = readOptions.getFadvise();
     long prefetchSizeInBytes = readOptions.getMinRangeRequestSize() / 2;
-    this.gRPCReadMessageTimeout = readOptions.getGrpcReadMessageTimeoutMillis();
+    this.grpcReadMessageTimeout = readOptions.getGrpcReadMessageTimeout();
     this.footerStartOffsetInBytes = max(0, (objectSize - prefetchSizeInBytes));
   }
 
@@ -478,7 +478,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private boolean hasMoreFooterContentToRead(ByteBuffer byteBuffer) {
     return footerBuffer != null
-        && (positionForNextRead) >= footerStartOffsetInBytes
+        && positionForNextRead >= footerStartOffsetInBytes
         && byteBuffer.hasRemaining();
   }
 
@@ -538,14 +538,11 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
                 blockingStub.getCallOptions(),
                 request);
         readObjectResponseIterator =
-            watchdog.watch(
-                requestContext, responseIterator, Duration.ofMillis(this.gRPCReadMessageTimeout));
+            watchdog.watch(requestContext, responseIterator, this.grpcReadMessageTimeout);
       } else {
         readObjectResponseIterator =
             watchdog.watch(
-                requestContext,
-                blockingStub.readObject(request),
-                Duration.ofMillis(this.gRPCReadMessageTimeout));
+                requestContext, blockingStub.readObject(request), this.grpcReadMessageTimeout);
       }
     } finally {
       requestContext.detach(toReattach);
@@ -556,7 +553,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   private StorageBlockingStub getStubWithDeadlineAndTracing(
       String objectName, long objectGeneration, long offset, OptionalLong bytesToRead) {
     StorageBlockingStub blockingStub =
-        stub.withDeadlineAfter(readOptions.getGrpcReadTimeoutMillis(), MILLISECONDS);
+        stub.withDeadlineAfter(readOptions.getGrpcReadTimeout().toMillis(), MILLISECONDS);
 
     if (!this.storageOptions.isTraceLogEnabled()) {
       return blockingStub;

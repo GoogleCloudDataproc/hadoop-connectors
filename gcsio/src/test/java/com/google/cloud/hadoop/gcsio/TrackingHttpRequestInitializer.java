@@ -270,12 +270,10 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
       String srcObject,
       String dstBucket,
       String dstObject,
-      Integer maxBytesRewrittenPerCall,
+      Integer maxRewriteChunkSize,
       Integer rewriteTokenId) {
     String rewriteParams =
-        (maxBytesRewrittenPerCall == null
-                ? ""
-                : "?maxBytesRewrittenPerCall=" + maxBytesRewrittenPerCall)
+        (maxRewriteChunkSize == null ? "" : "?maxBytesRewrittenPerCall=" + maxRewriteChunkSize)
             + (rewriteTokenId == null ? "" : "&rewriteToken=token_" + rewriteTokenId);
     return copyRequestString(srcBucket, srcObject, dstBucket, dstObject, "rewriteTo")
         + rewriteParams;
@@ -442,7 +440,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         bucket,
         prefix,
         /* objectFields= */ OBJECT_FIELDS,
-        (int) GoogleCloudStorageOptions.MAX_LIST_ITEMS_PER_CALL_DEFAULT,
+        GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
         pageToken);
   }
 
@@ -459,7 +457,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         /* includeTrailingDelimiter= */ true,
         prefix,
         objectFields,
-        (int) GoogleCloudStorageOptions.MAX_LIST_ITEMS_PER_CALL_DEFAULT,
+        GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
         pageToken);
   }
 
@@ -514,7 +512,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         includeTrailingDelimiter,
         prefix,
         objectFields,
-        (int) GoogleCloudStorageOptions.MAX_LIST_ITEMS_PER_CALL_DEFAULT,
+        GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
         pageToken);
   }
 

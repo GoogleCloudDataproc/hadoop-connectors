@@ -36,6 +36,7 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_XATTR_GET_
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_XATTR_GET_NAMED_MAP;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem;
 import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
@@ -47,6 +48,7 @@ import static com.google.common.base.StandardSystemProperty.USER_NAME;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
+import static java.lang.Math.toIntExact;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.stream;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_CREDENTIAL_PROVIDER_PATH;
@@ -1211,7 +1213,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
             () ->
                 myGhfs.append(
                     /* hadoopPath= */ null,
-                    GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE.getDefault(),
+                    toIntExact(GCS_OUTPUT_STREAM_BUFFER_SIZE.getDefault()),
                     () -> {}));
     assertThat(exception).hasMessageThat().contains("hadoopPath must not be null");
   }

@@ -28,18 +28,18 @@ import org.junit.runners.JUnit4;
 public class GoogleCloudStorageOptionsTest {
 
   @Test
-  public void build_throwsException_whenMaxBytesRewrittenPerCallNotMbMultiple() {
-    long maxBytesRewrittenPerCall = 1;
+  public void build_throwsException_whenMaxRewriteChunkSizeNot1mbMultiple() {
+    long maxRewriteChunkSize = 1;
     GoogleCloudStorageOptions.Builder builder =
-        GoogleCloudStorageOptions.builder().setMaxBytesRewrittenPerCall(maxBytesRewrittenPerCall);
+        GoogleCloudStorageOptions.builder().setMaxRewriteChunkSize(maxRewriteChunkSize);
 
     IllegalArgumentException e = assertThrows(IllegalArgumentException.class, builder::build);
 
     assertThat(e)
         .hasMessageThat()
         .isEqualTo(
-            "maxBytesRewrittenPerCall must be an integral multiple of 1 MiB (1048576), but was: "
-                + maxBytesRewrittenPerCall);
+            "maxRewriteChunkSize must be an integral multiple of 1 MiB (1048576), but was: "
+                + maxRewriteChunkSize);
   }
 
   @Test
