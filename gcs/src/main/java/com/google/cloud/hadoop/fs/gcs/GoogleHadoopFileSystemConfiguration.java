@@ -463,8 +463,7 @@ public class GoogleHadoopFileSystemConfiguration {
   /** Configuration key to configure client to use for GCS access. */
   public static final HadoopConfigurationProperty<ClientType> GCS_CLIENT_TYPE =
       new HadoopConfigurationProperty<>(
-          "fs.gs.client.type",
-          ClientTypeGoogleCloudStorageFileSystemOptions.DEFAULT.getClientType());
+          "fs.gs.client.type", GoogleCloudStorageFileSystemOptions.DEFAULT.getClientType());
 
   static GoogleCloudStorageFileSystemOptions.Builder getGcsFsOptionsBuilder(Configuration config) {
     return GoogleCloudStorageFileSystemOptions.builder()
@@ -473,7 +472,6 @@ public class GoogleHadoopFileSystemConfiguration {
         .setCloudStorageOptions(getGcsOptionsBuilder(config).build())
         .setEnsureNoConflictingItems(
             GCS_CREATE_ITEMS_CONFLICT_CHECK_ENABLE.get(config, config::getBoolean))
-        .setFilesystemApi(GCS_FILESYSTEM_API.get(config, config::getEnum))
         .setMarkerFilePattern(GCS_MARKER_FILE_PATTERN.get(config, config::get))
         .setPerformanceCacheEnabled(GCS_PERFORMANCE_CACHE_ENABLE.get(config, config::getBoolean))
         .setPerformanceCacheOptions(getPerformanceCachingOptions(config))

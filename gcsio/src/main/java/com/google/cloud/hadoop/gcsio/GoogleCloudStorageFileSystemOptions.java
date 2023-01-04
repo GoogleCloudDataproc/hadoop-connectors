@@ -38,8 +38,6 @@ public abstract class GoogleCloudStorageFileSystemOptions {
         .setClientType(ClientType.HTTP_API_CLIENT)
         .setCloudStorageOptions(GoogleCloudStorageOptions.DEFAULT)
         .setEnsureNoConflictingItems(true)
-        .setFilesystemApi(FilesystemAPI.OBJECT)
-        .setJavaClientEnabled(false)
         .setMarkerFilePattern((String) null)
         .setPerformanceCacheEnabled(false)
         .setPerformanceCacheOptions(PerformanceCachingGoogleCloudStorageOptions.DEFAULT)
