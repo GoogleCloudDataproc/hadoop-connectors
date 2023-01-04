@@ -22,6 +22,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.assertThrows;
 
+import com.google.cloud.hadoop.fs.gcs.auth.AbstractDelegationTokenBinding;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
 import com.google.cloud.hadoop.fs.gcs.auth.TestTokenIdentifierImpl;
@@ -86,7 +87,11 @@ public class GoogleHadoopFileSystemDelegationTokensTest {
   @Test
   public void testTokensInitializationWhenFsIsMissing_throwsRuntimeException() throws IOException {
     Configuration config = new Configuration();
-    config.set("fs.gs.delegation.token.binding", TestDelegationTokenBindingImpl.class.getName());
+    config.setClass(
+        "fs.gs.delegation.token.binding",
+        TestDelegationTokenBindingImpl.class,
+        AbstractDelegationTokenBinding.class);
+
     GcsDelegationTokens delegationTokens = new GcsDelegationTokens();
 
     assertThrows(RuntimeException.class, () -> delegationTokens.init(config));
@@ -145,7 +150,10 @@ public class GoogleHadoopFileSystemDelegationTokensTest {
     config.setLong("fs.gs.block.size", 1024);
 
     // Token binding config
-    config.set("fs.gs.delegation.token.binding", TestDelegationTokenBindingImpl.class.getName());
+    config.setClass(
+        "fs.gs.delegation.token.binding",
+        TestDelegationTokenBindingImpl.class,
+        AbstractDelegationTokenBinding.class);
     config.set(
         TestDelegationTokenBindingImpl.TestAccessTokenProviderImpl.TOKEN_CONFIG_PROPERTY_NAME,
         "qWDAWFA3WWFAWFAWFAW3FAWF3AWF3WFAF33GR5G5"); // Bogus auth token

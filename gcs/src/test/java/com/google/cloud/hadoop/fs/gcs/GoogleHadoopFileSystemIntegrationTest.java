@@ -50,6 +50,7 @@ import static org.junit.Assert.assertThrows;
 import com.google.api.client.http.HttpResponseException;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GcsFileChecksumType;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GlobAlgorithm;
+import com.google.cloud.hadoop.fs.gcs.auth.AbstractDelegationTokenBinding;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
@@ -230,7 +231,10 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     Configuration config = new Configuration();
 
     // Token binding config
-    config.set("fs.gs.delegation.token.binding", TestDelegationTokenBindingImpl.class.getName());
+    config.setClass(
+        "fs.gs.delegation.token.binding",
+        TestDelegationTokenBindingImpl.class,
+        AbstractDelegationTokenBinding.class);
     config.set(
         TestDelegationTokenBindingImpl.TestAccessTokenProviderImpl.TOKEN_CONFIG_PROPERTY_NAME,
         "qWDAWFA3WWFAWFAWFAW3FAWF3AWF3WFAF33GR5G5"); // Bogus auth token
@@ -254,7 +258,10 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     Configuration config = new Configuration();
 
     // Token binding config
-    config.set("fs.gs.delegation.token.binding", TestDelegationTokenBindingImpl.class.getName());
+    config.setClass(
+        "fs.gs.delegation.token.binding",
+        TestDelegationTokenBindingImpl.class,
+        AbstractDelegationTokenBinding.class);
     config.set(
         TestDelegationTokenBindingImpl.TestAccessTokenProviderImpl.TOKEN_CONFIG_PROPERTY_NAME,
         "qWDAWFA3WWFAWFAWFAW3FAWF3AWF3WFAF33GR5G5"); // Bogus auth token
