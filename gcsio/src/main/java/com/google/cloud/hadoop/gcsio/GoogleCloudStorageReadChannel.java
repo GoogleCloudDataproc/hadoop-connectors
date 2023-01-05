@@ -170,8 +170,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
     // Initialize metadata if available.
     GoogleCloudStorageItemInfo info = getInitialMetadata();
-    if (info != null || readOptions.isFastFailOnNotFoundEnabled()) {
-      initMetadata(info == null ? fetchInitialMetadata() : info);
+    if (info != null) {
+      initMetadata(info);
     } else if (readOptions.isFastFailOnNotFoundEnabled()) {
       prefetchFooterAndInitMetadata();
     }
@@ -207,7 +207,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
 
   /**
    * Returns {@link GoogleCloudStorageItemInfo} used to initialize metadata in constructor or {@code
-   * null} if {@link GoogleCloudStorageReadOptions#isFastFailOnNotFound()} is set to {@code false}.
+   * null} if {@link GoogleCloudStorageReadOptions#isFastFailOnNotFoundEnabled()} is set to {@code
+   * false}.
    */
   @Nullable
   protected GoogleCloudStorageItemInfo getInitialMetadata() throws IOException {
@@ -241,6 +242,7 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
     checkState(metadataInitialized, "metadata should be initialized already for '%s'", resourceId);
 
     // Do not cache footer for empty and gzip-encoded files
+    // TODO: cache footer if whole gzipped object were read.
     if (size == 0 || gzipEncoded) {
       return;
     }

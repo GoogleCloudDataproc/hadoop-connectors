@@ -1142,6 +1142,29 @@ public class GoogleCloudStorageNewIntegrationTest {
   }
 
   @Test
+  public void open_footerPrefetch_wholeFileReadWithOneRequest() throws Exception {
+    String testBucket = gcsfsIHelper.sharedBucketName1;
+    StorageResourceId testFile = new StorageResourceId(testBucket, getTestResource());
+
+    gcsfsIHelper.writeTextFile(
+        UriPaths.fromResourceId(testFile, /* allowEmptyObjectName= */ false), "content");
+
+    long generationId = gcsfsIHelper.gcs.getItemInfo(testFile).getContentGeneration();
+
+    GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
+
+    byte[] readContent = new byte[7];
+    try (SeekableByteChannel channel = gcs.open(testFile)) {
+      channel.read(ByteBuffer.wrap(readContent));
+    }
+
+    assertThat(new String(readContent, UTF_8)).isEqualTo("content");
+
+    assertThat(gcsRequestsTracker.getAllRequestStrings())
+        .containsExactly(getMediaRequestString(testBucket, testFile.getObjectName()));
+  }
+
+  @Test
   public void open_gzipEncoded_succeeds_ifContentEncodingSupportEnabled() throws Exception {
     String testBucket = gcsfsIHelper.sharedBucketName1;
     StorageResourceId testFile = new StorageResourceId(testBucket, getTestResource());
@@ -1167,10 +1190,7 @@ public class GoogleCloudStorageNewIntegrationTest {
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
         .containsExactly(
-            getRequestString(
-                testBucket,
-                testFile.getObjectName(),
-                /* fields= */ "contentEncoding,generation,size"),
+            getMediaRequestString(testBucket, testFile.getObjectName()),
             getMediaRequestString(testBucket, testFile.getObjectName(), generationId))
         .inOrder();
   }
@@ -1225,11 +1245,7 @@ public class GoogleCloudStorageNewIntegrationTest {
         .isEqualTo("Cannot read GZIP encoded files - content encoding support is disabled.");
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(
-                testBucket,
-                testFile.getObjectName(),
-                /* fields= */ "contentEncoding,generation,size"));
+        .containsExactly(getMediaRequestString(testBucket, testFile.getObjectName()));
   }
 
   @Test

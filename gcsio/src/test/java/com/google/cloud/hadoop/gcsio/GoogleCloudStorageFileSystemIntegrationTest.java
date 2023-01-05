@@ -551,7 +551,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     GoogleCloudStorageReadOptions readOptions =
         GoogleCloudStorageReadOptions.builder()
             .setFadvise(Fadvise.RANDOM)
-            .setMinRangeRequestSize(0)
+            .setMinRangeRequestSize(1)
             .build();
     try (SeekableByteChannel readChannel = gcsiHelper.open(testObject, readOptions)) {
       String read1 = gcsiHelper.readText(readChannel, 0, offset, false);

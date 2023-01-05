@@ -17,7 +17,6 @@
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getMediaRequestString;
-import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getStandardOptionBuilder;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.truth.Truth.assertThat;
@@ -108,17 +107,10 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
       os.writeBytes(expectedContent);
     }
 
-    GoogleCloudStorageItemInfo itemInfo =
-        ((GoogleHadoopFileSystem) ghfsIHelper.ghfs).getGcsFs().getGcs().getItemInfo(fileId);
-
     CompletableFuture<FSDataInputStream> isFuture = ghfs.openFile(filePath).build();
 
     assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(
-                testBucketName,
-                name.getMethodName(),
-                /* fields= */ "contentEncoding,generation,size"));
+        .containsExactly(getMediaRequestString(testBucketName, name.getMethodName()));
 
     String fileContent;
     try (FSDataInputStream is = isFuture.get()) {
@@ -127,13 +119,7 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
 
     assertThat(fileContent).isEqualTo(expectedContent);
     assertThat(gcsRequestsTracker.getAllRequestStrings())
-        .containsExactly(
-            getRequestString(
-                testBucketName,
-                name.getMethodName(),
-                /* fields= */ "contentEncoding,generation,size"),
-            getMediaRequestString(
-                testBucketName, name.getMethodName(), itemInfo.getContentGeneration()))
+        .containsExactly(getMediaRequestString(testBucketName, name.getMethodName()))
         .inOrder();
   }
 

@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.gcsio.integration;
 
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getBucketRequestString;
+import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getMediaRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.resumableUploadChunkRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.resumableUploadRequestString;
@@ -133,10 +134,7 @@ public class GoogleCloudStorageImplTest {
 
     assertThat(trackingGcs.requestsTracker.getAllRequestStrings())
         .containsExactly(
-            getRequestString(
-                resourceId.getBucketName(),
-                resourceId.getObjectName(),
-                /* fields= */ "contentEncoding,generation,size"));
+            getMediaRequestString(resourceId.getBucketName(), resourceId.getObjectName()));
   }
 
   @Test
@@ -211,8 +209,7 @@ public class GoogleCloudStorageImplTest {
     assertThat(gcs.getStatistics())
         .containsExactlyEntriesIn(
             ImmutableMap.<String, Long>builder()
-                .put("http_get_200", 1L)
-                .put("http_get_206", 1L)
+                .put("http_get_206", 2L)
                 .put("http_get_404", 1L)
                 .put("http_post_200", 1L)
                 .put("http_put_200", 1L)
@@ -225,8 +222,8 @@ public class GoogleCloudStorageImplTest {
         .containsExactlyEntriesIn(
             ImmutableMap.<String, Long>builder()
                 .put("http_delete_204", 1L)
-                .put("http_get_200", 2L)
-                .put("http_get_206", 1L)
+                .put("http_get_200", 1L)
+                .put("http_get_206", 2L)
                 .put("http_get_404", 1L)
                 .put("http_post_200", 1L)
                 .put("http_put_200", 1L)
