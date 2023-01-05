@@ -16,7 +16,6 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.BLOCK_SIZE;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
@@ -189,7 +188,7 @@ public class GoogleHadoopFSIntegrationTest {
   @Test
   public void getServerDefaults_shouldReturnSpecifiedConfiguration() throws Exception {
     Configuration config = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
-    config.setLong(BLOCK_SIZE.getKey(), 1);
+    config.setLong("fs.gs.block.size", 1);
     GoogleHadoopFS ghfs = new GoogleHadoopFS(initUri, config);
 
     FsServerDefaults defaults = ghfs.getServerDefaults();

@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 
 /** Helper class to create an in-memory GHFS from an in-memory GcsFs instance for testing only. */
 public class InMemoryGoogleHadoopFileSystem extends GoogleHadoopFileSystem {
@@ -70,7 +71,8 @@ public class InMemoryGoogleHadoopFileSystem extends GoogleHadoopFileSystem {
   public static Configuration getSampleConfiguration() throws IOException {
     // Set the Hadoop job configuration.
     Configuration config = new Configuration();
-    config.set("fs.gs.impl", InMemoryGoogleHadoopFileSystem.class.getName());
+    config.setClass("fs.gs.impl", InMemoryGoogleHadoopFileSystem.class, FileSystem.class);
+
     return config;
   }
 

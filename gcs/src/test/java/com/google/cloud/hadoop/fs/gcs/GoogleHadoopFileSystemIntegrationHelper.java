@@ -16,12 +16,7 @@
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE;
 import static com.google.cloud.hadoop.gcsio.testing.TestConfiguration.GCS_TEST_PROJECT_ID;
-import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTHENTICATION_TYPE_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
@@ -45,21 +40,18 @@ public final class GoogleHadoopFileSystemIntegrationHelper {
    */
   public static Configuration getTestConfig() {
     Configuration config = new Configuration();
-    config.setBoolean(GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.getKey(), true);
+    config.setBoolean("fs.gs.implicit.dir.repair.enable", true);
     // Allow buckets to be deleted in test cleanup:
-    config.setBoolean(GoogleHadoopFileSystemConfiguration.GCE_BUCKET_DELETE_ENABLE.getKey(), true);
+    config.setBoolean("fs.gs.bucket.delete.enable", true);
 
     // Configure test authentication
     TestConfiguration testConf = TestConfiguration.getInstance();
     String projectId = checkNotNull(testConf.getProjectId(), ENV_VAR_MSG_FMT, GCS_TEST_PROJECT_ID);
-    config.set(GCS_PROJECT_ID.getKey(), projectId);
+    config.set("fs.gs.project.id", projectId);
     if (testConf.getServiceAccountJsonKeyFile() != null) {
-      config.setEnum(
-          GCS_CONFIG_PREFIX + AUTHENTICATION_TYPE_SUFFIX.getKey(),
-          AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
+      config.setEnum("fs.gs.auth.type", AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
       config.set(
-          GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.getKey(),
-          testConf.getServiceAccountJsonKeyFile());
+          "fs.gs.auth.service.account.json.keyfile", testConf.getServiceAccountJsonKeyFile());
     }
 
     return config;

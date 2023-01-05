@@ -16,11 +16,6 @@
 
 package com.google.cloud.hadoop.fs.gcs.contract;
 
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID;
-import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTHENTICATION_TYPE_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
-
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
@@ -44,15 +39,11 @@ public class GoogleContract extends AbstractBondedFSContract {
 
     TestConfiguration testConf = TestConfiguration.getInstance();
     if (testConf.getProjectId() != null) {
-      conf.set(GCS_PROJECT_ID.getKey(), testConf.getProjectId());
+      conf.set("fs.gs.project.id", testConf.getProjectId());
     }
     if (testConf.getServiceAccountJsonKeyFile() != null) {
-      conf.setEnum(
-          GCS_CONFIG_PREFIX + AUTHENTICATION_TYPE_SUFFIX.getKey(),
-          AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
-      conf.set(
-          GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.getKey(),
-          testConf.getServiceAccountJsonKeyFile());
+      conf.setEnum("fs.gs.auth.type", AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
+      conf.set("fs.gs.auth.service.account.json.keyfile", testConf.getServiceAccountJsonKeyFile());
     }
   }
 
