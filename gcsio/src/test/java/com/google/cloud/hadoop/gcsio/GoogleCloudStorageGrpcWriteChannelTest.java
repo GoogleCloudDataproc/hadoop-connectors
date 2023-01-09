@@ -16,7 +16,6 @@ import static org.mockito.Mockito.verify;
 
 import com.google.api.client.util.BackOff;
 import com.google.auth.Credentials;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageGrpcWriteChannelTest.FakeService.InsertRequestObserver;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.BackOffFactory;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.common.collect.ImmutableList;
@@ -83,6 +82,13 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
                           .setBucket(BUCKET_NAME)
                           .setName(OBJECT_NAME)
                           .setContentType(CONTENT_TYPE)))
+          .build();
+  private static final Object DEFAULT_OBJECT =
+      Object.newBuilder()
+          .setBucket(BUCKET_NAME)
+          .setName(OBJECT_NAME)
+          .setGeneration(1)
+          .setMetageneration(2)
           .build();
   private static final QueryWriteStatusRequest WRITE_STATUS_REQUEST =
       QueryWriteStatusRequest.newBuilder().setUploadId(UPLOAD_ID).build();
@@ -526,7 +532,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     byte[] expectedCrc32C = {51, 121, -76, -54};
 
     fakeService.setResponse(
-        FakeService.DEFAULT_OBJECT
+        DEFAULT_OBJECT
             .toBuilder()
             .setSize(9)
             .setGeneration(1)
@@ -815,15 +821,7 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
     }
   }
 
-  static class FakeService extends StorageImplBase {
-
-    static final Object DEFAULT_OBJECT =
-        Object.newBuilder()
-            .setBucket(BUCKET_NAME)
-            .setName(OBJECT_NAME)
-            .setGeneration(1)
-            .setMetageneration(2)
-            .build();
+  private static class FakeService extends StorageImplBase {
 
     WriteObjectResponse writeObjectResponse = null;
     Throwable insertRequestException = null;
@@ -905,51 +903,51 @@ public final class GoogleCloudStorageGrpcWriteChannelTest {
       // update the list).
       this.insertObjectExceptions = Lists.newArrayList(insertObjectExceptions);
     }
+  }
 
-    static class InsertRequestObserver implements StreamObserver<WriteObjectRequest> {
+  private static class InsertRequestObserver implements StreamObserver<WriteObjectRequest> {
 
-      private StreamObserver<WriteObjectResponse> responseObserver;
-      private Object object = DEFAULT_OBJECT;
-      WriteObjectResponse writeObjectResponse =
-          WriteObjectResponse.newBuilder().setResource(object).build();
-      Throwable insertRequestException;
-      boolean resumeFromInsertException = false;
-      boolean errored = false;
+    private StreamObserver<WriteObjectResponse> responseObserver;
+    private Object object = DEFAULT_OBJECT;
+    WriteObjectResponse writeObjectResponse =
+        WriteObjectResponse.newBuilder().setResource(object).build();
+    Throwable insertRequestException;
+    boolean resumeFromInsertException = false;
+    boolean errored = false;
 
-      public InsertRequestObserver(WriteObjectResponse response, Throwable throwable) {
-        if (response != null) {
-          writeObjectResponse = response;
+    public InsertRequestObserver(WriteObjectResponse response, Throwable throwable) {
+      if (response != null) {
+        writeObjectResponse = response;
+      }
+      if (throwable != null) {
+        insertRequestException = throwable;
+      }
+    }
+
+    @Override
+    public void onNext(WriteObjectRequest request) {
+      if (insertRequestException != null) {
+        onError(insertRequestException);
+        if (resumeFromInsertException) {
+          insertRequestException = null;
         }
-        if (throwable != null) {
-          insertRequestException = throwable;
-        }
       }
+    }
 
-      @Override
-      public void onNext(WriteObjectRequest request) {
-        if (insertRequestException != null) {
-          onError(insertRequestException);
-          if (resumeFromInsertException) {
-            insertRequestException = null;
-          }
-        }
-      }
+    @Override
+    public void onError(Throwable t) {
+      errored = true;
+      responseObserver.onError(t);
+    }
 
-      @Override
-      public void onError(Throwable t) {
-        errored = true;
-        responseObserver.onError(t);
-      }
+    @Override
+    public void onCompleted() {
+      responseObserver.onNext(writeObjectResponse);
+      responseObserver.onCompleted();
+    }
 
-      @Override
-      public void onCompleted() {
-        responseObserver.onNext(writeObjectResponse);
-        responseObserver.onCompleted();
-      }
-
-      public boolean isErrored() {
-        return errored;
-      }
+    public boolean isErrored() {
+      return errored;
     }
   }
 }
