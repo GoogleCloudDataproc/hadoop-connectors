@@ -34,10 +34,10 @@ import com.google.auth.oauth2.ComputeEngineCredentials;
 import com.google.cloud.hadoop.util.HttpTransportFactory;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.WritableByteChannel;
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -73,7 +73,7 @@ public class GoogleCloudStorageImplCreateTest {
   // We want to test this entire class with both javaClientImp and gcsImpl
   // Some of our internal endpoints only work with TD
   public static Iterable<Boolean> javaClientEnabled() {
-    return List.of(false, true);
+    return ImmutableList.of(false, true);
   }
 
   @Test
