@@ -50,7 +50,7 @@ public class MockGoogleCloudStorageImplFactory {
 
   public static GcsJavaClientImpl mockedJavaClientGcs(
       GoogleCloudStorageOptions options, HttpTransport transport) throws IOException {
-    Credential fakeCredential = null;
+    Credential fakeCredential = new MockGoogleCredential.Builder().build();
     Storage storage =
         new Storage(
             transport,
