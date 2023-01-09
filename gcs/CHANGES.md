@@ -2,6 +2,9 @@
 
 ## Next
 
+
+1.  Added dependency on new storage client library: [google-cloud-storage](https://github.com/googleapis/java-storage/tree/main/google-cloud-storage).
+
 1. Add support for OAuth2 based client authentication that retrieves
 a refresh token using the authorisation code grant flow configured via the
 following properties:
