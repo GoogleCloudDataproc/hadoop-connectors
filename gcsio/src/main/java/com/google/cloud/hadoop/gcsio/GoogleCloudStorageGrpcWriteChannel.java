@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl.encodeMetadata;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.storage.v2.ServiceConstants.Values.MAX_WRITE_CHUNK_BYTES;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.stream.Collectors.toMap;
@@ -284,6 +285,9 @@ public final class GoogleCloudStorageGrpcWriteChannel
                   .newCall(StorageGrpc.getWriteObjectMethod(), stub.getCallOptions());
           writeObjectRequestStreamObserver =
               ClientCalls.asyncClientStreamingCall(call, responseObserver);
+
+          checkState(watchdog.getOpenStreams().size() == 0, "gRPC streams seems to be leaking");
+
           requestStreamObserver =
               watchdog.watch(
                   call,
@@ -315,13 +319,17 @@ public final class GoogleCloudStorageGrpcWriteChannel
         if (objectFinalized
             || requestChunkMap.size() >= channelOptions.getNumberOfBufferedRequests()) {
           // We are closing request stream either
-          // 1. It's final request OR
-          // 2. If requestChunkMap is full -> to make sure that gcs checkpoint already sent chunks.
+          // 1. It's final request.
+          //  OR
+          // 2. If requestChunkMap is full. -> We are initiating `onComplete` call back so that gcs
+          // will checkpoint all chunks which we have already sent.
+          // It's imp to note here that we are just marking the stream complete. Object will still
+          // not be finalized and
+          // will only be done on a finalChunk i.e. insertRequest with `finishWrite` set to true.
           requestStreamObserver.onCompleted();
           try {
             responseObserver.done.await();
             if (responseObserver.hasTransientError() || responseObserver.hasNonTransientError()) {
-              // responseObserver
               break;
             }
             // Clear the cached requests as we have established that
