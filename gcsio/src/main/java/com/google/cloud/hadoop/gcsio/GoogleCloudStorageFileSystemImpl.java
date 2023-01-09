@@ -1,11 +1,11 @@
 /*
- * Copyright 2022 Google Inc. All Rights Reserved.
+ * Copyright 2022 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -125,9 +125,10 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   public GoogleCloudStorageFileSystemImpl(
       Credentials credentials, GoogleCloudStorageFileSystemOptions options) throws IOException {
     this(
-        new GoogleCloudStorageImpl(
-            checkNotNull(options, "options must not be null").getCloudStorageOptions(),
-            credentials),
+        GoogleCloudStorageImpl.builder()
+            .setOptions(checkNotNull(options, "options must not be null").getCloudStorageOptions())
+            .setCredentials(credentials)
+            .build(),
         options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }
@@ -146,10 +147,11 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       GoogleCloudStorageFileSystemOptions options)
       throws IOException {
     this(
-        new GoogleCloudStorageImpl(
-            checkNotNull(options, "options must not be null").getCloudStorageOptions(),
-            credentials,
-            downscopedAccessTokenFn),
+        GoogleCloudStorageImpl.builder()
+            .setOptions(checkNotNull(options, "options must not be null").getCloudStorageOptions())
+            .setCredentials(credentials)
+            .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
+            .build(),
         options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }
@@ -194,6 +196,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     return service;
   }
 
+  @Override
   public GoogleCloudStorageFileSystemOptions getOptions() {
     return options;
   }
@@ -339,7 +342,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     // Delete children before their parents.
     //
     // Note: we modify the input list, which is ok for current usage.
-    // We should make a copy in case that changes in future.
+    // We should make a copy in case that changes in the future.
     itemsToDelete.sort(FILE_INFO_PATH_COMPARATOR.reversed());
 
     if (!itemsToDelete.isEmpty()) {
@@ -416,7 +419,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     try {
       gcs.createEmptyObject(resourceId);
     } catch (FileAlreadyExistsException e) {
-      // This means that directory object already exist and we do not need to do anything.
+      // This means that directory object already exist, and we do not need to do anything.
       logger.atFiner().withCause(e).log(
           "mkdirs: %s already exists, ignoring creation failure", resourceId);
     }
@@ -546,13 +549,11 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       }
 
       if (dstInfo.exists()) {
-        if (dst.equals(GCS_ROOT)) {
-          dst =
-              UriPaths.fromStringPathComponents(
-                  srcItemName, /* objectName= */ null, /* allowEmptyObjectName= */ true);
-        } else {
-          dst = UriPaths.toDirectory(dst.resolve(srcItemName));
-        }
+        dst =
+            dst.equals(GCS_ROOT)
+                ? UriPaths.fromStringPathComponents(
+                    srcItemName, /* objectName= */ null, /* allowEmptyObjectName= */ true)
+                : UriPaths.toDirectory(dst.resolve(srcItemName));
       }
     } else {
       // -- src is a file
@@ -586,7 +587,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   /**
    * Renames given directory without checking any parameters.
    *
-   * <p>GCS does not support atomic renames therefore a rename is implemented as copying source
+   * <p>GCS does not support atomic renames therefore rename is implemented as copying source
    * metadata to destination and then deleting source metadata. Note that only the metadata is
    * copied and not the content of any file.
    */
@@ -823,7 +824,9 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
     return fileInfo;
   }
 
-  /** @see #getFileInfo(URI) */
+  /**
+   * @see #getFileInfo(URI)
+   */
   private GoogleCloudStorageItemInfo getFileInfoInternal(
       StorageResourceId resourceId, boolean inferImplicitDirectories) throws IOException {
     if (resourceId.isRoot() || resourceId.isBucket()) {
@@ -978,7 +981,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
    * </ul>
    *
    * @param objectName Name of an object.
-   * @return List of sub-directory like paths.
+   * @return List of subdirectory like paths.
    */
   static List<String> getDirs(String objectName) {
     if (isNullOrEmpty(objectName)) {

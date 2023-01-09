@@ -1,14 +1,16 @@
 /*
- * Copyright 2018 Google Inc. All Rights Reserved.
+ * Copyright 2018 Google LLC
  *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software distributed under the
- * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing permissions and
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
  * limitations under the License.
  */
 
@@ -19,10 +21,10 @@ import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.BUCKET_N
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.HTTP_TRANSPORT;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.OBJECT_NAME;
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTestUtils.createReadChannel;
+import static com.google.cloud.hadoop.gcsio.MockGoogleCloudStorageImplFactory.mockedGcsImpl;
 import static com.google.cloud.hadoop.gcsio.StorageResourceId.UNKNOWN_GENERATION_ID;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getMediaRequestString;
 import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.getRequestString;
-import static com.google.cloud.hadoop.gcsio.testing.MockGoogleCloudStorageImplFactory.mockedGcs;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.dataRangeResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.dataResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.inputStreamResponse;
@@ -62,8 +64,6 @@ import org.junit.runners.JUnit4;
 /** Unit tests for {@link GoogleCloudStorageReadChannel} class. */
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageReadChannelTest {
-
-  private static final String PROJECT_ID = "google.com:foo-project";
 
   @Test
   public void metadataInitialization_eager() throws IOException {
@@ -628,7 +628,7 @@ public class GoogleCloudStorageReadChannelTest {
                   }
                 }),
             dataResponse(ImmutableMap.of("Content-Length", testData2.length), testData2));
-    GoogleCloudStorage gcs = mockedGcs(transport);
+    GoogleCloudStorage gcs = mockedGcsImpl(transport);
 
     GoogleCloudStorageReadChannel readChannel =
         (GoogleCloudStorageReadChannel)

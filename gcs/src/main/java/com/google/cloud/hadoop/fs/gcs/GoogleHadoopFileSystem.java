@@ -1,11 +1,11 @@
 /*
- * Copyright 2013 Google Inc. All Rights Reserved.
+ * Copyright 2013 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,7 +22,7 @@ import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_FILE_CHECKSUM_TYPE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_GLOB_ALGORITHM;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_LAZY_INITIALIZATION_ENABLE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT;
 import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.CLOUD_PLATFORM_SCOPE;
@@ -38,12 +38,11 @@ import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.trackDura
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
-import com.google.cloud.hadoop.gcsio.CreateObjectOptions;
 import com.google.cloud.hadoop.gcsio.FileInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemProvider;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.ListFileOptions;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
@@ -71,7 +70,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.DirectoryNotEmptyException;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -347,11 +345,11 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
             : null;
     return accessTokenProvider != null
             && accessTokenProvider.getAccessTokenType() == AccessTokenType.DOWNSCOPED
-        ? GoogleCloudStorageFileSystemProvider.newInstance(
+        ? new GoogleCloudStorageFileSystemImpl(
             /* credentials= */ null,
             accessBoundaries -> accessTokenProvider.getAccessToken(accessBoundaries).getToken(),
             gcsFsOptions)
-        : GoogleCloudStorageFileSystemProvider.newInstance(
+        : new GoogleCloudStorageFileSystemImpl(
             credentials, /* downscopedAccessTokenFn= */ null, gcsFsOptions);
   }
 
@@ -541,9 +539,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
                                   ? CreateFileOptions.WriteMode.OVERWRITE
                                   : CreateFileOptions.WriteMode.CREATE_NEW)
                           .setMinSyncInterval(
-                              Duration.ofMillis(
-                                  GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(
-                                      getConf(), getConf()::getInt)))
+                              GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL.getTimeDuration(getConf()))
                           .build(),
                       statistics),
                   statistics);
@@ -1104,9 +1100,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
             filePath,
             CreateFileOptions.builder()
                 .setWriteMode(CreateFileOptions.WriteMode.APPEND)
-                .setMinSyncInterval(
-                    Duration.ofMillis(
-                        GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.get(getConf(), getConf()::getInt)))
+                .setMinSyncInterval(GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL.getTimeDuration(getConf()))
                 .build(),
             statistics),
         statistics);
@@ -1139,7 +1133,7 @@ public class GoogleHadoopFileSystem extends FileSystem implements IOStatisticsSo
       // concat operation appends to the target.
       List<URI> sources = Lists.newArrayList(tgtPath);
       sources.addAll(partition);
-      getGcsFs().compose(sources, tgtPath, CreateObjectOptions.CONTENT_TYPE_DEFAULT);
+      getGcsFs().compose(sources, tgtPath, CreateFileOptions.DEFAULT.getContentType());
     }
   }
 

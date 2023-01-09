@@ -1,11 +1,11 @@
 /*
- * Copyright 2013 Google Inc. All Rights Reserved.
+ * Copyright 2013 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,7 +21,10 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
 /** Contains helper methods for standardizing String-matching algorithms specific to GCS. */
-public class GoogleCloudStorageStrings {
+public final class GoogleCloudStorageStrings {
+
+  private GoogleCloudStorageStrings() {}
+
   /**
    * Helper that mimics the GCS API behavior for taking an existing objectName and checking if it
    * matches a user-supplied prefix with an optional directory "delimiter". If it matches, either

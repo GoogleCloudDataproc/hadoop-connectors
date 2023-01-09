@@ -1,25 +1,25 @@
 /*
- * Copyright 2019 Google LLC. All Rights Reserved.
+ * Copyright 2019 Google LLC
  *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software distributed under the
- * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing permissions and
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
  * limitations under the License.
  */
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_PIPE_TYPE;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.concurrent.TimeUnit.DAYS;
 import static org.junit.Assert.assertThrows;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
@@ -29,7 +29,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelp
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions.PipeType;
 import java.net.URI;
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Random;
@@ -74,7 +73,7 @@ public class GoogleHadoopOutputStreamIntegrationTest {
 
   private Configuration getTestConfig() {
     Configuration conf = GoogleHadoopFileSystemIntegrationHelper.getTestConfig();
-    conf.setEnum(GCS_OUTPUT_STREAM_PIPE_TYPE.getKey(), pipeType);
+    conf.setEnum("fs.gs.outputstream.pipe.type", pipeType);
     return conf;
   }
 
@@ -83,7 +82,7 @@ public class GoogleHadoopOutputStreamIntegrationTest {
     URI testFile = gcsFsIHelper.getUniqueObjectUri("GHFSOutputStream_write_withZeroBufferSize");
 
     Configuration config = getTestConfig();
-    config.setInt(GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE.getKey(), 0);
+    config.setInt("fs.gs.outputstream.buffer.size", 0);
 
     GoogleHadoopFileSystem ghfs =
         GoogleHadoopFileSystemIntegrationHelper.createGhfs(testFile, config);
@@ -138,7 +137,7 @@ public class GoogleHadoopOutputStreamIntegrationTest {
     Path hadoopPath = new Path(path);
 
     Configuration config = getTestConfig();
-    config.setInt(GCS_OUTPUT_STREAM_BUFFER_SIZE.getKey(), 0);
+    config.setInt("fs.gs.outputstream.buffer.size", 0);
     FileSystem fs = GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, config);
 
     String line1 = "hello\n";
@@ -276,7 +275,7 @@ public class GoogleHadoopOutputStreamIntegrationTest {
     Path hadoopPath = new Path(path);
 
     Configuration config = getTestConfig();
-    config.setLong(GCS_OUTPUT_STREAM_SYNC_MIN_INTERVAL_MS.getKey(), Duration.ofDays(1).toMillis());
+    config.setTimeDuration("fs.gs.outputstream.sync.min.interval", 1, DAYS);
     FileSystem ghfs = GoogleHadoopFileSystemIntegrationHelper.createGhfs(path, config);
 
     byte[] testData = new byte[10];

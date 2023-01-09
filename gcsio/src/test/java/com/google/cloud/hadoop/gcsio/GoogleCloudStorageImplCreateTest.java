@@ -1,21 +1,23 @@
 /*
- * Copyright 2021 Google Inc. All Rights Reserved.
+ * Copyright 2021 Google LLC
  *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software distributed under the
- * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing permissions and
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
  * limitations under the License.
  */
 
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.testing.MockGoogleCloudStorageImplFactory.mockedGcs;
-import static com.google.cloud.hadoop.gcsio.testing.MockGoogleCloudStorageImplFactory.mockedJavaClientGcs;
+import static com.google.cloud.hadoop.gcsio.MockGoogleCloudStorageImplFactory.mockedGcsClientImpl;
+import static com.google.cloud.hadoop.gcsio.MockGoogleCloudStorageImplFactory.mockedGcsImpl;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.arbitraryInputStreamSupplier;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.inputStreamResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonErrorResponse;
@@ -27,14 +29,8 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 
 import com.google.api.client.http.HttpTransport;
-import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.testing.http.MockHttpTransport;
-import com.google.api.services.storage.Storage;
-import com.google.auth.Credentials;
 import com.google.auth.oauth2.ComputeEngineCredentials;
-import com.google.cloud.hadoop.util.HttpTransportFactory;
-import com.google.cloud.hadoop.util.RetryHttpInitializer;
-import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
 import com.google.cloud.hadoop.util.testing.ThrowingInputStream;
 import java.io.IOException;
@@ -58,29 +54,29 @@ public class GoogleCloudStorageImplCreateTest {
   private static final String BUCKET_NAME = "foo-bucket";
   private static final String OBJECT_NAME = "bar-object";
 
-  private final boolean javaClientEnabled;
+  private final boolean tesStorageClientImpl;
 
-  public GoogleCloudStorageImplCreateTest(boolean javaClientEnabled) {
-    this.javaClientEnabled = javaClientEnabled;
+  public GoogleCloudStorageImplCreateTest(boolean tesStorageClientImpl) {
+    this.tesStorageClientImpl = tesStorageClientImpl;
   }
 
   @Parameters
-  // We want to test this entire class with both javaClientImp and gcsImpl
-  // Some of our internal endpoints only work with TD
-  public static Iterable<Boolean> javaClientEnabled() {
+  public static Iterable<Boolean> getTesStorageClientImplParameter() {
     return List.of(false, true);
   }
 
   @Test
   public void create_grpc_useDirectpath() throws IOException {
     GoogleCloudStorageImpl gcs =
-        new GoogleCloudStorageImpl(
-            GoogleCloudStorageOptions.builder()
-                .setAppName("app")
-                .setGrpcEnabled(true)
-                .setTrafficDirectorEnabled(false)
-                .build(),
-            createStorage());
+        GoogleCloudStorageImpl.builder()
+            .setOptions(
+                GoogleCloudStorageOptions.builder()
+                    .setAppName("app")
+                    .setGrpcEnabled(true)
+                    .setTrafficDirectorEnabled(false)
+                    .build())
+            .setCredentials(ComputeEngineCredentials.create())
+            .build();
     assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
         .isInstanceOf(StorageStubProvider.DirectPathGrpcDecorator.class);
   }
@@ -88,14 +84,16 @@ public class GoogleCloudStorageImplCreateTest {
   @Test
   public void create_grpcAndDisableDirectPath_useCloudpath() throws IOException {
     GoogleCloudStorageImpl gcs =
-        new GoogleCloudStorageImpl(
-            GoogleCloudStorageOptions.builder()
-                .setAppName("app")
-                .setGrpcEnabled(true)
-                .setDirectPathPreferred(false)
-                .setTrafficDirectorEnabled(false)
-                .build(),
-            createStorage());
+        GoogleCloudStorageImpl.builder()
+            .setOptions(
+                GoogleCloudStorageOptions.builder()
+                    .setAppName("app")
+                    .setGrpcEnabled(true)
+                    .setDirectPathPreferred(false)
+                    .setTrafficDirectorEnabled(false)
+                    .build())
+            .setCredentials(ComputeEngineCredentials.create())
+            .build();
     assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
         .isInstanceOf(StorageStubProvider.CloudPathGrpcDecorator.class);
   }
@@ -103,9 +101,11 @@ public class GoogleCloudStorageImplCreateTest {
   @Test
   public void create_grpcAndTrafficDirector_useTrafficDirector() throws IOException {
     GoogleCloudStorageImpl gcs =
-        new GoogleCloudStorageImpl(
-            GoogleCloudStorageOptions.builder().setAppName("app").setGrpcEnabled(true).build(),
-            createStorage());
+        GoogleCloudStorageImpl.builder()
+            .setOptions(
+                GoogleCloudStorageOptions.builder().setAppName("app").setGrpcEnabled(true).build())
+            .setCredentials(ComputeEngineCredentials.create())
+            .build();
     assertThat(gcs.getStorageStubProvider().getGrpcDecorator())
         .isInstanceOf(StorageStubProvider.TrafficDirectorGrpcDecorator.class);
   }
@@ -159,8 +159,8 @@ public class GoogleCloudStorageImplCreateTest {
   }
 
   /**
-   * Test handling when the parent thread waiting for the write to finish via the close call is
-   * interrupted, that the actual write is cancelled and interrupted as well.
+   * Test handling when the parent thread waiting for the write operation to finish via the close
+   * call is interrupted, that the actual write is cancelled and interrupted as well.
    */
   @Test
   public void testCreateObjectApiInterruptedException() throws Exception {
@@ -213,25 +213,6 @@ public class GoogleCloudStorageImplCreateTest {
   }
 
   private GoogleCloudStorage getCloudStorageImpl(HttpTransport transport) throws IOException {
-    if (javaClientEnabled) {
-      return mockedJavaClientGcs(transport);
-    }
-    return mockedGcs(transport);
-  }
-
-  private static Storage createStorage() throws IOException {
-    return createStorage(ComputeEngineCredentials.create());
-  }
-
-  private static Storage createStorage(Credentials credentials) throws IOException {
-    return new Storage.Builder(
-            HttpTransportFactory.createHttpTransport(),
-            GsonFactory.getDefaultInstance(),
-            new RetryHttpInitializer(
-                credentials,
-                RetryHttpInitializerOptions.builder()
-                    .setDefaultUserAgent("foo-user-agent")
-                    .build()))
-        .build();
+    return tesStorageClientImpl ? mockedGcsClientImpl(transport) : mockedGcsImpl(transport);
   }
 }

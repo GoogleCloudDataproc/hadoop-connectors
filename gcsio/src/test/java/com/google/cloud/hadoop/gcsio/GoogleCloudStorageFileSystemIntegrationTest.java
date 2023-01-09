@@ -1,14 +1,16 @@
 /*
- * Copyright 2014 Google Inc. All Rights Reserved.
+ * Copyright 2014 Google Inc.
  *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software distributed under the
- * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing permissions and
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
  * limitations under the License.
  */
 
@@ -106,8 +108,6 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   // Name of the test object.
   protected static String objectName = "gcsio-test.txt";
 
-  protected static final int UPLOAD_CHUNK_SIZE_DEFAULT = 64 * 1024 * 1024;
-
   @ClassRule
   public static NotInheritableExternalResource storageResource =
       new NotInheritableExternalResource(GoogleCloudStorageFileSystemIntegrationTest.class) {
@@ -130,7 +130,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
                         .setProjectId(projectId)
                         .setWriteChannelOptions(
                             AsyncWriteChannelOptions.builder()
-                                .setUploadChunkSize(UPLOAD_CHUNK_SIZE_DEFAULT)
+                                .setUploadChunkSize(64 * 1024 * 1024)
                                 .build())
                         .build());
 
@@ -1672,8 +1672,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
     }
     assertThat(gcsfs.exists(object1) && gcsfs.exists(object2)).isTrue();
 
-    gcsfs.compose(
-        ImmutableList.of(object1, object2), destination, CreateObjectOptions.CONTENT_TYPE_DEFAULT);
+    gcsfs.compose(ImmutableList.of(object1, object2), destination, "application/octet-stream");
 
     byte[] expectedOutput = "content1content2".getBytes(UTF_8);
     ByteBuffer actualOutput = ByteBuffer.allocate(expectedOutput.length);

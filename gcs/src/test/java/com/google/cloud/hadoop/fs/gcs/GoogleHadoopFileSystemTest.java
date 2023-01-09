@@ -1,23 +1,21 @@
 /*
- * Copyright 2014 Google Inc. All Rights Reserved.
+ * Copyright 2014 Google Inc.
  *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software distributed under the
- * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing permissions and
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
  * limitations under the License.
  */
 
 package com.google.cloud.hadoop.fs.gcs;
 
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_LAZY_INITIALIZATION_ENABLE;
-import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTHENTICATION_TYPE_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
@@ -76,9 +74,8 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   public void lazyInitialization_succeeds_withInvalidCredentialsConfiguration() throws Exception {
     new GoogleHadoopFileSystem();
     Configuration lazyConf = new Configuration();
-    lazyConf.setBoolean(GCS_LAZY_INITIALIZATION_ENABLE.getKey(), true);
-    lazyConf.set(
-        GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.getKey(), "non-existent.json");
+    lazyConf.setBoolean("fs.gs.lazy.init.enable", true);
+    lazyConf.set("fs.gs.auth.service.account.json.keyfile", "non-existent.json");
     GoogleHadoopFileSystem lazyFs = new GoogleHadoopFileSystem();
 
     lazyFs.initialize(new URI("gs://test-non-existent/"), lazyConf);
@@ -89,12 +86,9 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   public void lazyInitialization_deleteCall_fails_withInvalidCredentialsConfiguration()
       throws Exception {
     Configuration lazyConf = new Configuration();
-    lazyConf.setBoolean(GCS_LAZY_INITIALIZATION_ENABLE.getKey(), true);
-    lazyConf.setEnum(
-        GCS_CONFIG_PREFIX + AUTHENTICATION_TYPE_SUFFIX.getKey(),
-        AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
-    lazyConf.set(
-        GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.getKey(), "non-existent.json");
+    lazyConf.setBoolean("fs.gs.lazy.init.enable", true);
+    lazyConf.setEnum("fs.gs.auth.type", AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
+    lazyConf.set("fs.gs.auth.service.account.json.keyfile", "non-existent.json");
     GoogleHadoopFileSystem lazyFs = new GoogleHadoopFileSystem();
 
     lazyFs.initialize(new URI("gs://test-non-existent"), lazyConf);
@@ -121,12 +115,9 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   public void eagerInitialization_fails_withInvalidCredentialsConfiguration() {
     new GoogleHadoopFileSystem();
     Configuration eagerConf = new Configuration();
-    eagerConf.setBoolean(GCS_LAZY_INITIALIZATION_ENABLE.getKey(), false);
-    eagerConf.setEnum(
-        GCS_CONFIG_PREFIX + AUTHENTICATION_TYPE_SUFFIX.getKey(),
-        AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
-    eagerConf.set(
-        GCS_CONFIG_PREFIX + SERVICE_ACCOUNT_JSON_KEYFILE_SUFFIX.getKey(), "non-existent.json");
+    eagerConf.setBoolean("fs.gs.lazy.init.enable", false);
+    eagerConf.setEnum("fs.gs.auth.type", AuthenticationType.SERVICE_ACCOUNT_JSON_KEYFILE);
+    eagerConf.set("fs.gs.auth.service.account.json.keyfile", "non-existent.json");
     FileSystem eagerFs = new GoogleHadoopFileSystem();
 
     FileNotFoundException exception =
@@ -187,9 +178,7 @@ public class GoogleHadoopFileSystemTest extends GoogleHadoopFileSystemIntegratio
   @Test
   public void testGetDefaultPortIndicatesPortsAreNotUsed() throws Exception {
     Configuration config = new Configuration();
-    config.setEnum(
-        GCS_CONFIG_PREFIX + AUTHENTICATION_TYPE_SUFFIX.getKey(),
-        AuthenticationType.ACCESS_TOKEN_PROVIDER);
+    config.setEnum("fs.gs.auth.type", AuthenticationType.ACCESS_TOKEN_PROVIDER);
     config.setClass(
         "fs.gs.auth.access.token.provider",
         TestingAccessTokenProvider.class,

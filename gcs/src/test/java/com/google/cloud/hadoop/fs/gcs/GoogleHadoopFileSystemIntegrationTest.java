@@ -1,14 +1,16 @@
 /*
- * Copyright 2014 Google Inc. All Rights Reserved.
+ * Copyright 2014 Google Inc.
  *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software distributed under the
- * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing permissions and
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
  * limitations under the License.
  */
 
@@ -32,19 +34,14 @@ import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_RENAME;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_XATTR_GET_MAP;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_XATTR_GET_NAMED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_XATTR_GET_NAMED_MAP;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_CONFIG_PREFIX;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE;
+import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE;
 import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemTestHelper.createInMemoryGoogleHadoopFileSystem;
 import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
-import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AUTHENTICATION_TYPE_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
-import static com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX;
 import static com.google.common.base.StandardSystemProperty.USER_NAME;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
+import static java.lang.Math.toIntExact;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.stream;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_CREDENTIAL_PROVIDER_PATH;
@@ -53,6 +50,7 @@ import static org.junit.Assert.assertThrows;
 import com.google.api.client.http.HttpResponseException;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GcsFileChecksumType;
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem.GlobAlgorithm;
+import com.google.cloud.hadoop.fs.gcs.auth.AbstractDelegationTokenBinding;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
@@ -233,8 +231,10 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     Configuration config = new Configuration();
 
     // Token binding config
-    config.set(
-        DELEGATION_TOKEN_BINDING_CLASS.getKey(), TestDelegationTokenBindingImpl.class.getName());
+    config.setClass(
+        "fs.gs.delegation.token.binding",
+        TestDelegationTokenBindingImpl.class,
+        AbstractDelegationTokenBinding.class);
     config.set(
         TestDelegationTokenBindingImpl.TestAccessTokenProviderImpl.TOKEN_CONFIG_PROPERTY_NAME,
         "qWDAWFA3WWFAWFAWFAW3FAWF3AWF3WFAF33GR5G5"); // Bogus auth token
@@ -258,8 +258,10 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     Configuration config = new Configuration();
 
     // Token binding config
-    config.set(
-        DELEGATION_TOKEN_BINDING_CLASS.getKey(), TestDelegationTokenBindingImpl.class.getName());
+    config.setClass(
+        "fs.gs.delegation.token.binding",
+        TestDelegationTokenBindingImpl.class,
+        AbstractDelegationTokenBinding.class);
     config.set(
         TestDelegationTokenBindingImpl.TestAccessTokenProviderImpl.TOKEN_CONFIG_PROPERTY_NAME,
         "qWDAWFA3WWFAWFAWFAW3FAWF3AWF3WFAF33GR5G5"); // Bogus auth token
@@ -549,7 +551,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
     assertThat(gcsOptions.isAutoRepairImplicitDirectoriesEnabled()).isTrue();
 
-    config.setBoolean(GCS_REPAIR_IMPLICIT_DIRECTORIES_ENABLE.getKey(), false);
+    config.setBoolean("fs.gs.implicit.dir.repair.enable", false);
 
     optionsBuilder = GoogleHadoopFileSystemConfiguration.getGcsFsOptionsBuilder(config);
     options = optionsBuilder.build();
@@ -567,7 +569,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
     // Set up remaining settings to known test values.
     long blockSize = 1024;
-    config.setLong(GoogleHadoopFileSystemConfiguration.BLOCK_SIZE.getKey(), blockSize);
+    config.setLong("fs.gs.block.size", blockSize);
     String rootBucketName = ghfsHelper.getUniqueBucketName("initialize-root");
 
     URI initUri = new Path("gs://" + rootBucketName).toUri();
@@ -587,7 +589,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
       throws URISyntaxException, IOException {
     Configuration config = loadConfig();
     // Unset Project ID
-    config.unset(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey());
+    config.unset("fs.gs.project.id");
 
     URI gsUri = new Path("gs://foo").toUri();
     new GoogleHadoopFileSystem().initialize(gsUri, config);
@@ -611,9 +613,9 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     URI gsUri = new URI("gs://foobar/");
     String fakeProjectId = "123456";
     Configuration config = new Configuration();
-    config.set(GCS_CONFIG_PREFIX + AUTHENTICATION_TYPE_SUFFIX.getKey(), "INVALID_AUTH_TYPE");
+    config.set("fs.gs.auth.type", "INVALID_AUTH_TYPE");
     // Set project ID.
-    config.set(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(), fakeProjectId);
+    config.set("fs.gs.project.id", fakeProjectId);
 
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
 
@@ -653,8 +655,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
       Path path = wdd.path;
       Path expectedWorkingDir = wdd.expectedPath;
       Path currentWorkingDir = ghfs.getWorkingDirectory();
-      config.set(
-          GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY.getKey(), path.toString());
+      config.set("fs.gs.working.dir", path.toString());
       ghfs.initialize(myGhfs.initUri, config);
       Path newWorkingDir = ghfs.getWorkingDirectory();
       if (expectedWorkingDir != null) {
@@ -1164,7 +1165,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   public void testConfigurablePermissions() throws IOException {
     String testPermissions = "777";
     Configuration conf = getConfigurationWithImplementation();
-    conf.set(GoogleHadoopFileSystemConfiguration.PERMISSIONS_TO_REPORT.getKey(), testPermissions);
+    conf.set("fs.gs.reported.permissions", testPermissions);
     GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
     myGhfs.initialize(ghfs.getUri(), conf);
     URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
@@ -1209,7 +1210,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
             () ->
                 myGhfs.append(
                     /* hadoopPath= */ null,
-                    GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE.getDefault(),
+                    toIntExact(GCS_OUTPUT_STREAM_BUFFER_SIZE.getDefault()),
                     () -> {}));
     assertThat(exception).hasMessageThat().contains("hadoopPath must not be null");
   }
@@ -1445,7 +1446,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
       throws IOException {
     GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) ghfs;
     Configuration config = myGhfs.getConf();
-    config.unset(GoogleHadoopFileSystemConfiguration.GCS_WORKING_DIRECTORY.getKey());
+    config.unset("fs.gs.working.dir");
     ghfs.initialize(myGhfs.initUri, config);
 
     String expectedHomeDir =
@@ -1465,8 +1466,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
   private void testGlobStatusFlatConcurrent(GlobAlgorithm globAlgorithm) throws IOException {
     Configuration configuration = ghfs.getConf();
-    configuration.setEnum(
-        GoogleHadoopFileSystemConfiguration.GCS_GLOB_ALGORITHM.getKey(), globAlgorithm);
+    configuration.setEnum("fs.gs.glob.algorithm", globAlgorithm);
     ghfs.initialize(ghfs.getUri(), configuration);
 
     Path testRoot = new Path("/directory1/");
@@ -1661,8 +1661,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
         "fs.gs.auth.access.token.provider",
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
-    config.set(
-        GCS_CONFIG_PREFIX + IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey(), "test-service-account");
+    config.set("fs.gs.auth.impersonation.service.account", "test-service-account");
 
     Path gcsPath = new Path("gs://foobar/");
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
@@ -1682,8 +1681,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
     config.set(
-        GCS_CONFIG_PREFIX
-            + USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey()
+        "fs.gs.auth.impersonation.service.account.for.user."
             + UserGroupInformation.getCurrentUser().getShortUserName(),
         "test-service-account");
 
@@ -1705,8 +1703,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
     config.set(
-        GCS_CONFIG_PREFIX
-            + GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey()
+        "fs.gs.auth.impersonation.service.account.for.group."
             + UserGroupInformation.getCurrentUser().getGroupNames()[0],
         "test-service-account");
 
@@ -1728,13 +1725,11 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
     config.set(
-        GCS_CONFIG_PREFIX
-            + USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey()
+        "fs.gs.auth.impersonation.service.account.for.user."
             + UserGroupInformation.getCurrentUser().getShortUserName(),
         "test-service-account1");
     config.set(
-        GCS_CONFIG_PREFIX
-            + GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey()
+        "fs.gs.auth.impersonation.service.account.for.group."
             + UserGroupInformation.getCurrentUser().getGroupNames()[0],
         "test-service-account2");
 
@@ -1755,16 +1750,13 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
         "fs.gs.auth.access.token.provider",
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
+    config.set("fs.gs.auth.impersonation.service.account", "test-service-account1");
     config.set(
-        GCS_CONFIG_PREFIX + IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey(), "test-service-account1");
-    config.set(
-        GCS_CONFIG_PREFIX
-            + USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey()
+        "fs.gs.auth.impersonation.service.account.for.user."
             + UserGroupInformation.getCurrentUser().getShortUserName(),
         "test-service-account2");
     config.set(
-        GCS_CONFIG_PREFIX
-            + GROUP_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey()
+        "fs.gs.auth.impersonation.service.account.for.group."
             + UserGroupInformation.getCurrentUser().getGroupNames()[0],
         "test-service-account3");
 
@@ -1786,8 +1778,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
         TestingAccessTokenProvider.class,
         AccessTokenProvider.class);
     config.set(
-        GCS_CONFIG_PREFIX + USER_IMPERSONATION_SERVICE_ACCOUNT_SUFFIX.getKey() + "invalid-user",
-        "test-service-account");
+        "fs.gs.auth.impersonation.service.account.for.user.invalid-user", "test-service-account");
 
     URI gsUri = new URI("gs://foobar/");
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();

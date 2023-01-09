@@ -1,11 +1,11 @@
 /*
- * Copyright 2018 Google Inc. All Rights Reserved.
+ * Copyright 2018 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -84,19 +85,25 @@ class InMemoryGlobberFileSystem extends FileSystem {
     }
   }
 
-  /** @inheritDoc */
+  /**
+   * @inheritDoc
+   */
   @Override
   public URI getUri() {
     return uri;
   }
 
-  /** @inheritDoc */
+  /**
+   * @inheritDoc
+   */
   @Override
   public Path getWorkingDirectory() {
     return workingDirectory;
   }
 
-  /** @inheritDoc */
+  /**
+   * @inheritDoc
+   */
   @Override
   public FileStatus[] listStatus(Path f) throws IOException {
     Path qualifiedPath = makeQualified(f);
@@ -114,7 +121,9 @@ class InMemoryGlobberFileSystem extends FileSystem {
     return result;
   }
 
-  /** @inheritDoc */
+  /**
+   * @inheritDoc
+   */
   @Override
   public FileStatus getFileStatus(Path f) throws IOException {
     Path qualifiedPath = makeQualified(f);
@@ -129,13 +138,17 @@ class InMemoryGlobberFileSystem extends FileSystem {
 
   // Below are unsupported methods that are not used in 'globStatus' calls
 
-  /** @inheritDoc */
+  /**
+   * @inheritDoc
+   */
   @Override
   public FSDataInputStream open(Path f, int bufferSize) {
     throw new UnsupportedOperationException();
   }
 
-  /** @inheritDoc */
+  /**
+   * @inheritDoc
+   */
   @Override
   public FSDataOutputStream create(
       Path f,
@@ -148,37 +161,49 @@ class InMemoryGlobberFileSystem extends FileSystem {
     throw new UnsupportedOperationException();
   }
 
-  /** @inheritDoc */
+  /**
+   * @inheritDoc
+   */
   @Override
   public FSDataOutputStream append(Path f, int bufferSize, Progressable progress) {
     throw new UnsupportedOperationException();
   }
 
-  /** @inheritDoc */
+  /**
+   * @inheritDoc
+   */
   @Override
   public boolean rename(Path src, Path dst) {
     throw new UnsupportedOperationException();
   }
 
-  /** @inheritDoc */
+  /**
+   * @inheritDoc
+   */
   @Override
   public boolean delete(Path f) {
     throw new UnsupportedOperationException();
   }
 
-  /** @inheritDoc */
+  /**
+   * @inheritDoc
+   */
   @Override
   public boolean delete(Path f, boolean recursive) {
     throw new UnsupportedOperationException();
   }
 
-  /** @inheritDoc */
+  /**
+   * @inheritDoc
+   */
   @Override
   public void setWorkingDirectory(Path newDir) {
     throw new UnsupportedOperationException();
   }
 
-  /** @inheritDoc */
+  /**
+   * @inheritDoc
+   */
   @Override
   public boolean mkdirs(Path f, FsPermission permission) {
     throw new UnsupportedOperationException();

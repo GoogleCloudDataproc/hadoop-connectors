@@ -1,11 +1,11 @@
 /*
- * Copyright 2019 Google LLC. All Rights Reserved.
+ * Copyright 2019 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,7 +29,6 @@ import com.google.cloud.hadoop.util.interceptors.InvocationIdInterceptor;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -165,7 +164,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
     AtomicLong resumableUploadId = new AtomicLong();
     return requests.stream()
         .map(GoogleCloudStorageIntegrationHelper::requestToString)
-        // Replace randomized pageToken with predictable value so it could be asserted in tests
+        // Replace randomized pageToken with predictable value, so it could be asserted in tests
         .map(r -> replacePageTokenWithId(r, pageTokenId))
         .map(r -> replaceRewriteTokenWithId(r, rewriteTokenId))
         .map(r -> replaceGenerationMatchWithId(r, generationMatchId))
@@ -271,12 +270,10 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
       String srcObject,
       String dstBucket,
       String dstObject,
-      Integer maxBytesRewrittenPerCall,
+      Integer maxRewriteChunkSize,
       Integer rewriteTokenId) {
     String rewriteParams =
-        (maxBytesRewrittenPerCall == null
-                ? ""
-                : "?maxBytesRewrittenPerCall=" + maxBytesRewrittenPerCall)
+        (maxRewriteChunkSize == null ? "" : "?maxBytesRewrittenPerCall=" + maxRewriteChunkSize)
             + (rewriteTokenId == null ? "" : "&rewriteToken=token_" + rewriteTokenId);
     return copyRequestString(srcBucket, srcObject, dstBucket, dstObject, "rewriteTo")
         + rewriteParams;
@@ -443,7 +440,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         bucket,
         prefix,
         /* objectFields= */ OBJECT_FIELDS,
-        (int) GoogleCloudStorageOptions.MAX_LIST_ITEMS_PER_CALL_DEFAULT,
+        GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
         pageToken);
   }
 
@@ -460,7 +457,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         /* includeTrailingDelimiter= */ true,
         prefix,
         objectFields,
-        (int) GoogleCloudStorageOptions.MAX_LIST_ITEMS_PER_CALL_DEFAULT,
+        GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
         pageToken);
   }
 
@@ -515,7 +512,7 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
         includeTrailingDelimiter,
         prefix,
         objectFields,
-        (int) GoogleCloudStorageOptions.MAX_LIST_ITEMS_PER_CALL_DEFAULT,
+        GoogleCloudStorageOptions.DEFAULT.getMaxListItemsPerCall(),
         pageToken);
   }
 
@@ -546,10 +543,6 @@ public class TrackingHttpRequestInitializer implements HttpRequestInitializer {
   }
 
   private static String urlEncode(String string) {
-    try {
-      return URLEncoder.encode(string, UTF_8.name());
-    } catch (UnsupportedEncodingException e) {
-      throw new RuntimeException("Failed to url encode string: " + string, e);
-    }
+    return URLEncoder.encode(string, UTF_8);
   }
 }

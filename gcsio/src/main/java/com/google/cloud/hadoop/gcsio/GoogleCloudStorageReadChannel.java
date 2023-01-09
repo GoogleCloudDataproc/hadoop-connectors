@@ -1,11 +1,11 @@
 /*
- * Copyright 2013 Google Inc. All Rights Reserved.
+ * Copyright 2013 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -197,11 +197,11 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   @VisibleForTesting
   ExponentialBackOff createBackOff() {
     return new ExponentialBackOff.Builder()
-        .setInitialIntervalMillis(readOptions.getBackoffInitialIntervalMillis())
+        .setInitialIntervalMillis(toIntExact(readOptions.getBackoffInitialInterval().toMillis()))
         .setRandomizationFactor(readOptions.getBackoffRandomizationFactor())
         .setMultiplier(readOptions.getBackoffMultiplier())
-        .setMaxIntervalMillis(readOptions.getBackoffMaxIntervalMillis())
-        .setMaxElapsedTimeMillis(readOptions.getBackoffMaxElapsedTimeMillis())
+        .setMaxIntervalMillis(toIntExact(readOptions.getBackoffMaxInterval().toMillis()))
+        .setMaxElapsedTimeMillis(toIntExact(readOptions.getBackoffMaxElapsedTime().toMillis()))
         .build();
   }
 
