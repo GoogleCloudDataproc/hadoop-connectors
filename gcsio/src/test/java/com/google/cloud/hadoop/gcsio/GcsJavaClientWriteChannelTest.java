@@ -1,6 +1,5 @@
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.testing.MockGoogleCloudStorageImplFactory.mockGcsJavaStorage;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonErrorResponse;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.truth.Truth.assertThat;
@@ -18,9 +17,15 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.testing.http.MockHttpTransport;
+import com.google.auth.Credentials;
 import com.google.cloud.WriteChannel;
+import com.google.cloud.hadoop.gcsio.GcsJavaClientImpl.GcsJavaClientImplBuilder;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
+import com.google.cloud.hadoop.util.RetryHttpInitializer;
+import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
+import com.google.cloud.hadoop.util.testing.FakeCredentials;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Storage;
@@ -241,5 +246,28 @@ public class GcsJavaClientWriteChannelTest {
             Collectors.toMap(
                 entity -> entity.getKey(),
                 entity -> GoogleCloudStorageImpl.decodeMetadataValues(entity.getValue())));
+  }
+
+  private GoogleCloudStorage mockGcsJavaStorage(
+      MockHttpTransport transport, Storage javaClientStorage) throws IOException {
+    Credentials fakeCredential = new FakeCredentials();
+    com.google.api.services.storage.Storage storage =
+        new com.google.api.services.storage.Storage(
+            transport,
+            GsonFactory.getDefaultInstance(),
+            new RetryHttpInitializer(
+                new FakeCredentials(),
+                RetryHttpInitializerOptions.builder()
+                    .setDefaultUserAgent("gcs-io-unit-test")
+                    .build()));
+    GoogleCloudStorageOptions options =
+        GoogleCloudStorageOptions.builder()
+            .setAppName("gcsio-unit-test")
+            .setGrpcEnabled(true)
+            .build();
+    return new GcsJavaClientImplBuilder(options, fakeCredential, null)
+        .withApairyClientStorage(storage)
+        .withJavaClientStorage(javaClientStorage)
+        .build();
   }
 }

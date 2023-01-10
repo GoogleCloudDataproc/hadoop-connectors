@@ -40,7 +40,7 @@ public class GcsJavaClientImpl implements GoogleCloudStorage {
   private Storage storage;
 
   // Thread-pool used for background tasks.
-  private final ExecutorService backgroundTasksThreadPool =
+  private ExecutorService backgroundTasksThreadPool =
       Executors.newCachedThreadPool(
           new ThreadFactoryBuilder()
               .setNameFormat("gcs-java-client-write-channel-pool-%d")
@@ -77,23 +77,31 @@ public class GcsJavaClientImpl implements GoogleCloudStorage {
   @Override
   public WritableByteChannel create(StorageResourceId resourceId, CreateObjectOptions options)
       throws IOException {
-    logger.atFiner().log("create(%s)", resourceId);
-    checkArgument(
-        resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
-    // Update resourceId if generationId is missing
-    if (!resourceId.hasGenerationId()) {
-      resourceId =
-          new StorageResourceId(
-              resourceId.getBucketName(),
-              resourceId.getObjectName(),
-              getWriteGeneration(resourceId, options.isOverwriteExisting()));
-    }
+    if (storageOptions.isGrpcEnabled()) {
+      logger.atFiner().log("create(%s)", resourceId);
+      checkArgument(
+          resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
+      // Update resourceId if generationId is missing
+      StorageResourceId resourceIdWithGeneration = resourceId;
+      if (!resourceId.hasGenerationId()) {
+        resourceIdWithGeneration =
+            new StorageResourceId(
+                resourceId.getBucketName(),
+                resourceId.getObjectName(),
+                getWriteGeneration(resourceId, options.isOverwriteExisting()));
+      }
 
-    GcsJavaClientWriteChannel channel =
-        new GcsJavaClientWriteChannel(
-            storage, storageOptions, resourceId, options, backgroundTasksThreadPool);
-    channel.initialize();
-    return channel;
+      GcsJavaClientWriteChannel channel =
+          new GcsJavaClientWriteChannel(
+              storage,
+              storageOptions,
+              resourceIdWithGeneration,
+              options,
+              backgroundTasksThreadPool);
+      channel.initialize();
+      return channel;
+    }
+    return gcsClientDelegate.create(resourceId, options);
   }
 
   @Override
@@ -219,7 +227,15 @@ public class GcsJavaClientImpl implements GoogleCloudStorage {
 
   @Override
   public void close() {
-    gcsClientDelegate.close();
+    try {
+      try {
+        gcsClientDelegate.close();
+      } finally {
+        backgroundTasksThreadPool.shutdown();
+      }
+    } finally {
+      backgroundTasksThreadPool = null;
+    }
   }
 
   /**
