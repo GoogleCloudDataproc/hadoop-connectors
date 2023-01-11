@@ -45,7 +45,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
   GoogleCloudStorageClientImpl(
       GoogleCloudStorageOptions storageOptions,
-      @Nullable Credential credential,
+      Credential credential,
       @Nullable com.google.api.services.storage.Storage apiaryClientStorage,
       @Nullable HttpRequestInitializer httpRequestInitializer,
       @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
@@ -58,7 +58,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             credential,
             downscopedAccessTokenFn));
     this.storageOptions = checkNotNull(storageOptions, "options must not be null");
-    this.credential = checkNotNull(credential, "credentials must not be null");
+    this.credential = checkNotNull(credential, "credential must not be null");
   }
 
   private static GoogleCloudStorage getDelegate(
@@ -90,7 +90,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
     public abstract Builder setStorageOptions(GoogleCloudStorageOptions storageOptions);
 
-    public abstract Builder setCredential(@Nullable Credential credential);
+    public abstract Builder setCredential(Credential credential);
 
     public abstract Builder setApiaryClientStorage(
         @Nullable com.google.api.services.storage.Storage apiaryClientStorage);
