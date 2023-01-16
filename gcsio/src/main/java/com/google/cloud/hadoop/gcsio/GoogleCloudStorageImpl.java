@@ -387,13 +387,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     this.httpRequestInitializer = this.storage.getRequestFactory().getInitializer();
 
-    this.metricsRecorder =
-        MetricsSink.CLOUD_MONITORING == this.storageOptions.getMetricsSink()
-            ? CloudMonitoringMetricsRecorder.create(
-                options.getProjectId(),
-                new CredentialAdapter(
-                    ((RetryHttpInitializer) httpRequestInitializer).getCredential()))
-            : new NoOpMetricsRecorder();
+    this.metricsRecorder = getMetricsRecorder(options, credential, this.httpRequestInitializer);
 
     // Create the gRPC stub if necessary;
     if (this.storageOptions.isGrpcEnabled()) {
@@ -422,6 +416,24 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
 
     this.storageRequestAuthorizer = initializeStorageRequestAuthorizer(storageOptions);
     this.downscopedAccessTokenFn = downscopedAccessTokenFn;
+  }
+
+  private static MetricsRecorder getMetricsRecorder(
+      GoogleCloudStorageOptions options,
+      Credential credential,
+      HttpRequestInitializer httpRequestInitializer) {
+    if (MetricsSink.CLOUD_MONITORING != options.getMetricsSink()) {
+      return new NoOpMetricsRecorder();
+    }
+
+    Credential theCredential = credential;
+
+    if (theCredential == null) {
+      theCredential = ((RetryHttpInitializer) httpRequestInitializer).getCredential();
+    }
+
+    return CloudMonitoringMetricsRecorder.create(
+        options.getProjectId(), new CredentialAdapter(theCredential));
   }
 
   private static Credential tryGetCredentialsFromRequestInitializer(
