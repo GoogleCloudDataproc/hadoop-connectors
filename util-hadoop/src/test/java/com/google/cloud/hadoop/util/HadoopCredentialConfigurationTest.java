@@ -16,6 +16,9 @@ package com.google.cloud.hadoop.util;
 
 import static com.github.stefanbirkner.systemlambda.SystemLambda.withEnvironmentVariable;
 import static com.google.cloud.hadoop.util.CredentialFactory.CREDENTIAL_ENV_VAR;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.AUTH_CLIENT_ID_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.AUTH_CLIENT_SECRET_SUFFIX;
+import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.AUTH_REFRESH_TOKEN_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_NULL_CREDENTIAL_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.ENABLE_SERVICE_ACCOUNTS_SUFFIX;
 import static com.google.cloud.hadoop.util.HadoopCredentialConfiguration.SERVICE_ACCOUNT_EMAIL_SUFFIX;
@@ -32,6 +35,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertThrows;
 
+import com.google.api.client.auth.oauth2.ClientParametersAuthentication;
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.auth.oauth2.TokenResponse;
 import com.google.api.client.testing.http.MockHttpTransport;
@@ -57,25 +61,28 @@ public class HadoopCredentialConfigurationTest {
   private static final Map<String, Object> expectedDefaultConfiguration =
       new HashMap<String, Object>() {
         {
-          put(".auth.access.token.provider.impl", null);
+          put(".auth.client.id", null);
+          put(".auth.client.secret", null);
+          put(".auth.impersonation.service.account", null);
+          put(".auth.impersonation.service.account.for.group.", ImmutableMap.of());
+          put(".auth.impersonation.service.account.for.user.", ImmutableMap.of());
           put(".auth.null.enable", false);
+          put(".auth.refresh.token", null);
           put(".auth.service.account.email", null);
-          put(".service.account.auth.email", null);
           put(".auth.service.account.enable", true);
-          put(".enable.service.account.auth", true);
           put(".auth.service.account.json.keyfile", null);
           put(".auth.service.account.keyfile", null);
-          put(".service.account.auth.keyfile", null);
           put(".auth.service.account.private.key", null);
           put(".auth.service.account.private.key.id", null);
-          put(".token.server.url", "https://oauth2.googleapis.com/token");
+          put(".enable.service.account.auth", true);
           put(".http.transport.type", JAVA_NET);
           put(".proxy.address", null);
           put(".proxy.password", null);
           put(".proxy.username", null);
-          put(".auth.impersonation.service.account", null);
-          put(".auth.impersonation.service.account.for.user.", ImmutableMap.of());
-          put(".auth.impersonation.service.account.for.group.", ImmutableMap.of());
+          put(".service.account.auth.email", null);
+          put(".service.account.auth.keyfile", null);
+          put(".token.server.url", "https://oauth2.googleapis.com/token");
+          put(".auth.access.token.provider.impl", null);
         }
       };
 
@@ -221,6 +228,27 @@ public class HadoopCredentialConfigurationTest {
   public void defaultPropertiesValues() {
     assertThat(getDefaultProperties(HadoopCredentialConfiguration.class))
         .containsExactlyEntriesIn(expectedDefaultConfiguration);
+  }
+
+  @Test
+  public void oAuthCredentialsUsedWhenConfigured() throws Exception {
+    String clientId = "test-client-id";
+    String clientSecret = "test-client-secret";
+    String refreshToken = "test-refresh-token";
+
+    configuration.set(getConfigKey(AUTH_CLIENT_ID_SUFFIX), clientId);
+    configuration.set(getConfigKey(AUTH_CLIENT_SECRET_SUFFIX), clientSecret);
+    configuration.set(getConfigKey(AUTH_REFRESH_TOKEN_SUFFIX), refreshToken);
+
+    GoogleCredentialWithRetry credential =
+        (GoogleCredentialWithRetry) getCredentialFactory().getCredential(TEST_SCOPES);
+
+    ClientParametersAuthentication clientParametersAuthentication =
+        (ClientParametersAuthentication) credential.getClientAuthentication();
+
+    assertThat(clientParametersAuthentication.getClientId()).isEqualTo(clientId);
+    assertThat(clientParametersAuthentication.getClientSecret()).isEqualTo(clientSecret);
+    assertThat(credential.getRefreshToken()).isEqualTo(refreshToken);
   }
 
   private static String getStringPath(String resource) throws Exception {

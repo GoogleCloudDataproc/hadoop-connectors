@@ -42,6 +42,7 @@ import com.google.api.services.storage.StorageScopes;
 import com.google.cloud.hadoop.util.HttpTransportFactory.HttpTransportType;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.flogger.GoogleLogger;
 import java.io.File;
@@ -315,6 +316,19 @@ public class CredentialFactory {
     return new GoogleCredentialWithRetry(builder, options.getTokenServerUrl());
   }
 
+  private Credential getOAuthCredential(HttpTransport transport, List<String> scopes)
+      throws IOException {
+    logger.atFine().log("getOAuthCredential(%s)", transport);
+    GoogleCredential.Builder builder =
+        new GoogleCredential.Builder()
+            .setClientSecrets(options.getAuthClientId(), options.getAuthClientSecret().value())
+            .setTransport(getTransport())
+            .setJsonFactory(JSON_FACTORY);
+    return new GoogleCredentialWithRetry(builder, options.getTokenServerUrl())
+        .setRefreshToken(options.getAuthRefreshToken().value())
+        .createScoped(scopes);
+  }
+
   /**
    * Determines whether Application Default Credentials have been configured as an evironment
    * variable.
@@ -407,6 +421,10 @@ public class CredentialFactory {
       if (isApplicationDefaultCredentialsConfigured()) {
         return getApplicationDefaultCredentials(scopes, getTransport());
       }
+
+      if (isOAuthCredentialsConfigured(options)) {
+        return getOAuthCredential(getTransport(), scopes);
+      }
     } else if (options.isNullCredentialEnabled()) {
       logger.atWarning().log(
           "Allowing null credentials for unit testing. This should not be used in production");
@@ -420,7 +438,8 @@ public class CredentialFactory {
     return isNullOrEmpty(options.getServiceAccountKeyFile())
         && isNullOrEmpty(options.getServiceAccountJsonKeyFile())
         && options.getServiceAccountPrivateKey() == null
-        && !isApplicationDefaultCredentialsConfigured();
+        && !isApplicationDefaultCredentialsConfigured()
+        && !isOAuthCredentialsConfigured(options);
   }
 
   private HttpTransport getTransport() throws IOException {
@@ -438,5 +457,13 @@ public class CredentialFactory {
   @VisibleForTesting
   void setTransport(HttpTransport transport) {
     this.transport = transport;
+  }
+
+  private static boolean isOAuthCredentialsConfigured(CredentialOptions options) {
+    return !Strings.isNullOrEmpty(options.getAuthClientId())
+        && options.getAuthRefreshToken() != null
+        && options.getAuthRefreshToken().value() != null
+        && options.getAuthClientSecret() != null
+        && options.getAuthClientSecret().value() != null;
   }
 }

@@ -31,7 +31,8 @@
 
     Permissions that are reported for a file or directory to have regardless of
     actual Cloud Storage permissions. Can be either in octal or symbolic format
-    that accepted by FsPermission class.
+    that accepted by FsPermission class. This permission is important when the
+    default file system is set to `gs` instead of `hdfs` in `yarn-site.xml`.
 
 *   `fs.gs.delegation.token.binding` (not set by default)
 
@@ -99,7 +100,15 @@
 
 *   `fs.gs.batch.threads` (default: `15`)
 
-    Maximum number of threads used to execute batch requests in parallel.
+    Maximum number of threads used to execute batch requests in parallel. Each
+    thread batches at most `fs.gs.max.requests.per.batch` Cloud Storage requests
+    in a single batch request. These threads are used to execute the Class A,
+    Class B and Free Cloud Storage operations as copy, list, delete, etc. These
+    operations are part of typical `hdfs` CLI commands such as `hdfs mv`, `hdfs
+    cp`, etc.
+
+    Depending on the number of requests the connector evenly distributes the
+    number of requests across batch threads.
 
 *   `fs.gs.list.max.items.per.call` (default: `5000`)
 
@@ -165,7 +174,7 @@ provider.
 #### Service account authentication
 
 The following properties are required only when running not on a GCE VM and
-`fs.gs.auth.service.account.enable` is `true`. There are 3 ways to configure
+`fs.gs.auth.service.account.enable` is `true`. There are 4 ways to configure
 these credentials, which are mutually exclusive.
 
 *   `fs.gs.auth.service.account.email` (not set by default)
@@ -210,6 +219,32 @@ exist at the same path on all nodes
 
     The PKCS12 (p12) certificate file of the service account used for GCS access
     when `fs.gs.auth.service.account.enable` is `true`.
+
+##### Method 4
+
+Configure service account credentials using OAuth client secret and refresh token.
+
+To achieve this the connector will use the
+[refresh token grant flow](https://oauth.net/2/grant-types/refresh-token/) to
+retrieve a new access tokens when necessary.
+
+In order to use this authentication type, you will first need to retrieve a
+refresh token using the
+[authorization code grant flow](https://oauth.net/2/grant-types/authorization-code)
+and pass it to the connector with OAuth client ID and secret:
+
+*   `fs.gs.auth.client.id` (not set by default)
+
+    The OAuth2 client ID.
+
+*   `fs.gs.auth.client.secret` (not set by default)
+
+    The OAuth2 client secret.
+
+*   `fs.gs.auth.refresh.token` (not set by default)
+
+    The refresh token.
+
 
 #### Service account impersonation
 
@@ -288,11 +323,9 @@ permissions (not authorized) to execute these requests.
 
 *   `fs.gs.outputstream.buffer.size` (default: `8388608`)
 
-    Write buffer size.
-
-*   `fs.gs.outputstream.pipe.buffer.size` (default: `1048576`)
-
-    Pipe buffer size used for uploading Cloud Storage objects.
+    Write buffer size used by the file system API to send the data to be
+    uploaded to Cloud Storage upload thread via pipes. The various pipe types
+    are documented below.
 
 *   `fs.gs.outputstream.pipe.type` (default: `IO_STREAM_PIPE`)
 
@@ -315,9 +348,29 @@ permissions (not authorized) to execute these requests.
         client cannot reliably write in the output stream from multiple threads
         without triggering *"Pipe broken"* exceptions;
 
+*   `fs.gs.outputstream.pipe.buffer.size` (default: `1048576`)
+
+    Pipe buffer size used for uploading Cloud Storage objects. This pipe is an
+    intermediate channel which is used to receive the data on one side and allow
+    for reading of the data by the Cloud Storage upload thread on the other
+    side.
+
 *   `fs.gs.outputstream.upload.chunk.size` (default: `67108864`)
 
-    The number of bytes in one GCS upload request.
+    The number of bytes in one Google Cloud Storage upload request via the
+    [`MediaHttUploader` class](https://cloud.google.com/java/docs/reference/google-api-client/latest/com.google.api.client.googleapis.media.MediaHttpUploader).
+    This is used only for JSON API and for best performance should be a multiple
+    of 8 MiB.
+
+    Having a large value like 64 MiB allows the upload to Cloud Storage to be
+    faster due to smaller number of HTTP requests needed for upload. But on the
+    other side if there are many files (partitions) being written at the same
+    time then each file will hold 64 MiB buffer in memory, i.e. if 250 files are
+    written at once then the total memory requirement will be 250 * 64 MiB = 16
+    GiB of memory, which may result in OOM.
+
+    To arrive to the optimal value this parameter needs to be tweaked based on
+    the upload performance and number of concurrent files being written.
 
 *   `fs.gs.outputstream.upload.cache.size` (default: `0`)
 
@@ -349,6 +402,11 @@ permissions (not authorized) to execute these requests.
     *   `FLUSHABLE_COMPOSITE` - stream behaves similarly to
         `SYNCABLE_COMPOSITE`, except `hflush()` is also supported. It will use
         the same implementation as `hsync()`.
+
+    For streaming applications where checkpoint files are used,
+    `FLUSHABLE_COMPOSITE` should be used as the upstream frameworks typically
+    use `hflush()` or `hsync()` calls before closing a file and if
+    `FLUSHABLE_COMPOSITE` is not used then data is not written to these files.
 
 *   `fs.gs.outputstream.sync.min.interval.ms` (default: `0`)
 
