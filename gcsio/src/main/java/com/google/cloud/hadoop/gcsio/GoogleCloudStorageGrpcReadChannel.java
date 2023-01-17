@@ -1,16 +1,19 @@
 /*
- * Copyright 2020 Google Inc. All Rights Reserved.
+ * Copyright 2020 Google LLC
  *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software distributed under the
- * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing permissions and
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.CloudMonitoringMetricsRecorder.LATENCY_MS;
@@ -131,7 +134,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private final Watchdog watchdog;
 
-  private final long gRPCReadMessageTimeout;
+  private final Duration grpcReadMessageTimeout;
 
   private static void validate(GoogleCloudStorageItemInfo itemInfo) throws IOException {
     checkNotNull(itemInfo, "itemInfo cannot be null");
@@ -187,7 +190,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     this.backOffFactory = backOffFactory;
     this.readStrategy = readOptions.getFadvise();
     long prefetchSizeInBytes = readOptions.getMinRangeRequestSize() / 2;
-    this.gRPCReadMessageTimeout = readOptions.getGrpcReadMessageTimeoutMillis();
+    this.grpcReadMessageTimeout = readOptions.getGrpcReadMessageTimeout();
     this.footerStartOffsetInBytes = max(0, (objectSize - prefetchSizeInBytes));
   }
 
@@ -475,7 +478,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
 
   private boolean hasMoreFooterContentToRead(ByteBuffer byteBuffer) {
     return footerBuffer != null
-        && (positionForNextRead) >= footerStartOffsetInBytes
+        && positionForNextRead >= footerStartOffsetInBytes
         && byteBuffer.hasRemaining();
   }
 
@@ -535,14 +538,11 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
                 blockingStub.getCallOptions(),
                 request);
         readObjectResponseIterator =
-            watchdog.watch(
-                requestContext, responseIterator, Duration.ofMillis(this.gRPCReadMessageTimeout));
+            watchdog.watch(requestContext, responseIterator, this.grpcReadMessageTimeout);
       } else {
         readObjectResponseIterator =
             watchdog.watch(
-                requestContext,
-                blockingStub.readObject(request),
-                Duration.ofMillis(this.gRPCReadMessageTimeout));
+                requestContext, blockingStub.readObject(request), this.grpcReadMessageTimeout);
       }
     } finally {
       requestContext.detach(toReattach);
@@ -553,7 +553,7 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
   private StorageBlockingStub getStubWithDeadlineAndTracing(
       String objectName, long objectGeneration, long offset, OptionalLong bytesToRead) {
     StorageBlockingStub blockingStub =
-        stub.withDeadlineAfter(readOptions.getGrpcReadTimeoutMillis(), MILLISECONDS);
+        stub.withDeadlineAfter(readOptions.getGrpcReadTimeout().toMillis(), MILLISECONDS);
 
     if (!this.storageOptions.isTraceLogEnabled()) {
       return blockingStub;

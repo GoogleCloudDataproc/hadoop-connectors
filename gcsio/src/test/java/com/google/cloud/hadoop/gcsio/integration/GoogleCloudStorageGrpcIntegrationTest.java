@@ -1,16 +1,19 @@
 /*
- * Copyright 2022 Google Inc. All Rights Reserved.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- *  http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software distributed under the
- * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Copyright 2022 Google LLC
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+
+*
+*      http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 package com.google.cloud.hadoop.gcsio.integration;
 
@@ -19,9 +22,7 @@ import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHe
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.writeObject;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.hadoop.gcsio.AssertingLogHandler;
 import com.google.cloud.hadoop.gcsio.EventLoggingHttpRequestInitializer;
@@ -51,7 +52,6 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -92,32 +92,38 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   }
 
   private GoogleCloudStorage createGoogleCloudStorage() throws IOException {
-    return new GoogleCloudStorageImpl(
-        configureOptionsWithTD().build(), GoogleCloudStorageTestHelper.getCredentials());
+    return GoogleCloudStorageImpl.builder()
+        .setOptions(configureOptionsWithTD().build())
+        .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
+        .build();
   }
 
   private GoogleCloudStorage createGoogleCloudStorage(
       AsyncWriteChannelOptions asyncWriteChannelOptions) throws IOException {
-    return new GoogleCloudStorageImpl(
-        configureOptionsWithTD().setWriteChannelOptions(asyncWriteChannelOptions).build(),
-        GoogleCloudStorageTestHelper.getCredentials());
+    return GoogleCloudStorageImpl.builder()
+        .setOptions(
+            configureOptionsWithTD().setWriteChannelOptions(asyncWriteChannelOptions).build())
+        .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
+        .build();
   }
 
   @BeforeClass
   public static void createBuckets() throws IOException {
     GoogleCloudStorage rawStorage =
-        new GoogleCloudStorageImpl(
-            GoogleCloudStorageTestUtils.configureDefaultOptions().build(),
-            GoogleCloudStorageTestHelper.getCredentials());
+        GoogleCloudStorageImpl.builder()
+            .setOptions(GoogleCloudStorageTestUtils.configureDefaultOptions().build())
+            .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
+            .build();
     rawStorage.createBucket(BUCKET_NAME);
   }
 
   @AfterClass
   public static void cleanupBuckets() throws IOException {
     GoogleCloudStorage rawStorage =
-        new GoogleCloudStorageImpl(
-            GoogleCloudStorageTestUtils.configureDefaultOptions().build(),
-            GoogleCloudStorageTestHelper.getCredentials());
+        GoogleCloudStorageImpl.builder()
+            .setOptions(GoogleCloudStorageTestUtils.configureDefaultOptions().build())
+            .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
+            .build();
     BUCKET_HELPER.cleanup(rawStorage);
   }
 
@@ -186,11 +192,13 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   @Test
   public void testOpenWithMetricsEnabled() throws IOException {
     GoogleCloudStorage rawStorage =
-        new GoogleCloudStorageImpl(
-            GoogleCloudStorageTestHelper.getStandardOptionBuilder()
-                .setMetricsSink(MetricsSink.CLOUD_MONITORING)
-                .build(),
-            GoogleCloudStorageTestHelper.getCredentials());
+        GoogleCloudStorageImpl.builder()
+            .setOptions(
+                GoogleCloudStorageTestHelper.getStandardOptionBuilder()
+                    .setMetricsSink(MetricsSink.CLOUD_MONITORING)
+                    .build())
+            .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
+            .build();
     StorageResourceId objectToCreate = new StorageResourceId(BUCKET_NAME, "testOpen_Object");
     byte[] objectBytes = writeObject(rawStorage, objectToCreate, /* objectSize= */ 100);
     assertObjectContent(rawStorage, objectToCreate, objectBytes);
@@ -203,17 +211,19 @@ public class GoogleCloudStorageGrpcIntegrationTest {
         assertingHandler.getLoggerForClass(
             GoogleCloudStorageGrpcTracingInterceptor.class.getName());
 
-    AssertingLogHandler jsonLogHander = new AssertingLogHandler();
+    AssertingLogHandler jsonLogHandler = new AssertingLogHandler();
     Logger jsonTracingLogger =
-        jsonLogHander.getLoggerForClass(EventLoggingHttpRequestInitializer.class.getName());
+        jsonLogHandler.getLoggerForClass(EventLoggingHttpRequestInitializer.class.getName());
 
     try {
       GoogleCloudStorage rawStorage =
-          new GoogleCloudStorageImpl(
-              GoogleCloudStorageTestUtils.configureDefaultOptions()
-                  .setTraceLogEnabled(true)
-                  .build(),
-              GoogleCloudStorageTestHelper.getCredentials());
+          GoogleCloudStorageImpl.builder()
+              .setOptions(
+                  GoogleCloudStorageTestUtils.configureDefaultOptions()
+                      .setTraceLogEnabled(true)
+                      .build())
+              .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
+              .build();
 
       StorageResourceId objectToCreate1 = new StorageResourceId(BUCKET_NAME, "testOpen_Object1");
       StorageResourceId objectToCreate2 = new StorageResourceId(BUCKET_NAME, "testOpen_Object2");
@@ -288,12 +298,12 @@ public class GoogleCloudStorageGrpcIntegrationTest {
           inboundReadContent1Details, inboundReadContent2Details, objectSize, 50);
 
       assertingHandler.verifyCommonTraceFields();
-      jsonLogHander.verifyJsonLogFields(BUCKET_NAME, "testOpen_Object");
-      jsonLogHander.assertLogCount(4);
+      jsonLogHandler.verifyJsonLogFields(BUCKET_NAME, "testOpen_Object");
+      jsonLogHandler.assertLogCount(4);
 
     } finally {
-      grpcTracingLogger.removeHandler(jsonLogHander);
-      jsonTracingLogger.removeHandler(jsonLogHander);
+      grpcTracingLogger.removeHandler(jsonLogHandler);
+      jsonTracingLogger.removeHandler(jsonLogHandler);
     }
   }
 
@@ -322,14 +332,14 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   private void verifyTrace(
       Map<String, Object> traceDetails, String requestType, String objectName, String methodName) {
     Gson gson = new Gson();
-    assertEquals(methodName, traceDetails.get("details"));
-    assertTrue(traceDetails.containsKey("elapsedmillis"));
+    assertThat(traceDetails.get("details")).isEqualTo(methodName);
+    assertThat(traceDetails).containsKey("elapsedmillis");
 
     GrpcRequestTracingInfo requestTracingInfo =
         gson.fromJson(traceDetails.get("requestinfo").toString(), GrpcRequestTracingInfo.class);
-    assertEquals("grpc", requestTracingInfo.getApi());
-    assertEquals(requestType, requestTracingInfo.getRequestType());
-    assertEquals(objectName, requestTracingInfo.getObjectName());
+    assertThat(requestTracingInfo.getApi()).isEqualTo("grpc");
+    assertThat(requestTracingInfo.getRequestType()).isEqualTo(requestType);
+    assertThat(requestTracingInfo.getObjectName()).isEqualTo(objectName);
   }
 
   @Test
@@ -351,8 +361,6 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   }
 
   @Test
-  @Ignore(
-      "Ignoring the test since this is breaking all PRs. Will be re-enalbed after investigating")
   public void testOpenLargeObject() throws IOException {
     GoogleCloudStorage rawStorage = createGoogleCloudStorage();
     StorageResourceId resourceId = new StorageResourceId(BUCKET_NAME, "testOpenLargeObject_Object");
@@ -660,16 +668,20 @@ public class GoogleCloudStorageGrpcIntegrationTest {
             .setGrpcChecksumsEnabled(false)
             .setFadvise(Fadvise.RANDOM)
             .build();
-    SeekableByteChannel readableByteChannel = rawStorage.open(objectToCreate, readOptions);
+
     int newPosition = 7 * 1024;
-    readableByteChannel.position(newPosition);
     ByteBuffer readBuffer = ByteBuffer.wrap(readArray);
-    int bytesRead = readableByteChannel.read(readBuffer);
+    int bytesRead;
+    try (SeekableByteChannel readableByteChannel = rawStorage.open(objectToCreate, readOptions)) {
+      readableByteChannel.position(newPosition);
+      bytesRead = readableByteChannel.read(readBuffer);
+    }
+
     byte[] trimmedObjectBytes =
         Arrays.copyOfRange(objectBytes, newPosition, newPosition + totalBytes);
     byte[] readBufferByteArray = Arrays.copyOf(readBuffer.array(), readBuffer.limit());
 
-    assertEquals(totalBytes, bytesRead);
+    assertThat(bytesRead).isEqualTo(totalBytes);
     assertByteArrayEquals(trimmedObjectBytes, readBufferByteArray);
   }
 
@@ -692,16 +704,19 @@ public class GoogleCloudStorageGrpcIntegrationTest {
             .setGrpcChecksumsEnabled(false)
             .setFadvise(Fadvise.RANDOM)
             .build();
-    SeekableByteChannel readableByteChannel = rawStorage.open(objectToCreate, readOptions);
     int newPosition = 7 * 1024;
-    readableByteChannel.position(newPosition);
     ByteBuffer readBuffer = ByteBuffer.wrap(readArray);
-    int bytesRead = readableByteChannel.read(readBuffer);
+    int bytesRead;
+    try (SeekableByteChannel readableByteChannel = rawStorage.open(objectToCreate, readOptions)) {
+      readableByteChannel.position(newPosition);
+      bytesRead = readableByteChannel.read(readBuffer);
+    }
+
     byte[] trimmedObjectBytes =
         Arrays.copyOfRange(objectBytes, newPosition, newPosition + totalBytes);
     byte[] readBufferByteArray = Arrays.copyOf(readBuffer.array(), readBuffer.limit());
 
-    assertEquals(totalBytes, bytesRead);
+    assertThat(bytesRead).isEqualTo(totalBytes);
     assertByteArrayEquals(trimmedObjectBytes, readBufferByteArray);
   }
 
@@ -724,16 +739,19 @@ public class GoogleCloudStorageGrpcIntegrationTest {
             .setGrpcChecksumsEnabled(false)
             .setFadvise(Fadvise.AUTO)
             .build();
-    SeekableByteChannel readableByteChannel = rawStorage.open(objectToCreate, readOptions);
     int newPosition = 7 * 1024;
-    readableByteChannel.position(newPosition);
     ByteBuffer readBuffer = ByteBuffer.wrap(readArray);
-    int bytesRead = readableByteChannel.read(readBuffer);
+    int bytesRead;
+    try (SeekableByteChannel readableByteChannel = rawStorage.open(objectToCreate, readOptions)) {
+      readableByteChannel.position(newPosition);
+      bytesRead = readableByteChannel.read(readBuffer);
+    }
+
     byte[] trimmedObjectBytes =
         Arrays.copyOfRange(objectBytes, newPosition, newPosition + totalBytes);
     byte[] readBufferByteArray = Arrays.copyOf(readBuffer.array(), readBuffer.limit());
 
-    assertEquals(totalBytes, bytesRead);
+    assertThat(bytesRead).isEqualTo(totalBytes);
     assertByteArrayEquals(trimmedObjectBytes, readBufferByteArray);
   }
 
@@ -756,16 +774,18 @@ public class GoogleCloudStorageGrpcIntegrationTest {
             .setGrpcChecksumsEnabled(false)
             .setFadvise(Fadvise.SEQUENTIAL)
             .build();
-    SeekableByteChannel readableByteChannel = rawStorage.open(objectToCreate, readOptions);
     int newPosition = 7 * 1024;
-    readableByteChannel.position(newPosition);
     ByteBuffer readBuffer = ByteBuffer.wrap(readArray);
-    int bytesRead = readableByteChannel.read(readBuffer);
+    int bytesRead;
+    try (SeekableByteChannel readableByteChannel = rawStorage.open(objectToCreate, readOptions)) {
+      readableByteChannel.position(newPosition);
+      bytesRead = readableByteChannel.read(readBuffer);
+    }
     byte[] trimmedObjectBytes =
         Arrays.copyOfRange(objectBytes, newPosition, newPosition + totalBytes);
     byte[] readBufferByteArray = Arrays.copyOf(readBuffer.array(), readBuffer.limit());
 
-    assertEquals(totalBytes, bytesRead);
+    assertThat(bytesRead).isEqualTo(totalBytes);
     assertByteArrayEquals(trimmedObjectBytes, readBufferByteArray);
   }
 

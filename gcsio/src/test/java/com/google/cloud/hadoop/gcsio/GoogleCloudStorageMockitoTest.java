@@ -1,28 +1,29 @@
 /*
- * Copyright 2019 Google Inc. All Rights Reserved.
+ * Copyright 2019 Google LLC
  *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software distributed under the
- * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing permissions and
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
  * limitations under the License.
  */
 
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageTest.newStorageObject;
-import static com.google.cloud.hadoop.gcsio.testing.MockGoogleCloudStorageImplFactory.mockedGcs;
+import static com.google.cloud.hadoop.gcsio.MockGoogleCloudStorageImplFactory.mockedGcsImpl;
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockTransport;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.times;
@@ -73,7 +74,7 @@ public class GoogleCloudStorageMockitoTest {
    * with the mocks, run before every test case.
    */
   @Before
-  public void setUp() {
+  public void setUp() throws IOException {
     MockitoAnnotations.initMocks(this);
 
     MockHttpTransport transport = mockTransport();
@@ -83,11 +84,11 @@ public class GoogleCloudStorageMockitoTest {
             .setProjectId(PROJECT_ID)
             .setCopyWithRewriteEnabled(false)
             .build();
-    gcs = mockedGcs(gcsOptions, transport);
+    gcs = mockedGcsImpl(gcsOptions, transport);
     gcs.setBatchFactory(mockBatchFactory);
     gcs.setErrorExtractor(mockErrorExtractor);
 
-    when(mockBatchFactory.newBatchHelper(any(), any(Storage.class), anyLong(), anyLong(), anyInt()))
+    when(mockBatchFactory.newBatchHelper(any(), any(Storage.class), anyInt(), anyInt(), anyInt()))
         .thenReturn(mockBatchHelper);
   }
 
@@ -177,7 +178,7 @@ public class GoogleCloudStorageMockitoTest {
             gcs.deleteObjects(Lists.newArrayList(new StorageResourceId(BUCKET_NAME, OBJECT_NAME))));
 
     verify(mockBatchFactory, times(2))
-        .newBatchHelper(any(), any(Storage.class), anyLong(), anyLong(), anyInt());
+        .newBatchHelper(any(), any(Storage.class), anyInt(), anyInt(), anyInt());
     verify(mockBatchHelper, times(4)).queue(any(), any());
     verify(mockErrorExtractor, times(2)).itemNotFound(any(IOException.class));
     verify(mockErrorExtractor).preconditionNotMet(any(IOException.class));
@@ -241,7 +242,7 @@ public class GoogleCloudStorageMockitoTest {
                 BUCKET_NAME, ImmutableList.of(dstObjectName)));
 
     verify(mockBatchFactory, times(2))
-        .newBatchHelper(any(), any(Storage.class), anyLong(), anyLong(), anyInt());
+        .newBatchHelper(any(), any(Storage.class), anyInt(), anyInt(), anyInt());
     verify(mockBatchHelper, times(2)).queue(any(Storage.Objects.Copy.class), any());
     verify(mockErrorExtractor, times(2)).itemNotFound(any(IOException.class));
     verify(mockBatchHelper, times(2)).flush();
@@ -303,7 +304,7 @@ public class GoogleCloudStorageMockitoTest {
     // All invocations still should have been attempted; the exception should have been thrown
     // at the very end.
     verify(mockBatchFactory)
-        .newBatchHelper(any(), any(Storage.class), anyLong(), anyLong(), anyInt());
+        .newBatchHelper(any(), any(Storage.class), anyInt(), anyInt(), anyInt());
     verify(mockBatchHelper).queue(any(Storage.Buckets.Get.class), any());
     verify(mockBatchHelper).queue(any(Storage.Objects.Get.class), any());
     verify(mockErrorExtractor, times(2)).itemNotFound(any(IOException.class));

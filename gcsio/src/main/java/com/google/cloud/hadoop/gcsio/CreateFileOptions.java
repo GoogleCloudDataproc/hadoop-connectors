@@ -1,11 +1,11 @@
 /*
- * Copyright 2014 Google Inc. All Rights Reserved.
+ * Copyright 2014 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -44,9 +44,9 @@ public abstract class CreateFileOptions {
   public static Builder builder() {
     return new AutoValue_CreateFileOptions.Builder()
         .setAttributes(ImmutableMap.of())
-        .setContentType(CreateObjectOptions.CONTENT_TYPE_DEFAULT)
+        .setContentType(CreateObjectOptions.DEFAULT_OVERWRITE.getContentType())
         .setEnsureNoDirectoryConflict(true)
-        .setMinSyncInterval(Duration.ofSeconds(10))
+        .setMinSyncInterval(Duration.ZERO)
         .setOverwriteGenerationId(StorageResourceId.UNKNOWN_GENERATION_ID)
         .setWriteMode(WriteMode.CREATE_NEW);
   }
@@ -105,13 +105,11 @@ public abstract class CreateFileOptions {
       checkArgument(
           !options.getAttributes().containsKey("Content-Type"),
           "The Content-Type attribute must be set via the contentType option");
-      switch (options.getWriteMode()) {
-        case APPEND:
-        case CREATE_NEW:
-          checkArgument(
-              options.getOverwriteGenerationId() == StorageResourceId.UNKNOWN_GENERATION_ID,
-              "overwriteGenerationId is set to %s but it can be set only in OVERWRITE mode",
-              options.getOverwriteGenerationId());
+      if (options.getWriteMode() != WriteMode.OVERWRITE) {
+        checkArgument(
+            options.getOverwriteGenerationId() == StorageResourceId.UNKNOWN_GENERATION_ID,
+            "overwriteGenerationId is set to %s but it can be set only in OVERWRITE mode",
+            options.getOverwriteGenerationId());
       }
       return options;
     }

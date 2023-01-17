@@ -1,11 +1,11 @@
 /*
- * Copyright 2013 Google Inc. All Rights Reserved.
+ * Copyright 2013 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl.getFromFuture;
@@ -71,15 +72,15 @@ public class BatchHelper {
    */
   public static class Factory {
     public BatchHelper newBatchHelper(
-        HttpRequestInitializer requestInitializer, Storage gcs, long maxRequestsPerBatch) {
+        HttpRequestInitializer requestInitializer, Storage gcs, int maxRequestsPerBatch) {
       return new BatchHelper(requestInitializer, gcs, maxRequestsPerBatch, /* numThreads= */ 0);
     }
 
     BatchHelper newBatchHelper(
         HttpRequestInitializer requestInitializer,
         Storage gcs,
-        long maxRequestsPerBatch,
-        long totalRequests,
+        int maxRequestsPerBatch,
+        int totalRequests,
         int maxThreads) {
       checkArgument(maxRequestsPerBatch > 0, "maxRequestsPerBatch should be greater than 0");
       checkArgument(totalRequests > 0, "totalRequests should be greater than 0");

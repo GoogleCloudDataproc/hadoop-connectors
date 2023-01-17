@@ -1,14 +1,16 @@
 /*
- * Copyright 2014 Google Inc. All Rights Reserved.
+ * Copyright 2014 Google Inc.
  *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software distributed under the
- * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing permissions and
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
  * limitations under the License.
  */
 
@@ -26,7 +28,6 @@ import com.google.api.services.storage.StorageScopes;
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.ComputeEngineCredentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
-import com.google.cloud.hadoop.gcsio.GcsJavaClientImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
@@ -66,7 +67,10 @@ public class GoogleCloudStorageTestHelper {
 
   public static GoogleCloudStorage createGoogleCloudStorage() {
     try {
-      return new GoogleCloudStorageImpl(getStandardOptionBuilder().build(), getCredentials());
+      return GoogleCloudStorageImpl.builder()
+          .setOptions(getStandardOptionBuilder().build())
+          .setCredentials(getCredentials())
+          .build();
     } catch (IOException e) {
       throw new RuntimeException("Failed to create GoogleCloudStorage instance", e);
     }
@@ -276,13 +280,13 @@ public class GoogleCloudStorageTestHelper {
 
     private static String makeUniqueBucketNamePrefix(String prefix) {
       String username = System.getProperty("user.name", "unknown").replaceAll("[-.]", "");
-      // Total 13 characters of unique string will be created.
-      // Maximum only first 8 characters of username is considered. Remaining characters will be
-      // taken from UUID.
-      // Leaving room of 48 characters for bucketPrefix and suffix (excluding delimiters)
+      // Total 13 characters of unique string will be created. Maximum only first 8 characters of
+      // username is considered. Remaining characters will be taken from UUID. Leaving room of 48
+      // characters for bucketPrefix and suffix (excluding delimiters)
       int usernamePrefixLen = min(username.length(), 8);
       username = username.substring(0, usernamePrefixLen);
-      String uuidSuffix = UUID.randomUUID().toString().substring(0, 12 - usernamePrefixLen);
+      String uuidSuffix =
+          UUID.randomUUID().toString().replaceAll("-", "").substring(0, 12 - usernamePrefixLen);
       return prefix + DELIMITER + username + DELIMITER + uuidSuffix;
     }
 

@@ -1,11 +1,11 @@
 /*
- * Copyright 2019 Google Inc. All Rights Reserved.
+ * Copyright 2019 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,11 +18,11 @@ package com.google.cloud.hadoop.fs.gcs;
 
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.DELEGATION_TOKENS_ISSUED;
 import static com.google.cloud.hadoop.fs.gcs.GhfsStatistic.INVOCATION_GET_DELEGATION_TOKEN;
-import static com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystemConfiguration.DELEGATION_TOKEN_BINDING_CLASS;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.assertThrows;
 
+import com.google.cloud.hadoop.fs.gcs.auth.AbstractDelegationTokenBinding;
 import com.google.cloud.hadoop.fs.gcs.auth.GcsDelegationTokens;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
 import com.google.cloud.hadoop.fs.gcs.auth.TestTokenIdentifierImpl;
@@ -87,8 +87,11 @@ public class GoogleHadoopFileSystemDelegationTokensTest {
   @Test
   public void testTokensInitializationWhenFsIsMissing_throwsRuntimeException() throws IOException {
     Configuration config = new Configuration();
-    config.set(
-        DELEGATION_TOKEN_BINDING_CLASS.getKey(), TestDelegationTokenBindingImpl.class.getName());
+    config.setClass(
+        "fs.gs.delegation.token.binding",
+        TestDelegationTokenBindingImpl.class,
+        AbstractDelegationTokenBinding.class);
+
     GcsDelegationTokens delegationTokens = new GcsDelegationTokens();
 
     assertThrows(RuntimeException.class, () -> delegationTokens.init(config));
@@ -143,12 +146,14 @@ public class GoogleHadoopFileSystemDelegationTokensTest {
   private Configuration loadConfig() {
     Configuration config = new Configuration();
 
-    config.set(GoogleHadoopFileSystemConfiguration.GCS_PROJECT_ID.getKey(), "test_project");
-    config.setLong(GoogleHadoopFileSystemConfiguration.BLOCK_SIZE.getKey(), 1024);
+    config.set("fs.gs.project.id", "test_project");
+    config.setLong("fs.gs.block.size", 1024);
 
     // Token binding config
-    config.set(
-        DELEGATION_TOKEN_BINDING_CLASS.getKey(), TestDelegationTokenBindingImpl.class.getName());
+    config.setClass(
+        "fs.gs.delegation.token.binding",
+        TestDelegationTokenBindingImpl.class,
+        AbstractDelegationTokenBinding.class);
     config.set(
         TestDelegationTokenBindingImpl.TestAccessTokenProviderImpl.TOKEN_CONFIG_PROPERTY_NAME,
         "qWDAWFA3WWFAWFAWFAW3FAWF3AWF3WFAF33GR5G5"); // Bogus auth token

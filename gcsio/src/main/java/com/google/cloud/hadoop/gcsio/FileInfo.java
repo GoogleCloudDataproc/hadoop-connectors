@@ -1,11 +1,11 @@
 /*
- * Copyright 2013 Google Inc. All Rights Reserved.
+ * Copyright 2013 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,8 +17,8 @@
 package com.google.cloud.hadoop.gcsio;
 
 import java.net.URI;
+import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -140,7 +140,8 @@ public class FileInfo {
   /** Gets string representation of this instance. */
   @Override
   public String toString() {
-    return getPath() + (exists() ? ": created on: " + new Date(getCreationTime()) : ": exists: no");
+    return getPath()
+        + (exists() ? ": created on: " + Instant.ofEpochMilli(getCreationTime()) : ": exists: no");
   }
 
   @Override

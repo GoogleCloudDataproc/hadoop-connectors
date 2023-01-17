@@ -1,14 +1,16 @@
 /*
- * Copyright 2015 Google Inc. All Rights Reserved.
+ * Copyright 2015 Google Inc.
  *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software distributed under the
- * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or typeied. See the License for the specific language governing permissions and
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
  * limitations under the License.
  */
 
@@ -25,7 +27,6 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.UnknownHostException;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
 import javax.net.ssl.SSLSocketFactory;
@@ -142,7 +143,7 @@ public class HttpTransportFactoryTest {
       throws GeneralSecurityException, IOException {
     NetHttpTransport.Builder builder =
         HttpTransportFactory.createNetHttpTransportBuilder(
-            /* proxyUri= */ null, /* readTimeoutMillis= */ null);
+            /* proxyUri= */ null, /* readTimeout= */ null);
 
     assertThat(builder.getSslSocketFactory()).isInstanceOf(CustomSslSocketFactory.class);
   }
@@ -165,7 +166,7 @@ public class HttpTransportFactoryTest {
 
   @Test
   public void testCustomSslSocketFactorySetReadTimeout() throws IOException {
-    Duration readTimeout = Duration.ofMillis(20 * 1000);
+    Duration readTimeout = Duration.ofSeconds(20);
     CustomSslSocketFactory customSslSocketFactory =
         new CustomSslSocketFactory(FAKE_SOCKET_FACTORY, readTimeout);
 
@@ -204,13 +205,12 @@ public class HttpTransportFactoryTest {
     }
 
     @Override
-    public Socket createSocket(String s, int i) throws IOException, UnknownHostException {
+    public Socket createSocket(String s, int i) {
       return createSocket();
     }
 
     @Override
-    public Socket createSocket(String s, int i, InetAddress inetAddress, int i1)
-        throws IOException, UnknownHostException {
+    public Socket createSocket(String s, int i, InetAddress inetAddress, int i1) {
       return createSocket();
     }
 

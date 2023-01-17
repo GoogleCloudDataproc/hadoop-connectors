@@ -1,14 +1,16 @@
 /*
- * Copyright 2020 Google LLC. All Rights Reserved.
+ * Copyright 2020 Google LLC
  *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software distributed under the
- * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing permissions and
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
  * limitations under the License.
  */
 
@@ -19,11 +21,13 @@ import static com.google.cloud.hadoop.gcsio.TrackingHttpRequestInitializer.listR
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.getStandardOptionBuilder;
 import static com.google.common.truth.Truth.assertThat;
 
+import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TrackingStorageWrapper;
 import java.io.IOException;
 import java.net.URI;
+import java.time.Duration;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -48,7 +52,7 @@ public class GoogleCloudStorageFileSystemPerformanceCacheIntegrationTest {
 
   private static final PerformanceCachingGoogleCloudStorageOptions PERF_CACHE_GCS_OPTIONS =
       PerformanceCachingGoogleCloudStorageOptions.DEFAULT.toBuilder()
-          .setMaxEntryAgeMillis(10_000)
+          .setMaxEntryAge(Duration.ofSeconds(10))
           .build();
 
   private static GoogleCloudStorage helperGcs;
@@ -269,15 +273,20 @@ public class GoogleCloudStorageFileSystemPerformanceCacheIntegrationTest {
   private static TrackingStorageWrapper<GoogleCloudStorageFileSystem>
       newTrackingGoogleCloudStorageFileSystem(GoogleCloudStorageFileSystemOptions gcsfsOptions)
           throws IOException {
+    Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
     return new TrackingStorageWrapper<>(
         gcsfsOptions.getCloudStorageOptions(),
         httpRequestInitializer ->
             new GoogleCloudStorageFileSystemImpl(
                 gcsOptions ->
                     new PerformanceCachingGoogleCloudStorage(
-                        new GoogleCloudStorageImpl(gcsOptions, httpRequestInitializer),
+                        GoogleCloudStorageImpl.builder()
+                            .setOptions(gcsOptions)
+                            .setCredentials(credentials)
+                            .setHttpRequestInitializer(httpRequestInitializer)
+                            .build(),
                         PERF_CACHE_GCS_OPTIONS),
                 gcsfsOptions),
-        GoogleCloudStorageTestHelper.getCredentials());
+        credentials);
   }
 }

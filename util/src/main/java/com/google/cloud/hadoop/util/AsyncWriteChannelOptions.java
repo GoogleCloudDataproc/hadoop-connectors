@@ -1,14 +1,16 @@
 /*
- * Copyright 2014 Google Inc. All Rights Reserved.
+ * Copyright 2014 Google Inc.
  *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software distributed under the
- * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing permissions and
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
  * limitations under the License.
  */
 
@@ -19,6 +21,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import com.google.api.client.googleapis.media.MediaHttpUploader;
 import com.google.auto.value.AutoValue;
 import com.google.common.flogger.GoogleLogger;
+import java.time.Duration;
 
 /** Options for the {@link AbstractGoogleAsyncWriteChannel}. */
 @AutoValue
@@ -28,58 +31,33 @@ public abstract class AsyncWriteChannelOptions {
 
   /** Pipe used for output stream. */
   public enum PipeType {
-    NIO_CHANNEL_PIPE,
     IO_STREAM_PIPE,
+    NIO_CHANNEL_PIPE,
   }
 
-  /** Default upload buffer size. */
-  public static final int BUFFER_SIZE_DEFAULT = 8 * 1024 * 1024;
-
-  /** Default pipe buffer size. */
-  public static final int PIPE_BUFFER_SIZE_DEFAULT = 1024 * 1024;
-
   /** Upload chunk size granularity */
-  public static final int UPLOAD_CHUNK_SIZE_GRANULARITY = 8 * 1024 * 1024;
+  private static final int UPLOAD_CHUNK_SIZE_GRANULARITY = 8 * 1024 * 1024;
 
   /** Default upload chunk size. */
-  public static final int UPLOAD_CHUNK_SIZE_DEFAULT =
+  private static final int DEFAULT_UPLOAD_CHUNK_SIZE =
       Runtime.getRuntime().maxMemory() < 512 * 1024 * 1024
           ? UPLOAD_CHUNK_SIZE_GRANULARITY
-          : 8 * UPLOAD_CHUNK_SIZE_GRANULARITY;
-
-  /** Default upload cache size. */
-  public static final int UPLOAD_CACHE_SIZE_DEFAULT = 0;
-
-  /** Default of whether to use direct upload. */
-  public static final boolean DIRECT_UPLOAD_ENABLED_DEFAULT = false;
-
-  /** Default of whether to enabled checksums for gRPC. */
-  public static final boolean GRPC_CHECKSUMS_ENABLED_DEFAULT = false;
-
-  /** Default timeout for grpc write stream. */
-  public static final long DEFAULT_GRPC_WRITE_TIMEOUT = 10 * 60 * 1000;
-
-  /** Default number of insert requests to retain, in case we need to rewind and resume an upload */
-  public static final long DEFAULT_NUM_REQUESTS_BUFFERED_GRPC = 20;
-
-  public static final long DEFAULT_GRPC_WRITE_MESSAGE_TIMEOUT_MILLIS = 3 * 1000;
-
-  public static final PipeType PIPE_TYPE_DEFAULT = PipeType.IO_STREAM_PIPE;
+          : 3 * UPLOAD_CHUNK_SIZE_GRANULARITY;
 
   public static final AsyncWriteChannelOptions DEFAULT = builder().build();
 
   public static Builder builder() {
     return new AutoValue_AsyncWriteChannelOptions.Builder()
-        .setBufferSize(BUFFER_SIZE_DEFAULT)
-        .setPipeBufferSize(PIPE_BUFFER_SIZE_DEFAULT)
-        .setPipeType(PIPE_TYPE_DEFAULT)
-        .setUploadChunkSize(UPLOAD_CHUNK_SIZE_DEFAULT)
-        .setUploadCacheSize(UPLOAD_CACHE_SIZE_DEFAULT)
-        .setDirectUploadEnabled(DIRECT_UPLOAD_ENABLED_DEFAULT)
-        .setGrpcChecksumsEnabled(GRPC_CHECKSUMS_ENABLED_DEFAULT)
-        .setGrpcWriteTimeout(DEFAULT_GRPC_WRITE_TIMEOUT)
-        .setNumberOfBufferedRequests(DEFAULT_NUM_REQUESTS_BUFFERED_GRPC)
-        .setGrpcWriteMessageTimeoutMillis(DEFAULT_GRPC_WRITE_MESSAGE_TIMEOUT_MILLIS);
+        .setBufferSize(8 * 1024 * 1024)
+        .setDirectUploadEnabled(false)
+        .setGrpcChecksumsEnabled(false)
+        .setGrpcWriteMessageTimeout(Duration.ofSeconds(3))
+        .setGrpcWriteTimeout(Duration.ofMinutes(10))
+        .setNumberOfBufferedRequests(20)
+        .setPipeBufferSize(1024 * 1024)
+        .setPipeType(PipeType.IO_STREAM_PIPE)
+        .setUploadCacheSize(0)
+        .setUploadChunkSize(DEFAULT_UPLOAD_CHUNK_SIZE);
   }
 
   public abstract Builder toBuilder();
@@ -98,11 +76,11 @@ public abstract class AsyncWriteChannelOptions {
 
   public abstract boolean isGrpcChecksumsEnabled();
 
-  public abstract long getGrpcWriteTimeout();
+  public abstract Duration getGrpcWriteTimeout();
 
-  public abstract long getNumberOfBufferedRequests();
+  public abstract int getNumberOfBufferedRequests();
 
-  public abstract long getGrpcWriteMessageTimeoutMillis();
+  public abstract Duration getGrpcWriteMessageTimeout();
 
   /** Mutable builder for the GoogleCloudStorageWriteChannelOptions class. */
   @AutoValue.Builder
@@ -120,9 +98,9 @@ public abstract class AsyncWriteChannelOptions {
 
     public abstract Builder setDirectUploadEnabled(boolean directUploadEnabled);
 
-    public abstract Builder setGrpcWriteTimeout(long grpcWriteTimeout);
+    public abstract Builder setGrpcWriteTimeout(Duration grpcWriteTimeout);
 
-    public abstract Builder setNumberOfBufferedRequests(long numberOfBufferedRequests);
+    public abstract Builder setNumberOfBufferedRequests(int numberOfBufferedRequests);
 
     /**
      * Enable gRPC checksumming. On by default. It is strongly recommended to leave this enabled, to
@@ -130,7 +108,7 @@ public abstract class AsyncWriteChannelOptions {
      */
     public abstract Builder setGrpcChecksumsEnabled(boolean grpcChecksumsEnabled);
 
-    public abstract Builder setGrpcWriteMessageTimeoutMillis(long grpcWriteMessageTimeoutMillis);
+    public abstract Builder setGrpcWriteMessageTimeout(Duration grpcWriteMessageTimeout);
 
     abstract AsyncWriteChannelOptions autoBuild();
 

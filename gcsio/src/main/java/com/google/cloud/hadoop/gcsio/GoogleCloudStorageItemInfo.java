@@ -1,11 +1,11 @@
 /*
- * Copyright 2013 Google Inc. All Rights Reserved.
+ * Copyright 2013 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,8 +21,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+import java.time.Instant;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.Map;
 import java.util.Objects;
 
@@ -400,7 +400,7 @@ public class GoogleCloudStorageItemInfo {
   @Override
   public String toString() {
     return exists()
-        ? String.format("%s: created on: %s", resourceId, new Date(creationTime))
+        ? String.format("%s: created on: %s", resourceId, Instant.ofEpochMilli(creationTime))
         : String.format("%s: exists: no", resourceId);
   }
 

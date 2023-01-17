@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 Google Inc. All Rights Reserved.
+ * Copyright 2015 Google Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may
- * not use this file except in compliance with the License. You may obtain
- * a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,6 +20,7 @@ import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.g
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
+import static java.lang.Math.toIntExact;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.cloud.hadoop.gcsio.CreateFileOptions;
@@ -205,7 +206,7 @@ public class HadoopFileSystemIntegrationHelper
    */
   protected String readTextFile(Path hadoopPath, int offset, int len, boolean checkOverflow)
       throws IOException {
-    String text = null;
+    String text;
     FSDataInputStream readStream = null;
     long fileSystemBytesRead = 0;
     FileSystem.Statistics stats = FileSystem.getStatistics(ghfs.getScheme(), ghfs.getClass());
@@ -243,7 +244,7 @@ public class HadoopFileSystemIntegrationHelper
           .that(bytesReadStats)
           .isEqualTo(len);
     } else if (statistics == FileSystemStatistics.GREATER_OR_EQUAL) {
-      assertWithMessage("Expected %d <= %d", len, bytesReadStats)
+      assertWithMessage("Expected %s <= %s", len, bytesReadStats)
           .that(len <= bytesReadStats)
           .isTrue();
     } else if (statistics == FileSystemStatistics.NONE) {
@@ -396,7 +397,7 @@ public class HadoopFileSystemIntegrationHelper
    */
   public int writeFile(Path hadoopPath, byte[] buffer, int numWrites, boolean overwrite)
       throws IOException {
-    int numBytesWritten = -1;
+    int numBytesWritten;
     int totalBytesWritten = 0;
 
     long fileSystemBytesWritten = 0;
@@ -410,7 +411,8 @@ public class HadoopFileSystemIntegrationHelper
             hadoopPath,
             FsPermission.getDefault(),
             overwrite,
-            GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE.getDefault(),
+            toIntExact(
+                GoogleHadoopFileSystemConfiguration.GCS_OUTPUT_STREAM_BUFFER_SIZE.getDefault()),
             GoogleHadoopFileSystem.REPLICATION_FACTOR_DEFAULT,
             GoogleHadoopFileSystemConfiguration.BLOCK_SIZE.getDefault(),
             /* progress= */ null)) {
@@ -431,7 +433,7 @@ public class HadoopFileSystemIntegrationHelper
           .that(bytesWrittenStats)
           .isEqualTo(totalBytesWritten);
     } else if (statistics == FileSystemStatistics.GREATER_OR_EQUAL) {
-      assertWithMessage("Expected %d <= %d", totalBytesWritten, bytesWrittenStats)
+      assertWithMessage("Expected %s <= %s", totalBytesWritten, bytesWrittenStats)
           .that(totalBytesWritten <= bytesWrittenStats)
           .isTrue();
     } else if (statistics == FileSystemStatistics.NONE) {
