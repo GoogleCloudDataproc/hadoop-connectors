@@ -99,7 +99,7 @@ public class GoogleCloudStorageImplTest {
       };
 
   @Before
-  public void beforeAll() throws IOException {
+  public void before() throws IOException {
     helperGcs =
         tesStorageClientImpl
             ? GoogleCloudStorageTestHelper.createJavaClientStorage()
@@ -108,7 +108,7 @@ public class GoogleCloudStorageImplTest {
   }
 
   @After
-  public void afterAll() throws IOException {
+  public void after() throws IOException {
     try {
       BUCKET_HELPER.cleanup(helperGcs);
     } finally {

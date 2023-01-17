@@ -1,3 +1,19 @@
+/*
+ * Copyright 2023 Google Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.jsonErrorResponse;
@@ -5,10 +21,7 @@ import static com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.mockT
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static com.google.storage.v2.ServiceConstants.Values.MAX_WRITE_CHUNK_BYTES;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -17,7 +30,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.auth.Credentials;
 import com.google.cloud.WriteChannel;
@@ -42,6 +54,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -49,7 +62,7 @@ import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
 
 @RunWith(JUnit4.class)
-public class GcsJavaClientWriteChannelTest {
+public class GoogleCloudStorageClientLibraryWriteChannelTest {
 
   private static final String V1_BUCKET_NAME = "bucket-name";
   private static final String BUCKET_NAME = GrpcChannelUtils.toV2BucketName(V1_BUCKET_NAME);
@@ -60,17 +73,17 @@ public class GcsJavaClientWriteChannelTest {
   private static final long GENERATION_ID = 0L;
   private static final Map<String, String> metadata =
       Map.of("metadata-key-1", "dGVzdC1tZXRhZGF0YQ==");
+  private static ExecutorService EXECUTOR_SERVICE = Executors.newCachedThreadPool();
 
   private final StorageResourceId resourceId =
       new StorageResourceId(BUCKET_NAME, OBJECT_NAME, GENERATION_ID);
-  private GcsJavaClientWriteChannel writeChannel;
+  private GoogleCloudStorageClientLibraryWriteChannel writeChannel;
+  // TODO: Instead of using mock shift to using fakes.
   private Storage mockedStorage = mock(Storage.class);
   private WriteChannel fakeWriteChannel;
   ArgumentCaptor<BlobInfo> blobInfoCapture = ArgumentCaptor.forClass(BlobInfo.class);
   ArgumentCaptor<BlobWriteOption> blobWriteOptionsCapture =
       ArgumentCaptor.forClass(BlobWriteOption.class);
-
-  private final ExecutorService executor = Executors.newCachedThreadPool();
 
   @Before
   public void setUp() throws Exception {
@@ -78,6 +91,15 @@ public class GcsJavaClientWriteChannelTest {
     when(mockedStorage.writer(blobInfoCapture.capture(), blobWriteOptionsCapture.capture()))
         .thenReturn(fakeWriteChannel);
     writeChannel = getJavaStorageChannel();
+  }
+
+  @AfterClass
+  public static void cleanUp() {
+    try {
+      EXECUTOR_SERVICE.shutdown();
+    } finally {
+      EXECUTOR_SERVICE = null;
+    }
   }
 
   @Test
@@ -97,7 +119,7 @@ public class GcsJavaClientWriteChannelTest {
     verify(fakeWriteChannel, times(1)).close();
     verifyBlobInfoProperties();
     verifyBlobWriteOptionProperties();
-    assertTrue(writeChannel.isUploadSuccessful());
+    assertThat(writeChannel.isUploadSuccessful()).isTrue();
   }
 
   @Test
@@ -113,7 +135,7 @@ public class GcsJavaClientWriteChannelTest {
     verify(fakeWriteChannel, times(1)).close();
     verifyBlobInfoProperties();
     verifyBlobWriteOptionProperties();
-    assertTrue(writeChannel.isUploadSuccessful());
+    assertThat(writeChannel.isUploadSuccessful()).isTrue();
   }
 
   @Test
@@ -129,7 +151,7 @@ public class GcsJavaClientWriteChannelTest {
     verifyBlobInfoProperties();
     verifyBlobWriteOptionProperties();
     assertThrows(IOException.class, writeChannel::close);
-    assertFalse(writeChannel.isUploadSuccessful());
+    assertThat(writeChannel.isUploadSuccessful()).isFalse();
   }
 
   /**
@@ -205,8 +227,8 @@ public class GcsJavaClientWriteChannelTest {
     return ByteString.copyFrom(result);
   }
 
-  private GcsJavaClientWriteChannel getJavaStorageChannel() {
-    return new GcsJavaClientWriteChannel(
+  private GoogleCloudStorageClientLibraryWriteChannel getJavaStorageChannel() {
+    return new GoogleCloudStorageClientLibraryWriteChannel(
         mockedStorage,
         GoogleCloudStorageOptions.DEFAULT.toBuilder()
             .setWriteChannelOptions(
@@ -219,24 +241,24 @@ public class GcsJavaClientWriteChannelTest {
             .setMetadata(getDecodedMetadata())
             .setKmsKeyName(KMS_KEY)
             .build(),
-        executor);
+        EXECUTOR_SERVICE);
   }
 
   private void verifyBlobInfoProperties() {
     BlobInfo blobInfo = blobInfoCapture.getValue();
-    assertEquals(resourceId.getBucketName(), blobInfo.getBucket());
-    assertEquals(resourceId.getObjectName(), blobInfo.getName());
-    assertEquals(CONTENT_TYPE, blobInfo.getContentType());
-    assertEquals(CONTENT_ENCODING, blobInfo.getContentEncoding());
-    assertTrue(metadata.equals(blobInfo.getMetadata()));
+    assertThat(blobInfo.getBucket()).isEqualTo(resourceId.getBucketName());
+    assertThat(blobInfo.getName()).isEqualTo(resourceId.getObjectName());
+    assertThat(blobInfo.getContentType()).isEqualTo(CONTENT_TYPE);
+    assertThat(blobInfo.getContentEncoding()).isEqualTo(CONTENT_ENCODING);
+    assertThat(blobInfo.getMetadata()).isEqualTo(metadata);
   }
 
   private void verifyBlobWriteOptionProperties() {
     List<BlobWriteOption> optionsList = blobWriteOptionsCapture.getAllValues();
-    assertTrue(optionsList.contains(BlobWriteOption.kmsKeyName(KMS_KEY)));
-    assertTrue(optionsList.contains(BlobWriteOption.generationMatch()));
-    assertTrue(optionsList.contains(BlobWriteOption.disableGzipContent()));
-    assertTrue(optionsList.contains(BlobWriteOption.crc32cMatch()));
+    assertThat(optionsList).contains(BlobWriteOption.kmsKeyName(KMS_KEY));
+    assertThat(optionsList).contains(BlobWriteOption.generationMatch());
+    assertThat(optionsList).contains(BlobWriteOption.disableGzipContent());
+    assertThat(optionsList).contains(BlobWriteOption.crc32cMatch());
   }
 
   private Map<String, byte[]> getDecodedMetadata() {
@@ -248,25 +270,24 @@ public class GcsJavaClientWriteChannelTest {
   }
 
   private GoogleCloudStorage mockGcsJavaStorage(
-      MockHttpTransport transport, Storage javaClientStorage) throws IOException {
-    Credentials fakeCredential = new FakeCredentials();
-    com.google.api.services.storage.Storage storage =
-        new com.google.api.services.storage.Storage(
-            transport,
-            GsonFactory.getDefaultInstance(),
-            new RetryHttpInitializer(
-                new FakeCredentials(),
-                RetryHttpInitializerOptions.builder()
-                    .setDefaultUserAgent("gcs-io-unit-test")
-                    .build()));
+      MockHttpTransport transport, Storage clientLibraryStorage) throws IOException {
+    Credentials fakeCredentials = new FakeCredentials();
     GoogleCloudStorageOptions options =
         GoogleCloudStorageOptions.builder()
             .setAppName("gcsio-unit-test")
             .setGrpcEnabled(true)
             .build();
-    return new GcsJavaClientImplBuilder(options, fakeCredential, null)
-        .withApairyClientStorage(storage)
-        .withJavaClientStorage(javaClientStorage)
+    return GoogleCloudStorageClientImpl.builder()
+        .setOptions(options)
+        .setCredentials(fakeCredentials)
+        .setHttpTransport(transport)
+        .setHttpRequestInitializer(
+            new RetryHttpInitializer(
+                fakeCredentials,
+                RetryHttpInitializerOptions.builder()
+                    .setDefaultUserAgent("gcsio-unit-test")
+                    .build()))
+        .setClientLibraryStorage(clientLibraryStorage)
         .build();
   }
 }

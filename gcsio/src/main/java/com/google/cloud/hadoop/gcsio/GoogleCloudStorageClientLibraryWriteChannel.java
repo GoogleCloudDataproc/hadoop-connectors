@@ -39,7 +39,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 
 /** Implements WritableByteChannel to provide write access to GCS via java-storage client */
-class GcsJavaClientWriteChannel extends AbstractGoogleAsyncWriteChannel<Boolean> {
+class GoogleCloudStorageClientLibraryWriteChannel extends AbstractGoogleAsyncWriteChannel<Boolean> {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
@@ -53,7 +53,7 @@ class GcsJavaClientWriteChannel extends AbstractGoogleAsyncWriteChannel<Boolean>
   // TODO: not supported as of now
   // private final String requesterPaysProject;
 
-  public GcsJavaClientWriteChannel(
+  public GoogleCloudStorageClientLibraryWriteChannel(
       Storage storage,
       GoogleCloudStorageOptions storageOptions,
       StorageResourceId resourceId,
@@ -65,23 +65,8 @@ class GcsJavaClientWriteChannel extends AbstractGoogleAsyncWriteChannel<Boolean>
     this.resourceId = resourceId;
     this.createOptions = createOptions;
     this.channelOptions = storageOptions.getWriteChannelOptions();
-  }
-
-  @Override
-  public void initialize() throws IOException {
-    final BlobId blobId =
-        BlobId.of(
-            resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
-    BlobInfo blobInfo =
-        BlobInfo.newBuilder(blobId)
-            .setContentType(createOptions.getContentType())
-            .setContentEncoding(createOptions.getContentEncoding())
-            .setMetadata(encodeMetadata(createOptions.getMetadata()))
-            .build();
-    this.writeChannel = storage.writer(blobInfo, generateWriteOptions());
-    this.writeChannel.setChunkSize(
-        (int) channelOptions.getNumberOfBufferedRequests() * MAX_WRITE_CHUNK_BYTES.getNumber());
-    super.initialize();
+    this.writeChannel =
+        getClientLibraryWriteChannel(storage, resourceId, createOptions, storageOptions);
   }
 
   @Override
@@ -93,6 +78,34 @@ class GcsJavaClientWriteChannel extends AbstractGoogleAsyncWriteChannel<Boolean>
     } catch (Exception e) {
       throw new RuntimeException(String.format("Failed to start upload for '%s'", resourceId), e);
     }
+  }
+
+  private BlobInfo getBlobInfo(StorageResourceId resourceId, CreateObjectOptions createOptions) {
+    BlobId blobId =
+        BlobId.of(
+            resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
+    BlobInfo blobInfo =
+        BlobInfo.newBuilder(blobId)
+            .setContentType(createOptions.getContentType())
+            .setContentEncoding(createOptions.getContentEncoding())
+            .setMetadata(encodeMetadata(createOptions.getMetadata()))
+            .build();
+    return blobInfo;
+  }
+
+  private WriteChannel getClientLibraryWriteChannel(
+      Storage storage,
+      StorageResourceId resourceId,
+      CreateObjectOptions createOptions,
+      GoogleCloudStorageOptions storageOptions) {
+    WriteChannel writeChannel =
+        storage.writer(getBlobInfo(resourceId, createOptions), generateWriteOptions());
+    writeChannel.setChunkSize(
+        Math.toIntExact(
+            storageOptions.getWriteChannelOptions().getNumberOfBufferedRequests()
+                * MAX_WRITE_CHUNK_BYTES.getNumber()));
+
+    return writeChannel;
   }
 
   private class UploadOperation implements Callable<Boolean> {

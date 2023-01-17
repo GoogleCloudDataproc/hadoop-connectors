@@ -16,14 +16,26 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
+
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpTransport;
 import com.google.auth.Credentials;
 import com.google.auto.value.AutoBuilder;
 import com.google.cloud.hadoop.util.AccessBoundary;
+import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.flogger.GoogleLogger;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
+import java.nio.channels.WritableByteChannel;
+import java.nio.file.FileAlreadyExistsException;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 
@@ -34,13 +46,25 @@ import javax.annotation.Nullable;
  */
 @VisibleForTesting
 public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
+  private final GoogleCloudStorageOptions storageOptions;
+  private final Storage storage;
+
+  // Thread-pool used for background tasks.
+  private ExecutorService backgroundTasksThreadPool =
+      Executors.newCachedThreadPool(
+          new ThreadFactoryBuilder()
+              .setNameFormat("gcs-java-client-write-channel-pool-%d")
+              .setDaemon(true)
+              .build());
   /**
    * Having an instance of gscImpl to redirect calls to Json client while new client implementation
    * is in WIP.
    */
   GoogleCloudStorageClientImpl(
       GoogleCloudStorageOptions options,
+      @Nullable Storage clientLibraryStorage,
       @Nullable Credentials credentials,
       @Nullable HttpTransport httpTransport,
       @Nullable HttpRequestInitializer httpRequestInitializer,
@@ -54,6 +78,87 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             .setHttpRequestInitializer(httpRequestInitializer)
             .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
             .build());
+    this.storageOptions = checkNotNull(options, "options must not be null");
+    this.storage =
+        clientLibraryStorage == null ? createStorage(credentials, options) : clientLibraryStorage;
+  }
+
+  @Override
+  public WritableByteChannel create(StorageResourceId resourceId, CreateObjectOptions options)
+      throws IOException {
+    if (storageOptions.isGrpcEnabled()) {
+      logger.atFiner().log("create(%s)", resourceId);
+      checkArgument(
+          resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
+      // Update resourceId if generationId is missing
+      StorageResourceId resourceIdWithGeneration = resourceId;
+      if (!resourceId.hasGenerationId()) {
+        resourceIdWithGeneration =
+            new StorageResourceId(
+                resourceId.getBucketName(),
+                resourceId.getObjectName(),
+                getWriteGeneration(resourceId, options.isOverwriteExisting()));
+      }
+
+      GoogleCloudStorageClientLibraryWriteChannel channel =
+          new GoogleCloudStorageClientLibraryWriteChannel(
+              storage,
+              storageOptions,
+              resourceIdWithGeneration,
+              options,
+              backgroundTasksThreadPool);
+      channel.initialize();
+      return channel;
+    }
+    return super.create(resourceId, options);
+  }
+
+  @Override
+  public void close() {
+    try {
+      try {
+        super.close();
+      } finally {
+        backgroundTasksThreadPool.shutdown();
+      }
+    } finally {
+      backgroundTasksThreadPool = null;
+    }
+  }
+
+  /**
+   * Gets the object generation for a write operation
+   *
+   * <p>making getItemInfo call even if overwrite is disabled to fail fast in case file is existing.
+   *
+   * @param resourceId object for which generation info is requested
+   * @param overwrite whether existing object should be overwritten
+   * @return the generation of the object
+   * @throws IOException if the object already exists and cannot be overwritten
+   */
+  private long getWriteGeneration(StorageResourceId resourceId, boolean overwrite)
+      throws IOException {
+    logger.atFiner().log("getWriteGeneration(%s, %s)", resourceId, overwrite);
+    GoogleCloudStorageItemInfo info = getItemInfo(resourceId);
+    if (!info.exists()) {
+      return 0L;
+    }
+    if (info.exists() && overwrite) {
+      long generation = info.getContentGeneration();
+      checkState(generation != 0, "Generation should not be 0 for an existing item");
+      return generation;
+    }
+    throw new FileAlreadyExistsException(String.format("Object %s already exists.", resourceId));
+  }
+
+  private static Storage createStorage(
+      Credentials credentials, GoogleCloudStorageOptions storageOptions) {
+    checkNotNull(storageOptions, "options must not be null");
+    return StorageOptions.grpc()
+        .setAttemptDirectPath(storageOptions.isTrafficDirectorEnabled())
+        .setCredentials(credentials)
+        .build()
+        .getService();
   }
 
   public static Builder builder() {
@@ -75,6 +180,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
     public abstract Builder setDownscopedAccessTokenFn(
         @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn);
+
+    public abstract Builder setClientLibraryStorage(@Nullable Storage clientLibraryStorage);
 
     public abstract GoogleCloudStorageClientImpl build() throws IOException;
   }
