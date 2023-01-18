@@ -111,7 +111,7 @@ public class GoogleCloudStorageImplTest {
   }
 
   @After
-  public static void after() throws IOException {
+  public void after() throws IOException {
     try {
       BUCKET_HELPER.cleanup(helperGcs);
     } finally {
