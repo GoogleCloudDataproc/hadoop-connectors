@@ -43,6 +43,8 @@ import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.io.BaseEncoding;
+import com.google.protobuf.ByteString;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -54,8 +56,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /** Helper methods for GCS integration tests. */
 public class GoogleCloudStorageTestHelper {
@@ -77,7 +81,7 @@ public class GoogleCloudStorageTestHelper {
     }
   }
 
-  public static GoogleCloudStorage createJavaClientStorage() {
+  public static GoogleCloudStorage mockedGcsClientImpl() {
     try {
       return GoogleCloudStorageClientImpl.builder()
           .setOptions(getStandardOptionBuilder().build())
@@ -248,6 +252,34 @@ public class GoogleCloudStorageTestHelper {
     logger.atInfo().log(
         "Took %sms to write %sB", (endTime - startTime), (long) partitionsCount * partitionSize);
     return partition;
+  }
+
+  public static Map<String, byte[]> getDecodedMetadata(Map<String, String> metadata) {
+    return metadata.entrySet().stream()
+        .collect(
+            Collectors.toMap(
+                entity -> entity.getKey(), entity -> decodeMetadataValues(entity.getValue())));
+  }
+
+  public static byte[] decodeMetadataValues(String value) {
+    try {
+      return BaseEncoding.base64().decode(value);
+    } catch (IllegalArgumentException iae) {
+      logger.atSevere().withCause(iae).log(
+          "Failed to parse base64 encoded attribute value %s - %s", value, iae);
+      return null;
+    }
+  }
+
+  public static ByteString createTestData(int numBytes) {
+    byte[] result = new byte[numBytes];
+    for (int i = 0; i < numBytes; ++i) {
+      // Sequential data makes it easier to compare expected vs. actual in
+      // case of error. Since chunk sizes are multiples of 256, the modulo
+      // ensures chunks have different data.
+      result[i] = (byte) (i % 257);
+    }
+    return ByteString.copyFrom(result);
   }
 
   /** Helper for dealing with buckets in GCS integration tests. */

@@ -17,7 +17,6 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.google.api.client.http.HttpRequestInitializer;
@@ -55,7 +54,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private ExecutorService backgroundTasksThreadPool =
       Executors.newCachedThreadPool(
           new ThreadFactoryBuilder()
-              .setNameFormat("gcs-java-client-write-channel-pool-%d")
+              .setNameFormat("gcsio-storage-client-write-channel-pool-%d")
               .setDaemon(true)
               .build());
   /**
@@ -78,7 +77,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             .setHttpRequestInitializer(httpRequestInitializer)
             .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
             .build());
-    this.storageOptions = checkNotNull(options, "options must not be null");
+    this.storageOptions = options;
     this.storage =
         clientLibraryStorage == null ? createStorage(credentials, options) : clientLibraryStorage;
   }
@@ -100,8 +99,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
                 getWriteGeneration(resourceId, options.isOverwriteExisting()));
       }
 
-      GoogleCloudStorageClientLibraryWriteChannel channel =
-          new GoogleCloudStorageClientLibraryWriteChannel(
+      GoogleCloudStorageClientWriteChannel channel =
+          new GoogleCloudStorageClientWriteChannel(
               storage,
               storageOptions,
               resourceIdWithGeneration,
@@ -153,7 +152,6 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
 
   private static Storage createStorage(
       Credentials credentials, GoogleCloudStorageOptions storageOptions) {
-    checkNotNull(storageOptions, "options must not be null");
     return StorageOptions.grpc()
         .setAttemptDirectPath(storageOptions.isTrafficDirectorEnabled())
         .setCredentials(credentials)
@@ -181,6 +179,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
     public abstract Builder setDownscopedAccessTokenFn(
         @Nullable Function<List<AccessBoundary>, String> downscopedAccessTokenFn);
 
+    @VisibleForTesting
     public abstract Builder setClientLibraryStorage(@Nullable Storage clientLibraryStorage);
 
     public abstract GoogleCloudStorageClientImpl build() throws IOException;

@@ -145,7 +145,7 @@ public class GoogleCloudStorageImpl implements GoogleCloudStorage {
   }
 
   @Nullable
-  static byte[] decodeMetadataValues(String value) {
+  private static byte[] decodeMetadataValues(String value) {
     try {
       return BaseEncoding.base64().decode(value);
     } catch (IllegalArgumentException iae) {

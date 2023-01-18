@@ -66,22 +66,6 @@ public class MockGoogleCloudStorageImplFactory {
                 RetryHttpInitializerOptions.builder()
                     .setDefaultUserAgent("gcsio-unit-test")
                     .build()))
-        .setCredentials(fakeCredentials)
-        .setClientLibraryStorage(storage)
-        .build();
-  }
-
-  public static GoogleCloudStorageClientImpl mockedGcsClientImpl(
-      GoogleCloudStorageOptions options,
-      HttpTransport transport,
-      HttpRequestInitializer httpRequestInitializer,
-      Storage storage)
-      throws IOException {
-    return GoogleCloudStorageClientImpl.builder()
-        .setOptions(options)
-        .setCredentials(new FakeCredentials())
-        .setHttpTransport(transport)
-        .setHttpRequestInitializer(httpRequestInitializer)
         .setClientLibraryStorage(storage)
         .build();
   }

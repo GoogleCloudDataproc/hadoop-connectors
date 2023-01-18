@@ -1,11 +1,11 @@
 /*
- * Copyright 2023 Google Inc. All Rights Reserved.
+ * Copyright 2023 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,34 +39,25 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 
 /** Implements WritableByteChannel to provide write access to GCS via java-storage client */
-class GoogleCloudStorageClientLibraryWriteChannel extends AbstractGoogleAsyncWriteChannel<Boolean> {
+class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChannel<Boolean> {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  private final GoogleCloudStorageOptions storageOptions;
   private final StorageResourceId resourceId;
-  private final AsyncWriteChannelOptions channelOptions;
-  private final Storage storage;
   private WriteChannel writeChannel;
-  private final CreateObjectOptions createOptions;
-  private Boolean uploadSuccess = false;
+  private Boolean uploadSucceeded = false;
   // TODO: not supported as of now
   // private final String requesterPaysProject;
 
-  public GoogleCloudStorageClientLibraryWriteChannel(
+  public GoogleCloudStorageClientWriteChannel(
       Storage storage,
       GoogleCloudStorageOptions storageOptions,
       StorageResourceId resourceId,
       CreateObjectOptions createOptions,
       ExecutorService uploadThreadPool) {
     super(uploadThreadPool, storageOptions.getWriteChannelOptions());
-    this.storage = storage;
-    this.storageOptions = storageOptions;
     this.resourceId = resourceId;
-    this.createOptions = createOptions;
-    this.channelOptions = storageOptions.getWriteChannelOptions();
-    this.writeChannel =
-        getClientLibraryWriteChannel(storage, resourceId, createOptions, storageOptions);
+    this.writeChannel = getClientWriteChannel(storage, resourceId, createOptions, storageOptions);
   }
 
   @Override
@@ -80,7 +71,8 @@ class GoogleCloudStorageClientLibraryWriteChannel extends AbstractGoogleAsyncWri
     }
   }
 
-  private BlobInfo getBlobInfo(StorageResourceId resourceId, CreateObjectOptions createOptions) {
+  private static BlobInfo getBlobInfo(
+      StorageResourceId resourceId, CreateObjectOptions createOptions) {
     BlobId blobId =
         BlobId.of(
             resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
@@ -93,19 +85,23 @@ class GoogleCloudStorageClientLibraryWriteChannel extends AbstractGoogleAsyncWri
     return blobInfo;
   }
 
-  private WriteChannel getClientLibraryWriteChannel(
+  private static WriteChannel getClientWriteChannel(
       Storage storage,
       StorageResourceId resourceId,
       CreateObjectOptions createOptions,
       GoogleCloudStorageOptions storageOptions) {
+    AsyncWriteChannelOptions channelOptions = storageOptions.getWriteChannelOptions();
     WriteChannel writeChannel =
-        storage.writer(getBlobInfo(resourceId, createOptions), generateWriteOptions());
-    writeChannel.setChunkSize(
-        Math.toIntExact(
-            storageOptions.getWriteChannelOptions().getNumberOfBufferedRequests()
-                * MAX_WRITE_CHUNK_BYTES.getNumber()));
+        storage.writer(
+            getBlobInfo(resourceId, createOptions),
+            generateWriteOptions(createOptions, channelOptions));
+    writeChannel.setChunkSize(getUploadChunkSize(channelOptions.getNumberOfBufferedRequests()));
 
     return writeChannel;
+  }
+
+  private static int getUploadChunkSize(int bufferedRequestCount) {
+    return Math.toIntExact(bufferedRequestCount * MAX_WRITE_CHUNK_BYTES.getNumber());
   }
 
   private class UploadOperation implements Callable<Boolean> {
@@ -139,7 +135,7 @@ class GoogleCloudStorageClientLibraryWriteChannel extends AbstractGoogleAsyncWri
           // switch to read mode
           byteBuffer.flip();
           // this could result into partial write
-          writeToGcs(byteBuffer);
+          writeToGCS(byteBuffer);
           if (!lastChunk) {
             // compact buffer for further writing
             byteBuffer.compact();
@@ -149,19 +145,19 @@ class GoogleCloudStorageClientLibraryWriteChannel extends AbstractGoogleAsyncWri
         // uploading all bytes of last chunk
         if (lastChunk && byteBuffer.hasRemaining()) {
           while (byteBuffer.hasRemaining()) {
-            writeToGcs(byteBuffer);
+            writeToGCS(byteBuffer);
           }
         }
         return true;
       } catch (Exception e) {
-        logger.atSevere().withCause(e).log("Exception while writing to channel");
         throw new IOException(
             String.format("Error occurred while uploading resource %s", resourceId), e);
       }
     }
   }
 
-  private BlobWriteOption[] generateWriteOptions() {
+  private static BlobWriteOption[] generateWriteOptions(
+      CreateObjectOptions createOptions, AsyncWriteChannelOptions channelOptions) {
     List<BlobWriteOption> writeOptions = new ArrayList<>();
 
     writeOptions.add(BlobWriteOption.disableGzipContent());
@@ -189,7 +185,7 @@ class GoogleCloudStorageClientLibraryWriteChannel extends AbstractGoogleAsyncWri
 
   @Override
   public void handleResponse(Boolean response) {
-    this.uploadSuccess = response;
+    this.uploadSucceeded = response;
   }
 
   @Override
@@ -198,10 +194,10 @@ class GoogleCloudStorageClientLibraryWriteChannel extends AbstractGoogleAsyncWri
   }
 
   public boolean isUploadSuccessful() {
-    return uploadSuccess;
+    return uploadSucceeded;
   }
 
-  private int writeToGcs(ByteBuffer byteBuffer) throws IOException {
+  private int writeToGCS(ByteBuffer byteBuffer) throws IOException {
     int bytesWritten = writeChannel.write(byteBuffer);
     logger.atFinest().log("Bytes written %d for resource %s", bytesWritten, resourceId);
     return bytesWritten;

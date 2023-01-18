@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Google Inc.
+ * Copyright 2023 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import static org.mockito.Mockito.when;
 import com.google.api.client.testing.http.MockHttpTransport;
 import com.google.auth.Credentials;
 import com.google.cloud.WriteChannel;
+import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.cloud.hadoop.util.RetryHttpInitializerOptions;
@@ -53,7 +54,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
@@ -62,7 +62,7 @@ import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
 
 @RunWith(JUnit4.class)
-public class GoogleCloudStorageClientLibraryWriteChannelTest {
+public class GoogleCloudStorageClientWriteChannelTest {
 
   private static final String V1_BUCKET_NAME = "bucket-name";
   private static final String BUCKET_NAME = GrpcChannelUtils.toV2BucketName(V1_BUCKET_NAME);
@@ -77,7 +77,7 @@ public class GoogleCloudStorageClientLibraryWriteChannelTest {
 
   private final StorageResourceId resourceId =
       new StorageResourceId(BUCKET_NAME, OBJECT_NAME, GENERATION_ID);
-  private GoogleCloudStorageClientLibraryWriteChannel writeChannel;
+  private GoogleCloudStorageClientWriteChannel writeChannel;
   // TODO: Instead of using mock shift to using fakes.
   private Storage mockedStorage = mock(Storage.class);
   private WriteChannel fakeWriteChannel;
@@ -104,21 +104,18 @@ public class GoogleCloudStorageClientLibraryWriteChannelTest {
 
   @Test
   public void writeMultipleChunksSuccess() throws IOException {
-    fakeWriteChannel = spy(new FakeWriteChannel());
-    when(mockedStorage.writer(blobInfoCapture.capture(), blobWriteOptionsCapture.capture()))
-        .thenReturn(fakeWriteChannel);
-    writeChannel = getJavaStorageChannel();
-
     int numberOfChunks = 10;
     writeChannel.initialize();
-    ByteString data = createTestData(MAX_WRITE_CHUNK_BYTES.getNumber() * numberOfChunks);
+    ByteString data =
+        GoogleCloudStorageTestHelper.createTestData(
+            MAX_WRITE_CHUNK_BYTES.getNumber() * numberOfChunks);
     writeChannel.write(data.asReadOnlyByteBuffer());
     writeChannel.close();
     // Fake writer only writes half the buffer at a time
     verify(fakeWriteChannel, times(numberOfChunks * 2)).write(any());
     verify(fakeWriteChannel, times(1)).close();
-    verifyBlobInfoProperties();
-    verifyBlobWriteOptionProperties();
+    verifyBlobInfoProperties(blobInfoCapture, resourceId);
+    verifyBlobWriteOptionProperties(blobWriteOptionsCapture);
     assertThat(writeChannel.isUploadSuccessful()).isTrue();
   }
 
@@ -127,29 +124,35 @@ public class GoogleCloudStorageClientLibraryWriteChannelTest {
     int numberOfChunks = 1;
     writeChannel.initialize();
     // (chunkSize/2) < data.size < chunkSize
-    ByteString data = createTestData(MAX_WRITE_CHUNK_BYTES.getNumber() * numberOfChunks - 1);
+    ByteString data =
+        GoogleCloudStorageTestHelper.createTestData(
+            MAX_WRITE_CHUNK_BYTES.getNumber() * numberOfChunks - 1);
     writeChannel.write(data.asReadOnlyByteBuffer());
     writeChannel.close();
     // Fake writer only writes half the buffer at a time
     verify(fakeWriteChannel, times(numberOfChunks * 2)).write(any());
     verify(fakeWriteChannel, times(1)).close();
-    verifyBlobInfoProperties();
-    verifyBlobWriteOptionProperties();
+    verifyBlobInfoProperties(blobInfoCapture, resourceId);
+    verifyBlobWriteOptionProperties(blobWriteOptionsCapture);
     assertThat(writeChannel.isUploadSuccessful()).isTrue();
   }
 
   @Test
   public void writeMultipleChunksFailure() throws IOException {
     fakeWriteChannel = spy(new FakeWriteChannel(true));
+    ArgumentCaptor<BlobInfo> blobInfoCapture = ArgumentCaptor.forClass(BlobInfo.class);
+    ArgumentCaptor<BlobWriteOption> blobWriteOptionsCapture =
+        ArgumentCaptor.forClass(BlobWriteOption.class);
     when(mockedStorage.writer(blobInfoCapture.capture(), blobWriteOptionsCapture.capture()))
         .thenReturn(fakeWriteChannel);
     writeChannel = getJavaStorageChannel();
     writeChannel.initialize();
-    ByteString data = createTestData(MAX_WRITE_CHUNK_BYTES.getNumber() * 10);
+    ByteString data =
+        GoogleCloudStorageTestHelper.createTestData(MAX_WRITE_CHUNK_BYTES.getNumber() * 10);
     assertThrows(IOException.class, () -> writeChannel.write(data.asReadOnlyByteBuffer()));
     verify(fakeWriteChannel, times(1)).write(any());
-    verifyBlobInfoProperties();
-    verifyBlobWriteOptionProperties();
+    verifyBlobInfoProperties(blobInfoCapture, resourceId);
+    verifyBlobWriteOptionProperties(blobWriteOptionsCapture);
     assertThrows(IOException.class, writeChannel::close);
     assertThat(writeChannel.isUploadSuccessful()).isFalse();
   }
@@ -215,20 +218,8 @@ public class GoogleCloudStorageClientLibraryWriteChannelTest {
         .isTrue();
   }
 
-  private ByteString createTestData(int numBytes) {
-    byte[] result = new byte[numBytes];
-    for (int i = 0; i < numBytes; ++i) {
-      // Sequential data makes it easier to compare expected vs. actual in
-      // case of error. Since chunk sizes are multiples of 256, the modulo
-      // ensures chunks have different data.
-      result[i] = (byte) (i % 257);
-    }
-
-    return ByteString.copyFrom(result);
-  }
-
-  private GoogleCloudStorageClientLibraryWriteChannel getJavaStorageChannel() {
-    return new GoogleCloudStorageClientLibraryWriteChannel(
+  private GoogleCloudStorageClientWriteChannel getJavaStorageChannel() {
+    return new GoogleCloudStorageClientWriteChannel(
         mockedStorage,
         GoogleCloudStorageOptions.DEFAULT.toBuilder()
             .setWriteChannelOptions(
@@ -238,13 +229,14 @@ public class GoogleCloudStorageClientLibraryWriteChannelTest {
         CreateObjectOptions.DEFAULT_NO_OVERWRITE.toBuilder()
             .setContentType(CONTENT_TYPE)
             .setContentEncoding(CONTENT_ENCODING)
-            .setMetadata(getDecodedMetadata())
+            .setMetadata(GoogleCloudStorageTestHelper.getDecodedMetadata(metadata))
             .setKmsKeyName(KMS_KEY)
             .build(),
         EXECUTOR_SERVICE);
   }
 
-  private void verifyBlobInfoProperties() {
+  private static void verifyBlobInfoProperties(
+      ArgumentCaptor<BlobInfo> blobInfoCapture, StorageResourceId resourceId) {
     BlobInfo blobInfo = blobInfoCapture.getValue();
     assertThat(blobInfo.getBucket()).isEqualTo(resourceId.getBucketName());
     assertThat(blobInfo.getName()).isEqualTo(resourceId.getObjectName());
@@ -253,20 +245,15 @@ public class GoogleCloudStorageClientLibraryWriteChannelTest {
     assertThat(blobInfo.getMetadata()).isEqualTo(metadata);
   }
 
-  private void verifyBlobWriteOptionProperties() {
+  private static void verifyBlobWriteOptionProperties(
+      ArgumentCaptor<BlobWriteOption> blobWriteOptionsCapture) {
     List<BlobWriteOption> optionsList = blobWriteOptionsCapture.getAllValues();
-    assertThat(optionsList).contains(BlobWriteOption.kmsKeyName(KMS_KEY));
-    assertThat(optionsList).contains(BlobWriteOption.generationMatch());
-    assertThat(optionsList).contains(BlobWriteOption.disableGzipContent());
-    assertThat(optionsList).contains(BlobWriteOption.crc32cMatch());
-  }
-
-  private Map<String, byte[]> getDecodedMetadata() {
-    return metadata.entrySet().stream()
-        .collect(
-            Collectors.toMap(
-                entity -> entity.getKey(),
-                entity -> GoogleCloudStorageImpl.decodeMetadataValues(entity.getValue())));
+    assertThat(optionsList)
+        .containsExactly(
+            BlobWriteOption.kmsKeyName(KMS_KEY),
+            BlobWriteOption.generationMatch(),
+            BlobWriteOption.disableGzipContent(),
+            BlobWriteOption.crc32cMatch());
   }
 
   private GoogleCloudStorage mockGcsJavaStorage(

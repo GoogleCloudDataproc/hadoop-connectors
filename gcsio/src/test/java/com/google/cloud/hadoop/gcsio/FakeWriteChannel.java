@@ -23,17 +23,14 @@ import java.nio.ByteBuffer;
 /** FakeWriterChannel which writes only half the passed in byteBuffer capacity at a time. */
 public class FakeWriteChannel implements WriteChannel {
 
-  private boolean isOpen = false;
+  private boolean open = true;
 
-  private boolean writeException = false;
+  private boolean throwExceptionOnWrite = false;
 
-  public FakeWriteChannel() {
-    isOpen = true;
-  }
+  public FakeWriteChannel() {}
 
-  public FakeWriteChannel(Boolean writeException) {
-    this();
-    this.writeException = writeException;
+  public FakeWriteChannel(boolean writeException) {
+    this.throwExceptionOnWrite = writeException;
   }
 
   @Override
@@ -46,11 +43,11 @@ public class FakeWriteChannel implements WriteChannel {
 
   @Override
   public int write(ByteBuffer src) throws IOException {
-    if (writeException) {
+    if (throwExceptionOnWrite) {
       throw new IOException("Intentionally triggered");
     }
     int bytesWritten = 0;
-    // always writes half or lesser from the provided byte buffer capacity
+    // always writes half or less from the provided byte buffer capacity
     int capacity = src.capacity();
     if ((src.limit() - src.position()) <= capacity / 2) {
       bytesWritten = src.limit();
@@ -64,11 +61,11 @@ public class FakeWriteChannel implements WriteChannel {
 
   @Override
   public boolean isOpen() {
-    return isOpen;
+    return open;
   }
 
   @Override
   public void close() throws IOException {
-    isOpen = false;
+    open = false;
   }
 }

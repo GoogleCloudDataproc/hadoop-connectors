@@ -70,17 +70,20 @@ import org.junit.runners.Parameterized.Parameters;
 @RunWith(Parameterized.class)
 public class GoogleCloudStorageImplTest {
 
-  private static final TestBucketHelper BUCKET_HELPER = new TestBucketHelper("gcs-grpc-team");
+  private static final TestBucketHelper BUCKET_HELPER = new TestBucketHelper("dataproc-gcs-impl");
   private static final String TEST_BUCKET = BUCKET_HELPER.getUniqueBucketPrefix();
 
   private static final GoogleCloudStorageOptions GCS_OPTIONS = getStandardOptionBuilder().build();
 
   private static GoogleCloudStorage helperGcs;
 
-  private final boolean tesStorageClientImpl;
+  private final boolean testStorageClientImpl;
+  private final boolean traceSupported;
 
   public GoogleCloudStorageImplTest(boolean tesStorageClientImpl) {
-    this.tesStorageClientImpl = tesStorageClientImpl;
+    this.testStorageClientImpl = tesStorageClientImpl;
+    // As of now trace is not supported via google-cloud-storage
+    this.traceSupported = !tesStorageClientImpl;
   }
 
   @Parameters
@@ -101,14 +104,14 @@ public class GoogleCloudStorageImplTest {
   @Before
   public void before() throws IOException {
     helperGcs =
-        tesStorageClientImpl
-            ? GoogleCloudStorageTestHelper.createJavaClientStorage()
+        testStorageClientImpl
+            ? GoogleCloudStorageTestHelper.mockedGcsClientImpl()
             : GoogleCloudStorageTestHelper.createGoogleCloudStorage();
     helperGcs.createBucket(TEST_BUCKET);
   }
 
   @After
-  public void after() throws IOException {
+  public static void after() throws IOException {
     try {
       BUCKET_HELPER.cleanup(helperGcs);
     } finally {
@@ -131,7 +134,7 @@ public class GoogleCloudStorageImplTest {
     try (SeekableByteChannel readChannel = trackingGcs.delegate.open(resourceId, readOptions)) {
       assertThat(readChannel.size()).isEqualTo(expectedSize);
     }
-    if (isTraceSupported()) {
+    if (traceSupported) {
       assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
           .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
 
@@ -158,7 +161,7 @@ public class GoogleCloudStorageImplTest {
     try (SeekableByteChannel readChannel = trackingGcs.delegate.open(itemInfo)) {
       assertThat(readChannel.size()).isEqualTo(expectedSize);
     }
-    if (isTraceSupported()) {
+    if (traceSupported) {
       assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
           .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
 
@@ -183,7 +186,7 @@ public class GoogleCloudStorageImplTest {
             partitionsCount);
 
     assertObjectContent(helperGcs, resourceId, partition, partitionsCount);
-    if (isTraceSupported()) {
+    if (traceSupported) {
       assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
           .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
 
@@ -204,7 +207,7 @@ public class GoogleCloudStorageImplTest {
 
     byte[] partition = writeObject(gcs, resourceId, /* objectSize= */ 5 * uploadChunkSize);
 
-    if (isTraceSupported()) {
+    if (traceSupported) {
       assertThat(gcs.getStatistics())
           .containsExactlyEntriesIn(
               ImmutableMap.<String, Long>builder()
@@ -258,7 +261,7 @@ public class GoogleCloudStorageImplTest {
 
     assertObjectContent(helperGcs, resourceId, partition, partitionsCount);
 
-    if (isTraceSupported()) {
+    if (traceSupported) {
       assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
           .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
 
@@ -302,7 +305,7 @@ public class GoogleCloudStorageImplTest {
         .containsMatch(Pattern.compile("(412 Precondition Failed)|(FAILED_PRECONDITION)"));
 
     assertObjectContent(helperGcs, resourceId, bytesToWrite, /* expectedBytesCount= */ 1);
-    if (isTraceSupported()) {
+    if (traceSupported) {
       assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
           .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
 
@@ -361,7 +364,7 @@ public class GoogleCloudStorageImplTest {
     assertThat(listedItems.stream().map(GoogleCloudStorageItemInfo::getResourceId).toArray())
         .asList()
         .containsExactly(resourceId);
-    if (isTraceSupported()) {
+    if (traceSupported) {
       assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
           .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
 
@@ -403,7 +406,7 @@ public class GoogleCloudStorageImplTest {
         .containsExactly("text/plain", "image/png", "application/octet-stream")
         .inOrder();
 
-    if (isTraceSupported()) {
+    if (traceSupported) {
       assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
           .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
 
@@ -467,7 +470,7 @@ public class GoogleCloudStorageImplTest {
         dstBucketName, ImmutableList.of(copiedResourceId.getObjectName()));
 
     assertObjectContent(helperGcs, copiedResourceId, partition, partitionsCount);
-    if (isTraceSupported()) {
+    if (traceSupported) {
       assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
           .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
 
@@ -525,7 +528,7 @@ public class GoogleCloudStorageImplTest {
     assertThat(itemInfo.metadataEquals(expectedMetadata)).isTrue();
     assertThat(itemInfo.metadataEquals(itemInfo.getMetadata())).isTrue();
     assertThat(itemInfo.metadataEquals(wrongMetadata)).isFalse();
-    if (isTraceSupported()) {
+    if (traceSupported) {
       assertThat(trackingGcs.requestsTracker.getAllRequestInvocationIds().size())
           .isEqualTo(trackingGcs.requestsTracker.getAllRequests().size());
 
@@ -538,7 +541,7 @@ public class GoogleCloudStorageImplTest {
 
   @Test
   public void tracelog_enabled() throws IOException {
-    if (isTraceSupported()) {
+    if (traceSupported) {
       doTestTraceLog(true, 3, 5);
     }
   }
@@ -586,7 +589,7 @@ public class GoogleCloudStorageImplTest {
     return new TrackingStorageWrapper<>(
         options,
         httpRequestInitializer ->
-            tesStorageClientImpl
+            testStorageClientImpl
                 ? GoogleCloudStorageClientImpl.builder()
                     .setOptions(options)
                     .setCredentials(credentials)
@@ -603,7 +606,7 @@ public class GoogleCloudStorageImplTest {
   private GoogleCloudStorage getStorageFromOptions(GoogleCloudStorageOptions options)
       throws IOException {
     Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
-    return tesStorageClientImpl
+    return testStorageClientImpl
         ? GoogleCloudStorageClientImpl.builder()
             .setOptions(options)
             .setCredentials(credentials)
@@ -640,10 +643,5 @@ public class GoogleCloudStorageImplTest {
                             /* uploadId= */ i))
                 .collect(toList()))
         .build();
-  }
-
-  private boolean isTraceSupported() {
-    // Tracing is not supported as of now in Java client
-    return tesStorageClientImpl ? false : true;
   }
 }

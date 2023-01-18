@@ -63,7 +63,7 @@ import org.junit.runners.Parameterized.Parameters;
 @RunWith(Parameterized.class)
 public class GoogleCloudStorageImplCreateTest {
 
-  private static final String BUCKET_NAME = "gcs-grpc-team";
+  private static final String BUCKET_NAME = "foo-bucket";
   private static final String OBJECT_NAME = "bar-object";
   private static final com.google.cloud.storage.Storage mockedJavaClientStorage =
       mock(com.google.cloud.storage.Storage.class);
@@ -78,7 +78,7 @@ public class GoogleCloudStorageImplCreateTest {
 
   @Parameters
   public static Iterable<Boolean> getTesStorageClientImplParameter() {
-    return List.of(true);
+    return List.of(false, true);
   }
 
   @Before
