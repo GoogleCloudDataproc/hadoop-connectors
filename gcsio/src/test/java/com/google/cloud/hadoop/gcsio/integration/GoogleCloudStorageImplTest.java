@@ -54,6 +54,7 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
@@ -453,7 +454,9 @@ public class GoogleCloudStorageImplTest {
     StorageResourceId resourceId =
         new StorageResourceId(srcBucketName, name.getMethodName() + "_src");
 
-    String dstBucketName = BUCKET_HELPER.getUniqueBucketName(name.getMethodName().toLowerCase());
+    String dstBucketName =
+        BUCKET_HELPER.getUniqueBucketName(
+            UUID.randomUUID().toString().replaceAll("-", "").substring(0, 10));
     // Create destination bucket with different storage class,
     // because this is supported only by rewrite but not copy requests
     helperGcs.createBucket(
