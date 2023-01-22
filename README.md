@@ -2,7 +2,6 @@
 
 [![GitHub release](https://img.shields.io/github/release/GoogleCloudDataproc/hadoop-connectors.svg)](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/latest)
 [![GitHub release date](https://img.shields.io/github/release-date/GoogleCloudDataproc/hadoop-connectors.svg)](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/latest)
-[![Code Quality: Java](https://img.shields.io/lgtm/grade/java/g/GoogleCloudDataproc/hadoop-connectors.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/GoogleCloudDataproc/hadoop-connectors/context:java)
 [![codecov](https://codecov.io/gh/GoogleCloudDataproc/hadoop-connectors/branch/master/graph/badge.svg)](https://codecov.io/gh/GoogleCloudDataproc/hadoop-connectors)
 
 Libraries and tools for interoperability between Apache Hadoop related
