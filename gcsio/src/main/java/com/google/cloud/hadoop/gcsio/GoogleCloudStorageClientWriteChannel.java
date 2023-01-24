@@ -29,7 +29,6 @@ import com.google.cloud.storage.Storage.BlobWriteOption;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.io.ByteStreams;
 import com.google.protobuf.ByteString;
-import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -45,7 +44,7 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
 
   private final StorageResourceId resourceId;
   private WriteChannel writeChannel;
-  private Boolean uploadSucceeded = false;
+  private boolean uploadSucceeded = false;
   // TODO: not supported as of now
   // private final String requesterPaysProject;
 
@@ -73,11 +72,12 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
 
   private static BlobInfo getBlobInfo(
       StorageResourceId resourceId, CreateObjectOptions createOptions) {
-    BlobId blobId =
-        BlobId.of(
-            resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
     BlobInfo blobInfo =
-        BlobInfo.newBuilder(blobId)
+        BlobInfo.newBuilder(
+                BlobId.of(
+                    resourceId.getBucketName(),
+                    resourceId.getObjectName(),
+                    resourceId.getGenerationId()))
             .setContentType(createOptions.getContentType())
             .setContentEncoding(createOptions.getContentEncoding())
             .setMetadata(encodeMetadata(createOptions.getMetadata()))
@@ -95,25 +95,21 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
         storage.writer(
             getBlobInfo(resourceId, createOptions),
             generateWriteOptions(createOptions, channelOptions));
-    writeChannel.setChunkSize(getUploadChunkSize(channelOptions.getNumberOfBufferedRequests()));
+    writeChannel.setChunkSize(channelOptions.getUploadChunkSize());
 
     return writeChannel;
-  }
-
-  private static int getUploadChunkSize(int bufferedRequestCount) {
-    return Math.toIntExact(bufferedRequestCount * MAX_WRITE_CHUNK_BYTES.getNumber());
   }
 
   private class UploadOperation implements Callable<Boolean> {
 
     // Read end of the pipe.
-    private final BufferedInputStream pipeSource;
+    private final InputStream pipeSource;
     private final StorageResourceId resourceId;
     private final int MAX_BYTES_PER_MESSAGE = MAX_WRITE_CHUNK_BYTES.getNumber();
 
     UploadOperation(InputStream pipeSource, StorageResourceId resourceId) {
       this.resourceId = resourceId;
-      this.pipeSource = new BufferedInputStream(pipeSource, MAX_BYTES_PER_MESSAGE);
+      this.pipeSource = pipeSource;
     }
 
     @Override
@@ -135,7 +131,7 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
           // switch to read mode
           byteBuffer.flip();
           // this could result into partial write
-          writeToGCS(byteBuffer);
+          writeInternal(byteBuffer);
           if (!lastChunk) {
             // compact buffer for further writing
             byteBuffer.compact();
@@ -145,7 +141,7 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
         // uploading all bytes of last chunk
         if (lastChunk && byteBuffer.hasRemaining()) {
           while (byteBuffer.hasRemaining()) {
-            writeToGCS(byteBuffer);
+            writeInternal(byteBuffer);
           }
         }
         return true;
@@ -177,8 +173,6 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
       super.close();
       writeChannel.close();
     } catch (Exception e) {
-      logger.atSevere().withCause(e).log(
-          "Error occurred while closing write channel for resource %s", resourceId);
       throw new IOException(String.format("Upload failed for '%s'", resourceId), e);
     }
   }
@@ -197,7 +191,7 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
     return uploadSucceeded;
   }
 
-  private int writeToGCS(ByteBuffer byteBuffer) throws IOException {
+  private int writeInternal(ByteBuffer byteBuffer) throws IOException {
     int bytesWritten = writeChannel.write(byteBuffer);
     logger.atFinest().log("Bytes written %d for resource %s", bytesWritten, resourceId);
     return bytesWritten;

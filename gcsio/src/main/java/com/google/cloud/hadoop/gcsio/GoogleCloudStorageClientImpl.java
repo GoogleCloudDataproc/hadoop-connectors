@@ -85,31 +85,24 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   @Override
   public WritableByteChannel create(StorageResourceId resourceId, CreateObjectOptions options)
       throws IOException {
-    if (storageOptions.isGrpcEnabled()) {
-      logger.atFiner().log("create(%s)", resourceId);
-      checkArgument(
-          resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
-      // Update resourceId if generationId is missing
-      StorageResourceId resourceIdWithGeneration = resourceId;
-      if (!resourceId.hasGenerationId()) {
-        resourceIdWithGeneration =
-            new StorageResourceId(
-                resourceId.getBucketName(),
-                resourceId.getObjectName(),
-                getWriteGeneration(resourceId, options.isOverwriteExisting()));
-      }
-
-      GoogleCloudStorageClientWriteChannel channel =
-          new GoogleCloudStorageClientWriteChannel(
-              storage,
-              storageOptions,
-              resourceIdWithGeneration,
-              options,
-              backgroundTasksThreadPool);
-      channel.initialize();
-      return channel;
+    logger.atFiner().log("create(%s)", resourceId);
+    checkArgument(
+        resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
+    // Update resourceId if generationId is missing
+    StorageResourceId resourceIdWithGeneration = resourceId;
+    if (!resourceId.hasGenerationId()) {
+      resourceIdWithGeneration =
+          new StorageResourceId(
+              resourceId.getBucketName(),
+              resourceId.getObjectName(),
+              getWriteGeneration(resourceId, options.isOverwriteExisting()));
     }
-    return super.create(resourceId, options);
+
+    GoogleCloudStorageClientWriteChannel channel =
+        new GoogleCloudStorageClientWriteChannel(
+            storage, storageOptions, resourceIdWithGeneration, options, backgroundTasksThreadPool);
+    channel.initialize();
+    return channel;
   }
 
   @Override
@@ -120,6 +113,8 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       } finally {
         backgroundTasksThreadPool.shutdown();
       }
+    } catch (Exception e) {
+      logger.atWarning().withCause(e).log("Exception while closing gcsClientImpl");
     } finally {
       backgroundTasksThreadPool = null;
     }

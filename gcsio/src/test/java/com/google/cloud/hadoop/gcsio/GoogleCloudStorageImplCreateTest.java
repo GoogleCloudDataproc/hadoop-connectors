@@ -34,20 +34,16 @@ import static org.mockito.Mockito.when;
 
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.testing.http.MockHttpTransport;
-import com.google.api.client.util.DateTime;
-import com.google.api.services.storage.model.StorageObject;
 import com.google.auth.oauth2.ComputeEngineCredentials;
+import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.util.testing.MockHttpTransportHelper.ErrorResponses;
 import com.google.cloud.hadoop.util.testing.ThrowingInputStream;
 import java.io.IOException;
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
-import java.util.Date;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -68,12 +64,12 @@ public class GoogleCloudStorageImplCreateTest {
   private static final com.google.cloud.storage.Storage mockedJavaClientStorage =
       mock(com.google.cloud.storage.Storage.class);
 
-  private final boolean tesStorageClientImpl;
+  private final boolean testStorageClientImpl;
 
   private GoogleCloudStorageOptions gcsOptions;
 
   public GoogleCloudStorageImplCreateTest(boolean tesStorageClientImpl) {
-    this.tesStorageClientImpl = tesStorageClientImpl;
+    this.testStorageClientImpl = tesStorageClientImpl;
   }
 
   @Parameters
@@ -87,7 +83,7 @@ public class GoogleCloudStorageImplCreateTest {
         GoogleCloudStorageOptions.builder()
             .setAppName("gcsio-unit-test")
             .setProjectId("google.com:foo-project")
-            .setGrpcEnabled(tesStorageClientImpl)
+            .setGrpcEnabled(testStorageClientImpl)
             .build();
   }
 
@@ -176,7 +172,9 @@ public class GoogleCloudStorageImplCreateTest {
   @Test
   public void testCreateObjectOverwriteFile() throws IOException {
     MockHttpTransport transport =
-        mockTransport(jsonDataResponse(newStorageObject(BUCKET_NAME, OBJECT_NAME)));
+        mockTransport(
+            jsonDataResponse(
+                GoogleCloudStorageTestHelper.newStorageObject(BUCKET_NAME, OBJECT_NAME)));
     GoogleCloudStorage gcs = getCloudStorageImpl(transport, gcsOptions);
 
     WritableByteChannel writeChannel =
@@ -192,7 +190,9 @@ public class GoogleCloudStorageImplCreateTest {
   @Test
   public void testCreateObjectFileAlreadyPresent() throws IOException {
     MockHttpTransport transport =
-        mockTransport(jsonDataResponse(newStorageObject(BUCKET_NAME, OBJECT_NAME)));
+        mockTransport(
+            jsonDataResponse(
+                GoogleCloudStorageTestHelper.newStorageObject(BUCKET_NAME, OBJECT_NAME)));
     GoogleCloudStorage gcs = getCloudStorageImpl(transport, gcsOptions);
 
     FileAlreadyExistsException thrown =
@@ -313,27 +313,14 @@ public class GoogleCloudStorageImplCreateTest {
         .isTrue();
   }
 
-  static StorageObject newStorageObject(String bucketName, String objectName) {
-    Random r = new Random();
-    return new StorageObject()
-        .setBucket(bucketName)
-        .setName(objectName)
-        .setSize(BigInteger.valueOf(r.nextInt(Integer.MAX_VALUE)))
-        .setStorageClass("standard")
-        .setGeneration((long) r.nextInt(Integer.MAX_VALUE))
-        .setMetageneration((long) r.nextInt(Integer.MAX_VALUE))
-        .setTimeCreated(new DateTime(new Date()))
-        .setUpdated(new DateTime(new Date()));
-  }
-
   private GoogleCloudStorage getCloudStorageImpl(
       HttpTransport transport, GoogleCloudStorageOptions options) throws IOException {
     if (options != null) {
-      return tesStorageClientImpl
+      return testStorageClientImpl
           ? mockedGcsClientImpl(options, transport, mockedJavaClientStorage)
           : mockedGcsImpl(options, transport);
     }
-    return tesStorageClientImpl
+    return testStorageClientImpl
         ? mockedGcsClientImpl(transport, mockedJavaClientStorage)
         : mockedGcsImpl(transport);
   }

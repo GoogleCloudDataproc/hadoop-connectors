@@ -24,7 +24,9 @@ import static com.google.common.truth.Truth.assertWithMessage;
 import static java.lang.Math.min;
 import static org.junit.Assert.fail;
 
+import com.google.api.client.util.DateTime;
 import com.google.api.services.storage.StorageScopes;
+import com.google.api.services.storage.model.StorageObject;
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.ComputeEngineCredentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
@@ -47,6 +49,7 @@ import com.google.common.io.BaseEncoding;
 import com.google.protobuf.ByteString;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
@@ -55,6 +58,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -262,13 +266,7 @@ public class GoogleCloudStorageTestHelper {
   }
 
   public static byte[] decodeMetadataValues(String value) {
-    try {
-      return BaseEncoding.base64().decode(value);
-    } catch (IllegalArgumentException iae) {
-      logger.atSevere().withCause(iae).log(
-          "Failed to parse base64 encoded attribute value %s - %s", value, iae);
-      return null;
-    }
+    return BaseEncoding.base64().decode(value);
   }
 
   public static ByteString createTestData(int numBytes) {
@@ -280,6 +278,19 @@ public class GoogleCloudStorageTestHelper {
       result[i] = (byte) (i % 257);
     }
     return ByteString.copyFrom(result);
+  }
+
+  public static StorageObject newStorageObject(String bucketName, String objectName) {
+    Random r = new Random();
+    return new StorageObject()
+        .setBucket(bucketName)
+        .setName(objectName)
+        .setSize(BigInteger.valueOf(r.nextInt(Integer.MAX_VALUE)))
+        .setStorageClass("standard")
+        .setGeneration((long) r.nextInt(Integer.MAX_VALUE))
+        .setMetageneration((long) r.nextInt(Integer.MAX_VALUE))
+        .setTimeCreated(new DateTime(new Date()))
+        .setUpdated(new DateTime(new Date()));
   }
 
   /** Helper for dealing with buckets in GCS integration tests. */

@@ -25,12 +25,14 @@ public class FakeWriteChannel implements WriteChannel {
 
   private boolean open = true;
 
-  private boolean throwExceptionOnWrite = false;
+  private final boolean throwExceptionOnWrite;
 
-  public FakeWriteChannel() {}
+  public FakeWriteChannel() {
+    this.throwExceptionOnWrite = false;
+  }
 
-  public FakeWriteChannel(boolean writeException) {
-    this.throwExceptionOnWrite = writeException;
+  public FakeWriteChannel(boolean throwExceptionOnWrite) {
+    this.throwExceptionOnWrite = throwExceptionOnWrite;
   }
 
   @Override
