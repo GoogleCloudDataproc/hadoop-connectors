@@ -173,7 +173,15 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
   @Override
   public void close() throws IOException {
     try {
+      if (!isOpen()) {
+        return;
+      }
       super.close();
+      // WriteChannel close is overloaded with
+      // 1. object closable
+      // 2. finalizing gcs-object
+      // TODO: what if we want to close the object and free up the resources but not call finalize
+      // the gcs-object.
       writeChannel.close();
     } catch (Exception e) {
       throw new IOException(String.format("Upload failed for '%s'", resourceId), e);
