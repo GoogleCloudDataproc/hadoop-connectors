@@ -148,7 +148,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   private static Storage createStorage(
       Credentials credentials, GoogleCloudStorageOptions storageOptions) {
     return StorageOptions.grpc()
-        .setAttemptDirectPath(storageOptions.isTrafficDirectorEnabled())
+        .setAttemptDirectPath(storageOptions.isDirectPathPreferred())
         .setCredentials(credentials)
         .build()
         .getService();
