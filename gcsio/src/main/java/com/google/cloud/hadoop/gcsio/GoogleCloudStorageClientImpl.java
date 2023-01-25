@@ -113,8 +113,6 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       } finally {
         backgroundTasksThreadPool.shutdown();
       }
-    } catch (Exception e) {
-      logger.atWarning().withCause(e).log("Exception while closing gcsClientImpl");
     } finally {
       backgroundTasksThreadPool = null;
     }
