@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
+import javax.annotation.Nonnull;
 
 /** Implements WritableByteChannel to provide write access to GCS via java-storage client */
 class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChannel<Boolean> {
@@ -107,7 +108,7 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
     private final StorageResourceId resourceId;
     private final int MAX_BYTES_PER_MESSAGE = MAX_WRITE_CHUNK_BYTES.getNumber();
 
-    UploadOperation(InputStream pipeSource, StorageResourceId resourceId) {
+    UploadOperation(@Nonnull InputStream pipeSource, @Nonnull StorageResourceId resourceId) {
       this.resourceId = resourceId;
       this.pipeSource = pipeSource;
     }
@@ -116,6 +117,7 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
     public Boolean call() throws Exception {
       // Try-with-resource will close this end of the pipe so that
       // the writer at the other end will not hang indefinitely.
+      logger.atFiner().log("Starting upload for resource %s", resourceId);
       try (pipeSource) {
         boolean lastChunk = false;
         ByteBuffer byteBuffer = ByteBuffer.allocate(MAX_BYTES_PER_MESSAGE);
@@ -144,6 +146,7 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
             writeInternal(byteBuffer);
           }
         }
+        logger.atFiner().log("Uploaded all chunks for resource %s", resourceId);
         return true;
       } catch (Exception e) {
         throw new IOException(
@@ -174,6 +177,8 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
       writeChannel.close();
     } catch (Exception e) {
       throw new IOException(String.format("Upload failed for '%s'", resourceId), e);
+    } finally {
+      writeChannel = null;
     }
   }
 
@@ -193,7 +198,9 @@ class GoogleCloudStorageClientWriteChannel extends AbstractGoogleAsyncWriteChann
 
   private int writeInternal(ByteBuffer byteBuffer) throws IOException {
     int bytesWritten = writeChannel.write(byteBuffer);
-    logger.atFinest().log("Bytes written %d for resource %s", bytesWritten, resourceId);
+    logger.atFinest().log(
+        "%d bytes were written out of provided buffer of capacity %d",
+        bytesWritten, byteBuffer.limit());
     return bytesWritten;
   }
 }
