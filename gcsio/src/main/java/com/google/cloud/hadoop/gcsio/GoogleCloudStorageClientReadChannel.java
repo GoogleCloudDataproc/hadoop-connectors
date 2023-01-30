@@ -10,6 +10,8 @@ import com.google.cloud.ReadChannel;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.Storage.BlobSourceOption;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import java.io.ByteArrayInputStream;
 import java.io.EOFException;
@@ -21,8 +23,11 @@ import java.nio.channels.Channels;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
+import java.util.ArrayList;
+import java.util.List;
 import javax.annotation.Nonnull;
 
+@VisibleForTesting
 class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
@@ -34,7 +39,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   private Storage storage;
   // The size of this object generation, in bytes.
   private final long objectSize;
-  private boolean randomAccess;
+  @VisibleForTesting boolean randomAccess;
   // True if this channel is open, false otherwise.
   private boolean channelIsOpen = true;
 
@@ -44,7 +49,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   private ReadableByteChannel contentReadChannel = null;
   // This is the actual current position in `contentChannel` from where read can happen.
   // This remains unchanged of position(long) method call.
-  private long contentChannelPosition = 0;
+  private long contentChannelPosition = -1;
   private long contentChannelEnd = -1;
   private int footerSize;
 
@@ -71,14 +76,26 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
             resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
     this.readOptions = readOptions;
     this.objectSize = itemInfo.getSize();
-    this.randomAccess = readOptions.getFadvise().equals(Fadvise.RANDOM) ? false : true;
+    this.randomAccess = readOptions.getFadvise().equals(Fadvise.RANDOM) ? true : false;
     this.footerSize = (int) readOptions.getMinRangeRequestSize();
   }
 
   @Override
   public int read(ByteBuffer dst) throws IOException {
     throwIfNotOpen();
-    // add check if there is any space remaining in dst buffer
+
+    // Don't try to read if the buffer has no space.
+    if (dst.remaining() == 0) {
+      return 0;
+    }
+
+    logger.atFiner().log(
+        "Reading %d bytes at %d position from '%s'", dst.remaining(), currentPosition, resourceId);
+
+    if (currentPosition == objectSize) {
+      return -1;
+    }
+
     int totalBytesRead = 0;
     while (dst.hasRemaining()) {
       // if in Footer and not readRandom
@@ -337,7 +354,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
   private void resetContentChannel() {
     checkState(contentReadChannel == null, "contentChannel should be null for '%s'", resourceId);
-    contentChannelPosition = 0;
+    contentChannelPosition = -1;
     contentChannelEnd = -1;
   }
 
@@ -390,7 +407,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
   // Update this function to create the reader and then set limits
   private ReadableByteChannel getStorageReadChannel(long seek, long limit) throws IOException {
-    ReadChannel readChannel = storage.reader(blobId);
+    ReadChannel readChannel = storage.reader(blobId, generateReadOptions(blobId));
     try {
       readChannel.seek(seek);
       // TODO: should we also add a check to not set limit if contentChannelEnd == objectSize?
@@ -404,6 +421,14 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
               "Unable to update the boundaries/Range of contentChannel %s", resourceId.toString()),
           e);
     }
+  }
+
+  private static BlobSourceOption[] generateReadOptions(BlobId blobId) {
+    List<BlobSourceOption> readOptions = new ArrayList<>();
+    if (blobId.getGeneration() != null) {
+      readOptions.add(BlobSourceOption.generationMatch(blobId.getGeneration()));
+    }
+    return readOptions.toArray(new BlobSourceOption[readOptions.size()]);
   }
 
   private boolean isFooterRead() {
