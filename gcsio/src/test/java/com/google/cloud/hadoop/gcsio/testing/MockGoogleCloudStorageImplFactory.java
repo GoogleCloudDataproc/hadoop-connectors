@@ -63,13 +63,11 @@ public class MockGoogleCloudStorageImplFactory {
         new com.google.api.services.storage.Storage(
             transport,
             GsonFactory.getDefaultInstance(),
-            new TrackingHttpRequestInitializer(
-                new RetryHttpInitializer(
-                    fakeCredential,
-                    RetryHttpInitializerOptions.builder()
-                        .setDefaultUserAgent("gcs-io-unit-test")
-                        .build()),
-                false));
+            new RetryHttpInitializer(
+                fakeCredential,
+                RetryHttpInitializerOptions.builder()
+                    .setDefaultUserAgent("gcs-io-unit-test")
+                    .build()));
     return GoogleCloudStorageClientImpl.builder()
         .setOptions(options)
         .setApiaryClientStorage(apiaryStorage)
