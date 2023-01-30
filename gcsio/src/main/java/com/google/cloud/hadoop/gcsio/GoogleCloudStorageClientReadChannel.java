@@ -255,7 +255,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   private long getRangeRequestStart() {
     if (readOptions.getFadvise() != Fadvise.SEQUENTIAL && isFooterRead()) {
       // Prefetch footer and adjust start position to footerStart.
-      return objectSize - footerSize;
+      return Math.max(0, objectSize - footerSize);
     }
     return currentPosition;
   }
