@@ -24,11 +24,14 @@ import static com.google.common.truth.Truth.assertWithMessage;
 import static java.lang.Math.min;
 import static org.junit.Assert.fail;
 
+import com.google.api.client.util.DateTime;
 import com.google.api.services.storage.StorageScopes;
+import com.google.api.services.storage.model.StorageObject;
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.ComputeEngineCredentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageClientImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
@@ -42,8 +45,11 @@ import com.google.cloud.hadoop.util.RetryHttpInitializer;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
 import com.google.common.flogger.GoogleLogger;
+import com.google.common.io.BaseEncoding;
+import com.google.protobuf.ByteString;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
@@ -52,9 +58,12 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /** Helper methods for GCS integration tests. */
 public class GoogleCloudStorageTestHelper {
@@ -68,6 +77,17 @@ public class GoogleCloudStorageTestHelper {
   public static GoogleCloudStorage createGoogleCloudStorage() {
     try {
       return GoogleCloudStorageImpl.builder()
+          .setOptions(getStandardOptionBuilder().build())
+          .setCredentials(getCredentials())
+          .build();
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to create GoogleCloudStorage instance", e);
+    }
+  }
+
+  public static GoogleCloudStorage mockedGcsClientImpl() {
+    try {
+      return GoogleCloudStorageClientImpl.builder()
           .setOptions(getStandardOptionBuilder().build())
           .setCredentials(getCredentials())
           .build();
@@ -236,6 +256,41 @@ public class GoogleCloudStorageTestHelper {
     logger.atInfo().log(
         "Took %sms to write %sB", (endTime - startTime), (long) partitionsCount * partitionSize);
     return partition;
+  }
+
+  public static Map<String, byte[]> getDecodedMetadata(Map<String, String> metadata) {
+    return metadata.entrySet().stream()
+        .collect(
+            Collectors.toMap(
+                entity -> entity.getKey(), entity -> decodeMetadataValues(entity.getValue())));
+  }
+
+  public static byte[] decodeMetadataValues(String value) {
+    return BaseEncoding.base64().decode(value);
+  }
+
+  public static ByteString createTestData(int numBytes) {
+    byte[] result = new byte[numBytes];
+    for (int i = 0; i < numBytes; ++i) {
+      // Sequential data makes it easier to compare expected vs. actual in
+      // case of error. Since chunk sizes are multiples of 256, the modulo
+      // ensures chunks have different data.
+      result[i] = (byte) (i % 257);
+    }
+    return ByteString.copyFrom(result);
+  }
+
+  public static StorageObject newStorageObject(String bucketName, String objectName) {
+    Random r = new Random();
+    return new StorageObject()
+        .setBucket(bucketName)
+        .setName(objectName)
+        .setSize(BigInteger.valueOf(r.nextInt(Integer.MAX_VALUE)))
+        .setStorageClass("standard")
+        .setGeneration((long) r.nextInt(Integer.MAX_VALUE))
+        .setMetageneration((long) r.nextInt(Integer.MAX_VALUE))
+        .setTimeCreated(new DateTime(new Date()))
+        .setUpdated(new DateTime(new Date()));
   }
 
   /** Helper for dealing with buckets in GCS integration tests. */
