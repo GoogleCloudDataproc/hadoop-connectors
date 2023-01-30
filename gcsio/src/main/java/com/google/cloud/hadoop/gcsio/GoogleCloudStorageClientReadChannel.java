@@ -1,3 +1,19 @@
+/*
+ * Copyright 2023 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -33,8 +49,6 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   private StorageResourceId resourceId;
   private BlobId blobId;
-  private GoogleCloudStorageItemInfo itemInfo;
-  private GoogleCloudStorageOptions storageOptions;
   private GoogleCloudStorageReadOptions readOptions;
   private Storage storage;
   // The size of this object generation, in bytes.
@@ -69,8 +83,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       throws IOException {
     validate(itemInfo);
     this.storage = gcs;
-    this.itemInfo = itemInfo;
-    this.resourceId = itemInfo.getResourceId();
+    this.resourceId =
+        new StorageResourceId(
+            itemInfo.getBucketName(), itemInfo.getObjectName(), itemInfo.getContentGeneration());
     this.blobId =
         BlobId.of(
             resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
