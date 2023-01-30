@@ -104,6 +104,7 @@ public class GoogleCloudStorageTestHelper {
       return GoogleCloudStorageClientImpl.builder()
           .setOptions(getStandardOptionBuilder().build())
           .setCredentials(getCredentials())
+          .setCredential(getCredential())
           .build();
     } catch (IOException e) {
       throw new RuntimeException("Failed to create GoogleCloudStorage instance", e);
