@@ -981,6 +981,8 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
         "contentChannelEnd should be initialized already for '%s'",
         resourceId);
 
+    // This checks if whatever we have loaded from first request was actually a footer or not
+    // contentChannelEnd == size specifically checks for it.
     if (!gzipEncoded
         && readOptions.getFadvise() != Fadvise.SEQUENTIAL
         && contentChannelEnd == size
@@ -1065,12 +1067,17 @@ public class GoogleCloudStorageReadChannel implements SeekableByteChannel {
   }
 
   private long getContentChannelPositionForFirstRead(long bytesToRead) {
+    // IF client specifically asked for sequential read OR
+    // request buffer size is higher than the configured buffer size don't update current position
     if (readOptions.getFadvise() == Fadvise.SEQUENTIAL
         || bytesToRead >= readOptions.getMinRangeRequestSize()) {
       return currentPosition;
     }
     // Prefetch footer (bytes before 'currentPosition' in case of last byte read) lazily.
     // Max prefetch size is (minRangeRequestSize / 2) bytes.
+    // shifts the current position backwards in such a way that we can utilize reading buffer chunk
+    // size
+    // why it is required is not clear.
     if (bytesToRead <= readOptions.getMinRangeRequestSize() / 2) {
       return Math.max(0, currentPosition - readOptions.getMinRangeRequestSize() / 2);
     }
