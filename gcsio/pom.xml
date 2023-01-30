@@ -202,16 +202,6 @@
       <groupId>io.grpc</groupId>
       <artifactId>grpc-testing</artifactId>
     </dependency>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <scope>compile</scope>
-    </dependency>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <scope>compile</scope>
-    </dependency>
   </dependencies>
   <build>
     <plugins>
