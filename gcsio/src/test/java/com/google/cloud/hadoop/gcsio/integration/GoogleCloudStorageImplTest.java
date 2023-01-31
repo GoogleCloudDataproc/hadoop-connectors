@@ -41,7 +41,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.StorageResourceId;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TestBucketHelper;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.TrackingStorageWrapper;
@@ -90,7 +89,7 @@ public class GoogleCloudStorageImplTest {
 
   @Parameters
   public static Iterable<Boolean> getTesStorageClientImplParameter() {
-    return List.of(true);
+    return List.of(false, true);
   }
 
   @Rule
@@ -131,16 +130,9 @@ public class GoogleCloudStorageImplTest {
         newTrackingGoogleCloudStorage(GCS_OPTIONS);
 
     GoogleCloudStorageReadOptions readOptions =
-        GoogleCloudStorageReadOptions.builder()
-            .setFastFailOnNotFoundEnabled(false)
-            .setFadvise(Fadvise.RANDOM)
-            .build();
+        GoogleCloudStorageReadOptions.builder().setFastFailOnNotFoundEnabled(false).build();
 
     try (SeekableByteChannel readChannel = trackingGcs.delegate.open(resourceId, readOptions)) {
-      ByteBuffer buffer = ByteBuffer.allocate(2 * 1024 * 1024);
-      readChannel.read(buffer);
-      buffer.clear();
-      readChannel.read(buffer);
       assertThat(readChannel.size()).isEqualTo(expectedSize);
     }
     if (traceSupported) {
