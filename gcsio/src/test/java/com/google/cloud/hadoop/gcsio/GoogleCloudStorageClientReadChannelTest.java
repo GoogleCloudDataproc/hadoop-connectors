@@ -213,13 +213,13 @@ public class GoogleCloudStorageClientReadChannelTest {
 
     ByteBuffer buffer = ByteBuffer.allocate(chunkSize);
     readChannel.read(buffer);
-    assertThat(readChannel.randomAccess).isFalse();
+    assertThat(readChannel.randomAccessStatus()).isFalse();
     verifyContent(buffer, 0, chunkSize);
 
     buffer.clear();
     readChannel.position(seekPosition);
     readChannel.read(buffer);
-    assertThat(readChannel.randomAccess).isTrue();
+    assertThat(readChannel.randomAccessStatus()).isTrue();
     verifyContent(buffer, seekPosition, chunkSize);
 
     verify(fakeReadChannel, times(2)).seek(anyLong());
@@ -246,13 +246,13 @@ public class GoogleCloudStorageClientReadChannelTest {
     ByteBuffer buffer = ByteBuffer.allocate(chunkSize);
     readChannel.position(seekPosition);
     readChannel.read(buffer);
-    assertThat(readChannel.randomAccess).isFalse();
+    assertThat(readChannel.randomAccessStatus()).isFalse();
     verifyContent(buffer, seekPosition, chunkSize);
 
     buffer.clear();
     readChannel.position(0);
     readChannel.read(buffer);
-    assertThat(readChannel.randomAccess).isTrue();
+    assertThat(readChannel.randomAccessStatus()).isTrue();
     verifyContent(buffer, 0, chunkSize);
 
     verify(fakeReadChannel, times(2)).seek(anyLong());
@@ -268,7 +268,8 @@ public class GoogleCloudStorageClientReadChannelTest {
 
     // footerSize is the minimumChunkSize
     int footerSize = chunkSize;
-    int startPosition = OBJECT_SIZE - new Random().nextInt(footerSize);
+    // chunk which starts somewhere within the footer length
+    int startPosition = OBJECT_SIZE - (new Random().nextInt(footerSize - 1) + 1);
     readChannel.position(startPosition);
     assertThat(readChannel.position()).isEqualTo(startPosition);
     int bytesToRead = 1;

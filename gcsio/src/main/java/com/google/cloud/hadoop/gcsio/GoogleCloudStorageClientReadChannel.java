@@ -47,13 +47,15 @@ import javax.annotation.Nonnull;
 class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-  private StorageResourceId resourceId;
-  private BlobId blobId;
-  private GoogleCloudStorageReadOptions readOptions;
-  private Storage storage;
+
+  private static final int SKIP_BUFFER_SIZE = 8192;
+  private final StorageResourceId resourceId;
+  private final BlobId blobId;
+  private final GoogleCloudStorageReadOptions readOptions;
+  private final Storage storage;
   // The size of this object generation, in bytes.
   private final long objectSize;
-  @VisibleForTesting boolean randomAccess;
+  private boolean randomAccess;
   // True if this channel is open, false otherwise.
   private boolean channelIsOpen = true;
 
@@ -65,13 +67,12 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   // This remains unchanged of position(long) method call.
   private long contentChannelPosition = -1;
   private long contentChannelEnd = -1;
-  private int footerSize;
+  private final int footerSize;
 
   // Used as scratch space when reading bytes just to discard them when trying to perform small
   // in-place seeks.
   private byte[] skipBuffer = null;
   // Size of buffer to allocate for skipping bytes in-place when performing in-place seeks.
-  static final int SKIP_BUFFER_SIZE = 8192;
 
   // Prefetched footer content.
   private byte[] footerContent;
@@ -113,8 +114,6 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
     int totalBytesRead = 0;
     while (dst.hasRemaining()) {
-      // if in Footer and not readRandom
-      // have a separate logic to load footer cache and serve from cache
       try {
         performPendingSeeks(dst.remaining());
         int bytesRead = contentReadChannel.read(dst);
@@ -142,11 +141,11 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
             break;
           }
         }
-      } catch (IOException ioe) {
+      } catch (Exception e) {
         logger.atFine().log(
-            "Closing contentChannel after %s exception for '%s'.", ioe.getMessage(), resourceId);
+            "Closing contentChannel after %s exception for '%s'.", e.getMessage(), resourceId);
         closeContentChannel();
-        throw ioe;
+        throw e;
       }
     }
     return totalBytesRead;
@@ -239,7 +238,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           totalBytesRead,
           footerSize,
           resourceId);
-    } catch (IOException e) {
+    } catch (Exception e) {
       footerContent = null;
       throw e;
     }
@@ -281,7 +280,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
     // Check if footer was fetched
     if (contentChannelEnd == objectSize
-        && contentChannelEnd - contentChannelPosition == footerSize) {
+        && (contentChannelEnd - contentChannelPosition) == footerSize) {
       if (footerContent == null) {
         cacheFooter(readableByteChannel);
       }
@@ -361,7 +360,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           seekDistance -= bytesRead;
           contentChannelPosition += bytesRead;
         }
-      } catch (IOException e) {
+      } catch (Exception e) {
         logger.atInfo().withCause(e).log(
             "Got an IO exception on contentChannel.read(), a lazy-seek will be pending for '%s'",
             resourceId);
@@ -459,6 +458,11 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     return objectSize - currentPosition <= footerSize;
   }
 
+  @VisibleForTesting
+  boolean randomAccessStatus() {
+    return randomAccess;
+  }
+
   private static void validate(GoogleCloudStorageItemInfo itemInfo) throws IOException {
     checkNotNull(itemInfo, "itemInfo cannot be null");
     StorageResourceId resourceId = itemInfo.getResourceId();
@@ -480,7 +484,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   }
 
   /** Validates that the given position is valid for this channel. */
-  protected void validatePosition(long position) throws IOException {
+  private void validatePosition(long position) throws IOException {
     if (position < 0) {
       throw new EOFException(
           String.format(
