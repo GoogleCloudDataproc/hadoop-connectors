@@ -115,31 +115,38 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     while (dst.hasRemaining()) {
       // if in Footer and not readRandom
       // have a separate logic to load footer cache and serve from cache
-      performPendingSeeks(dst.remaining());
-      int bytesRead = contentReadChannel.read(dst);
+      try {
+        performPendingSeeks(dst.remaining());
+        int bytesRead = contentReadChannel.read(dst);
 
-      if (bytesRead > 0) {
-        totalBytesRead += bytesRead;
-        currentPosition += bytesRead;
-        contentChannelPosition += bytesRead;
-      }
+        if (bytesRead > 0) {
+          totalBytesRead += bytesRead;
+          currentPosition += bytesRead;
+          contentChannelPosition += bytesRead;
+        }
 
-      if (bytesRead < 0) {
-        if (currentPosition != contentChannelEnd && currentPosition != objectSize) {
-          throw new IOException(
-              String.format(
-                  "Received end of stream result before all requestedBytes were received;"
-                      + "EndOf stream signal received at offset: %d where as stream was suppose to end at: %d for resource: %s of size: %d",
-                  currentPosition, contentChannelEnd, resourceId, objectSize));
+        if (bytesRead < 0) {
+          if (currentPosition != contentChannelEnd && currentPosition != objectSize) {
+            throw new IOException(
+                String.format(
+                    "Received end of stream result before all requestedBytes were received;"
+                        + "EndOf stream signal received at offset: %d where as stream was suppose to end at: %d for resource: %s of size: %d",
+                    currentPosition, contentChannelEnd, resourceId, objectSize));
+          }
+          // If we have reached an end of a contentChannel but not an end of an object.
+          // then close contentChannel and continue reading an object if necessary.
+          if (contentChannelEnd != objectSize && currentPosition == contentChannelEnd) {
+            closeContentChannel();
+            continue;
+          } else {
+            break;
+          }
         }
-        // If we have reached an end of a contentChannel but not an end of an object.
-        // then close contentChannel and continue reading an object if necessary.
-        if (contentChannelEnd != objectSize && currentPosition == contentChannelEnd) {
-          closeContentChannel();
-          continue;
-        } else {
-          break;
-        }
+      } catch (IOException ioe) {
+        logger.atFine().log(
+            "Closing contentChannel after %s exception for '%s'.", ioe.getMessage(), resourceId);
+        closeContentChannel();
+        throw ioe;
       }
     }
     return totalBytesRead;
@@ -212,10 +219,12 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     footerContent = new byte[footerSize];
     try (InputStream footerStream = Channels.newInputStream(readableByteChannel)) {
       int totalBytesRead = 0;
-      int bytesRead = 0;
+      int bytesRead;
       do {
         bytesRead = footerStream.read(footerContent, totalBytesRead, footerSize - totalBytesRead);
-        totalBytesRead += bytesRead;
+        if (bytesRead >= 0) {
+          totalBytesRead += bytesRead;
+        }
       } while (bytesRead >= 0 && totalBytesRead < footerSize);
       checkState(
           bytesRead >= 0,
@@ -347,7 +356,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           logger.atInfo().log(
               "Somehow read %d bytes trying to skip %d bytes to seek to position %d, size: %d",
               bytesRead, seekDistance, currentPosition, objectSize);
-          // close Read Channel here
+          closeContentChannel();
         } else {
           seekDistance -= bytesRead;
           contentChannelPosition += bytesRead;

@@ -48,6 +48,7 @@ public class GoogleCloudStorageClientReadChannelTest {
 
   private static final String V1_BUCKET_NAME = "bucket-name";
   private static final String OBJECT_NAME = "object-name";
+  private static final int CHUNK_SIZE = FakeReadChannel.CHUNK_SIZE;
   private static final int OBJECT_SIZE = 1024 * 1024;
   private static final int IN_PLACE_SEEK_LIMIT = 5;
   private static final StorageResourceId RESOURCE_ID =
@@ -359,6 +360,47 @@ public class GoogleCloudStorageClientReadChannelTest {
     verify(fakeReadChannel, times(3)).read(any());
     verify(fakeReadChannel, times(0)).close();
 
+    verifyNoMoreInteractions(fakeReadChannel);
+  }
+
+  @Test
+  public void readThrowException() throws IOException {
+    fakeReadChannel = spy(new FakeReadChannel(CONTENT, true, false));
+    when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
+    readChannel =
+        getJavaStorageChannel(
+            DEFAULT_ITEM_INFO,
+            GoogleCloudStorageReadOptions.builder()
+                .setFadvise(Fadvise.RANDOM)
+                .setGrpcChecksumsEnabled(true)
+                .setInplaceSeekLimit(IN_PLACE_SEEK_LIMIT)
+                .setMinRangeRequestSize(FakeReadChannel.CHUNK_SIZE)
+                .build());
+
+    int startPosition = 0;
+    readChannel.position(startPosition);
+    assertThrows(IOException.class, () -> readChannel.read(ByteBuffer.allocate(1)));
+  }
+
+  @Test
+  public void closeThrowsException() throws IOException {
+    fakeReadChannel = spy(new FakeReadChannel(CONTENT, false, true));
+    when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
+    readChannel =
+        getJavaStorageChannel(
+            DEFAULT_ITEM_INFO,
+            GoogleCloudStorageReadOptions.builder()
+                .setFadvise(Fadvise.RANDOM)
+                .setGrpcChecksumsEnabled(true)
+                .setInplaceSeekLimit(IN_PLACE_SEEK_LIMIT)
+                .setMinRangeRequestSize(FakeReadChannel.CHUNK_SIZE)
+                .build());
+    readChannel.read(ByteBuffer.allocate(CHUNK_SIZE));
+    readChannel.close();
+    verify(fakeReadChannel, times(1)).seek(anyLong());
+    verify(fakeReadChannel, times(1)).limit(anyLong());
+    verify(fakeReadChannel, times(1)).read(any());
+    verify(fakeReadChannel, times(1)).close();
     verifyNoMoreInteractions(fakeReadChannel);
   }
 

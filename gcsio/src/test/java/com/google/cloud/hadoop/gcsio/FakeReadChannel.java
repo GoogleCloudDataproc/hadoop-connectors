@@ -31,11 +31,10 @@ public class FakeReadChannel implements ReadChannel {
 
   private final boolean throwExceptionOnRead;
 
+  private final boolean throwExceptionOnClose;
+
   private long position;
   private long limit = Long.MAX_VALUE;
-
-  private boolean readStarted = false;
-
   private ByteString content;
 
   private long currentPosition = 0;
@@ -43,11 +42,14 @@ public class FakeReadChannel implements ReadChannel {
   public FakeReadChannel(ByteString content) {
     this.content = content;
     this.throwExceptionOnRead = false;
+    this.throwExceptionOnClose = false;
   }
 
-  public FakeReadChannel(ByteString content, boolean throwExceptionOnRead) {
+  public FakeReadChannel(
+      ByteString content, boolean throwExceptionOnRead, boolean throwExceptionOnClose) {
     this.content = content;
     this.throwExceptionOnRead = throwExceptionOnRead;
+    this.throwExceptionOnClose = throwExceptionOnClose;
   }
 
   @Override
@@ -57,6 +59,9 @@ public class FakeReadChannel implements ReadChannel {
 
   @Override
   public void close() {
+    if (throwExceptionOnClose) {
+      throw new RuntimeException("Exception while closing channel");
+    }
     open = false;
   }
 
@@ -81,9 +86,8 @@ public class FakeReadChannel implements ReadChannel {
 
   @Override
   public int read(ByteBuffer dst) throws IOException {
-    readStarted = true;
     if (throwExceptionOnRead) {
-      throw new IOException("Intentionally triggered");
+      throw new IOException("Intentionally triggered exception in read");
     }
     if (currentPosition >= limit) {
       return -1;
