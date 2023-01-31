@@ -427,9 +427,6 @@ public class GoogleCloudStorageGrpcReadChannel implements SeekableByteChannel {
     InputStream stream = getObjectMediaResponseMarshaller.popStream(res);
     try {
       ByteString content = res.getChecksummedData().getContent();
-      // why is it needed here?
-      // why can't we just do it at the time of figuring out if it is within the boundaries of
-      // inPlaceSeek
       int skipBytes = Math.toIntExact(positionForNextRead - positionInGrpcStream);
       if (skipBytes >= 0 && skipBytes < content.size()) {
         content = content.substring(skipBytes);

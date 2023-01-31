@@ -85,7 +85,7 @@ public class FakeReadChannel implements ReadChannel {
     if (throwExceptionOnRead) {
       throw new IOException("Intentionally triggered");
     }
-    if (currentPosition == limit) {
+    if (currentPosition >= limit) {
       return -1;
     }
     long readStart = currentPosition;

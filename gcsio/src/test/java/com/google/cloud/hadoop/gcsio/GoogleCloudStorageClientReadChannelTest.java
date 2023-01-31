@@ -33,8 +33,10 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.storage.Storage;
 import com.google.protobuf.ByteString;
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.util.Random;
 import org.junit.Before;
 import org.junit.Test;
@@ -47,6 +49,7 @@ public class GoogleCloudStorageClientReadChannelTest {
   private static final String V1_BUCKET_NAME = "bucket-name";
   private static final String OBJECT_NAME = "object-name";
   private static final int OBJECT_SIZE = 1024 * 1024;
+  private static final int IN_PLACE_SEEK_LIMIT = 5;
   private static final StorageResourceId RESOURCE_ID =
       new StorageResourceId(V1_BUCKET_NAME, OBJECT_NAME);
   private static final ByteString CONTENT =
@@ -80,9 +83,32 @@ public class GoogleCloudStorageClientReadChannelTest {
             GoogleCloudStorageReadOptions.builder()
                 .setFadvise(Fadvise.RANDOM)
                 .setGrpcChecksumsEnabled(true)
-                .setInplaceSeekLimit(5)
+                .setInplaceSeekLimit(IN_PLACE_SEEK_LIMIT)
                 .setMinRangeRequestSize(FakeReadChannel.CHUNK_SIZE)
                 .build());
+  }
+
+  @Test
+  public void inValidSeekPositions() throws IOException {
+    int seekPosition = -1;
+    assertThrows(EOFException.class, () -> readChannel.position(seekPosition));
+    assertThrows(EOFException.class, () -> readChannel.position(OBJECT_SIZE));
+  }
+
+  @Test
+  public void readThrowsClosedChannel() throws IOException {
+    readChannel.close();
+    assertThrows(ClosedChannelException.class, () -> readChannel.read(ByteBuffer.allocate(1)));
+  }
+
+  @Test
+  public void closingClosedChannel() throws IOException {
+    readChannel.read(ByteBuffer.allocate(1));
+    readChannel.close();
+    readChannel.close();
+    readChannel.close();
+    // Channel's close was closed only once.
+    verify(fakeReadChannel, times(1)).close();
   }
 
   @Test
@@ -97,15 +123,13 @@ public class GoogleCloudStorageClientReadChannelTest {
                 .setInplaceSeekLimit(5)
                 .setMinRangeRequestSize(readBytes)
                 .build());
-    long startPosition = 0;
+    int startPosition = 0;
     readChannel.position(startPosition);
     assertThat(readChannel.position()).isEqualTo(startPosition);
 
     ByteBuffer buffer = ByteBuffer.allocate(readBytes);
     readChannel.read(buffer);
-    assertByteArrayEquals(
-        buffer.array(),
-        CONTENT.substring((int) startPosition, (int) (startPosition + readBytes)).toByteArray());
+    verifyContent(buffer, startPosition, readBytes);
     verify(fakeReadChannel, times(1)).seek(anyLong());
     verify(fakeReadChannel, times(1)).limit(anyLong());
     verify(fakeReadChannel, times(1)).read(any());
@@ -117,7 +141,7 @@ public class GoogleCloudStorageClientReadChannelTest {
   public void readMultipleChunkSuccessSequential() throws IOException {
     int chunksToRead = 5;
     int chunkSize = FakeReadChannel.CHUNK_SIZE;
-    int totalBytesRead = chunksToRead * chunkSize;
+    int readBytes = chunksToRead * chunkSize;
     GoogleCloudStorageClientReadChannel readChannel =
         getJavaStorageChannel(
             DEFAULT_ITEM_INFO,
@@ -127,17 +151,13 @@ public class GoogleCloudStorageClientReadChannelTest {
                 .setInplaceSeekLimit(5)
                 .setMinRangeRequestSize(chunkSize)
                 .build());
-    long startPosition = 0;
+    int startPosition = 0;
     readChannel.position(startPosition);
     assertThat(readChannel.position()).isEqualTo(startPosition);
 
-    ByteBuffer buffer = ByteBuffer.allocate(totalBytesRead);
+    ByteBuffer buffer = ByteBuffer.allocate(readBytes);
     readChannel.read(buffer);
-    assertByteArrayEquals(
-        buffer.array(),
-        CONTENT
-            .substring((int) startPosition, (int) (startPosition + totalBytesRead))
-            .toByteArray());
+    verifyContent(buffer, startPosition, readBytes);
 
     verify(fakeReadChannel, times(1)).seek(anyLong());
     verify(fakeReadChannel, times(1)).limit(anyLong());
@@ -153,14 +173,13 @@ public class GoogleCloudStorageClientReadChannelTest {
     readChannel.position(startPosition);
     assertThat(readChannel.position()).isEqualTo(startPosition);
     int totalBytesRead = 0;
+    ByteBuffer buffer = ByteBuffer.allocate(chunkSize);
     while (totalBytesRead < OBJECT_SIZE) {
       readChannel.position(totalBytesRead);
       assertThat(readChannel.position()).isEqualTo(totalBytesRead);
-      ByteBuffer buffer = ByteBuffer.allocate(chunkSize);
+      buffer.clear();
       readChannel.read(buffer);
-      assertByteArrayEquals(
-          buffer.array(),
-          CONTENT.substring(totalBytesRead, (totalBytesRead + chunkSize)).toByteArray());
+      verifyContent(buffer, totalBytesRead, chunkSize);
       totalBytesRead += buffer.limit();
     }
 
@@ -194,14 +213,13 @@ public class GoogleCloudStorageClientReadChannelTest {
     ByteBuffer buffer = ByteBuffer.allocate(chunkSize);
     readChannel.read(buffer);
     assertThat(readChannel.randomAccess).isFalse();
-    assertByteArrayEquals(buffer.array(), CONTENT.substring(0, chunkSize).toByteArray());
+    verifyContent(buffer, 0, chunkSize);
 
     buffer.clear();
     readChannel.position(seekPosition);
     readChannel.read(buffer);
     assertThat(readChannel.randomAccess).isTrue();
-    assertByteArrayEquals(
-        buffer.array(), CONTENT.substring(seekPosition, seekPosition + chunkSize).toByteArray());
+    verifyContent(buffer, seekPosition, chunkSize);
 
     verify(fakeReadChannel, times(2)).seek(anyLong());
     verify(fakeReadChannel, times(2)).limit(anyLong());
@@ -228,14 +246,13 @@ public class GoogleCloudStorageClientReadChannelTest {
     readChannel.position(seekPosition);
     readChannel.read(buffer);
     assertThat(readChannel.randomAccess).isFalse();
-    assertByteArrayEquals(
-        buffer.array(), CONTENT.substring(seekPosition, seekPosition + chunkSize).toByteArray());
+    verifyContent(buffer, seekPosition, chunkSize);
 
     buffer.clear();
     readChannel.position(0);
     readChannel.read(buffer);
     assertThat(readChannel.randomAccess).isTrue();
-    assertByteArrayEquals(buffer.array(), CONTENT.substring(0, chunkSize).toByteArray());
+    verifyContent(buffer, 0, chunkSize);
 
     verify(fakeReadChannel, times(2)).seek(anyLong());
     verify(fakeReadChannel, times(2)).limit(anyLong());
@@ -250,15 +267,13 @@ public class GoogleCloudStorageClientReadChannelTest {
 
     // footerSize is the minimumChunkSize
     int footerSize = chunkSize;
-    long startPosition = OBJECT_SIZE - new Random().nextInt(footerSize);
+    int startPosition = OBJECT_SIZE - new Random().nextInt(footerSize);
     readChannel.position(startPosition);
     assertThat(readChannel.position()).isEqualTo(startPosition);
     int bytesToRead = 1;
     ByteBuffer buffer = ByteBuffer.allocate(bytesToRead);
     readChannel.read(buffer);
-    assertByteArrayEquals(
-        buffer.array(),
-        CONTENT.substring((int) startPosition, (int) (startPosition + bytesToRead)).toByteArray());
+    verifyContent(buffer, startPosition, bytesToRead);
     verify(fakeReadChannel, times(1)).seek(anyLong());
     verify(fakeReadChannel, times(1)).limit(anyLong());
     verify(fakeReadChannel, times(1)).read(any());
@@ -268,9 +283,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     readChannel.position(startPosition);
     buffer.clear();
     readChannel.read(buffer);
-    assertByteArrayEquals(
-        buffer.array(),
-        CONTENT.substring((int) startPosition, (int) (startPosition + bytesToRead)).toByteArray());
+    verifyContent(buffer, startPosition, bytesToRead);
 
     verifyNoMoreInteractions(fakeReadChannel);
   }
@@ -305,7 +318,7 @@ public class GoogleCloudStorageClientReadChannelTest {
   }
 
   @Test
-  public void gzipEncodedOBject_throwWhileChannelCreation() {
+  public void gzipEncodedObject_throwWhileChannelCreation() {
     assertThrows(
         IOException.class,
         () ->
@@ -322,6 +335,37 @@ public class GoogleCloudStorageClientReadChannelTest {
                     /* metaGeneration= */ 2L,
                     /* verificationAttributes= */ null),
                 GoogleCloudStorageReadOptions.DEFAULT));
+  }
+
+  @Test
+  public void verifyInPlaceSeek() throws IOException {
+    int startPosition = 0;
+    int bytesToRead = 100;
+    readChannel.position(startPosition);
+    assertThat(readChannel.position()).isEqualTo(startPosition);
+    ByteBuffer buffer = ByteBuffer.allocate(bytesToRead);
+    readChannel.read(buffer);
+    verifyContent(buffer, startPosition, bytesToRead);
+    verify(fakeReadChannel, times(1)).seek(anyLong());
+    verify(fakeReadChannel, times(1)).limit(anyLong());
+
+    buffer.clear();
+    int seekPosition =
+        startPosition + bytesToRead + IN_PLACE_SEEK_LIMIT; // within the in placeSeek limit
+    readChannel.position(seekPosition);
+    readChannel.read(buffer);
+    // Total 3 read calls
+    // 2 for actual read operation, 1 for in place seek.
+    verify(fakeReadChannel, times(3)).read(any());
+    verify(fakeReadChannel, times(0)).close();
+
+    verifyNoMoreInteractions(fakeReadChannel);
+  }
+
+  private void verifyContent(ByteBuffer buffer, int startPosition, int length) {
+    assertThat(buffer.limit()).isEqualTo(length);
+    assertByteArrayEquals(
+        buffer.array(), CONTENT.substring(startPosition, (startPosition + length)).toByteArray());
   }
 
   private GoogleCloudStorageClientReadChannel getJavaStorageChannel(
