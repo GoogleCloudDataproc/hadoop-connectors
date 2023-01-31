@@ -49,12 +49,14 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   private static final int SKIP_BUFFER_SIZE = 8192;
+
   private final StorageResourceId resourceId;
   private final BlobId blobId;
   private final GoogleCloudStorageReadOptions readOptions;
   private final Storage storage;
   // The size of this object generation, in bytes.
   private final long objectSize;
+  private final int footerSize;
   private boolean randomAccess;
   // True if this channel is open, false otherwise.
   private boolean channelIsOpen = true;
@@ -67,7 +69,6 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   // This remains unchanged of position(long) method call.
   private long contentChannelPosition = -1;
   private long contentChannelEnd = -1;
-  private final int footerSize;
 
   // Used as scratch space when reading bytes just to discard them when trying to perform small
   // in-place seeks.
@@ -78,8 +79,8 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   private byte[] footerContent;
 
   public GoogleCloudStorageClientReadChannel(
-      Storage gcs,
-      GoogleCloudStorageItemInfo itemInfo,
+      @Nonnull Storage gcs,
+      @Nonnull GoogleCloudStorageItemInfo itemInfo,
       @Nonnull GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     validate(itemInfo);
