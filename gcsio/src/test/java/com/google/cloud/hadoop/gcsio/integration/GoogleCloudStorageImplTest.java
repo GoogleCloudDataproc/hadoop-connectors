@@ -89,7 +89,7 @@ public class GoogleCloudStorageImplTest {
 
   @Parameters
   public static Iterable<Boolean> getTesStorageClientImplParameter() {
-    return List.of(true);
+    return List.of(false, true);
   }
 
   @Rule
