@@ -181,7 +181,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       this.blobId =
           BlobId.of(
               resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
-      this.randomAccess = readOptions.getFadvise().equals(Fadvise.RANDOM) ? true : false;
+      this.randomAccess = readOptions.getFadvise().equals(Fadvise.RANDOM);
       this.footerSize = (int) readOptions.getMinRangeRequestSize();
     }
 
