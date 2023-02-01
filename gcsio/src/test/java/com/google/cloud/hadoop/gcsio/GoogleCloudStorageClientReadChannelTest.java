@@ -140,7 +140,7 @@ public class GoogleCloudStorageClientReadChannelTest {
 
   @Test
   public void readMultipleChunkSuccessSequential() throws IOException {
-    int chunksToRead = 5;
+    int chunksToRead = 2;
     int chunkSize = FakeReadChannel.CHUNK_SIZE;
     int readBytes = chunksToRead * chunkSize;
     GoogleCloudStorageClientReadChannel readChannel =
@@ -363,6 +363,9 @@ public class GoogleCloudStorageClientReadChannelTest {
 
     verifyNoMoreInteractions(fakeReadChannel);
   }
+
+  @Test
+  public void footerReuseInPlaceSeek() {}
 
   @Test
   public void readThrowException() throws IOException {

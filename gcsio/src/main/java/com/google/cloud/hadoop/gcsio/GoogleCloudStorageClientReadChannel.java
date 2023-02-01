@@ -48,35 +48,19 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  private static final int SKIP_BUFFER_SIZE = 8192;
-
   private final StorageResourceId resourceId;
-  private final BlobId blobId;
   private final GoogleCloudStorageReadOptions readOptions;
   private final Storage storage;
   // The size of this object generation, in bytes.
   private final long objectSize;
-  private final int footerSize;
-  private boolean randomAccess;
+  private final ContentReadChannel contentReadChannel;
+
   // True if this channel is open, false otherwise.
   private boolean channelIsOpen = true;
 
-  // Current position in this channel, it could be different from contentChannelPosition if
+  // Current position in this channel, it could be different from contentChannelCurrentPosition if
   // position(long) method calls were made without calls to read(ByteBuffer) method.
   private long currentPosition = 0;
-  private ReadableByteChannel contentReadChannel = null;
-  // This is the actual current position in `contentChannel` from where read can happen.
-  // This remains unchanged of position(long) method call.
-  private long contentChannelPosition = -1;
-  private long contentChannelEnd = -1;
-
-  // Used as scratch space when reading bytes just to discard them when trying to perform small
-  // in-place seeks.
-  private byte[] skipBuffer = null;
-  // Size of buffer to allocate for skipping bytes in-place when performing in-place seeks.
-
-  // Prefetched footer content.
-  private byte[] footerContent;
 
   public GoogleCloudStorageClientReadChannel(
       @Nonnull Storage gcs,
@@ -88,13 +72,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     this.resourceId =
         new StorageResourceId(
             itemInfo.getBucketName(), itemInfo.getObjectName(), itemInfo.getContentGeneration());
-    this.blobId =
-        BlobId.of(
-            resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
     this.readOptions = readOptions;
     this.objectSize = itemInfo.getSize();
-    this.randomAccess = readOptions.getFadvise().equals(Fadvise.RANDOM) ? true : false;
-    this.footerSize = (int) readOptions.getMinRangeRequestSize();
+    this.contentReadChannel = new ContentReadChannel(readOptions, resourceId);
   }
 
   @Override
@@ -105,51 +85,12 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     if (dst.remaining() == 0) {
       return 0;
     }
-
     logger.atFiner().log(
         "Reading %d bytes at %d position from '%s'", dst.remaining(), currentPosition, resourceId);
-
     if (currentPosition == objectSize) {
       return -1;
     }
-
-    int totalBytesRead = 0;
-    while (dst.hasRemaining()) {
-      try {
-        performPendingSeeks(dst.remaining());
-        int bytesRead = contentReadChannel.read(dst);
-
-        if (bytesRead > 0) {
-          totalBytesRead += bytesRead;
-          currentPosition += bytesRead;
-          contentChannelPosition += bytesRead;
-        }
-
-        if (bytesRead < 0) {
-          if (currentPosition != contentChannelEnd && currentPosition != objectSize) {
-            throw new IOException(
-                String.format(
-                    "Received end of stream result before all requestedBytes were received;"
-                        + "EndOf stream signal received at offset: %d where as stream was suppose to end at: %d for resource: %s of size: %d",
-                    currentPosition, contentChannelEnd, resourceId, objectSize));
-          }
-          // If we have reached an end of a contentChannel but not an end of an object.
-          // then close contentChannel and continue reading an object if necessary.
-          if (contentChannelEnd != objectSize && currentPosition == contentChannelEnd) {
-            closeContentChannel();
-            continue;
-          } else {
-            break;
-          }
-        }
-      } catch (Exception e) {
-        logger.atFine().log(
-            "Closing contentChannel after %s exception for '%s'.", e.getMessage(), resourceId);
-        closeContentChannel();
-        throw e;
-      }
-    }
-    return totalBytesRead;
+    return contentReadChannel.readContent(dst);
   }
 
   @Override
@@ -212,256 +153,355 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     }
     logger.atFiner().log("Closing channel for '%s'", resourceId);
     channelIsOpen = false;
-    closeContentChannel();
+    contentReadChannel.closeContentChannel();
   }
 
-  private void cacheFooter(ReadableByteChannel readableByteChannel) throws IOException {
-    footerContent = new byte[footerSize];
-    try (InputStream footerStream = Channels.newInputStream(readableByteChannel)) {
+  private class ContentReadChannel {
+
+    private static final int SKIP_BUFFER_SIZE = 8192;
+
+    // Size of buffer to allocate for skipping bytes in-place when performing in-place seeks.
+    private final int footerSize;
+    private final BlobId blobId;
+
+    // This is the actual current position in `contentChannel` from where read can happen.
+    // This remains unchanged of position(long) method call.
+    private long contentChannelCurrentPosition = -1;
+    private long contentChannelEnd = -1;
+    // Prefetched footer content.
+    private byte[] footerContent;
+    // Used as scratch space when reading bytes just to discard them when trying to perform small
+    // in-place seeks.
+    private byte[] skipBuffer = null;
+    private ReadableByteChannel contentChannel = null;
+    private boolean randomAccess;
+
+    public ContentReadChannel(
+        GoogleCloudStorageReadOptions readOptions, StorageResourceId resourceId) {
+      this.blobId =
+          BlobId.of(
+              resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
+      this.randomAccess = readOptions.getFadvise().equals(Fadvise.RANDOM) ? true : false;
+      this.footerSize = (int) readOptions.getMinRangeRequestSize();
+    }
+
+    public int readContent(ByteBuffer dst) throws IOException {
+
+      performPendingSeeks();
+
+      checkState(
+          contentChannelCurrentPosition == currentPosition || contentChannel == null,
+          "contentChannelCurrentPosition (%s) should be equal to currentPosition (%s) after lazy seek, if channel is open",
+          contentChannelCurrentPosition,
+          currentPosition);
+
       int totalBytesRead = 0;
-      int bytesRead;
-      do {
-        bytesRead = footerStream.read(footerContent, totalBytesRead, footerSize - totalBytesRead);
-        if (bytesRead >= 0) {
+      // We read from a streaming source. We may not get all the bytes we asked for
+      // in the first read. Therefore, loop till we either read the required number of
+      // bytes or we reach end-of-stream.
+      while (dst.hasRemaining()) {
+        try {
+          if (contentChannel == null) {
+            contentChannel = openContentChannel(dst.remaining());
+          }
+          int bytesRead = contentChannel.read(dst);
+
+          if (bytesRead == 0) {
+            throw new IOException(
+                String.format("Read 0 bytes without blocking from object: '%s'", resourceId));
+          }
+
+          if (bytesRead < 0) {
+            if (currentPosition != contentChannelEnd && currentPosition != objectSize) {
+              throw new IOException(
+                  String.format(
+                      "Received end of stream result before all requestedBytes were received;"
+                          + "EndOf stream signal received at offset: %d where as stream was suppose to end at: %d for resource: %s of size: %d",
+                      currentPosition, contentChannelEnd, resourceId, objectSize));
+            }
+            // If we have reached an end of a contentChannel but not an end of an object.
+            // then close contentChannel and continue reading an object if necessary.
+            if (contentChannelEnd != objectSize && currentPosition == contentChannelEnd) {
+              closeContentChannel();
+              continue;
+            } else {
+              break;
+            }
+          }
           totalBytesRead += bytesRead;
+          currentPosition += bytesRead;
+          contentChannelCurrentPosition += bytesRead;
+          checkState(
+              contentChannelCurrentPosition == currentPosition,
+              "contentChannelPosition (%s) should be equal to currentPosition (%s)"
+                  + " after successful read",
+              contentChannelCurrentPosition,
+              currentPosition);
+        } catch (Exception e) {
+          logger.atFine().log(
+              "Closing contentChannel after %s exception for '%s'.", e.getMessage(), resourceId);
+          closeContentChannel();
+          throw e;
         }
-      } while (bytesRead >= 0 && totalBytesRead < footerSize);
-      checkState(
-          bytesRead >= 0,
-          "footerStream shouldn't be empty before reading the footer of size %s, totalBytesRead %s, read via last call %s, for '%s'",
-          footerSize,
-          totalBytesRead,
-          bytesRead,
-          resourceId);
-      checkState(
-          totalBytesRead == footerSize,
-          "totalBytesRead (%s) should equal footerSize (%s) for '%s'",
-          totalBytesRead,
-          footerSize,
-          resourceId);
-    } catch (Exception e) {
-      footerContent = null;
-      throw e;
-    }
-    logger.atFiner().log("Prefetched %s bytes footer for '%s'", footerContent.length, resourceId);
-  }
-
-  private ReadableByteChannel serveFooterContent() {
-    contentChannelPosition = currentPosition;
-    int offset = toIntExact(currentPosition - (objectSize - footerContent.length));
-    int length = footerContent.length - offset;
-    logger.atFiner().log(
-        "Opened channel (prefetched footer) from %d position for '%s'",
-        currentPosition, resourceId);
-    return Channels.newChannel(new ByteArrayInputStream(footerContent, offset, length));
-  }
-
-  private ReadableByteChannel openReadChannel(long bytesToRead) throws IOException {
-    checkArgument(bytesToRead > 0, "bytesToRead should be greater than 0, but was %s", bytesToRead);
-    checkState(
-        contentReadChannel == null && contentChannelEnd < 0,
-        "contentChannel and contentChannelEnd should be not initialized yet for '%s'",
-        resourceId);
-
-    if (footerContent != null && currentPosition >= objectSize - footerContent.length) {
-      return serveFooterContent();
-    }
-
-    contentChannelPosition = getRangeRequestStart();
-    long rangeLength = getRangeRequestLength(bytesToRead);
-    contentChannelEnd = rangeLength == -1 ? objectSize : contentChannelPosition + rangeLength;
-    checkState(
-        contentChannelEnd >= contentChannelPosition,
-        String.format(
-            "Start position should be <= endPosition startPosition:%d, endPosition: %d",
-            contentChannelPosition, contentChannelEnd));
-
-    ReadableByteChannel readableByteChannel =
-        getStorageReadChannel(contentChannelPosition, contentChannelEnd);
-
-    // Check if footer was fetched
-    if (contentChannelEnd == objectSize
-        && (contentChannelEnd - contentChannelPosition) == footerSize) {
-      if (footerContent == null) {
-        cacheFooter(readableByteChannel);
       }
-      return serveFooterContent();
+      return totalBytesRead;
     }
-    checkState(
-        contentChannelPosition == currentPosition,
-        "position of read offset isn't in alignment with channel's read offset");
-    return readableByteChannel;
-  }
 
-  private long getRangeRequestStart() {
-    if (readOptions.getFadvise() != Fadvise.SEQUENTIAL && isFooterRead()) {
-      // Prefetch footer and adjust start position to footerStart.
-      return Math.max(0, objectSize - footerSize);
+    private boolean shouldDetectRandomAccess() {
+      return !randomAccess && readOptions.getFadvise() == Fadvise.AUTO;
     }
-    return currentPosition;
-  }
 
-  /**
-   * Returns the length/size of byte range to be requested
-   *
-   * @param bytesToRead
-   * @return -1 if Whole objected is requested else the length/size of range.
-   */
-  private long getRangeRequestLength(long bytesToRead) {
-    if (randomAccess) {
-      // if randomAccess is enabled, limit fetched content
-      return Math.max(bytesToRead, readOptions.getMinRangeRequestSize());
+    private void setRandomAccess() {
+      randomAccess = true;
     }
-    return -1;
-  }
 
-  private void setRandomAccess() {
-    randomAccess = true;
-  }
+    private ReadableByteChannel openContentChannel(long bytesToRead) throws IOException {
+      checkArgument(
+          bytesToRead > 0, "bytesToRead should be greater than 0, but was %s", bytesToRead);
+      checkState(
+          contentChannel == null && contentChannelEnd < 0,
+          "contentChannel and contentChannelEnd should be not initialized yet for '%s'",
+          resourceId);
 
-  private boolean shouldDetectRandomAccess() {
-    return !randomAccess && readOptions.getFadvise() == Fadvise.AUTO;
-  }
+      if (footerContent != null && currentPosition >= objectSize - footerContent.length) {
+        return serveFooterContent();
+      }
 
-  private boolean isRandomAccessPattern(long oldPosition) {
-    if (!shouldDetectRandomAccess()) {
+      contentChannelCurrentPosition = getRangeRequestStart();
+      contentChannelEnd = getRangeRequestEnd(contentChannelCurrentPosition, bytesToRead);
+      checkState(
+          contentChannelEnd >= contentChannelCurrentPosition,
+          String.format(
+              "Start position should be <= endPosition startPosition:%d, endPosition: %d",
+              contentChannelCurrentPosition, contentChannelEnd));
+
+      ReadableByteChannel readableByteChannel =
+          getStorageReadChannel(contentChannelCurrentPosition, contentChannelEnd);
+
+      if (contentChannelEnd == objectSize
+          && (contentChannelEnd - contentChannelCurrentPosition) == footerSize) {
+        if (footerContent == null) {
+          cacheFooter(readableByteChannel);
+        }
+        return serveFooterContent();
+      }
+      checkState(
+          contentChannelCurrentPosition == currentPosition,
+          "position of read offset isn't in alignment with channel's read offset");
+      return readableByteChannel;
+    }
+
+    private void cacheFooter(ReadableByteChannel readableByteChannel) throws IOException {
+      footerContent = new byte[footerSize];
+      try (InputStream footerStream = Channels.newInputStream(readableByteChannel)) {
+        int totalBytesRead = 0;
+        int bytesRead;
+        do {
+          bytesRead = footerStream.read(footerContent, totalBytesRead, footerSize - totalBytesRead);
+          if (bytesRead >= 0) {
+            totalBytesRead += bytesRead;
+          }
+        } while (bytesRead >= 0 && totalBytesRead < footerSize);
+        checkState(
+            bytesRead >= 0,
+            "footerStream shouldn't be empty before reading the footer of size %s, totalBytesRead %s, read via last call %s, for '%s'",
+            footerSize,
+            totalBytesRead,
+            bytesRead,
+            resourceId);
+        checkState(
+            totalBytesRead == footerSize,
+            "totalBytesRead (%s) should equal footerSize (%s) for '%s'",
+            totalBytesRead,
+            footerSize,
+            resourceId);
+      } catch (Exception e) {
+        footerContent = null;
+        throw e;
+      }
+      logger.atFiner().log("Prefetched %s bytes footer for '%s'", footerContent.length, resourceId);
+    }
+
+    private ReadableByteChannel serveFooterContent() {
+      contentChannelCurrentPosition = currentPosition;
+      int offset = toIntExact(currentPosition - (objectSize - footerContent.length));
+      int length = footerContent.length - offset;
+      logger.atFiner().log(
+          "Opened channel (prefetched footer) from %d position for '%s'",
+          currentPosition, resourceId);
+      return Channels.newChannel(new ByteArrayInputStream(footerContent, offset, length));
+    }
+
+    private long getRangeRequestStart() {
+      if (readOptions.getFadvise() != Fadvise.SEQUENTIAL && isFooterRead()) {
+        // Prefetch footer and adjust start position to footerStart.
+        return Math.max(0, objectSize - footerSize);
+      }
+      return currentPosition;
+    }
+
+    public void closeContentChannel() {
+      if (contentChannel != null) {
+        logger.atFiner().log("Closing internal contentChannel for '%s'", resourceId);
+        try {
+          contentChannel.close();
+        } catch (Exception e) {
+          logger.atFine().withCause(e).log(
+              "Got an exception on contentChannel.close() for '%s'; ignoring it.", resourceId);
+        } finally {
+          contentChannel = null;
+          resetContentChannel();
+        }
+      }
+    }
+
+    private void resetContentChannel() {
+      checkState(contentChannel == null, "contentChannel should be null for '%s'", resourceId);
+      contentChannelCurrentPosition = -1;
+      contentChannelEnd = -1;
+    }
+
+    private boolean isInRangeSeek() {
+      long seekDistance = currentPosition - contentChannelCurrentPosition;
+      if (contentChannel != null
+          && seekDistance > 0
+          && seekDistance <= readOptions.getInplaceSeekLimit()
+          && currentPosition < contentChannelEnd) {
+        return true;
+      }
       return false;
     }
-    // backwardSeek
-    if (currentPosition < oldPosition) {
-      logger.atFine().log(
-          "Detected backward read from %s to %s position, switching to random IO for '%s'",
-          oldPosition, currentPosition, resourceId);
-      return true;
-    }
-    if (oldPosition >= 0 && oldPosition + readOptions.getInplaceSeekLimit() < currentPosition) {
-      logger.atFine().log(
-          "Detected forward read from %s to %s position over %s threshold,"
-              + " switching to random IO for '%s'",
-          oldPosition, currentPosition, readOptions.getInplaceSeekLimit(), resourceId);
-      return true;
-    }
-    return false;
-  }
 
-  private void skipInPlace(long seekDistance) {
-    if (skipBuffer == null) {
-      skipBuffer = new byte[SKIP_BUFFER_SIZE];
-    }
-    while (seekDistance > 0 && contentReadChannel != null) {
-      try {
-        int bufferSize = toIntExact(min(skipBuffer.length, seekDistance));
-        int bytesRead = contentReadChannel.read(ByteBuffer.wrap(skipBuffer, 0, bufferSize));
-        if (bytesRead < 0) {
-          logger.atInfo().log(
-              "Somehow read %d bytes trying to skip %d bytes to seek to position %d, size: %d",
-              bytesRead, seekDistance, currentPosition, objectSize);
+    private void skipInPlace() {
+      if (skipBuffer == null) {
+        skipBuffer = new byte[SKIP_BUFFER_SIZE];
+      }
+      long seekDistance = currentPosition - contentChannelCurrentPosition;
+      while (seekDistance > 0 && contentChannel != null) {
+        try {
+          int bufferSize = toIntExact(min(skipBuffer.length, seekDistance));
+          int bytesRead = contentChannel.read(ByteBuffer.wrap(skipBuffer, 0, bufferSize));
+          if (bytesRead < 0) {
+            logger.atInfo().log(
+                "Somehow read %d bytes trying to skip %d bytes to seek to position %d, size: %d",
+                bytesRead, seekDistance, currentPosition, objectSize);
+            closeContentChannel();
+          } else {
+            seekDistance -= bytesRead;
+            contentChannelCurrentPosition += bytesRead;
+          }
+        } catch (Exception e) {
+          logger.atInfo().withCause(e).log(
+              "Got an IO exception on contentChannel.read(), a lazy-seek will be pending for '%s'",
+              resourceId);
           closeContentChannel();
-        } else {
-          seekDistance -= bytesRead;
-          contentChannelPosition += bytesRead;
         }
-      } catch (Exception e) {
-        logger.atInfo().withCause(e).log(
-            "Got an IO exception on contentChannel.read(), a lazy-seek will be pending for '%s'",
-            resourceId);
+      }
+      checkState(
+          contentChannel == null || contentChannelCurrentPosition == currentPosition,
+          "contentChannelPosition (%s) should be equal to currentPosition (%s)"
+              + " after successful in-place skip",
+          contentChannelCurrentPosition,
+          currentPosition);
+    }
+
+    private void performPendingSeeks() {
+
+      // Return quickly if there is no pending seek operation, i.e. position didn't change.
+      if (currentPosition == contentChannelCurrentPosition && contentChannel != null) {
+        return;
+      }
+
+      logger.atFiner().log(
+          "Performing lazySeek from %s to %s position '%s'",
+          contentChannelCurrentPosition, currentPosition, resourceId);
+
+      if (isInRangeSeek()) {
+        skipInPlace();
+      } else {
+        if (isRandomAccessPattern()) {
+          setRandomAccess();
+        }
+        // close existing contentChannel as requested bytes can't be served from current
+        // contentChannel;
         closeContentChannel();
       }
     }
-    checkState(
-        contentReadChannel == null || contentChannelPosition == currentPosition,
-        "contentChannelPosition (%s) should be equal to currentPosition (%s)"
-            + " after successful in-place skip",
-        contentChannelPosition,
-        currentPosition);
-  }
 
-  private void resetContentChannel() {
-    checkState(contentReadChannel == null, "contentChannel should be null for '%s'", resourceId);
-    contentChannelPosition = -1;
-    contentChannelEnd = -1;
-  }
+    private boolean isRandomAccessPattern() {
+      if (!shouldDetectRandomAccess()) {
+        return false;
+      }
+      if (currentPosition < contentChannelCurrentPosition) {
+        logger.atFine().log(
+            "Detected backward read from %s to %s position, switching to random IO for '%s'",
+            contentChannelCurrentPosition, currentPosition, resourceId);
+        return true;
+      }
+      if (contentChannelCurrentPosition >= 0
+          && contentChannelCurrentPosition + readOptions.getInplaceSeekLimit() < currentPosition) {
+        logger.atFine().log(
+            "Detected forward read from %s to %s position over %s threshold,"
+                + " switching to random IO for '%s'",
+            contentChannelCurrentPosition,
+            currentPosition,
+            readOptions.getInplaceSeekLimit(),
+            resourceId);
+        return true;
+      }
+      return false;
+    }
 
-  protected void closeContentChannel() {
-    if (contentReadChannel != null) {
-      logger.atFiner().log("Closing internal contentChannel for '%s'", resourceId);
+    private ReadableByteChannel getStorageReadChannel(long seek, long limit) throws IOException {
+      ReadChannel readChannel = storage.reader(blobId, generateReadOptions(blobId));
       try {
-        contentReadChannel.close();
-      } catch (Exception e) {
-        logger.atFine().withCause(e).log(
-            "Got an exception on contentChannel.close() for '%s'; ignoring it.", resourceId);
-      } finally {
-        contentReadChannel = null;
-        resetContentChannel();
-      }
-    }
-  }
-
-  private void performPendingSeeks(long bytesToRead) throws IOException {
-    if (currentPosition == contentChannelPosition && contentReadChannel != null) {
-      // No seek is required
-      return;
-    }
-
-    logger.atFiner().log(
-        "Performing lazySeek from %s to %s position for '%s'",
-        contentChannelPosition, currentPosition, resourceId);
-    // record the variation in channelPosition
-    // used to auto-detect random access
-    long oldPosition = contentChannelPosition;
-    long seekDistance = currentPosition - contentChannelPosition;
-    // Check if inPlace seek is a viable option
-    // If not close existing channel and open new one.
-
-    if (contentReadChannel != null
-        && seekDistance > 0
-        && seekDistance <= readOptions.getInplaceSeekLimit()
-        && currentPosition < contentChannelEnd) {
-      skipInPlace(seekDistance);
-    } else {
-      closeContentChannel();
-    }
-    if (contentReadChannel == null) {
-      if (isRandomAccessPattern(oldPosition)) {
-        setRandomAccess();
-      }
-      contentReadChannel = openReadChannel(bytesToRead);
-    }
-  }
-
-  // Update this function to create the reader and then set limits
-  private ReadableByteChannel getStorageReadChannel(long seek, long limit) throws IOException {
-    ReadChannel readChannel = storage.reader(blobId, generateReadOptions(blobId));
-    try {
-      readChannel.seek(seek);
-      // TODO: should we also add a check to not set limit if contentChannelEnd == objectSize?
-      if (limit != -1) {
+        readChannel.seek(seek);
         readChannel.limit(limit);
+        return readChannel;
+      } catch (Exception e) {
+        throw new IOException(
+            String.format(
+                "Unable to update the boundaries/Range of contentChannel %s",
+                resourceId.toString()),
+            e);
       }
-      return readChannel;
-    } catch (Exception e) {
-      throw new IOException(
-          String.format(
-              "Unable to update the boundaries/Range of contentChannel %s", resourceId.toString()),
-          e);
     }
-  }
 
-  private static BlobSourceOption[] generateReadOptions(BlobId blobId) {
-    List<BlobSourceOption> readOptions = new ArrayList<>();
-    if (blobId.getGeneration() != null) {
-      readOptions.add(BlobSourceOption.generationMatch(blobId.getGeneration()));
+    private BlobSourceOption[] generateReadOptions(BlobId blobId) {
+      List<BlobSourceOption> readOptions = new ArrayList<>();
+      if (blobId.getGeneration() != null) {
+        readOptions.add(BlobSourceOption.generationMatch(blobId.getGeneration()));
+      }
+      return readOptions.toArray(new BlobSourceOption[readOptions.size()]);
     }
-    return readOptions.toArray(new BlobSourceOption[readOptions.size()]);
-  }
 
-  private boolean isFooterRead() {
-    return objectSize - currentPosition <= footerSize;
+    private boolean isFooterRead() {
+      return objectSize - currentPosition <= footerSize;
+    }
+
+    private long getRangeRequestEnd(long startPosition, long bytesToRead) {
+      long endPosition = objectSize;
+      if (randomAccess) {
+        // opening a channel for whole object doesn't make sense as anyhow it will not be utilized
+        // for further reads.
+        endPosition = startPosition + Math.max(bytesToRead, readOptions.getMinRangeRequestSize());
+      }
+      // if requested bytes overlaps with footer
+      // send request for non-footer portion first
+      // for requested range falling in footerLength will be served from
+      // already cached footer OR
+      // if not already cached, it will be cached and then served.
+      long footerStartPosition = Math.max(0, objectSize - footerSize);
+      if (startPosition < footerStartPosition && endPosition > footerStartPosition) {
+        endPosition = footerStartPosition;
+      }
+      return endPosition;
+    }
   }
 
   @VisibleForTesting
   boolean randomAccessStatus() {
-    return randomAccess;
+    return contentReadChannel.randomAccess;
   }
 
   private static void validate(GoogleCloudStorageItemInfo itemInfo) throws IOException {
