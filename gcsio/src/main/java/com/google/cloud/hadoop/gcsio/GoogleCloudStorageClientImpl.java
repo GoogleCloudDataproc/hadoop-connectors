@@ -111,7 +111,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
   public SeekableByteChannel open(
       StorageResourceId resourceId, GoogleCloudStorageReadOptions readOptions) throws IOException {
     logger.atFiner().log("open(%s, %s)", resourceId, readOptions);
-    return open(resourceId, null, readOptions);
+    return open(resourceId, /* itemInfo= */ null, readOptions);
   }
 
   @Override

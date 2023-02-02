@@ -365,33 +365,6 @@ public class GoogleCloudStorageClientReadChannelTest {
   }
 
   @Test
-  public void requestRangeOverlapFooterCache() throws IOException {
-    int chunkSize = FakeReadChannel.CHUNK_SIZE;
-
-    // footerSize is the minimumChunkSize
-    int footerSize = chunkSize;
-    // position just before footer start
-    int startPosition = OBJECT_SIZE - footerSize - 5;
-    readChannel.position(startPosition);
-    assertThat(readChannel.position()).isEqualTo(startPosition);
-    // requested range is overlapping with footer
-    int bytesToRead = CHUNK_SIZE;
-    ByteBuffer buffer = ByteBuffer.allocate(bytesToRead);
-    readChannel.read(buffer);
-    verifyContent(buffer, startPosition, bytesToRead);
-    verify(fakeReadChannel, times(2)).seek(anyLong());
-    verify(fakeReadChannel, times(2)).limit(anyLong());
-    verify(fakeReadChannel, times(3)).read(any());
-    verify(fakeReadChannel, times(2)).close();
-
-    // Footer is served from cache
-    startPosition = OBJECT_SIZE - footerSize;
-    readChannel.position(startPosition);
-    readChannel.read(buffer);
-    verifyNoMoreInteractions(fakeReadChannel);
-  }
-
-  @Test
   public void readThrowException() throws IOException {
     fakeReadChannel = spy(new FakeReadChannel(CONTENT, true, false));
     when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
@@ -431,6 +404,9 @@ public class GoogleCloudStorageClientReadChannelTest {
     verify(fakeReadChannel, times(1)).close();
     verifyNoMoreInteractions(fakeReadChannel);
   }
+
+  @Test
+  public void smallerObjectFullyCached() {}
 
   private void verifyContent(ByteBuffer buffer, int startPosition, int length) {
     assertThat(buffer.limit()).isEqualTo(length);

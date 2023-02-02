@@ -19,6 +19,7 @@ package com.google.cloud.hadoop.gcsio;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static java.lang.Math.max;
 import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
 
@@ -53,22 +54,21 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   private final Storage storage;
   // The size of this object generation, in bytes.
   private final long objectSize;
-  private final ContentReadChannel contentReadChannel;
+  private ContentReadChannel contentReadChannel;
 
-  // True if this channel is open, false otherwise.
-  private boolean channelIsOpen = true;
+  private boolean open = true;
 
   // Current position in this channel, it could be different from contentChannelCurrentPosition if
   // position(long) method calls were made without calls to read(ByteBuffer) method.
   private long currentPosition = 0;
 
   public GoogleCloudStorageClientReadChannel(
-      @Nonnull Storage gcs,
+      @Nonnull Storage storage,
       @Nonnull GoogleCloudStorageItemInfo itemInfo,
       @Nonnull GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     validate(itemInfo);
-    this.storage = gcs;
+    this.storage = storage;
     this.resourceId =
         new StorageResourceId(
             itemInfo.getBucketName(), itemInfo.getObjectName(), itemInfo.getContentGeneration());
@@ -95,7 +95,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
   @Override
   public int write(ByteBuffer src) throws IOException {
-    throw new UnsupportedOperationException("Cannot mutate read-only channel: " + this);
+    throw new UnsupportedOperationException("Cannot mutate read-only channel");
   }
 
   @Override
@@ -137,31 +137,34 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
   @Override
   public SeekableByteChannel truncate(long size) throws IOException {
-    return null;
+    throw new UnsupportedOperationException("Cannot mutate read-only channel");
   }
 
   @Override
   public boolean isOpen() {
-    return channelIsOpen;
+    return open;
   }
 
   @Override
-  public void close() {
-    if (!channelIsOpen) {
-      logger.atFiner().log("Ignoring close: channel for '%s' is not open.", resourceId);
-      return;
+  public void close() throws IOException {
+    try {
+      if (open) {
+        logger.atFiner().log("Closing channel for '%s'", resourceId);
+        contentReadChannel.closeContentChannel();
+      }
+    } catch (Exception e) {
+      throw new IOException(
+          String.format("Exception occurred while closing channel '%s'", resourceId), e);
+    } finally {
+      contentReadChannel = null;
+      open = false;
     }
-    logger.atFiner().log("Closing channel for '%s'", resourceId);
-    channelIsOpen = false;
-    contentReadChannel.closeContentChannel();
   }
 
   private class ContentReadChannel {
 
-    private static final int SKIP_BUFFER_SIZE = 8192;
-
     // Size of buffer to allocate for skipping bytes in-place when performing in-place seeks.
-    private final int footerSize;
+    private static final int SKIP_BUFFER_SIZE = 8192;
     private final BlobId blobId;
 
     // This is the actual current position in `contentChannel` from where read can happen.
@@ -173,7 +176,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     // Used as scratch space when reading bytes just to discard them when trying to perform small
     // in-place seeks.
     private byte[] skipBuffer = null;
-    private ReadableByteChannel contentChannel = null;
+    private ReadableByteChannel byteChannel = null;
     private boolean randomAccess;
 
     public ContentReadChannel(
@@ -182,7 +185,6 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           BlobId.of(
               resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
       this.randomAccess = readOptions.getFadvise().equals(Fadvise.RANDOM);
-      this.footerSize = (int) readOptions.getMinRangeRequestSize();
     }
 
     public int readContent(ByteBuffer dst) throws IOException {
@@ -190,7 +192,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       performPendingSeeks();
 
       checkState(
-          contentChannelCurrentPosition == currentPosition || contentChannel == null,
+          contentChannelCurrentPosition == currentPosition || byteChannel == null,
           "contentChannelCurrentPosition (%s) should be equal to currentPosition (%s) after lazy seek, if channel is open",
           contentChannelCurrentPosition,
           currentPosition);
@@ -201,10 +203,10 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       // bytes or we reach end-of-stream.
       while (dst.hasRemaining()) {
         try {
-          if (contentChannel == null) {
-            contentChannel = openContentChannel(dst.remaining());
+          if (byteChannel == null) {
+            byteChannel = openByteChannel(dst.remaining());
           }
-          int bytesRead = contentChannel.read(dst);
+          int bytesRead = byteChannel.read(dst);
 
           if (bytesRead == 0) {
             throw new IOException(
@@ -255,11 +257,11 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       randomAccess = true;
     }
 
-    private ReadableByteChannel openContentChannel(long bytesToRead) throws IOException {
+    private ReadableByteChannel openByteChannel(long bytesToRead) throws IOException {
       checkArgument(
           bytesToRead > 0, "bytesToRead should be greater than 0, but was %s", bytesToRead);
       checkState(
-          contentChannel == null && contentChannelEnd < 0,
+          byteChannel == null && contentChannelEnd < 0,
           "contentChannel and contentChannelEnd should be not initialized yet for '%s'",
           resourceId);
 
@@ -279,7 +281,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           getStorageReadChannel(contentChannelCurrentPosition, contentChannelEnd);
 
       if (contentChannelEnd == objectSize
-          && (contentChannelEnd - contentChannelCurrentPosition) == footerSize) {
+          && (contentChannelEnd - contentChannelCurrentPosition)
+              <= readOptions.getMinRangeRequestSize()) {
+
         if (footerContent == null) {
           cacheFooter(readableByteChannel);
         }
@@ -292,6 +296,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     }
 
     private void cacheFooter(ReadableByteChannel readableByteChannel) throws IOException {
+      int footerSize = toIntExact(objectSize - contentChannelCurrentPosition);
       footerContent = new byte[footerSize];
       try (InputStream footerStream = Channels.newInputStream(readableByteChannel)) {
         int totalBytesRead = 0;
@@ -302,6 +307,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
             totalBytesRead += bytesRead;
           }
         } while (bytesRead >= 0 && totalBytesRead < footerSize);
+        // Is this correct?
         checkState(
             bytesRead >= 0,
             "footerStream shouldn't be empty before reading the footer of size %s, totalBytesRead %s, read via last call %s, for '%s'",
@@ -335,35 +341,35 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     private long getRangeRequestStart() {
       if (readOptions.getFadvise() != Fadvise.SEQUENTIAL && isFooterRead()) {
         // Prefetch footer and adjust start position to footerStart.
-        return Math.max(0, objectSize - footerSize);
+        return max(0, objectSize - readOptions.getMinRangeRequestSize());
       }
       return currentPosition;
     }
 
     public void closeContentChannel() {
-      if (contentChannel != null) {
+      if (byteChannel != null) {
         logger.atFiner().log("Closing internal contentChannel for '%s'", resourceId);
         try {
-          contentChannel.close();
+          byteChannel.close();
         } catch (Exception e) {
           logger.atFine().withCause(e).log(
               "Got an exception on contentChannel.close() for '%s'; ignoring it.", resourceId);
         } finally {
-          contentChannel = null;
-          resetContentChannel();
+          byteChannel = null;
+          reset();
         }
       }
     }
 
-    private void resetContentChannel() {
-      checkState(contentChannel == null, "contentChannel should be null for '%s'", resourceId);
+    private void reset() {
+      checkState(byteChannel == null, "contentChannel should be null for '%s'", resourceId);
       contentChannelCurrentPosition = -1;
       contentChannelEnd = -1;
     }
 
     private boolean isInRangeSeek() {
       long seekDistance = currentPosition - contentChannelCurrentPosition;
-      if (contentChannel != null
+      if (byteChannel != null
           && seekDistance > 0
           && seekDistance <= readOptions.getInplaceSeekLimit()
           && currentPosition < contentChannelEnd) {
@@ -377,10 +383,10 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         skipBuffer = new byte[SKIP_BUFFER_SIZE];
       }
       long seekDistance = currentPosition - contentChannelCurrentPosition;
-      while (seekDistance > 0 && contentChannel != null) {
+      while (seekDistance > 0 && byteChannel != null) {
         try {
           int bufferSize = toIntExact(min(skipBuffer.length, seekDistance));
-          int bytesRead = contentChannel.read(ByteBuffer.wrap(skipBuffer, 0, bufferSize));
+          int bytesRead = byteChannel.read(ByteBuffer.wrap(skipBuffer, 0, bufferSize));
           if (bytesRead < 0) {
             logger.atInfo().log(
                 "Somehow read %d bytes trying to skip %d bytes to seek to position %d, size: %d",
@@ -398,7 +404,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         }
       }
       checkState(
-          contentChannel == null || contentChannelCurrentPosition == currentPosition,
+          byteChannel == null || contentChannelCurrentPosition == currentPosition,
           "contentChannelPosition (%s) should be equal to currentPosition (%s)"
               + " after successful in-place skip",
           contentChannelCurrentPosition,
@@ -408,7 +414,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     private void performPendingSeeks() {
 
       // Return quickly if there is no pending seek operation, i.e. position didn't change.
-      if (currentPosition == contentChannelCurrentPosition && contentChannel != null) {
+      if (currentPosition == contentChannelCurrentPosition && byteChannel != null) {
         return;
       }
 
@@ -476,7 +482,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     }
 
     private boolean isFooterRead() {
-      return objectSize - currentPosition <= footerSize;
+      return objectSize - currentPosition <= readOptions.getMinRangeRequestSize();
     }
 
     private long getRangeRequestEnd(long startPosition, long bytesToRead) {
@@ -484,16 +490,10 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       if (randomAccess) {
         // opening a channel for whole object doesn't make sense as anyhow it will not be utilized
         // for further reads.
-        endPosition = startPosition + Math.max(bytesToRead, readOptions.getMinRangeRequestSize());
+        endPosition = startPosition + max(bytesToRead, readOptions.getMinRangeRequestSize());
       }
-      // if requested bytes overlaps with footer
-      // send request for non-footer portion first
-      // for requested range falling in footerLength will be served from
-      // already cached footer OR
-      // if not already cached, it will be cached and then served.
-      long footerStartPosition = Math.max(0, objectSize - footerSize);
-      if (startPosition < footerStartPosition && endPosition > footerStartPosition) {
-        endPosition = footerStartPosition;
+      if (footerContent != null) {
+        endPosition = min(endPosition, objectSize - footerContent.length);
       }
       return endPosition;
     }
