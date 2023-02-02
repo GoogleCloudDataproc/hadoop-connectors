@@ -44,6 +44,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nonnull;
 
+/** Provides seekable read access to GCS via java-storage library. */
 @VisibleForTesting
 class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
@@ -161,6 +162,11 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     }
   }
 
+  /**
+   * This class own the responsibility of opening up contentChannel. It also implements the Fadvise,
+   * which helps in deciding the boundaries of content channel being opened and also caching the
+   * footer of an object.
+   */
   private class ContentReadChannel {
 
     // Size of buffer to allocate for skipping bytes in-place when performing in-place seeks.
@@ -202,6 +208,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       // in the first read. Therefore, loop till we either read the required number of
       // bytes or we reach end-of-stream.
       while (dst.hasRemaining()) {
+        int remainingBeforeRead = dst.remaining();
         try {
           if (byteChannel == null) {
             byteChannel = openByteChannel(dst.remaining());
@@ -240,6 +247,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
               contentChannelCurrentPosition,
               currentPosition);
         } catch (Exception e) {
+          int partialBytes = partiallyReadBytes(remainingBeforeRead, dst);
+          totalBytesRead += partialBytes;
+          currentPosition += partialBytes;
           logger.atFine().log(
               "Closing contentChannel after %s exception for '%s'.", e.getMessage(), resourceId);
           closeContentChannel();
@@ -247,6 +257,14 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         }
       }
       return totalBytesRead;
+    }
+
+    private int partiallyReadBytes(int remainingBeforeRead, ByteBuffer dst) {
+      int partialReadBytes = 0;
+      if (remainingBeforeRead != dst.remaining()) {
+        partialReadBytes = remainingBeforeRead - dst.remaining();
+      }
+      return partialReadBytes;
     }
 
     private boolean shouldDetectRandomAccess() {
@@ -307,7 +325,6 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
             totalBytesRead += bytesRead;
           }
         } while (bytesRead >= 0 && totalBytesRead < footerSize);
-        // Is this correct?
         checkState(
             bytesRead >= 0,
             "footerStream shouldn't be empty before reading the footer of size %s, totalBytesRead %s, read via last call %s, for '%s'",
@@ -493,6 +510,8 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
         endPosition = startPosition + max(bytesToRead, readOptions.getMinRangeRequestSize());
       }
       if (footerContent != null) {
+        // If footer is cached open just till footerStart.
+        // Remaining content ill be served from cached footer itself.
         endPosition = min(endPosition, objectSize - footerContent.length);
       }
       return endPosition;
@@ -512,9 +531,8 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
     if (!itemInfo.exists()) {
       throw new FileNotFoundException(String.format("File not found: %s", resourceId));
     }
-    // The non-gRPC read channel has special support for gzip. This channel doesn't
-    // decompress gzip-encoded objects on the fly, so best to fail fast rather than return
-    // gibberish unexpectedly.
+    // The non-gRPC read channel has special support for gzip.
+    // TODO: enable support for gzip if required.
     String contentEncoding = itemInfo.getContentEncoding();
     if (contentEncoding != null && contentEncoding.contains("gzip")) {
       throw new IOException(

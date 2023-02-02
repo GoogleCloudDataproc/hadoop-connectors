@@ -18,6 +18,7 @@ package com.google.cloud.hadoop.gcsio;
 
 import static com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper.assertByteArrayEquals;
 import static com.google.common.truth.Truth.assertThat;
+import static java.lang.Math.toIntExact;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -56,6 +57,14 @@ public class GoogleCloudStorageClientReadChannelTest {
   private static final ByteString CONTENT =
       GoogleCloudStorageTestHelper.createTestData(OBJECT_SIZE);
 
+  private static final GoogleCloudStorageReadOptions DEFAULT_READ_OPTION =
+      GoogleCloudStorageReadOptions.builder()
+          .setFadvise(Fadvise.RANDOM)
+          .setGrpcChecksumsEnabled(true)
+          .setInplaceSeekLimit(IN_PLACE_SEEK_LIMIT)
+          .setMinRangeRequestSize(FakeReadChannel.CHUNK_SIZE)
+          .build();
+
   private static final GoogleCloudStorageItemInfo DEFAULT_ITEM_INFO =
       GoogleCloudStorageItemInfo.createObject(
           RESOURCE_ID,
@@ -78,15 +87,7 @@ public class GoogleCloudStorageClientReadChannelTest {
   public void setUp() throws IOException {
     fakeReadChannel = spy(new FakeReadChannel(CONTENT));
     when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
-    readChannel =
-        getJavaStorageChannel(
-            DEFAULT_ITEM_INFO,
-            GoogleCloudStorageReadOptions.builder()
-                .setFadvise(Fadvise.RANDOM)
-                .setGrpcChecksumsEnabled(true)
-                .setInplaceSeekLimit(IN_PLACE_SEEK_LIMIT)
-                .setMinRangeRequestSize(FakeReadChannel.CHUNK_SIZE)
-                .build());
+    readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, DEFAULT_READ_OPTION);
   }
 
   @Test
@@ -366,17 +367,16 @@ public class GoogleCloudStorageClientReadChannelTest {
 
   @Test
   public void readThrowException() throws IOException {
-    fakeReadChannel = spy(new FakeReadChannel(CONTENT, true, false));
+    fakeReadChannel =
+        spy(
+            new FakeReadChannel(CONTENT) {
+              @Override
+              public int read(ByteBuffer dst) throws IOException {
+                throw new IOException("Intentionally triggered. Partial Read");
+              }
+            });
     when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
-    readChannel =
-        getJavaStorageChannel(
-            DEFAULT_ITEM_INFO,
-            GoogleCloudStorageReadOptions.builder()
-                .setFadvise(Fadvise.RANDOM)
-                .setGrpcChecksumsEnabled(true)
-                .setInplaceSeekLimit(IN_PLACE_SEEK_LIMIT)
-                .setMinRangeRequestSize(FakeReadChannel.CHUNK_SIZE)
-                .build());
+    readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, DEFAULT_READ_OPTION);
 
     int startPosition = 0;
     readChannel.position(startPosition);
@@ -385,23 +385,90 @@ public class GoogleCloudStorageClientReadChannelTest {
 
   @Test
   public void closeThrowsException() throws IOException {
-    fakeReadChannel = spy(new FakeReadChannel(CONTENT, false, true));
+    fakeReadChannel =
+        spy(
+            new FakeReadChannel(CONTENT) {
+              @Override
+              public void close() {
+                throw new RuntimeException("Runtime exception while closing content Channel");
+              }
+            });
     when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
-    readChannel =
-        getJavaStorageChannel(
-            DEFAULT_ITEM_INFO,
-            GoogleCloudStorageReadOptions.builder()
-                .setFadvise(Fadvise.RANDOM)
-                .setGrpcChecksumsEnabled(true)
-                .setInplaceSeekLimit(IN_PLACE_SEEK_LIMIT)
-                .setMinRangeRequestSize(FakeReadChannel.CHUNK_SIZE)
-                .build());
+    readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, DEFAULT_READ_OPTION);
     readChannel.read(ByteBuffer.allocate(CHUNK_SIZE));
     readChannel.close();
     verify(fakeReadChannel, times(1)).seek(anyLong());
     verify(fakeReadChannel, times(1)).limit(anyLong());
     verify(fakeReadChannel, times(1)).read(any());
     verify(fakeReadChannel, times(1)).close();
+    verifyNoMoreInteractions(fakeReadChannel);
+  }
+
+  @Test
+  public void partialReadThrows() throws IOException {
+    int startPosition = 0;
+    int readBytes = 10;
+    int partialByteRead = readBytes / 2;
+    fakeReadChannel =
+        spy(
+            new FakeReadChannel(CONTENT) {
+              @Override
+              public int read(ByteBuffer dst) throws IOException {
+                ByteString messageData =
+                    CONTENT.substring(
+                        toIntExact(startPosition), toIntExact(startPosition + partialByteRead));
+                for (Byte messageDatum : messageData) {
+                  dst.put(messageDatum);
+                }
+                throw new IOException("Intentionally triggered. Partial Read");
+              }
+            });
+    when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
+    readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, DEFAULT_READ_OPTION);
+
+    // Read partial content
+    ByteBuffer buffer = ByteBuffer.allocate(readBytes);
+    assertThrows(IOException.class, () -> readChannel.read(buffer));
+    verify(fakeReadChannel, times(1)).seek(anyLong());
+    verify(fakeReadChannel, times(1)).limit(anyLong());
+    verify(fakeReadChannel, times(1)).read(any());
+    verify(fakeReadChannel, times(1)).close();
+    assertThat(buffer.position()).isEqualTo(partialByteRead);
+    assertThat(readChannel.position()).isEqualTo(partialByteRead);
+    verifyNoMoreInteractions(fakeReadChannel);
+  }
+
+  @Test
+  public void contentChannelCreationException() throws IOException {
+    fakeReadChannel =
+        spy(
+            new FakeReadChannel(CONTENT) {
+              @Override
+              public void seek(long seek) throws IOException {
+                throw new IOException(
+                    "Intentionally triggered while setting position for content channel");
+              }
+            });
+    when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
+    readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, DEFAULT_READ_OPTION);
+    assertThrows(IOException.class, () -> readChannel.read(ByteBuffer.allocate(1)));
+    verify(fakeReadChannel, times(1)).seek(anyLong());
+    verifyNoMoreInteractions(fakeReadChannel);
+
+    fakeReadChannel =
+        spy(
+            new FakeReadChannel(CONTENT) {
+              @Override
+              public ReadChannel limit(long seek) {
+                throw new RuntimeException(
+                    "Intentionally triggered while setting position for content channel");
+              }
+            });
+    when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
+    readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, DEFAULT_READ_OPTION);
+    assertThrows(IOException.class, () -> readChannel.read(ByteBuffer.allocate(1)));
+    verify(fakeReadChannel, times(1)).seek(anyLong());
+    verify(fakeReadChannel, times(1)).limit(anyLong());
     verifyNoMoreInteractions(fakeReadChannel);
   }
 
