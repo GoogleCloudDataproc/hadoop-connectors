@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
 
 import com.google.cloud.ReadChannel;
@@ -23,10 +24,23 @@ import com.google.cloud.RestorableState;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Iterator;
+import java.util.List;
 
 public class FakeReadChannel implements ReadChannel {
-
   public static final int CHUNK_SIZE = 1024;
+
+  public static enum REQUEST_TYPE {
+    READ_CHUNK,
+    READ_EXCEPTION,
+    PARTIAL_READ,
+    NEGATIVE_READ,
+    ZERO_READ
+  }
+
+  private final List<REQUEST_TYPE> orderRequestsList;
+
+  private final Iterator<REQUEST_TYPE> requestTypesIterator;
   private boolean open = true;
   private long position;
   private long limit = Long.MAX_VALUE;
@@ -36,6 +50,14 @@ public class FakeReadChannel implements ReadChannel {
 
   public FakeReadChannel(ByteString content) {
     this.content = content;
+    this.orderRequestsList = null;
+    this.requestTypesIterator = null;
+  }
+
+  public FakeReadChannel(ByteString content, List<REQUEST_TYPE> orderRequestsList) {
+    this.content = content;
+    this.orderRequestsList = orderRequestsList;
+    this.requestTypesIterator = orderRequestsList.iterator();
   }
 
   @Override
@@ -67,23 +89,50 @@ public class FakeReadChannel implements ReadChannel {
     return null;
   }
 
-  @Override
-  public int read(ByteBuffer dst) throws IOException {
-
+  private int readInternal(ByteBuffer dst, long startIndex, long bytesToRead) {
     if (currentPosition >= limit) {
       return -1;
     }
-    long readStart = currentPosition;
+    long readStart = startIndex;
     long readEnd =
-        Math.min(
-            Math.min(currentPosition + CHUNK_SIZE, currentPosition + dst.remaining()),
-            Math.min(content.size(), limit));
-
+        min(
+            min(startIndex + bytesToRead, startIndex + dst.remaining()),
+            min(content.size(), limit));
     ByteString messageData = content.substring(toIntExact(readStart), toIntExact(readEnd));
     for (Byte messageDatum : messageData) {
       dst.put(messageDatum);
     }
-    currentPosition += messageData.size();
     return messageData.size();
+  }
+
+  @Override
+  public int read(ByteBuffer dst) throws IOException {
+    REQUEST_TYPE requestType = REQUEST_TYPE.READ_CHUNK;
+    if (requestTypesIterator != null && requestTypesIterator.hasNext()) {
+      requestType = requestTypesIterator.next();
+    }
+    int bytesRead = 0;
+    switch (requestType) {
+      case ZERO_READ:
+        bytesRead = 0;
+        break;
+      case NEGATIVE_READ:
+        bytesRead = -1;
+        break;
+      case READ_EXCEPTION:
+        throw new IOException("Exception occurred in read");
+      case PARTIAL_READ:
+        bytesRead = readInternal(dst, currentPosition, dst.remaining() / 2);
+        currentPosition += bytesRead;
+        throw new IOException("Partial Read Exception");
+      default:
+        bytesRead = readInternal(dst, currentPosition, CHUNK_SIZE);
+        break;
+    }
+
+    if (bytesRead > 0) {
+      currentPosition += bytesRead;
+    }
+    return bytesRead;
   }
 }
