@@ -365,7 +365,8 @@ public class GoogleCloudStorageClientReadChannelTest {
 
   @Test
   public void readThrowException() throws IOException {
-    fakeReadChannel = spy(new FakeReadChannel(CONTENT, ImmutableList.of(REQUEST_TYPE.READ_EXCEPTION)));
+    fakeReadChannel =
+        spy(new FakeReadChannel(CONTENT, ImmutableList.of(REQUEST_TYPE.READ_EXCEPTION)));
     when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
     readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, DEFAULT_READ_OPTION);
 
@@ -399,7 +400,8 @@ public class GoogleCloudStorageClientReadChannelTest {
   public void partialReadThrows() throws IOException {
     int readBytes = 10;
     int partialByteRead = readBytes / 2;
-    fakeReadChannel = spy(new FakeReadChannel(CONTENT, ImmutableList.of(REQUEST_TYPE.PARTIAL_READ)));
+    fakeReadChannel =
+        spy(new FakeReadChannel(CONTENT, ImmutableList.of(REQUEST_TYPE.PARTIAL_READ)));
     when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
     readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, DEFAULT_READ_OPTION);
 
@@ -419,7 +421,10 @@ public class GoogleCloudStorageClientReadChannelTest {
   public void readThrowsEventuallyPass() throws IOException {
     int readBytes = 10;
     int partialByteRead = readBytes / 2;
-    fakeReadChannel = spy(new FakeReadChannel(CONTENT, ImmutableList.of(REQUEST_TYPE.PARTIAL_READ, REQUEST_TYPE.READ_CHUNK)));
+    fakeReadChannel =
+        spy(
+            new FakeReadChannel(
+                CONTENT, ImmutableList.of(REQUEST_TYPE.PARTIAL_READ, REQUEST_TYPE.READ_CHUNK)));
     when(mockedStorage.reader(any(), any())).thenReturn(fakeReadChannel);
     readChannel = getJavaStorageChannel(DEFAULT_ITEM_INFO, DEFAULT_READ_OPTION);
 
@@ -508,7 +513,7 @@ public class GoogleCloudStorageClientReadChannelTest {
     // but fetches only 1 byte from contentChannel
     // rest is served from cached footer
     assertThat(seekValue.getAllValues().get(1)).isEqualTo(startPosition);
-    assertThat(limitValue.getAllValues().get(1)).isEqualTo(startPosition +1);
+    assertThat(limitValue.getAllValues().get(1)).isEqualTo(startPosition + 1);
   }
 
   private void verifyContent(ByteBuffer buffer, int startPosition, int length) {
