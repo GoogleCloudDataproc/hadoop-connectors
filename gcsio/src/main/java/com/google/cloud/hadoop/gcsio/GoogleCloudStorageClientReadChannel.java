@@ -148,17 +148,17 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
   @Override
   public void close() throws IOException {
-    try {
-      if (open) {
+    if (open) {
+      try {
         logger.atFiner().log("Closing channel for '%s'", resourceId);
         contentReadChannel.closeContentChannel();
+      } catch (Exception e) {
+        throw new IOException(
+            String.format("Exception occurred while closing channel '%s'", resourceId), e);
+      } finally {
+        contentReadChannel = null;
+        open = false;
       }
-    } catch (Exception e) {
-      throw new IOException(
-          String.format("Exception occurred while closing channel '%s'", resourceId), e);
-    } finally {
-      contentReadChannel = null;
-      open = false;
     }
   }
 
@@ -190,7 +190,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
       this.blobId =
           BlobId.of(
               resourceId.getBucketName(), resourceId.getObjectName(), resourceId.getGenerationId());
-      this.randomAccess = readOptions.getFadvise().equals(Fadvise.RANDOM);
+      this.randomAccess = readOptions.getFadvise() == Fadvise.RANDOM;
     }
 
     public int readContent(ByteBuffer dst) throws IOException {
