@@ -42,7 +42,6 @@ import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.Nonnull;
 
 /** Provides seekable read access to GCS via java-storage library. */
 @VisibleForTesting
@@ -64,9 +63,9 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   private long currentPosition = 0;
 
   public GoogleCloudStorageClientReadChannel(
-      @Nonnull Storage storage,
-      @Nonnull GoogleCloudStorageItemInfo itemInfo,
-      @Nonnull GoogleCloudStorageReadOptions readOptions)
+      Storage storage,
+      GoogleCloudStorageItemInfo itemInfo,
+      GoogleCloudStorageReadOptions readOptions)
       throws IOException {
     validate(itemInfo);
     this.storage = storage;
