@@ -48,7 +48,7 @@ public abstract class GoogleCloudStorageOptions {
         .setAutoRepairImplicitDirectoriesEnabled(true)
         .setBatchThreads(15)
         .setCopyWithRewriteEnabled(true)
-        .setDirectPathPreferred(true)
+        .setDirectPathPreferred(false)
         .setGrpcEnabled(false)
         .setGrpcMessageTimeoutCheckInterval(Duration.ofSeconds(1))
         .setGrpcServerAddress(
