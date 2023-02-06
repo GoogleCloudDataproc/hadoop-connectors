@@ -176,7 +176,7 @@ class StorageStubProvider {
               .callCredentials(MoreCallCredentials.from(credentials))
               .build();
       // TODO(veblush): Remove experimental suffix once this code is proven stable.
-      return Grpc.newChannelBuilder("google-c2p-experimental:///" + target, credentialsBuilder);
+      return Grpc.newChannelBuilder("google-c2p:///" + target, credentialsBuilder);
     }
 
     public AbstractStub<?> applyCallOption(AbstractStub<?> stub) {
