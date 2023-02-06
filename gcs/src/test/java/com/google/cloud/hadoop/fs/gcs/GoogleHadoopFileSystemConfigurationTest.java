@@ -66,7 +66,7 @@ public class GoogleHadoopFileSystemConfigurationTest {
           put("fs.gs.glob.algorithm", GlobAlgorithm.CONCURRENT);
           put("fs.gs.grpc.checkinterval.timeout", 1_000L);
           put("fs.gs.grpc.checksums.enable", false);
-          put("fs.gs.grpc.directpath.enable", false);
+          put("fs.gs.grpc.directpath.enable", true);
           put("fs.gs.grpc.enable", false);
           put("fs.gs.grpc.read.message.timeout", 3_000L);
           put("fs.gs.grpc.read.timeout", 3_600_000L);
