@@ -30,7 +30,6 @@ import com.google.cloud.hadoop.gcsio.GoogleCloudStorage;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageGrpcTracingInterceptor;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageItemInfo;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions.MetricsSink;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
@@ -53,11 +52,7 @@ import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
 
-@RunWith(Parameterized.class)
 public class GoogleCloudStorageGrpcIntegrationTest {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
@@ -70,30 +65,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
 
   private static final String BUCKET_NAME = BUCKET_HELPER.getUniqueBucketName("shared");
 
-  private final boolean tdEnabled;
-
-  @Parameters
-  // We want to test this entire class with both gRPC-LB and Traffic Director
-  // Some of our internal endpoints only work with TD
-  public static Iterable<Boolean> tdEnabled() {
-    return Boolean.parseBoolean(System.getenv("GCS_TEST_ONLY_RUN_WITH_TD_ENABLED"))
-        ? List.of(true)
-        : List.of(false, true);
-  }
-
-  public GoogleCloudStorageGrpcIntegrationTest(boolean tdEnabled) {
-    this.tdEnabled = tdEnabled;
-  }
-
-  private GoogleCloudStorageOptions.Builder configureOptionsWithTD() {
-    logger.atInfo().log("Creating client with tdEnabled %s", this.tdEnabled);
-    return GoogleCloudStorageTestUtils.configureDefaultOptions()
-        .setTrafficDirectorEnabled(this.tdEnabled);
-  }
-
   private GoogleCloudStorage createGoogleCloudStorage() throws IOException {
     return GoogleCloudStorageImpl.builder()
-        .setOptions(configureOptionsWithTD().build())
+        .setOptions(GoogleCloudStorageTestUtils.configureDefaultOptions().build())
         .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
         .build();
   }
@@ -102,7 +76,9 @@ public class GoogleCloudStorageGrpcIntegrationTest {
       AsyncWriteChannelOptions asyncWriteChannelOptions) throws IOException {
     return GoogleCloudStorageImpl.builder()
         .setOptions(
-            configureOptionsWithTD().setWriteChannelOptions(asyncWriteChannelOptions).build())
+            GoogleCloudStorageTestUtils.configureDefaultOptions()
+                .setWriteChannelOptions(asyncWriteChannelOptions)
+                .build())
         .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
         .build();
   }
