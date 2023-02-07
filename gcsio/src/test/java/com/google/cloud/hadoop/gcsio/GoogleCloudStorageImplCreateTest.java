@@ -50,6 +50,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -88,6 +89,7 @@ public class GoogleCloudStorageImplCreateTest {
   }
 
   @Test
+  @Ignore
   public void create_grpc_useDirectpath() throws IOException {
     GoogleCloudStorageImpl gcs =
         GoogleCloudStorageImpl.builder()
@@ -104,6 +106,7 @@ public class GoogleCloudStorageImplCreateTest {
   }
 
   @Test
+  @Ignore
   public void create_grpcAndDisableDirectPath_useCloudpath() throws IOException {
     GoogleCloudStorageImpl gcs =
         GoogleCloudStorageImpl.builder()

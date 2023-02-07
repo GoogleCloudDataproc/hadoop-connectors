@@ -22,6 +22,7 @@ import com.google.auth.Credentials;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.flogger.GoogleLogger;
 import com.google.storage.v2.StorageGrpc;
 import com.google.storage.v2.StorageGrpc.StorageBlockingStub;
 import com.google.storage.v2.StorageGrpc.StorageStub;
@@ -38,6 +39,8 @@ import java.util.concurrent.ExecutorService;
 
 /** Provides gRPC stubs for accessing the Storage gRPC API. */
 class StorageStubProvider {
+
+  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
   static final Metadata.Key<String> GOOG_REQUEST_PARAMS =
       Metadata.Key.of("x-goog-request-params", Metadata.ASCII_STRING_MARSHALLER);
 
@@ -176,6 +179,7 @@ class StorageStubProvider {
               .callCredentials(MoreCallCredentials.from(credentials))
               .build();
       // TODO(veblush): Remove experimental suffix once this code is proven stable.
+      logger.atInfo().log("Traffic director target is: %s", target);
       return Grpc.newChannelBuilder("google-c2p-experimental:///" + target, credentialsBuilder);
     }
 
@@ -194,12 +198,6 @@ class StorageStubProvider {
 
   private static GrpcDecorator getGrpcDecorator(
       GoogleCloudStorageOptions options, Credentials credentials) {
-    if (options.isTrafficDirectorEnabled()) {
-      return new TrafficDirectorGrpcDecorator(credentials);
-    } else if (options.isDirectPathPreferred()) {
-      return new DirectPathGrpcDecorator(credentials);
-    } else {
-      return new CloudPathGrpcDecorator(credentials);
-    }
+    return new TrafficDirectorGrpcDecorator(credentials);
   }
 }
