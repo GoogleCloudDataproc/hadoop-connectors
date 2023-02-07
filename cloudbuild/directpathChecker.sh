@@ -4,4 +4,4 @@ https://github.com/GoogleCloudPlatform/grpc-gcp-tools/releases/latest/download/d
 chmod a+x dp_check
 
 ./dp_check --service storage.googleapis.com \
-    -check_grpclb=false -check_xds=true 2> /dev/null
+    --xds_expect_fallback_configured=false -check_grpclb=false -check_xds=true -ipv4_only 2> /dev/null
