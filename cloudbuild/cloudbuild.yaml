@@ -18,7 +18,20 @@ steps:
     id: 'docker-build'
     args: ['build', '--tag=gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit', '-f', 'cloudbuild/Dockerfile', '.']
 
-  # 2. Run unit tests
+  # 2. Run dp_check
+  - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
+        id: 'dp_check'
+        waitFor: ['docker-build']
+        entrypoint: 'bash'
+        args: ['/hadoop-connectors/cloudbuild/directpathChecker.sh']
+        env:
+        - 'CODECOV_TOKEN=$_CODECOV_TOKEN'
+        - 'VCS_BRANCH_NAME=$BRANCH_NAME'
+        - 'VCS_COMMIT_ID=$COMMIT_SHA'
+        - 'VCS_TAG=$TAG_NAME'
+        - 'CI_BUILD_ID=$BUILD_ID'
+
+  # 3. Run unit tests
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
     id: 'unit-tests'
     waitFor: ['docker-build']
@@ -31,7 +44,7 @@ steps:
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
 
-  # 3. Run integration tests concurrently with unit tests
+  # 4. Run integration tests concurrently with unit tests
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
     id: 'integration-tests'
     waitFor: ['docker-build']
