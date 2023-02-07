@@ -24,7 +24,7 @@ cd /hadoop-connectors
 if [[ $TEST_TYPE == unittest ]]; then
   ./mvnw -B -e -Pcoverage clean verify
 else
-  ./mvnw -B -e -Pintegration-test -Pcoverage clean verify -Djava.util.logging.config.file=cloudbuild/logging.properties
+  ./mvnw -B -e -Pintegration-test -Pcoverage clean verify -Djava.util.logging.config.file=/hadoop-connectors/cloudbuild/logging.properties
 fi
 
 # Upload test coverage report to Codecov
