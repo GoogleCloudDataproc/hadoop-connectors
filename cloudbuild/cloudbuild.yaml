@@ -16,10 +16,10 @@ steps:
   # 1. Create a Docker image containing hadoop-connectors repo
   - name: 'gcr.io/cloud-builders/docker'
     id: 'docker-build'
-    args: ['build', '--tag=gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit', '-f', 'cloudbuild/Dockerfile', '.']
+    args: ['build', '--tag=gcr.io/google.com/hadoop-cloud-dev/dataproc-hadoop-connectors-presubmit', '-f', 'cloudbuild/Dockerfile', '.']
 
   # 2. Run unit tests
-  - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
+  - name: 'gcr.io/google.com/hadoop-cloud-dev/dataproc-hadoop-connectors-presubmit'
     id: 'unit-tests'
     waitFor: ['docker-build']
     entrypoint: 'bash'
@@ -32,7 +32,7 @@ steps:
       - 'CI_BUILD_ID=$BUILD_ID'
 
   # 3. Run integration tests concurrently with unit tests
-  - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
+  - name: 'gcr.io/google.com/hadoop-cloud-dev/dataproc-hadoop-connectors-presubmit'
     id: 'integration-tests'
     waitFor: ['docker-build']
     entrypoint: 'bash'
@@ -44,8 +44,6 @@ steps:
       - 'VCS_COMMIT_ID=$COMMIT_SHA'
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
-      - 'GRPC_GO_LOG_VERBOSITY_LEVEL=99'
-      - 'GRPC_GO_LOG_SEVERITY_LEVEL=INFO'
 
 # Tests take on average 25 minutes to run
 timeout: 2400s
