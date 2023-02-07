@@ -44,6 +44,7 @@ steps:
       - 'VCS_COMMIT_ID=$COMMIT_SHA'
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
+      - 'JAVA_OPTS=-Djava.util.logging.config.file=/hadoop-connectors/cloudbuild/logging.properties'
 
 # Tests take on average 25 minutes to run
 timeout: 2400s
