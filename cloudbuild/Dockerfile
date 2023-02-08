@@ -23,3 +23,8 @@ FROM openjdk:11-jdk
 
 # Copy everything into the container to allow concurrent build execution
 COPY . /hadoop-connectors
+
+RUN ./mvnw -B -e -Pintegration-test -Pcoverage clean verify -Djava.util.logging.config.file=/hadoop-connectors/cloudbuild/logging.properties
+
+# Upload test coverage report to Codecov
+RUN bash <(curl -s https://codecov.io/bash) -K -F "${TEST_TYPE}"
