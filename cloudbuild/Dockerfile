@@ -16,6 +16,8 @@ FROM gcr.io/cloud-builders/curl
 
 RUN curl -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/?recursive=true
 
+RUN cat /etc/hosts
+
 # This Dockerfile creates an image for running presubmit tests.
 FROM openjdk:11-jdk
 
