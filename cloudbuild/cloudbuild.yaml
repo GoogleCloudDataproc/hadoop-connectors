@@ -18,6 +18,20 @@ steps:
     id: 'docker-build'
     args: ['build', "--network=cloudbuild", "--add-host=metadata.google.internal:169.254.169.254", '--tag=gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit', '-f', 'cloudbuild/Dockerfile', '.']
 
+  - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
+    id: 'dp_check'
+    waitFor: [ 'docker-build' ]
+    entrypoint: 'bash'
+    args: [ '/hadoop-connectors/cloudbuild/directpathChecker.sh' ]
+    env:
+     - 'CODECOV_TOKEN=$_CODECOV_TOKEN'
+     - 'VCS_BRANCH_NAME=$BRANCH_NAME'
+     - 'VCS_COMMIT_ID=$COMMIT_SHA'
+     - 'VCS_TAG=$TAG_NAME'
+     - 'CI_BUILD_ID=$BUILD_ID'
+     - 'GRPC_GO_LOG_SEVERITY_LEVEL=INFO'
+     - 'GRPC_GO_LOG_VERBOSITYY_LEVEL=99'
+
   # 3. Run unit tests
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
     id: 'unit-tests'
