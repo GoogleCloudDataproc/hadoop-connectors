@@ -12,19 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/cloud-builders/curl
-
-RUN curl -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/?recursive=true
-
-RUN cat /etc/hosts
-
 # This Dockerfile creates an image for running presubmit tests.
 FROM openjdk:11-jdk
 
 # Copy everything into the container to allow concurrent build execution
 COPY . /hadoop-connectors
-
-RUN ./mvnw -B -e -Pintegration-test -Pcoverage clean verify -Djava.util.logging.config.file=/hadoop-connectors/cloudbuild/logging.properties
-
-# Upload test coverage report to Codecov
-RUN bash <(curl -s https://codecov.io/bash) -K -F "${TEST_TYPE}"
