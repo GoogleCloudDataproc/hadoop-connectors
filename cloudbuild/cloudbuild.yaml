@@ -16,7 +16,7 @@ steps:
   # 1. Create a Docker image containing hadoop-connectors repo
   - name: 'gcr.io/cloud-builders/docker'
     id: 'docker-build'
-    args: ['build', '--tag=gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit', '-f', 'cloudbuild/Dockerfile', '.']
+    args: ['build', '--network=host','--tag=gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit', '-f', 'cloudbuild/Dockerfile', '.']
 
   # 2. Run dp_check
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
