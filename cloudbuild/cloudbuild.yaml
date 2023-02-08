@@ -30,6 +30,8 @@ steps:
      - 'VCS_COMMIT_ID=$COMMIT_SHA'
      - 'VCS_TAG=$TAG_NAME'
      - 'CI_BUILD_ID=$BUILD_ID'
+     - 'GRPC_GO_LOG_VERBOSITYY_LEVEL=99'
+     - 'GRPC_GO_LOG_SEVERITY_LEVEL=INFO'
 
   # 3. Run unit tests
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
