@@ -16,12 +16,18 @@ steps:
   # 1. Create a Docker image containing hadoop-connectors repo
   - name: 'gcr.io/cloud-builders/docker'
     id: 'docker-build'
-    args: ['build', '--add-host=metadata.google.internal:169.254.169.254', '--tag=gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit', '-f', 'cloudbuild/Dockerfile', '.']
+    args: ['build', '--add-host=host.docker.internal:host-gateway', '--network=host', '--tag=gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit', '-f', 'cloudbuild/Dockerfile', '.']
+
+  - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
+    id: 'hostsFile'
+    waitFor: [ 'docker-build' ]
+    entrypoint: 'bash'
+    args: [ '/hadoop-connectors/cloudbuild/testScript.sh']
 
   # 2. Run dp_check
   - name: 'gcr.io/$PROJECT_ID/dataproc-hadoop-connectors-presubmit'
     id: 'dp_check'
-    waitFor: ['docker-build']
+    waitFor: ['hostsFile']
     entrypoint: 'bash'
     args: ['/hadoop-connectors/cloudbuild/directpathChecker.sh']
     env:
