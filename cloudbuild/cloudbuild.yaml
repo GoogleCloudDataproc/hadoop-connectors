@@ -44,6 +44,8 @@ steps:
       - 'VCS_COMMIT_ID=$COMMIT_SHA'
       - 'VCS_TAG=$TAG_NAME'
       - 'CI_BUILD_ID=$BUILD_ID'
+      - 'GRPC_GO_LOG_SEVERITY_LEVEL=INFO'
+      - 'GRPC_GO_LOG_VERBOSITYY_LEVEL=99'
 
 # Tests take on average 25 minutes to run
 timeout: 2400s

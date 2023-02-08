@@ -14,7 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-echo 169.254.169.254 metadata.google.internal > /etc/hosts
+echo "169.254.169.254 metadata.google.internal" >> /etc/hosts
+
+cat /etc/hosts
 
 set -euxo pipefail
 
