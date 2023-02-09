@@ -73,12 +73,10 @@ public class GoogleCloudStorageGrpcIntegrationTest {
   private final boolean tdEnabled;
 
   @Parameters
-  // We want to test this entire class with both gRPC-LB and Traffic Director
-  // Some of our internal endpoints only work with TD
+  // Falling back to gRPC-LB for now as TD has issue with CloudBuild
+  // TODO: issues/956 Enabled TD once resolved.
   public static Iterable<Boolean> tdEnabled() {
-    return Boolean.parseBoolean(System.getenv("GCS_TEST_ONLY_RUN_WITH_TD_ENABLED"))
-        ? List.of(true)
-        : List.of(false, true);
+    return List.of(false);
   }
 
   public GoogleCloudStorageGrpcIntegrationTest(boolean tdEnabled) {
@@ -218,10 +216,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     try {
       GoogleCloudStorage rawStorage =
           GoogleCloudStorageImpl.builder()
-              .setOptions(
-                  GoogleCloudStorageTestUtils.configureDefaultOptions()
-                      .setTraceLogEnabled(true)
-                      .build())
+              .setOptions(configureOptionsWithTD().setTraceLogEnabled(true).build())
               .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
               .build();
 
