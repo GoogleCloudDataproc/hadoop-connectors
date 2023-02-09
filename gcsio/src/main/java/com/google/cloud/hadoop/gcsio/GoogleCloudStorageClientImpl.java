@@ -17,6 +17,7 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.google.api.client.http.HttpRequestInitializer;
@@ -30,6 +31,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.flogger.GoogleLogger;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
 import java.util.List;
@@ -103,6 +105,36 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             storage, storageOptions, resourceIdWithGeneration, options, backgroundTasksThreadPool);
     channel.initialize();
     return channel;
+  }
+
+  @Override
+  public SeekableByteChannel open(
+      StorageResourceId resourceId, GoogleCloudStorageReadOptions readOptions) throws IOException {
+    logger.atFiner().log("open(%s, %s)", resourceId, readOptions);
+    return open(resourceId, /* itemInfo= */ null, readOptions);
+  }
+
+  @Override
+  public SeekableByteChannel open(
+      GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
+      throws IOException {
+    logger.atFiner().log("open(%s, %s)", itemInfo, readOptions);
+    checkNotNull(itemInfo, "itemInfo should not be null");
+
+    StorageResourceId resourceId = itemInfo.getResourceId();
+    checkArgument(
+        resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
+
+    return open(resourceId, itemInfo, readOptions);
+  }
+
+  private SeekableByteChannel open(
+      StorageResourceId resourceId,
+      GoogleCloudStorageItemInfo itemInfo,
+      GoogleCloudStorageReadOptions readOptions)
+      throws IOException {
+    return new GoogleCloudStorageClientReadChannel(
+        storage, itemInfo == null ? getItemInfo(resourceId) : itemInfo, readOptions);
   }
 
   @Override
