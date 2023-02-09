@@ -230,9 +230,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     try {
       GoogleCloudStorage rawStorage =
           new GoogleCloudStorageImpl(
-              configureOptionsWithTD()
-                  .setTraceLogEnabled(true)
-                  .build(),
+              configureOptionsWithTD().setTraceLogEnabled(true).build(),
               GoogleCloudStorageTestHelper.getCredential());
 
       StorageResourceId objectToCreate1 = new StorageResourceId(BUCKET_NAME, "testOpen_Object1");
