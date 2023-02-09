@@ -17,7 +17,6 @@
 package com.google.cloud.hadoop.gcsio;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.google.api.client.auth.oauth2.Credential;
@@ -113,20 +112,6 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
       StorageResourceId resourceId, GoogleCloudStorageReadOptions readOptions) throws IOException {
     logger.atFiner().log("open(%s, %s)", resourceId, readOptions);
     return open(resourceId, /* itemInfo= */ null, readOptions);
-  }
-
-  @Override
-  public SeekableByteChannel open(
-      GoogleCloudStorageItemInfo itemInfo, GoogleCloudStorageReadOptions readOptions)
-      throws IOException {
-    logger.atFiner().log("open(%s, %s)", itemInfo, readOptions);
-    checkNotNull(itemInfo, "itemInfo should not be null");
-
-    StorageResourceId resourceId = itemInfo.getResourceId();
-    checkArgument(
-        resourceId.isStorageObject(), "Expected full StorageObject id, got %s", resourceId);
-
-    return open(resourceId, itemInfo, readOptions);
   }
 
   private SeekableByteChannel open(
