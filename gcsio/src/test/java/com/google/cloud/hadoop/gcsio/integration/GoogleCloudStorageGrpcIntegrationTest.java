@@ -216,10 +216,7 @@ public class GoogleCloudStorageGrpcIntegrationTest {
     try {
       GoogleCloudStorage rawStorage =
           GoogleCloudStorageImpl.builder()
-              .setOptions(
-                  GoogleCloudStorageTestUtils.configureDefaultOptions()
-                      .setTraceLogEnabled(true)
-                      .build())
+              .setOptions(configureOptionsWithTD().setTraceLogEnabled(true).build())
               .setCredentials(GoogleCloudStorageTestHelper.getCredentials())
               .build();
 
