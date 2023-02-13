@@ -49,7 +49,7 @@ import java.util.concurrent.TimeUnit;
 public abstract class GoogleCloudStorageIntegrationHelper {
 
   // Prefix used for naming test buckets.
-  private static final String TEST_BUCKET_NAME_PREFIX = "gcs-grpc-team_gcsio";
+  private static final String TEST_BUCKET_NAME_PREFIX = "dataproc-gcs-gcsio";
 
   private final TestBucketHelper bucketHelper = new TestBucketHelper(TEST_BUCKET_NAME_PREFIX);
 
