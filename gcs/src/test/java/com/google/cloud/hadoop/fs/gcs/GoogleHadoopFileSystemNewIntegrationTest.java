@@ -38,23 +38,31 @@ import com.google.common.io.CharStreams;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
-import org.junit.AfterClass;
+import org.junit.After;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
 /** Integration tests for GoogleHadoopFileSystem class. */
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class GoogleHadoopFileSystemNewIntegrationTest {
+
+  @Parameterized.Parameter public boolean testStorageClientImpl;
+
+  @Parameters
+  public static Iterable<Boolean> getTesStorageClientImplParameter() {
+    return List.of(false, true);
+  }
 
   private static GoogleCloudStorageOptions gcsOptions;
   private static RetryHttpInitializer httpRequestsInitializer;
@@ -64,8 +72,8 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
   @Rule public TestName name = new TestName();
   private TrackingHttpRequestInitializer gcsRequestsTracker;
 
-  @BeforeClass
-  public static void beforeClass() throws Throwable {
+  @Before
+  public void before() throws Throwable {
     Credentials credentials =
         checkNotNull(
             GoogleCloudStorageTestHelper.getCredentials(), "credentials should not be null");
@@ -75,7 +83,7 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
         new RetryHttpInitializer(credentials, gcsOptions.toRetryHttpInitializerOptions());
 
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
-    ghfsIHelper = new HadoopFileSystemIntegrationHelper(ghfs);
+    ghfsIHelper = new HadoopFileSystemIntegrationHelper(ghfs, testStorageClientImpl);
 
     testBucketName = ghfsIHelper.getUniqueBucketName("new-it");
     URI testBucketUri = new URI("gs://" + testBucketName);
@@ -83,16 +91,12 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
     ghfs.initialize(testBucketUri, GoogleHadoopFileSystemTestBase.loadConfig());
 
     ghfs.getGcsFs().mkdir(testBucketUri);
-  }
-
-  @AfterClass
-  public static void afterClass() {
-    ghfsIHelper.afterAllTests();
-  }
-
-  @Before
-  public void before() throws Exception {
     gcsRequestsTracker = new TrackingHttpRequestInitializer(httpRequestsInitializer);
+  }
+
+  @After
+  public void afterClass() {
+    ghfsIHelper.afterAllTests();
   }
 
   @Test

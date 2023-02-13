@@ -27,6 +27,7 @@ import com.google.cloud.hadoop.gcsio.CreateFileOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationHelper;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.UriPaths;
 import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import java.io.FileNotFoundException;
@@ -66,11 +67,14 @@ public class HadoopFileSystemIntegrationHelper
   // FS statistics mode of the FS tested by this class.
   FileSystemStatistics statistics = FileSystemStatistics.IGNORE;
 
-  public HadoopFileSystemIntegrationHelper(FileSystem hfs) throws IOException {
+  public HadoopFileSystemIntegrationHelper(FileSystem hfs, boolean testStorageClientImpl)
+      throws IOException {
     super(
         new GoogleCloudStorageFileSystemImpl(
             InMemoryGoogleCloudStorage::new,
             GoogleCloudStorageFileSystemOptions.builder()
+                .setClientType(
+                    testStorageClientImpl ? ClientType.STORAGE_CLIENT : ClientType.HTTP_API_CLIENT)
                 .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
                 .build()));
     this.ghfs = hfs;

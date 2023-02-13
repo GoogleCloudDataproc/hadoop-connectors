@@ -110,7 +110,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
     // loadConfig needs ghfsHelper, which is normally created in
     // postCreateInit. Create one here for it to use.
-    ghfsHelper = new HadoopFileSystemIntegrationHelper(ghfs);
+    ghfsHelper = new HadoopFileSystemIntegrationHelper(ghfs, testStorageClientImpl);
 
     URI initUri = new URI("gs://" + ghfsHelper.getUniqueBucketName("init"));
     ghfs.initialize(initUri, loadConfig());
