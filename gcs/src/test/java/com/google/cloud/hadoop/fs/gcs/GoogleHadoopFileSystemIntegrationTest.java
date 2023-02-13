@@ -1060,7 +1060,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     createFile(new Path("/directory1/subdirectory2/file1"), data);
     createFile(new Path("/directory1/subdirectory2/file2"), data);
 
-    FileStatus[] rootDirectories = ghfs.globStatus(new Path("/d*"));
+    FileStatus[] rootDirectories = ghfs.globStatus(new Path("/directory1*"));
     assertThat(stream(rootDirectories).map(d -> d.getPath().getName()).collect(toImmutableList()))
         .containsExactly("directory1");
 
