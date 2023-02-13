@@ -16,6 +16,7 @@
 
 package com.google.cloud.hadoop.gcsio;
 
+import static com.google.cloud.hadoop.gcsio.GoogleCloudStorageExceptions.createFileNotFoundException;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -25,6 +26,7 @@ import static java.lang.Math.toIntExact;
 
 import com.google.cloud.ReadChannel;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
+import com.google.cloud.hadoop.util.ErrorTypeExtractor;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.Storage.BlobSourceOption;
@@ -48,12 +50,12 @@ import java.util.List;
 class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
-
   private final StorageResourceId resourceId;
   private final GoogleCloudStorageReadOptions readOptions;
   private final Storage storage;
   // The size of this object generation, in bytes.
   private final long objectSize;
+  private final ErrorTypeExtractor errorExtractor;
   private ContentReadChannel contentReadChannel;
 
   private boolean open = true;
@@ -65,10 +67,12 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
   public GoogleCloudStorageClientReadChannel(
       Storage storage,
       GoogleCloudStorageItemInfo itemInfo,
-      GoogleCloudStorageReadOptions readOptions)
+      GoogleCloudStorageReadOptions readOptions,
+      ErrorTypeExtractor errorExtractor)
       throws IOException {
     validate(itemInfo);
     this.storage = storage;
+    this.errorExtractor = errorExtractor;
     this.resourceId =
         new StorageResourceId(
             itemInfo.getBucketName(), itemInfo.getObjectName(), itemInfo.getContentGeneration());
@@ -252,7 +256,7 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           logger.atFine().log(
               "Closing contentChannel after %s exception for '%s'.", e.getMessage(), resourceId);
           closeContentChannel();
-          throw e;
+          throw convertError(e);
         }
       }
       return totalBytesRead;
@@ -538,6 +542,19 @@ class GoogleCloudStorageClientReadChannel implements SeekableByteChannel {
           String.format(
               "Cannot read GZIP-encoded file (%s) (not supported via gRPC API): %s",
               contentEncoding, resourceId));
+    }
+  }
+
+  private IOException convertError(Exception error) {
+    String msg = String.format("Error reading '%s'", resourceId);
+    switch (errorExtractor.getErrorType(error)) {
+      case NON_FOUND:
+        return createFileNotFoundException(
+            resourceId.getBucketName(), resourceId.getObjectName(), new IOException(msg, error));
+      case OUT_OF_RANGE:
+        return (IOException) new EOFException(msg).initCause(error);
+      default:
+        return new IOException(msg, error);
     }
   }
 

@@ -24,6 +24,7 @@ import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
 import com.google.auth.Credentials;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
@@ -51,117 +52,94 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import org.junit.ClassRule;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
-import org.junit.rules.ExternalResource;
-import org.junit.runner.Description;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
-import org.junit.runners.model.Statement;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
 /** Integration tests for GoogleCloudStorageFileSystem class. */
-@RunWith(JUnit4.class)
-public class GoogleCloudStorageFileSystemIntegrationTest {
+@RunWith(Parameterized.class)
+public abstract class GoogleCloudStorageFileSystemIntegrationTest {
+
+  @Parameterized.Parameter public boolean testStorageClientImpl;
+
+  @Parameters
+  public static Iterable<Boolean> getTesStorageClientImplParameter() {
+    return List.of(false, true);
+  }
 
   private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
-  // hack to make tests pass until JUnit 4.13 regression will be fixed:
-  // https://github.com/junit-team/junit4/issues/1509
-  // TODO: refactor or delete this hack
-  public static class NotInheritableExternalResource extends ExternalResource {
-    private final Class<?> testClass;
-
-    public NotInheritableExternalResource(Class<?> testClass) {
-      this.testClass = testClass;
-    }
-
-    @Override
-    public Statement apply(Statement base, Description description) {
-      if (testClass.equals(description.getTestClass())) {
-        return super.apply(base, description);
-      }
-      return base;
-    }
-
-    @Override
-    public void before() throws Throwable {}
-
-    @Override
-    public void after() {}
-  }
-
   // GCS FS test access instance.
-  protected static GoogleCloudStorageFileSystem gcsfs;
+  protected GoogleCloudStorageFileSystem gcsfs;
 
   // GCS instance used for cleanup
-  protected static GoogleCloudStorage gcs;
+  protected GoogleCloudStorage gcs;
 
-  protected static GoogleCloudStorageFileSystemIntegrationHelper gcsiHelper;
+  protected GoogleCloudStorageFileSystemIntegrationHelper gcsiHelper;
 
   // Time when test started. Used for determining which objects got
   // created after the test started.
-  protected static Instant testStartTime;
+  protected Instant testStartTime;
 
-  protected static String sharedBucketName1;
-  protected static String sharedBucketName2;
+  public String sharedBucketName1;
+  public String sharedBucketName2;
 
   // Name of the test object.
-  protected static String objectName = "gcsio-test.txt";
+  protected String objectName = "gcsio-test.txt";
 
-  @ClassRule
-  public static NotInheritableExternalResource storageResource =
-      new NotInheritableExternalResource(GoogleCloudStorageFileSystemIntegrationTest.class) {
-        /** Perform initialization once before tests are run. */
-        @Override
-        public void before() throws Throwable {
-          if (gcsfs == null) {
-            Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
-            String projectId = checkNotNull(TestConfiguration.getInstance().getProjectId());
+  /** Perform initialization once before tests are run. */
+  @Before
+  public void before() throws Exception {
+    if (gcsfs == null) {
+      Credentials credentials = GoogleCloudStorageTestHelper.getCredentials();
+      String projectId = checkNotNull(TestConfiguration.getInstance().getProjectId());
 
-            GoogleCloudStorageFileSystemOptions.Builder optionsBuilder =
-                GoogleCloudStorageFileSystemOptions.builder()
-                    .setMarkerFilePattern("_(FAILURE|SUCCESS)");
+      GoogleCloudStorageFileSystemOptions.Builder optionsBuilder =
+          GoogleCloudStorageFileSystemOptions.builder().setMarkerFilePattern("_(FAILURE|SUCCESS)");
 
-            optionsBuilder
-                .setBucketDeleteEnabled(true)
-                .setCloudStorageOptions(
-                    GoogleCloudStorageOptions.builder()
-                        .setAppName(GoogleCloudStorageTestHelper.APP_NAME)
-                        .setProjectId(projectId)
-                        .setWriteChannelOptions(
-                            AsyncWriteChannelOptions.builder()
-                                .setUploadChunkSize(64 * 1024 * 1024)
-                                .build())
-                        .build());
+      optionsBuilder
+          .setClientType(
+              testStorageClientImpl ? ClientType.STORAGE_CLIENT : ClientType.HTTP_API_CLIENT)
+          .setBucketDeleteEnabled(testStorageClientImpl)
+          .setCloudStorageOptions(
+              GoogleCloudStorageOptions.builder()
+                  .setAppName(GoogleCloudStorageTestHelper.APP_NAME)
+                  .setProjectId(projectId)
+                  .setWriteChannelOptions(
+                      AsyncWriteChannelOptions.builder()
+                          .setUploadChunkSize(64 * 1024 * 1024)
+                          .build())
+                  .build());
 
-            gcsfs = new GoogleCloudStorageFileSystemImpl(credentials, optionsBuilder.build());
+      gcsfs = new GoogleCloudStorageFileSystemImpl(credentials, optionsBuilder.build());
 
-            gcs = gcsfs.getGcs();
+      gcs = gcsfs.getGcs();
 
-            postCreateInit();
-          }
-        }
+      postCreateInit();
+    }
+  }
 
-        /** Perform clean-up once after all tests are turn. */
-        @Override
-        public void after() {
-          if (gcs != null) {
-            gcsiHelper.afterAllTests();
-            gcsiHelper = null;
-          }
-          if (gcsfs != null) {
-            gcsfs.close();
-            gcsfs = null;
-          }
-        }
-      };
+  @After
+  public void after() throws IOException {
+    if (gcs != null) {
+      gcsiHelper.afterAllTests();
+      gcsiHelper = null;
+    }
+    if (gcsfs != null) {
+      gcsfs.close();
+      gcsfs = null;
+    }
+  }
 
-  public static void postCreateInit() throws IOException {
+  public void postCreateInit() throws IOException {
     postCreateInit(new GoogleCloudStorageFileSystemIntegrationHelper(gcsfs));
   }
 
   /** Perform initialization after creating test instances. */
-  public static void postCreateInit(GoogleCloudStorageFileSystemIntegrationHelper helper)
+  public void postCreateInit(GoogleCloudStorageFileSystemIntegrationHelper helper)
       throws IOException {
     testStartTime = Instant.now();
 
@@ -369,6 +347,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   /** Validates delete(). */
   @Test
   public void testDelete() throws Exception {
+    logger.atInfo().log("test data %s", testStorageClientImpl);
     deleteHelper(
         new DeletionBehavior() {
           @Override
@@ -520,6 +499,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   /** Validates partial reads. */
   @Test
   public void testReadPartialObject() throws IOException {
+    logger.atInfo().log("test data %s", testStorageClientImpl);
     String bucketName = sharedBucketName1;
     String message = "Hello world!\n";
 
@@ -1684,7 +1664,7 @@ public class GoogleCloudStorageFileSystemIntegrationTest {
   }
 
   /** Gets a unique path of a non-existent file. */
-  public static URI getTempFilePath() {
+  public URI getTempFilePath() {
     return gcsiHelper.getPath(sharedBucketName1, "file-" + UUID.randomUUID());
   }
 

@@ -16,13 +16,11 @@
 
 package com.google.cloud.hadoop.gcsio;
 
-import static com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage.getInMemoryGoogleCloudStorageOptions;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
-import com.google.cloud.hadoop.gcsio.testing.InMemoryGoogleCloudStorage;
 import com.google.cloud.hadoop.util.AsyncWriteChannelOptions;
 import com.google.cloud.hadoop.util.RequesterPaysOptions;
 import java.io.IOException;
@@ -31,49 +29,17 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
 
 /**
  * The unittest version of {@code GoogleCloudStorageFileSystemIntegrationTest}; the external
  * GoogleCloudStorage dependency is replaced by an in-memory version which mimics the same
  * bucket/object semantics.
  */
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSystemIntegrationTest {
-
-  @ClassRule
-  public static NotInheritableExternalResource storageResource =
-      new NotInheritableExternalResource(GoogleCloudStorageFileSystemTest.class) {
-        @Override
-        public void before() throws IOException {
-          // Disable logging.
-          // Normally you would need to keep a strong reference to any logger used for
-          // configuration, but the "root" logger is always present.
-          Logger.getLogger("").setLevel(Level.OFF);
-
-          if (gcsfs == null) {
-            gcsfs =
-                new GoogleCloudStorageFileSystemImpl(
-                    InMemoryGoogleCloudStorage::new,
-                    GoogleCloudStorageFileSystemOptions.builder()
-                        .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
-                        .setMarkerFilePattern("_(FAILURE|SUCCESS)")
-                        .build());
-            gcs = gcsfs.getGcs();
-            GoogleCloudStorageFileSystemIntegrationTest.postCreateInit();
-          }
-        }
-
-        @Override
-        public void after() {
-          GoogleCloudStorageFileSystemIntegrationTest.storageResource.after();
-        }
-      };
 
   /**
    * Helper to fill out some default valid options after which the caller may want to reset a few

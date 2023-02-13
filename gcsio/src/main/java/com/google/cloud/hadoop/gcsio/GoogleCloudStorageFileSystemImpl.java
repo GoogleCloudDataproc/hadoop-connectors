@@ -30,6 +30,7 @@ import static java.util.concurrent.Executors.newFixedThreadPool;
 
 import com.google.auth.Credentials;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorage.ListPage;
+import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.CheckedFunction;
 import com.google.cloud.hadoop.util.LazyExecutorService;
@@ -115,6 +116,26 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
   static final Comparator<FileInfo> FILE_INFO_PATH_COMPARATOR =
       comparing(FileInfo::getPath, PATH_COMPARATOR);
 
+  private static GoogleCloudStorage createCloudStorage(
+      GoogleCloudStorageFileSystemOptions options,
+      Credentials credentials,
+      Function<List<AccessBoundary>, String> downscopedAccessTokenFn)
+      throws IOException {
+    checkNotNull(options, "options must not be null");
+    if (options.getClientType() == ClientType.STORAGE_CLIENT) {
+      return GoogleCloudStorageClientImpl.builder()
+          .setOptions(options.getCloudStorageOptions())
+          .setCredentials(credentials)
+          .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
+          .build();
+    }
+    return GoogleCloudStorageImpl.builder()
+        .setOptions(options.getCloudStorageOptions())
+        .setCredentials(credentials)
+        .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
+        .build();
+  }
+
   /**
    * Constructs an instance of GoogleCloudStorageFileSystem.
    *
@@ -124,12 +145,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
    */
   public GoogleCloudStorageFileSystemImpl(
       Credentials credentials, GoogleCloudStorageFileSystemOptions options) throws IOException {
-    this(
-        GoogleCloudStorageImpl.builder()
-            .setOptions(checkNotNull(options, "options must not be null").getCloudStorageOptions())
-            .setCredentials(credentials)
-            .build(),
-        options);
+    this(createCloudStorage(options, credentials, null), options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }
 
@@ -146,13 +162,7 @@ public class GoogleCloudStorageFileSystemImpl implements GoogleCloudStorageFileS
       Function<List<AccessBoundary>, String> downscopedAccessTokenFn,
       GoogleCloudStorageFileSystemOptions options)
       throws IOException {
-    this(
-        GoogleCloudStorageImpl.builder()
-            .setOptions(checkNotNull(options, "options must not be null").getCloudStorageOptions())
-            .setCredentials(credentials)
-            .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
-            .build(),
-        options);
+    this(createCloudStorage(options, credentials, downscopedAccessTokenFn), options);
     logger.atFiner().log("GoogleCloudStorageFileSystem(options: %s)", options);
   }
 

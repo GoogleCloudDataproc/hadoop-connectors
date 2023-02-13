@@ -23,12 +23,12 @@ import static org.junit.Assert.assertThrows;
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
 
 /**
  * Integration tests for HDFS.
@@ -44,7 +44,7 @@ import org.junit.runners.JUnit4;
  * the behavior of HDFS. The FileSystemDescriptor thus reroutes all the test methods through the
  * proper HDFS instance using webhdfs:/ paths.
  */
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class WebHdfsIntegrationTest extends HadoopFileSystemTestBase {
 
   // Environment variable from which to get HDFS access info.
@@ -53,36 +53,26 @@ public class WebHdfsIntegrationTest extends HadoopFileSystemTestBase {
   // HDFS path (passed to the test through environment var).
   static String hdfsRoot;
 
-  @ClassRule
-  public static NotInheritableExternalResource storageResource =
-      new NotInheritableExternalResource(WebHdfsIntegrationTest.class) {
-        /** Performs initialization once before tests are run. */
-        @Override
-        public void before() throws Throwable {
-          // Get info about the HDFS instance against which we run tests.
-          hdfsRoot = System.getenv(WEBHDFS_ROOT);
-          assertThat(hdfsRoot).isNotNull();
+  @Override
+  public void before() throws IOException, URISyntaxException {
+    // Get info about the HDFS instance against which we run tests.
+    hdfsRoot = System.getenv(WEBHDFS_ROOT);
+    assertThat(hdfsRoot).isNotNull();
 
-          // Create a FileSystem instance to access the given HDFS.
-          URI hdfsUri = new URI(hdfsRoot);
-          Configuration config = new Configuration();
-          config.set("fs.default.name", hdfsRoot);
-          ghfs = FileSystem.get(hdfsUri, config);
+    // Create a FileSystem instance to access the given HDFS.
+    URI hdfsUri = new URI(hdfsRoot);
+    Configuration config = new Configuration();
+    config.set("fs.default.name", hdfsRoot);
+    ghfs = FileSystem.get(hdfsUri, config);
 
-          postCreateInit();
-          ghfsHelper.setIgnoreStatistics();
-        }
+    postCreateInit();
+    ghfsHelper.setIgnoreStatistics();
+  }
 
-        /** Perform clean-up once after all tests are turn. */
-        @Override
-        public void after() {
-          HadoopFileSystemTestBase.storageResource.after();
-        }
-      };
-
+  @Override
   /** Perform initialization after creating test instances. */
-  public static void postCreateInit() throws IOException {
-    HadoopFileSystemTestBase.postCreateInit();
+  public void postCreateInit() throws IOException {
+    super.postCreateInit();
   }
 
   // -----------------------------------------------------------------
