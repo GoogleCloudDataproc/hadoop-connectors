@@ -38,7 +38,6 @@ import com.google.common.io.CharStreams;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -50,19 +49,11 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
 import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
+import org.junit.runners.JUnit4;
 
 /** Integration tests for GoogleHadoopFileSystem class. */
-@RunWith(Parameterized.class)
+@RunWith(JUnit4.class)
 public class GoogleHadoopFileSystemNewIntegrationTest {
-
-  @Parameterized.Parameter public boolean testStorageClientImpl;
-
-  @Parameters
-  public static Iterable<Boolean> getTesStorageClientImplParameter() {
-    return List.of(false, true);
-  }
 
   private static GoogleCloudStorageOptions gcsOptions;
   private static RetryHttpInitializer httpRequestsInitializer;
@@ -83,7 +74,7 @@ public class GoogleHadoopFileSystemNewIntegrationTest {
         new RetryHttpInitializer(credentials, gcsOptions.toRetryHttpInitializerOptions());
 
     GoogleHadoopFileSystem ghfs = new GoogleHadoopFileSystem();
-    ghfsIHelper = new HadoopFileSystemIntegrationHelper(ghfs, testStorageClientImpl);
+    ghfsIHelper = new HadoopFileSystemIntegrationHelper(ghfs);
 
     testBucketName = ghfsIHelper.getUniqueBucketName("new-it");
     URI testBucketUri = new URI("gs://" + testBucketName);

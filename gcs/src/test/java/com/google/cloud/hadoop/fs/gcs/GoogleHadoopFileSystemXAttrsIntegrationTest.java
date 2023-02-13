@@ -38,9 +38,9 @@ import org.apache.hadoop.fs.XAttrSetFlag;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.runners.JUnit4;
 
-@RunWith(Parameterized.class)
+@RunWith(JUnit4.class)
 public final class GoogleHadoopFileSystemXAttrsIntegrationTest extends HadoopFileSystemTestBase {
 
   @Before
@@ -51,7 +51,7 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest extends HadoopFil
 
     // loadConfig needs ghfsHelper, which is normally created in
     // postCreateInit. Create one here for it to use.
-    ghfsHelper = new HadoopFileSystemIntegrationHelper(ghfs, testStorageClientImpl);
+    ghfsHelper = new HadoopFileSystemIntegrationHelper(ghfs);
 
     URI initUri = new URI("gs://" + ghfsHelper.getUniqueBucketName("init"));
     ghfs.initialize(initUri, GoogleHadoopFileSystemTestBase.loadConfig());
@@ -61,22 +61,7 @@ public final class GoogleHadoopFileSystemXAttrsIntegrationTest extends HadoopFil
       testInstance.getGcsFs();
     }
 
-    super.postCreateInit();
-  }
-
-  /*  @Override
-  public void postCreateInit() throws IOException {
-    postCreateInit(new HadoopFileSystemIntegrationHelper(ghfs));
-  }*/
-
-  /** Perform initialization after creating test instances. */
-  public void postCreateInit(HadoopFileSystemIntegrationHelper helper) throws IOException {
-    ghfsHelper = helper;
-    ghfsHelper.ghfs.mkdirs(new Path(ghfsHelper.ghfs.getUri()));
-    super.postCreateInit(ghfsHelper);
-
-    // Ensures that we do not accidentally end up testing wrong functionality.
-    gcsfs = null;
+    postCreateInit();
   }
 
   @Test

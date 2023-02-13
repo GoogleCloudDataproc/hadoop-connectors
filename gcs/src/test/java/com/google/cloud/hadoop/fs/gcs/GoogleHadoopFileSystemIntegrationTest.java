@@ -63,7 +63,6 @@ import com.google.cloud.hadoop.util.ApiErrorExtractor;
 import com.google.cloud.hadoop.util.HadoopCredentialsConfiguration.AuthenticationType;
 import com.google.cloud.hadoop.util.testing.TestingAccessTokenProvider;
 import com.google.common.collect.ImmutableList;
-import com.google.common.flogger.GoogleLogger;
 import com.google.common.hash.Hashing;
 import com.google.common.primitives.Ints;
 import java.io.File;
@@ -92,13 +91,11 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.runners.JUnit4;
 
 /** Integration tests for GoogleHadoopFileSystem class. */
-@RunWith(Parameterized.class)
+@RunWith(JUnit4.class)
 public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSystemTestBase {
-
-  private static final GoogleLogger logger = GoogleLogger.forEnclosingClass();
 
   private static final String PUBLIC_BUCKET = "gs://gcp-public-data-landsat";
 
@@ -110,7 +107,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
     // loadConfig needs ghfsHelper, which is normally created in
     // postCreateInit. Create one here for it to use.
-    ghfsHelper = new HadoopFileSystemIntegrationHelper(ghfs, testStorageClientImpl);
+    ghfsHelper = new HadoopFileSystemIntegrationHelper(ghfs);
 
     URI initUri = new URI("gs://" + ghfsHelper.getUniqueBucketName("init"));
     ghfs.initialize(initUri, loadConfig());
@@ -955,7 +952,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     assertThat(thrown).hasMessageThat().isEqualTo("No bucket specified in GCS URI: gs:/");
   }
 
-  private static Configuration getConfigurationWithImplementation() {
+  private Configuration getConfigurationWithImplementation() {
     Configuration conf = loadConfig();
     conf.set("fs.gs.impl", GoogleHadoopFileSystem.class.getCanonicalName());
     return conf;

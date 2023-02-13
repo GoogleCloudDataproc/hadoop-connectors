@@ -26,7 +26,7 @@ import com.google.auth.Credentials;
 import com.google.auto.value.AutoBuilder;
 import com.google.cloud.hadoop.util.AccessBoundary;
 import com.google.cloud.hadoop.util.ErrorTypeExtractor;
-import com.google.cloud.hadoop.util.GRPCErrorTypeExtractor;
+import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.annotations.VisibleForTesting;
@@ -84,7 +84,7 @@ public class GoogleCloudStorageClientImpl extends ForwardingGoogleCloudStorage {
             .setDownscopedAccessTokenFn(downscopedAccessTokenFn)
             .build());
     this.storageOptions = options;
-    this.errorExtractor = GRPCErrorTypeExtractor.INSTANCE;
+    this.errorExtractor = GrpcErrorTypeExtractor.INSTANCE;
     this.storage =
         clientLibraryStorage == null ? createStorage(credentials, options) : clientLibraryStorage;
   }

@@ -16,21 +16,25 @@
 
 package com.google.cloud.hadoop.util;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
+import org.junit.Test;
 
-public class GRPCErrorTypeExtractor implements ErrorTypeExtractor {
+public class GrpcErrorTypeExtractorTest {
 
-  public static final GRPCErrorTypeExtractor INSTANCE = new GRPCErrorTypeExtractor();
+  private static final GrpcErrorTypeExtractor typeExtractor = GrpcErrorTypeExtractor.INSTANCE;
 
-  @Override
-  public ErrorType getErrorType(Exception error) {
-    switch (Status.fromThrowable(error).getCode()) {
-      case NOT_FOUND:
-        return ErrorType.NON_FOUND;
-      case OUT_OF_RANGE:
-        return ErrorType.OUT_OF_RANGE;
-      default:
-        return ErrorType.UNKNOWN;
-    }
+  @Test
+  public void testNotFound() {
+    Exception ex = new StatusRuntimeException(Status.NOT_FOUND);
+    assertThat(typeExtractor.getErrorType(ex)).isEqualTo(ErrorType.NON_FOUND);
+  }
+
+  @Test
+  public void testOutOfRange() {
+    Exception ex = new StatusRuntimeException(Status.OUT_OF_RANGE);
+    assertThat(typeExtractor.getErrorType(ex)).isEqualTo(ErrorType.OUT_OF_RANGE);
   }
 }

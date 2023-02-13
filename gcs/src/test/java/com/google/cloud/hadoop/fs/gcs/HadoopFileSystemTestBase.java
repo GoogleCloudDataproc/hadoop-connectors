@@ -74,7 +74,7 @@ public abstract class HadoopFileSystemTestBase extends GoogleCloudStorageFileSys
 
   @Override
   public void postCreateInit() throws IOException {
-    postCreateInit(new HadoopFileSystemIntegrationHelper(ghfs, testStorageClientImpl));
+    postCreateInit(new HadoopFileSystemIntegrationHelper(ghfs));
   }
 
   /** Perform initialization after creating test instances. */

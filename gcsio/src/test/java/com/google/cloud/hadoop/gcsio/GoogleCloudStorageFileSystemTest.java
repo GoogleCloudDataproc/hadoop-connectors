@@ -35,15 +35,12 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 
 /**
  * The unittest version of {@code GoogleCloudStorageFileSystemIntegrationTest}; the external
  * GoogleCloudStorage dependency is replaced by an in-memory version which mimics the same
  * bucket/object semantics.
  */
-@RunWith(Parameterized.class)
 public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSystemIntegrationTest {
 
   @Before

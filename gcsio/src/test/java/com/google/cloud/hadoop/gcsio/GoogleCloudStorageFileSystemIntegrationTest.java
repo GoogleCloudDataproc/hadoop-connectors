@@ -24,7 +24,6 @@ import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertThrows;
 
 import com.google.auth.Credentials;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions.ClientType;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
 import com.google.cloud.hadoop.gcsio.testing.TestConfiguration;
@@ -61,7 +60,7 @@ import org.junit.runners.Parameterized.Parameters;
 
 /** Integration tests for GoogleCloudStorageFileSystem class. */
 @RunWith(Parameterized.class)
-public abstract class GoogleCloudStorageFileSystemIntegrationTest {
+public class GoogleCloudStorageFileSystemIntegrationTest {
 
   @Parameterized.Parameter public boolean testStorageClientImpl;
 
@@ -102,8 +101,8 @@ public abstract class GoogleCloudStorageFileSystemIntegrationTest {
 
       optionsBuilder
           .setClientType(
-              testStorageClientImpl ? ClientType.STORAGE_CLIENT : ClientType.HTTP_API_CLIENT)
-          .setBucketDeleteEnabled(testStorageClientImpl)
+              GoogleCloudStorageFileSystemIntegrationHelper.getClientType(testStorageClientImpl))
+          .setBucketDeleteEnabled(true)
           .setCloudStorageOptions(
               GoogleCloudStorageOptions.builder()
                   .setAppName(GoogleCloudStorageTestHelper.APP_NAME)

@@ -32,7 +32,7 @@ import com.google.cloud.ReadChannel;
 import com.google.cloud.hadoop.gcsio.FakeReadChannel.REQUEST_TYPE;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageReadOptions.Fadvise;
 import com.google.cloud.hadoop.gcsio.integration.GoogleCloudStorageTestHelper;
-import com.google.cloud.hadoop.util.GRPCErrorTypeExtractor;
+import com.google.cloud.hadoop.util.GrpcErrorTypeExtractor;
 import com.google.cloud.storage.Storage;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
@@ -531,6 +531,6 @@ public class GoogleCloudStorageClientReadChannelTest {
       objectInfo = DEFAULT_ITEM_INFO;
     }
     return new GoogleCloudStorageClientReadChannel(
-        mockedStorage, objectInfo, readOptions, GRPCErrorTypeExtractor.INSTANCE);
+        mockedStorage, objectInfo, readOptions, GrpcErrorTypeExtractor.INSTANCE);
   }
 }
