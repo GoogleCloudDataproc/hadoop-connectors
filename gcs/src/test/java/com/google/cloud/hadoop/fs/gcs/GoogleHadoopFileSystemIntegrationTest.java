@@ -1480,7 +1480,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     ghfs.mkdirs(new Path("/directory1/subdirectory1"));
     createFile(new Path("/directory1/subdirectory1/file1"), "data".getBytes(UTF_8));
 
-    FileStatus[] rootDirStatuses = ghfs.globStatus(new Path("/d*"));
+    FileStatus[] rootDirStatuses = ghfs.globStatus(new Path("/directory1*"));
     List<String> rootDirs =
         stream(rootDirStatuses).map(d -> d.getPath().toString()).collect(toImmutableList());
 
