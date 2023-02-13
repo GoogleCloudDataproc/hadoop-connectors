@@ -60,44 +60,34 @@ public class HadoopFileSystemIntegrationTest extends HadoopFileSystemTestBase {
 
   @ClassRule public static TemporaryFolder folder = new TemporaryFolder();
 
-  @ClassRule
-  public static NotInheritableExternalResource storageResource =
-      new NotInheritableExternalResource(HadoopFileSystemIntegrationTest.class) {
-        /** Performs initialization once before tests are run. */
-        @Override
-        public void before() throws Throwable {
-          // Get info about the HDFS instance against which we run tests.
-          hdfsRoot = System.getenv(HDFS_ROOT);
+  @Override
+  public void before() throws IOException, URISyntaxException {
+    // Get info about the HDFS instance against which we run tests.
+    hdfsRoot = System.getenv(HDFS_ROOT);
 
-          if (isNullOrEmpty(hdfsRoot)) {
-            hdfsRoot = "file://" + folder.newFolder("hdfs_root").getAbsolutePath();
-          }
+    if (isNullOrEmpty(hdfsRoot)) {
+      hdfsRoot = "file://" + folder.newFolder("hdfs_root").getAbsolutePath();
+    }
 
-          // Create a FileSystem instance to access the given HDFS.
-          URI hdfsUri;
-          try {
-            hdfsUri = new URI(hdfsRoot);
-          } catch (URISyntaxException e) {
-            throw new AssertionError("Invalid HDFS path: " + hdfsRoot, e);
-          }
-          Configuration config = new Configuration();
-          config.set("fs.default.name", hdfsRoot);
-          ghfs = FileSystem.get(hdfsUri, config);
+    // Create a FileSystem instance to access the given HDFS.
+    URI hdfsUri;
+    try {
+      hdfsUri = new URI(hdfsRoot);
+    } catch (URISyntaxException e) {
+      throw new AssertionError("Invalid HDFS path: " + hdfsRoot, e);
+    }
+    Configuration config = new Configuration();
+    config.set("fs.default.name", hdfsRoot);
+    ghfs = FileSystem.get(hdfsUri, config);
 
-          postCreateInit();
-          ghfsHelper.setIgnoreStatistics(); // Multi-threaded code screws us up.
-        }
-
-        /** Perform clean-up once after all tests are turn. */
-        @Override
-        public void after() {
-          HadoopFileSystemTestBase.storageResource.after();
-        }
-      };
+    postCreateInit();
+    ghfsHelper.setIgnoreStatistics(); // Multi-threaded code screws us up.
+  }
 
   /** Perform initialization after creating test instances. */
-  public static void postCreateInit() throws IOException {
-    HadoopFileSystemTestBase.postCreateInit();
+  @Override
+  public void postCreateInit() throws IOException {
+    super.postCreateInit();
   }
 
   // -----------------------------------------------------------------

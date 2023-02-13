@@ -692,7 +692,9 @@ public class GoogleCloudStorageNewIntegrationTest {
   public void listObjectInfo_includePrefix_implicitDirInBucket() throws Exception {
     GoogleCloudStorage gcs = createGoogleCloudStorage(gcsOptions);
 
-    String testBucket = gcsfsIHelper.createUniqueBucket("lst-objs_incl-pfx_impl-dir-in-bckt");
+    String testBucket =
+        gcsfsIHelper.createUniqueBucket(
+            UUID.randomUUID().toString().replaceAll("-", "").substring(0, 10));
     gcsfsIHelper.createObjects(testBucket, "implDir/obj");
 
     List<GoogleCloudStorageItemInfo> listedObjects =

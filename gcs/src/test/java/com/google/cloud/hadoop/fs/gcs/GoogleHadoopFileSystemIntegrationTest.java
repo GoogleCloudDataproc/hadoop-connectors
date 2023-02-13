@@ -54,7 +54,6 @@ import com.google.cloud.hadoop.fs.gcs.auth.AbstractDelegationTokenBinding;
 import com.google.cloud.hadoop.fs.gcs.auth.TestDelegationTokenBindingImpl;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystem;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemImpl;
-import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemIntegrationTest;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageFileSystemOptions;
 import com.google.cloud.hadoop.gcsio.GoogleCloudStorageOptions;
 import com.google.cloud.hadoop.gcsio.MethodOutcome;
@@ -87,8 +86,8 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.Service;
+import org.junit.After;
 import org.junit.Before;
-import org.junit.ClassRule;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -100,34 +99,38 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
   private static final String PUBLIC_BUCKET = "gs://gcp-public-data-landsat";
 
-  @ClassRule
-  public static NotInheritableExternalResource storageResource =
-      new NotInheritableExternalResource(GoogleHadoopFileSystemIntegrationTest.class) {
-        @Override
-        public void before() throws Throwable {
-          GoogleHadoopFileSystem testInstance = new GoogleHadoopFileSystem();
-          ghfs = testInstance;
+  @Before
+  public void before() throws Exception {
 
-          // loadConfig needs ghfsHelper, which is normally created in
-          // postCreateInit. Create one here for it to use.
-          ghfsHelper = new HadoopFileSystemIntegrationHelper(ghfs);
+    GoogleHadoopFileSystem testInstance = new GoogleHadoopFileSystem();
+    ghfs = testInstance;
 
-          URI initUri = new URI("gs://" + ghfsHelper.getUniqueBucketName("init"));
-          ghfs.initialize(initUri, loadConfig());
+    // loadConfig needs ghfsHelper, which is normally created in
+    // postCreateInit. Create one here for it to use.
+    ghfsHelper = new HadoopFileSystemIntegrationHelper(ghfs);
 
-          if (GoogleHadoopFileSystemConfiguration.GCS_LAZY_INITIALIZATION_ENABLE.get(
-              ghfs.getConf(), ghfs.getConf()::getBoolean)) {
-            testInstance.getGcsFs();
-          }
+    URI initUri = new URI("gs://" + ghfsHelper.getUniqueBucketName("init"));
+    ghfs.initialize(initUri, loadConfig());
 
-          HadoopFileSystemTestBase.postCreateInit();
-        }
+    if (GoogleHadoopFileSystemConfiguration.GCS_LAZY_INITIALIZATION_ENABLE.get(
+        ghfs.getConf(), ghfs.getConf()::getBoolean)) {
+      testInstance.getGcsFs();
+    }
 
-        @Override
-        public void after() {
-          GoogleHadoopFileSystemTestBase.storageResource.after();
-        }
-      };
+    super.postCreateInit();
+  }
+
+  @After
+  public void after() throws IOException {
+    if (gcs != null) {
+      gcsiHelper.afterAllTests();
+      gcsiHelper = null;
+    }
+    if (gcsfs != null) {
+      gcsfs.close();
+      gcsfs = null;
+    }
+  }
 
   @Before
   public void clearFileSystemCache() throws IOException {
@@ -291,7 +294,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   @Test
   public void create_throwsExceptionWhenReplicationIsNotPositiveInteger() throws Exception {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI fileUri = getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     short replicationSmallerThanZero = -1;
 
@@ -305,7 +308,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   @Test
   public void create_throwsExceptionWhenBlockSizeIsNotPositiveInteger() throws Exception {
     GoogleHadoopFileSystem myGhfs = createInMemoryGoogleHadoopFileSystem();
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI fileUri = getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     long blockSizeSmallerThanZero = -1;
     IllegalArgumentException blockSmallerThanZeroException =
@@ -361,7 +364,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
   @Test
   public void createNonRecursive() throws IOException {
     GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) ghfs;
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI fileUri = getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     try (FSDataOutputStream createNonRecursiveOutputStream =
         myGhfs.createNonRecursive(filePath, true, 1, (short) 1, 1, () -> {})) {
@@ -483,7 +486,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
             "hdfs://",
             "gsg://" + rootBucket,
             "gsg://" + rootBucket + "/bar");
-    GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) HadoopFileSystemTestBase.ghfs;
+    GoogleHadoopFileSystem myGhfs = (GoogleHadoopFileSystem) ghfs;
     for (String invalidPath : invalidSchemePaths) {
       Path path = new Path(invalidPath);
       IllegalArgumentException e =
@@ -949,7 +952,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     assertThat(thrown).hasMessageThat().isEqualTo("No bucket specified in GCS URI: gs:/");
   }
 
-  private static Configuration getConfigurationWithImplementation() {
+  private Configuration getConfigurationWithImplementation() {
     Configuration conf = loadConfig();
     conf.set("fs.gs.impl", GoogleHadoopFileSystem.class.getCanonicalName());
     return conf;
@@ -1054,7 +1057,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     createFile(new Path("/directory1/subdirectory2/file1"), data);
     createFile(new Path("/directory1/subdirectory2/file2"), data);
 
-    FileStatus[] rootDirectories = ghfs.globStatus(new Path("/d*"));
+    FileStatus[] rootDirectories = ghfs.globStatus(new Path("/directory1*"));
     assertThat(stream(rootDirectories).map(d -> d.getPath().getName()).collect(toImmutableList()))
         .containsExactly("directory1");
 
@@ -1153,7 +1156,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
   @Test
   public void getFileStatus_throwsExceptionWhenFileInfoDontExists() throws IOException {
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI fileUri = getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     FileNotFoundException e =
         assertThrows(FileNotFoundException.class, () -> ghfs.getFileStatus(filePath));
@@ -1168,7 +1171,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     conf.set("fs.gs.reported.permissions", testPermissions);
     GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
     myGhfs.initialize(ghfs.getUri(), conf);
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI fileUri = getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     ghfsHelper.writeFile(filePath, "foo", 1, /* overwrite= */ true);
 
@@ -1187,7 +1190,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     Configuration conf = getConfigurationWithImplementation();
     GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
     myGhfs.initialize(ghfs.getUri(), conf);
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI fileUri = getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     ghfsHelper.writeFile(filePath, "foo", 1, /* overwrite= */ true);
 
@@ -1396,7 +1399,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
 
   @Test
   public void fileChecksum_throwsExceptionWhenFileNotFound() throws Exception {
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI fileUri = getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     FileNotFoundException e =
         assertThrows(FileNotFoundException.class, () -> ghfs.getFileChecksum(filePath));
@@ -1416,7 +1419,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
         GcsFileChecksumType.MD5, content -> Hashing.md5().hashString(content, UTF_8).asBytes());
   }
 
-  private static void testFileChecksum(
+  private void testFileChecksum(
       GcsFileChecksumType checksumType, Function<String, byte[]> checksumFn) throws Exception {
     Configuration config = getConfigurationWithImplementation();
     config.set("fs.gs.checksum.type", checksumType.name());
@@ -1424,7 +1427,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     GoogleHadoopFileSystem myGhfs = new GoogleHadoopFileSystem();
     myGhfs.initialize(ghfs.getUri(), config);
 
-    URI fileUri = GoogleCloudStorageFileSystemIntegrationTest.getTempFilePath();
+    URI fileUri = getTempFilePath();
     Path filePath = ghfsHelper.castAsHadoopPath(fileUri);
     String fileContent = "foo-testFileChecksum-" + checksumType;
     ghfsHelper.writeFile(filePath, fileContent, 1, /* overwrite= */ true);
@@ -1474,7 +1477,7 @@ public class GoogleHadoopFileSystemIntegrationTest extends GoogleHadoopFileSyste
     ghfs.mkdirs(new Path("/directory1/subdirectory1"));
     createFile(new Path("/directory1/subdirectory1/file1"), "data".getBytes(UTF_8));
 
-    FileStatus[] rootDirStatuses = ghfs.globStatus(new Path("/d*"));
+    FileStatus[] rootDirStatuses = ghfs.globStatus(new Path("/directory1*"));
     List<String> rootDirs =
         stream(rootDirStatuses).map(d -> d.getPath().toString()).collect(toImmutableList());
 

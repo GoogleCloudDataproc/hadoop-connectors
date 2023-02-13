@@ -33,7 +33,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.junit.ClassRule;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -46,34 +46,25 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class GoogleCloudStorageFileSystemTest extends GoogleCloudStorageFileSystemIntegrationTest {
 
-  @ClassRule
-  public static NotInheritableExternalResource storageResource =
-      new NotInheritableExternalResource(GoogleCloudStorageFileSystemTest.class) {
-        @Override
-        public void before() throws IOException {
-          // Disable logging.
-          // Normally you would need to keep a strong reference to any logger used for
-          // configuration, but the "root" logger is always present.
-          Logger.getLogger("").setLevel(Level.OFF);
-
-          if (gcsfs == null) {
-            gcsfs =
-                new GoogleCloudStorageFileSystemImpl(
-                    InMemoryGoogleCloudStorage::new,
-                    GoogleCloudStorageFileSystemOptions.builder()
-                        .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
-                        .setMarkerFilePattern("_(FAILURE|SUCCESS)")
-                        .build());
-            gcs = gcsfs.getGcs();
-            GoogleCloudStorageFileSystemIntegrationTest.postCreateInit();
-          }
-        }
-
-        @Override
-        public void after() {
-          GoogleCloudStorageFileSystemIntegrationTest.storageResource.after();
-        }
-      };
+  @Before
+  @Override
+  public void before() throws Exception {
+    // Disable logging.
+    // Normally you would need to keep a strong reference to any logger used for
+    // configuration, but the "root" logger is always present.
+    Logger.getLogger("").setLevel(Level.OFF);
+    if (gcsfs == null) {
+      gcsfs =
+          new GoogleCloudStorageFileSystemImpl(
+              InMemoryGoogleCloudStorage::new,
+              GoogleCloudStorageFileSystemOptions.builder()
+                  .setCloudStorageOptions(getInMemoryGoogleCloudStorageOptions())
+                  .setMarkerFilePattern("_(FAILURE|SUCCESS)")
+                  .build());
+      gcs = gcsfs.getGcs();
+      postCreateInit();
+    }
+  }
 
   /**
    * Helper to fill out some default valid options after which the caller may want to reset a few
